@@ -82,6 +82,7 @@ internal object LocalHtmlPolicy {
     private const val MAX_STYLE_ATTRIBUTE = 16 * 1024
     private const val MAX_GEOMETRY_ATTRIBUTE = 64 * 1024
     private const val MAX_CSS = 256 * 1024
+    private const val FIRST_PRINTABLE = 0x20
     private const val DELETE = 0x7f
 
     private const val HEAD =
@@ -96,7 +97,12 @@ internal object LocalHtmlPolicy {
 
     private enum class Context { HTML, SVG, SVG_TEXT }
 
-    @Suppress("CyclomaticComplexMethod", "LongMethod", "NestedBlockDepth")
+    @Suppress(
+        "CyclomaticComplexMethod",
+        "LongMethod",
+        "LoopWithTooManyJumpStatements",
+        "NestedBlockDepth",
+    )
     suspend fun sanitize(source: String): LocalHtmlDocument {
         val context = currentCoroutineContext()
         context.ensureActive()
@@ -112,7 +118,7 @@ internal object LocalHtmlPolicy {
             limit: Int,
         ) = value.takeIf { candidate ->
             candidate.length <= limit &&
-                candidate.none { (it.code < 0x20 && it !in "\t\n\r") || it.code == DELETE }
+                candidate.none { (it.code < FIRST_PRINTABLE && it !in "\t\n\r") || it.code == DELETE }
         }
 
         // Every source attribute is either copied through a rule, deliberately ignored, or reported.

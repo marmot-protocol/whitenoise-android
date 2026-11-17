@@ -63,8 +63,10 @@ class LocalHtmlViewTest {
             assertEquals(document.html, shadow.lastLoadDataWithBaseURL.data)
             val client = shadow.webViewClient
             // Only the document itself, a single main-frame data: GET, is ever served.
-            assertEquals(403, client.shouldInterceptRequest(browser, request("data:text/html,x", mainFrame = false))!!.statusCode)
-            assertEquals(403, client.shouldInterceptRequest(browser, request("data:text/html,x", method = "POST"))!!.statusCode)
+            val subframe = request("data:text/html,x", mainFrame = false)
+            assertEquals(403, client.shouldInterceptRequest(browser, subframe)!!.statusCode)
+            val post = request("data:text/html,x", method = "POST")
+            assertEquals(403, client.shouldInterceptRequest(browser, post)!!.statusCode)
             assertNull(client.shouldInterceptRequest(browser, request("DATA:text/html,x")))
             assertEquals(403, client.shouldInterceptRequest(browser, request("data:text/html,x"))!!.statusCode)
             for (url in listOf("https://example.org/", "file:///secret", "content://secret", "wn-document-link:0")) {

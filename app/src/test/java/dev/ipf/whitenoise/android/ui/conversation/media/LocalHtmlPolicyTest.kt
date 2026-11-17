@@ -104,7 +104,7 @@ class LocalHtmlPolicyTest {
                     "<h1><font><h1>inner</h1></font>after</h1>",
                     "<ul><li><center><li>inner</li></center>after</li></ul>",
                 )
-            for (source in hostile + unwrappedNesting + agentOverview) {
+            for (source in hostile + unwrappedNesting + AGENT_OVERVIEW) {
                 val html = LocalHtmlPolicy.sanitize(source).html
                 val reparsed = Jsoup.parse(html)
                 reparsed.outputSettings().prettyPrint(false).escapeMode(Entities.EscapeMode.base)
@@ -143,7 +143,7 @@ class LocalHtmlPolicyTest {
 
     @Test fun agentOverviewKeepsLayoutStylingAndCharts() =
         runBlocking {
-            val doc = LocalHtmlPolicy.sanitize(agentOverview)
+            val doc = LocalHtmlPolicy.sanitize(AGENT_OVERVIEW)
             assertFalse(doc.omitted)
             val output = Jsoup.parse(doc.html)
             assertTrue(
@@ -260,7 +260,7 @@ class LocalHtmlPolicyTest {
         }
 
     private companion object {
-        val agentOverview =
+        const val AGENT_OVERVIEW =
             "<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport " +
                 "content='width=device-width'><title>Overview</title><style>.card{border:1px solid #333}" +
                 "</style></head><body class=page><header><h1>Sprint overview</h1></header>" +
