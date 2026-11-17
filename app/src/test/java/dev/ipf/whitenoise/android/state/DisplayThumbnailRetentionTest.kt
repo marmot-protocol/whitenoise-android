@@ -82,7 +82,7 @@ class DisplayThumbnailRetentionTest {
     @Test
     fun nativeCleanupRemovesRemovedAndUnbackedSources() =
         runTest(dispatcher) {
-            (0..6).map(::source).forEach(::seed)
+            (0..7).map(::source).forEach(::seed)
             fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
             fixture.setNativePhase(1, AttachmentTransferStateFfi.UNAVAILABLE)
             fixture.setNativePhase(2, AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE)
@@ -91,11 +91,15 @@ class DisplayThumbnailRetentionTest {
             fixture.setNativePhase(5, AttachmentTransferStateFfi.READY)
             fixture.setNativePhase(6, AttachmentTransferStateFfi.CANCELLED)
             fixture.disk.put(qualifiedRequest(6).cacheKey(), byteArrayOf(1, 2, 3))
+            // A file this device sent that MDK declined to keep: its own copy and thumbnail both stay.
+            fixture.setNativePhase(7, AttachmentTransferStateFfi.COMPLETED_UNRETAINED)
+            fixture.disk.put(qualifiedRequest(7).cacheKey(), byteArrayOf(4, 5, 6))
             var snapshots = 0
             fixture.onNativeSnapshot = { snapshots++ }
             fixture.state.reconcileDisplayThumbnails()
-            assertEquals(setOf(source(5), source(6)), fixture.thumbnails.storedSources())
+            assertEquals(setOf(source(5), source(6), source(7)), fixture.thumbnails.storedSources())
             assertTrue("this device's own original stays", fixture.disk.contains(qualifiedRequest(6).cacheKey()))
+            assertTrue("an unretained own upload keeps its copy", fixture.disk.contains(qualifiedRequest(7).cacheKey()))
             assertEquals(1, snapshots)
             assertEquals(0, fixture.nativeAssetReads.get())
             assertTrue(fixture.calls.isEmpty())
@@ -104,10 +108,10 @@ class DisplayThumbnailRetentionTest {
     /** A derivative backs a read only while MDK retains the body or this device holds its own original. */
     @Test
     fun onlyARetainedBodyOrOwnOriginalKeepsTheDerivative() {
-        val kept = AttachmentTransferStateFfi.entries.filter { it.keepsDisplayThumbnail(hostOriginal = false) }
+        val kept = AttachmentTransferStateFfi.entries.filter { it.keepsDisplayThumbnail { false } }
         assertEquals(listOf(AttachmentTransferStateFfi.READY), kept)
         AttachmentTransferStateFfi.entries.forEach { state ->
-            assertEquals(!state.removesDisplayThumbnail(), state.keepsDisplayThumbnail(hostOriginal = true))
+            assertEquals(!state.removesDisplayThumbnail(), state.keepsDisplayThumbnail { true })
         }
     }
 
@@ -145,7 +149,7 @@ class DisplayThumbnailRetentionTest {
             assertNotNull(fixture.state.scheduleForegroundDisplayThumbnailReconciliation())
         }
 
-    /** MDK's removal states, and only those, remove the original along with its derivatives. */
+    /** MDK's removal states, and only those, remove the original along with its derivatives; unretained is not one. */
     @Test
     fun onlyRemovalStatesRemoveTheOriginal() {
         val removed =
@@ -154,7 +158,6 @@ class DisplayThumbnailRetentionTest {
                 AttachmentTransferStateFfi.REMOVED,
                 AttachmentTransferStateFfi.CLEANED_BY_SETTING,
                 AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
-                AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
             )
         assertEquals(removed, AttachmentTransferStateFfi.entries.filter { it.removesDisplayThumbnail() }.toSet())
     }

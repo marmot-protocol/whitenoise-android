@@ -97,7 +97,7 @@ private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
         val unbacked =
             !removed &&
                 withContext(Dispatchers.IO) {
-                    !item.state.keepsDisplayThumbnail(hostHoldsOriginal(source.attachmentKey))
+                    !item.state.keepsDisplayThumbnail { hostHoldsOriginal(source.attachmentKey) }
                 }
         if (removed || unbacked) evictRemovedDisplaySource(source, tokens[index], stillOwned, unbacked)
     }

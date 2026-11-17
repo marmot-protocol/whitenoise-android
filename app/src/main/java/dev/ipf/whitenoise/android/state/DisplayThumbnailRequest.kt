@@ -84,8 +84,9 @@ internal suspend fun WhiteNoiseAppState.readDisplayThumbnail(
         displayThumbnailTracer.trace("WhiteNoise.displayThumbnail.read") {
             withContext(Dispatchers.IO) {
                 runCatchingCancellable {
+                    val key = request.source.attachmentKey
                     displayThumbnails
-                        .takeIf { nativeState.keepsDisplayThumbnail(hostHoldsOriginal(request.source.attachmentKey)) }
+                        .takeIf { nativeState.keepsDisplayThumbnail { hostHoldsOriginal(key) } }
                         ?.read(request.source, maxEdgePx, request.generation)
                 }.getOrNull()
             }
@@ -120,7 +121,7 @@ internal suspend fun WhiteNoiseAppState.persistDisplayThumbnail(
                 val transfer = request.source.transferRequest() ?: return@runCatchingCancellable null
                 val target = resolveNativeAttachmentTarget(transfer) ?: return@runCatchingCancellable null
                 val phase = nativeAttachmentState(transfer.copy(sourceMessageIdHex = target.sourceMessageIdHex))
-                val backed = phase?.keepsDisplayThumbnail(hostHoldsOriginal(request.source.attachmentKey)) == true
+                val backed = phase?.keepsDisplayThumbnail { hostHoldsOriginal(request.source.attachmentKey) } == true
                 target.takeIf { backed }
             }.getOrNull()
         } ?: return
