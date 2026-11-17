@@ -305,7 +305,10 @@ internal fun GroupDetailsScreen(
         val reviewRuntime = remember(controller) { appState.runtimeGeneration }
         val detailsScrollState = key(controller) { rememberScrollState() }
         val membersScrollState = key(controller) { rememberScrollState() }
-        var membersExpanded by remember(controller) { mutableStateOf(autoOpenMembers && !controller.isDm) }
+        // Saved together so a recreated shortcut-opened Members page reopens with its Back-to-chat origin.
+        var membersExpanded by rememberSaveable(controller.group.groupIdHex) {
+            mutableStateOf(autoOpenMembers && !controller.isDm)
+        }
         var membersAutoOpened by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(autoOpenMembers) }
         var memberSearchOpen by remember(controller) { mutableStateOf(false) }
         var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
