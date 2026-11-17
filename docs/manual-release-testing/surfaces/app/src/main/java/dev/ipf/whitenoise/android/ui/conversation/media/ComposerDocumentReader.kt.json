@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerDocumentReader.kt",
         "anchor": "fun ComposerDocumentReader(",
         "test_ids": [
-          "MED-054"
+          "MED-056"
         ]
       }
     ],
@@ -18,7 +18,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerDocumentReader.kt",
         "anchor": "withPrivatePdfFile(",
         "test_ids": [
-          "MED-054"
+          "MED-056"
         ]
       }
     ]

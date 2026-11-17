@@ -9,7 +9,7 @@
         "anchor": "R.string.read_aloud",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -18,7 +18,7 @@
         "anchor": "fun TextAttachmentFilenameDialog(",
         "test_ids": [
           "MED-001",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -27,7 +27,7 @@
         "anchor": "fun TextAttachmentLoading(",
         "test_ids": [
           "MED-001",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -36,7 +36,7 @@
         "anchor": "fun TextAttachmentMetadata(",
         "test_ids": [
           "MED-001",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -45,7 +45,7 @@
         "anchor": "fun TextAttachmentReaderBottomBar(",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -54,7 +54,7 @@
         "anchor": "fun TextAttachmentReaderContent(",
         "test_ids": [
           "MED-001",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -63,7 +63,7 @@
         "anchor": "fun TextAttachmentReaderDialog(",
         "test_ids": [
           "MED-001",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -72,7 +72,7 @@
         "anchor": "fun TextAttachmentReaderScreen(",
         "test_ids": [
           "MED-001",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -82,7 +82,7 @@
         "test_ids": [
           "MED-001",
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -91,7 +91,7 @@
         "anchor": "fun TextAttachmentReadyBody(",
         "test_ids": [
           "MED-001",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -100,7 +100,7 @@
         "anchor": "fun TextAttachmentTruncatedNotice(",
         "test_ids": [
           "MED-001",
-          "MED-054"
+          "MED-056"
         ]
       }
     ],
@@ -111,7 +111,7 @@
         "anchor": "R.string.bytes_count",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -120,7 +120,7 @@
         "anchor": "R.string.save",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -129,7 +129,7 @@
         "anchor": "R.string.share",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       }
     ],
@@ -140,7 +140,7 @@
         "anchor": "R.string.back",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -149,7 +149,7 @@
         "anchor": "R.string.copy_text",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -158,7 +158,7 @@
         "anchor": "R.string.media_open",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -167,7 +167,7 @@
         "anchor": "R.string.more_options",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -176,7 +176,7 @@
         "anchor": "R.string.text_attachment_open_external",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -185,7 +185,7 @@
         "anchor": "R.string.text_attachment_reader_title",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -194,7 +194,7 @@
         "anchor": "R.string.tts_bar_error",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -203,7 +203,7 @@
         "anchor": "fadeEnabled = playback == null",
         "test_ids": [
           "MED-010",
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -215,7 +215,7 @@
           "SCR-002",
           "SCR-003",
           "SCR-004",
-          "MED-054"
+          "MED-056"
         ]
       }
     ]

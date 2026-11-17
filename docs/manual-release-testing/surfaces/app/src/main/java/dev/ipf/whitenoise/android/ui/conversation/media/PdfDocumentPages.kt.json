@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
         "anchor": "fun PdfDocumentPages(",
         "test_ids": [
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
         "anchor": "fun PdfPageImage(",
         "test_ids": [
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
         "anchor": "R.string.document_pdf_page",
         "test_ids": [
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
         "anchor": "R.string.document_pdf_unavailable",
         "test_ids": [
-          "MED-054"
+          "MED-056"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
         "anchor": "R.string.document_zoom_reset",
         "test_ids": [
-          "MED-054"
+          "MED-056"
         ]
       }
     ]
