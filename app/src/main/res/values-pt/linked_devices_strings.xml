@@ -36,6 +36,11 @@
     <string name="error_account_unlinked">Este dispositivo foi desvinculado desta conta, então não pode entrar aqui. Use Sair e apagar e entre de novo para vincular este dispositivo novamente.</string>
     <string name="wipe_report_left_to_other_devices">Conversas que seus outros dispositivos vão concluir: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Não foi possível pedir aos seus outros dispositivos que concluíssem a saída deste. Eles podem continuar listando este dispositivo até você removê-lo de um deles.</string>
+    <string name="history_imported_from_device">Importado de %1$s</string>
+    <string name="history_imported_from_another_device">Importado de outro dispositivo</string>
+    <string name="history_restored_from_backup">Restaurado de um backup</string>
+    <string name="history_receiving">Recebendo mensagens anteriores de outro dos seus dispositivos…</string>
+    <string name="history_retrying">Ainda não foi possível obter as mensagens anteriores. Uma nova tentativa será feita automaticamente.</string>
     <string name="link_device_this_title">Vincular este dispositivo agora</string>
     <string name="link_device_this_detail">Junte-se aos dispositivos já vinculados a esta conta.</string>
     <string name="link_device_add_title">Adicionar um novo dispositivo</string>

@@ -82,11 +82,13 @@ import dev.ipf.whitenoise.android.ui.common.WindowWidthClass
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.common.rememberRetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
+import dev.ipf.whitenoise.android.ui.conversation.LocalChatHistoryImport
 import dev.ipf.whitenoise.android.ui.conversation.canonicalMessageId
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.conversation.hasVisibleComposer
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
+import dev.ipf.whitenoise.android.ui.conversation.rememberChatHistoryImport
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.icons.filled.Settings
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
@@ -2071,6 +2073,8 @@ internal fun MainShell(
                             CompositionLocalProvider(
                                 LocalTopNoticeScope provides
                                     ConversationNoticeDestination(content.accountRef, chat.group.groupIdHex),
+                                LocalChatHistoryImport provides
+                                    rememberChatHistoryImport(appState, content.accountRef, chat.group.groupIdHex),
                             ) {
                                 ConversationScreen(
                                     appState = appState,

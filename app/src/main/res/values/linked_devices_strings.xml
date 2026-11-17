@@ -36,6 +36,11 @@
     <string name="error_account_unlinked">This device was unlinked from this account, so it can\'t sign in here. Use Sign out and wipe, then sign in again to link this device anew.</string>
     <string name="wipe_report_left_to_other_devices">Chats left for your other devices to finish: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Your other devices couldn\'t be asked to finish signing this one out. They may still list this device until you remove it from one of them.</string>
+    <string name="history_imported_from_device">Imported from %1$s</string>
+    <string name="history_imported_from_another_device">Imported from another device</string>
+    <string name="history_restored_from_backup">Restored from backup</string>
+    <string name="history_receiving">Receiving earlier messages from another of your devices…</string>
+    <string name="history_retrying">Couldn\'t get earlier messages yet. This will be tried again by itself.</string>
     <string name="link_device_this_title">Link this device</string>
     <string name="link_device_this_detail">Join the devices already linked to this account.</string>
     <string name="link_device_add_title">Add a new device</string>

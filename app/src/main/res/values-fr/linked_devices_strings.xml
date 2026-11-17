@@ -36,6 +36,11 @@
     <string name="error_account_unlinked">Cet appareil a été dissocié de ce compte et ne peut donc pas s’y connecter. Utilisez Se déconnecter et effacer, puis reconnectez-vous pour associer de nouveau cet appareil.</string>
     <string name="wipe_report_left_to_other_devices">Discussions que vos autres appareils termineront : %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Vos autres appareils n’ont pas pu être sollicités pour terminer la déconnexion de celui-ci. Ils peuvent continuer à l’afficher jusqu’à ce que vous le supprimiez depuis l’un d’eux.</string>
+    <string name="history_imported_from_device">Importé depuis %1$s</string>
+    <string name="history_imported_from_another_device">Importé depuis un autre appareil</string>
+    <string name="history_restored_from_backup">Restauré depuis une sauvegarde</string>
+    <string name="history_receiving">Réception des messages précédents depuis un autre de vos appareils…</string>
+    <string name="history_retrying">Impossible d’obtenir les messages précédents pour l’instant. Une nouvelle tentative aura lieu automatiquement.</string>
     <string name="link_device_this_title">Associer cet appareil</string>
     <string name="link_device_this_detail">Rejoignez les appareils déjà associés à ce compte.</string>
     <string name="link_device_add_title">Ajouter un nouvel appareil</string>

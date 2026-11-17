@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DateFormatPreference
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.state.chatHistoryTransfer
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Add
@@ -180,6 +181,8 @@ internal fun ConversationEmptyMessage(
     state: ConversationEmptyState,
     modifier: Modifier = Modifier,
 ) {
+    // A chat with nothing local yet says so while its earlier messages are still arriving from another device.
+    chatHistoryTransfer(LocalChatHistoryImport.current())?.let { ChatHistoryTransferNotice(it) }
     Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         when (state) {
             ConversationEmptyState.NoMessages ->

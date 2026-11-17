@@ -36,6 +36,11 @@
     <string name="error_account_unlinked">Este dispositivo fue desvinculado de esta cuenta, así que no puede iniciar sesión aquí. Usa Cerrar sesión y borrar y vuelve a iniciar sesión para vincular este dispositivo de nuevo.</string>
     <string name="wipe_report_left_to_other_devices">Chats que terminarán tus otros dispositivos: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">No se pudo pedir a tus otros dispositivos que terminaran de cerrar la sesión de este. Puede que sigan mostrando este dispositivo hasta que lo elimines desde uno de ellos.</string>
+    <string name="history_imported_from_device">Importado desde %1$s</string>
+    <string name="history_imported_from_another_device">Importado desde otro dispositivo</string>
+    <string name="history_restored_from_backup">Restaurado desde una copia de seguridad</string>
+    <string name="history_receiving">Recibiendo mensajes anteriores desde otro de tus dispositivos…</string>
+    <string name="history_retrying">Aún no se pudieron obtener los mensajes anteriores. Se volverá a intentar automáticamente.</string>
     <string name="link_device_this_title">Vincular este dispositivo</string>
     <string name="link_device_this_detail">Únete a los dispositivos ya vinculados a esta cuenta.</string>
     <string name="link_device_add_title">Añadir un dispositivo nuevo</string>

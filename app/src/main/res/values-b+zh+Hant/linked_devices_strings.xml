@@ -36,6 +36,11 @@
     <string name="error_account_unlinked">此裝置已被取消與此帳號的連結，因此無法在此登入。請使用登出並清除，然後重新登入以重新連結此裝置。</string>
     <string name="wipe_report_left_to_other_devices">交由你的其他裝置完成的聊天：%1$d</string>
     <string name="wipe_report_other_devices_not_reached">無法請你的其他裝置完成此裝置的登出。在你從其中一部裝置移除它之前，它們可能仍會列出此裝置。</string>
+    <string name="history_imported_from_device">從 %1$s 匯入</string>
+    <string name="history_imported_from_another_device">從另一部裝置匯入</string>
+    <string name="history_restored_from_backup">從備份還原</string>
+    <string name="history_receiving">正在從你的另一部裝置接收之前的訊息…</string>
+    <string name="history_retrying">暫時無法取得之前的訊息。稍後會自動重試。</string>
     <string name="link_device_this_title">連結此裝置</string>
     <string name="link_device_this_detail">加入已與此帳號連結的裝置。</string>
     <string name="link_device_add_title">新增裝置</string>
