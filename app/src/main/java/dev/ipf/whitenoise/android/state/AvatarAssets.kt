@@ -51,8 +51,9 @@ internal fun AvatarAssetFfi.cacheKey(accountRef: String): String? {
  * only for targets a screen names; the acquired bytes arrive as a later projection with a new content
  * revision, which re-keys the caller. Missing or deferred local bytes remain a lazy placeholder; the
  * caller never substitutes a second URL acquisition for an authoritative MDK asset. The decode runs in
- * [domain]'s worker, or the domain the chat list names for this asset when null. Only a visible row passes
- * [abandonable], letting a decode that is still queued when every such row has left be skipped.
+ * [domain]'s worker, or the domain the chat list names for this asset when null. Only callers serving a screen
+ * that is showing (rows, the cold-start prewarm, prepared avatar windows) pass [abandonable], letting a decode
+ * that is still queued once all of them have left be skipped.
  */
 internal suspend fun WhiteNoiseAppState.durableAvatar(
     asset: AvatarAssetFfi?,

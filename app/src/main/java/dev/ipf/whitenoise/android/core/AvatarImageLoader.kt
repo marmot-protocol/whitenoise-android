@@ -366,10 +366,10 @@ object AvatarImageLoader {
      * Whether the detached fetch should not run: its lifetime was retired, or it is a stored avatar decode that only
      * abandonable callers asked for, such as chat-list rows, and that reached its slot after all of them left. Each
      * stored decode can start an isolated worker for its conversation, about half a second where workers are
-     * exec-spawned, so a queue of abandoned rows would hold up the screen the user moved to. A warm-up that stops
-     * waiting on purpose is not abandonable, so its decode still lands in the cache. The entry leaves [inFlight] under
-     * the same lock its joiners take, so a later caller starts a fresh decode rather than joining the skipped one. A
-     * skip records no failure, so the avatar loads normally when its row is shown again.
+     * exec-spawned, so a queue of abandoned rows would hold up the screen the user moved to. A notification or
+     * private-contact read is not abandonable, so its decode still lands in the cache. The entry leaves [inFlight]
+     * under the same lock its joiners take, so a later caller starts a fresh decode rather than joining the skipped
+     * one. A skip records no failure, so the avatar loads normally when its row is shown again.
      */
     private fun skipsFetch(
         launchedGeneration: Long,
@@ -674,8 +674,9 @@ object AvatarImageLoader {
 
     /**
      * [loadStored] whose decode runs in a worker serving only [domain], the asset owner's domain. An [abandonable]
-     * caller, a visible row, lets the decode be skipped if it is still queued once every caller has left. Any other
-     * caller, such as a warm-up that stops waiting on purpose, keeps the decode running so its pixels still land.
+     * caller, one serving a screen that is showing (a row, the cold-start prewarm, a prepared avatar window), lets the
+     * decode be skipped if it is still queued once every caller has left. Any other caller, such as a notification,
+     * keeps the decode running so its pixels still land.
      */
     internal suspend fun loadStored(
         key: String,

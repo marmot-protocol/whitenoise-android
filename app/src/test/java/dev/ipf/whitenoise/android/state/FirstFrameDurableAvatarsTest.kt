@@ -63,6 +63,7 @@ import kotlin.coroutines.startCoroutine
 @Config(sdk = [36])
 class FirstFrameDurableAvatarsTest {
     private val controllers = mutableListOf<ChatsController>()
+    private val slowRead = CompletableDeferred<List<AvatarBytesFfi>>()
 
     /** Starts every test with an empty decoded-pixel cache. */
     @Before
@@ -70,9 +71,11 @@ class FirstFrameDurableAvatarsTest {
         AvatarImageLoader.clear()
     }
 
-    /** Releases controllers and decoded pixels. */
+    /** Ends the slow read and releases controllers and decoded pixels. */
     @After
     fun tearDown() {
+        // Ends a deliberately slow read, so its stored-decode slot is free for later tests in this JVM.
+        slowRead.complete(emptyList())
         controllers.forEach(ChatsController::onCleared)
         AvatarImageLoader.clear()
     }
@@ -166,7 +169,7 @@ class FirstFrameDurableAvatarsTest {
     /** A read that never answers cannot hold the restored frame past the budget. */
     @Test
     fun slowStoredReadGivesUpWithinTheBudget() {
-        val fixture = NativeAvatars { awaitCancellation() }
+        val fixture = NativeAvatars { slowRead.await() }
         val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
         val started = System.nanoTime()
@@ -192,6 +195,7 @@ class FirstFrameDurableAvatarsTest {
             val blockers = fillStoredLane(release)
 
             fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored))
+            assertTrue("the prewarm decode is still queued after the budget", AvatarImageLoader.isInFlightForTest(key))
             release.complete(Unit)
             blockers.awaitAll()
             withTimeout(SETTLE_TIMEOUT_MS) { while (AvatarImageLoader.isInFlightForTest(key)) delay(1) }
