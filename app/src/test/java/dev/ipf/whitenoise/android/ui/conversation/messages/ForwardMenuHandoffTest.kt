@@ -139,18 +139,7 @@ class ForwardMenuHandoffTest {
                 )
             }
         }
-        if (media) {
-            // Media forwarding waits for the real source layer, which idle synchronization does not draw.
-            composeRule.runOnIdle {
-                val bitmap = Bitmap.createBitmap(sourceView.width, sourceView.height, Bitmap.Config.ARGB_8888)
-                try {
-                    sourceView.draw(Canvas(bitmap))
-                } finally {
-                    bitmap.recycle()
-                }
-            }
-            composeRule.waitForIdle()
-        }
+        if (media) drawMediaSource(sourceView)
         composeRule
             .onNodeWithText("Forward")
             .assertIsDisplayed()
@@ -179,6 +168,7 @@ class ForwardMenuHandoffTest {
                 item = item.copy(status = MessageStatus.Received)
                 menuOpen = true
             }
+            drawMediaSource(sourceView)
             composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertExists()
             pickerClose.assertDoesNotExist()
             composeRule.onNodeWithText("Copy").performClick()
@@ -188,6 +178,19 @@ class ForwardMenuHandoffTest {
         }
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(0, restorations) }
+    }
+
+    private fun drawMediaSource(sourceView: View) {
+        // Each menu opening creates a source layer, which idle synchronization alone does not draw.
+        composeRule.runOnIdle {
+            val bitmap = Bitmap.createBitmap(sourceView.width, sourceView.height, Bitmap.Config.ARGB_8888)
+            try {
+                sourceView.draw(Canvas(bitmap))
+            } finally {
+                bitmap.recycle()
+            }
+        }
+        composeRule.waitForIdle()
     }
 
     private fun mediaReference() =
