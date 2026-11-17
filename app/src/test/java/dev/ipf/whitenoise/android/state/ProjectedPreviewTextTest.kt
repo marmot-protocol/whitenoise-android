@@ -76,6 +76,24 @@ class ProjectedPreviewTextTest {
         assertNull(deletedRow.projectedDeliveryIndicator())
     }
 
+    /** A last message the account wrote on another of its devices gets the sent tick, not a received row. */
+    @Test
+    fun aLastMessageFromAnotherOwnDeviceGetsTheSentTick() {
+        val fromOtherDevice = item(preview = preview(plaintext = "x"))
+
+        assertEquals(OutgoingMessageIndicator.Sent, fromOtherDevice.projectedDeliveryIndicator("SENDER"))
+        assertNull(fromOtherDevice.projectedDeliveryIndicator("someone-else"))
+        assertNull(fromOtherDevice.projectedDeliveryIndicator())
+    }
+
+    /** A deleted last message from another own device still shows no tick. */
+    @Test
+    fun aDeletedLastMessageFromAnotherOwnDeviceShowsNoTick() {
+        val deleted = item(preview = preview(plaintext = "x", deleted = true))
+
+        assertNull(deleted.projectedDeliveryIndicator("sender"))
+    }
+
     @Test
     fun projectedAttachmentKindSkipsTheLocalMediaResolve() {
         val projected = row("group-a", attachmentPreview(ChatListAttachmentKindFfi.PHOTO, count = 1u))

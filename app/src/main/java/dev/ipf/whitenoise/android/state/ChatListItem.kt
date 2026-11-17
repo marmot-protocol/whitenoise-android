@@ -5,6 +5,8 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
@@ -363,17 +365,26 @@ data class ChatListItem(
     /** [hasUnread] with the removed-group suppression applied (#625). */
     fun effectiveHasUnread(activeAccountIdHex: String?): Boolean = hasUnread && !removedFromGroup(activeAccountIdHex)
 
-    /** Delivery tick for the projected last message, or null for no tick. */
-    fun projectedDeliveryIndicator(): OutgoingMessageIndicator? =
-        if (awaitingSendPreview) {
-            OutgoingMessageIndicator.Sending
-        } else {
-            projection
-                ?.lastMessage
-                ?.takeUnless { it.deleted }
-                ?.deliveryState
-                ?.outgoingIndicator()
+    /**
+     * Delivery tick for the projected last message, or null for no tick. MDK reports a delivery state only for a
+     * message this installation sent. A last message [ownAccountIdHex] wrote on another of its devices has none, yet
+     * it is the account's own and already delivered, so it gets the sent tick instead of reading as received.
+     */
+    fun projectedDeliveryIndicator(ownAccountIdHex: String? = null): OutgoingMessageIndicator? {
+        val last = projection?.lastMessage?.takeUnless { it.deleted }
+        return when {
+            awaitingSendPreview -> OutgoingMessageIndicator.Sending
+            last == null -> null
+            last.fromAnotherOwnDevice(ownAccountIdHex) -> OutgoingMessageIndicator.Sent
+            else -> last.deliveryState.outgoingIndicator()
         }
+    }
+
+    /** Whether this preview is a message [ownAccountIdHex] wrote that this installation did not send. */
+    private fun ChatListMessagePreviewFfi.fromAnotherOwnDevice(ownAccountIdHex: String?): Boolean {
+        val received = deliveryState == ChatListMessageDeliveryStateFfi.NOT_APPLICABLE && groupSystem == null
+        return received && ownAccountIdHex != null && sender.equals(ownAccountIdHex, ignoreCase = true)
+    }
 
     /** The engine's durable mute projection — ORed with local preferences. */
     fun engineMuted(): Boolean = projection?.muted == true

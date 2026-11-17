@@ -271,7 +271,7 @@ internal fun ChatRow(
             Modifier
         }
     val pinned = item.pinned()
-    val deliveryIndicator = item.projectedDeliveryIndicator()
+    val deliveryIndicator = item.projectedDeliveryIndicator(activeAccountIdHex)
     val actionColors = accountActionColors(appState, accountRef)
     ChatRowLayout(
         modifier =
