@@ -62,6 +62,8 @@ internal object PlatformInterruptedAttachmentProbe {
         val phase: AttachmentTransferStateFfi,
         val attempt: ULong,
         val retryAt: ULong?,
+        val hostPermissionRevision: Long,
+        val permissionRefreshInFlight: Boolean,
     )
 
     /** Both observers belong to one probe lifetime and supply its success or failure evidence. */
@@ -114,6 +116,23 @@ internal object PlatformInterruptedAttachmentProbe {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
         check(shell("getprop ro.kernel.qemu").trim() == "1")
+        // Read existing ownership counters only; diagnostics never refresh permission or demand.
+        val permissions =
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("nativeAttachmentPermissions")
+                .apply {
+                    isAccessible = true
+                }.get(state)
+        val permissionRevision =
+            permissions.javaClass
+                .getDeclaredField("revision")
+                .apply { isAccessible = true }
+                .get(permissions) as AtomicLong
+        val permissionInFlight =
+            permissions.javaClass
+                .getDeclaredField("inFlight")
+                .apply { isAccessible = true }
+                .get(permissions) as AtomicLong
         val restoreApplication = PlatformBackgroundAttachmentProbe.bindGeneratedApplication(context, state)
         val manager = WorkManager.getInstance(context)
         val workName = attachmentDownloadWorkName(request)
@@ -147,6 +166,8 @@ internal object PlatformInterruptedAttachmentProbe {
                                     phase = it.phase,
                                     attempt = it.attempt,
                                     retryAt = it.retryAt,
+                                    hostPermissionRevision = permissionRevision.get(),
+                                    permissionRefreshInFlight = permissionInFlight.get() != 0L,
                                 )
                             }.collect(observations::recordNativeSnapshot)
                     }
@@ -457,6 +478,8 @@ internal object PlatformInterruptedAttachmentProbe {
                 JSONObject()
                     .put("observation_index", snapshot.observationIndex)
                     .put("observed_elapsed_ms", snapshot.observedElapsedMillis)
+                    .put("host_permission_revision", snapshot.hostPermissionRevision)
+                    .put("permission_refresh_in_flight", snapshot.permissionRefreshInFlight)
                     .put("state", snapshot.phase.name)
                     .put("attempt", snapshot.attempt.toLong())
                     .put(
