@@ -12,6 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -163,6 +165,22 @@ class StickerLibrary(
 
     /** A link to [pack] naming the relays it was found on, so recipients on other relays can open it; null if none. */
     suspend fun shareLink(pack: StickerPackFfi): String? = packShareLink(pack.coordinate)
+
+    /**
+     * White Noise's own packs that aren't installed, each fetched through a link naming White Noise's relays so an
+     * account without them still sees the packs. The lookups run in parallel so the section appears in one step.
+     * Opening one records its link, so its Add installs through the same relays. A pack that can't be fetched is left
+     * out, and nothing installs here.
+     */
+    suspend fun whiteNoisePacks(): List<StickerPackFfi> =
+        coroutineScope {
+            WhiteNoiseStickerPacks.coordinates
+                .filterNot(::isInstalled)
+                .map { coordinate ->
+                    async { runCatchingCancellable { lookUp(WhiteNoiseStickerPacks.link(coordinate)) }.getOrNull() }
+                }.awaitAll()
+                .filterNotNull()
+        }
 }
 
 /**
