@@ -57,7 +57,9 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isConversationMutePending
 import dev.ipf.whitenoise.android.ui.group.ConversationMuteControl
+import dev.ipf.whitenoise.android.ui.group.MuteTarget
 import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
 import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -406,6 +408,20 @@ class ConversationTopBarSemanticsTest {
         composeRule.runOnIdle { assertFalse(dialogOpen.value) }
     }
 
+    /** A mute control captured before an account switch closes its dialog but writes nothing to the new session. */
+    @Test
+    fun staleMuteControlDoesNotWrite() {
+        val appState = appState()
+        val dialogOpen = mutableStateOf(true)
+        val stale = muteControl(appState, dialogOpen = dialogOpen, isCurrent = { false })
+        val modesBefore = appState.chatMutePreferences.state.value.notificationModes
+        stale.mute(MuteTarget.Always)
+        stale.unmute()
+        assertFalse(dialogOpen.value)
+        assertFalse(appState.isConversationMutePending(GROUP_ID))
+        assertEquals(modesBefore, appState.chatMutePreferences.state.value.notificationModes)
+    }
+
     /** With a change handler the timer badge opens the picker instead of details; without one it stays inert. */
     @Test
     fun timerBadgeOpensPickerOnlyWhenEditable() {
@@ -592,6 +608,7 @@ class ConversationTopBarSemanticsTest {
         appState: WhiteNoiseAppState,
         pending: Boolean = false,
         dialogOpen: MutableState<Boolean> = mutableStateOf(false),
+        isCurrent: () -> Boolean = { true },
     ) = ConversationMuteControl(
         appState,
         GROUP_ID,
@@ -600,6 +617,7 @@ class ConversationTopBarSemanticsTest {
         pending = pending,
         restoreMode = ChatNotifyMode.ALL,
         dialogOpen = dialogOpen,
+        isCurrent = isCurrent,
     )
 
     /** Builds an app state with the test account active. */

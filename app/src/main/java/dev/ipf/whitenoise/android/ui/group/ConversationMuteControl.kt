@@ -38,6 +38,8 @@ internal class ConversationMuteControl(
     val pending: Boolean,
     val restoreMode: ChatNotifyMode,
     private val dialogOpen: MutableState<Boolean>,
+    /** False once the account, runtime or chat that built this control is no longer current. */
+    private val isCurrent: () -> Boolean,
 ) {
     val durationDialogOpen: Boolean get() = dialogOpen.value
 
@@ -64,12 +66,14 @@ internal class ConversationMuteControl(
 
     /** Restores the notify mode saved before the mute; no confirmation. */
     fun unmute() {
+        if (!isCurrent()) return
         appState.setConversationNotifyMode(groupIdHex, restoreMode)
     }
 
     /** Closes the duration choice and mutes until [target]. */
     fun mute(target: MuteTarget) {
         dialogOpen.value = false
+        if (!isCurrent()) return
         when (target) {
             is MuteTarget.After -> appState.muteConversationFor(groupIdHex, target.durationMillis)
             is MuteTarget.At -> appState.muteConversationUntil(groupIdHex, target.expiryMillis)
@@ -109,6 +113,8 @@ internal fun rememberConversationMuteControl(
             appState.conversationRestoreNotifyMode(groupIdHex)
         }
     val dialogOpen = remember(controller) { mutableStateOf(false) }
+    // A callback captured before an account switch or runtime restart must not write to the new session.
+    val runtime = appState.runtimeGeneration
     return ConversationMuteControl(
         appState,
         groupIdHex,
@@ -117,6 +123,7 @@ internal fun rememberConversationMuteControl(
         pending,
         restoreMode,
         dialogOpen,
+        isCurrent = { controller.isCurrentGroupMutationOwner(appState, runtime) },
     )
 }
 
