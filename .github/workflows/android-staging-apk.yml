@@ -1,581 +1,84 @@
 name: Android Staging APK
-
-# Builds a signed staging APK for internal installation. This intentionally
-# stays separate from android-ci.yml: PR validation remains credential-free,
-# while master pushes can produce a downloadable staging artifact.
-
-on:
-  push:
-    branches: [master]
-  workflow_dispatch:
-    inputs:
-      startup_diagnostics:
-        description: Enable bounded local startup stage logging and the Retry-screen share action
-        type: boolean
-        required: false
-        default: false
-      background_fixture:
-        description: Build configured Dev benchmark APKs for an explicitly authorized disposable Android profile
-        type: boolean
-        required: false
-        default: false
-      responsiveness_pr_number:
-        description: Open internal PR for an owned-emulator responsiveness measurement campaign
-        type: string
-        required: false
-        default: ''
-      responsiveness_before_sha:
-        description: Full ancestor SHA; opts into credential-free before/after fixture APKs instead of staging
-        type: string
-        required: false
-        default: ''
-
-concurrency:
-  group: ${{ inputs.responsiveness_before_sha != '' && format('android-responsiveness-{0}', inputs.responsiveness_pr_number) || format('android-staging-apk-{0}-{1}', github.workflow, github.ref) }}
-  cancel-in-progress: ${{ inputs.responsiveness_before_sha == '' }}
-
+on: workflow_dispatch
 permissions:
   contents: read
-  pull-requests: read
-
+env:
+  BATTERY_SOURCE_SHA: 2f1d7f5425ffb022e4f9de53175153962e572302
+  BATTERY_FIXTURE_PACKAGE: dev.ipf.whitenoise.android.batterycalibration
 jobs:
-  build:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.background_fixture && inputs.responsiveness_before_sha == '')
-    name: Build signed staging APK
+  isolated-battery-fixture:
+    name: Build isolated master battery fixture
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: 2f1d7f5425ffb022e4f9de53175153962e572302
           persist-credentials: false
-
-      - name: Configure MarmotKit cache directory
-        shell: bash
-        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
-
-      # AGP 9.x / Gradle 9.4.1 require JDK 17.
-      - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with:
           cache-read-only: true
-
-      - name: Set up Android SDK tools
-        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
-        with:
-          # The action's default list names the legacy `tools` package, which current
-          # command-line tools no longer publish; only platform-tools is needed here.
-          packages: platform-tools
-
-      - name: Test release and staging transport tooling
-        run: |
-          ./scripts/release_test.sh
-          .github/scripts/test-staging-apk-transport.sh
-          python3 .github/scripts/test-generate-audit-attestation.py
-          python3 .github/scripts/test-apk-size-report.py
-
-      - name: Read MarmotKit artifact pin
-        id: marmotkit
-        shell: bash
-        run: |
-          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
-          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
-          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
-
-      - name: Restore MarmotKit artifact
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/marmotkit-cache
-          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
-
-      - name: Check staging secrets
-        env:
-          ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
-          WHITENOISE_STAGING_KEYSTORE_BASE64: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_BASE64 }}
-          WHITENOISE_STAGING_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_PASSWORD }}
-          WHITENOISE_STAGING_KEY_ALIAS: ${{ secrets.WHITENOISE_STAGING_KEY_ALIAS }}
-          WHITENOISE_STAGING_KEY_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEY_PASSWORD }}
-          WHITENOISE_OTLP_ENDPOINT: https://otlp.whitenoise.chat/v1/metrics
-          WHITENOISE_OTLP_AUTH_TOKEN: ${{ secrets.WHITENOISE_OTLP_AUTH_TOKEN }}
-          WHITENOISE_STAGING_PRODUCT_EVENTS_ENDPOINT: ${{ secrets.WHITENOISE_STAGING_PRODUCT_EVENTS_ENDPOINT }}
-          WHITENOISE_STAGING_PRODUCT_APP_KEY: ${{ secrets.WHITENOISE_STAGING_PRODUCT_APP_KEY }}
-          WHITENOISE_STAGING_PRODUCT_OPERATOR: ${{ secrets.WHITENOISE_STAGING_PRODUCT_OPERATOR }}
-          WHITENOISE_AUDIT_OTLP_ENDPOINT: https://otlp.whitenoise.chat/v1/logs
-          WHITENOISE_AUDIT_OTLP_AUTH_TOKEN: ${{ secrets.WHITENOISE_AUDIT_OTLP_AUTH_TOKEN }}
-          WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX: ${{ secrets.WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX }}
-          WHITENOISE_PUSH_RELAY_HINT: ${{ secrets.WHITENOISE_PUSH_RELAY_HINT }}
+      - name: Build the pinned master code under a separate application ID
         shell: bash
         run: |
           set -euo pipefail
-
-          required=(
-            ANDROID_GOOGLE_SERVICES_JSON_BASE64
-            WHITENOISE_STAGING_KEYSTORE_BASE64
-            WHITENOISE_STAGING_KEYSTORE_PASSWORD
-            WHITENOISE_STAGING_KEY_ALIAS
-            WHITENOISE_STAGING_KEY_PASSWORD
-            WHITENOISE_OTLP_ENDPOINT
-            WHITENOISE_OTLP_AUTH_TOKEN
-            WHITENOISE_AUDIT_OTLP_ENDPOINT
-            WHITENOISE_AUDIT_OTLP_AUTH_TOKEN
-            WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX
-            WHITENOISE_PUSH_RELAY_HINT
-          )
-
-          missing=()
-          for name in "${required[@]}"; do
-            if [[ -z "${!name:-}" ]]; then
-              missing+=("$name")
-            fi
-          done
-
-          if (( ${#missing[@]} > 0 )); then
-            printf 'Missing staging CI secret(s):\n' >&2
-            printf ' - %s\n' "${missing[@]}" >&2
-            exit 1
-          fi
-
-      - name: Generate trusted audit attestation
-        env:
-          WHITENOISE_AUDIT_OTLP_ENDPOINT: https://otlp.whitenoise.chat/v1/logs
-          WHITENOISE_AUDIT_OTLP_AUTH_TOKEN: ${{ secrets.WHITENOISE_AUDIT_OTLP_AUTH_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          .github/scripts/generate-audit-attestation.py \
-            app/src/staging/assets/whitenoise-audit-attestation-v1.json
-          {
-            printf 'WHITENOISE_AUDIT_RUNTIME_REQUIRED=true\n'
-            printf 'WHITENOISE_AUDIT_DATA_MODE=obfuscated_sensitive_data\n'
-          } >> "$GITHUB_ENV"
-
-      - name: Write Firebase config
-        env:
-          ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
-
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          package_name = "dev.ipf.whitenoise.android.staging"
-          config = json.loads(Path("app/google-services.json").read_text())
-          packages = [
-              client.get("client_info", {})
-              .get("android_client_info", {})
-              .get("package_name")
-              for client in config.get("client", [])
-          ]
-          if package_name not in packages:
-              raise SystemExit(f"google-services.json is missing client for {package_name}")
-          PY
-
-      - name: Decode staging keystore
-        env:
-          WHITENOISE_STAGING_KEYSTORE_BASE64: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_BASE64 }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          keystore_path="$RUNNER_TEMP/whitenoise-staging-release.p12"
-          printf '%s' "$WHITENOISE_STAGING_KEYSTORE_BASE64" \
-            | base64 --decode > "$keystore_path"
-          chmod 600 "$keystore_path"
-          printf 'WHITENOISE_STAGING_KEYSTORE_PATH=%s\n' "$keystore_path" >> "$GITHUB_ENV"
-
-      # The raw APK must stay well below the encrypted Marmot media ceiling.
-      # Legacy JNI packaging compresses native libraries and makes Android
-      # extract them at install time without changing the staging app identity.
-      - name: Configure transport-safe staging packaging
-        shell: bash
-        run: |
-          cat > "$RUNNER_TEMP/compact-staging-apk.gradle" <<'GRADLE'
+          test "$(git rev-parse HEAD)" = "$BATTERY_SOURCE_SHA"
+          cat > "$RUNNER_TEMP/battery-fixture.init.gradle" <<'GRADLE'
           gradle.beforeProject { project ->
-              project.plugins.withId("com.android.application") {
-                  project.extensions.getByName("android").packaging.jniLibs.useLegacyPackaging = true
+              if (project.path == ':app') {
+                  project.plugins.withId('com.android.application') {
+                      project.androidComponents.finalizeDsl { android ->
+                          def flavor = android.productFlavors.getByName('dev')
+                          flavor.applicationIdSuffix = '.batterycalibration'
+                          flavor.manifestPlaceholders['appName'] = 'White Noise Battery Fixture'
+                      }
+                  }
               }
           }
           GRADLE
-          printf 'STAGING_INIT_SCRIPT=%s\n' "$RUNNER_TEMP/compact-staging-apk.gradle" >> "$GITHUB_ENV"
-
-      - name: Resolve staging source PR
-        env:
-          GH_TOKEN: ${{ github.token }}
+          ./gradlew --init-script "$RUNNER_TEMP/battery-fixture.init.gradle" \
+            -Pandroid.injected.build.abi=arm64-v8a \
+            :app:assembleDevZapstoreBenchmarkRelease --no-daemon --build-cache --stacktrace
+      - name: Record build and APK provenance
         shell: bash
         run: |
-          source_pr=""
-          if pulls=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls"); then
-            source_pr=$(jq -r --arg sha "$GITHUB_SHA" '
-              [.[] | select(.merged_at != null and .merge_commit_sha == $sha)] |
-              if length == 1 then .[0].number else empty end' <<< "$pulls") || source_pr=""
-          fi
-          echo "APP_SOURCE_PR=$source_pr" >> "$GITHUB_ENV"
-
-      - name: Build staging APK
-        env:
-          ORG_GRADLE_PROJECT_startupDiagnostics: ${{ github.event_name == 'workflow_dispatch' && inputs.startup_diagnostics || false }}
-          WHITENOISE_STAGING_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_PASSWORD }}
-          WHITENOISE_STAGING_KEY_ALIAS: ${{ secrets.WHITENOISE_STAGING_KEY_ALIAS }}
-          WHITENOISE_STAGING_KEY_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEY_PASSWORD }}
-          WHITENOISE_OTLP_ENDPOINT: https://otlp.whitenoise.chat/v1/metrics
-          WHITENOISE_OTLP_AUTH_TOKEN: ${{ secrets.WHITENOISE_OTLP_AUTH_TOKEN }}
-          WHITENOISE_STAGING_PRODUCT_EVENTS_ENDPOINT: ${{ secrets.WHITENOISE_STAGING_PRODUCT_EVENTS_ENDPOINT }}
-          WHITENOISE_STAGING_PRODUCT_APP_KEY: ${{ secrets.WHITENOISE_STAGING_PRODUCT_APP_KEY }}
-          WHITENOISE_STAGING_PRODUCT_OPERATOR: ${{ secrets.WHITENOISE_STAGING_PRODUCT_OPERATOR }}
-          WHITENOISE_AUDIT_OTLP_ENDPOINT: https://otlp.whitenoise.chat/v1/logs
-          WHITENOISE_AUDIT_OTLP_AUTH_TOKEN: ${{ secrets.WHITENOISE_AUDIT_OTLP_AUTH_TOKEN }}
-          WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX: ${{ secrets.WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX }}
-          WHITENOISE_PUSH_RELAY_HINT: ${{ secrets.WHITENOISE_PUSH_RELAY_HINT }}
-        run: >-
-          ./scripts/release.sh --flavor staging --abi arm64-v8a
-          --gradle-init-script "$STAGING_INIT_SCRIPT"
-
-      - name: Verify transport-safe staging APK
-        shell: bash
-        run: |
-          mapfile -t apks < <(find app/build/outputs/apk/stagingZapstore/release \
-            -maxdepth 1 -type f -name 'whitenoise-staging-v8a-release-*.apk' -print)
-          [[ ${#apks[@]} -eq 1 ]]
-          .github/scripts/verify-staging-apk-transport.sh "${apks[0]}"
-          python3 - "${apks[0]}" <<'PY'
-          import json
-          import sys
-          import zipfile
-          from pathlib import Path
-
-          generated = Path("app/src/staging/assets/whitenoise-audit-attestation-v1.json").read_bytes()
-          with zipfile.ZipFile(sys.argv[1]) as apk:
-              bundled = apk.read("assets/whitenoise-audit-attestation-v1.json")
-          if bundled != generated:
-              raise SystemExit("bundled audit attestation differs from the trusted generated source")
-          json.loads(bundled)
-          PY
-
-      # Observational: shows which components the transport limit is paying for (#3695).
-      - name: Report staging APK size by component
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -euo pipefail
-          apk=$(find app/build/outputs/apk/stagingZapstore/release -maxdepth 1 -type f \
-            -name 'whitenoise-staging-v8a-release-*.apk' -print -quit)
-          mkdir -p build/reports/apk-size
-          python3 .github/scripts/apk-size-report.py "$apk" --flavor staging --commit "$GITHUB_SHA" \
-            --marmot-version app/src/main/marmotkit/MARMOT_VERSION \
-            --json build/reports/apk-size/staging.json --markdown build/reports/apk-size/staging.md
-          cat build/reports/apk-size/staging.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Retain staging APK size report
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: apk-size-staging-${{ github.run_number }}-${{ github.sha }}
-          path: build/reports/apk-size/
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Compute short SHA
-        id: sha
-        shell: bash
-        run: printf 'short=%s\n' "${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload staging APK
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          # Unique per run so consecutive master commits don't produce
-          # identically-named zips that collide on disk when downloaded.
-          # See issue #992.
-          name: whitenoise-staging-v8a-release-${{ github.run_number }}-${{ steps.sha.outputs.short }}
-          path: app/build/outputs/apk/stagingZapstore/release/whitenoise-staging-v8a-release-*.apk
-          if-no-files-found: error
-          # Short retention on purpose: the signed APK bakes in the staging
-          # OTLP/audit-log auth tokens, so every day it sits in Actions
-          # artifacts is another day those are extractable (#224).
-          retention-days: 3
-
-  background-fixture:
-    name: Build disposable-profile background fixture
-    if: github.event_name == 'workflow_dispatch' && inputs.background_fixture && inputs.responsiveness_before_sha == ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      WHITENOISE_DEV_PUSH_SERVER_PUBKEY_HEX: ${{ secrets.WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX }}
-      WHITENOISE_DEV_PUSH_RELAY_HINT: ${{ secrets.WHITENOISE_PUSH_RELAY_HINT }}
-    steps:
-      - name: Checkout requested candidate without credentials
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - name: Set up JDK 17
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Set up Gradle with read-only cache
-        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
-        with:
-          cache-read-only: true
-      - name: Write configured Firebase client for the disposable Dev profile
-        env:
-          ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$ANDROID_GOOGLE_SERVICES_JSON_BASE64"
-          test -n "$WHITENOISE_DEV_PUSH_SERVER_PUBKEY_HEX"
-          test -n "$WHITENOISE_DEV_PUSH_RELAY_HINT"
-          printf '%s' "$ANDROID_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
-          chmod 600 app/google-services.json
-      - name: Build exact-source fixture APKs
-        run: >-
-          ./gradlew :app:assembleDevZapstoreDebug :app:assembleDevZapstoreBenchmarkRelease
-          :benchmark:assembleDevZapstoreBenchmarkRelease
-          -Pandroid.injected.build.abi=arm64-v8a --build-cache --no-daemon --stacktrace
-      - name: Stage fixture bytes and provenance
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/background-fixture
           python3 - <<'PY'
           import hashlib
           import json
           import os
-          import shutil
           from pathlib import Path
+          import shutil
 
-          destination = Path('build/background-fixture')
-          outputs = []
-          for module, variant in [('app', 'devZapstoreDebug'), ('app', 'devZapstoreBenchmarkRelease'),
-                                  ('benchmark', 'devZapstoreBenchmarkRelease')]:
-              candidates = []
-              for base in ['outputs/apk', 'intermediates/apk']:
-                  for metadata in (Path(module) / 'build' / base).rglob('output-metadata.json'):
-                      data = json.loads(metadata.read_text())
-                      if data.get('variantName') != variant:
-                          continue
-                      for entry in data['elements']:
-                          apk = metadata.parent / entry['outputFile']
-                          if apk.is_file():
-                              candidates.append((apk, data['applicationId']))
-              unique = {str(p.resolve()): (p, package) for p, package in candidates}
-              if len(unique) != 1:
-                  raise SystemExit('Fixture output is absent or ambiguous.')
-              apk, package = next(iter(unique.values()))
-              target = destination / f'{module}-{variant}.apk'
-              shutil.copyfile(apk, target)
-              outputs.append({'file': target.name, 'package': package,
-                              'sha256': hashlib.sha256(target.read_bytes()).hexdigest()})
-          pin = dict(line.split('=', 1) for line in Path('app/src/main/marmotkit/MARMOT_VERSION').read_text().splitlines()
-                     if '=' in line)
-          manifest = {'schema': 1, 'source_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
-                      'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'mdk_sha': pin['mdk-sha'],
-                      'transport': 'staging_push_gateway', 'requires_disposable_profile': True, 'outputs': outputs}
-          (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          package = os.environ["BATTERY_FIXTURE_PACKAGE"]
+          matches = set()
+          for meta in Path("app/build").rglob("output-metadata.json"):
+              data = json.loads(meta.read_text())
+              if data.get("variantName") != "devZapstoreBenchmarkRelease" or data.get("applicationId") != package:
+                  continue
+              for entry in data["elements"]:
+                  file = meta.parent / entry["outputFile"]
+                  if file.is_file() and "arm64-v8a" in file.name:
+                      matches.add(file.resolve())
+          if len(matches) != 1:
+              raise SystemExit("Expected exactly one arm64-v8a battery fixture APK")
+          destination = Path("build/battery-fixture")
+          destination.mkdir(parents=True)
+          apk = destination / "app.apk"
+          shutil.copyfile(matches.pop(), apk)
+          pin = dict(line.split("=", 1) for line in Path("app/src/main/marmotkit/MARMOT_VERSION").read_text().splitlines()
+                     if "=" in line)
+          manifest = {"source_sha": os.environ["BATTERY_SOURCE_SHA"], "mdk_sha": pin["mdk-sha"],
+                      "package": package, "abi": "arm64-v8a",
+                      "apk_sha256": hashlib.sha256(apk.read_bytes()).hexdigest()}
+          (destination / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
           PY
-      - name: Retain exact-source fixture APKs
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: background-fixture-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/background-fixture/
-          compression-level: 9
+          name: isolated-master-battery-fixture-2f1d7f5
+          path: build/battery-fixture/
           if-no-files-found: error
-          retention-days: 7
-      - name: Remove Firebase configuration
-        if: always()
-        run: rm -f app/google-services.json
-
-  # Credential-free, opt-in artifacts only. Neither job installs apps or publishes a release.
-  responsiveness-source:
-    if: github.event_name == 'workflow_dispatch' && inputs.responsiveness_before_sha != ''
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      before: ${{ steps.source.outputs.before }}
-      after: ${{ steps.source.outputs.after }}
-      artifact: ${{ steps.source.outputs.artifact }}
-    steps:
-      - name: Resolve current internal head and matching native pin
-        id: source
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ inputs.responsiveness_pr_number }}
-          BEFORE_SHA: ${{ inputs.responsiveness_before_sha }}
-          WORKFLOW_SOURCE_SHA: ${{ github.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          pull=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
-          [[ $(jq -r .state <<< "$pull") == open ]]
-          [[ $(jq -r .head.repo.full_name <<< "$pull") == "$REPOSITORY" ]]
-          after=$(jq -r .head.sha <<< "$pull")
-          [[ "$after" =~ ^[0-9a-f]{40}$ && "$after" != "$BEFORE_SHA" ]]
-          [[ "$after" == "$WORKFLOW_SOURCE_SHA" ]] || { echo "Dispatch from the current candidate branch" >&2; exit 1; }
-          for revision in "$BEFORE_SHA" "$after"; do
-            gh api "repos/$REPOSITORY/contents/app/src/main/marmotkit/MARMOT_VERSION?ref=$revision" \
-              --jq .content | base64 --decode > "$RUNNER_TEMP/$revision.marmot-version"
-          done
-          cmp "$RUNNER_TEMP/$BEFORE_SHA.marmot-version" "$RUNNER_TEMP/$after.marmot-version"
-          artifact=$(awk -F= '$1 == "artifact-sha256" {print $2}' "$RUNNER_TEMP/$after.marmot-version")
-          [[ "$artifact" =~ ^[0-9a-f]{64}$ ]]
-          printf 'before=%s\nafter=%s\nartifact=%s\n' "$BEFORE_SHA" "$after" "$artifact" >> "$GITHUB_OUTPUT"
-
-  responsiveness-fixture:
-    needs: responsiveness-source
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    timeout-minutes: 60
-    env:
-      BEFORE_SHA: ${{ needs.responsiveness-source.outputs.before }}
-      AFTER_SHA: ${{ needs.responsiveness-source.outputs.after }}
-      PR_NUMBER: ${{ inputs.responsiveness_pr_number }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ env.BEFORE_SHA }}
-          path: before
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ env.AFTER_SHA }}
-          path: after
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Configure private MarmotKit fixture cache
-        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
-      - name: Verify exact ancestor relationship
-        working-directory: after
-        run: |
-          test "$(git rev-parse HEAD)" = "$AFTER_SHA"
-          test "$(git -C ../before rev-parse HEAD)" = "$BEFORE_SHA"
-          git merge-base --is-ancestor "$BEFORE_SHA" "$AFTER_SHA"
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
-        with:
-          cache-read-only: true
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/marmotkit-cache
-          key: marmotkit-${{ runner.os }}-${{ needs.responsiveness-source.outputs.artifact }}
-      # One runner owns one ephemeral default debug key for the entire pair.
-      # Both revisions must update the retained owned-emulator identity in place.
-      - name: Assemble both revisions under the same fixture signing identity
-        run: |
-          for role in before after; do
-            (
-              cd "$role"
-              ./gradlew :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest \
-                :app:assembleDevZapstoreBenchmarkRelease :benchmark:assembleDevZapstoreBenchmarkRelease \
-                -Pandroid.injected.build.abi=arm64-v8a --build-cache --no-daemon --stacktrace
-            )
-          done
-      - name: Stage immutable fixture bytes and shared-certificate provenance
-        env:
-          BUILD_RUN_ID: ${{ github.run_id }}
-          BUILD_RUN_ATTEMPT: ${{ github.run_attempt }}
-        run: |
-          python3 - <<'PYTHON'
-          import hashlib, json, os, pathlib, re, shutil, subprocess
-          workspace = pathlib.Path.cwd()
-          sdk = pathlib.Path(os.environ['ANDROID_HOME'])
-          signers = sorted((sdk / 'build-tools').glob('*/apksigner'))
-          if not signers:
-              raise SystemExit('missing APK signature verifier')
-          campaign_certificate = None
-          expected = [
-              ('app', 'devZapstoreDebug', 'dev.ipf.whitenoise.android.dev'),
-              ('app', 'devZapstoreDebugAndroidTest', 'dev.ipf.whitenoise.android.dev.test'),
-              ('app', 'devZapstoreBenchmarkRelease', 'dev.ipf.whitenoise.android.dev'),
-              ('benchmark', 'devZapstoreBenchmarkRelease', 'dev.ipf.whitenoise.android.benchmark'),
-          ]
-          for role, source in [('before', os.environ['BEFORE_SHA']), ('after', os.environ['AFTER_SHA'])]:
-              root = workspace / role
-              if subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip() != source:
-                  raise SystemExit('fixture source mismatch')
-              out = workspace / 'build/responsiveness-qualification' / role
-              out.mkdir(parents=True, exist_ok=True)
-              outputs = []
-              for module, variant, package in expected:
-                  matches = []
-                  for metadata in (root / module / 'build').rglob('output-metadata.json'):
-                      data = json.loads(metadata.read_text())
-                      if data.get('artifactType', {}).get('type') != 'APK':
-                          continue
-                      if data.get('applicationId') != package or data.get('variantName') != variant:
-                          continue
-                      for element in data['elements']:
-                          abis = [f['value'] for f in element.get('filters', []) if f['filterType'] == 'ABI']
-                          apk = metadata.parent / element['outputFile']
-                          if (not abis or abis == ['arm64-v8a']) and apk.suffix == '.apk' and apk.is_file():
-                              matches.append((apk.resolve(), bool(abis)))
-                  # Split builds also emit a universal APK; prefer the exact ABI.
-                  preferred = [apk for apk, split in matches if split]
-                  matches = list(dict.fromkeys(preferred or [apk for apk, _ in matches]))
-                  if len(matches) != 1:
-                      raise SystemExit('expected one APK for ' + role + '/' + module + '/' + variant +
-                                       ': ' + repr([str(apk.relative_to(root)) for apk in matches]))
-                  verification = subprocess.check_output(
-                      [str(signers[-1]), 'verify', '--verbose', '--print-certs', str(matches[0])], text=True)
-                  signer_label = (
-                      r'(?:(?:V2|V3(?:\.[12])?|V4) Signer:|Signer '
-                      r'(?:#\d+|\(minSdkVersion=\d+(?: \(dev release=true\))?, maxSdkVersion=\d+\)))'
-                  )
-                  certificates = sorted(set(re.findall(
-                      r'^' + signer_label + r' certificate SHA-256 digest: ([0-9a-f]{64})$',
-                      verification, re.MULTILINE)))
-                  if len(certificates) != 1 or not re.search(r'^Number of signers: 1$', verification, re.MULTILINE):
-                      print(verification)
-                      raise SystemExit('expected one fixture signer for ' + role + '/' + variant)
-                  certificate = certificates[0]
-                  if campaign_certificate is None:
-                      campaign_certificate = certificate
-                  if certificate != campaign_certificate:
-                      raise SystemExit('before/after fixture certificates differ')
-                  name = module + '-' + variant + '.apk'
-                  target = out / name
-                  shutil.copyfile(matches[0], target)
-                  outputs.append({'file': name, 'package': package, 'variant': variant,
-                                  'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
-                                  'certificate_sha256': certificate})
-              manifest = {'schema': 1, 'source_sha': source, 'role': role,
-                          'candidate_sha': os.environ['AFTER_SHA'], 'pr_number': os.environ['PR_NUMBER'],
-                          'build_run_id': os.environ['BUILD_RUN_ID'],
-                          'build_run_attempt': os.environ['BUILD_RUN_ATTEMPT'],
-                          'workflow_ref': os.environ['GITHUB_WORKFLOW_REF'],
-                          'device_scope': 'owned_emulator_only', 'outputs': outputs}
-              (out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-              shutil.copyfile(root / 'app/src/main/marmotkit/MARMOT_VERSION', out / 'MARMOT_VERSION')
-          before_pin = (workspace / 'before/app/src/main/marmotkit/MARMOT_VERSION').read_bytes()
-          after_pin = (workspace / 'after/app/src/main/marmotkit/MARMOT_VERSION').read_bytes()
-          if before_pin != after_pin:
-              raise SystemExit('fixture native pins differ')
-          PYTHON
-      - name: Recheck candidate head before retaining artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: test "$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq .head.sha)" = "$AFTER_SHA"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: responsiveness-pair-${{ env.BEFORE_SHA }}-${{ env.AFTER_SHA }}-${{ github.run_id }}
-          path: build/responsiveness-qualification/
-          if-no-files-found: error
-          compression-level: 0
           retention-days: 7
