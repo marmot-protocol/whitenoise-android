@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.DeviceLinkEndReasonFfi
 import dev.ipf.marmotkit.DeviceLinkPromptFfi
-import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.marmotkit.LinkedDeviceFfi
 import dev.ipf.marmotkit.LinkedDeviceStatusFfi
@@ -32,6 +30,45 @@ class DeviceLinkControllerTest {
         var rosterReads = 0
         var linkReads = 0
         val accounts = mutableListOf<String>()
+        val commands = mutableListOf<String>()
+        var commandResult: suspend () -> DeviceLinkSnapshotFfi = { linkSnapshot() }
+
+        /** Records the command and answers with the scripted result. */
+        override suspend fun startDeviceLink(accountRef: String): DeviceLinkSnapshotFfi {
+            commands += "start:$accountRef"
+            return commandResult()
+        }
+
+        /** Records the command and answers with the scripted result. */
+        override suspend fun confirmDeviceLinkMatch(accountRef: String): DeviceLinkSnapshotFfi {
+            commands += "confirm:$accountRef"
+            return commandResult()
+        }
+
+        /** Records the command and answers with the scripted result. */
+        override suspend fun cancelDeviceLink(accountRef: String): DeviceLinkSnapshotFfi {
+            commands += "cancel:$accountRef"
+            return commandResult()
+        }
+
+        /** Records the command with its prompt and choices and answers with the scripted result. */
+        override suspend fun linkDevice(
+            accountRef: String,
+            promptId: String,
+            choices: DeviceLinkChoices,
+        ): DeviceLinkSnapshotFfi {
+            commands += "link:$accountRef:$promptId:$choices"
+            return commandResult()
+        }
+
+        /** Records the command with its prompt and answers with the scripted result. */
+        override suspend fun declineDeviceLink(
+            accountRef: String,
+            promptId: String,
+        ): DeviceLinkSnapshotFfi {
+            commands += "decline:$accountRef:$promptId"
+            return commandResult()
+        }
 
         /** Counts the read and answers with the scripted snapshot. */
         override suspend fun deviceLinkSnapshot(accountRef: String): DeviceLinkSnapshotFfi {
@@ -333,107 +370,124 @@ class DeviceLinkControllerTest {
         assertFalse(roster.hasOtherDevices)
     }
 
-    /** Only prompts that still need the user or are in progress count as open. */
+    /** A command publishes the snapshot MDK returns and clears the running mark. */
     @Test
-    fun onlyUnsettledPromptsAreOpen() {
-        val open =
-            listOf(
-                DeviceLinkPromptStateFfi.Preparing,
-                DeviceLinkPromptStateFfi.Comparing(emptyList()),
-                DeviceLinkPromptStateFfi.CompetingRequests,
-                DeviceLinkPromptStateFfi.RateLimited(1u),
-                DeviceLinkPromptStateFfi.CannotLink(emptyList()),
-                DeviceLinkPromptStateFfi.TooManyDevices,
-                DeviceLinkPromptStateFfi.Linking,
-            )
-        val settled =
-            listOf(
-                DeviceLinkPromptStateFfi.Linked,
-                DeviceLinkPromptStateFfi.AddedElsewhere("a", "b"),
-                DeviceLinkPromptStateFfi.Ended(DeviceLinkEndReasonFfi.TIMED_OUT),
-            )
+    fun aCommandPublishesTheReturnedSnapshot() =
+        runTest {
+            val native = Native()
+            val returned = linkSnapshot(stalled = true)
+            native.commandResult = { returned }
+            val controller = DeviceLinkController(ACCOUNT, native)
 
-        open.forEach { assertTrue(it.toString(), it.isOpen()) }
-        settled.forEach { assertFalse(it.toString(), it.isOpen()) }
-    }
+            controller.start()
 
-    /** Open requests from every profile are listed oldest first, and settled ones are left out. */
+            assertEquals(returned, controller.link)
+            assertNull(controller.running)
+            assertEquals(listOf("start:$ACCOUNT"), native.commands)
+        }
+
+    /** Each command reaches its own native call with the account, prompt and choices it was given. */
     @Test
-    fun pendingRequestsSpanProfilesOldestFirst() {
-        val pending =
-            pendingDeviceLinkRequests(
-                mapOf(
-                    "b" to linkSnapshot(prompt("b1", 30u), prompt("b2", 5u, DeviceLinkPromptStateFfi.Linked)),
-                    "a" to linkSnapshot(prompt("a1", 20u), prompt("a2", 10u)),
+    fun eachCommandReachesItsNativeCall() =
+        runTest {
+            val native = Native()
+            val controller = DeviceLinkController(ACCOUNT, native)
+            val choices = DeviceLinkChoices(label = "Desk", addToAllChats = false, bringHistory = false)
+
+            controller.start()
+            controller.confirmMatch()
+            controller.cancel()
+            controller.link("p1", choices)
+            controller.decline("p2")
+
+            assertEquals(
+                listOf(
+                    "start:$ACCOUNT",
+                    "confirm:$ACCOUNT",
+                    "cancel:$ACCOUNT",
+                    "link:$ACCOUNT:p1:$choices",
+                    "decline:$ACCOUNT:p2",
                 ),
+                native.commands,
             )
+        }
 
-        assertEquals(
-            listOf(
-                PendingDeviceLinkRequest("a", "a2", 10),
-                PendingDeviceLinkRequest("a", "a1", 20),
-                PendingDeviceLinkRequest("b", "b1", 30),
-            ),
-            pending,
-        )
-    }
-
-    /** The oldest request is presented, and a newer one never replaces it while MDK still lists it. */
+    /** A second tap while a command runs submits nothing. */
     @Test
-    fun aPresentedRequestIsNotReplacedByANewerOne() {
-        val first = PendingDeviceLinkRequest("a", "p1", 10)
-        val older = PendingDeviceLinkRequest("b", "p0", 1)
+    fun aCommandStartedWhileAnotherRunsIsDropped() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val native = Native()
+            native.commandResult = {
+                gate.await()
+                linkSnapshot()
+            }
+            val controller = DeviceLinkController(ACCOUNT, native)
+            val first = launch { controller.confirmMatch() }
+            runCurrent()
+            assertEquals(DeviceLinkCommand.ConfirmMatch, controller.running)
 
-        val presented = DeviceLinkRequestQueue().offer(listOf(first), blocked = false)
-        val afterOlderArrives = presented.offer(listOf(older, first), blocked = false)
+            controller.confirmMatch()
+            controller.cancel()
+            gate.complete(Unit)
+            first.join()
 
-        assertEquals(first, presented.presented)
-        assertEquals(first, afterOlderArrives.presented)
-    }
+            assertEquals(listOf("confirm:$ACCOUNT"), native.commands)
+            assertNull(controller.running)
+        }
 
-    /** Nothing new is presented while a protected flow is on screen, and it is presented once that ends. */
+    /** A failed command keeps the shown snapshot and reports the failure once. */
     @Test
-    fun nothingNewIsPresentedWhileBlocked() {
-        val request = PendingDeviceLinkRequest("a", "p1", 10)
+    fun aFailedCommandIsReportedOnceAndKeepsTheSnapshot() =
+        runTest {
+            val native = Native()
+            val controller = DeviceLinkController(ACCOUNT, native)
+            controller.refreshLink()
+            val shown = controller.link
+            val error = MarmotKitException.TransportClosed()
+            native.commandResult = { throw error }
 
-        val blocked = DeviceLinkRequestQueue().offer(listOf(request), blocked = true)
-        val unblocked = blocked.offer(listOf(request), blocked = false)
+            controller.link("p1", DeviceLinkChoices())
 
-        assertNull(blocked.presented)
-        assertEquals(request, unblocked.presented)
-    }
+            assertEquals(DeviceLinkCommandFailure(DeviceLinkCommand.Link, error), controller.failure)
+            assertEquals(shown, controller.link)
+            assertNull(controller.running)
+            controller.failureShown()
+            assertNull(controller.failure)
+        }
 
-    /** A request already presented stays presented when a protected flow starts. */
+    /** A command result that arrives after retirement is dropped, and later commands are not sent. */
     @Test
-    fun aPresentedRequestSurvivesBlocking() {
-        val request = PendingDeviceLinkRequest("a", "p1", 10)
-        val presented = DeviceLinkRequestQueue().offer(listOf(request), blocked = false)
+    fun aCommandFinishingAfterRetirementIsDropped() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val native = Native()
+            native.commandResult = {
+                gate.await()
+                linkSnapshot(stalled = true)
+            }
+            val controller = DeviceLinkController(ACCOUNT, native)
+            val command = launch { controller.start() }
+            runCurrent()
 
-        assertEquals(request, presented.offer(listOf(request), blocked = true).presented)
-    }
+            controller.retire()
+            gate.complete(Unit)
+            command.join()
+            controller.cancel()
 
-    /** Closing a request hides it without answering, presents the next one, and forgets it once MDK drops it. */
+            assertNull(controller.link)
+            assertNull(controller.failure)
+            assertEquals(listOf("start:$ACCOUNT"), native.commands)
+        }
+
+    /** A device name is accepted up to MDK's 64-byte limit, counted in UTF-8 bytes rather than characters. */
     @Test
-    fun hidingARequestPresentsTheNextAndIsForgottenWhenItSettles() {
-        val first = PendingDeviceLinkRequest("a", "p1", 10)
-        val second = PendingDeviceLinkRequest("a", "p2", 20)
-        val presented = DeviceLinkRequestQueue().offer(listOf(first, second), blocked = false)
-
-        val hidden = presented.hidePresented().offer(listOf(first, second), blocked = false)
-        val settled = hidden.offer(listOf(second), blocked = false)
-
-        assertEquals(second, hidden.presented)
-        assertEquals(setOf(first), hidden.hidden)
-        assertTrue(settled.hidden.isEmpty())
-    }
-
-    /** A request MDK no longer lists stops being presented. */
-    @Test
-    fun aRequestMdkDroppedIsNoLongerPresented() {
-        val request = PendingDeviceLinkRequest("a", "p1", 10)
-        val presented = DeviceLinkRequestQueue().offer(listOf(request), blocked = false)
-
-        assertNull(presented.offer(emptyList(), blocked = false).presented)
+    fun aDeviceNameIsLimitedInUtf8Bytes() {
+        assertTrue(deviceLabelFits(""))
+        assertTrue(deviceLabelFits("a".repeat(64)))
+        assertFalse(deviceLabelFits("a".repeat(65)))
+        assertTrue(deviceLabelFits("é".repeat(32)))
+        assertFalse(deviceLabelFits("é".repeat(33)))
     }
 
     private companion object {
@@ -468,13 +522,6 @@ class DeviceLinkControllerTest {
             inactive = inactive,
             removalPending = removalPending,
         )
-
-        /** A request prompt in [state], open by default. */
-        fun prompt(
-            id: String,
-            requestedAt: ULong,
-            state: DeviceLinkPromptStateFfi = DeviceLinkPromptStateFfi.Preparing,
-        ) = DeviceLinkPromptFfi(promptId = id, slotIdHex = null, requestedAt = requestedAt, state = state)
 
         /** A snapshot holding [prompts] and nothing else. */
         fun linkSnapshot(

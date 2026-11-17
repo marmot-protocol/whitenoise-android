@@ -1,0 +1,81 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.link_device_action_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "R.string.link_device_action_failed",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_not_now",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "R.string.link_request_not_now",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_other_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "R.string.link_request_other_profile",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "R.string.link_request_review",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "R.string.link_request_title",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "ActiveProfileLinkRequest",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "fun ActiveProfileLinkRequest(",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "DeviceLinkFailureEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "fun DeviceLinkFailureEffect(",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "DeviceLinkOtherProfileDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "fun DeviceLinkOtherProfileDialog(",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "DeviceLinkRequestHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "fun DeviceLinkRequestHost(",
+        "test_ids": [
+          "SET-060"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

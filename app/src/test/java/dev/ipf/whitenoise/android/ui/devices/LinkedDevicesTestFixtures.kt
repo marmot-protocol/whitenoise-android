@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.devices
 
+import dev.ipf.marmotkit.DeviceLinkEmojiFfi
 import dev.ipf.marmotkit.LinkedDeviceStatusFfi
 import dev.ipf.whitenoise.android.state.LinkedDeviceRoster
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
@@ -47,3 +48,15 @@ internal fun fixtureRoster() =
 
 /** A loaded state showing [fixtureRoster]. */
 internal fun fixtureRosterState() = LinkedDeviceRosterState(roster = fixtureRoster())
+
+/** Seven emoji with their descriptions, as MDK supplies a comparison code. */
+internal fun fixtureCode(): List<DeviceLinkEmojiFfi> =
+    listOf(
+        "🦊" to "fox",
+        "🌵" to "cactus",
+        "🚲" to "bicycle",
+        "🎈" to "balloon",
+        "🍋" to "lemon",
+        "⚓" to "anchor",
+        "🔔" to "bell",
+    ).map { (emoji, description) -> DeviceLinkEmojiFfi(emoji, description) }

@@ -178,6 +178,60 @@
         "test_ids": [
           "SET-059"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_add_steps",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_add_steps",
+        "test_ids": [
+          "SET-059",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_add_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_add_title",
+        "test_ids": [
+          "SET-059",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_external_signer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_external_signer",
+        "test_ids": [
+          "SET-059",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_in_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_in_progress",
+        "test_ids": [
+          "SET-059",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_this_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_this_detail",
+        "test_ids": [
+          "SET-059",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_this_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_this_title",
+        "test_ids": [
+          "SET-059",
+          "SET-060"
+        ]
       }
     ]
   },

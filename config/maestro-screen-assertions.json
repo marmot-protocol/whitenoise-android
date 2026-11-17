@@ -2083,6 +2083,18 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+      "symbol": "ActiveProfileLinkRequest",
+      "bindings": [],
+      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this request. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-060 on a linked-devices test build; add a direct assertion when the entry point ships."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+      "symbol": "DeviceLinkOtherProfileDialog",
+      "bindings": [],
+      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this request. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-060 on a linked-devices test build; add a direct assertion when the entry point ships."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
       "symbol": "LinkedDevicesScreen",
       "bindings": [],
