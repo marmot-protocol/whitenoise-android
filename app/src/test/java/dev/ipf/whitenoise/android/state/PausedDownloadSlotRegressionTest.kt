@@ -131,6 +131,7 @@ class PausedDownloadSlotRegressionTest {
             paused.succeed(bytes(paused.reference.fileName))
             assertArrayEquals(bytes(reference(0).fileName), tapped.await())
             (visible + waiting).awaitAll()
+            assertEquals(5, fixture.calls.size)
         }
 
     /** The app's download gate, read the way the fixture injects its other private state. */

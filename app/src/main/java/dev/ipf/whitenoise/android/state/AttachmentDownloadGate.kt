@@ -156,24 +156,20 @@ internal class AttachmentDownloadGate(
             if (!held.ownsPermit) return block()
             gate.releaseForPause(held)
             // The key stays counted as admitted until it owns a permit again, including while it queues for one, so a
-            // tap at any point of the pause still escalates the native transfer.
+            // tap at any point of the pause still escalates the native transfer. Work that ends without queuing again
+            // stops counting as admitted first, then drops any promotion or visible demand made meanwhile, so no tap
+            // can slip a promotion in after that drop.
+            var dropPending = true
             try {
-                var finished = false
-                val result =
-                    try {
-                        block().also { finished = true }
-                    } finally {
-                        // Work ending by an error must not leave a tap's promotion or visible demand made meanwhile.
-                        if (!finished) gate.forgetPending(cacheKey)
-                    }
+                val result = block()
                 if (requeueAfter(result)) {
                     waiter = gate.acquire(cacheKey, accountRef, held.priority, foreground, keptDemand = held.demand)
-                } else {
-                    gate.forgetPending(cacheKey)
+                    dropPending = false
                 }
                 return result
             } finally {
                 gate.endPause(cacheKey)
+                if (dropPending) gate.forgetPending(cacheKey)
             }
         }
     }
