@@ -129,11 +129,13 @@ import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
 import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
+import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.StagedAttachmentSendClaim
 import dev.ipf.whitenoise.android.state.StagedAttachmentSender
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
@@ -144,6 +146,7 @@ import dev.ipf.whitenoise.android.state.createPoll
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.dmPeerAccount
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
+import dev.ipf.whitenoise.android.state.headerShortcutPreferences
 import dev.ipf.whitenoise.android.state.hiddenMessageIdsInGroup
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.isLoadingPage
@@ -161,6 +164,7 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
+import dev.ipf.whitenoise.android.state.resolveConversationAutoRead
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.sendSticker
@@ -181,6 +185,7 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import dev.ipf.whitenoise.android.ui.chats.isBrowsingAttachments
 import dev.ipf.whitenoise.android.ui.chats.messageSearchConstraintsFor
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
@@ -265,8 +270,14 @@ import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsShari
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerSheet
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.group.DisappearingTimerEditor
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
+import dev.ipf.whitenoise.android.ui.group.MuteDurationHost
+import dev.ipf.whitenoise.android.ui.group.applyDisappearingTimer
+import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
+import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
+import dev.ipf.whitenoise.android.ui.group.rememberConversationMuteControl
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
@@ -690,6 +701,7 @@ internal fun ConversationScreen(
     // Empty newly-created groups should route users into the existing member
     // invite flow instead of carrying a duplicate picker in the create sheet.
     var openAddMemberOnDetails by remember(chat.id) { mutableStateOf(false) }
+    var openMembersOnDetails by remember(chat.id) { mutableStateOf(false) }
     // Re-open after back-to-list should land where the reader left off only
     // when fully read. Unread, search-hit, just-created, and notification opens
     // let their dedicated unread/newest/focus anchor own the position.
@@ -3961,6 +3973,76 @@ internal fun ConversationScreen(
         ).second
     // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
     val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
+    // The header opens chat details from its title and from the member shortcuts. The keyboard starts
+    // closing as the header unfolds into the details cards, not after the composer leaves.
+    val openDetailsFromHeader: () -> Unit = {
+        routeMorph.anchor = ConversationMorphAnchor.Details
+        keyboardController?.hide()
+        showDetails = true
+    }
+    // Chat details and the optional header shortcut open the same in-chat search.
+    val openConversationSearch: () -> Unit = {
+        showDetails = false
+        presentationState.searchState.value =
+            conversationSearchPreset(
+                conversationAccountRef,
+                appState.runtimeGeneration,
+                chat.id,
+                controller.title(groupTitleCopy),
+            )
+        navigationState.searchOpen = true
+    }
+    val headerShortcuts = appState.headerShortcutPreferences.shortcuts
+    // Mute and Read aloud write through the active account, so like chat details they stay hidden while a
+    // notification-routed open is still waiting for its account switch.
+    val headerSettingsOwner = controller.isCurrentGroupMutationOwner(appState, appState.runtimeGeneration)
+    // Read aloud mirrors the chat details auto-read choice and stays hidden without a usable speech engine.
+    val headerReadAloudOn =
+        if (headerSettingsOwner && HeaderShortcut.ReadAloud in headerShortcuts && appState.ttsHasUsableEngine) {
+            val autoRead by appState.ttsAutoReadPreferences.state.collectAsState()
+            controller.boundAccountRef?.let {
+                resolveConversationAutoRead(
+                    autoRead.globalDefaultEnabled,
+                    appState.ttsAutoReadPreferences.overrideFor(it, controller.group.groupIdHex),
+                )
+            }
+        } else {
+            null
+        }
+
+    // The account can switch between composition and the tap, so the write rechecks the owner.
+    fun toggleHeaderReadAloud(on: Boolean?) {
+        if (!controller.isCurrentGroupMutationOwner(appState, appState.runtimeGeneration)) return
+        appState.setConversationAutoReadOverride(
+            controller.group.groupIdHex,
+            if (on == true) TtsAutoReadOverride.OFF else TtsAutoReadOverride.ON,
+        )
+    }
+    // The mute state read runs only when the person put Mute/unmute in the header.
+    val headerMuteControl =
+        if (headerSettingsOwner && HeaderShortcut.MuteUnmute in headerShortcuts) {
+            rememberConversationMuteControl(appState, controller)
+        } else {
+            null
+        }
+    headerMuteControl?.let { MuteDurationHost(it) }
+    var showHeaderTimerPicker by remember(controller) { mutableStateOf(false) }
+    val headerTimerRuntime = remember(controller) { appState.runtimeGeneration }
+    val headerTimerEditable =
+        disappearingTimerEditable(
+            canEdit = controller.canEditGroupSettings,
+            mutationsBlocked =
+                controller.mutationInFlight || !controller.isCurrentGroupMutationOwner(appState, headerTimerRuntime),
+        )
+    DisappearingTimerEditor(
+        open = showHeaderTimerPicker && headerTimerEditable,
+        currentSecs = controller.group.disappearingMessageSecs.toLong(),
+        editable = headerTimerEditable,
+        identity = { GroupActingAccountIdentity(appState, controller.boundAccountRef) },
+        resetKeys = arrayOf(controller, appState.activeAccountRef, appState.runtimeGeneration),
+        onDismiss = { showHeaderTimerPicker = false },
+        onApply = { secs -> controller.applyDisappearingTimer(appState, headerTimerRuntime, secs) },
+    )
     if (transcriptRoutedAway) {
         if (showDetails) {
             /** Shows group details in place of the transcript while they are open. */
@@ -3972,6 +4054,7 @@ internal fun ConversationScreen(
                     onBack = {
                         showDetails = false
                         openAddMemberOnDetails = false
+                        openMembersOnDetails = false
                     },
                     onLeft = exitConversation,
                     onJumpToMessage = { messageId ->
@@ -3980,17 +4063,9 @@ internal fun ConversationScreen(
                     },
                     autoOpenAddMember = openAddMemberOnDetails,
                     onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
-                    onOpenSearch = {
-                        showDetails = false
-                        presentationState.searchState.value =
-                            conversationSearchPreset(
-                                conversationAccountRef,
-                                appState.runtimeGeneration,
-                                chat.id,
-                                controller.title(groupTitleCopy),
-                            )
-                        navigationState.searchOpen = true
-                    },
+                    autoOpenMembers = openMembersOnDetails,
+                    onAutoOpenMembersConsumed = { openMembersOnDetails = false },
+                    onOpenSearch = openConversationSearch,
                     onStartGroupWithPeer = onStartGroupWithPeer,
                 )
             }
@@ -4353,15 +4428,39 @@ internal fun ConversationScreen(
                                 firstFrameAvatar = chat.firstFrameAvatar,
                                 freezeRoutePresentation = freezeRoutePresentation,
                                 openDetailsDescription = openDetailsDescription,
-                                onOpenDetails = {
-                                    // The keyboard starts closing as the header unfolds into the
-                                    // details cards, not after the composer leaves.
-                                    routeMorph.anchor = ConversationMorphAnchor.Details
-                                    keyboardController?.hide()
-                                    showDetails = true
-                                },
+                                onOpenDetails = openDetailsFromHeader,
                                 onBack = exitConversation,
                                 compactHeight = compactHeightConversation,
+                                actions = {
+                                    ConversationHeaderShortcuts(
+                                        shortcuts = headerShortcuts,
+                                        capacity = it,
+                                        muteControl = headerMuteControl,
+                                        onSearch = openConversationSearch,
+                                        readAloudOn = headerReadAloudOn,
+                                        onToggleReadAloud = { toggleHeaderReadAloud(headerReadAloudOn) },
+                                        onTimer = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
+                                        onMembers =
+                                            if (controller.isDm) {
+                                                null
+                                            } else {
+                                                {
+                                                    openMembersOnDetails = true
+                                                    openDetailsFromHeader()
+                                                }
+                                            },
+                                        onAddMembers =
+                                            if (controller.isDm || !controller.canEditGroupSettings) {
+                                                null
+                                            } else {
+                                                {
+                                                    openAddMemberOnDetails = true
+                                                    openDetailsFromHeader()
+                                                }
+                                            },
+                                    )
+                                },
+                                onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
                             )
                         }
                     },

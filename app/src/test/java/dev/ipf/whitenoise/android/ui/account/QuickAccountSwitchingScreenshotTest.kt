@@ -72,8 +72,9 @@ class QuickAccountSwitchingScreenshotTest {
         }
     }
 
-    /** The default-on Appearance preference in AMOLED right-to-left. */
+    /** The default-on Appearance preference in AMOLED right-to-left, tall enough to keep its row in view. */
     @Test
+    @Config(sdk = [36], qualifiers = "en-w360dp-h1600dp-mdpi")
     fun appearanceAmoledRtl() {
         capture(
             "quick_account_switching_appearance_amoled_rtl",

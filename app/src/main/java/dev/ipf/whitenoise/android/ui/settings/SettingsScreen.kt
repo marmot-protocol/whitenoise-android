@@ -324,6 +324,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.ChatFolders,
         SettingsDetail.Gestures,
         SettingsDetail.Composer,
+        SettingsDetail.ChatHeader,
         SettingsDetail.CustomEmoji,
         -> SettingsDetail.Chats
         SettingsDetail.EmojiSets -> SettingsDetail.CustomEmoji
@@ -585,6 +586,7 @@ private fun SettingsDetailRoute(
                 onOpenChatBubbleColors = { onDetailChange(SettingsDetail.ChatBubbleColors) },
             )
         SettingsDetail.Composer -> ComposerSettingsScreen(appState, onBack = onBack)
+        SettingsDetail.ChatHeader -> ChatHeaderSettingsScreen(appState, onBack = onBack)
         SettingsDetail.ActionColor -> ActionColorScreen(appState, onBack = onBack)
         SettingsDetail.ChatBubbleColors -> ChatBubbleColorsScreen(appState, onBack = onBack)
         SettingsDetail.Language -> LanguageScreen(appState, onBack = onBack)

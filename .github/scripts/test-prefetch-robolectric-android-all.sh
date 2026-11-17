@@ -166,6 +166,21 @@ if run_fake "$FIXTURE/two.pins" "$FIXTURE/fail-m2" >/dev/null 2>&1; then
 fi
 [[ "$(wc -l <"$PREFETCH_CALLS")" -eq 1 ]] || fail 'failure escaped the exclusive source or advanced jars'
 [[ -z "$(find "$FIXTURE/fail-m2" -type f)" ]] || fail 'failed partial was retained'
+# Terminating the prefetch itself, as a cancelled CI step does, stops its stalled transport.
+export PREFETCH_MODE=stall
+: >"$PREFETCH_PIDS"
+# Started directly, not through run_fake, so the signal reaches the prefetch shell itself.
+PATH="$FIXTURE/bin:$PATH" ROBOLECTRIC_PREFETCH_BUDGET_SECONDS=30 \
+  ROBOLECTRIC_ANDROID_ALL_PINS="$FIXTURE/good.pins" ROBOLECTRIC_LOCAL_REPOSITORY="$FIXTURE/term-m2" \
+  ROBOLECTRIC_VERSION_CATALOG="$FIXTURE/libs.versions.toml" \
+  ROBOLECTRIC_ANDROID_ALL_REMOTE="$PREFETCH_EXPECTED_REMOTE" bash "$SCRIPT" >/dev/null 2>&1 &
+prefetch=$!
+for _ in $(seq 50); do [[ -s "$PREFETCH_PIDS" ]] && break; sleep 0.1; done
+[[ -s "$PREFETCH_PIDS" ]] || fail 'stalled transport never started'
+kill -TERM "$prefetch"
+wait "$prefetch" 2>/dev/null && fail 'terminated prefetch reported success'
+assert_transport_stopped
+[[ -z "$(find "$FIXTURE/term-m2" -name '.prefetch.*')" ]] || fail 'terminated prefetch kept its partial directory'
 
 # Real curl receives HTTP 429 and a long Retry-After from a loopback server.
 python3 - "$SCRIPT" "$FIXTURE" <<'HTTP_REGRESSION'

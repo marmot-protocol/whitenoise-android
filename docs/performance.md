@@ -405,7 +405,7 @@ below for this probe: that runner intentionally replaces the existing dev app.
 
 The network phase makes 20 sequential native calls for the first image with no
 Android plaintext cache, then 20 batches of the sixteen distinct references
-through the actual three-slot gate (340 native download calls total, roughly
+through the actual four-slot gate (340 native download calls total, roughly
 22 MiB of image payload). The transport and server caches may already be warm;
 only the Android plaintext cache is bypassed. Each batch asserts the host
 concurrency bound and byte equality. Reports separate per-request latency
@@ -452,7 +452,7 @@ PSS separately with `dumpsys meminfo`; RSS counts shared zygote pages per proces
 Run `MediaDownloadHostRegressionTest` for the actual app-state download and
 encrypted-cache path with a suspended synthetic native boundary, and
 `MediaImageBubbleLatencyTest` for the production Compose image bubble. The
-host tests assert distinct-request ownership, three-slot admission, explicit
+host tests assert distinct-request ownership, four-slot admission, explicit
 priority promotion, useful progress alongside a delayed native call, no
 host retry loop after native timeout/integrity failure, account isolation, and
 cache reuse after the caller leaves and returns. The Compose tests cover decoded
@@ -1270,3 +1270,9 @@ claiming the corresponding performance qualification. The hosted
 existing cache, frame and process-memory counters on the same synthetic scroll
 workload around repeated application callbacks. Its raw PSS/heap samples are
 measurements, not a forced-GC estimate or a guaranteed process-memory reduction.
+
+## Display-thumbnail diagnostics
+
+`adb shell setprop log.tag.DisplayThumbnailStats DEBUG` enables fixed `HIT`, `MISS`, `WRITE_ATTEMPT`, `ORIGINAL_MATERIALIZE` and `ORIGINAL_CHUNK` log categories. Restore the prior tag setting after qualification. Logging is disabled at the default INFO threshold and contains no identities, locators, media or sizes. Chunk markers count actual binding invocations, including failed calls. Materialization and write markers count attempts. These counters distinguish avoided original reads from a warm memory cache on release-like builds, including devices without ftrace support. The original-read path uses its existing bridge call without a new timing span.
+
+Encrypted display-cache identities are reconciled against batched native transfer snapshots after bootstrap and on a foreground return more than 15 minutes after the last complete pass, and by the existing hourly background maintenance. Android scheduling can delay background work. The pinned runtime has no global media-removal event; [mdk#3491](https://github.com/marmot-protocol/mdk/issues/3491) proposes one, which would replace this polling. Local and received deletion events also request targeted cache eviction. MDK supplies removal decisions. A removal state removes the original and its derivatives. Any other state without a retained body removes only the derivatives, unless this device still holds its own original. Reconciliation preserves failed native reads and keeps already-painted memory pixels within their existing presentation lifetime.

@@ -218,6 +218,14 @@
         "test_ids": [
           "SET-046"
         ]
+      },
+      {
+        "surface": "Settings hierarchy: header_shortcuts_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.header_shortcuts_title",
+        "test_ids": [
+          "SET-058"
+        ]
       }
     ],
     "composable_surfaces": [
@@ -397,6 +405,14 @@
         "anchor": "R.string.explanation_organize_hub_translation",
         "test_ids": [
           "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_hub_chat_header",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.explanation_organize_hub_chat_header",
+        "test_ids": [
+          "SET-058"
         ]
       }
     ]

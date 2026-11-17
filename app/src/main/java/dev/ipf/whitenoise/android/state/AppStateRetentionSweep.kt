@@ -30,6 +30,7 @@ suspend fun WhiteNoiseAppState.sweepExpiredDisappearingMessages() {
         currentCoroutineContext().ensureActive()
         runRetentionSweep(account.label, System.currentTimeMillis())
     }
+    scheduleDisplayThumbnailReconciliation().join()
 }
 
 /**
@@ -101,6 +102,6 @@ private suspend fun WhiteNoiseAppState.processRetentionSweepOutcome(
             .forEach(::removeMediaMemoryCacheEntry)
     }
     withContext(Dispatchers.IO) {
-        diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
+        removeMediaDiskCacheTags(expiredCiphertextSha256)
     }
 }

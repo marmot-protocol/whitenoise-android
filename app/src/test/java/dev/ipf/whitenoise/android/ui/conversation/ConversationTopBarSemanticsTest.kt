@@ -1,28 +1,38 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -33,20 +43,29 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isConversationMutePending
+import dev.ipf.whitenoise.android.ui.group.ConversationMuteControl
+import dev.ipf.whitenoise.android.ui.group.MuteTarget
+import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
+import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -196,6 +215,264 @@ class ConversationTopBarSemanticsTest {
             .captureRoboImage("src/test/snapshots/conversation_header_prepared_title_light.png")
     }
 
+    /** The default header has no shortcut buttons. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithoutShortcutsLight() = shortcutHeader("none_light", emptyList())
+
+    /** The default header in dark theme. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithoutShortcutsDark() = shortcutHeader("none_dark", emptyList(), dark = true)
+
+    /** One chosen shortcut sits at the end of the header. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithOneShortcutLight() = shortcutHeader("one_light", listOf(HeaderShortcut.Search))
+
+    /** One shortcut in dark theme. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithOneShortcutDark() = shortcutHeader("one_dark", listOf(HeaderShortcut.Search), dark = true)
+
+    /** Two shortcuts keep the person's order and leave the title its width. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithTwoShortcutsLight() = shortcutHeader("two_light", BOTH_SHORTCUTS)
+
+    /** Two shortcuts in dark theme. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithTwoShortcutsDark() = shortcutHeader("two_dark", BOTH_SHORTCUTS, dark = true)
+
+    /** Search and an active Read aloud button share the header. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithReadAloudLight() = shortcutHeader("read_aloud_light", READ_ALOUD_SHORTCUTS)
+
+    /** Search and Read aloud in dark theme. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithReadAloudDark() = shortcutHeader("read_aloud_dark", READ_ALOUD_SHORTCUTS, dark = true)
+
+    /** With every shortcut chosen, a typical phone shows the first four and the chat name keeps half the bar. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithAllShortcutsLight() = shortcutHeader("all_light", HeaderShortcut.entries.toList())
+
+    /** Every shortcut chosen in dark theme. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithAllShortcutsDark() = shortcutHeader("all_dark", HeaderShortcut.entries.toList(), dark = true)
+
+    /** Every shortcut chosen on a small phone at double font: only two fit, with the members line and timer badge. */
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", rtl = false)
+
+    /** The crowded header mirrored for a right-to-left language. */
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun crowdedHeaderLargeFontRtl() = crowdedHeader("crowded_large_font_rtl", rtl = true)
+
+    /** The first shortcuts that fit show in the chosen order; the rest wait for a wider window. */
+    @Test
+    fun headerShowsOnlyTheShortcutsThatFit() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                capacity = it,
+                shortcuts = HeaderShortcut.entries.reversed(),
+                muteControl = muteControl(appState),
+                onSearch = {},
+                readAloudOn = true,
+                onTimer = {},
+                onMembers = {},
+                onAddMembers = {},
+            )
+        })
+        // 360dp at normal font fits three: the reversed list starts with Add members, Members and Timer.
+        for (tag in GROUP_SHORTCUT_TAGS) composeRule.onNodeWithTag(tag).assertExists()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_MUTE_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_SEARCH_TAG).assertDoesNotExist()
+    }
+
+    /** Capacity keeps the chat name at least as wide as the buttons and readable at large font sizes. */
+    @Test
+    fun shortcutCapacityLeavesTheChatNameRoom() {
+        assertEquals(3, headerShortcutCapacity(360.dp, 1f))
+        assertEquals(4, headerShortcutCapacity(411.dp, 1f))
+        assertEquals(2, headerShortcutCapacity(320.dp, 2f))
+        assertEquals(6, headerShortcutCapacity(600.dp, 1f))
+        assertEquals(0, headerShortcutCapacity(120.dp, 1f))
+        assertEquals(Int.MAX_VALUE, headerShortcutCapacity(Dp.Infinity, 1f))
+    }
+
+    /** Timer, Members and Add members run their handlers and stay hidden when their handler is absent. */
+    @Test
+    fun groupShortcutsRunHandlersAndHideWithoutOne() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        val available = mutableStateOf(true)
+        val taps = mutableListOf<String>()
+        render(appState, controller, actions = {
+            val on = available.value
+            ConversationHeaderShortcuts(
+                capacity = it,
+                shortcuts = listOf(HeaderShortcut.DisappearingTimer, HeaderShortcut.Members, HeaderShortcut.AddMembers),
+                muteControl = null,
+                onSearch = {},
+                onTimer = if (on) ({ taps += "timer" }) else null,
+                onMembers = if (on) ({ taps += "members" }) else null,
+                onAddMembers = if (on) ({ taps += "add" }) else null,
+            )
+        })
+        for (tag in GROUP_SHORTCUT_TAGS) {
+            composeRule.onNodeWithTag(tag).assertTouchHeightIsEqualTo(48.dp).performClick()
+        }
+        composeRule.runOnIdle {
+            assertEquals(listOf("timer", "members", "add"), taps)
+            available.value = false
+        }
+        for (tag in GROUP_SHORTCUT_TAGS) composeRule.onNodeWithTag(tag).assertDoesNotExist()
+    }
+
+    /** Search runs the supplied handler; Mute asks for a duration through the shared control, never directly. */
+    @Test
+    fun shortcutsRunTheirSharedHandlers() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        val dialogOpen = mutableStateOf(false)
+        var searches = 0
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                capacity = it,
+                shortcuts = listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute),
+                muteControl = muteControl(appState, dialogOpen = dialogOpen),
+                onSearch = { searches += 1 },
+            )
+        })
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_SEARCH_TAG).assertTouchHeightIsEqualTo(48.dp).performClick()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_MUTE_TAG).assertTouchHeightIsEqualTo(48.dp).performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, searches)
+            assertTrue(dialogOpen.value)
+        }
+    }
+
+    /** Read aloud is a checkable button that flips this chat's override; without a speech engine it is absent. */
+    @Test
+    fun readAloudShortcutTogglesAndHidesWithoutEngine() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        val readAloudOn = mutableStateOf<Boolean?>(false)
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                capacity = it,
+                shortcuts = listOf(HeaderShortcut.ReadAloud),
+                muteControl = null,
+                onSearch = {},
+                readAloudOn = readAloudOn.value,
+                onToggleReadAloud = { readAloudOn.value = !(readAloudOn.value ?: false) },
+            )
+        })
+        composeRule
+            .onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG)
+            .assertTouchHeightIsEqualTo(48.dp)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Off))
+            .performClick()
+        composeRule
+            .onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.On))
+        composeRule.runOnIdle { readAloudOn.value = null }
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG).assertDoesNotExist()
+    }
+
+    /** A mute command in flight disables the header button so a second tap cannot race it. */
+    @Test
+    fun pendingMuteDisablesTheHeaderShortcut() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        val dialogOpen = mutableStateOf(false)
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                capacity = it,
+                shortcuts = listOf(HeaderShortcut.MuteUnmute),
+                muteControl = muteControl(appState, pending = true, dialogOpen = dialogOpen),
+                onSearch = {},
+            )
+        })
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_MUTE_TAG).assertIsNotEnabled().performClick()
+        composeRule.runOnIdle { assertFalse(dialogOpen.value) }
+    }
+
+    /** A mute control captured before an account switch closes its dialog but writes nothing to the new session. */
+    @Test
+    fun staleMuteControlDoesNotWrite() {
+        val appState = appState()
+        val dialogOpen = mutableStateOf(true)
+        val stale = muteControl(appState, dialogOpen = dialogOpen, isCurrent = { false })
+        val modesBefore = appState.chatMutePreferences.state.value.notificationModes
+        stale.mute(MuteTarget.Always)
+        stale.unmute()
+        assertFalse(dialogOpen.value)
+        assertFalse(appState.isConversationMutePending(GROUP_ID))
+        assertEquals(modesBefore, appState.chatMutePreferences.state.value.notificationModes)
+    }
+
+    /** With a change handler the timer badge opens the picker instead of details; without one it stays inert. */
+    @Test
+    fun timerBadgeOpensPickerOnlyWhenEditable() {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 60uL))
+        val editable = mutableStateOf(true)
+        var timerClicks = 0
+        var detailsClicks = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    TopBar(
+                        appState,
+                        controller,
+                        onOpenDetails = { detailsClicks += 1 },
+                        onTimerClick = if (editable.value) ({ timerClicks += 1 }) else null,
+                    )
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG)
+            .assertHasClickAction()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, timerClicks)
+            assertEquals(0, detailsClicks)
+            editable.value = false
+        }
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag("conversation.header.timer", useUnmergedTree = true).assertExists()
+    }
+
+    /** Only an admin member whose group mutations are not blocked may open the timer picker from the header. */
+    @Test
+    fun timerEditabilityCoversEditorBlockedEditorAndNonEditor() {
+        val appState = appState()
+        val editor = ConversationController(appState, group())
+        val nonEditor = ConversationController(appState, group().copy(admins = emptyList()))
+        for (controller in listOf(editor, nonEditor)) {
+            controller.members = listOf(AppGroupMemberRecordFfi(ACCOUNT_ID, ACCOUNT_REF, true))
+        }
+        assertTrue(editor.canEditGroupSettings)
+        assertFalse(nonEditor.canEditGroupSettings)
+        assertTrue(disappearingTimerEditable(canEdit = editor.canEditGroupSettings, mutationsBlocked = false))
+        assertFalse(disappearingTimerEditable(canEdit = editor.canEditGroupSettings, mutationsBlocked = true))
+        assertFalse(disappearingTimerEditable(canEdit = nonEditor.canEditGroupSettings, mutationsBlocked = false))
+    }
+
     /** Hydration cannot replace the opening route title until the existing route owner releases its freeze. */
     @Test
     fun frozenRouteRetainsTitleUntilTransitionCompletes() {
@@ -212,6 +489,7 @@ class ConversationTopBarSemanticsTest {
     }
 
     /** Real controller presentation with inert navigation; no native reads or mutations are supplied. */
+    @Suppress("LongParameterList")
     private fun render(
         appState: WhiteNoiseAppState,
         controller: ConversationController,
@@ -219,37 +497,128 @@ class ConversationTopBarSemanticsTest {
         frozen: State<Boolean> = mutableStateOf(false),
         onOpenDetails: () -> Unit = {},
         fontScale: Float = 1f,
+        dark: Boolean = false,
+        actions: @Composable RowScope.(capacity: Int) -> Unit = {},
+        rtl: Boolean = false,
+        onTimerClick: (() -> Unit)? = null,
     ) {
-        val searchFocusRequester = FocusRequester()
         composeRule.setContent {
-            WhiteNoiseTheme(fontScale = fontScale) {
-                Surface {
-                    ConversationTopBar(
-                        selectionMode = false,
-                        selectedCount = 0,
-                        onCloseSelection = {},
-                        searchOpen = false,
-                        searchQuery = "",
-                        onSearchQueryChange = {},
-                        onClearSearch = {},
-                        onCloseSearch = {},
-                        onSearchAction = {},
-                        searchFocusRequester = searchFocusRequester,
-                        appState = appState,
-                        controller = controller,
-                        groupTitleCopy = GroupTitleCopy.Default,
-                        openedAsDmHint = false,
-                        freezeRoutePresentation = frozen.value,
-                        openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
-                        onOpenDetails = onOpenDetails,
-                        onBack = {},
-                        compactHeight = compactHeight,
-                        performanceSelectorsEnabled = true,
-                    )
+            val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
+                    Surface {
+                        TopBar(appState, controller, compactHeight, frozen.value, onOpenDetails, actions, onTimerClick)
+                    }
                 }
             }
         }
     }
+
+    @Composable
+    @Suppress("LongParameterList")
+    private fun TopBar(
+        appState: WhiteNoiseAppState,
+        controller: ConversationController,
+        compactHeight: Boolean = false,
+        frozen: Boolean = false,
+        onOpenDetails: () -> Unit = {},
+        actions: @Composable RowScope.(capacity: Int) -> Unit = {},
+        onTimerClick: (() -> Unit)? = null,
+    ) {
+        ConversationTopBar(
+            selectionMode = false,
+            selectedCount = 0,
+            onCloseSelection = {},
+            searchOpen = false,
+            searchQuery = "",
+            onSearchQueryChange = {},
+            onClearSearch = {},
+            onCloseSearch = {},
+            onSearchAction = {},
+            searchFocusRequester = remember { FocusRequester() },
+            appState = appState,
+            controller = controller,
+            groupTitleCopy = GroupTitleCopy.Default,
+            openedAsDmHint = false,
+            freezeRoutePresentation = frozen,
+            openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
+            onOpenDetails = onOpenDetails,
+            onBack = {},
+            compactHeight = compactHeight,
+            performanceSelectorsEnabled = true,
+            actions = actions,
+            onTimerClick = onTimerClick,
+        )
+    }
+
+    /** Records the header with [shortcuts] chosen, using an unmuted conversation's mute control. */
+    private fun shortcutHeader(
+        name: String,
+        shortcuts: List<HeaderShortcut>,
+        dark: Boolean = false,
+    ) {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        render(appState, controller, dark = dark, actions = {
+            ConversationHeaderShortcuts(
+                shortcuts,
+                capacity = it,
+                muteControl = muteControl(appState),
+                onSearch = {},
+                readAloudOn = true,
+                onTimer = {},
+                onMembers = {},
+                onAddMembers = {},
+            )
+        })
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_shortcuts_$name.png")
+    }
+
+    /** Records a three-member group with a one-day timer and every shortcut chosen at double font scale. */
+    private fun crowdedHeader(
+        name: String,
+        rtl: Boolean,
+    ) {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
+        controller.members = (1..3).map { AppGroupMemberRecordFfi("0$it" + "00".repeat(31), ACCOUNT_REF, it == 1) }
+        controller.membersLoaded = true
+        render(appState, controller, fontScale = 2f, rtl = rtl, onTimerClick = {}, actions = {
+            ConversationHeaderShortcuts(
+                HeaderShortcut.entries.toList(),
+                capacity = it,
+                muteControl = muteControl(appState),
+                onSearch = {},
+                readAloudOn = false,
+                onTimer = {},
+                onMembers = {},
+                onAddMembers = {},
+            )
+        })
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG).assertHasClickAction()
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_shortcuts_$name.png")
+    }
+
+    private fun muteControl(
+        appState: WhiteNoiseAppState,
+        pending: Boolean = false,
+        dialogOpen: MutableState<Boolean> = mutableStateOf(false),
+        isCurrent: () -> Boolean = { true },
+    ) = ConversationMuteControl(
+        appState,
+        GROUP_ID,
+        muted = false,
+        mutedUntilMs = null,
+        pending = pending,
+        restoreMode = ChatNotifyMode.ALL,
+        dialogOpen = dialogOpen,
+        isCurrent = isCurrent,
+    )
 
     /** Builds an app state with the test account active. */
     private fun appState() =
@@ -332,5 +701,11 @@ class ConversationTopBarSemanticsTest {
         const val OPEN_DETAILS_DESCRIPTION = "Open group details"
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
+        val BOTH_SHORTCUTS = listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search)
+        val READ_ALOUD_SHORTCUTS = listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud)
+        const val PHONE = "en-w411dp-h891dp-xxhdpi"
+        const val SMALL_PHONE = "en-w320dp-h780dp-xxhdpi"
+        val GROUP_SHORTCUT_TAGS =
+            listOf(CONVERSATION_HEADER_TIMER_TAG, CONVERSATION_HEADER_MEMBERS_TAG, CONVERSATION_HEADER_ADD_MEMBERS_TAG)
     }
 }

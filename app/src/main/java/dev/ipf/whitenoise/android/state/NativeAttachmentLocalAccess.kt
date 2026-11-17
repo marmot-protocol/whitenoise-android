@@ -162,9 +162,15 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachment(
             marmotIo { attachmentLocalAssets(request.accountRef, request.groupIdHex, targets) }
         },
         readAsset = { reference, offset, limit ->
-            marmotIo { readAttachmentAsset(request.accountRef, reference, offset, limit) }
+            marmotIo {
+                recordDisplayThumbnailEvent(DisplayThumbnailEvent.ORIGINAL_CHUNK)
+                readAttachmentAsset(request.accountRef, reference, offset, limit)
+            }
         },
-    ).open(listOf(target), maxBytes).single()
+    ).let { access ->
+        recordDisplayThumbnailEvent(DisplayThumbnailEvent.ORIGINAL_MATERIALIZE)
+        access.open(listOf(target), maxBytes).single()
+    }
 }
 
 /** Returns whether MarmotKit currently owns verified readable plaintext for this exact target. */
