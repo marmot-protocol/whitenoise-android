@@ -105,7 +105,10 @@ class TwoPaneChatLayoutTest {
             val list = composeRule.onNodeWithTag(TWO_PANE_LIST_TAG).getUnclippedBoundsInRoot()
             val conversation = composeRule.onNodeWithTag(FRAME_CONVERSATION_TAG).getUnclippedBoundsInRoot()
             assertEquals("list at $window", listWidth.value, (list.right - list.left).value, PANE_TOLERANCE)
-            assertTrue("conversation keeps the majority at $window", conversation.right - conversation.left > list.right - list.left)
+            assertTrue(
+                "conversation keeps the majority at $window",
+                conversation.right - conversation.left > list.right - list.left,
+            )
             assertEquals(
                 "panes fill $window",
                 window.width.value,

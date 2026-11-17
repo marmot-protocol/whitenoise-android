@@ -52,15 +52,21 @@ class TwoPaneChatLayoutScreenshotTest {
 
     @Test
     @Config(qualifiers = PHONE_LANDSCAPE)
-    fun phoneLandscapeOpenChatLight() = capture(darkTheme = false, openChat = true, name = "two_pane_phone_landscape_light", window = PHONE)
+    fun phoneLandscapeOpenChatLight() {
+        capture(darkTheme = false, openChat = true, name = "two_pane_phone_landscape_light", window = PHONE)
+    }
 
     @Test
     @Config(qualifiers = PHONE_LANDSCAPE)
-    fun phoneLandscapeOpenChatDark() = capture(darkTheme = true, openChat = true, name = "two_pane_phone_landscape_dark", window = PHONE)
+    fun phoneLandscapeOpenChatDark() {
+        capture(darkTheme = true, openChat = true, name = "two_pane_phone_landscape_dark", window = PHONE)
+    }
 
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w960dp-h432dp-mdpi")
-    fun phoneLandscapeOpenChatRtl() = capture(darkTheme = true, openChat = true, name = "two_pane_phone_landscape_rtl", window = PHONE)
+    fun phoneLandscapeOpenChatRtl() {
+        capture(darkTheme = true, openChat = true, name = "two_pane_phone_landscape_rtl", window = PHONE)
+    }
 
     @Test
     @Config(qualifiers = PHONE_LANDSCAPE)

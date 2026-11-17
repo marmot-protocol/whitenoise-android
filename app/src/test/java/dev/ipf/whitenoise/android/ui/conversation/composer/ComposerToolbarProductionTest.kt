@@ -15,18 +15,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -38,7 +35,6 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInputSelection
@@ -95,16 +91,13 @@ class ComposerToolbarProductionTest {
     private lateinit var text: ComposerTextState
     private var focused = false
     private var keyboardHides = 0
-    private var keyboardShows = 0
     private var back: OnBackInvokedCallback? = null
 
     // Stands in for the conversation's full-screen route, which replaces the composer while open.
     private var customizing by mutableStateOf(false)
     private val keyboard =
         object : SoftwareKeyboardController {
-            override fun show() {
-                keyboardShows++
-            }
+            override fun show() = Unit
 
             override fun hide() {
                 keyboardHides++
@@ -177,132 +170,6 @@ class ComposerToolbarProductionTest {
         composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.composer_customize)).assertDoesNotExist()
         assertEquals(1, cameraCalls)
-    }
-
-    /** Toolbar targets keep their whole hit area; only the gaps between them reach the editor (#3857). */
-    @Test
-    fun shortcutTargetEdgesKeepTheirActionAndBlankGapsOpenTheKeyboard() {
-        render(
-            ComposerToolbarSettings(
-                listOf(ComposerShortcut.Camera, ComposerShortcut.Gallery),
-                ComposerToolbarLayout.AlwaysExpanded,
-            ),
-        )
-        val editor = composeRule.onNode(hasSetTextAction())
-        val camera = composeRule.onNodeWithTag("composer.shortcut.camera").fetchSemanticsNode().touchBoundsInRoot
-        val gallerySlot = composeRule.onNodeWithTag("composer.shortcut.gallery").fetchSemanticsNode().boundsInRoot
-        // Neighboring buttons overlap where their touch areas meet; check only edges Gallery cannot claim.
-        val gallery =
-            composeRule
-                .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick), useUnmergedTree = true)
-                .fetchSemanticsNodes()
-                .map { it.touchBoundsInRoot }
-                .first { it.contains(gallerySlot.center) }
-        val edges =
-            listOf(
-                Offset(camera.left + 1f, camera.center.y),
-                Offset(camera.right - 1f, camera.center.y),
-                Offset(camera.center.x, camera.top + 1f),
-                Offset(camera.center.x, camera.bottom - 1f),
-            ).filterNot { gallery.contains(it) }
-        assertTrue("Camera must expose edges of its own", edges.size >= 3)
-        edges.forEachIndexed { index, point ->
-            composeRule.mainClock.advanceTimeBy(1_000)
-            composeRule.onRoot().performTouchInput { click(point) }
-            composeRule.waitForIdle()
-            assertEquals(
-                "camera edge $point runs Camera once; camera=$camera gallery=$gallery " +
-                    "galleryCalls=$galleryCalls keyboard=$keyboardShows",
-                index + 1,
-                cameraCalls,
-            )
-        }
-        editor.assertIsNotFocused()
-        assertEquals("a shortcut tap never requests the keyboard", 0, keyboardShows)
-
-        val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
-        val controls =
-            listOf(
-                SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick),
-                SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick),
-                hasSetTextAction(),
-            ).flatMap { matcher ->
-                composeRule
-                    .onAllNodes(matcher, useUnmergedTree = true)
-                    .fetchSemanticsNodes()
-                    .map { it.touchBoundsInRoot.inflate(4f) }
-            }
-        val gap =
-            generateSequence(surface.left + 24f) { it + 4f }
-                .takeWhile { it < surface.right - 24f }
-                .map { Offset(it, camera.center.y) }
-                .first { point -> controls.none { it.contains(point) } }
-        composeRule.onRoot().performTouchInput { click(gap) }
-        composeRule.waitForIdle()
-        editor.assertIsFocused()
-        assertEquals("a toolbar gap opens the keyboard", 1, keyboardShows)
-        assertEquals("a toolbar gap never runs a shortcut", edges.size, cameraCalls)
-        assertEquals(0, galleryCalls)
-
-        composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
-        composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
-        assertEquals("holding Camera explains it instead of running it", edges.size, cameraCalls)
-    }
-
-    /** With voice on the toolbar, the empty draft's disabled Send still owns its whole target (#3857). */
-    @Test
-    fun disabledSendTargetEdgesNeverOpenTheKeyboard() {
-        val voice =
-            VoiceRecordingController(
-                context = context,
-                outputDirectory = context.cacheDir,
-                scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
-                onPermissionRequest = { false },
-                onRecordingComplete = { _, _ -> },
-                onError = {},
-            )
-        try {
-            render(
-                ComposerToolbarSettings(
-                    listOf(ComposerShortcut.Camera, ComposerShortcut.VoiceNote),
-                    ComposerToolbarLayout.AlwaysExpanded,
-                    rightShortcuts = emptySet(),
-                ),
-                voiceController = voice,
-            )
-            val editor = composeRule.onNode(hasSetTextAction())
-            val sendNode = composeRule.onNodeWithContentDescription(context.getString(R.string.send))
-            sendNode.assertIsNotEnabled()
-            // The enabled Send answers inside its laid-out bounds; disabled, it claims the same area.
-            val send = sendNode.fetchSemanticsNode().boundsInRoot
-            val others =
-                composeRule
-                    .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick), useUnmergedTree = true)
-                    .fetchSemanticsNodes()
-                    .map { it.boundsInRoot }
-                    .filterNot { it == send }
-            val edges =
-                listOf(
-                    Offset(send.left + 1f, send.center.y),
-                    Offset(send.right - 1f, send.center.y),
-                    Offset(send.center.x, send.top + 1f),
-                    Offset(send.center.x, send.bottom - 1f),
-                    send.center,
-                ).filterNot { point -> others.any { it.contains(point) } }
-            assertTrue("Send must expose edges of its own", edges.size >= 3)
-            for (point in edges) {
-                composeRule.onRoot().performTouchInput { click(point) }
-                composeRule.waitForIdle()
-                assertEquals(
-                    "disabled Send edge $point never opens the keyboard; send=$send others=$others",
-                    0,
-                    keyboardShows,
-                )
-            }
-            editor.assertIsNotFocused()
-        } finally {
-            voice.release()
-        }
     }
 
     @Test

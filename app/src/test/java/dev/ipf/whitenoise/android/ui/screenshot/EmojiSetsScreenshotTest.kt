@@ -56,10 +56,14 @@ class EmojiSetsScreenshotTest {
     @Test fun browserLight() = preview("browser_light", showPreview = false)
 
     /** Unreachable relays show their notice instead of "no sets", with Refresh in the top bar (#3882). */
-    @Test fun browserDiscoveryIncompleteDark() = failedBrowser("discovery_incomplete_dark", EmojiSetNotice.DiscoveryIncomplete, dark = true)
+    @Test fun browserDiscoveryIncompleteDark() {
+        failedBrowser("discovery_incomplete_dark", EmojiSetNotice.DiscoveryIncomplete, dark = true)
+    }
 
     /** A failed discovery in a mirrored layout with large text. */
-    @Test fun browserDiscoveryErrorRtlLarge() = failedBrowser("discovery_error_rtl_large", EmojiSetNotice.Error, rtl = true)
+    @Test fun browserDiscoveryErrorRtlLarge() {
+        failedBrowser("discovery_error_rtl_large", EmojiSetNotice.Error, rtl = true)
+    }
 
     /** An unopened set preview and its image-host disclosure. */
     @Test fun previewLight() = preview("preview_light")

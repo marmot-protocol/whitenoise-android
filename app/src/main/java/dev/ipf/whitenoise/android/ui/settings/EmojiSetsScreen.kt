@@ -194,33 +194,7 @@ private fun EmojiSetBrowser(
     onShow: (EmojiSetFfi) -> Unit,
 ) {
     SettingsList {
-        item {
-            Column(
-                modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                verticalArrangement = Arrangement.spacedBy(EmojiSetSpacing),
-            ) {
-                WhiteNoiseTextField(
-                    state = field,
-                    modifier = Modifier.fillMaxWidth().testTag("emoji_sets.query"),
-                    label = { Text(stringResource(R.string.emoji_sets_query)) },
-                    lineLimits = TextFieldLineLimits.SingleLine,
-                )
-                val findLabel = stringResource(R.string.emoji_sets_find)
-                Button(
-                    onClick = { onSearch(field.text.toString().trim()) },
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                findLabel,
-                                stringResource(R.string.explanation_organize_emoji_find),
-                            ),
-                        ),
-                    enabled = !state.busy,
-                ) {
-                    Text(findLabel)
-                }
-            }
-        }
+        item { EmojiSetQuery(field, busy = state.busy, onSearch = onSearch) }
         item { EmojiSetStatus(state) }
         // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
         val discoveryFailed =
@@ -251,6 +225,40 @@ private fun EmojiSetBrowser(
                     )
                 }
             }
+        }
+    }
+}
+
+/** The query field and its explicit Find action. */
+@Composable
+private fun EmojiSetQuery(
+    field: TextFieldState,
+    busy: Boolean,
+    onSearch: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        verticalArrangement = Arrangement.spacedBy(EmojiSetSpacing),
+    ) {
+        WhiteNoiseTextField(
+            state = field,
+            modifier = Modifier.fillMaxWidth().testTag("emoji_sets.query"),
+            label = { Text(stringResource(R.string.emoji_sets_query)) },
+            lineLimits = TextFieldLineLimits.SingleLine,
+        )
+        val findLabel = stringResource(R.string.emoji_sets_find)
+        Button(
+            onClick = { onSearch(field.text.toString().trim()) },
+            modifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        findLabel,
+                        stringResource(R.string.explanation_organize_emoji_find),
+                    ),
+                ),
+            enabled = !busy,
+        ) {
+            Text(findLabel)
         }
     }
 }

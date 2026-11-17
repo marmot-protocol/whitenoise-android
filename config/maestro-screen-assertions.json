@@ -856,6 +856,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationEmojiLibraryOverlay.kt",
+      "symbol": "ConversationEmojiLibraryOverlay",
+      "bindings": [
+        {
+          "case": "conversation-emoji-cancel",
+          "selector": {
+            "id": "emoji_sets.query"
+          },
+          "scope": "emoji sets opened from the composer emoji rail over the fixture conversation; Back closes it and the conversation stays.",
+          "entry_assertion": {
+            "id": "emoji_sets.query"
+          },
+          "opened_by": {
+            "id": "emoji.picker.browse_sets"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationInitialPresentation.kt",
       "symbol": "ConversationInitialLoadingOverlay",
       "bindings": [

@@ -94,7 +94,9 @@ class ComposerEmojiLibraryActionsTest {
     fun paneActionsLight() = capture(fontScale = 1f, direction = LayoutDirection.Ltr, dark = false, name = "light")
 
     @Test
-    fun paneActionsLargeRtlDark() = capture(fontScale = 2f, direction = LayoutDirection.Rtl, dark = true, name = "large_rtl_dark")
+    fun paneActionsLargeRtlDark() {
+        capture(fontScale = 2f, direction = LayoutDirection.Rtl, dark = true, name = "large_rtl_dark")
+    }
 
     private fun capture(
         fontScale: Float,

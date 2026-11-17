@@ -134,7 +134,9 @@ class ComposerExpansionBehaviorTest {
 
     /** Mirrored geometry keeps the same blank-surface contract. */
     @Test
-    fun emptyExpandedComposerBlankTapsOpenKeyboardInRtl() = assertBlankTapsOpenKeyboard(layoutDirection = LayoutDirection.Rtl)
+    fun emptyExpandedComposerBlankTapsOpenKeyboardInRtl() {
+        assertBlankTapsOpenKeyboard(layoutDirection = LayoutDirection.Rtl)
+    }
 
     /** Larger text moves the editor and toolbar without opening dead zones. */
     @Test

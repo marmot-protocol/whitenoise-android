@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming")
+
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.activity.compose.BackHandler
@@ -6,9 +8,6 @@ import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.settings.CustomEmojiScreen
 import dev.ipf.whitenoise.android.ui.settings.EmojiSetsScreen
-
-/** A page opened from the composer's emoji keyboard rail. */
-internal enum class ConversationEmojiLibraryPage { Sets, Settings }
 
 /**
  * Emoji sets or emoji settings over the open conversation, so browsing never leaves the chat or

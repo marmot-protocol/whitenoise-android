@@ -28,6 +28,14 @@
         ]
       },
       {
+        "surface": "EmojiSetQuery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetQuery(",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
         "surface": "EmojiSetPreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
         "anchor": "fun EmojiSetPreview(",
