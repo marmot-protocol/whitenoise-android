@@ -183,6 +183,28 @@ class TreeReuseTest(unittest.TestCase):
                                f'repos/{REPO}/actions/runs/11': run(), **forged})
                 self.assertEqual(decide(api)[0]['reuse'], 'none')
 
+    def test_a_run_of_different_trusted_code_is_refused_with_its_own_reason(self):
+        """A moved base changes the trusted files, so the refusal must be countable in shadow summaries."""
+        different = contents()
+        different[f'repos/{REPO}/contents/{ci_reuse.WORKFLOW_PATH}?ref={HEAD}'] = {'sha': 'f' * 40}
+        api = FakeApi({artifact_path('full'): {'artifacts': [artifact('full')]},
+                       f'repos/{REPO}/actions/runs/11': run(), **different})
+        for setting in ('enforce', 'shadow'):
+            outputs, reason = decide(api, setting=setting)
+            self.assertEqual((outputs['reuse'], reason), ('none', ci_reuse.DIFFERENT_CODE_REASON))
+        # Runs that are not trusted at all keep the generic reason, and a later match still wins.
+        outputs, reason = decide(self.attested('full', conclusion='failure'))
+        self.assertEqual((outputs['reuse'], reason), ('none', 'no verified result for this content'))
+        newer = artifact('full', run_id=12, created_at='2026-11-17T12:00:00Z')
+        stale = contents(BEFORE)
+        stale[f'repos/{REPO}/contents/{ci_reuse.WORKFLOW_PATH}?ref={BEFORE}'] = {'sha': 'f' * 40}
+        api = FakeApi({artifact_path('full'): {'artifacts': [artifact('full'), newer]},
+                       f'repos/{REPO}/actions/runs/12': run(head_sha=BEFORE),
+                       f'repos/{REPO}/actions/runs/11': run(), **stale, **contents()})
+        outputs, reason = decide(api)
+        self.assertEqual((outputs['reuse'], outputs['reuse_run']), ('tree', '11'))
+        self.assertNotEqual(reason, ci_reuse.DIFFERENT_CODE_REASON)
+
     def test_missing_local_code_or_run_commit_never_reuses(self):
         """Without the current blob hashes or a well-formed run commit, nothing can be compared."""
         self.assertEqual(decide(self.attested('full'), blobs={})[0]['reuse'], 'none')

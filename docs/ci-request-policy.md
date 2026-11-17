@@ -155,7 +155,10 @@ Identical content is validated once, in two places. A merge group never reuses a
   byte-identical to the code now running. The classifier and this lookup run first in the
   job, in Python's isolated mode, before any step that runs other PR-controlled code. A
   fork, an expired proof, a skipped run that merely reused another result and any API or
-  parsing error select normal validation.
+  parsing error select normal validation. A proof whose run executed different trusted
+  CI code (the base moved the workflow or the reuse scripts since it started) is refused
+  with its own reason in the job summary, so shadow reviews can count it. Writing and
+  uploading a proof never fails the required check.
 - A **master push** of the commit a merge group already validated, shown by that run's
   aggregate job having passed (the queue merges at that moment, before the run itself
   finishes), skips the suites. It keeps `tooling-contracts` (the source-bound manual

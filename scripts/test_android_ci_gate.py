@@ -166,7 +166,11 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn("    name: Compile, test, ktlint, detekt, Android lint${{ github.event.pull_request.draft "
                       "&& ' (draft fast lane)' || '' }}\n", self.gate)
         self.assertIn('JOB_RESULTS: ${{ toJSON(needs) }}', self.gate)
-        self.assertNotIn('continue-on-error:', self.gate)
+        # Only the two proof steps, which merely save time later, may fail without failing the check.
+        proof_steps = ('Write the validated tree proof', 'Retain the validated tree proof')
+        for chunk in self.gate.split('\n      - name: ')[1:]:
+            name = chunk.split('\n', 1)[0]
+            self.assertEqual('continue-on-error: true' in chunk, name in proof_steps, name)
 
     def test_inventory_reporting_cannot_weaken_or_fail_security_enforcement(self):
         """Exports and comparisons cannot fail a lane or weaken its preceding floor gate."""
@@ -529,6 +533,8 @@ class AndroidCiGateTest(unittest.TestCase):
             for condition in ('success()', "github.event_name == 'pull_request'",
                               "needs.changes.outputs.reuse == 'none'", "needs.changes.outputs.docs_only == 'false'"):
                 self.assertIn(condition, step, (name, condition))
+            # A proof is an optimisation, so an artifact-service error must not fail the required check.
+            self.assertIn('continue-on-error: true', step, name)
         proof = self.named_step(self.gate, 'Retain the validated tree proof')
         self.assertIn('name: android-ci-attest-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}', proof)
         self.assertIn('retention-days: 7', proof)

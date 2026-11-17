@@ -1518,10 +1518,12 @@ jobs:
           done
   # Preserve the existing check name for branch protection and consumers.
   # A successful docs-only classifier permits only the named Android skips.
-  # Deliberate PR skips are derived here from the event, never from job output:
-  # secondary-variant runs only on ready PRs, compose-compiler is skipped for
-  # deferred campaigns and drafts. Missing outputs, unexpected skips, failures
-  # and cancellations remain red.
+  # Deliberate PR skips are derived here from the event: secondary-variant runs
+  # only on ready PRs, compose-compiler is skipped for deferred campaigns and
+  # drafts. The one skip taken from job output is a recorded reuse, which the
+  # classifier job reports and the rules below accept only for a ready pull
+  # request (tree) or a master push (push), never in a merge group. Missing
+  # outputs, unexpected skips, failures and cancellations remain red.
   # Drafts report under a different name. A green draft result must never be
   # the latest required check on a head that is then marked ready, because the
   # ready run creates this job only after its heavy lanes finish.
@@ -1590,8 +1592,10 @@ jobs:
       # queue and the ready-for-review run look this artifact up by its lane and tree
       # (scripts/ci_reuse.py re-verifies the producing run before trusting it). Only this
       # job's own success after real jobs ran records a proof, so reuse never chains from a skip.
+      # A proof only saves time later, so a failed write or upload must never turn the required check red.
       - name: Write the validated tree proof
         if: success() && github.event_name == 'pull_request' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        continue-on-error: true
         env:
           PROOF_LANE: ${{ needs.changes.outputs.ci_mode }}
           PROOF_TREE: ${{ needs.changes.outputs.tree }}
@@ -1603,6 +1607,7 @@ jobs:
 
       - name: Retain the validated tree proof
         if: success() && github.event_name == 'pull_request' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: android-ci-attest-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}

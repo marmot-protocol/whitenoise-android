@@ -37,6 +37,8 @@ REQUIRED_JOB = 'Compile, test, ktlint, detekt, Android lint'
 SHA_PATTERN = re.compile(r'[0-9a-f]{40}')
 MAX_CANDIDATES = 5
 NONE = 'none'
+DIFFERENT_CODE_REASON = ('a verified run exists, but it ran different trusted CI code (the workflow or reuse '
+                         'scripts changed since it started), so this run validates in full')
 # An unset variable only reports what reuse would do; `enforce` turns it on.
 SETTINGS = {'': 'shadow', 'shadow': 'shadow', 'enforce': 'enforce', 'off': 'off'}
 LOOKUP_ERRORS = (OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.SubprocessError)
@@ -198,7 +200,15 @@ def ran_the_same_code(api, repo, sha, blobs):
 
 
 def attested_run(api, repo, tree, lanes, blobs):
-    """Return the id of a trusted pull request run that validated this tree, if any."""
+    """Return a (run id, note) pair for a trusted pull request run that validated this tree.
+
+    The run id is None when nothing qualifies. The note names the one case that is
+    otherwise invisible: a successful, same-repository run whose trusted CI code differs from
+    the code running now, which happens when the base branch changed the workflow or the
+    reuse scripts after the earlier run started. Such a run is refused, and shadow summaries
+    must still be able to count it.
+    """
+    note = ''
     for lane in lanes:
         name = attestation_name(lane, tree)
         listing = api.get(f'repos/{repo}/actions/artifacts?name={name}&per_page=100')
@@ -214,12 +224,14 @@ def attested_run(api, repo, tree, lanes, blobs):
             run_id = artifact['workflow_run']['id']
             try:
                 run = api.get(f'repos/{repo}/actions/runs/{run_id}')
-                if (ci_run_is_trusted(run, repo, 'pull_request')
-                        and ran_the_same_code(api, repo, run.get('head_sha'), blobs)):
-                    return str(run_id)
+                if not ci_run_is_trusted(run, repo, 'pull_request'):
+                    continue
+                if ran_the_same_code(api, repo, run.get('head_sha'), blobs):
+                    return str(run_id), ''
+                note = DIFFERENT_CODE_REASON
             except LOOKUP_ERRORS:
                 continue  # One unreadable candidate must not hide a good one.
-    return None
+    return None, note
 
 
 def aggregate_passed(api, repo, run_id):
@@ -248,15 +260,15 @@ def queue_run(api, repo, sha):
 
 
 def lookup(api, repo, event, action, ci_mode, tree, head_sha, blobs):
-    """Find the verified run that makes this run redundant, as a (kind, run id) pair."""
+    """Find the verified run that makes this run redundant, as a (kind, run id, note) triple."""
     # A merge group never reuses a pull request proof: see the module docstring.
     if event == 'pull_request' and action == 'ready_for_review' and SHA_PATTERN.fullmatch(tree):
-        run_id = attested_run(api, repo, tree, accepted_lanes(ci_mode), blobs)
-        return ('tree', run_id) if run_id else (NONE, '')
+        run_id, note = attested_run(api, repo, tree, accepted_lanes(ci_mode), blobs)
+        return ('tree', run_id, '') if run_id else (NONE, '', note)
     if event == 'push' and SHA_PATTERN.fullmatch(head_sha):
         run_id = queue_run(api, repo, head_sha)
-        return ('push', run_id) if run_id else (NONE, '')
-    return NONE, ''
+        return ('push', run_id, '') if run_id else (NONE, '', '')
+    return NONE, '', ''
 
 
 def decide(api, repo, event, action, ci_mode, docs_only, tree, head_sha, setting,
@@ -274,13 +286,13 @@ def decide(api, repo, event, action, ci_mode, docs_only, tree, head_sha, setting
     if docs_only == 'true':
         return outputs, 'documentation-only change'
     try:
-        kind, run_id = lookup(api, repo, event, action, ci_mode, tree, head_sha, blobs or {})
+        kind, run_id, note = lookup(api, repo, event, action, ci_mode, tree, head_sha, blobs or {})
         if kind == 'push' and cache_inputs():
             return outputs, 'a cache input changed, so this push refreshes the caches'
     except LOOKUP_ERRORS as error:
         return outputs, f'lookup failed, running full validation: {type(error).__name__}'
     if kind == NONE:
-        return outputs, 'no verified result for this content'
+        return outputs, note or 'no verified result for this content'
     if mode == 'shadow':
         return outputs, f'shadow: would reuse {kind} result from run {run_id}'
     outputs.update(reuse=kind, reuse_run=run_id)
