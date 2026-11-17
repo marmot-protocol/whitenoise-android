@@ -289,6 +289,85 @@ class PushReuseTest(unittest.TestCase):
             self.assertIsNone(ci_reuse.pushed_paths(BEFORE))
             self.assertTrue(ci_reuse.lint_inputs_changed(BEFORE))
 
+    @staticmethod
+    def push_runs_path():
+        """Build the listing path the script requests for earlier master push runs."""
+        return f'repos/{REPO}/actions/workflows/android-ci.yml/runs?event=push&branch=master&per_page=30'
+
+    @staticmethod
+    def push_run(run_id, sha, **overrides):
+        """Build one master push run record that is trusted unless an override breaks it."""
+        return dict(run('push'), id=run_id, head_sha=sha, **overrides)
+
+    @staticmethod
+    def lint_jobs(*outcomes):
+        """Build a jobs response with the Zapstore and Play lint jobs in the given conclusions."""
+        return {'jobs': [{'name': name, 'status': 'completed' if outcome else 'queued', 'conclusion': outcome}
+                         for name, outcome in zip(ci_reuse.LINT_JOBS, outcomes)]}
+
+    def test_lint_baseline_is_the_newest_push_whose_lint_completed(self):
+        """A reused or cancelled preceding push proves nothing, so the baseline skips back to a real writer."""
+        cancelled, reused, writer = 'a1' * 20, 'a2' * 20, 'a3' * 20
+        api = FakeApi({self.push_runs_path(): {'workflow_runs': [
+            self.push_run(30, HEAD), self.push_run(31, cancelled), self.push_run(32, reused),
+            self.push_run(33, writer)]},
+            f'repos/{REPO}/actions/runs/31/jobs?per_page=100': self.lint_jobs('success', 'cancelled'),
+            f'repos/{REPO}/actions/runs/32/jobs?per_page=100': {'jobs': []},
+            f'repos/{REPO}/actions/runs/33/jobs?per_page=100': self.lint_jobs('success', 'success')})
+        self.assertEqual(ci_reuse.last_lint_writer(api, REPO, HEAD), writer)
+        # The run for the pushed commit itself is never consulted.
+        self.assertNotIn(f'repos/{REPO}/actions/runs/30/jobs?per_page=100', api.paths)
+
+    def test_lint_baseline_ignores_untrusted_or_unreadable_runs_and_gives_up_when_none_completed(self):
+        """Foreign, wrong-event or unreadable runs are skipped, and no writer in range means none."""
+        writer = 'a3' * 20
+        listing = [self.push_run(40, 'a4' * 20, head_repository={'full_name': 'someone/else'}),
+                   self.push_run(41, 'a5' * 20, event='pull_request'),
+                   self.push_run(42, 'a6' * 20, path='.github/workflows/other.yml'),
+                   self.push_run(43, 'not-a-sha'), self.push_run(44, 'a7' * 20),
+                   self.push_run(45, writer)]
+        api = FakeApi({self.push_runs_path(): {'workflow_runs': listing},
+                       f'repos/{REPO}/actions/runs/45/jobs?per_page=100': self.lint_jobs('success', 'success')})
+        self.assertEqual(ci_reuse.last_lint_writer(api, REPO, HEAD), writer)
+        self.assertEqual(api.paths.count(f'repos/{REPO}/actions/runs/44/jobs?per_page=100'), 1)
+        for skipped in (40, 41, 42, 43):
+            self.assertNotIn(f'repos/{REPO}/actions/runs/{skipped}/jobs?per_page=100', api.paths)
+        none_completed = FakeApi({self.push_runs_path(): {'workflow_runs': [self.push_run(50, 'a8' * 20)]},
+                                  f'repos/{REPO}/actions/runs/50/jobs?per_page=100': self.lint_jobs('success')})
+        self.assertIsNone(ci_reuse.last_lint_writer(none_completed, REPO, HEAD))
+
+    def test_lint_inputs_are_measured_from_the_last_completed_writer_and_fail_closed(self):
+        """Test-only pushes after an unfinished lint writer still refresh lint, and errors choose lint."""
+        writer = 'a3' * 20
+        api = FakeApi({self.push_runs_path(): {'workflow_runs': [self.push_run(33, writer)]},
+                       f'repos/{REPO}/actions/runs/33/jobs?per_page=100': self.lint_jobs('success', 'success')})
+        diffs = []
+
+        def changed(command, **kwargs):
+            """Record the diff request and report main sources that changed since the baseline."""
+            diffs.append(command)
+            return subprocess.CompletedProcess(command, 0, stdout=b'app/src/main/java/A.kt\0app/src/test/ATest.kt\0')
+
+        # The diff spans every push since the writer, including an earlier push that changed main sources.
+        with unittest.mock.patch('subprocess.run', side_effect=changed):
+            self.assertTrue(ci_reuse.lint_inputs_since_last_writer(api, REPO, HEAD))
+        self.assertEqual(diffs[0][-2:], [writer, 'HEAD'])
+        tests_only = subprocess.CompletedProcess(['git'], 0, stdout=b'app/src/test/java/ATest.kt\0')
+        empty = FakeApi({self.push_runs_path(): {'workflow_runs': []}})
+        garbled = FakeApi({self.push_runs_path(): {'workflow_runs': 'garbled'}})
+        with unittest.mock.patch('subprocess.run', return_value=tests_only):
+            self.assertFalse(ci_reuse.lint_inputs_since_last_writer(api, REPO, HEAD))
+            # No completed writer, or an unreadable listing, always keeps the lint jobs.
+            for unknown in (empty, FakeApi({}), garbled):
+                self.assertTrue(ci_reuse.lint_inputs_since_last_writer(unknown, REPO, HEAD))
+
+    def test_lint_jobs_match_the_workflow_matrix(self):
+        """The writer check names the same lint jobs that a master push runs for each distribution."""
+        text = (pathlib.Path(ci_reuse.__file__).resolve().parents[1] / '.github/workflows/android-ci.yml').read_text()
+        self.assertIn('name: Android lint (${{ matrix.flavor }})', text)
+        self.assertIn('\'["Zapstore", "Play"]\'', text)
+        self.assertEqual(ci_reuse.LINT_JOBS, ('Android lint (Zapstore)', 'Android lint (Play)'))
+
     def test_required_job_matches_the_validate_job_name(self):
         """The aggregate job the push lookup trusts is the workflow's required check."""
         workflow = pathlib.Path(ci_reuse.__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'

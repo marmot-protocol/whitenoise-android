@@ -48,9 +48,14 @@ CACHE_INPUT_FILES = {'gradle.properties', 'gradlew', 'scripts/prepare_marmotkit_
                      *TRUSTED_CODE}
 CACHE_INPUT_SUFFIXES = ('.gradle', '.gradle.kts', '.lockfile')
 # Android lint results are cached per set of lint inputs, and master pushes are the only writers.
-# A reused push skips the unit suites but must keep refreshing lint when these inputs change.
+# A reused push skips the unit suites but must keep refreshing lint when these inputs changed
+# since the last push whose lint jobs completed (pushes cancel each other, so the preceding push
+# may never have finished its lint).
 LINT_INPUT_PREFIX = 'app/src/'
 LINT_EXCLUDED_PREFIXES = ('app/src/test/', 'app/src/androidTest/')
+LINT_JOBS = ('Android lint (Zapstore)', 'Android lint (Play)')
+PUSH_BRANCH = 'master'
+MAX_LINT_RUNS = 20
 
 
 class GhApi:
@@ -126,10 +131,49 @@ def cache_inputs_changed(before):
     return paths is None or any(is_cache_input(path) for path in paths)
 
 
-def lint_inputs_changed(before):
-    """Return True when the push touched an app source set lint analyzes, or when that cannot be told."""
-    paths = pushed_paths(before)
+def lint_inputs_changed(baseline):
+    """Return True when an app source set lint analyzes changed since the baseline, or when that cannot be told."""
+    paths = pushed_paths(baseline)
     return paths is None or any(is_lint_input(path) for path in paths)
+
+
+def lint_writer_ran(api, repo, run_id):
+    """Check that a push run finished the lint jobs of every distribution successfully."""
+    jobs = api.get(f'repos/{repo}/actions/runs/{run_id}/jobs?per_page=100')
+    finished = {job.get('name') for job in jobs.get('jobs', [])
+                if job.get('status') == 'completed' and job.get('conclusion') == 'success'}
+    return all(name in finished for name in LINT_JOBS)
+
+
+def last_lint_writer(api, repo, head_sha):
+    """Return the commit of the newest earlier master push whose lint jobs completed, if any.
+
+    Pushes to master cancel each other, and a reused push skips lint, so the preceding push
+    says nothing about what the lint cache holds. Only a push whose lint jobs finished does.
+    """
+    listing = api.get(f'repos/{repo}/actions/workflows/android-ci.yml/runs'
+                      f'?event=push&branch={PUSH_BRANCH}&per_page=30')
+    for run in listing.get('workflow_runs', [])[:MAX_LINT_RUNS]:
+        sha = run.get('head_sha')
+        if (sha == head_sha or not SHA_PATTERN.fullmatch(sha or '') or run.get('event') != 'push'
+                or str(run.get('path', '')).split('@', 1)[0] != WORKFLOW_PATH
+                or (run.get('head_repository') or {}).get('full_name') != repo):
+            continue
+        try:
+            if lint_writer_ran(api, repo, run['id']):
+                return sha
+        except LOOKUP_ERRORS:
+            continue  # One unreadable run must not hide an earlier writer.
+    return None
+
+
+def lint_inputs_since_last_writer(api, repo, head_sha):
+    """Return True when lint inputs changed since the last completed lint writer, failing closed."""
+    try:
+        baseline = last_lint_writer(api, repo, head_sha)
+    except LOOKUP_ERRORS:
+        baseline = None
+    return lint_inputs_changed(baseline)
 
 
 def ci_run_is_trusted(run, repo, event, complete=True):
@@ -220,7 +264,8 @@ def decide(api, repo, event, action, ci_mode, docs_only, tree, head_sha, setting
     """Return the reuse outputs. Anything but a verified match selects full validation.
 
     `lint_writer` tells a reused push whether it must still run the Android lint jobs, which
-    are the only writers of the lint cache that pull requests and merge groups restore.
+    are the only writers of the lint cache that pull requests and merge groups restore. It is
+    true when lint inputs changed since the last push whose lint jobs completed.
     """
     outputs = {'reuse': NONE, 'reuse_run': '', 'tree': tree, 'lint_writer': 'false'}
     mode = SETTINGS.get(setting, 'off')
@@ -273,10 +318,11 @@ def main():
         tree = current_tree()
     except (OSError, subprocess.SubprocessError):
         tree = ''
-    outputs, reason = decide(GhApi(), args.repo, args.event, args.action, args.mode,
+    api = GhApi()
+    outputs, reason = decide(api, args.repo, args.event, args.action, args.mode,
                              args.docs_only, tree, args.head_sha, args.setting,
                              trusted_blobs(), lambda: cache_inputs_changed(args.before),
-                             lambda: lint_inputs_changed(args.before))
+                             lambda: lint_inputs_since_last_writer(api, args.repo, args.head_sha))
     publish(outputs, reason)
 
 

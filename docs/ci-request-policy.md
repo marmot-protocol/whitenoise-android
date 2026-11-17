@@ -160,9 +160,11 @@ Identical content is validated once, in two places. A merge group never reuses a
   aggregate job having passed (the queue merges at that moment, before the run itself
   finishes), skips the suites. It keeps `tooling-contracts` (the source-bound manual
   testing guide), `build-contracts` (Gradle cache refresh and the optional Maestro APK),
-  the Android lint jobs when the push changed an app source set (pushes are the only
-  writers of the lint cache that PRs and merge groups restore, and the unit suites are
-  the expensive part that is skipped) and, for risky diffs, the Compose reports. A push
+  the Android lint jobs when an app source set changed since the last `master` push whose
+  lint jobs completed (pushes are the only writers of the lint cache that PRs and merge
+  groups restore, pushes cancel each other so the preceding push may never have finished
+  its lint, and the unit suites are the expensive part that is skipped) and, for risky
+  diffs, the Compose reports. A push
   that changes a cache input (Gradle
   files, the wrapper, lock files, the MarmotKit pin or the reuse code itself) validates
   fully so the master caches stay fresh. The nightly run refreshes the writers a reused

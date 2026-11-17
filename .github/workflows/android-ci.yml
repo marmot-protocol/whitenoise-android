@@ -867,8 +867,9 @@ jobs:
           retention-days: 14
   static-analysis:
     needs: changes
-    # A reused master push still lints when it changed lint inputs: pushes are the only writers of
-    # the lint cache that pull requests and merge groups restore.
+    # A reused master push still lints when lint inputs changed since the last push whose lint jobs
+    # completed: pushes are the only writers of the lint cache that pull requests and merge groups
+    # restore, and pushes cancel each other, so the preceding push may never have finished its lint.
     if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse == 'none' || (needs.changes.outputs.reuse == 'push' && needs.changes.outputs.lint_writer == 'true')) && needs.changes.outputs.precheck != 'true'
     name: Android lint (${{ matrix.flavor }})
     runs-on: ubuntu-latest
