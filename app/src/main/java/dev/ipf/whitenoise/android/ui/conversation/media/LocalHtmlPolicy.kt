@@ -258,14 +258,19 @@ internal object LocalHtmlPolicy {
         if (styles.isNotEmpty()) output.head().appendElement("style").appendChild(DataNode(styles.toString()))
         output.outputSettings().prettyPrint(false).escapeMode(Entities.EscapeMode.base)
         // The browser parses this text again, and tree-builder repairs such as closing a <p> or <a> inside an
-        // unwrapped element can change the nesting. Serializing jsoup's spec-following reparse makes the result a
-        // fixed point, so the page the browser builds is the tree checked here.
-        val reparsed = Jsoup.parse("<!doctype html>" + output.html())
-        reparsed.outputSettings().prettyPrint(false).escapeMode(Entities.EscapeMode.base)
-        val html = reparsed.html()
+        // unwrapped element can change the nesting. Serializing jsoup's spec-following reparse, then refusing any
+        // result that a further parse would still change, keeps the page the browser builds the tree checked here.
+        val html = reparse(output.html())
+        require(reparse(html) == html) { "HTML reparse changed the document" }
         require(html.toByteArray(Charsets.UTF_8).size <= MAX_OUTPUT) { "HTML output limit" }
         return LocalHtmlDocument(html, links.toList(), omitted)
     }
+
+    private fun reparse(html: String): String =
+        Jsoup
+            .parse(if (html.startsWith("<!doctype html>", ignoreCase = true)) html else "<!doctype html>$html")
+            .apply { outputSettings().prettyPrint(false).escapeMode(Entities.EscapeMode.base) }
+            .html()
 
     @Suppress("ComplexCondition")
     private fun rewriteLink(
