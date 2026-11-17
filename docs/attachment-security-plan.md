@@ -47,7 +47,7 @@ Source entry points:
 and [incoming shares](../app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImportState.kt).
 The remaining owners are
 [waveforms](../app/src/main/java/dev/ipf/whitenoise/android/audio/AudioWaveformExtractor.kt),
-[video playback](../app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt),
+[video playback](../app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoViewer.kt),
 [download permissions](../app/src/main/java/dev/ipf/whitenoise/android/state/MediaAutoDownloadMatrix.kt)
 and [Data usage](../app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt).
 

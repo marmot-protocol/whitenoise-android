@@ -84,7 +84,7 @@ class MediaViewerContentBoundsCoverageTest {
         )
         assertTrue(
             "the viewer page must render the shared surface",
-            "VideoViewerSurface(" in source("MediaVideo.kt").functionBody("VideoViewerPage"),
+            "VideoViewerSurface(" in source("MediaVideoViewer.kt").functionBody("VideoViewerPage"),
         )
     }
 

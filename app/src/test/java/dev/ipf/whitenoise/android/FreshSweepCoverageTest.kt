@@ -152,7 +152,7 @@ class FreshSweepCoverageTest {
 
     @Test
     fun mediaCacheFileProbesRunOffTheComposeThread() {
-        val video = source("ui/conversation/media/MediaVideo.kt")
+        val video = mediaVideoSources()
         val voice = source("ui/conversation/media/MediaVoice.kt")
 
         assertFalse(Regex("remember\\([^)]*\\) \\{\\s*cachedVideoAttachmentFile").containsMatchIn(video))
@@ -336,10 +336,9 @@ class FreshSweepCoverageTest {
     @Test
     fun retainedMediaFilesAreRevalidatedBeforePlayback() {
         val voice = source("ui/conversation/media/MediaVoice.kt")
-        val video = source("ui/conversation/media/MediaVideo.kt")
         val voiceBubble = voice.section("internal fun MediaVoiceBubble(", "internal fun VoiceAttachmentContent(")
-        val videoBubble = video.section("internal fun MediaVideoBubble(", "internal fun cachedVideoAttachmentFile(")
-        val videoGridTile = video.section("internal fun MediaVideoGridTile(", "internal fun MediaVideoBubble(")
+        val videoBubble = source("ui/conversation/media/MediaVideo.kt").functionBody("MediaVideoBubble")
+        val videoGridTile = source("ui/conversation/media/MediaVideoGridTile.kt").functionBody("MediaVideoGridTile")
 
         assertTrue(
             "voice playback must rematerialize a retained file that LRU eviction removed",
@@ -369,6 +368,11 @@ class FreshSweepCoverageTest {
         ).firstOrNull(File::exists)?.readText()
             ?: error("Missing source file: $relativePath")
 
+    /** Reads the attachment-video sources split across the bubble, grid tile, cache and viewer files. */
+    private fun mediaVideoSources(): String =
+        listOf("MediaVideo.kt", "MediaVideoGridTile.kt", "MediaVideoCache.kt", "MediaVideoViewer.kt")
+            .joinToString("\n") { source("ui/conversation/media/$it") }
+
     private fun String.section(
         start: String,
         end: String,
@@ -380,7 +384,7 @@ class FreshSweepCoverageTest {
     }
 
     private fun String.helperBody(name: String): String {
-        val start = indexOf("private fun $name")
+        val start = Regex("""(?:private|internal) fun $name\(""").find(this)?.range?.first ?: -1
         val end = indexOf("\n}", start)
         check(start >= 0 && end > start) { "Missing helper $name" }
         return substring(start, end + 2)
