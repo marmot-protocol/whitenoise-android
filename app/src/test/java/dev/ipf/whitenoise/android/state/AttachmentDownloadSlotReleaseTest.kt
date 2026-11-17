@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
@@ -129,6 +131,89 @@ class AttachmentDownloadSlotReleaseTest {
             }
         }
 
+    /**
+     * A visible request that queues again after its pause keeps its original place: a newer visible request still
+     * goes first, and background work still goes after it.
+     */
+    @Test
+    fun aRequeuedVisibleRequestKeepsItsPlace() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val started = mutableListOf<String>()
+                val pauseEnds = CompletableDeferred<Unit>()
+                val holderDone = CompletableDeferred<Unit>()
+                val older =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("older", ACCOUNT, AUTOMATIC, foreground = true) {
+                            withDownloadSlotReleased { pauseEnds.await() }
+                            started += "older"
+                        }
+                    }
+                val holder = startHolding(gate, "holder", holderDone)
+                val queued =
+                    listOf(
+                        startRecording(gate, "background", started),
+                        startRecording(gate, "newer", started, foreground = true),
+                    )
+                pauseEnds.complete(Unit)
+                yield()
+                holderDone.complete(Unit)
+                (queued + older + holder).awaitAll()
+
+                assertEquals(listOf("newer", "older", "background"), started)
+            }
+        }
+
+    /**
+     * Work that fails during its pause drops a tap's promotion made meanwhile, so a later owner of the key does not
+     * inherit it.
+     */
+    @Test
+    fun workFailingDuringThePauseDropsATapMadeMeanwhile() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                runCatching {
+                    gate.withPermit("image", ACCOUNT, AUTOMATIC) {
+                        withDownloadSlotReleased<Unit> {
+                            gate.promote("image")
+                            throw IOException("pause outlasted its grace")
+                        }
+                    }
+                }
+                val started = mutableListOf<String>()
+                val holderDone = CompletableDeferred<Unit>()
+                val holder = startHolding(gate, "holder", holderDone)
+                val queued = listOf(startRecording(gate, "background", started), startRecording(gate, "image", started))
+                holderDone.complete(Unit)
+                (queued + holder).awaitAll()
+
+                assertEquals("the later owner queues as automatic work", listOf("background", "image"), started)
+            }
+        }
+
+    /** Holds a slot under [key] until [done] completes. */
+    private fun CoroutineScope.startHolding(
+        gate: AttachmentDownloadGate,
+        key: String,
+        done: CompletableDeferred<Unit>,
+    ): Deferred<Unit> =
+        async(start = CoroutineStart.UNDISPATCHED) {
+            gate.withPermit(key, ACCOUNT, AUTOMATIC) { done.await() }
+        }
+
+    /** Queues a request under [key] that records its key in [started] once admitted. */
+    private fun CoroutineScope.startRecording(
+        gate: AttachmentDownloadGate,
+        key: String,
+        started: MutableList<String>,
+        foreground: Boolean = false,
+    ): Deferred<Unit> =
+        async(start = CoroutineStart.UNDISPATCHED) {
+            gate.withPermit(key, ACCOUNT, AUTOMATIC, foreground) { started += key }
+        }
+
     /** Outside any gate permit, releasing a slot simply runs the work. */
     @Test
     fun withoutAHeldSlotTheWorkJustRuns() =
@@ -138,6 +223,7 @@ class AttachmentDownloadSlotReleaseTest {
 
     private companion object {
         const val ACCOUNT = "account-a"
+        val AUTOMATIC = AttachmentDownloadPriority.Automatic
         const val TEST_TIMEOUT = 5_000L
     }
 }

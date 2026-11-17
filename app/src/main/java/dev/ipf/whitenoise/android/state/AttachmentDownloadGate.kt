@@ -141,9 +141,11 @@ internal class AttachmentDownloadGate(
 
         /**
          * Gives the permit back while [block] runs, then queues for it again as the same request when [requeueAfter]
-         * accepts the result. Meanwhile the key still counts as admitted, so a tap on it still escalates the native
-         * transfer. A [block] that throws, or a result that needs no more network work, leaves the permit given back,
-         * so the ending work does not wait for a permit only to release it.
+         * accepts the result, keeping its original visible demand. Meanwhile the key still counts as admitted, so a tap
+         * on it still escalates the native transfer. A [block] that throws, or a result that needs no more network
+         * work, leaves the permit given back and drops any promotion or visible demand made for the key meanwhile, so
+         * the ending work neither waits for a permit only to release it nor hands its priority to a later owner. A
+         * nested call on a slot already given back just runs [block].
          */
         suspend fun <T> releasedWhile(
             requeueAfter: (T) -> Boolean,

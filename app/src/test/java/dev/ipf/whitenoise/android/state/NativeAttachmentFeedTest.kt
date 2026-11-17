@@ -159,6 +159,8 @@ class NativeAttachmentFeedTest {
             val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
             val otherDone = CompletableDeferred<Unit>()
             val observer = async { observeWithSlot(gate, feed) }
+            // The observer must own the only slot first, so "other" can only get it through the pause.
+            withTimeout(WAIT_MILLIS) { while (!gate.isAdmitted("paused")) delay(1) }
             val other = async { holdSlot(gate, otherDone) }
 
             withTimeout(WAIT_MILLIS) { while (!gate.isAdmitted("other")) delay(1) }
