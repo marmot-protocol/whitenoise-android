@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.cancelBlockedLeave
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /** Shows the durable last-admin block or offers to verify membership after it clears. */

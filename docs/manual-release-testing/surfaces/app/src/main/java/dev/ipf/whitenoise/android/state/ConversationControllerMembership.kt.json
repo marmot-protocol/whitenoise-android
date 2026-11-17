@@ -1,0 +1,146 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "R.string.toast_admin_transferred",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.toast_admin_transferred",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_cant_transfer_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.toast_cant_transfer_admin",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_remove_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.toast_couldnt_remove_member",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_update_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.toast_couldnt_update_admin",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_granted_but_couldnt_step_down",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.toast_granted_but_couldnt_step_down",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_keep_one_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.toast_keep_one_admin",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_member_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.toast_member_removed",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_promote_before_removing_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.toast_promote_before_removing_admin",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.make_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.make_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.remove_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.remove_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.remove_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.remove_member",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.step_down_as_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.step_down_as_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "surface": "Transfer retry keeps the combined transfer action and affected successor",
+        "anchor": "R.string.transfer_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "setting:toast_couldnt_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "anchor": "R.string.toast_couldnt_add_members",
+        "test_ids": [
+          "GRP-005"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMembership.kt",
+        "surface": "Atomic initial admin invitation",
+        "anchor": "initialAdminInviteWriter(account",
+        "test_ids": [
+          "GRP-030"
+        ]
+      }
+    ]
+  }
+}

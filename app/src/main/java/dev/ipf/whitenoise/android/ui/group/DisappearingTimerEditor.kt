@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.updateMessageRetention
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 
 /** Whether this person may change the group's settings, including the disappearing-messages timer. */
