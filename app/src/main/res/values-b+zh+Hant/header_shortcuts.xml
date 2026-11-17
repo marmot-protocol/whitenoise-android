@@ -7,4 +7,8 @@
     <string name="explanation_header_shortcut_read_aloud">在每個聊天的標題列顯示朗讀按鈕。它會為該聊天開啟或關閉新訊息朗讀，與聊天詳細資料中的相同。僅適用於這部裝置。</string>
     <string name="header_shortcuts_hint">標題列依你勾選的順序顯示。</string>
     <string name="conversation_header_timer_change">變更閱後即焚訊息計時器</string>
+    <string name="header_shortcut_members">成員</string>
+    <string name="explanation_header_shortcut_disappearing">在你可以變更閱後即焚訊息計時器的聊天中顯示計時器按鈕。它會開啟與聊天詳細資料相同的選擇器。僅適用於此裝置。</string>
+    <string name="explanation_header_shortcut_members">在群組聊天標題列中顯示成員按鈕。它會開啟成員清單。僅適用於此裝置。</string>
+    <string name="explanation_header_shortcut_add_members">在你可以新增成員的群組聊天中顯示新增成員按鈕。僅適用於此裝置。</string>
 </resources>

@@ -7,4 +7,8 @@
     <string name="explanation_header_shortcut_read_aloud">Shows a read-aloud button in every chat header. It turns reading new messages aloud on or off for that chat, the same as in chat details. Applies on this device only.</string>
     <string name="header_shortcuts_hint">The header shows them in the order you check them.</string>
     <string name="conversation_header_timer_change">Change disappearing messages timer</string>
+    <string name="header_shortcut_members">Members</string>
+    <string name="explanation_header_shortcut_disappearing">Shows a timer button in chats where you can change the disappearing messages timer. It opens the same picker as chat details. Applies on this device only.</string>
+    <string name="explanation_header_shortcut_members">Shows a members button in group chat headers. It opens the member list. Applies on this device only.</string>
+    <string name="explanation_header_shortcut_add_members">Shows an add-members button in group chats where you can add people. Applies on this device only.</string>
 </resources>

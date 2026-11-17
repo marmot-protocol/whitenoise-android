@@ -28,6 +28,22 @@ class ConversationHeaderShortcutCoverageTest {
         assertContains(conversation, "onSearch = openConversationSearch")
     }
 
+    /**
+     * The timer shortcut opens the same picker as the timer badge, and Members/Add members open the details
+     * pages through the auto-open routes the empty-group prompt already uses.
+     */
+    @Test
+    fun groupShortcutsReuseTheDetailsRoutes() {
+        assertContains(conversation, "onTimer = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null")
+        assertContains(conversation, "onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null")
+        assertContains(conversation, "autoOpenMembers = openMembersOnDetails")
+        assertContains(conversation, "autoOpenAddMember = openAddMemberOnDetails")
+        val addMembers = conversation.substringAfter("onAddMembers =").substringBefore("onTimerClick")
+        assertContains(addMembers, "openAddMemberOnDetails = true")
+        assertContains(addMembers, "openDetailsFromHeader()")
+        assertContains(details, "LaunchedEffect(autoOpenMembers)")
+    }
+
     /** Read aloud in the header and in details read and write the same per-chat override. */
     @Test
     fun headerAndDetailsShareTheReadAloudOverride() {

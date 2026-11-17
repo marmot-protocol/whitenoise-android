@@ -7,4 +7,8 @@
     <string name="explanation_header_shortcut_read_aloud">Показывает кнопку чтения вслух в заголовке каждого чата. Она включает или выключает чтение новых сообщений вслух для этого чата, как в сведениях о чате. Действует только на этом устройстве.</string>
     <string name="header_shortcuts_hint">Заголовок показывает кнопки в том порядке, в котором вы их отметили.</string>
     <string name="conversation_header_timer_change">Изменить таймер исчезающих сообщений</string>
+    <string name="header_shortcut_members">Участники</string>
+    <string name="explanation_header_shortcut_disappearing">Показывает кнопку таймера в чатах, где вы можете изменить таймер исчезающих сообщений. Она открывает тот же выбор, что и в сведениях о чате. Действует только на этом устройстве.</string>
+    <string name="explanation_header_shortcut_members">Показывает кнопку участников в заголовке групповых чатов. Она открывает список участников. Действует только на этом устройстве.</string>
+    <string name="explanation_header_shortcut_add_members">Показывает кнопку добавления участников в групповых чатах, куда вы можете добавлять людей. Действует только на этом устройстве.</string>
 </resources>

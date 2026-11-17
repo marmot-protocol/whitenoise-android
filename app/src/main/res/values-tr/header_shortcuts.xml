@@ -7,4 +7,8 @@
     <string name="explanation_header_shortcut_read_aloud">Her sohbet başlığında bir sesli okuma düğmesi gösterir. Sohbet ayrıntılarında olduğu gibi, o sohbetteki yeni mesajların sesli okunmasını açar veya kapatır. Yalnızca bu cihazda geçerlidir.</string>
     <string name="header_shortcuts_hint">Başlık, onları işaretlediğiniz sırayla gösterir.</string>
     <string name="conversation_header_timer_change">Kaybolan mesaj zamanlayıcısını değiştir</string>
+    <string name="header_shortcut_members">Üyeler</string>
+    <string name="explanation_header_shortcut_disappearing">Kaybolan mesaj zamanlayıcısını değiştirebildiğin sohbetlerde bir zamanlayıcı düğmesi gösterir. Sohbet ayrıntılarındaki seçicinin aynısını açar. Yalnızca bu cihazda geçerlidir.</string>
+    <string name="explanation_header_shortcut_members">Grup sohbetlerinin başlığında bir üyeler düğmesi gösterir. Üye listesini açar. Yalnızca bu cihazda geçerlidir.</string>
+    <string name="explanation_header_shortcut_add_members">Kişi ekleyebildiğin grup sohbetlerinde bir üye ekleme düğmesi gösterir. Yalnızca bu cihazda geçerlidir.</string>
 </resources>

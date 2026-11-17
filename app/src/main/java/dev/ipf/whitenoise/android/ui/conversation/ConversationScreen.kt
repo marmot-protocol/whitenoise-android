@@ -696,6 +696,7 @@ internal fun ConversationScreen(
     // Empty newly-created groups should route users into the existing member
     // invite flow instead of carrying a duplicate picker in the create sheet.
     var openAddMemberOnDetails by remember(chat.id) { mutableStateOf(false) }
+    var openMembersOnDetails by remember(chat.id) { mutableStateOf(false) }
     // Re-open after back-to-list should land where the reader left off only
     // when fully read. Unread, search-hit, just-created, and notification opens
     // let their dedicated unread/newest/focus anchor own the position.
@@ -3881,6 +3882,13 @@ internal fun ConversationScreen(
         ).second
     // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
     val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
+    // The header opens chat details from its title and from the member shortcuts. The keyboard starts
+    // closing as the header unfolds into the details cards, not after the composer leaves.
+    val openDetailsFromHeader: () -> Unit = {
+        routeMorph.anchor = ConversationMorphAnchor.Details
+        keyboardController?.hide()
+        showDetails = true
+    }
     // Chat details and the optional header shortcut open the same in-chat search.
     val openConversationSearch: () -> Unit = {
         showDetails = false
@@ -3955,6 +3963,7 @@ internal fun ConversationScreen(
                     onBack = {
                         showDetails = false
                         openAddMemberOnDetails = false
+                        openMembersOnDetails = false
                     },
                     onLeft = exitConversation,
                     onJumpToMessage = { messageId ->
@@ -3963,6 +3972,8 @@ internal fun ConversationScreen(
                     },
                     autoOpenAddMember = openAddMemberOnDetails,
                     onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
+                    autoOpenMembers = openMembersOnDetails,
+                    onAutoOpenMembersConsumed = { openMembersOnDetails = false },
                     onOpenSearch = openConversationSearch,
                     onStartGroupWithPeer = onStartGroupWithPeer,
                 )
@@ -4318,13 +4329,7 @@ internal fun ConversationScreen(
                                 firstFrameAvatar = chat.firstFrameAvatar,
                                 freezeRoutePresentation = freezeRoutePresentation,
                                 openDetailsDescription = openDetailsDescription,
-                                onOpenDetails = {
-                                    // The keyboard starts closing as the header unfolds into the
-                                    // details cards, not after the composer leaves.
-                                    routeMorph.anchor = ConversationMorphAnchor.Details
-                                    keyboardController?.hide()
-                                    showDetails = true
-                                },
+                                onOpenDetails = openDetailsFromHeader,
                                 onBack = exitConversation,
                                 compactHeight = compactHeightConversation,
                                 actions = {
@@ -4334,6 +4339,25 @@ internal fun ConversationScreen(
                                         onSearch = openConversationSearch,
                                         readAloudOn = headerReadAloudOn,
                                         onToggleReadAloud = { toggleHeaderReadAloud(headerReadAloudOn) },
+                                        onTimer = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
+                                        onMembers =
+                                            if (controller.isDm) {
+                                                null
+                                            } else {
+                                                {
+                                                    openMembersOnDetails = true
+                                                    openDetailsFromHeader()
+                                                }
+                                            },
+                                        onAddMembers =
+                                            if (controller.isDm || !controller.canEditGroupSettings) {
+                                                null
+                                            } else {
+                                                {
+                                                    openAddMemberOnDetails = true
+                                                    openDetailsFromHeader()
+                                                }
+                                            },
                                     )
                                 },
                                 onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,

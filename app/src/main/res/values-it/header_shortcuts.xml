@@ -7,4 +7,8 @@
     <string name="explanation_header_shortcut_read_aloud">Mostra un pulsante di lettura ad alta voce nell\'intestazione di ogni chat. Attiva o disattiva la lettura ad alta voce dei nuovi messaggi di quella chat, come nei dettagli della chat. Vale solo su questo dispositivo.</string>
     <string name="header_shortcuts_hint">L\'intestazione le mostra nell\'ordine in cui le spunti.</string>
     <string name="conversation_header_timer_change">Cambia il timer dei messaggi effimeri</string>
+    <string name="header_shortcut_members">Membri</string>
+    <string name="explanation_header_shortcut_disappearing">Mostra un pulsante timer nelle chat in cui puoi modificare il timer dei messaggi effimeri. Apre lo stesso selettore dei dettagli della chat. Vale solo su questo dispositivo.</string>
+    <string name="explanation_header_shortcut_members">Mostra un pulsante Membri nell’intestazione delle chat di gruppo. Apre l’elenco dei membri. Vale solo su questo dispositivo.</string>
+    <string name="explanation_header_shortcut_add_members">Mostra un pulsante per aggiungere membri nelle chat di gruppo in cui puoi aggiungere persone. Vale solo su questo dispositivo.</string>
 </resources>

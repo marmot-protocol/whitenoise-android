@@ -96,6 +96,9 @@
 *.ConversationTopBarSemanticsTest.headerWithTwoShortcutsDark
 *.ConversationTopBarSemanticsTest.crowdedHeaderLargeFont
 *.ConversationTopBarSemanticsTest.crowdedHeaderLargeFontRtl
+*.ConversationTopBarSemanticsTest.fiveShortcutsLargeFont
+*.ConversationTopBarSemanticsTest.headerWithAllShortcutsLight
+*.ConversationTopBarSemanticsTest.headerWithAllShortcutsDark
 *.ConversationTopBarSemanticsTest.headerWithReadAloudLight
 *.ConversationTopBarSemanticsTest.headerWithReadAloudDark
 *.ConversationTtsFollowComposeTest.tallMediaBeforeSentenceUsesMeasuredSentenceGeometry
@@ -169,7 +172,7 @@
 *.ProfileNotificationOverrideScreenTest.customScreenDark
 *.ProfileNotificationOverrideScreenTest.customScreenAmoled
 *.ProfileNotificationOverrideScreenTest.customScreenLargeRtl
-# Chat header shortcut check marks: themes, the two-shortcut limit and large RTL text.
+# Chat header shortcut check marks: themes, every shortcut checked and large RTL text.
 *.ChatHeaderSettingsScreenTest.light
 *.ChatHeaderSettingsScreenTest.dark
 *.ChatHeaderSettingsScreenTest.amoled

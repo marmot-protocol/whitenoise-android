@@ -289,6 +289,9 @@ internal fun GroupDetailsScreen(
     // details screen is mounted so the initial invite path reuses later-add UI.
     autoOpenAddMember: Boolean = false,
     onAutoOpenAddMemberConsumed: () -> Unit = {},
+    // When true (header Members shortcut), open the members page directly; Back from it leaves details.
+    autoOpenMembers: Boolean = false,
+    onAutoOpenMembersConsumed: () -> Unit = {},
     // Close details and raise the conversation's message search.
     onOpenSearch: (() -> Unit)? = null,
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
@@ -302,7 +305,8 @@ internal fun GroupDetailsScreen(
         val reviewRuntime = remember(controller) { appState.runtimeGeneration }
         val detailsScrollState = key(controller) { rememberScrollState() }
         val membersScrollState = key(controller) { rememberScrollState() }
-        var membersExpanded by remember(controller) { mutableStateOf(false) }
+        var membersExpanded by remember(controller) { mutableStateOf(autoOpenMembers && !controller.isDm) }
+        var membersAutoOpened by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(autoOpenMembers) }
         var memberSearchOpen by remember(controller) { mutableStateOf(false) }
         var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
         var memberSearchRetry by remember(controller) { mutableIntStateOf(0) }
@@ -425,6 +429,13 @@ internal fun GroupDetailsScreen(
                 )
             }
         }
+        LaunchedEffect(autoOpenMembers) {
+            if (autoOpenMembers && !isDm) {
+                membersAutoOpened = true
+                membersExpanded = true
+                onAutoOpenMembersConsumed()
+            }
+        }
         LaunchedEffect(autoOpenAddMember, canAdministerMembers) {
             if (autoOpenAddMember && canAdministerMembers) {
                 addMemberAutoOpened = true
@@ -509,7 +520,9 @@ internal fun GroupDetailsScreen(
                 target = detailsDestination,
                 depth = if (detailsDestination == "details") 0 else 1,
                 ownerKey = controller to appState.runtimeGeneration,
-                suppressMotion = addMemberAutoOpened && detailsDestination == "add-members",
+                suppressMotion =
+                    (addMemberAutoOpened && detailsDestination == "add-members") ||
+                        (membersAutoOpened && detailsDestination == "members"),
                 animationsEnabled = rememberConversationMotionEnabled(),
             )
 
@@ -1465,7 +1478,10 @@ internal fun GroupDetailsScreen(
                                     SettingsLink(
                                         context = rowContext,
                                         title = stringResource(R.string.see_all_members),
-                                        onClick = { membersExpanded = true },
+                                        onClick = {
+                                            membersAutoOpened = false
+                                            membersExpanded = true
+                                        },
                                         leading = {
                                             SettingsLeadingIcon(R.drawable.ic_group)
                                         },
@@ -1497,10 +1513,11 @@ internal fun GroupDetailsScreen(
             }
         }
         if (membersExpanded && !isDm) {
-            BackHandler { membersExpanded = false }
+            val closeMembers = { if (membersAutoOpened) onBack() else membersExpanded = false }
+            BackHandler(onBack = closeMembers)
             detailsRoute {
                 GroupMembersScreen(
-                    onBack = { membersExpanded = false },
+                    onBack = closeMembers,
                     scrollState = membersScrollState,
                     feedback = groupFeedback,
                     content = memberContent,

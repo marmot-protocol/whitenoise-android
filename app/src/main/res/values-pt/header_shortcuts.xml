@@ -7,4 +7,8 @@
     <string name="explanation_header_shortcut_read_aloud">Mostra um botão de leitura em voz alta no cabeçalho de cada conversa. Ele liga ou desliga a leitura em voz alta das novas mensagens dessa conversa, como nos detalhes da conversa. Vale somente neste dispositivo.</string>
     <string name="header_shortcuts_hint">O cabeçalho os mostra na ordem em que você os marcar.</string>
     <string name="conversation_header_timer_change">Alterar o temporizador de mensagens temporárias</string>
+    <string name="header_shortcut_members">Membros</string>
+    <string name="explanation_header_shortcut_disappearing">Mostra um botão de temporizador nas conversas em que você pode alterar o temporizador de mensagens temporárias. Abre o mesmo seletor dos detalhes da conversa. Aplica-se apenas a este dispositivo.</string>
+    <string name="explanation_header_shortcut_members">Mostra um botão de membros no cabeçalho das conversas em grupo. Abre a lista de membros. Aplica-se apenas a este dispositivo.</string>
+    <string name="explanation_header_shortcut_add_members">Mostra um botão para adicionar membros nas conversas em grupo em que você pode adicionar pessoas. Aplica-se apenas a este dispositivo.</string>
 </resources>

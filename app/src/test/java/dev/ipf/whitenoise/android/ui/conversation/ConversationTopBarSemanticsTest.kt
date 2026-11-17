@@ -236,15 +236,54 @@ class ConversationTopBarSemanticsTest {
     /** Search and Read aloud in dark theme. */
     @Test fun headerWithReadAloudDark() = shortcutHeader("read_aloud_dark", READ_ALOUD_SHORTCUTS, dark = true)
 
+    /** Every shortcut at once on a typical phone width, at the composer's compact pitch. */
+    @Test fun headerWithAllShortcutsLight() = shortcutHeader("all_light", HeaderShortcut.entries.toList())
+
+    /** Every shortcut at once in dark theme. */
+    @Test fun headerWithAllShortcutsDark() = shortcutHeader("all_dark", HeaderShortcut.entries.toList(), dark = true)
+
     /** A narrow window at double font keeps three shortcuts, the members line and the tappable timer badge on screen. */
     @Test
     @Config(qualifiers = "en-w320dp-h780dp-mdpi")
-    fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", rtl = false)
+    fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", THREE_SHORTCUTS, rtl = false)
 
     /** The crowded header mirrored for a right-to-left language. */
     @Test
     @Config(qualifiers = "en-w320dp-h780dp-mdpi")
-    fun crowdedHeaderLargeFontRtl() = crowdedHeader("crowded_large_font_rtl", rtl = true)
+    fun crowdedHeaderLargeFontRtl() = crowdedHeader("crowded_large_font_rtl", THREE_SHORTCUTS, rtl = true)
+
+    /** Five shortcuts in the same narrow, double-font window: the title still keeps a readable start. */
+    @Test
+    @Config(qualifiers = "en-w320dp-h780dp-mdpi")
+    fun fiveShortcutsLargeFont() = crowdedHeader("five_large_font", FIVE_SHORTCUTS, rtl = false)
+
+    /** Timer, Members and Add members run their handlers and stay hidden when their handler is absent. */
+    @Test
+    fun groupShortcutsRunHandlersAndHideWithoutOne() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        val available = mutableStateOf(true)
+        val taps = mutableListOf<String>()
+        render(appState, controller, actions = {
+            val on = available.value
+            ConversationHeaderShortcuts(
+                shortcuts = listOf(HeaderShortcut.DisappearingTimer, HeaderShortcut.Members, HeaderShortcut.AddMembers),
+                muteControl = null,
+                onSearch = {},
+                onTimer = if (on) ({ taps += "timer" }) else null,
+                onMembers = if (on) ({ taps += "members" }) else null,
+                onAddMembers = if (on) ({ taps += "add" }) else null,
+            )
+        })
+        for (tag in GROUP_SHORTCUT_TAGS) {
+            composeRule.onNodeWithTag(tag).assertTouchHeightIsEqualTo(48.dp).performClick()
+        }
+        composeRule.runOnIdle {
+            assertEquals(listOf("timer", "members", "add"), taps)
+            available.value = false
+        }
+        for (tag in GROUP_SHORTCUT_TAGS) composeRule.onNodeWithTag(tag).assertDoesNotExist()
+    }
 
     /** Search runs the supplied handler; Mute asks for a duration through the shared control, never directly. */
     @Test
@@ -450,16 +489,25 @@ class ConversationTopBarSemanticsTest {
         val appState = appState()
         val controller = ConversationController(appState, group())
         render(appState, controller, dark = dark, actions = {
-            ConversationHeaderShortcuts(shortcuts, muteControl(appState), onSearch = {}, readAloudOn = true)
+            ConversationHeaderShortcuts(
+                shortcuts,
+                muteControl(appState),
+                onSearch = {},
+                readAloudOn = true,
+                onTimer = {},
+                onMembers = {},
+                onAddMembers = {},
+            )
         })
         composeRule
             .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
             .captureRoboImage("src/test/snapshots/conversation_header_shortcuts_$name.png")
     }
 
-    /** Records a three-member group with a one-day timer and both shortcuts at double font scale. */
+    /** Records a three-member group with a one-day timer and [shortcuts] at double font scale. */
     private fun crowdedHeader(
         name: String,
+        shortcuts: List<HeaderShortcut>,
         rtl: Boolean,
     ) {
         val appState = appState()
@@ -468,7 +516,15 @@ class ConversationTopBarSemanticsTest {
         controller.members = (1..3).map { AppGroupMemberRecordFfi("0$it" + "00".repeat(31), ACCOUNT_REF, it == 1) }
         controller.membersLoaded = true
         render(appState, controller, fontScale = 2f, rtl = rtl, onTimerClick = {}, actions = {
-            ConversationHeaderShortcuts(HeaderShortcut.entries.toList(), muteControl(appState), onSearch = {}, readAloudOn = false)
+            ConversationHeaderShortcuts(
+                shortcuts,
+                muteControl(appState),
+                onSearch = {},
+                readAloudOn = false,
+                onTimer = {},
+                onMembers = {},
+                onAddMembers = {},
+            )
         })
         composeRule.onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG).assertHasClickAction()
         composeRule
@@ -573,5 +629,9 @@ class ConversationTopBarSemanticsTest {
         val GROUP_ID = "04" + "00".repeat(31)
         val BOTH_SHORTCUTS = listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search)
         val READ_ALOUD_SHORTCUTS = listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud)
+        val THREE_SHORTCUTS = listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute, HeaderShortcut.DisappearingTimer)
+        val FIVE_SHORTCUTS = THREE_SHORTCUTS + listOf(HeaderShortcut.Members, HeaderShortcut.AddMembers)
+        val GROUP_SHORTCUT_TAGS =
+            listOf(CONVERSATION_HEADER_TIMER_TAG, CONVERSATION_HEADER_MEMBERS_TAG, CONVERSATION_HEADER_ADD_MEMBERS_TAG)
     }
 }
