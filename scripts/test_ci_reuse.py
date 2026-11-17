@@ -1,5 +1,6 @@
 """Unit tests for scripts/ci_reuse.py: reuse is granted only for a verified, trusted match."""
 
+import json
 import os
 import pathlib
 import re
@@ -516,6 +517,78 @@ class CandidateResilienceTest(unittest.TestCase):
                            {'jobs': [{'name': ci_reuse.REQUIRED_JOB, 'status': 'completed', 'conclusion': 'success'}]}})
         outputs, _ = decide(api, event='push')
         self.assertEqual((outputs['reuse'], outputs['reuse_run']), ('push', '22'))
+
+
+class LookupBudgetTest(unittest.TestCase):
+    """The whole lookup shares one time budget, so slow requests cannot exhaust the job."""
+
+    class Clock:
+        """A controllable monotonic clock."""
+
+        def __init__(self):
+            """Start at zero seconds."""
+            self.now = 0.0
+
+        def __call__(self):
+            """Return the current fake time."""
+            return self.now
+
+    def test_each_request_is_capped_by_the_smaller_of_its_limit_and_the_remaining_budget(self):
+        """A request never outlives the budget, and none starts once the budget is gone."""
+        clock = self.Clock()
+        api = ci_reuse.GhApi(budget=100, clock=clock)
+        done = subprocess.CompletedProcess(['gh'], 0, stdout='{}')
+        with unittest.mock.patch('subprocess.run', return_value=done) as runner:
+            api.get('repos/a/b')
+            clock.now = 70
+            api.get('repos/a/b')
+            clock.now = 100
+            with self.assertRaises(TimeoutError):
+                api.get('repos/a/b')
+        self.assertEqual([call.kwargs['timeout'] for call in runner.call_args_list], [60, 30])
+
+    def test_slow_requests_end_the_lookup_in_full_validation_without_further_requests(self):
+        """Repeated timeouts consume the budget, then every later candidate is refused instantly."""
+        clock = self.Clock()
+        api = ci_reuse.GhApi(budget=150, clock=clock)
+        listing = {'workflow_runs': [dict(run('push'), id=60 + index, head_sha=f'{index:040x}')
+                                     for index in range(1, 20)]}
+
+        def slow(command, **kwargs):
+            """Serve the run listing quickly, then let every jobs request run into its timeout."""
+            if 'jobs' not in command[-1]:
+                clock.now += 1
+                return subprocess.CompletedProcess(command, 0, stdout=json.dumps(listing))
+            clock.now += kwargs['timeout']
+            raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+
+        with unittest.mock.patch('subprocess.run', side_effect=slow) as runner:
+            # With no readable lint writer, the answer is "lint is required".
+            self.assertTrue(ci_reuse.lint_inputs_since_last_writer(api, REPO, HEAD))
+        # The listing plus three timed-out requests use the whole budget, and none of the
+        # remaining 16 candidates starts a request.
+        self.assertEqual(runner.call_count, 4)
+        self.assertLessEqual(clock.now, 150)
+
+    def test_an_exhausted_budget_selects_full_validation(self):
+        """The decision reports a failed lookup rather than waiting on more requests."""
+        clock = self.Clock()
+        api = ci_reuse.GhApi(budget=0, clock=clock)
+        outputs, reason = decide(api)
+        self.assertEqual(outputs['reuse'], 'none')
+        self.assertIn('lookup failed', reason)
+        outputs, reason = decide(api, event='push')
+        self.assertEqual(outputs['reuse'], 'none')
+
+    def test_the_budget_fits_inside_the_classifier_job_with_room_to_spare(self):
+        """The workflow's job timeout, the shell backstop and the budget stay consistent."""
+        workflow = (pathlib.Path(ci_reuse.__file__).resolve().parents[1] / '.github/workflows/android-ci.yml').read_text()
+        job_minutes = int(re.search(r'name: Classify complete PR changes\n    runs-on: ubuntu-latest\n'
+                                    r'    timeout-minutes: (\d+)', workflow).group(1))
+        backstop = int(re.search(r'if ! timeout (\d+) python3 -I scripts/ci_reuse.py', workflow).group(1))
+        self.assertLess(ci_reuse.REQUEST_TIMEOUT_SECONDS, ci_reuse.LOOKUP_BUDGET_SECONDS)
+        self.assertLess(ci_reuse.LOOKUP_BUDGET_SECONDS, backstop)
+        self.assertLessEqual(backstop * 2, job_minutes * 60)
 
 
 class IsolationTest(unittest.TestCase):

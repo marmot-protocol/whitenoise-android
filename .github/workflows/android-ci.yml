@@ -136,7 +136,8 @@ jobs:
           GIT_NO_REPLACE_OBJECTS: '1'
         shell: bash
         run: |
-          if ! python3 -I scripts/ci_reuse.py --repo "$CI_REPO" --event "$CI_EVENT" --action "$CI_ACTION" \
+          # The script bounds its own API time; this backstop keeps a hung call from using up the job.
+          if ! timeout 300 python3 -I scripts/ci_reuse.py --repo "$CI_REPO" --event "$CI_EVENT" --action "$CI_ACTION" \
               --mode "$CI_MODE" --docs-only "$CI_DOCS_ONLY" --head-sha "$CI_HEAD_SHA" \
               --before "$CI_BEFORE_SHA" --setting "$ANDROID_CI_REUSE"; then
             echo '::warning title=Validation reuse::The lookup failed, so this run validates in full.'

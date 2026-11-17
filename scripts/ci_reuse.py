@@ -28,6 +28,7 @@ import json
 import os
 import re
 import subprocess
+import time
 
 WORKFLOW_PATH = '.github/workflows/android-ci.yml'
 # The code that names, computes and uploads a proof. A proof is trusted only when the run
@@ -58,15 +59,31 @@ LINT_EXCLUDED_PREFIXES = ('app/src/test/', 'app/src/androidTest/')
 LINT_JOBS = ('Android lint (Zapstore)', 'Android lint (Play)')
 PUSH_BRANCH = 'master'
 MAX_LINT_RUNS = 20
+# One request may take a minute, but the whole lookup must finish well inside the 10-minute
+# `changes` job, which still has to classify and fall back to full validation afterwards.
+REQUEST_TIMEOUT_SECONDS = 60
+LOOKUP_BUDGET_SECONDS = 150
 
 
 class GhApi:
-    """Read-only GitHub REST access through the authenticated `gh` command."""
+    """Read-only GitHub REST access through the authenticated `gh` command, within a time budget.
+
+    The whole lookup shares one budget, so many slow requests in a row cannot use up the
+    `changes` job's timeout before the workflow falls back to full validation.
+    """
+
+    def __init__(self, budget=LOOKUP_BUDGET_SECONDS, clock=time.monotonic):
+        """Start the budget clock for every request this client makes."""
+        self.clock = clock
+        self.deadline = clock() + budget
 
     def get(self, path):
-        """Return the decoded JSON body of one GET request, raising on any failure."""
-        completed = subprocess.run(['gh', 'api', path], capture_output=True, text=True,
-                                   check=True, timeout=60)
+        """Return the decoded JSON body of one GET request, raising on any failure or an empty budget."""
+        remaining = self.deadline - self.clock()
+        if remaining <= 0:
+            raise TimeoutError('the reuse lookup ran out of its time budget')
+        completed = subprocess.run(['gh', 'api', path], capture_output=True, text=True, check=True,
+                                   timeout=min(REQUEST_TIMEOUT_SECONDS, remaining))
         return json.loads(completed.stdout)
 
 
