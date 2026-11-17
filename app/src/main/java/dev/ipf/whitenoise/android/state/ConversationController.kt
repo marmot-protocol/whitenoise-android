@@ -4,7 +4,6 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -40,7 +39,6 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
-import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
@@ -77,9 +75,7 @@ import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.OutgoingSend
 import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
 import dev.ipf.whitenoise.android.media.mutationKey
-import dev.ipf.whitenoise.android.ui.conversation.media.isPendingVideo
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
-import dev.ipf.whitenoise.android.ui.conversation.media.pendingVideoPosterFrame
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -104,244 +100,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * The two deletion scopes a user may apply to one message. This is the single
- * authoritative deletion-capability model: both the action UI (which choices
- * the delete surface offers) and the controller mutation path (which requests
- * it accepts) derive from [messageDeleteCapability], so button visibility is
- * never the security boundary.
- */
-@Immutable
-data class MessageDeleteCapability(
-    val canDeleteForMe: Boolean,
-    val canDeleteForEveryone: Boolean,
-) {
-    val canDeleteAtAll: Boolean get() = canDeleteForMe || canDeleteForEveryone
-}
-
-/**
- * Whether the runtime can actually deliver a moderator's delete of another
- * member's group message. The Marmot timeline ingest now honours a group
- * admin's delete of another member's message: the moderation verdict is
- * evaluated against signed group state when the delete is recorded and
- * persisted with the event, and direct conversations never grant moderation.
- * Kept as a constant so the moderator branch can be cut in one place if the
- * engine behaviour ever has to be rolled back.
- */
-internal const val GROUP_MODERATION_DELETE_SUPPORTED = true
-
-/**
- * Deletion-capability matrix:
- *
- *  - Own message (direct or group): delete for me, delete for everyone.
- *  - Someone else's direct message: delete for me only. A direct conversation
- *    has no moderation, whatever admin flags its underlying two-member group
- *    carries — DM creators are often marked admin at the MLS layer, and an
- *    admin role held in any other group never reaches here at all (each
- *    conversation's controller only passes its own membership role).
- *  - Another member's group message: delete for everyone only when the
- *    current user moderates this group (admin/owner) and the runtime supports
- *    delivering it ([moderationDeleteSupported]); regular members get
- *    delete for me only.
- *  - Already-deleted projection: delete for me only. The underlying protocol
- *    tombstone remains authoritative; local cleanup never offers or retries a
- *    delete for everyone.
- *
- * [localDeleteSupported] and [remoteDeleteSupported] carry the plumbing facts
- * (usable message id, live membership / publish path); this function owns only
- * the ownership/role policy layered on top of them.
- */
-internal fun messageDeleteCapability(
-    isDirectConversation: Boolean,
-    mine: Boolean,
-    selfIsAdmin: Boolean,
-    localDeleteSupported: Boolean,
-    remoteDeleteSupported: Boolean,
-    alreadyDeleted: Boolean,
-    moderationDeleteSupported: Boolean = GROUP_MODERATION_DELETE_SUPPORTED,
-): MessageDeleteCapability {
-    if (alreadyDeleted) {
-        return MessageDeleteCapability(
-            canDeleteForMe = localDeleteSupported,
-            canDeleteForEveryone = false,
-        )
-    }
-    val moderatesOthersMessages = !isDirectConversation && selfIsAdmin && moderationDeleteSupported
-    return MessageDeleteCapability(
-        canDeleteForMe = localDeleteSupported,
-        canDeleteForEveryone = remoteDeleteSupported && (mine || moderatesOthersMessages),
-    )
-}
-
-/**
- * Ownership boundary for an optimistic outgoing row. Only [PRE_ACCEPTANCE]
- * may be cancelled locally; every later phase is already owned by MDK or has
- * an acknowledgement whose ownership cannot be disproved safely.
- */
-internal enum class OptimisticSendPhase {
-    PRE_ACCEPTANCE,
-    ACCEPTED_PENDING,
-    ACCEPTANCE_UNKNOWN,
-    SETTLED,
-    FAILED,
-    CANCELLED,
-}
-
-internal class OptimisticSendCancelledException : Exception("Optimistic send cancelled before admission")
-
-internal const val MAX_CANCELLED_SEND_TOMBSTONES = 64
-
-/** Shared membership gate for optimistic work that the engine later validates. */
-private fun canAcceptSeededMemberMutation(
-    accountRef: String?,
-    membersVerified: Boolean,
-    isSelfMember: Boolean,
-    seededSelfMember: Boolean,
-    selfLeft: Boolean,
-    unrecoverable: Boolean,
-    disbanding: Boolean,
-    disbanded: Boolean,
-): Boolean =
-    accountRef != null &&
-        !unrecoverable &&
-        !disbanding &&
-        !disbanded &&
-        (
-            (membersVerified && isSelfMember) ||
-                (!membersVerified && seededSelfMember && !selfLeft)
-        )
-
-/**
- * Whether a text [ConversationController.send] can commit an optimistic record.
- * This must stay aligned with the UI's input-clearing decision (issue #264).
- */
-internal fun canAcceptTextSend(
-    accountRef: String?,
-    trimmed: String,
-    membersVerified: Boolean,
-    isSelfMember: Boolean,
-    seededSelfMember: Boolean,
-    selfLeft: Boolean,
-    unrecoverable: Boolean,
-    disbanding: Boolean,
-    disbanded: Boolean,
-): Boolean =
-    trimmed.isNotEmpty() &&
-        canAcceptSeededMemberMutation(
-            accountRef = accountRef,
-            membersVerified = membersVerified,
-            isSelfMember = isSelfMember,
-            seededSelfMember = seededSelfMember,
-            selfLeft = selfLeft,
-            unrecoverable = unrecoverable,
-            disbanding = disbanding,
-            disbanded = disbanded,
-        )
-
-/**
- * Reactions use the same seed-safe membership window as text sends. The
- * authoritative engine still validates the mutation and rolls back the
- * optimistic reaction if the cached membership has become stale.
- */
-internal fun canAcceptReaction(
-    accountRef: String?,
-    membersVerified: Boolean,
-    isSelfMember: Boolean,
-    seededSelfMember: Boolean,
-    selfLeft: Boolean,
-    unrecoverable: Boolean,
-    disbanding: Boolean,
-    disbanded: Boolean,
-): Boolean =
-    canAcceptSeededMemberMutation(
-        accountRef = accountRef,
-        membersVerified = membersVerified,
-        isSelfMember = isSelfMember,
-        seededSelfMember = seededSelfMember,
-        selfLeft = selfLeft,
-        unrecoverable = unrecoverable,
-        disbanding = disbanding,
-        disbanded = disbanded,
-    )
-
-internal fun mediaCacheKey(
-    account: String,
-    groupIdHex: String,
-    messageIdHex: String,
-    attachmentIndex: Int,
-): String = "$account|$groupIdHex|$messageIdHex|$attachmentIndex"
-
-/**
- * True when [cacheKey] was minted by [mediaCacheKey] for this account+group.
- * The retention sweep uses this to drop a pruned group's decrypted in-memory
- * entries: the engine prunes atomically, so no pre-prune media rows survive
- * to map ciphertext tags to exact keys, and the whole group slice goes.
- * Case-insensitive: hex ids drift in casing across sources, matching the
- * projector's comparisons and the chat list's lowercased row keys.
- */
-internal fun mediaCacheKeyInGroup(
-    cacheKey: String,
-    account: String,
-    groupIdHex: String,
-): Boolean = cacheKey.startsWith("$account|$groupIdHex|", ignoreCase = true)
-
-/**
- * The keys in this account+group's L1 slice whose message row is no longer
- * loaded. The bounded timeline window trims old rows, so an expired-tag
- * mapping for them is gone; the open conversation's sweep drops these
- * fail-closed rather than let a pruned attachment's decrypted bytes outlive
- * the prune, while loaded rows keep their entries (no on-screen refetch).
- */
-internal fun staleGroupMediaCacheKeys(
-    cachedKeys: Collection<String>,
-    account: String,
-    groupIdHex: String,
-    loadedMessageIds: Set<String>,
-): List<String> {
-    val loadedLowercase = loadedMessageIds.mapTo(HashSet()) { it.lowercase() }
-    return cachedKeys.filter { key ->
-        mediaCacheKeyInGroup(key, account, groupIdHex) &&
-            key.split('|').getOrNull(2)?.lowercase() !in loadedLowercase
-    }
-}
-
-internal suspend fun removeMediaMemoryCacheKeys(
-    cacheKeys: Iterable<String>,
-    dispatcher: CoroutineDispatcher,
-    removeEntry: (String) -> Unit,
-) {
-    withContext(dispatcher) {
-        cacheKeys.forEach(removeEntry)
-    }
-}
-
-/**
- * The poster seeded under a just-sent attachment's confirmed key.
- *
- * A photo decodes its own bytes. A video has a frame pulled from the same bytes instead, so the
- * confirmed bubble opens on the poster the optimistic one already showed rather than waiting for
- * the file to be materialized and read again (#2732). A photo decodes in [domain]'s worker.
- */
-internal suspend fun decodeMediaThumbnailOffMain(
-    attachment: PendingAttachment,
-    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
-        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
-): android.graphics.Bitmap? {
-    // A file-backed item has no bytes here; its confirmed bubble paints the thumbhash, then MDK's copy.
-    val bytes = attachment.inMemoryBytes ?: return null
-    return withContext(Dispatchers.Default) {
-        if (attachment.isPendingVideo) {
-            pendingVideoPosterFrame(bytes, extractPoster = true).bitmap
-        } else {
-            MediaPipeline.decodeSampledBitmap(
-                bytes,
-                MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-                domain = domain,
-            )
-        }
-    }
-}
-
 internal fun <T> newestMatchingController(
     controllers: Iterable<T>,
     matches: (T) -> Boolean,
@@ -359,36 +117,6 @@ data class ConversationControllerCopy(
 
     fun couldntAddMemberDuplicate(name: String): String = String.format(couldntAddMemberDuplicateFormat, name)
 }
-
-/**
- * Whether [update] ends this device's membership. A [SelfMembershipFfi.DEVICE_REMOVED] copy counts: this device takes
- * no more sends, while its account stays on the roster through another device. A durable
- * pending leave is provisional even when the record already says LEFT.
- */
-internal fun groupStateUpdateRemovesSelf(
-    previous: AppGroupRecordFfi,
-    update: AppGroupRecordFfi,
-): Boolean = !previous.hasSettledDeparture() && update.hasSettledDeparture()
-
-/** Pending LEFT can still resolve to a joined account after cancellation. */
-internal fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
-    selfMembership.isNonMember() && !(selfMembership == SelfMembershipFfi.LEFT && leaveRequestPending)
-
-/** Distinguishes an actual eviction from a provisional voluntary departure. */
-internal fun SelfMembershipFfi.isGroupEviction(): Boolean =
-    when (this) {
-        SelfMembershipFfi.REMOVED, SelfMembershipFfi.DEVICE_REMOVED -> true
-        SelfMembershipFfi.MEMBER, SelfMembershipFfi.LEFT -> false
-    }
-
-/** A readback can rejoin only an active, confirmed group with no outstanding leave request. */
-internal fun AppGroupRecordFfi.isJoinedAfterLeave(): Boolean =
-    selfMembership == SelfMembershipFfi.MEMBER &&
-        !leaveRequestPending &&
-        !leaveBlocked &&
-        !pendingConfirmation &&
-        !disbanded &&
-        !disbanding
 
 /**
  * Whether [detail] is the MLS "duplicate signature key" commit rejection
@@ -415,92 +143,6 @@ internal fun agentStreamFailureText(
     if (throwable is CancellationException) throw throwable
     return copy.streamFailed()
 }
-
-internal const val MARMOT_DELETE_EVENT_KIND = 5uL
-internal const val MARMOT_REACTION_EVENT_KIND = 7uL
-
-/** Delivery changes can carry the peer reaction that confirms a previously failed send. */
-internal fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
-    when (this) {
-        TimelineUpdateTriggerFfi.REACTION_ADDED,
-        TimelineUpdateTriggerFfi.REACTION_REMOVED,
-        TimelineUpdateTriggerFfi.MESSAGE_DELETED,
-        TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
-        TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
-        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
-        -> true
-        TimelineUpdateTriggerFfi.NEW_MESSAGE,
-        TimelineUpdateTriggerFfi.REPLY_PREVIEW_CHANGED,
-        TimelineUpdateTriggerFfi.AGENT_STREAM_STARTED,
-        TimelineUpdateTriggerFfi.AGENT_STREAM_FINISHED,
-        TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
-        // Typed agent, group-system, and custom-event updates do not mutate
-        // reaction tallies, so they fall in the false bucket — kept explicit
-        // so a future trigger that *does* change
-        // reactions fails the exhaustiveness check rather than silently
-        // missing a recompute.
-        TimelineUpdateTriggerFfi.AGENT_ACTIVITY,
-        TimelineUpdateTriggerFfi.AGENT_OPERATION,
-        TimelineUpdateTriggerFfi.GROUP_SYSTEM,
-        TimelineUpdateTriggerFfi.CUSTOM_EVENT,
-        -> false
-    }
-
-@Suppress("MayBeConstant")
-internal val ConversationTimelinePageLimit = 50u
-
-internal fun compareConversationTimelinePosition(
-    firstAt: ULong,
-    firstId: String,
-    secondAt: ULong,
-    secondId: String,
-): Int = firstAt.compareTo(secondAt).takeIf { it != 0 } ?: firstId.compareTo(secondId)
-
-internal enum class ConversationSearchPageDirection { OLDER, NEWER }
-
-internal enum class ConversationLoadFailureEdge { TOP, BOTTOM }
-
-internal fun conversationLoadFailureEdge(
-    hasPageFailure: Boolean,
-    failedPageDirection: ConversationSearchPageDirection?,
-): ConversationLoadFailureEdge =
-    if (hasPageFailure && failedPageDirection == ConversationSearchPageDirection.NEWER) {
-        ConversationLoadFailureEdge.BOTTOM
-    } else {
-        ConversationLoadFailureEdge.TOP
-    }
-
-internal fun conversationSearchPageDirection(
-    match: ConversationSearchMatch,
-    oldestTimelineAt: ULong,
-    oldestMessageId: String,
-    newestTimelineAt: ULong,
-    newestMessageId: String,
-    hasMoreBefore: Boolean,
-    hasMoreAfter: Boolean,
-): ConversationSearchPageDirection? =
-    when {
-        hasMoreBefore &&
-            compareConversationTimelinePosition(
-                match.timelineAt,
-                match.messageIdHex,
-                oldestTimelineAt,
-                oldestMessageId,
-            ) < 0 -> ConversationSearchPageDirection.OLDER
-        hasMoreAfter &&
-            compareConversationTimelinePosition(
-                match.timelineAt,
-                match.messageIdHex,
-                newestTimelineAt,
-                newestMessageId,
-            ) > 0 -> ConversationSearchPageDirection.NEWER
-        else -> null
-    }
-
-// Cap on the live-projected timeline window (≈4 pages). Bounds memory for a
-// long-open, busy conversation while leaving ample scroll headroom before
-// loadOlder() must re-fetch.
-internal const val LIVE_TIMELINE_WINDOW_CAP = 200
 
 // Cap on how many subscription windows one coalesced batch can absorb. A
 // runaway producer shouldn't be able to wedge the UI behind an unbounded
