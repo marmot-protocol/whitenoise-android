@@ -23,7 +23,7 @@ import dev.ipf.whitenoise.android.ui.settings.SpokenAudioAlertControl
 import dev.ipf.whitenoise.android.ui.settings.SpokenAudioAlertSwitch
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -63,15 +63,15 @@ class SpokenAudioAlertSwitchScreenshotTest {
     /** On, right to left with doubled text. */
     @Test fun rtlLargeText() = capture("rtl_large", checked = true, dark = true, rtl = true, large = true)
 
-    /** The control starts on and a tap stores the new value. */
+    /** The control starts off and a tap stores the opt-in. */
     @Test
-    fun theSwitchStartsOnAndATapIsStored() {
+    fun theSwitchStartsOffAndATapIsStored() {
         composeRule.setContent { WhiteNoiseTheme { Column { SpokenAudioAlertControl() } } }
         val row = composeRule.onNodeWithTag("notification-quiet-spoken-audio")
-        row.assertIsOn()
-        row.performClick()
         row.assertIsOff()
-        assertFalse(SpokenAudioAlertPreferences.enabled(context))
+        row.performClick()
+        row.assertIsOn()
+        assertTrue(SpokenAudioAlertPreferences.enabled(context))
     }
 
     /** Renders the switch row in one configuration and records it. */

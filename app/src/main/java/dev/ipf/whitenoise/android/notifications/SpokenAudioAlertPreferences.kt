@@ -9,15 +9,15 @@ import android.media.AudioPlaybackConfiguration
 /**
  * Device-wide choice to keep message alerts silent while another app plays speech (#1717). Android plays
  * a channel's sound with a duckable focus request; it ducks music itself but hands a speech player the
- * focus loss, and podcast and audiobook players pause on it. On by default.
+ * focus loss, and podcast and audiobook players pause on it. Off by default; listeners can opt in.
  */
 internal object SpokenAudioAlertPreferences {
     const val KEY = "quiet_alerts_during_spoken_audio"
 
-    /** Missing or unreadable preferences keep the default, which is on. */
+    /** Missing or unreadable preferences keep the default, which is off. */
     fun enabled(context: Context): Boolean {
-        val stored = runCatching { preferences(context).getBoolean(KEY, true) }
-        return stored.getOrDefault(true)
+        val stored = runCatching { preferences(context).getBoolean(KEY, false) }
+        return stored.getOrDefault(false)
     }
 
     /** Persists the choice; only the next first post reads it. */

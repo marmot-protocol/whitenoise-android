@@ -40,17 +40,18 @@ class SpokenAudioAlertsTest {
     @After
     fun tearDown() = clearChoice()
 
-    /** A podcast or audiobook player quiets the alert by default. */
+    /** A podcast or audiobook player leaves alerts audible until the listener opts in. */
     @Test
-    fun playingSpeechQuietsAlertsByDefault() {
+    fun playingSpeechKeepsAlertsAudibleByDefault() {
         playing(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_SPEECH))
-        assertTrue(SpokenAudioAlertPreferences.enabled(context))
-        assertTrue(quietAlertForSpokenAudio(context))
+        assertFalse(SpokenAudioAlertPreferences.enabled(context))
+        assertFalse(quietAlertForSpokenAudio(context))
     }
 
     /** Music is ducked by Android itself, so it keeps the alert audible. */
     @Test
     fun musicKeepsAlertsAudible() {
+        SpokenAudioAlertPreferences.setEnabled(context, true)
         playing(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_MUSIC))
         assertFalse(quietAlertForSpokenAudio(context))
     }
@@ -58,6 +59,7 @@ class SpokenAudioAlertsTest {
     /** Assistant and accessibility speech are not media, so they never quiet an alert. */
     @Test
     fun assistantAndAccessibilitySpeechKeepAlertsAudible() {
+        SpokenAudioAlertPreferences.setEnabled(context, true)
         playing(
             attributes(AudioAttributes.USAGE_ASSISTANT, AudioAttributes.CONTENT_TYPE_SPEECH),
             attributes(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY, AudioAttributes.CONTENT_TYPE_SPEECH),
@@ -68,6 +70,7 @@ class SpokenAudioAlertsTest {
     /** A speech player that is registered but not playing keeps the alert audible. */
     @Test
     fun idleSpeechPlayerKeepsAlertsAudible() {
+        SpokenAudioAlertPreferences.setEnabled(context, true)
         audio.setActivePlaybackConfigurationsFor(
             listOf(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_SPEECH)),
         )
@@ -79,10 +82,25 @@ class SpokenAudioAlertsTest {
     @Test
     fun turningTheChoiceOffKeepsAlertsAudible() {
         playing(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_SPEECH))
-        SpokenAudioAlertPreferences.setEnabled(context, false)
-        assertFalse(quietAlertForSpokenAudio(context))
         SpokenAudioAlertPreferences.setEnabled(context, true)
+        assertTrue(SpokenAudioAlertPreferences.enabled(context))
         assertTrue(quietAlertForSpokenAudio(context))
+        SpokenAudioAlertPreferences.setEnabled(context, false)
+        assertFalse(SpokenAudioAlertPreferences.enabled(context))
+        assertFalse(quietAlertForSpokenAudio(context))
+    }
+
+    /** A malformed stored value follows the same audible default as an unset choice. */
+    @Test
+    fun unreadableChoiceKeepsAlertsAudible() {
+        context
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .putString(SpokenAudioAlertPreferences.KEY, "invalid")
+            .commit()
+        playing(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_SPEECH))
+        assertFalse(SpokenAudioAlertPreferences.enabled(context))
+        assertFalse(quietAlertForSpokenAudio(context))
     }
 
     /** Reports [players] as registered while media is playing. */
