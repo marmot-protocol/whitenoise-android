@@ -4,6 +4,12 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT="$REPO_DIR/scripts/prefetch-robolectric-android-all.sh"
+# Keep the runner's process-control implementation visible when deadline checks fail.
+printf 'Prefetch deadline tools: bash %s\n' "$BASH_VERSION"
+command -v timeout
+readlink -f "$(command -v timeout)"
+timeout --version
+ps --version
 FIXTURE="$(mktemp -d)"
 trap 'rm -rf "$FIXTURE"' EXIT
 
@@ -106,7 +112,10 @@ assert_transport_stopped() {
       [[ -z "$state" || "$state" == Z* ]] && break
       sleep 0.05
     done
-    [[ -z "$state" || "$state" == Z* ]] || fail 'timed transport or its descendant is still running'
+    if [[ -n "$state" && "$state" != Z* ]]; then
+      ps -o pid,ppid,pgid,sid,stat,args -p "$pid" >&2 || true
+      fail 'timed transport or its descendant is still running'
+    fi
   done <"$PREFETCH_PIDS"
 }
 run_fake() {

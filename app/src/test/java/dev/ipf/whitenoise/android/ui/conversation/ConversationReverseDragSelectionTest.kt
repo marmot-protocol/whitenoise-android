@@ -123,8 +123,10 @@ internal class ConversationReverseDragSelectionTest {
             val bounds = row.fetchSemanticsNode().boundsInRoot
             // Tall fixture rows leave enough vertical travel to exceed slop without crossing the anchor.
             val heldPoint = Offset(bounds.center.x, bounds.bottom - 4f)
+            // A held range drag requests frames until release; advance its clock explicitly.
+            composeRule.mainClock.autoAdvance = false
             host.performTouchInput { moveTo(heldPoint) }
-            composeRule.waitForIdle()
+            advanceFrames(2)
             composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertDoesNotExist()
             assertTrue("the anchor-only drag has no selection yet", surface.selectedMessages.isEmpty())
             assertEquals("a held drag must consume the menu restore", showsBeforeDrag, keyboard.showRequests)
@@ -142,11 +144,12 @@ internal class ConversationReverseDragSelectionTest {
                         .fetchSemanticsNode()
                         .boundsInRoot.center
                 host.performTouchInput { moveTo(neighborPoint) }
-                composeRule.waitForIdle()
+                advanceFrames(2)
                 assertTrue("crossing a row enters selection", surface.selectedMessages.isNotEmpty())
                 assertEquals(showsBeforeDrag, keyboard.showRequests)
             }
             host.performTouchInput { if (cancelGesture) cancel() else up() }
+            composeRule.mainClock.autoAdvance = true
             composeRule.waitForIdle()
             if (!crossRow) assertTrue(surface.selectedMessages.isEmpty())
             assertEquals("release/cancel cannot replay the consumed restore", showsBeforeDrag, keyboard.showRequests)

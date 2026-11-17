@@ -34,6 +34,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Exercises the production row's action and real picker window, including their teardown. */
 @RunWith(RobolectricTestRunner::class)
@@ -45,6 +46,7 @@ class ForwardMenuHandoffTest {
 
     @Test fun forwardingDoesNotDismissAndRestoreConversationSearch() = assertHandoff(MessageMenuKeyboardOwner.Search)
 
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     @Test fun mediaEligibilityLossClosesThePickerAndMenuWithoutRestoringTheKeyboard() {
         assertHandoff(MessageMenuKeyboardOwner.Composer, media = true)
     }
