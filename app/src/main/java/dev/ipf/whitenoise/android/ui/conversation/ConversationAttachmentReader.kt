@@ -30,6 +30,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
+// Keep picker limits aligned with the retained-upload LRU. A larger value
+// could evict an attachment during its own insert and make retries impossible.
 private const val MEDIA_ATTACHMENT_MAX_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
 private const val VIDEO_FALLBACK_NAME = "video.mp4"
 
