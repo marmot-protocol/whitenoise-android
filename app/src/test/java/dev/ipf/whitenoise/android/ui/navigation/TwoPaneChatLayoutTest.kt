@@ -95,8 +95,9 @@ class TwoPaneChatLayoutTest {
     }
 
     /**
-     * Short, wide windows such as a phone held horizontally split the panes evenly after the divider;
-     * taller expanded windows keep the fixed 360dp list (#3866).
+     * Short, wide windows such as a phone held horizontally split the panes evenly after the divider,
+     * with the list capped for very wide short windows; taller expanded windows keep the fixed 360dp
+     * list (#3866).
      */
     @Test
     fun shortExpandedWindowsBalanceThePanes() {
@@ -106,7 +107,8 @@ class TwoPaneChatLayoutTest {
             listOf(
                 DpSize(840.dp, 400.dp) to 419.5.dp,
                 DpSize(960.dp, 432.dp) to 479.5.dp,
-                DpSize(1080.dp, 432.dp) to 539.5.dp,
+                DpSize(1080.dp, 432.dp) to ShortWindowListMaxWidth,
+                DpSize(1920.dp, 400.dp) to ShortWindowListMaxWidth,
                 DpSize(840.dp, 480.dp) to TwoPaneListWidth,
                 DpSize(1280.dp, 800.dp) to TwoPaneListWidth,
             )
