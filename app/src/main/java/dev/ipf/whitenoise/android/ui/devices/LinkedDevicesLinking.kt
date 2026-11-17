@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.DeviceGroupMoveStateFfi
 import dev.ipf.marmotkit.DeviceGroupMoveViewFfi
 import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.LinkedDeviceChatCounts
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsCallout
@@ -42,6 +43,21 @@ internal data class LinkedDevicesActions(
     val onRetry: () -> Unit = {},
     val onLinkThisDevice: () -> Unit = {},
     val onDismissMoveSibling: (moveId: String, slotIdHex: String) -> Unit = { _, _ -> },
+    val onOpenDevice: (slotIdHex: String) -> Unit = {},
+    val onRepair: () -> Unit = {},
+    val review: SignInReviewActions = SignInReviewActions(),
+)
+
+/**
+ * What MDK reports about this device's standing beside the roster: the chat counts, whether its KeyPackage refresh
+ * is overdue, whether it can no longer keep up with its device group, and the sign-ins and warning under review.
+ */
+internal data class LinkedDevicesHealth(
+    val counts: LinkedDeviceChatCounts = LinkedDeviceChatCounts(),
+    val keyPackageRefreshOverdue: Boolean = false,
+    val stalled: Boolean = false,
+    val busy: Boolean = false,
+    val review: SignInReviewState = SignInReviewState(),
 )
 
 /** Whether a move is still under way. MDK accepts no further move or link request while one is. */

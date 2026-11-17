@@ -18,6 +18,9 @@ internal data class LinkedDeviceRow(
     val lastActiveAtSeconds: Long?,
     val inactive: Boolean,
     val removalPending: Boolean,
+    val addToAllChats: Boolean = true,
+    val bringHistory: Boolean = false,
+    val keepWhileInactive: Boolean = false,
 )
 
 /**
@@ -36,6 +39,12 @@ internal data class LinkedDeviceRoster(
     /** Whether the account has any device besides this one, removal pending or not. */
     val hasOtherDevices: Boolean
         get() = others.isNotEmpty() || removing.isNotEmpty()
+
+    /** The row for [slotIdHex] as the roster now lists it, or null once the roster no longer does. */
+    fun device(slotIdHex: String): LinkedDeviceRow? {
+        val all = listOfNotNull(thisDevice) + others + removing
+        return all.firstOrNull { it.slotIdHex == slotIdHex }
+    }
 }
 
 /** Groups MDK's roster for display without adding, dropping or reinterpreting a device. */
@@ -64,4 +73,7 @@ private fun LinkedDeviceFfi.toRow(): LinkedDeviceRow =
         lastActiveAtSeconds = lastActiveAt?.toLong(),
         inactive = inactive,
         removalPending = removalPending,
+        addToAllChats = addToAllChats,
+        bringHistory = bringHistory,
+        keepWhileInactive = keepWhileInactive,
     )

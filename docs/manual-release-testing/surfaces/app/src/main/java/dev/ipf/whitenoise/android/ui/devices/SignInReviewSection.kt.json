@@ -1,0 +1,257 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.compromise_warning_dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.compromise_warning_dismiss",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.compromise_warning_dismiss_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.compromise_warning_dismiss_detail",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.compromise_warning_foreign_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.compromise_warning_foreign_key",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.compromise_warning_rejected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.compromise_warning_rejected",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.compromise_warning_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.compromise_warning_title",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_not_now",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.link_request_not_now",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_appeared",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_appeared",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_detail_before",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_detail_before",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_detail_new",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_detail_new",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_dismiss",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_last_seen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_last_seen",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_linked_elsewhere",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_linked_elsewhere",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_not_now_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_not_now_state",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_previously_linked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_previously_linked",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_question_before",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_question_before",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_question_new",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_question_new",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_reject",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_reject",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_reject_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_reject_confirm",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_rejected_elsewhere",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_rejected_elsewhere",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_signed_out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_signed_out",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_unknown_client",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_in_unknown_client",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_ins_check",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_ins_check",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_ins_check_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_ins_check_detail",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_ins_check_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_ins_check_failed",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_ins_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.sign_ins_section",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.start_fresh_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.start_fresh_detail",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.start_fresh_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.start_fresh_title",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.started_fresh_note",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "R.string.started_fresh_note",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "SignInReviewDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "fun SignInReviewDialog(",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "SignInReviewText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+        "anchor": "fun SignInReviewText(",
+        "test_ids": [
+          "SET-064"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

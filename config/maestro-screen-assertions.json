@@ -914,7 +914,7 @@
             "text": "Rejoin group\\?"
           },
           "opened_by": {
-            "text": "Review invitation from Fixture inviter \u00b7 epoch 9"
+            "text": "Review invitation from Fixture inviter · epoch 9"
           }
         },
         {
@@ -927,7 +927,7 @@
             "text": "Rejoin group\\?"
           },
           "opened_by": {
-            "text": "Review invitation from Fixture inviter \u00b7 epoch 9"
+            "text": "Review invitation from Fixture inviter · epoch 9"
           }
         },
         {
@@ -940,7 +940,7 @@
             "text": "Rejoin group\\?"
           },
           "opened_by": {
-            "text": "Review invitation from Fixture inviter \u00b7 epoch 9"
+            "text": "Review invitation from Fixture inviter · epoch 9"
           }
         }
       ]
@@ -1878,7 +1878,7 @@
         {
           "case": "presentation-nostr-image-failure",
           "selector": {
-            "text": "Couldn\u2019t load this image. Try again."
+            "text": "Couldn’t load this image. Try again."
           },
           "scope": "image-pane failure and retry against bounded null image loader."
         }
@@ -1921,11 +1921,11 @@
         {
           "case": "presentation-nostr-video-failure",
           "selector": {
-            "text": "Couldn\u2019t play this video\\."
+            "text": "Couldn’t play this video\\."
           },
           "scope": "ExoPlayer local missing-file failure and Close; no successful playback claim.",
           "entry_assertion": {
-            "text": "Couldn\u2019t play this video\\."
+            "text": "Couldn’t play this video\\."
           },
           "visible_on_entry": true
         }
@@ -1938,7 +1938,7 @@
         {
           "case": "reactions-details-back",
           "selector": {
-            "text": "All \u00b7 2"
+            "text": "All · 2"
           },
           "scope": "complete-reaction host resolves both native reactors and opens All filter."
         }
@@ -2070,11 +2070,11 @@
         {
           "case": "reactions-details-back",
           "selector": {
-            "text": "All \u00b7 2"
+            "text": "All · 2"
           },
           "scope": "non-focus-stealing reaction popup retains its app Back interception.",
           "entry_assertion": {
-            "text": "All \u00b7 2"
+            "text": "All · 2"
           },
           "opened_by": {
             "id": "conversation.reaction.pill:0"
@@ -2093,12 +2093,6 @@
       "symbol": "DeviceLinkOtherProfileDialog",
       "bindings": [],
       "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this request. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-060 on a linked-devices test build; add a direct assertion when the entry point ships."
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
-      "symbol": "LinkedDevicesScreen",
-      "bindings": [],
-      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open it. Roster loading, empty, failed-read, pending-removal and account-switch states are covered by JVM tests and manual SET-059 on a linked-devices test build; add a direct assertion when the entry point ships."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
@@ -3319,11 +3313,11 @@
         {
           "case": "presentation-extra-wait-wipe",
           "selector": {
-            "text": "Signing out & wiping\u2026"
+            "text": "Signing out & wiping…"
           },
           "scope": "non-cancellable wipe progress sheet ignores Back and remains visible; observation-only receipt requires zero callbacks. No wipe runs.",
           "entry_assertion": {
-            "text": "Signing out & wiping\u2026"
+            "text": "Signing out & wiping…"
           },
           "visible_on_entry": true
         }
@@ -3435,7 +3429,7 @@
         {
           "case": "nested-blocked-empty",
           "selector": {
-            "text": "You haven\u2019t blocked anyone."
+            "text": "You haven’t blocked anyone."
           },
           "scope": "empty blocked list of disposable account and Back."
         }
@@ -4213,11 +4207,11 @@
         {
           "case": "presentation-extra-help-cancel",
           "selector": {
-            "text": "Couldn\u2019t open GitHub"
+            "text": "Couldn’t open GitHub"
           },
           "scope": "bug-report parent receives a refused browser handoff, opens its recovery dialog, and verifies Cancel/Retry without any external browser launch.",
           "entry_assertion": {
-            "text": "Couldn\u2019t open GitHub"
+            "text": "Couldn’t open GitHub"
           },
           "opened_by": {
             "id": "help.bug.open"
@@ -4226,11 +4220,11 @@
         {
           "case": "presentation-extra-help-retry",
           "selector": {
-            "text": "Couldn\u2019t open GitHub"
+            "text": "Couldn’t open GitHub"
           },
           "scope": "bug-report parent receives a refused browser handoff, opens its recovery dialog, and verifies Cancel/Retry without any external browser launch.",
           "entry_assertion": {
-            "text": "Couldn\u2019t open GitHub"
+            "text": "Couldn’t open GitHub"
           },
           "opened_by": {
             "id": "help.bug.open"
@@ -5756,22 +5750,22 @@
         {
           "case": "presentation-modal-key-feedback-share",
           "selector": {
-            "text": "Couldn\u2019t open sharing"
+            "text": "Couldn’t open sharing"
           },
           "scope": "Shared actual export error/expiry dialog and exact dismissal, Back/reopen; no secret export, SAF write or chooser delivery.",
           "entry_assertion": {
-            "text": "Couldn\u2019t open sharing"
+            "text": "Couldn’t open sharing"
           },
           "visible_on_entry": true
         },
         {
           "case": "presentation-modal-key-feedback-save",
           "selector": {
-            "text": "Couldn\u2019t Save File"
+            "text": "Couldn’t Save File"
           },
           "scope": "Shared actual export error/expiry dialog and exact dismissal, Back/reopen; no secret export, SAF write or chooser delivery.",
           "entry_assertion": {
-            "text": "Couldn\u2019t Save File"
+            "text": "Couldn’t Save File"
           },
           "visible_on_entry": true
         },
@@ -6047,22 +6041,22 @@
         {
           "case": "presentation-modal-nostr-linked-failure",
           "selector": {
-            "text": "Couldn\u2019t load this image\\. Try again\\."
+            "text": "Couldn’t load this image\\. Try again\\."
           },
           "scope": "Actual linked-image Dialog starts its production request and presents success/failure with explicit Back or fullscreen Close; retry verifies exact second image load. Generated pixels at fetch boundary, no public fetch or decoder provenance claim.",
           "entry_assertion": {
-            "text": "Couldn\u2019t load this image\\. Try again\\."
+            "text": "Couldn’t load this image\\. Try again\\."
           },
           "visible_on_entry": true
         },
         {
           "case": "presentation-modal-nostr-linked-retry",
           "selector": {
-            "text": "Couldn\u2019t load this image\\. Try again\\."
+            "text": "Couldn’t load this image\\. Try again\\."
           },
           "scope": "Actual linked-image Dialog starts its production request and presents success/failure with explicit Back or fullscreen Close; retry verifies exact second image load. Generated pixels at fetch boundary, no public fetch or decoder provenance claim.",
           "entry_assertion": {
-            "text": "Couldn\u2019t load this image\\. Try again\\."
+            "text": "Couldn’t load this image\\. Try again\\."
           },
           "visible_on_entry": true
         }
@@ -6655,6 +6649,36 @@
           "visible_on_entry": true
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
+      "symbol": "RemoveDeviceDialog",
+      "bindings": [],
+      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this surface. Its states and actions are covered by JVM tests and the linked-devices manual scenarios on a test build; add a direct assertion when the entry point ships."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
+      "symbol": "RenameDeviceDialog",
+      "bindings": [],
+      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this surface. Its states and actions are covered by JVM tests and the linked-devices manual scenarios on a test build; add a direct assertion when the entry point ships."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+      "symbol": "RepairDeviceLinkDialog",
+      "bindings": [],
+      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this surface. Its states and actions are covered by JVM tests and the linked-devices manual scenarios on a test build; add a direct assertion when the entry point ships."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
+      "symbol": "LinkedDevicesScreen",
+      "bindings": [],
+      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this surface. Its states and actions are covered by JVM tests and the linked-devices manual scenarios on a test build; add a direct assertion when the entry point ships."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
+      "symbol": "SignInReviewDialog",
+      "bindings": [],
+      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this surface. Its states and actions are covered by JVM tests and the linked-devices manual scenarios on a test build; add a direct assertion when the entry point ships."
     }
   ]
 }

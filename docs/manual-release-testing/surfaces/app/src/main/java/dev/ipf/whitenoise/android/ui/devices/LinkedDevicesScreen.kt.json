@@ -170,24 +170,6 @@
         "test_ids": [
           "SET-059"
         ]
-      },
-      {
-        "surface": "LinkedDevicesScreen",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
-        "anchor": "fun LinkedDevicesScreen(",
-        "test_ids": [
-          "SET-059"
-        ]
-      },
-      {
-        "surface": "LinkThisDeviceRoute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
-        "anchor": "fun LinkThisDeviceRoute(",
-        "test_ids": [
-          "SET-059",
-          "SET-060",
-          "SET-062"
-        ]
       }
     ]
   },

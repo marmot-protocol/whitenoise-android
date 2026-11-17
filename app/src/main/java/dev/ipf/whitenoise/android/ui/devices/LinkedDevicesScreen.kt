@@ -2,13 +2,9 @@
 
 package dev.ipf.whitenoise.android.ui.devices
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -17,27 +13,19 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.marmotkit.LinkedDeviceStatusFfi
-import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
-import dev.ipf.whitenoise.android.state.DeviceLinkController
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
 import dev.ipf.whitenoise.android.state.LinkedDeviceRow
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.cancel
-import dev.ipf.whitenoise.android.state.confirmMatch
-import dev.ipf.whitenoise.android.state.dismissMoveSibling
-import dev.ipf.whitenoise.android.state.start
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsCallout
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
+import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
-import dev.ipf.whitenoise.android.ui.settings.SettingsValue
-import kotlinx.coroutines.launch
 import java.time.format.FormatStyle
 
 internal const val LINKED_DEVICES_LIST_TAG = "linked_devices.list"
@@ -49,54 +37,10 @@ internal const val LINKED_DEVICES_LINK_THIS_TAG = "linked_devices.link_this_devi
 internal const val LINKED_DEVICES_EXTERNAL_SIGNER_TAG = "linked_devices.external_signer"
 
 /**
- * Settings → Linked devices: the active account's device roster as MDK lists it, with Link this device opening in
- * place. Leaving the link step with Back only closes it; the link carries on in MDK and the roster offers the way
- * back in. Only Cancel cancels.
- */
-@Composable
-internal fun LinkedDevicesScreen(
-    appState: WhiteNoiseAppState,
-    onBack: () -> Unit,
-) {
-    val controller = rememberDeviceLinkController(appState)
-    val scope = rememberCoroutineScope()
-    var linking by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
-    controller?.let { DeviceLinkFailureEffect(appState, it) }
-    val newDevice = controller?.link?.newDevice
-    if (linking && controller != null) {
-        LinkThisDeviceRoute(controller, onClose = { linking = false })
-        return
-    }
-    val externalSigner = appState.activeAccount?.localSigning != true
-    LinkedDevicesContent(
-        state = controller?.roster ?: LinkedDeviceRosterState(),
-        linking =
-            LinkedDevicesLinking(
-                availability =
-                    if (externalSigner) DeviceLinkAvailability.ExternalSigner else DeviceLinkAvailability.Available,
-                newDevice = newDevice,
-                moves = controller?.link?.moves.orEmpty(),
-                busy = controller?.running != null,
-            ),
-        onBack = onBack,
-        actions =
-            LinkedDevicesActions(
-                onRetry = { controller?.let { scope.launch { it.refreshRoster() } } },
-                onLinkThisDevice = {
-                    linking = true
-                    if (!newDevice.inProgress()) controller?.let { scope.launch { it.start() } }
-                },
-                onDismissMoveSibling = { moveId, slot ->
-                    controller?.let { scope.launch { it.dismissMoveSibling(moveId, slot) } }
-                },
-            ),
-    )
-}
-
-/**
  * The roster screen for [state]. This device leads, other devices follow, and devices whose removal the device
  * group has not taken yet are listed apart. A failed read is announced above whatever rows were already read, with
- * a retry, and is never shown as an empty list. Below the rows come any moves MDK reports for this device, then
+ * a retry, and is never shown as an empty list. A row opens that device's page. Above the rows come the open
+ * security warning and this device's standing notices; below them the chat counts, any moves MDK reports, then
  * the linking actions: Link this device while it has no linked sibling (or to return to a link under way), Move
  * this device once it has, and what to do on another device to add it.
  */
@@ -106,43 +50,21 @@ internal fun LinkedDevicesContent(
     onBack: () -> Unit,
     linking: LinkedDevicesLinking = LinkedDevicesLinking(),
     actions: LinkedDevicesActions = LinkedDevicesActions(),
+    health: LinkedDevicesHealth = LinkedDevicesHealth(),
 ) {
     SettingsScaffold(title = stringResource(R.string.linked_devices), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag(LINKED_DEVICES_LIST_TAG)) {
             item(key = "detail") { SettingsExplainer(stringResource(R.string.linked_devices_detail)) }
+            compromiseWarning(health.review, actions.review.onDismissWarning)
+            linkedDevicesNotices(health, actions.onRepair)
             if (state.readFailed) linkedDevicesFailure(state.refreshing, actions.onRetry)
-            linkedDevicesRoster(state)
+            linkedDevicesRoster(state, actions.onOpenDevice)
+            linkedDevicesChatCounts(health.counts)
             linkedDevicesMoves(linking, actions.onDismissMoveSibling)
             linkedDevicesLinking(state, linking, actions.onLinkThisDevice)
+            if (linking.availability == DeviceLinkAvailability.Available) signInReview(health.review, actions.review)
         }
     }
-}
-
-/**
- * This device's own link, shown in place of the roster. Back only closes it: the link carries on in MDK and the
- * roster offers the way back in. Only Cancel cancels, and Try again starts a fresh request.
- */
-@Composable
-private fun LinkThisDeviceRoute(
-    controller: DeviceLinkController,
-    onClose: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    val state = controller.link?.newDevice ?: NewDeviceLinkStateFfi.WaitingForAnswer
-    BackHandler(onBack = onClose)
-    LinkThisDeviceContent(
-        step = newDeviceLinkStep(state),
-        running = controller.running,
-        onBack = onClose,
-        onAction = { action ->
-            when (action) {
-                DeviceLinkAction.ConfirmMatch -> scope.launch { controller.confirmMatch() }
-                DeviceLinkAction.Cancel -> scope.launch { controller.cancel() }
-                DeviceLinkAction.TryAgain -> scope.launch { controller.start() }
-                else -> onClose()
-            }
-        },
-    )
 }
 
 /** The failure notice and its retry, placed above the rows that were already read. */
@@ -174,7 +96,10 @@ private fun LazyListScope.linkedDevicesFailure(
 }
 
 /** The loading note before the first read, the empty note, or the grouped device rows. */
-private fun LazyListScope.linkedDevicesRoster(state: LinkedDeviceRosterState) {
+private fun LazyListScope.linkedDevicesRoster(
+    state: LinkedDeviceRosterState,
+    onOpenDevice: (String) -> Unit,
+) {
     val roster = state.roster
     when {
         roster == null && !state.readFailed ->
@@ -194,10 +119,10 @@ private fun LazyListScope.linkedDevicesRoster(state: LinkedDeviceRosterState) {
             }
         else -> {
             roster.thisDevice?.let { device ->
-                linkedDeviceSection(R.string.linked_devices_this_device, "this", listOf(device))
+                linkedDeviceSection(R.string.linked_devices_this_device, "this", listOf(device), onOpenDevice)
             }
-            linkedDeviceSection(R.string.linked_devices_other_devices, "others", roster.others)
-            linkedDeviceSection(R.string.linked_devices_removing, "removing", roster.removing)
+            linkedDeviceSection(R.string.linked_devices_other_devices, "others", roster.others, onOpenDevice)
+            linkedDeviceSection(R.string.linked_devices_removing, "removing", roster.removing, onOpenDevice)
             if (!roster.hasOtherDevices) {
                 item(key = "no-others") {
                     SettingsCallout(
@@ -215,6 +140,7 @@ private fun LazyListScope.linkedDeviceSection(
     title: Int,
     key: String,
     devices: List<LinkedDeviceRow>,
+    onOpenDevice: (String) -> Unit,
 ) {
     if (devices.isEmpty()) return
     item(key = "section.$key") { SettingsSection(stringResource(title)) }
@@ -222,10 +148,11 @@ private fun LazyListScope.linkedDeviceSection(
         SettingsGroup(modifier = Modifier.testTag("linked_devices.group.$key")) {
             devices.forEach { device ->
                 row(device.slotIdHex) { context ->
-                    SettingsValue(
+                    SettingsLink(
                         context = context,
                         title = device.label.ifBlank { stringResource(R.string.linked_devices_unnamed) },
-                        value = linkedDeviceSummary(device).joinToString("\n"),
+                        onClick = { onOpenDevice(device.slotIdHex) },
+                        subtitle = linkedDeviceSummary(device).joinToString("\n"),
                         modifier = Modifier.testTag("linked_devices.device.${device.slotIdHex}"),
                         explanation = stringResource(R.string.explanation_linked_device_row),
                         leading = { SettingsLeadingIcon(R.drawable.ic_device) },

@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.devices
 
 import dev.ipf.marmotkit.DeviceLinkEmojiFfi
 import dev.ipf.marmotkit.LinkedDeviceStatusFfi
+import dev.ipf.marmotkit.UnrecognizedSignInFfi
+import dev.ipf.marmotkit.UnrecognizedSignInStateFfi
 import dev.ipf.whitenoise.android.state.LinkedDeviceRoster
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
 import dev.ipf.whitenoise.android.state.LinkedDeviceRow
@@ -60,3 +62,19 @@ internal fun fixtureCode(): List<DeviceLinkEmojiFfi> =
         "⚓" to "anchor",
         "🔔" to "bell",
     ).map { (emoji, description) -> DeviceLinkEmojiFfi(emoji, description) }
+
+/** An unrecognized sign-in waiting for an answer in [slot]. */
+internal fun signIn(
+    slot: String,
+    beforeThisDevice: Boolean = false,
+) = UnrecognizedSignInFfi(
+    slotIdHex = slot,
+    client = "White Noise",
+    appearedAt = FIXTURE_LINKED_AT.toULong(),
+    lastSeenAt = FIXTURE_LINKED_AT.toULong() + 3_600u,
+    beforeThisDevice = beforeThisDevice,
+    signedIn = true,
+    state = UnrecognizedSignInStateFfi.PROMPT,
+    linkedBySlotIdHex = null,
+    previouslyLinkedHere = false,
+)
