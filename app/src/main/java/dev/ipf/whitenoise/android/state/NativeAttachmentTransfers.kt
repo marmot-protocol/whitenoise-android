@@ -226,13 +226,20 @@ private suspend fun observeNativeAttachment(
         }
         state =
             if (state == AttachmentTransferStateFfi.PAUSED) {
-                // A paused transfer does no network work, so its download slot serves others until the pause ends.
-                withDownloadSlotReleased { updates.awaitPauseEnd(onState, pausedGraceMillis) }
+                // A paused transfer does no network work, so its download slot serves others until the pause ends. It
+                // queues for one again only if the transfer still has work to do.
+                withDownloadSlotReleased(requeueAfter = ::stillTransferring) {
+                    updates.awaitPauseEnd(onState, pausedGraceMillis)
+                }
             } else {
                 updates.nextState().also(onState)
             }
     }
 }
+
+/** True for a state that still needs network work, so it needs a download slot again. */
+private fun stillTransferring(state: AttachmentTransferStateFfi): Boolean =
+    state != AttachmentTransferStateFfi.READY && state !in NATIVE_TRANSFER_TERMINAL_FAILURES
 
 /**
  * Returns the first state after a pause. With a [graceMillis], observation ends once the pause has lasted that long;

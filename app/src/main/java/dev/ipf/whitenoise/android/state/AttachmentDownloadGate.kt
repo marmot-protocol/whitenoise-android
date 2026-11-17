@@ -85,6 +85,7 @@ internal class AttachmentDownloadGate(
     private val keyedWaiters = KeyedWaiters()
     private val pendingPromotions = mutableSetOf<String>()
     private val pendingForeground = mutableMapOf<String, Long>()
+    private val pausedOwners = mutableMapOf<String, Int>()
     private var lastForegroundDemand = 0L
     private val anonymousKey = AtomicLong()
     private var activePermits = 0
@@ -139,14 +140,28 @@ internal class AttachmentDownloadGate(
         companion object Key : CoroutineContext.Key<DownloadSlot>
 
         /**
-         * Gives the permit back while [block] runs, then queues for it again as the same request. A [block] that
-         * throws leaves it given back, so the ending work does not wait for a permit only to release it.
+         * Gives the permit back while [block] runs, then queues for it again as the same request when [requeueAfter]
+         * accepts the result. Meanwhile the key still counts as admitted, so a tap on it still escalates the native
+         * transfer. A [block] that throws, or a result that needs no more network work, leaves the permit given back,
+         * so the ending work does not wait for a permit only to release it.
          */
-        suspend fun <T> releasedWhile(block: suspend () -> T): T {
+        suspend fun <T> releasedWhile(
+            requeueAfter: (T) -> Boolean,
+            block: suspend () -> T,
+        ): T {
             val held = waiter
-            gate.release(held)
-            val result = block()
-            waiter = gate.acquire(cacheKey, accountRef, held.priority, foreground)
+            gate.releaseForPause(held)
+            val result =
+                try {
+                    block()
+                } finally {
+                    gate.endPause(cacheKey)
+                }
+            if (requeueAfter(result)) {
+                waiter = gate.acquire(cacheKey, accountRef, held.priority, foreground)
+            } else {
+                gate.forgetPending(cacheKey)
+            }
             return result
         }
     }
@@ -200,11 +215,38 @@ internal class AttachmentDownloadGate(
         synchronized(lock) { pendingForeground.remove(key) }
     }
 
-    /** True only while this attachment currently owns one of the bounded native-work permits. */
+    /**
+     * True while this attachment owns one of the bounded native-work permits, or gave it back only because MDK holds
+     * its transfer paused: native work exists either way, so a tap can still escalate it.
+     */
     fun isAdmitted(key: String): Boolean =
         synchronized(lock) {
-            keyedWaiters.forKey(key).orEmpty().any(Waiter::ownsPermit)
+            keyedWaiters.forKey(key).orEmpty().any(Waiter::ownsPermit) || key in pausedOwners
         }
+
+    /** Gives [waiter]'s permit back while its native transfer is paused, keeping its key counted as admitted. */
+    private fun releaseForPause(waiter: Waiter) {
+        synchronized(lock) {
+            pausedOwners[waiter.key] = pausedOwners.getOrDefault(waiter.key, 0) + 1
+            release(waiter)
+        }
+    }
+
+    /** Ends one pause that [releaseForPause] began for [key]. */
+    private fun endPause(key: String) {
+        synchronized(lock) {
+            val remaining = pausedOwners.getOrDefault(key, 0) - 1
+            if (remaining > 0) pausedOwners[key] = remaining else pausedOwners.remove(key)
+        }
+    }
+
+    /** Drops promotions and visible demand still waiting for [key], once its work finished without queuing again. */
+    private fun forgetPending(key: String) {
+        synchronized(lock) {
+            pendingPromotions.remove(key)
+            pendingForeground.remove(key)
+        }
+    }
 
     /** Cancels only automatic requests that have not acquired a permit. */
     fun cancelQueuedAutomatic(accountRef: String): Int {
@@ -380,11 +422,14 @@ internal class AttachmentDownloadGate(
 }
 
 /**
- * Gives back the download slot this coroutine holds, if any, while [block] runs, then queues for it again. A transfer
- * MDK holds paused does no network work, so its slot can serve other downloads until the pause ends.
+ * Gives back the download slot this coroutine holds, if any, while [block] runs, then queues for it again when
+ * [requeueAfter] accepts the result. A transfer MDK holds paused does no network work, so its slot can serve other
+ * downloads until the pause ends.
  */
-internal suspend fun <T> withDownloadSlotReleased(block: suspend () -> T): T =
-    currentCoroutineContext()[AttachmentDownloadGate.DownloadSlot]?.releasedWhile(block) ?: block()
+internal suspend fun <T> withDownloadSlotReleased(
+    requeueAfter: (T) -> Boolean = { true },
+    block: suspend () -> T,
+): T = currentCoroutineContext()[AttachmentDownloadGate.DownloadSlot]?.releasedWhile(requeueAfter, block) ?: block()
 
 /**
  * Conservative classifier for the current MDK media error surface.

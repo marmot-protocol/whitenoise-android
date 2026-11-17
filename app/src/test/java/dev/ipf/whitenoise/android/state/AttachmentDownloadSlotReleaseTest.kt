@@ -6,7 +6,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -41,7 +43,7 @@ class AttachmentDownloadSlotReleaseTest {
                     }
                 secondRunning.await()
                 pauseEnds.complete(Unit)
-                kotlinx.coroutines.yield()
+                yield()
                 assertEquals("the resumed holder waits for a free slot", 2, events.size)
                 secondDone.complete(Unit)
                 listOf(paused, next).awaitAll()
@@ -76,6 +78,54 @@ class AttachmentDownloadSlotReleaseTest {
 
                 assertTrue("$failure", failure is IOException)
                 assertTrue("the slot was free for the next request", blocker.isCompleted)
+            }
+        }
+
+    /** A paused holder still counts as admitted, so a tap on it still escalates the native transfer. */
+    @Test
+    fun aPausedHolderStillCountsAsAdmitted() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                var admittedDuringPause = false
+                gate.withPermit("paused", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+                    withDownloadSlotReleased { admittedDuringPause = gate.isAdmitted("paused") }
+                }
+
+                assertTrue(admittedDuringPause)
+                assertFalse("the finished request is no longer admitted", gate.isAdmitted("paused"))
+            }
+        }
+
+    /** A pause that ends with nothing left to transfer finishes at once instead of queuing behind other downloads. */
+    @Test
+    fun aPauseThatEndsTheWorkDoesNotQueueAgain() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val pauseEnds = CompletableDeferred<Unit>()
+                val otherRunning = CompletableDeferred<Unit>()
+                val otherDone = CompletableDeferred<Unit>()
+                val paused =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("paused", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+                            withDownloadSlotReleased(requeueAfter = { false }) { pauseEnds.await() }
+                        }
+                    }
+                val other =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("other", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+                            otherRunning.complete(Unit)
+                            otherDone.await()
+                        }
+                    }
+                otherRunning.await()
+                pauseEnds.complete(Unit)
+                paused.await()
+
+                assertTrue("the other download still holds the only slot", other.isActive)
+                otherDone.complete(Unit)
+                other.await()
             }
         }
 
