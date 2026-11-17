@@ -225,24 +225,31 @@ private suspend fun observeNativeAttachment(
             throw NativeAttachmentTerminalException(requireNotNull(state))
         }
         state =
-            if (state == AttachmentTransferStateFfi.PAUSED && pausedGraceMillis != null) {
-                updates.awaitPauseEnd(onState, pausedGraceMillis)
+            if (state == AttachmentTransferStateFfi.PAUSED) {
+                // A paused transfer does no network work, so its download slot serves others until the pause ends.
+                withDownloadSlotReleased { updates.awaitPauseEnd(onState, pausedGraceMillis) }
             } else {
                 updates.nextState().also(onState)
             }
     }
 }
 
-/** Returns the first state after a pause, or ends observation once the pause has lasted [graceMillis]. */
+/**
+ * Returns the first state after a pause. With a [graceMillis], observation ends once the pause has lasted that long;
+ * without one, as for a visible bubble, it waits for as long as MDK keeps the transfer paused.
+ */
 private suspend fun NativeTransferFeed.awaitPauseEnd(
     onState: (AttachmentTransferStateFfi) -> Unit,
-    graceMillis: Long,
-): AttachmentTransferStateFfi =
-    withTimeoutOrNull(graceMillis) {
+    graceMillis: Long?,
+): AttachmentTransferStateFfi {
+    val pauseEnd: suspend () -> AttachmentTransferStateFfi = {
         var next = AttachmentTransferStateFfi.PAUSED
         while (next == AttachmentTransferStateFfi.PAUSED) next = nextState().also(onState)
         next
-    } ?: throw NativeAttachmentPausedException()
+    }
+    if (graceMillis == null) return pauseEnd()
+    return withTimeoutOrNull(graceMillis) { pauseEnd() } ?: throw NativeAttachmentPausedException()
+}
 
 /** A complete one-target replacement is required before interpreting native progress. */
 internal suspend fun NativeTransferFeed.nextState(): AttachmentTransferStateFfi =

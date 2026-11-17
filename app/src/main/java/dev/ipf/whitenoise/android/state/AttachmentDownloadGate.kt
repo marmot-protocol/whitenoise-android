@@ -4,9 +4,13 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.core.isMediaReferenceRefusal
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 internal enum class AttachmentDownloadPriority {
     Automatic,
@@ -39,7 +43,8 @@ internal class AttachmentDownloadGate(
         require(parallelism > 0) { "parallelism must be positive" }
     }
 
-    private class Waiter(
+    /** One registered request for a permit, queued in a lane until it owns one. */
+    internal class Waiter(
         val key: String,
         val accountRef: String?,
         var priority: AttachmentDownloadPriority,
@@ -112,11 +117,37 @@ internal class AttachmentDownloadGate(
         foreground: Boolean = false,
         block: suspend () -> T,
     ): T {
-        val waiter = acquire(key, accountRef, priority, foreground)
+        val slot = DownloadSlot(this, key, accountRef, foreground, acquire(key, accountRef, priority, foreground))
         try {
-            return block()
+            return withContext(slot) { block() }
         } finally {
-            release(waiter)
+            release(slot.waiter)
+        }
+    }
+
+    /**
+     * The permit one [withPermit] call holds, carried in its coroutine context so code deep inside the work, such as a
+     * native transfer observer, can give it back for a while with [withDownloadSlotReleased].
+     */
+    internal class DownloadSlot internal constructor(
+        private val gate: AttachmentDownloadGate,
+        private val cacheKey: String,
+        private val accountRef: String?,
+        private val foreground: Boolean,
+        @Volatile internal var waiter: Waiter,
+    ) : AbstractCoroutineContextElement(DownloadSlot) {
+        companion object Key : CoroutineContext.Key<DownloadSlot>
+
+        /**
+         * Gives the permit back while [block] runs, then queues for it again as the same request. A [block] that
+         * throws leaves it given back, so the ending work does not wait for a permit only to release it.
+         */
+        suspend fun <T> releasedWhile(block: suspend () -> T): T {
+            val held = waiter
+            gate.release(held)
+            val result = block()
+            waiter = gate.acquire(cacheKey, accountRef, held.priority, foreground)
+            return result
         }
     }
 
@@ -347,6 +378,13 @@ internal class AttachmentDownloadGate(
         const val DEFAULT_MAX_RETRY_BACKOFF_MILLIS = 600L
     }
 }
+
+/**
+ * Gives back the download slot this coroutine holds, if any, while [block] runs, then queues for it again. A transfer
+ * MDK holds paused does no network work, so its slot can serve other downloads until the pause ends.
+ */
+internal suspend fun <T> withDownloadSlotReleased(block: suspend () -> T): T =
+    currentCoroutineContext()[AttachmentDownloadGate.DownloadSlot]?.releasedWhile(block) ?: block()
 
 /**
  * Conservative classifier for the current MDK media error surface.
