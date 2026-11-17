@@ -5,8 +5,13 @@ package dev.ipf.whitenoise.android.ui.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,9 +32,9 @@ internal val TwoPaneListWidth = 360.dp
 /**
  * Share of the width after the divider that the chat list takes on short, wide windows such as a
  * phone held horizontally (#3866). From the 840dp expanded breakpoint this is always wider than
- * [TwoPaneListWidth] and leaves the conversation the majority.
+ * [TwoPaneListWidth].
  */
-internal const val SHORT_WINDOW_LIST_FRACTION = 0.45f
+internal const val SHORT_WINDOW_LIST_FRACTION = 0.5f
 
 internal const val TWO_PANE_LIST_TAG = "two_pane_list"
 internal const val CONVERSATION_PANE_PLACEHOLDER_TAG = "conversation_pane_placeholder"
@@ -39,8 +44,11 @@ internal const val CONVERSATION_PANE_PLACEHOLDER_TAG = "conversation_pane_placeh
  *
  * The conversation pane keeps the same composition position whether or not the list is shown, so
  * crossing the two-pane width keeps the open conversation, its scroll position and its draft.
- * Compact-height windows split the width 45:55 instead of fixing the list at [TwoPaneListWidth],
+ * Compact-height windows split the width evenly instead of fixing the list at [TwoPaneListWidth],
  * which would leave a phone held horizontally with a narrow list beside a very wide conversation.
+ *
+ * Side by side, each pane touches only one outer edge, so a camera cutout or navigation bar on the
+ * other edge must not pad it: the list drops the end-side inset and the conversation the start-side.
  */
 @Composable
 internal fun TwoPaneChatFrame(
@@ -60,6 +68,7 @@ internal fun TwoPaneChatFrame(
                             Modifier.width(TwoPaneListWidth)
                         },
                     ).fillMaxHeight()
+                    .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
                     .testTag(TWO_PANE_LIST_TAG),
             ) {
                 listPane()
@@ -69,7 +78,14 @@ internal fun TwoPaneChatFrame(
         Box(
             Modifier
                 .weight(if (twoPane && shortWindow) 1f - SHORT_WINDOW_LIST_FRACTION else 1f)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                .then(
+                    if (twoPane) {
+                        Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Start))
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
             conversationPane()
         }

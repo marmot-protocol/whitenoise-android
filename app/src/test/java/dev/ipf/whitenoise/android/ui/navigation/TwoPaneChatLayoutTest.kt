@@ -1,18 +1,26 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.os.Looper
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
@@ -28,6 +36,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.SavedStateHandle
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
@@ -84,7 +95,7 @@ class TwoPaneChatLayoutTest {
     }
 
     /**
-     * Short, wide windows such as a phone held horizontally split the panes 45:55 after the divider;
+     * Short, wide windows such as a phone held horizontally split the panes evenly after the divider;
      * taller expanded windows keep the fixed 360dp list (#3866).
      */
     @Test
@@ -93,9 +104,9 @@ class TwoPaneChatLayoutTest {
         mountFrame(size)
         val expected =
             listOf(
-                DpSize(840.dp, 400.dp) to 377.55.dp,
-                DpSize(960.dp, 432.dp) to 431.55.dp,
-                DpSize(1080.dp, 432.dp) to 485.55.dp,
+                DpSize(840.dp, 400.dp) to 419.5.dp,
+                DpSize(960.dp, 432.dp) to 479.5.dp,
+                DpSize(1080.dp, 432.dp) to 539.5.dp,
                 DpSize(840.dp, 480.dp) to TwoPaneListWidth,
                 DpSize(1280.dp, 800.dp) to TwoPaneListWidth,
             )
@@ -106,8 +117,8 @@ class TwoPaneChatLayoutTest {
             val conversation = composeRule.onNodeWithTag(FRAME_CONVERSATION_TAG).getUnclippedBoundsInRoot()
             assertEquals("list at $window", listWidth.value, (list.right - list.left).value, PANE_TOLERANCE)
             assertTrue(
-                "conversation keeps the majority at $window",
-                conversation.right - conversation.left > list.right - list.left,
+                "conversation is never narrower than the list at $window",
+                (conversation.right - conversation.left).value >= (list.right - list.left).value - PANE_TOLERANCE,
             )
             assertEquals(
                 "panes fill $window",
@@ -116,6 +127,60 @@ class TwoPaneChatLayoutTest {
                 PANE_TOLERANCE,
             )
         }
+    }
+
+    /**
+     * Side by side, a camera cutout pads only the pane on its edge: the conversation beside the list
+     * must not leave the cutout's width empty before its messages, nor the list beside the conversation.
+     */
+    @Test
+    fun eachPaneAppliesOnlyTheCutoutOnItsOwnEdge() {
+        lateinit var view: View
+        composeRule.setContent {
+            view = LocalView.current
+            val window = DpSize(960.dp, 432.dp)
+            CompositionLocalProvider(LocalWindowLayout provides WindowLayout.fromSize(window)) {
+                Box(Modifier.size(window)) {
+                    TwoPaneChatFrame(twoPane = true, listPane = { InsetContent(LIST_CONTENT_TAG) }) {
+                        InsetContent(CONVERSATION_CONTENT_TAG)
+                    }
+                }
+            }
+        }
+        val cases = listOf(Insets.of(CUTOUT_PX, 0, 0, 0), Insets.of(0, 0, CUTOUT_PX, 0))
+        cases.forEach { cutout ->
+            composeRule.runOnUiThread {
+                val insets =
+                    WindowInsetsCompat
+                        .Builder()
+                        .setInsets(WindowInsetsCompat.Type.displayCutout(), cutout)
+                        .build()
+                ViewCompat.dispatchApplyWindowInsets(view.rootView, insets)
+            }
+            composeRule.waitForIdle()
+            val list = composeRule.onNodeWithTag(TWO_PANE_LIST_TAG).getUnclippedBoundsInRoot()
+            val listContent = composeRule.onNodeWithTag(LIST_CONTENT_TAG).getUnclippedBoundsInRoot()
+            val conversation = composeRule.onNodeWithTag(CONVERSATION_CONTENT_TAG).getUnclippedBoundsInRoot()
+            assertEquals("list start at $cutout", cutout.left.toFloat(), (listContent.left - list.left).value, 0.5f)
+            assertEquals("list end at $cutout", 0f, (list.right - listContent.right).value, 0.5f)
+            assertEquals(
+                "conversation start at $cutout",
+                list.right.value + 1f,
+                conversation.left.value,
+                PANE_TOLERANCE,
+            )
+            assertEquals("conversation end at $cutout", 960f - cutout.right, conversation.right.value, 0.5f)
+        }
+    }
+
+    @Composable
+    private fun InsetContent(tag: String) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                .testTag(tag),
+        )
     }
 
     /** Crossing the 480dp short-window height changes only the proportion, never the conversation. */
@@ -281,6 +346,11 @@ class TwoPaneChatLayoutTest {
         val SHORT_HEIGHT = 400.dp
         const val PANE_TOLERANCE = 1f
         const val FRAME_CONVERSATION_TAG = "frame_conversation"
+        const val LIST_CONTENT_TAG = "list_inset_content"
+        const val CONVERSATION_CONTENT_TAG = "conversation_inset_content"
+
+        /** Cutout depth in pixels; the test runs at mdpi, so also its width in dp. */
+        const val CUTOUT_PX = 59
         const val DRAFT = "Draft kept across the fold"
     }
 }

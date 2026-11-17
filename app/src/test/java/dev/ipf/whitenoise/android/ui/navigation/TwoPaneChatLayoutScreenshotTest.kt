@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.os.Looper
+import android.view.View
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -11,6 +13,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.SavedStateHandle
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
@@ -29,7 +34,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * The tablet chat layout: the list beside an empty pane, then beside an open chat (#3685), and the
- * balanced split on a phone held horizontally (#3866).
+ * balanced split on a phone held horizontally (#3866). The light phone capture adds a camera cutout on
+ * the list's edge, so incoming messages must still start next to the divider.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -53,7 +59,13 @@ class TwoPaneChatLayoutScreenshotTest {
     @Test
     @Config(qualifiers = PHONE_LANDSCAPE)
     fun phoneLandscapeOpenChatLight() {
-        capture(darkTheme = false, openChat = true, name = "two_pane_phone_landscape_light", window = PHONE)
+        capture(
+            darkTheme = false,
+            openChat = true,
+            name = "two_pane_phone_landscape_light",
+            window = PHONE,
+            cutout = Insets.of(CUTOUT_PX, 0, 0, 0),
+        )
     }
 
     @Test
@@ -84,7 +96,9 @@ class TwoPaneChatLayoutScreenshotTest {
         openChat: Boolean,
         name: String,
         window: DpSize = TABLET,
+        cutout: Insets? = null,
     ) {
+        lateinit var view: View
         val fixture = ReturnFixture()
         val mounted = mutableStateOf(true)
         val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
@@ -92,6 +106,7 @@ class TwoPaneChatLayoutScreenshotTest {
             holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
         fixture.appState.setAppInForeground(true)
         composeRule.setContent {
+            view = LocalView.current
             if (mounted.value) {
                 CompositionLocalProvider(LocalWindowLayout provides WindowLayout.fromSize(window)) {
                     WhiteNoiseTheme(darkTheme = darkTheme) {
@@ -111,6 +126,17 @@ class TwoPaneChatLayoutScreenshotTest {
                 composeRule.onNodeWithTag(row).performClick()
                 awaitCondition { holder.selectedChat.value?.id == fixture.target.groupIdHex }
                 composeRule.mainClock.advanceTimeBy(1_000)
+                composeRule.waitForIdle()
+            }
+            if (cutout != null) {
+                composeRule.runOnUiThread {
+                    val insets =
+                        WindowInsetsCompat
+                            .Builder()
+                            .setInsets(WindowInsetsCompat.Type.displayCutout(), cutout)
+                            .build()
+                    ViewCompat.dispatchApplyWindowInsets(view.rootView, insets)
+                }
                 composeRule.waitForIdle()
             }
             composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
@@ -136,5 +162,8 @@ class TwoPaneChatLayoutScreenshotTest {
         val PHONE = DpSize(960.dp, 432.dp)
         const val PHONE_LANDSCAPE = "en-w960dp-h432dp-mdpi"
         const val LARGE_FONT_SCALE = 1.3f
+
+        /** A Pixel camera cutout in landscape, 59dp at mdpi. */
+        const val CUTOUT_PX = 59
     }
 }
