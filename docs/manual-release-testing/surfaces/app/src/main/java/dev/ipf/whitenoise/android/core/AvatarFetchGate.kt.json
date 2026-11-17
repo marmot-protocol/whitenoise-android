@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Notification avatar fetch lane and failure cooldown",
+        "surface": "Avatar failure cooldown",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarFetchGate.kt",
-        "anchor": "internal class AvatarFetchGate(",
+        "anchor": "internal class AvatarFailureExpiryCache(",
         "test_ids": [
           "INT-011"
         ]
