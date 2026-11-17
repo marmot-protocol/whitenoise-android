@@ -126,7 +126,8 @@ class AndroidCiGateTest(unittest.TestCase):
         """
         outcomes = {job: {'result': 'success', 'outputs': {}} for job in self.dependencies}
         outcomes['changes']['outputs'] = {'docs_only': 'false', 'supplemental_campaigns': 'true', 'precheck': 'false', 'ci_mode': 'legacy-pr' if event == 'pull_request' else 'full',
-                                         'full_matrix': 'false' if event == 'pull_request' else 'true'}
+                                         'full_matrix': 'false' if event == 'pull_request' else 'true',
+                                         'reuse': 'none', 'reuse_run': '', 'tree': '', 'lint_writer': 'false'}
         if event != 'pull_request' or draft == 'true':
             outcomes['secondary-variant']['result'] = 'skipped'
         # Compose compiler reports run on master, nightly and dispatch only.
@@ -158,12 +159,18 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_aggregate_covers_every_job_and_runs_after_failures(self):
         """Every producer must reach the aggregate even after a dependency fails."""
         jobs = set(re.findall(r'^  ([a-z][a-z-]+):$', self.workflow.split('\njobs:\n', 1)[1], re.MULTILINE))
-        self.assertEqual(set(self.dependencies), jobs - {'validate'})
+        # The merge-group watcher cancels the run but must never be one of the aggregate's needs.
+        self.assertEqual(set(self.dependencies), jobs - {'validate', 'merge-group-fail-fast'})
+        self.assertNotIn('merge-group-fail-fast', self.dependencies)
         self.assertIn('    if: always()\n', self.gate)
         self.assertIn("    name: Compile, test, ktlint, detekt, Android lint${{ github.event.pull_request.draft "
                       "&& ' (draft fast lane)' || '' }}\n", self.gate)
         self.assertIn('JOB_RESULTS: ${{ toJSON(needs) }}', self.gate)
-        self.assertNotIn('continue-on-error:', self.gate)
+        # Only the two proof steps, which merely save time later, may fail without failing the check.
+        proof_steps = ('Write the validated tree proof', 'Retain the validated tree proof')
+        for chunk in self.gate.split('\n      - name: ')[1:]:
+            name = chunk.split('\n', 1)[0]
+            self.assertEqual('continue-on-error: true' in chunk, name in proof_steps, name)
 
     def test_inventory_reporting_cannot_weaken_or_fail_security_enforcement(self):
         """Exports and comparisons cannot fail a lane or weaken its preceding floor gate."""
@@ -220,7 +227,9 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('  pull_request:\n    branches: [master]', events)
         self.assertNotIn('paths:', events)
         self.assertNotIn('paths-ignore:', events)
-        self.assertNotIn('\n    if:', self.tooling_contracts.split('    steps:', 1)[0])
+        # Only a verified same-content reuse may skip this job, never a path filter.
+        self.assertEqual(re.findall(r'\n    if: .*', self.tooling_contracts.split('    steps:', 1)[0]),
+                         ["\n    if: needs.changes.outputs.reuse != 'tree'"])
         step = self.named_step(self.tooling_contracts, 'Validate fuzz PR production triggers')
         self.assertNotIn('        if:', step)
         self.assertIn('python3 scripts/check_fuzz_pr_triggers.py\n', step)
@@ -415,6 +424,214 @@ class AndroidCiGateTest(unittest.TestCase):
             bad[name]['result'] = 'failure'
             self.assertNotEqual(self.run_gate(bad, 'merge_group').returncode, 0)
         self.assertNotEqual(self.run_gate(outcomes, 'push').returncode, 0)
+
+    def reused_outcomes(self, base, kind, kept=('changes',)):
+        """Copy outcomes in which a verified result replaced every job except the kept ones."""
+        outcomes = json.loads(json.dumps(base))
+        outcomes['changes']['outputs'].update(reuse=kind, reuse_run='11', tree='a' * 40)
+        for job in outcomes:
+            outcomes[job]['result'] = 'success' if job in kept else 'skipped'
+        return outcomes
+
+    def test_tree_reuse_accepts_only_the_exact_skip_set(self):
+        """A reused PR tree skips every job except the classifier, and no other outcome passes."""
+        cases = [('pull_request', self.precheck_outcomes(), 'merge-queue'),
+                 ('pull_request', self.successful_outcomes('merge_group'), '')]
+        for event, base, mode in cases:
+            outcomes = self.reused_outcomes(base, 'tree')
+            with self.subTest(event=event, mode=mode):
+                self.assertEqual(self.run_gate(outcomes, event, mode=mode).returncode, 0)
+                for job in self.dependencies:
+                    for result in ('failure', 'cancelled', 'skipped' if job == 'changes' else 'success'):
+                        bad = json.loads(json.dumps(outcomes))
+                        bad[job]['result'] = result
+                        self.assertNotEqual(self.run_gate(bad, event, mode=mode).returncode, 0, (job, result))
+
+    PUSH_KEPT = ('changes', 'tooling-contracts', 'build-contracts')
+
+    def test_push_reuse_still_runs_cache_writers_the_guide_lint_and_risky_compose_reports(self):
+        """A reused push skips the unit suites but keeps cache writers, the guide, lint when needed and Compose reports."""
+        for campaigns, compose in (('true', 'success'), ('false', 'skipped')):
+            for lint in ('true', 'false'):
+                base = self.successful_outcomes('push')
+                base['changes']['outputs'].update(supplemental_campaigns=campaigns, lint_writer=lint)
+                kept = self.PUSH_KEPT + (('compose-compiler',) if compose == 'success' else ()) + (
+                    ('static-analysis',) if lint == 'true' else ())
+                outcomes = self.reused_outcomes(base, 'push', kept)
+                with self.subTest(campaigns=campaigns, lint=lint):
+                    self.assertEqual(self.run_gate(outcomes, 'push').returncode, 0)
+                    for job in self.dependencies:
+                        for result in ('failure', 'cancelled', 'skipped' if outcomes[job]['result'] == 'success' else 'success'):
+                            bad = json.loads(json.dumps(outcomes))
+                            bad[job]['result'] = result
+                            self.assertNotEqual(self.run_gate(bad, 'push').returncode, 0, (campaigns, lint, job, result))
+
+    def test_reuse_needs_a_recorded_run_and_a_matching_context(self):
+        """A reuse claim without a numeric run, or in the wrong event or lane, is rejected."""
+        tree = self.reused_outcomes(self.successful_outcomes('merge_group'), 'tree')
+        push = self.reused_outcomes(self.successful_outcomes('push'), 'push', self.PUSH_KEPT + ('compose-compiler',))
+        self.assertEqual(self.run_gate(tree, 'pull_request').returncode, 0)
+        for bad_run in ('', 'abc', '12x', None):
+            for outcomes, event in ((tree, 'pull_request'), (push, 'push')):
+                changed = json.loads(json.dumps(outcomes))
+                changed['changes']['outputs']['reuse_run'] = bad_run
+                self.assertNotEqual(self.run_gate(changed, event).returncode, 0, (bad_run, event))
+        for value in ('', 'TREE', 'all', None):
+            changed = json.loads(json.dumps(tree))
+            changed['changes']['outputs']['reuse'] = value
+            self.assertNotEqual(self.run_gate(changed, 'pull_request').returncode, 0, value)
+        # The queue never accepts a reused pull request result, whatever the outputs claim.
+        for event in ('merge_group', 'push', 'schedule', 'workflow_dispatch'):
+            self.assertNotEqual(self.run_gate(tree, event).returncode, 0, event)
+        for event in ('pull_request', 'merge_group', 'schedule', 'workflow_dispatch'):
+            self.assertNotEqual(self.run_gate(push, event).returncode, 0, event)
+        # The lint-writer claim must be well formed and only a reused push may make it.
+        for value in ('', 'yes', None):
+            changed = json.loads(json.dumps(push))
+            changed['changes']['outputs']['lint_writer'] = value
+            self.assertNotEqual(self.run_gate(changed, 'push').returncode, 0, value)
+        for outcomes, event in ((tree, 'pull_request'), (self.successful_outcomes('merge_group'), 'merge_group')):
+            changed = json.loads(json.dumps(outcomes))
+            changed['changes']['outputs']['lint_writer'] = 'true'
+            self.assertNotEqual(self.run_gate(changed, event).returncode, 0, event)
+        # A draft run never reuses, and neither does the documentation shortcut or an unselected lane.
+        self.assertNotEqual(self.run_gate(self.reused_outcomes(self.successful_outcomes('merge_group'), 'tree'),
+                                          draft='true').returncode, 0)
+        docs = json.loads(json.dumps(tree))
+        docs['changes']['outputs'].update(docs_only='true', supplemental_campaigns='false')
+        self.assertNotEqual(self.run_gate(docs, 'pull_request').returncode, 0)
+        legacy = self.reused_outcomes(self.successful_outcomes(), 'tree')
+        self.assertNotEqual(self.run_gate(legacy).returncode, 0)
+
+    def test_reuse_gates_every_heavy_job_and_records_proofs_only_from_real_validation(self):
+        """Heavy jobs honor a verified reuse, and a proof is written only after real PR validation."""
+        for name in ('offline-zsp', 'compile-tests', 'static-analysis', 'tests', 'coverage', 'secondary-variant'):
+            header = self.job_block(self.workflow, name).split('    steps:', 1)[0]
+            self.assertIn("needs.changes.outputs.reuse == 'none'", header, name)
+        # Pushes are the only lint cache writers, so a reused push that changed lint inputs still lints.
+        lint = self.job_block(self.workflow, 'static-analysis').split('    steps:', 1)[0]
+        self.assertIn("(needs.changes.outputs.reuse == 'none' || (needs.changes.outputs.reuse == 'push' && "
+                      "needs.changes.outputs.lint_writer == 'true'))", lint)
+        # A reused push keeps the job that refreshes Gradle caches and stages the Maestro APK, the
+        # one that assembles the manual testing guide, and the Compose reports master pushes own.
+        for name in ('tooling-contracts', 'build-contracts', 'compose-compiler'):
+            header = self.job_block(self.workflow, name).split('    steps:', 1)[0]
+            self.assertIn("needs.changes.outputs.reuse != 'tree'", header, name)
+            self.assertNotIn("reuse == 'none'", header, name)
+        for output in ('reuse', 'reuse_run', 'tree', 'lint_writer'):
+            self.assertIn(f'      {output}: ${{{{ steps.reuse.outputs.{output} }}}}\n', self.changes)
+        self.assertIn('      actions: read\n', self.changes)
+        self.assertNotIn('actions: write', self.changes)
+        lookup = self.named_step(self.changes, 'Look for a verified result on identical content')
+        self.assertIn('vars.ANDROID_CI_REUSE', lookup)
+        self.assertIn('scripts/ci_reuse.py', lookup)
+        self.assertIn('--before "$CI_BEFORE_SHA"', lookup)
+        self.assertIn('CI_BEFORE_SHA: ${{ github.event.before }}', lookup)
+        self.assertIn("printf 'reuse=none\\nreuse_run=\\ntree=\\nlint_writer=false\\n' >> \"$GITHUB_OUTPUT\"", lookup)
+        for name in ('Write the validated tree proof', 'Retain the validated tree proof'):
+            step = self.named_step(self.gate, name)
+            for condition in ('success()', "github.event_name == 'pull_request'",
+                              "needs.changes.outputs.reuse == 'none'", "needs.changes.outputs.docs_only == 'false'"):
+                self.assertIn(condition, step, (name, condition))
+            # A proof is an optimisation, so an artifact-service error must not fail the required check.
+            self.assertIn('continue-on-error: true', step, name)
+        proof = self.named_step(self.gate, 'Retain the validated tree proof')
+        self.assertIn('name: android-ci-attest-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}', proof)
+        self.assertIn('retention-days: 7', proof)
+
+    def test_classifier_and_lookup_run_first_and_isolated_before_other_pr_code(self):
+        """Nothing PR-controlled runs before the steps that decide the lane, the tree and the reuse."""
+        steps = re.findall(r'^      - name: (.+)$', self.changes, re.MULTILINE)
+        classify = 'Classify complete PR diff'
+        lookup = 'Look for a verified result on identical content'
+        self.assertEqual(steps, ['Checkout', 'Read current full-CI override', classify, lookup,
+                                 'Test conservative CI classification'])
+        for name, command in ((classify, 'python3 -I scripts/check_ci_changes.py'),
+                              (lookup, 'python3 -I scripts/ci_reuse.py')):
+            step = self.named_step(self.changes, name)
+            self.assertIn(command, step)
+            self.assertIn("GIT_NO_REPLACE_OBJECTS: '1'", step)
+
+    def test_merge_group_fail_fast_watches_without_joining_the_aggregate(self):
+        """The watcher cancels a failed or dropped queue run, runs no repository code and never gates."""
+        watcher = self.job_block(self.workflow, 'merge-group-fail-fast')
+        self.assertIn("    if: github.event_name == 'merge_group'\n", watcher)
+        self.assertIn('    continue-on-error: true\n', watcher)
+        self.assertIn('      actions: write\n      checks: read\n      contents: read\n', watcher)
+        for forbidden in ('actions/checkout', './gradlew', 'secrets', 'checks: write', 'contents: write'):
+            self.assertNotIn(forbidden, watcher)
+        required = re.search(r'REQUIRED_JOB: (.+)', watcher).group(1)
+        self.assertIn(f'    name: {required}${{{{', self.gate)
+
+    def run_watcher(self, polls, head_ref='', ref_sha=''):
+        """Run the watcher's real shell against a fake `gh`, returning (exit code, recorded calls)."""
+        step = self.named_step(self.job_block(self.workflow, 'merge-group-fail-fast'),
+                               'Cancel the run when a job fails')
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for number, rows in enumerate(polls, 1):
+                (root / f'jobs.{number}').write_text(''.join('\t'.join(row) + '\n' for row in rows))
+            (root / 'jobs.last').write_text((root / f'jobs.{len(polls)}').read_text())
+            fake = root / 'bin'
+            fake.mkdir()
+            (fake / 'gh').write_text(textwrap.dedent('''\
+                #!/bin/bash
+                echo "$*" >> "$FAKE_LOG"
+                case "$*" in
+                  *"/jobs?per_page=100"*)
+                    n=$(cat "$FAKE_DIR/count" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$FAKE_DIR/count"
+                    f="$FAKE_DIR/jobs.$n"; [[ -f "$f" ]] || f="$FAKE_DIR/jobs.last"; cat "$f" ;;
+                  *"/annotations"*) echo "annotation" ;;
+                  *"git/matching-refs"*) printf '%s\\n' "$FAKE_REF_SHA" ;;
+                esac
+                '''))
+            (fake / 'sleep').write_text('#!/bin/bash\nexit 0\n')
+            for tool in fake.iterdir():
+                tool.chmod(0o755)
+            log = root / 'log'
+            log.write_text('')
+            result = subprocess.run(['bash', '-c', script], capture_output=True, text=True, timeout=60, env={
+                **os.environ, 'PATH': f'{fake}:{os.environ["PATH"]}', 'FAKE_DIR': str(root), 'FAKE_LOG': str(log),
+                'FAKE_REF_SHA': ref_sha, 'GH_TOKEN': 'x',
+                'GH_REPO': 'o/r', 'RUN_ID': '9', 'HEAD_REF': head_ref, 'HEAD_SHA': 'b' * 40,
+                'REQUIRED_JOB': 'Compile, test, ktlint, detekt, Android lint'})
+            return result.returncode, log.read_text()
+
+    def test_fail_fast_cancels_on_the_first_failed_job_and_otherwise_waits(self):
+        """A failed job cancels the run at once, while skips and the aggregate's start never do."""
+        url = 'https://api.github.com/check-runs/1'
+        healthy = [('Android lint (Zapstore)', 'in_progress', '', url), ('changes', 'completed', 'skipped', url)]
+        aggregate = healthy + [('Compile, test, ktlint, detekt, Android lint', 'queued', '', url)]
+        code, calls = self.run_watcher([healthy, healthy, aggregate])
+        self.assertEqual(code, 0)
+        self.assertNotIn('run cancel', calls)
+        failed = [('Unit tests (Zapstore, shard 0)', 'completed', 'failure', url)] + healthy
+        code, calls = self.run_watcher([failed])
+        self.assertEqual(code, 0)
+        self.assertIn('run cancel 9', calls)
+        self.assertIn('/annotations', calls)
+        code, calls = self.run_watcher([[('Unit tests (Zapstore, shard 0)', 'completed', 'cancelled', url)]])
+        self.assertIn('run cancel 9', calls)
+
+    def test_fail_fast_cancels_a_dropped_group_only_after_two_consecutive_misses(self):
+        """A group the queue dropped is cancelled after two clean lookups, never on one or a failure."""
+        ref = 'refs/heads/gh-readonly-queue/master/pr-1-abc'
+        url = 'https://api.github.com/check-runs/1'
+        healthy = [('Android lint (Zapstore)', 'in_progress', '', url)]
+        aggregate = healthy + [('Compile, test, ktlint, detekt, Android lint', 'queued', '', url)]
+        code, calls = self.run_watcher([healthy] * 4, head_ref=ref, ref_sha='c' * 40)
+        self.assertEqual(code, 0)
+        self.assertIn('run cancel 9', calls)
+        self.assertEqual(calls.count('/jobs?per_page=100'), 2)
+        # One miss is not enough: the aggregate starting on the next poll ends the watch.
+        code, calls = self.run_watcher([healthy, aggregate], head_ref=ref, ref_sha='c' * 40)
+        self.assertEqual(code, 0)
+        self.assertNotIn('run cancel', calls)
+        # The group's branch still points at this commit, so the run keeps going until the aggregate starts.
+        code, calls = self.run_watcher([healthy, healthy, healthy, aggregate], head_ref=ref, ref_sha='b' * 40)
+        self.assertEqual(code, 0)
+        self.assertNotIn('run cancel', calls)
 
     def test_job_caches(self):
         """Every workload restores its own task cache; only master writes.
@@ -980,7 +1197,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_test_compilation_is_isolated_by_flavor_and_shared_with_unit_shards(self):
         header = self.compile_tests.split('    steps:', 1)[0]
         self.assertIn('    needs: changes\n', header)
-        self.assertIn("    if: needs.changes.outputs.docs_only != 'true'\n", header)
+        self.assertIn("    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'\n", header)
         self.assertNotIn('draft', header)
         self.assertIn(self.tests_job.split('        flavor: ', 1)[1].split('\n', 1)[0]
                       .replace("&& '[\"Zapstore\"]'", "&& needs.changes.outputs.precheck != 'true' && '[\"Zapstore\"]'"),
