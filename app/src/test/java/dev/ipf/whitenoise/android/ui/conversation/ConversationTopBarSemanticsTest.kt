@@ -236,7 +236,7 @@ class ConversationTopBarSemanticsTest {
     /** Search and Read aloud in dark theme. */
     @Test fun headerWithReadAloudDark() = shortcutHeader("read_aloud_dark", READ_ALOUD_SHORTCUTS, dark = true)
 
-    /** A narrow window at double font keeps two shortcuts, the members line and the tappable timer badge on screen. */
+    /** A narrow window at double font keeps three shortcuts, the members line and the tappable timer badge on screen. */
     @Test
     @Config(qualifiers = "en-w320dp-h780dp-mdpi")
     fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", rtl = false)
@@ -468,7 +468,7 @@ class ConversationTopBarSemanticsTest {
         controller.members = (1..3).map { AppGroupMemberRecordFfi("0$it" + "00".repeat(31), ACCOUNT_REF, it == 1) }
         controller.membersLoaded = true
         render(appState, controller, fontScale = 2f, rtl = rtl, onTimerClick = {}, actions = {
-            ConversationHeaderShortcuts(BOTH_SHORTCUTS, muteControl(appState), onSearch = {})
+            ConversationHeaderShortcuts(HeaderShortcut.entries.toList(), muteControl(appState), onSearch = {}, readAloudOn = false)
         })
         composeRule.onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG).assertHasClickAction()
         composeRule

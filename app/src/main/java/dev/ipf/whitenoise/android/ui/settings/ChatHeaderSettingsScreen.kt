@@ -10,7 +10,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.HeaderShortcut
-import dev.ipf.whitenoise.android.state.HeaderShortcutPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.headerShortcutPreferences
 
@@ -30,8 +29,8 @@ internal fun ChatHeaderSettingsScreen(
 }
 
 /**
- * Check marks like the composer shortcut list; a full header disables the unchecked rows. Without a usable
- * speech engine Read aloud is offered only while it is still checked, so the person can free its slot.
+ * Check marks like the composer shortcut list. Without a usable speech engine Read aloud is offered only while it
+ * is still checked, so the person can turn it off.
  */
 @Composable
 internal fun ChatHeaderSettingsContent(
@@ -50,8 +49,6 @@ internal fun ChatHeaderSettingsContent(
                 SettingsGroup {
                     for (shortcut in offered) {
                         val checked = shortcut in shortcuts
-                        // A full header keeps its choices; another one waits until the person unchecks one.
-                        val full = !checked && shortcuts.size >= HeaderShortcutPreferences.MAX
                         val shortcutRow = headerShortcutRow(shortcut)
                         row(shortcutRow.key) { context ->
                             SettingsCheckbox(
@@ -61,8 +58,6 @@ internal fun ChatHeaderSettingsContent(
                                 { onToggle(shortcut) },
                                 modifier = Modifier.testTag("chatHeader.${shortcutRow.key}"),
                                 explanation = stringResource(shortcutRow.explanationRes),
-                                subtitle = if (full) stringResource(R.string.header_shortcuts_limit) else null,
-                                enabled = !full,
                                 leading = { SettingsLeadingIcon(shortcutRow.iconRes) },
                             )
                         }

@@ -2,10 +2,9 @@
 <resources>
     <string name="header_shortcuts_title">Быстрые кнопки в заголовке чата</string>
     <string name="header_shortcut_search">Поиск в чате</string>
-    <string name="header_shortcuts_limit">Не больше двух. Сначала снимите одну отметку.</string>
     <string name="explanation_header_shortcut_search">Показывает кнопку поиска в заголовке каждого чата. Она открывает тот же поиск, что и сведения о чате. Действует только на этом устройстве.</string>
     <string name="explanation_header_shortcut_mute">Показывает кнопку отключения звука в заголовке каждого чата. При отключении звука спрашивается срок; включение звука применяется сразу. Действует только на этом устройстве.</string>
     <string name="explanation_header_shortcut_read_aloud">Показывает кнопку чтения вслух в заголовке каждого чата. Она включает или выключает чтение новых сообщений вслух для этого чата, как в сведениях о чате. Действует только на этом устройстве.</string>
-    <string name="header_shortcuts_hint">Заголовок показывает не больше двух кнопок в том порядке, в котором вы их отметили.</string>
+    <string name="header_shortcuts_hint">Заголовок показывает кнопки в том порядке, в котором вы их отметили.</string>
     <string name="conversation_header_timer_change">Изменить таймер исчезающих сообщений</string>
 </resources>

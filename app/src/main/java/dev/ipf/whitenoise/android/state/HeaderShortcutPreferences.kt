@@ -9,18 +9,16 @@ import java.util.WeakHashMap
 /** Optional conversation header shortcuts; each one reuses the chat details action of the same name. */
 internal enum class HeaderShortcut { Search, MuteUnmute, ReadAloud }
 
-/** Device-wide header shortcut choice: ordered, at most [MAX] entries, empty by default. */
+/** Device-wide header shortcut choice: ordered, empty by default. */
 internal class HeaderShortcutPreferences(
     private val preferences: SharedPreferences,
 ) {
     var shortcuts by mutableStateOf(read())
         private set
 
-    /** Adds or removes one shortcut; adding past [MAX] is ignored rather than replacing an existing one. */
+    /** Adds a shortcut at the end or removes it. */
     fun toggle(shortcut: HeaderShortcut) {
-        val next = if (shortcut in shortcuts) shortcuts - shortcut else shortcuts + shortcut
-        if (next.size > MAX) return
-        write(next)
+        write(if (shortcut in shortcuts) shortcuts - shortcut else shortcuts + shortcut)
     }
 
     /** Saves [next] in order and republishes it through the same filter as a cold read. */
@@ -29,18 +27,16 @@ internal class HeaderShortcutPreferences(
         shortcuts = read()
     }
 
-    /** Unknown, duplicate or surplus saved names are dropped so a corrupt value cannot crowd the header. */
+    /** Unknown or duplicate saved names are dropped so a corrupt value cannot repeat or invent a button. */
     private fun read(): List<HeaderShortcut> {
         val stored = runCatching { preferences.getString(KEY, null) }.getOrNull().orEmpty()
         return stored
             .split(',')
             .mapNotNull { name -> HeaderShortcut.entries.firstOrNull { it.name == name } }
             .distinct()
-            .take(MAX)
     }
 
     companion object {
-        const val MAX = 2
         private const val KEY = "conversation_header_shortcuts"
     }
 }

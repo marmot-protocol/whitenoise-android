@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -28,28 +27,26 @@ class HeaderShortcutPreferencesTest {
         assertEquals(listOf(HeaderShortcut.Search), HeaderShortcutPreferences(prefs).shortcuts)
     }
 
-    /** A stored value can never put more than two shortcuts, duplicates or unknown names in the header. */
+    /** A stored value can never put duplicates or unknown names in the header. */
     @Test
-    fun storedValueIsBoundedToTwoKnownDistinctShortcuts() {
+    fun storedValueKeepsOnlyKnownDistinctShortcuts() {
         val prefs = preferences("bounded")
         prefs.edit().putString(KEY, "Pin,Search,Search,MuteUnmute,ReadAloud").commit()
-        val owner = HeaderShortcutPreferences(prefs)
-        assertEquals(listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute), owner.shortcuts)
-        assertTrue(owner.shortcuts.size <= HeaderShortcutPreferences.MAX)
+        assertEquals(
+            listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute, HeaderShortcut.ReadAloud),
+            HeaderShortcutPreferences(prefs).shortcuts,
+        )
     }
 
-    /** A full header refuses another shortcut instead of replacing one; freeing a slot lets it in. */
+    /** Every shortcut can be checked at once, in the order chosen, and survives a cold read. */
     @Test
-    fun fullHeaderRefusesAThirdShortcutUntilOneIsTurnedOff() {
-        assertEquals(2, HeaderShortcutPreferences.MAX)
-        val prefs = preferences("limit")
+    fun everyShortcutCanBeCheckedInOrder() {
+        val prefs = preferences("all")
         val owner = HeaderShortcutPreferences(prefs)
-        HeaderShortcut.entries.forEach(owner::toggle)
-        assertEquals(listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute), owner.shortcuts)
-        assertEquals(owner.shortcuts, HeaderShortcutPreferences(prefs).shortcuts)
-        owner.toggle(HeaderShortcut.Search)
-        owner.toggle(HeaderShortcut.ReadAloud)
-        assertEquals(listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.ReadAloud), owner.shortcuts)
+        val order = listOf(HeaderShortcut.ReadAloud, HeaderShortcut.Search, HeaderShortcut.MuteUnmute)
+        order.forEach(owner::toggle)
+        assertEquals(order, owner.shortcuts)
+        assertEquals(order, HeaderShortcutPreferences(prefs).shortcuts)
     }
 
     /** Fresh private preferences file for one test case. */

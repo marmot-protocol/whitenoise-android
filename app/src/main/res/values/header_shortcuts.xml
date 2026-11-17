@@ -2,10 +2,9 @@
 <resources>
     <string name="header_shortcuts_title">Chat header shortcuts</string>
     <string name="header_shortcut_search">Search in chat</string>
-    <string name="header_shortcuts_limit">Up to two. Uncheck one first.</string>
     <string name="explanation_header_shortcut_search">Shows a search button in every chat header. It opens the same search as chat details. Applies on this device only.</string>
     <string name="explanation_header_shortcut_mute">Shows a mute button in every chat header. Muting asks for how long; unmuting applies right away. Applies on this device only.</string>
     <string name="explanation_header_shortcut_read_aloud">Shows a read-aloud button in every chat header. It turns reading new messages aloud on or off for that chat, the same as in chat details. Applies on this device only.</string>
-    <string name="header_shortcuts_hint">The header shows up to two, in the order you check them.</string>
+    <string name="header_shortcuts_hint">The header shows them in the order you check them.</string>
     <string name="conversation_header_timer_change">Change disappearing messages timer</string>
 </resources>

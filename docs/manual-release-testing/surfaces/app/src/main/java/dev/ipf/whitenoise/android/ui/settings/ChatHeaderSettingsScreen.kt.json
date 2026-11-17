@@ -30,14 +30,6 @@
         ]
       },
       {
-        "surface": "R.string.header_shortcuts_limit",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatHeaderSettingsScreen.kt",
-        "anchor": "R.string.header_shortcuts_limit",
-        "test_ids": [
-          "SET-058"
-        ]
-      },
-      {
         "surface": "R.string.header_shortcuts_hint",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatHeaderSettingsScreen.kt",
         "anchor": "R.string.header_shortcuts_hint",

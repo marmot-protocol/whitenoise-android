@@ -11,7 +11,6 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -29,7 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The chat header shortcut list: check-mark rows, the two-shortcut limit and deterministic visuals. */
+/** The chat header shortcut list: check-mark rows and deterministic visuals. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -45,11 +44,11 @@ class ChatHeaderSettingsScreenTest {
     /** Records the default list against the AMOLED surface tokens. */
     @Test fun amoled() = screen("amoled", dark = true, amoled = true)
 
-    /** Records a full header: two checked rows and the third disabled with the limit note. */
-    @Test fun full() = screen("full", shortcuts = FULL)
+    /** Records every shortcut checked at once. */
+    @Test fun allChecked() = screen("all_checked", shortcuts = ALL)
 
-    /** Records the full state mirrored at twice the default text scale. */
-    @Test fun fullLargeRtl() = screen("full_large_rtl", shortcuts = FULL, scale = 2f, rtl = true)
+    /** Records every shortcut checked, mirrored at twice the default text scale. */
+    @Test fun allCheckedLargeRtl() = screen("all_checked_large_rtl", shortcuts = ALL, scale = 2f, rtl = true)
 
     /** Each row is a whole-row check box that reports its state and toggles its own shortcut. */
     @Test fun rowsAreCheckBoxesThatToggleTheirShortcut() {
@@ -70,20 +69,27 @@ class ChatHeaderSettingsScreenTest {
         assertEquals(listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud), toggled)
     }
 
-    /** A full header disables only the unchecked row; checked rows stay available to make room. */
-    @Test fun fullHeaderDisablesOnlyTheUncheckedRow() {
+    /** With two shortcuts checked the third row stays enabled and adds itself after them. */
+    @Test fun aThirdShortcutCanBeChecked() {
         val toggled = mutableListOf<HeaderShortcut>()
-        rule.setContent { WhiteNoiseTheme { ChatHeaderSettingsContent(FULL, { toggled += it }, {}) } }
+        rule.setContent {
+            WhiteNoiseTheme {
+                ChatHeaderSettingsContent(
+                    listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute),
+                    { toggled += it },
+                    {},
+                )
+            }
+        }
         rule
             .onNodeWithTag("chatHeader.read_aloud")
             .performScrollTo()
-            .assertIsNotEnabled()
+            .assertIsEnabled()
             .performClick()
-        rule.onNodeWithTag("chatHeader.mute").assertIsEnabled().performClick()
-        assertEquals(listOf(HeaderShortcut.MuteUnmute), toggled)
+        assertEquals(listOf(HeaderShortcut.ReadAloud), toggled)
     }
 
-    /** Without a speech engine Read aloud is not offered, unless it is still checked and holding a slot. */
+    /** Without a speech engine Read aloud is not offered, unless it is still checked. */
     @Test fun readAloudNeedsASpeechEngineUnlessAlreadyChecked() {
         val toggled = mutableListOf<HeaderShortcut>()
         var shortcuts by mutableStateOf(listOf(HeaderShortcut.Search))
@@ -125,6 +131,6 @@ class ChatHeaderSettingsScreenTest {
     }
 
     private companion object {
-        val FULL = listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute)
+        val ALL = HeaderShortcut.entries.toList()
     }
 }

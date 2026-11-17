@@ -2,10 +2,9 @@
 <resources>
     <string name="header_shortcuts_title">Accesos directos en la cabecera del chat</string>
     <string name="header_shortcut_search">Buscar en el chat</string>
-    <string name="header_shortcuts_limit">Hasta dos. Desmarca uno primero.</string>
     <string name="explanation_header_shortcut_search">Muestra un botón de búsqueda en la cabecera de cada chat. Abre la misma búsqueda que los detalles del chat. Solo se aplica en este dispositivo.</string>
     <string name="explanation_header_shortcut_mute">Muestra un botón de silencio en la cabecera de cada chat. Al silenciar se pregunta por cuánto tiempo; al reactivar el sonido se aplica al momento. Solo se aplica en este dispositivo.</string>
     <string name="explanation_header_shortcut_read_aloud">Muestra un botón de lectura en voz alta en la cabecera de cada chat. Activa o desactiva la lectura en voz alta de los mensajes nuevos de ese chat, igual que en los detalles del chat. Solo se aplica en este dispositivo.</string>
-    <string name="header_shortcuts_hint">La cabecera muestra hasta dos, en el orden en que los marques.</string>
+    <string name="header_shortcuts_hint">La cabecera los muestra en el orden en que los marques.</string>
     <string name="conversation_header_timer_change">Cambiar el temporizador de mensajes temporales</string>
 </resources>
