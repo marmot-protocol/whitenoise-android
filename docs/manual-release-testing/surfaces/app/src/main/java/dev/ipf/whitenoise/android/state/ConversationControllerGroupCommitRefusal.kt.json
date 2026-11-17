@@ -1,0 +1,32 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupCommitRefusal.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Relay refusal read beside the parked flag",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupCommitRefusal.kt",
+        "anchor": "internal suspend fun ConversationController.readGroupCommitRefusal(",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "Dismiss a relay's lasting refusal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupCommitRefusal.kt",
+        "anchor": "internal suspend fun ConversationController.dismissGroupCommitRefusal(",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "Refusal dismissal failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupCommitRefusal.kt",
+        "anchor": "R.string.group_commit_refusal_dismiss_failed",
+        "test_ids": [
+          "GRP-039"
+        ]
+      }
+    ]
+  }
+}

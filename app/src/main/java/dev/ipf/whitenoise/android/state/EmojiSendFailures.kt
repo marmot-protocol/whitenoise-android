@@ -39,10 +39,27 @@ internal class SendEmojiArtwork(
     suspend fun resolve(): List<LocalEmojiArtwork> = value ?: lookup().also { value = it }
 }
 
+/**
+ * A received emoji original could not be read because the connection was lost. Nothing was published, so the send
+ * retries its lookup instead of dropping the artwork, whatever the underlying error's text says.
+ */
+internal class EmojiArtworkConnectionLost(
+    cause: Throwable,
+) : Exception("emoji artwork read lost its connection", cause)
+
+/** A received emoji original whose bytes differ from the digest its message named; it is never sent. */
+internal class ReceivedEmojiMismatchException : IllegalStateException("emoji plaintext hash mismatch")
+
 /** Whether [throwable] is an upload-stage failure that a connectivity recovery can retry without duplicating. */
 internal fun isRetryableEmojiUploadFailure(throwable: Throwable): Boolean {
+    val chain = generateSequence(throwable) { it.cause }
+    return chain.any { it is EmojiUploadFailure } &&
+        (chain.any { it is EmojiArtworkConnectionLost } || isConnectivityFailure(throwable))
+}
+
+/** Whether [throwable] or one of its causes reads as lost connectivity, which a later attempt may clear. */
+internal fun isConnectivityFailure(throwable: Throwable): Boolean {
     val chain = generateSequence(throwable) { it.cause }.toList()
-    if (chain.none { it is EmojiUploadFailure }) return false
     val text = chain.joinToString("\n") { "${it.javaClass.simpleName} ${it.message}" }.lowercase(Locale.ROOT)
     return chain.any { it is MarmotKitException.TransportClosed } ||
         listOf("connection", "timed out", "timeout", "no relay", "network", "unreachable").any(text::contains)

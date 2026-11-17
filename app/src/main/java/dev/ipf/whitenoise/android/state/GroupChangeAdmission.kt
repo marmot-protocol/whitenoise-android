@@ -61,7 +61,8 @@ internal class GroupChangeDeclinedException(
 
 /**
  * The change a question is about: [accountRef]'s group [groupIdHex] in runtime [runtimeGeneration], named [title]
- * when the chat list knows it. A question belongs to that account and runtime only.
+ * when the chat list knows it. A question belongs to that account and runtime only. [commitRefused] says a relay
+ * refused an earlier confirmed change for good, so waiting cannot resolve the undelivered caution.
  */
 internal data class GroupChangeTarget(
     val accountRef: String,
@@ -72,6 +73,7 @@ internal data class GroupChangeTarget(
     val affectedMemberIds: List<String> = emptyList(),
     val initialAdminIds: Set<String> = emptySet(),
     val retentionSeconds: ULong? = null,
+    val commitRefused: Boolean = false,
 )
 
 /** One question to the user: wait, or let this one group change to [target] through despite [caution]. */
@@ -169,6 +171,7 @@ internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
     return withGroupCommitLockHeld(accountRef, groupIdHex) {
         admitGroupChange(
             ask = { cautions ->
+                val refused = GroupChangeCaution.Undelivered in cautions && groupCommitRefused(accountRef, groupIdHex)
                 val target =
                     GroupChangeTarget(
                         accountRef,
@@ -179,6 +182,7 @@ internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
                         reviewedMembers,
                         reviewedAdmins,
                         retentionSeconds,
+                        refused,
                     )
                 when {
                     !askUser || !ownsGroupChange(target) -> GroupChangeAnswer.Unavailable
@@ -334,3 +338,16 @@ private suspend fun WhiteNoiseAppState.hiddenGroupChangeCautions(
                 .fold(onSuccess = { it != null }, onFailure = { true })
     return if (owed) listOf(GroupChangeCaution.Undelivered) else emptyList()
 }
+
+/**
+ * Whether a relay refused one of this account's confirmed changes to [groupIdHex] for good, which MDK reports until
+ * the refusal is acknowledged. A failed read answers false, keeping the ordinary undelivered wording.
+ */
+private suspend fun WhiteNoiseAppState.groupCommitRefused(
+    accountRef: String,
+    groupIdHex: String,
+): Boolean =
+    runCatchingCancellable { marmotIo { groupCommitDelivery(accountRef, groupIdHex) } }
+        .getOrNull()
+        ?.refusedRelays
+        ?.isNotEmpty() == true

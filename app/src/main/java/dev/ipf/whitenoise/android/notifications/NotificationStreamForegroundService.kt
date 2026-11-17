@@ -23,6 +23,10 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
 import dev.ipf.whitenoise.android.state.RecoveryTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.acknowledgePushWakeServiceOwner
+import dev.ipf.whitenoise.android.state.pushWakeRecoveryAllowed
+import dev.ipf.whitenoise.android.state.releasePushWakeServiceOwner
+import dev.ipf.whitenoise.android.state.runPushWakeRecoveryAttempt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

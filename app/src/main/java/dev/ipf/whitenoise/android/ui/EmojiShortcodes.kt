@@ -12,7 +12,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
@@ -231,20 +233,27 @@ internal fun EmojiArtImage(
     Image(rememberEmojiArtPainter(art), contentDescription, modifier)
 }
 
-/** Reuses the same decoded artwork and bundled crop in an image or a decorative draw layer. */
+/**
+ * Reuses the same decoded artwork and bundled crop in an image or a decorative draw layer. [filterQuality] lets a
+ * large rendering scale pixel art without smoothing; inline text keeps the default.
+ */
 @Composable
-internal fun rememberEmojiArtPainter(art: EmojiArt): Painter =
+internal fun rememberEmojiArtPainter(
+    art: EmojiArt,
+    filterQuality: FilterQuality = DrawScope.DefaultFilterQuality,
+): Painter =
     when (art) {
         is EmojiArt.Bundled -> {
             val region = EmojiShortcodes.builtinArtworkRegion(art.drawable)
-            if (region != null) {
+            if (region != null || filterQuality != DrawScope.DefaultFilterQuality) {
                 val bitmap = ImageBitmap.imageResource(art.drawable)
-                remember(bitmap, region) {
-                    BitmapPainter(bitmap, srcOffset = region.topLeft, srcSize = region.size)
+                val source = region ?: IntRect(IntOffset.Zero, IntSize(bitmap.width, bitmap.height))
+                remember(bitmap, source, filterQuality) {
+                    BitmapPainter(bitmap, source.topLeft, source.size, filterQuality)
                 }
             } else {
                 painterResource(art.drawable)
             }
         }
-        is EmojiArt.Decoded -> remember(art) { BitmapPainter(art.image) }
+        is EmojiArt.Decoded -> remember(art, filterQuality) { BitmapPainter(art.image, filterQuality = filterQuality) }
     }

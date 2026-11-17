@@ -87,7 +87,7 @@ class ErrorPresentationTest {
 
     @Test
     fun profileAdminPromotionScopesItsConfirmationToTheMutatedGroup() {
-        val body = appStateSource().readText().functionBody("promoteProfileInGroup")
+        val body = mainSource("state/AppStateProfileGroups.kt").readText().functionBody("promoteProfileInGroup")
 
         assertTrue(
             "profile-sheet admin success must use the originating account and group",
@@ -215,13 +215,6 @@ class ErrorPresentationTest {
         assertFalse(presentation.report.contains(secret))
         assertFalse(presentation.report.contains("user:pass"))
     }
-
-    private fun appStateSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-        ).firstOrNull(File::exists)
-            ?: error("Missing AppState.kt source file")
 
     private fun mainSource(relativePath: String): File =
         listOf(

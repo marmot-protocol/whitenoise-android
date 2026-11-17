@@ -47,6 +47,16 @@
           "MSG-010"
         ]
       }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "CloseReportOnDispose",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
+        "anchor": "fun CloseReportOnDispose(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

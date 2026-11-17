@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.state.forwardTargets
 import dev.ipf.whitenoise.android.state.forwardTargetsError
 import dev.ipf.whitenoise.android.state.forwardTargetsLoading
 import dev.ipf.whitenoise.android.state.forwardTargetsRevision
+import dev.ipf.whitenoise.android.state.groupPresentationChatsController
 import dev.ipf.whitenoise.android.state.loadAccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.mergeForwardTargets
 import dev.ipf.whitenoise.android.state.retryForwardTargets

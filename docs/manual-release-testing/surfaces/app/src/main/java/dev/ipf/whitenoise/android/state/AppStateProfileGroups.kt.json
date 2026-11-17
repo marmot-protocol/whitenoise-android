@@ -1,0 +1,59 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateProfileGroups.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "Reviewed group action context: R.string.group_action_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateProfileGroups.kt",
+        "anchor": "R.string.group_action_add_members",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.make_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateProfileGroups.kt",
+        "anchor": "R.string.make_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Profile invite failure: toast_couldnt_add_member_duplicate_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateProfileGroups.kt",
+        "anchor": "R.string.toast_couldnt_add_member_duplicate_detail",
+        "test_ids": [
+          "PRO-005"
+        ]
+      },
+      {
+        "surface": "Profile promotion result: toast_admin_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateProfileGroups.kt",
+        "anchor": "R.string.toast_admin_added",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Profile promotion failure: toast_couldnt_update_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateProfileGroups.kt",
+        "anchor": "R.string.toast_couldnt_update_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Profile invite failure fallback detail: error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateProfileGroups.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

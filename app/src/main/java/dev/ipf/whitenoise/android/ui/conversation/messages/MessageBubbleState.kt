@@ -1,10 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -14,6 +17,10 @@ import androidx.compose.ui.unit.IntSize
 import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.RecentEmojiList
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MessageReportRegistry
+import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.MarkdownLinkLayoutRegistry
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayoutReporter
 import dev.ipf.whitenoise.android.ui.SelectableTextLayoutReporter
@@ -23,9 +30,46 @@ import kotlinx.coroutines.Job
 // Every separately remembered value added about 100 bytecode units to the bubble, and at 16,383 units
 // (UINT16_MAX / 4) or more ART refuses to compile a method at all, so each row composed in the interpreter.
 
-/** Sheet, dialog and in-flight flags for one message, reset together when the message id changes. */
+/** One message's surface state, with its owed group report kept app-wide under the account, group and message. */
+@Composable
+internal fun rememberMessageBubbleSurfaces(
+    appState: WhiteNoiseAppState,
+    controller: ConversationController,
+    item: TimelineMessage,
+): MessageBubbleSurfaceState {
+    val surfaces =
+        remember(controller, item.presentationId) {
+            val chat = "${controller.conversationAccountRef}|${controller.group.groupIdHex}"
+            val reportKey = "$chat|${item.record.messageIdHex}"
+            MessageBubbleSurfaceState(appState.runtimeMirrors.messageReports, reportKey)
+        }
+    CloseReportOnDispose(surfaces)
+    return surfaces
+}
+
+/**
+ * Closes [surfaces]' report sheet when the bubble leaves composition, as on rotation or scrolling away. A report
+ * still sending then treats its own sheet as gone and shows a late failure as a notice, instead of writing it into a
+ * sheet nobody can see.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun CloseReportOnDispose(surfaces: MessageBubbleSurfaceState) {
+    DisposableEffect(surfaces) {
+        onDispose { if (surfaces.reportSheetOpen) surfaces.closeReport() }
+    }
+}
+
+/**
+ * Sheet, dialog and in-flight flags for one message, reset together when the message id changes. A report still
+ * sending, and the group's answer once the group took it, live in [reports] under [reportKey], which outlives this
+ * bubble, so scrolling away or recreating the screen cannot make the group receive the same report twice.
+ */
 @Stable
-internal class MessageBubbleSurfaceState {
+internal class MessageBubbleSurfaceState(
+    private val reports: MessageReportRegistry,
+    private val reportKey: String,
+) {
     var emojiPickerOpen by mutableStateOf(false)
     var bodyExceedsCollapseLimit by mutableStateOf(false)
 
@@ -48,9 +92,49 @@ internal class MessageBubbleSurfaceState {
     var messageShareInFlight by mutableStateOf(false)
     var messageShareJob by mutableStateOf<Job?>(null)
     var reportSheetOpen by mutableStateOf(false)
-    var reportInFlight by mutableStateOf(false)
+    var reportInFlight: Boolean
+        get() = reports.inFlight[reportKey] == true
+        set(value) {
+            if (value) reports.inFlight[reportKey] = true else reports.inFlight.remove(reportKey)
+        }
+
+    /** Bumped whenever the report sheet closes, so a late answer can tell whether its own sheet is still open. */
+    var reportSheetGeneration by mutableIntStateOf(0)
+
+    /** Whether a group report also sends the White Noise team a copy, on unless the reader turns it off. */
+    var reportToTeam by mutableStateOf(true)
+
+    /** The group's answer once it has the report, kept until the report finishes so the group never gets it twice. */
+    var reportGroupResult: Int?
+        get() = reports.groupResults[reportKey]
+        set(value) {
+            if (value == null) reports.groupResults.remove(reportKey) else reports.groupResults[reportKey] = value
+        }
+
+    /** Whether the group refused this report for good, so a retry goes to the White Noise team alone. */
+    var reportGroupRefused by mutableStateOf(false)
+
+    /** Whether the open sheet is retrying only a failed team copy, with the group's report already sent. */
+    var reportCopyPending by mutableStateOf(false)
+    var reportError by mutableStateOf<Int?>(null)
     var messageReports by mutableStateOf<List<ContentReportFfi>?>(null)
     var reportsRevision by mutableIntStateOf(0)
+
+    /** Closes the report sheet. A group report already sent is remembered, so reopening offers only the team copy. */
+    fun closeReport() {
+        reportSheetOpen = false
+        reportSheetGeneration += 1
+        reportToTeam = true
+        reportCopyPending = false
+        reportError = null
+    }
+
+    /** Clears a completed report, optionally leaving the sheet mounted until its exit animation finishes. */
+    fun finishReport(closeSheet: Boolean = true) {
+        if (closeSheet) closeReport()
+        reportGroupResult = null
+        reportGroupRefused = false
+    }
 
     /** Puts an emoji picked for configure [slot] in the draft, replacing that slot or appending the next (#3279). */
     fun pickConfigureReaction(

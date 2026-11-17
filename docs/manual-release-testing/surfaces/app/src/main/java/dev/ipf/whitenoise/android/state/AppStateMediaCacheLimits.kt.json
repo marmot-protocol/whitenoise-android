@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaCacheLimits.kt",
+  "legacy_sha256": "a38b4e066e94550519fbd0dcd28994aeb5018874a931412c6c2e5dcd52cbd6a7",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Presentation plaintext budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaCacheLimits.kt",
+        "anchor": "internal const val ATTACHMENT_PRESENTATION_MAX_BYTES",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "Decoded thumbnail budget scaled to device RAM",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaCacheLimits.kt",
+        "anchor": "internal fun mediaThumbnailCacheMaxBytes(",
+        "test_ids": [
+          "MED-053"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

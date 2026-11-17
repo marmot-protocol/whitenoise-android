@@ -1012,6 +1012,14 @@
       "assertions": "The actual group-scoped Make Admin confirmation names Bob; Back dismisses it and the unchanged Make Admin action remains available. Global multi-group picking and published promotion remain separate.",
       "postcondition": "none"
     },
+    "profiles-team-report-back": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-002"
+      ],
+      "assertions": "Bob's profile offers Report to White Noise team; it opens the private team report sheet and Back dismisses it without submitting a moderation report.",
+      "postcondition": "none"
+    },
     "profiles-start-group-back": {
       "suite": "profiles",
       "manual_ids": [

@@ -55,6 +55,7 @@ private fun stickerLibraryFor(
         fetchPack = { input -> appState.marmotIo { fetchStickerPack(account(), input) } },
         installPack = { input -> appState.marmotIo { installStickerPack(account(), input) } },
         uninstallPack = { input -> appState.marmotIo { uninstallStickerPack(account(), input) } },
+        packShareLink = { coordinate -> appState.marmotIo { stickerPackShareLink(account(), coordinate) } },
     )
 }
 

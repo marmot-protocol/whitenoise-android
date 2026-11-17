@@ -66,22 +66,6 @@
     ],
     "settings_controls": [
       {
-        "surface": "Reviewed group action context: R.string.group_action_add_members",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.group_action_add_members",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.string.make_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.make_admin",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
         "surface": "setting:font_size_save_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "R.string.font_size_save_failed",
@@ -275,14 +259,6 @@
         ]
       },
       {
-        "surface": "Profile invite failure: toast_couldnt_add_member_duplicate_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_couldnt_add_member_duplicate_detail",
-        "test_ids": [
-          "PRO-005"
-        ]
-      },
-      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "surface": "Font-scale cancellation reconciles actual commit and latest visible selection",
         "anchor": "fun updateFontScale(",
@@ -320,14 +296,6 @@
         "anchor": "R.string.toast_message_too_long",
         "test_ids": [
           "MSG-048"
-        ]
-      },
-      {
-        "surface": "Account dot follows the complete native total",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "hasReadyTotal(accountIdHex)",
-        "test_ids": [
-          "NAV-005"
         ]
       },
       {

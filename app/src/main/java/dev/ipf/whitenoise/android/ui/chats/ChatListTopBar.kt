@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
 import dev.ipf.whitenoise.android.state.chatsAvatarOpensSelector
 import dev.ipf.whitenoise.android.state.quickSwitchAvatarAccounts
 import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo

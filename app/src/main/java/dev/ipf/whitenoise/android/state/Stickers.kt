@@ -12,6 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -56,7 +58,12 @@ class StickerLibrary(
     private val fetchPack: suspend (input: String) -> StickerPackFfi,
     private val installPack: suspend (input: String) -> StickerPackFfi,
     private val uninstallPack: suspend (input: String) -> Unit,
+    /** MDK's share link for a coordinate, naming the relays the pack was found on; null when none is available. */
+    private val packShareLink: suspend (coordinate: String) -> String? = { null },
 ) {
+    /** The link or address each pack was last opened from, so installing it asks the same relay hints. */
+    private val openedFrom = HashMap<String, String>()
+
     /** The installed packs from the last successful read. */
     var installed: List<StickerPackFfi> by mutableStateOf(emptyList())
         private set
@@ -130,12 +137,15 @@ class StickerLibrary(
         }
     }
 
-    /** The pack an naddr or share link names, fetched from relays. */
-    suspend fun lookUp(input: String): StickerPackFfi = fetchPack(input)
+    /** The pack an naddr or share link names, fetched from the account's relays plus the input's relay hints. */
+    suspend fun lookUp(input: String): StickerPackFfi = fetchPack(input).also { openedFrom[it.coordinate] = input }
 
-    /** Installs [pack], lists it at once and rereads the installed list. */
+    /**
+     * Installs [pack] through the link it was opened from, so a pack found only on that link's relays still installs
+     * on an account without them, then lists it at once and rereads the installed list.
+     */
     suspend fun install(pack: StickerPackFfi): StickerPackFfi {
-        val added = installPack(pack.coordinate)
+        val added = installPack(openedFrom[pack.coordinate] ?: pack.coordinate)
         membershipGeneration++
         installed = installed.filterNot { it.coordinate == added.coordinate } + added
         reloadInstalled()
@@ -152,6 +162,25 @@ class StickerLibrary(
         installed = installed.filterNot { it.coordinate == pack.coordinate }
         reloadInstalled()
     }
+
+    /** A link to [pack] naming the relays it was found on, so recipients on other relays can open it; null if none. */
+    suspend fun shareLink(pack: StickerPackFfi): String? = packShareLink(pack.coordinate)
+
+    /**
+     * White Noise's own packs that aren't installed, each fetched through a link naming White Noise's relays so an
+     * account without them still sees the packs. The lookups run in parallel so the section appears in one step.
+     * Opening one records its link, so its Add installs through the same relays. A pack that can't be fetched is left
+     * out, and nothing installs here.
+     */
+    suspend fun whiteNoisePacks(): List<StickerPackFfi> =
+        coroutineScope {
+            WhiteNoiseStickerPacks.coordinates
+                .filterNot(::isInstalled)
+                .map { coordinate ->
+                    async { runCatchingCancellable { lookUp(WhiteNoiseStickerPacks.link(coordinate)) }.getOrNull() }
+                }.awaitAll()
+                .filterNotNull()
+        }
 }
 
 /**

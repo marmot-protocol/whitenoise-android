@@ -53,6 +53,8 @@ import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StickerAssetCache
 import dev.ipf.whitenoise.android.state.StickerLibrary
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.sonarStickerLink
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -61,7 +63,6 @@ import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerPresentation.D
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.net.URLEncoder
 
 private const val SEARCH_DEBOUNCE_MS = 250L
 
@@ -119,7 +120,7 @@ private fun StickerBrowserTopBar(
     }
 }
 
-/** Lists packs to discover, with search and an optional add-by-link field. */
+/** Lists White Noise's own packs and packs to discover, with search and an optional add-by-link field. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerBrowserPage(
@@ -136,6 +137,8 @@ internal fun StickerBrowserPage(
     var refreshRequests by remember { mutableIntStateOf(0) }
     var syncGeneration by remember { mutableIntStateOf(0) }
     val discovery = remember { DiscoveryResults() }
+    val whiteNoise = rememberWhiteNoisePacks(library, refreshRequests)
+    val discoverable = discovery.packs.filterNot { pack -> whiteNoise.any { it.coordinate == pack.coordinate } }
     LaunchedEffect(refreshRequests) {
         syncing = true
         syncFailed = attemptSticker { library.sync(force = refreshRequests > 0) } != null
@@ -168,6 +171,7 @@ internal fun StickerBrowserPage(
                 }
             }
         }
+        whiteNoiseSection(whiteNoise, onOpen)
         if (library.installed.isNotEmpty()) {
             item { StickerSectionTitle(stringResource(R.string.sticker_packs_installed)) }
             items(library.installed, key = { "installed:${it.coordinate}" }) { pack -> PackRow(pack) { onOpen(pack) } }
@@ -176,8 +180,8 @@ internal fun StickerBrowserPage(
         item { StickerSearchField(search) { search = it } }
         discoveryResults(
             state =
-                StickerPresentation.discoveryState(syncing, discovery.packs.size, search, syncFailed, discovery.failed),
-            packs = discovery.packs,
+                StickerPresentation.discoveryState(syncing, discoverable.size, search, syncFailed, discovery.failed),
+            packs = discoverable,
             onOpen = onOpen,
             onRetry = { refreshRequests++ },
         )
@@ -283,7 +287,7 @@ private fun DiscoveryRetry(
 /** One discovered pack with its title and sticker count; opens the pack. */
 @Suppress("FunctionNaming")
 @Composable
-private fun PackRow(
+internal fun PackRow(
     pack: StickerPackFfi,
     onClick: () -> Unit,
 ) {
@@ -327,9 +331,26 @@ internal fun StickerPackDetailPage(
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // A tap waits for MDK's link, so further taps meanwhile must not open a second share sheet.
+    var sharing by remember(pack.coordinate) { mutableStateOf(false) }
     StickerSheetTopBar(stickerPackTitle(pack), onBack = onBack, onClose = onClose) {
         IconButton(
-            onClick = { context.startActivity(stickerPackShareIntent(pack)) },
+            enabled = !sharing,
+            onClick = {
+                if (!sharing) {
+                    sharing = true
+                    scope.launch {
+                        try {
+                            // MDK's link names the relays the pack was found on; the local link is the fallback.
+                            val shared = runCatchingCancellable { library.shareLink(pack) }.getOrNull()
+                            context.startActivity(stickerPackShareIntent(shared ?: stickerPackShareLink(pack)))
+                        } finally {
+                            sharing = false
+                        }
+                    }
+                }
+            },
             modifier = Modifier.testTag("sticker.pack.share"),
         ) {
             Icon(painterResource(R.drawable.ic_share), stringResource(R.string.share))
@@ -402,22 +423,17 @@ private fun StickerPackToggle(
 }
 
 /**
- * Shares [pack] as a Sonar viewer link: it opens in a browser for people without the app, and MDK reads it back
- * when pasted into "Add by link". The system sheet offers Copy as well.
+ * Shares a pack's Sonar viewer [link]: it opens in a browser for people without the app, and MDK reads it back,
+ * relay hints included, when pasted into "Add by link". The system sheet offers Copy as well.
  */
-private fun stickerPackShareIntent(pack: StickerPackFfi): Intent =
+private fun stickerPackShareIntent(link: String): Intent =
     Intent.createChooser(
         Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, stickerPackShareLink(pack))
+            putExtra(Intent.EXTRA_TEXT, link)
         },
         null,
     )
 
-private const val STICKER_SHARE_LINK_BASE = "https://sonarprivacy.xyz/stickers?a="
-
 /** A link to [pack] that opens on the web and that MDK reads back when pasted into "Add by link". */
-internal fun stickerPackShareLink(pack: StickerPackFfi): String {
-    val coordinate = URLEncoder.encode(pack.coordinate, "UTF-8")
-    return STICKER_SHARE_LINK_BASE + coordinate
-}
+internal fun stickerPackShareLink(pack: StickerPackFfi): String = sonarStickerLink(pack.coordinate)
