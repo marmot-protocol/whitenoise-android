@@ -105,18 +105,8 @@ internal object PlatformInterruptedAttachmentProbe {
         }
     }
 
-    /** Automatic demand receives no interactive read, deliberate Retry, force-run or seeded checkpoint. */
-    @Suppress("LongMethod") // One lifetime owns the generated platform job and its cleanup.
-    suspend fun run(
-        state: WhiteNoiseAppState,
-        request: AttachmentTransferRequest,
-        port: Int,
-        bytes: ByteArray,
-    ) = coroutineScope {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
-        check(shell("getprop ro.kernel.qemu").trim() == "1")
-        // Read existing ownership counters only; diagnostics never refresh permission or demand.
+    /** Observe existing permission ownership without refreshing permission or demand. */
+    private fun permissionCounters(state: WhiteNoiseAppState): Pair<AtomicLong, AtomicLong> {
         val permissions =
             WhiteNoiseAppState::class.java
                 .getDeclaredField("nativeAttachmentPermissions")
@@ -133,6 +123,21 @@ internal object PlatformInterruptedAttachmentProbe {
                 .getDeclaredField("inFlight")
                 .apply { isAccessible = true }
                 .get(permissions) as AtomicLong
+        return permissionRevision to permissionInFlight
+    }
+
+    /** Automatic demand receives no interactive read, deliberate Retry, force-run or seeded checkpoint. */
+    @Suppress("LongMethod") // One lifetime owns the generated platform job and its cleanup.
+    suspend fun run(
+        state: WhiteNoiseAppState,
+        request: AttachmentTransferRequest,
+        port: Int,
+        bytes: ByteArray,
+    ) = coroutineScope {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
+        check(shell("getprop ro.kernel.qemu").trim() == "1")
+        val (permissionRevision, permissionInFlight) = permissionCounters(state)
         val restoreApplication = PlatformBackgroundAttachmentProbe.bindGeneratedApplication(context, state)
         val manager = WorkManager.getInstance(context)
         val workName = attachmentDownloadWorkName(request)
