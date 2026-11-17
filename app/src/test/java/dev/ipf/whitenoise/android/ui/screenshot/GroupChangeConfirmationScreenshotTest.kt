@@ -48,6 +48,7 @@ class GroupChangeConfirmationScreenshotTest {
 
         composeRule.onNodeWithText("Weekend hikers").assertExists()
         composeRule.onNodeWithText("Wait").performClick()
+        composeRule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
         composeRule.mainClock.advanceTimeUntil { decision.isCompleted }
         assertEquals(false, decision.getCompleted())
     }
@@ -80,6 +81,7 @@ class GroupChangeConfirmationScreenshotTest {
         capture("refused_light")
 
         composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.runOnIdle { androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
         composeRule.mainClock.advanceTimeUntil { decision.isCompleted }
         assertEquals(false, decision.getCompleted())
     }

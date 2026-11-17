@@ -52,7 +52,10 @@ class AuditDiagnosticsScreenshotTest {
         val audit = PrivacyAuditFixture(enabled = true, statuses = listOf(active, paused))
         render(audit, granted = true)
         scrollTo("Audit log delivery")
-        composeRule.waitUntil(timeoutMillis = 5_000) { audit.deliveryReads > 0 }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            audit.deliveryReads > 0 &&
+                composeRule.onAllNodes(hasText("Refresh")).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("Refresh").performScrollTo()
         composeRule.onNodeWithText("Paused · HTTP 403").assertIsDisplayed()
         composeRule.onNodeWithText("Waiting to upload").assertIsDisplayed()
