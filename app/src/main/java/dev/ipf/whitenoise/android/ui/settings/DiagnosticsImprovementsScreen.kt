@@ -41,8 +41,8 @@ import dev.ipf.whitenoise.android.state.deleteAuditLogs
 import dev.ipf.whitenoise.android.state.prepareAuditLogArchiveForExport
 import dev.ipf.whitenoise.android.state.retryUsageDiagnostics
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.state.setTelemetryEnabled
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
