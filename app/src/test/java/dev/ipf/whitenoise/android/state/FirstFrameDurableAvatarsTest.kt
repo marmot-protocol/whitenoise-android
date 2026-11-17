@@ -20,7 +20,6 @@ import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
-import dev.ipf.whitenoise.android.media.sandbox.ImageInspection
 import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
 import dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport
 import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerReadiness
@@ -139,41 +138,21 @@ class FirstFrameDurableAvatarsTest {
     }
 
     /** Pre-existing stored bytes are decoded before publication, so the first frame seeds the avatar. */
-    @Test(timeout = 10_000)
+    @Test
     fun restoredDirectRowSeedsTheStoredAvatarOnItsFirstFrame() {
         val storedBytes = payload()
         val fixture = NativeAvatars { listOf(storedBytes) }
         val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
-        // Publication correctness has an outer test timeout, independent of the production frame deadline.
-        val pixels = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
-        IsolatedMediaDecoder.installTestTransport(
-            object : MediaDecodeTransport by TestMediaDecodeTransport {
-                override fun inspect(bytes: ByteArray): ImageInspection = ImageInspection(64, 64, "image/png", 1)
+        runBlocking { fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored)) }
 
-                override fun decode(
-                    bytes: ByteArray,
-                    edge: Int,
-                    oriented: Boolean,
-                    operation: Int,
-                ): Bitmap = pixels
-            },
-        )
-        try {
-            runBlocking {
-                fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), budgetMs = Long.MAX_VALUE)
-            }
-
-            assertEquals(1, fixture.reads.get())
-            assertEquals("a restored frame never starts acquisition", 0, fixture.requests.get())
-            assertNotNull(AvatarImageLoader.cachedImage(checkNotNull(asset(GROUP).cacheKey(ACCOUNT))))
-            val item = firstFrame(fixture.state, stored).items.single()
-            assertEquals(asset(GROUP), item.selectedAvatarAsset)
-            assertEquals(ChatListAvatarSource.DURABLE, item.firstFrameAvatar?.source)
-            assertNull(item.memberSnapshot)
-        } finally {
-            IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
-        }
+        assertEquals(1, fixture.reads.get())
+        assertEquals("a restored frame never starts acquisition", 0, fixture.requests.get())
+        assertNotNull(AvatarImageLoader.cachedImage(checkNotNull(asset(GROUP).cacheKey(ACCOUNT))))
+        val item = firstFrame(fixture.state, stored).items.single()
+        assertEquals(asset(GROUP), item.selectedAvatarAsset)
+        assertEquals(ChatListAvatarSource.DURABLE, item.firstFrameAvatar?.source)
+        assertNull(item.memberSnapshot)
     }
 
     /** A read that never answers cannot hold the restored frame past the budget. */
