@@ -28,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -50,10 +49,7 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Pause
 import dev.ipf.whitenoise.android.ui.icons.filled.PlayArrow
-import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
-import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -201,16 +197,7 @@ internal fun VoiceLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .then(
-                    rememberSettingsNativeSurface(
-                        destination = null,
-                        fill = MaterialTheme.colorScheme.surfaceContainer,
-                        shape = MaterialTheme.shapes.large,
-                        strokeColor =
-                            amoledSurfaceBorderStroke()?.let { MaterialTheme.colorScheme.outlineVariant }
-                                ?: Color.Unspecified,
-                    ).first,
-                ).settingsCardMorph()
+                .then(rememberMediaLibraryRowSurface())
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)
