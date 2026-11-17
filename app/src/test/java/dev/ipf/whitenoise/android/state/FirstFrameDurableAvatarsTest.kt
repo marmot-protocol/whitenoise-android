@@ -24,8 +24,16 @@ import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
 import dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport
 import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerReadiness
 import dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -55,6 +63,7 @@ import kotlin.coroutines.startCoroutine
 @Config(sdk = [36])
 class FirstFrameDurableAvatarsTest {
     private val controllers = mutableListOf<ChatsController>()
+    private val slowRead = CompletableDeferred<List<AvatarBytesFfi>>()
 
     /** Starts every test with an empty decoded-pixel cache. */
     @Before
@@ -62,9 +71,11 @@ class FirstFrameDurableAvatarsTest {
         AvatarImageLoader.clear()
     }
 
-    /** Releases controllers and decoded pixels. */
+    /** Ends the slow read and releases controllers and decoded pixels. */
     @After
     fun tearDown() {
+        // Ends a deliberately slow read, so its stored-decode slot is free for later tests in this JVM.
+        slowRead.complete(emptyList())
         controllers.forEach(ChatsController::onCleared)
         AvatarImageLoader.clear()
     }
@@ -158,7 +169,7 @@ class FirstFrameDurableAvatarsTest {
     /** A read that never answers cannot hold the restored frame past the budget. */
     @Test
     fun slowStoredReadGivesUpWithinTheBudget() {
-        val fixture = NativeAvatars { awaitCancellation() }
+        val fixture = NativeAvatars { slowRead.await() }
         val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
         val started = System.nanoTime()
@@ -168,6 +179,48 @@ class FirstFrameDurableAvatarsTest {
         assertTrue("prewarm took ${elapsedMs}ms", elapsedMs < FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS * 4)
         assertNull(AvatarImageLoader.cachedImage(checkNotNull(asset(GROUP).cacheKey(ACCOUNT))))
         assertNull(firstFrame(fixture.state, stored).items.single().firstFrameAvatar)
+    }
+
+    /**
+     * A prewarm decode still queued when the budget ends, with no row mounted to ask for it again, is skipped
+     * instead of reading bytes and starting a worker after the user has moved on (#3819).
+     */
+    @Test
+    fun aPrewarmDecodeStillQueuedAfterTheBudgetIsSkipped() =
+        runBlocking<Unit> {
+            val fixture = NativeAvatars { listOf(payload()) }
+            val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
+            val key = checkNotNull(asset(GROUP).cacheKey(ACCOUNT))
+            val release = CompletableDeferred<Unit>()
+            val blockers = fillStoredLane(release)
+
+            fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored))
+            assertTrue("the prewarm decode is still queued after the budget", AvatarImageLoader.isInFlightForTest(key))
+            release.complete(Unit)
+            blockers.awaitAll()
+            withTimeout(SETTLE_TIMEOUT_MS) { while (AvatarImageLoader.isInFlightForTest(key)) delay(1) }
+
+            assertEquals("a skipped decode reads no bytes", 0, fixture.reads.get())
+            assertNull(AvatarImageLoader.cachedImage(key))
+        }
+
+    /** Holds both stored-decode slots until [release], so a later stored decode queues behind them. */
+    private suspend fun CoroutineScope.fillStoredLane(release: CompletableDeferred<Unit>): List<Deferred<Any?>> {
+        val started = AtomicInteger()
+        val bothBlocking = CompletableDeferred<Unit>()
+        val lifetime = AvatarImageLoader.currentCacheLifetime()
+        val blockers =
+            (1..2).map { index ->
+                async(Dispatchers.IO) {
+                    AvatarImageLoader.loadStored("marmot-avatar:owner:blocker-$index@1", lifetime) {
+                        if (started.incrementAndGet() == 2) bothBlocking.complete(Unit)
+                        release.await()
+                        null
+                    }
+                }
+            }
+        withTimeout(SETTLE_TIMEOUT_MS) { bothBlocking.await() }
+        return blockers
     }
 
     /** A quick switch neither reads nor waits for an avatar whose decode needs a new worker (#3496). */
@@ -322,6 +375,7 @@ class FirstFrameDurableAvatarsTest {
         val GROUP = "d1".repeat(16)
         val PEER = "aa".repeat(32)
         const val NANOS_PER_MS = 1_000_000L
+        const val SETTLE_TIMEOUT_MS = 5_000L
         const val FIRST_PIN = "first-pin"
         const val PENDING = "pending-invitation"
         const val DRAFTED = "drafted"
