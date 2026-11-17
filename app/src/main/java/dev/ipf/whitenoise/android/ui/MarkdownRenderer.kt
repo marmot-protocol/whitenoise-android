@@ -26,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -75,7 +74,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -97,7 +95,6 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.core.withoutRepeatsOf
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardTextActionsToMessageRow
 import dev.ipf.whitenoise.android.ui.conversation.messages.MAX_ROW_CUSTOM_ACTIONS
@@ -241,42 +238,13 @@ internal fun MarkdownMessageBody(
     }
     val currentOnWebLinkActivated by rememberUpdatedState(onWebLinkActivated)
     pendingLinkUrl?.let { url ->
-        val parsedLink = remember(url) { parsedOpenableMarkdownLink(url) }
-        AnimatedAlertDialog(
-            onDismissRequest = { pendingLinkUrl = null },
-            title = { Text(stringResource(R.string.link_confirm_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    parsedLink?.effectiveAuthority?.let { authority ->
-                        Text(
-                            authority,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    Text(
-                        markdownSafeDisplayText(parsedLink?.destination ?: url),
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 6,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        close {
-                            if (pendingLinkUrl == url) {
-                                pendingLinkUrl = null
-                                openMarkdownLink(context, url, currentOnWebLinkActivated)
-                            }
-                        }
-                    },
-                ) { Text(stringResource(R.string.link_confirm_open)) }
-            },
-            dismissButton = {
-                TextButton(onClick = dismiss) {
-                    Text(stringResource(R.string.cancel))
+        WebLinkConfirmation(
+            url = url,
+            onDismiss = { pendingLinkUrl = null },
+            onConfirm = {
+                if (pendingLinkUrl == url) {
+                    pendingLinkUrl = null
+                    openMarkdownLink(context, url, currentOnWebLinkActivated)
                 }
             },
         )
@@ -2301,7 +2269,7 @@ private fun canonicalPortSuffix(rawPort: String): String? {
  * swallow it — a dead tap beats a crash. One ACTION_VIEW path serves every
  * allowed external scheme.
  */
-private fun openMarkdownLink(
+internal fun openMarkdownLink(
     context: android.content.Context,
     url: String,
     onWebLinkActivated: ((String) -> Boolean)? = null,

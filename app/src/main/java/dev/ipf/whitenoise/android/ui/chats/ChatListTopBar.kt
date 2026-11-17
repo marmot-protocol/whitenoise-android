@@ -437,6 +437,8 @@ internal fun ConversationSearchTopBar(
                 value = query,
                 onValueChange = onQueryChange,
                 placeholder = stringResource(R.string.conversation_search_messages),
+                // Same outlined field as chat list and settings search.
+                outlined = true,
                 modifier =
                     Modifier
                         .fillMaxWidth()

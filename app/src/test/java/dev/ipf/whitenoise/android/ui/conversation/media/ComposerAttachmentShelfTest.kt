@@ -10,6 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -157,7 +161,7 @@ class ComposerAttachmentShelfTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("pending.card").assertHasNoClickAction()
+        composeRule.onNodeWithTag("pending.card").assertIsNotEnabled()
         composeRule
             .onNodeWithContentDescription(context.getString(R.string.media_attachment_remove) + ": A.pdf")
             .assertIsNotEnabled()
@@ -167,7 +171,7 @@ class ComposerAttachmentShelfTest {
 
     /** Only visual cards open the preview; file and contact cards carry no click action at all. */
     @Test
-    fun onlyVisualCardsOpenThePreview() {
+    fun visualCardsKeepOpeningThePreviewAndUnsupportedCardsStayInert() {
         var previews = 0
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -187,7 +191,7 @@ class ComposerAttachmentShelfTest {
                             kind = ComposerAttachmentCardKind.Contact,
                             video = false,
                             bitmap = null,
-                            onPreview = { previews++ },
+                            onPreview = null,
                             onRemove = {},
                             modifier = Modifier.testTag("contact.card"),
                         )
@@ -202,6 +206,88 @@ class ComposerAttachmentShelfTest {
             .assertWidthIsEqualTo(104.dp)
         composeRule.onNodeWithTag("visual.card").performClick()
         assertEquals(1, previews)
+    }
+
+    @Test fun supportedDocumentsOpenAndRemovalDoesNotOpen() {
+        val uri = Uri.parse("file:///private/notes.pdf")
+        var opened = 0
+        var removed = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ComposerAttachmentShelf(
+                    mediaSlots = emptyList(),
+                    documentUris = listOf(uri),
+                    prepared = emptyMap(),
+                    preparedDocuments =
+                        mapOf(uri to ComposerDocumentReaderTest.prepared("application/pdf", "notes.pdf")),
+                    onPreview = { error("must use document callback") },
+                    onOpenDocument = {
+                        assertEquals(uri, it)
+                        opened++
+                    },
+                    onRemoveMedia = {},
+                    onRemoveDocument = { removed++ },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("conversation.composer.attachment.0").assertHasClickAction().performClick()
+        assertEquals(1, opened)
+        val semantics = composeRule.onNodeWithTag("conversation.composer.attachment.0").fetchSemanticsNode().config
+        assertEquals(Role.Button, semantics[SemanticsProperties.Role])
+        assertEquals(context.getString(R.string.composer_preview_attachment), semantics[SemanticsActions.OnClick].label)
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.media_attachment_remove) + ": notes.pdf")
+            .performClick()
+        assertEquals(1, removed)
+        assertEquals(1, opened)
+        composeRule
+            .onNodeWithTag("conversation.composer.attachments")
+            .captureRoboImage("src/test/snapshots/composer_attachment_shelf_document.png")
+    }
+
+    @Test fun unpreparedAndUnsupportedDocumentsAreInert() {
+        val uri = Uri.parse("file:///private/archive.zip")
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ComposerAttachmentShelf(
+                    emptyList(),
+                    listOf(uri),
+                    emptyMap(),
+                    onPreview = {},
+                    onRemoveMedia = {},
+                    onRemoveDocument = {},
+                    preparedDocuments =
+                        mapOf(uri to ComposerDocumentReaderTest.prepared("application/zip", "archive.zip")),
+                    onOpenDocument = { error("unsupported") },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("conversation.composer.attachment.0").assertHasNoClickAction()
+    }
+
+    @Test fun preparingDocumentsAreInertButRemovable() {
+        val uri = Uri.parse("file:///private/notes.txt")
+        var removed = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ComposerAttachmentShelf(
+                    emptyList(),
+                    listOf(uri),
+                    emptyMap(),
+                    onPreview = {},
+                    onRemoveMedia = {},
+                    onRemoveDocument = { removed++ },
+                    preparing = true,
+                    preparedDocuments = mapOf(uri to ComposerDocumentReaderTest.prepared("text/plain", "notes.txt")),
+                    onOpenDocument = { error("preparing") },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("conversation.composer.attachment.0").assertHasNoClickAction()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.media_attachment_remove) + ": notes.txt")
+            .performClick()
+        assertEquals(1, removed)
     }
 
     /** Card geometry and the shelf height follow the prototype table for every kind. */

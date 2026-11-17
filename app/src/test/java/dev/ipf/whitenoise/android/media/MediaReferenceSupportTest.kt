@@ -61,6 +61,14 @@ class MediaReferenceSupportTest {
         assertFalse(MediaReferenceSupport.isImageMedia(reference(mediaType = "application/pdf")))
     }
 
+    @Test
+    fun documentExtensionsReachTheFileBubbleDespiteMisleadingMediaMime() {
+        assertFalse(MediaReferenceSupport.isImageMedia(reference(mediaType = "image/jpeg", fileName = "report.pdf")))
+        assertFalse(MediaReferenceSupport.isAudioMedia(reference(mediaType = "audio/mp4", fileName = "report.html")))
+        assertFalse(MediaReferenceSupport.isVideoMedia(reference(mediaType = "video/mp4", fileName = "report.xhtml")))
+        assertTrue(MediaReferenceSupport.isImageMedia(reference(mediaType = "image/svg+xml", fileName = "drawing.svg")))
+    }
+
     private fun reference(
         locatorUrl: String = "https://media.example/blob",
         locators: List<MediaLocatorFfi> =

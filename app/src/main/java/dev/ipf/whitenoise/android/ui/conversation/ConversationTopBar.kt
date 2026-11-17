@@ -3,8 +3,10 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
@@ -30,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -39,6 +42,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
@@ -115,6 +119,11 @@ internal fun ConversationTopBar(
     // conversation identity and the details action reachable.
     compactHeight: Boolean = false,
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
+    // Optional header shortcuts chosen in Chat header settings; empty keeps the plain header. The slot
+    // receives how many buttons fit beside the chat name at this width and font size.
+    actions: @Composable RowScope.(capacity: Int) -> Unit = {},
+    // Set only when this person may change the timer now; otherwise a tap on it opens details.
+    onTimerClick: (() -> Unit)? = null,
 ) {
     // MDK 0.10.0 prepares the conversation title inside the live window; fall back to the app's own
     // projection until the first replacement arrives or when the seam has no window. A DM peer's
@@ -228,183 +237,239 @@ internal fun ConversationTopBar(
                 controller.boundAccountRef,
                 surfaceIdentity = controller,
             ) {
-                TopAppBar(
-                    modifier = Modifier.testTag(CONVERSATION_TOP_BAR_TAG),
-                    expandedHeight =
-                        if (compactHeight) {
-                            compactTopBarHeightFor(LocalDensity.current.fontScale)
-                        } else {
-                            TopAppBarDefaults.TopAppBarExpandedHeight
-                        },
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 48.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    // The reader speaks the chat name and member line, then offers Details.
-                                    .explainOnLongPress(
-                                        Explanation(
-                                            openDetailsDescription,
-                                            stringResource(R.string.explanation_conversation_header_details),
-                                        ),
-                                    ).clickable(
-                                        onClickLabel = openDetailsDescription,
-                                        role = Role.Button,
-                                        onClick = onOpenDetails,
-                                    ).performanceTestTag(
-                                        PerformanceTestTags.OPEN_GROUP_DETAILS,
-                                        enabled = performanceSelectorsEnabled,
-                                    ).semantics(mergeDescendants = true) { heading() },
-                        ) {
-                            // The fallback monogram stays visible but would read as initials before the chat name.
-                            Box(Modifier.testTag("conversation.header.avatar").clearAndSetSemantics {}) {
-                                GroupAvatar(
-                                    appState = appState,
-                                    group = avatarGroup,
-                                    title = presentedTitle,
-                                    seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
-                                    size = if (compactHeight) 28.dp else 40.dp,
-                                    fallbackPictureUrl =
-                                        privatePeer ?: presentedAvatarAccount
-                                            ?.takeUnless { explicitSelectionMissing }
-                                            ?.let(appState::avatarUrl),
-                                    firstFrameAvatar = firstFrameAvatar,
-                                    accountRef = controller.boundAccountRef,
-                                    durableAvatar = selectedAsset,
-                                    durableAvatarIsPersonPicture =
-                                        selectedAssetIsPersonPicture ||
-                                            avatarSource?.avatarSource?.isPeerSourced() == true,
-                                )
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {
-                                EmojiLabel(
-                                    presentedTitle,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                val membersSubtitle =
-                                    if (
-                                        shouldShowConversationMembersSubtitle(
-                                            membersLoaded = presentedMembersLoaded,
-                                            openedAsDmHint = openedAsDmHint,
-                                            groupName = presentedGroup.name,
-                                            memberCount = presentedMemberCount,
-                                        )
-                                    ) {
-                                        conversationMemberCountLabel(
-                                            count = presentedMemberCount,
-                                            justYou = stringResource(R.string.just_you),
-                                            oneMember = stringResource(R.string.one_member),
-                                            membersFormat = stringResource(R.string.members_count),
-                                        )
-                                    } else {
-                                        null
-                                    }
-                                val disappearingSecs = presentedGroup.disappearingMessageSecs.toLong()
-                                val showTimer = disappearingSecs > 0L
-                                if (membersSubtitle != null || showTimer) {
-                                    val labelStyle = MaterialTheme.typography.labelSmall
-                                    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    val subtitleRow: @Composable () -> Unit = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                BoxWithConstraints {
+                    // The title's rendered size carries both the system font scale and the app's text size.
+                    val titleScale =
+                        with(LocalDensity.current) {
+                            MaterialTheme.typography.titleMedium.fontSize
+                                .toDp()
+                        } /
+                            BASE_TITLE_SIZE
+                    val shortcutCapacity = headerShortcutCapacity(maxWidth, titleScale)
+                    TopAppBar(
+                        modifier = Modifier.testTag(CONVERSATION_TOP_BAR_TAG),
+                        expandedHeight =
+                            if (compactHeight) {
+                                compactTopBarHeightFor(LocalDensity.current.fontScale)
+                            } else {
+                                TopAppBarDefaults.TopAppBarExpandedHeight
+                            },
+                        title = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 48.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        // The reader speaks the chat name and member line, then offers Details.
+                                        .explainOnLongPress(
+                                            Explanation(
+                                                openDetailsDescription,
+                                                stringResource(R.string.explanation_conversation_header_details),
+                                            ),
+                                        ).clickable(
+                                            onClickLabel = openDetailsDescription,
+                                            role = Role.Button,
+                                            onClick = onOpenDetails,
+                                        ).performanceTestTag(
+                                            PerformanceTestTags.OPEN_GROUP_DETAILS,
+                                            enabled = performanceSelectorsEnabled,
+                                        ).semantics(mergeDescendants = true) { heading() },
+                            ) {
+                                // The fallback monogram stays visible but would read as initials before the chat name.
+                                Box(Modifier.testTag("conversation.header.avatar").clearAndSetSemantics {}) {
+                                    GroupAvatar(
+                                        appState = appState,
+                                        group = avatarGroup,
+                                        title = presentedTitle,
+                                        seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
+                                        size = if (compactHeight) 28.dp else 40.dp,
+                                        fallbackPictureUrl =
+                                            privatePeer ?: presentedAvatarAccount
+                                                ?.takeUnless { explicitSelectionMissing }
+                                                ?.let(appState::avatarUrl),
+                                        firstFrameAvatar = firstFrameAvatar,
+                                        accountRef = controller.boundAccountRef,
+                                        durableAvatar = selectedAsset,
+                                        durableAvatarIsPersonPicture =
+                                            selectedAssetIsPersonPicture ||
+                                                avatarSource?.avatarSource?.isPeerSourced() == true,
+                                    )
+                                }
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp),
+                                ) {
+                                    EmojiLabel(
+                                        presentedTitle,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    val membersSubtitle =
+                                        if (
+                                            shouldShowConversationMembersSubtitle(
+                                                membersLoaded = presentedMembersLoaded,
+                                                openedAsDmHint = openedAsDmHint,
+                                                groupName = presentedGroup.name,
+                                                memberCount = presentedMemberCount,
+                                            )
                                         ) {
-                                            if (membersSubtitle != null) {
-                                                Text(membersSubtitle, style = labelStyle, color = labelColor)
-                                            }
-                                            if (showTimer) {
+                                            conversationMemberCountLabel(
+                                                count = presentedMemberCount,
+                                                justYou = stringResource(R.string.just_you),
+                                                oneMember = stringResource(R.string.one_member),
+                                                membersFormat = stringResource(R.string.members_count),
+                                            )
+                                        } else {
+                                            null
+                                        }
+                                    val disappearingSecs = presentedGroup.disappearingMessageSecs.toLong()
+                                    val showTimer = disappearingSecs > 0L
+                                    if (membersSubtitle != null || showTimer) {
+                                        val labelStyle = MaterialTheme.typography.labelSmall
+                                        val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        val subtitleRow: @Composable () -> Unit = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            ) {
+                                                // The timer keeps its width; a long member line yields first.
                                                 if (membersSubtitle != null) {
-                                                    Text("·", style = labelStyle, color = labelColor)
-                                                }
-                                                Icon(
-                                                    painterResource(R.drawable.ic_timer),
-                                                    contentDescription = null,
-                                                    modifier =
-                                                        Modifier.size(12.dp).testTag("conversation.header.timer"),
-                                                    tint = labelColor,
-                                                )
-                                                Text(
-                                                    disappearingMessagesLabel(disappearingSecs),
-                                                    style = labelStyle,
-                                                    color = labelColor,
-                                                )
-                                            }
-                                        }
-                                    }
-                                    if (showTimer) {
-                                        val timerTooltipState = rememberTooltipState(isPersistent = true)
-                                        val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
-                                        val showTooltipOnce =
-                                            remember(controller.group.groupIdHex) {
-                                                !appState.disappearingTooltipShown
-                                            }
-                                        if (showTooltipOnce) {
-                                            LaunchedEffect(controller.group.groupIdHex) {
-                                                appState.markDisappearingTooltipShown()
-                                                timerTooltipState.show()
-                                            }
-                                        }
-                                        val tooltipWindowHeight =
-                                            LocalWindowInfo.current.containerSize.height
-                                        val tooltipMaxHeight =
-                                            with(LocalDensity.current) {
-                                                tooltipWindowHeight.toDp()
-                                            }
-                                        TooltipBox(
-                                            positionProvider =
-                                                TooltipDefaults.rememberTooltipPositionProvider(
-                                                    TooltipAnchorPosition.Above,
-                                                ),
-                                            tooltip = {
-                                                RichTooltip(
-                                                    modifier =
-                                                        Modifier
-                                                            .testTag("conversation.timer.tooltip")
-                                                            .heightIn(max = tooltipMaxHeight),
-                                                ) {
                                                     Text(
-                                                        timerTooltipText,
-                                                        modifier =
-                                                            Modifier
-                                                                .testTag("conversation.timer.tooltip.text")
-                                                                .fadingVerticalScroll(rememberScrollState()),
+                                                        membersSubtitle,
+                                                        style = labelStyle,
+                                                        color = labelColor,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.weight(1f, fill = false),
                                                     )
                                                 }
-                                            },
-                                            state = timerTooltipState,
-                                            content = subtitleRow,
-                                        )
-                                    } else {
-                                        subtitleRow()
+                                                if (showTimer) {
+                                                    if (membersSubtitle != null) {
+                                                        Text("·", style = labelStyle, color = labelColor)
+                                                    }
+                                                    HeaderTimerBadge(
+                                                        label = disappearingMessagesLabel(disappearingSecs),
+                                                        labelStyle = labelStyle,
+                                                        labelColor = labelColor,
+                                                        onClick = onTimerClick,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        if (showTimer) {
+                                            val timerTooltipState = rememberTooltipState(isPersistent = true)
+                                            val timerTooltipText = stringResource(R.string.disappearing_tooltip_text)
+                                            val showTooltipOnce =
+                                                remember(controller.group.groupIdHex) {
+                                                    !appState.disappearingTooltipShown
+                                                }
+                                            if (showTooltipOnce) {
+                                                LaunchedEffect(controller.group.groupIdHex) {
+                                                    appState.markDisappearingTooltipShown()
+                                                    timerTooltipState.show()
+                                                }
+                                            }
+                                            val tooltipWindowHeight =
+                                                LocalWindowInfo.current.containerSize.height
+                                            val tooltipMaxHeight =
+                                                with(LocalDensity.current) {
+                                                    tooltipWindowHeight.toDp()
+                                                }
+                                            TooltipBox(
+                                                positionProvider =
+                                                    TooltipDefaults.rememberTooltipPositionProvider(
+                                                        TooltipAnchorPosition.Above,
+                                                    ),
+                                                tooltip = {
+                                                    RichTooltip(
+                                                        modifier =
+                                                            Modifier
+                                                                .testTag("conversation.timer.tooltip")
+                                                                .heightIn(max = tooltipMaxHeight),
+                                                    ) {
+                                                        Text(
+                                                            timerTooltipText,
+                                                            modifier =
+                                                                Modifier
+                                                                    .testTag("conversation.timer.tooltip.text")
+                                                                    .fadingVerticalScroll(rememberScrollState()),
+                                                        )
+                                                    }
+                                                },
+                                                state = timerTooltipState,
+                                                content = subtitleRow,
+                                            )
+                                        } else {
+                                            subtitleRow()
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = stringResource(R.string.back),
-                            )
-                        }
-                    },
-                    scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
-                    colors =
-                        TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
-                )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    painterResource(R.drawable.ic_arrow_back),
+                                    contentDescription = stringResource(R.string.back),
+                                )
+                            }
+                        },
+                        actions = { actions(shortcutCapacity) },
+                        scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
+                        colors =
+                            TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
+                    )
+                }
             }
         }
     }
 }
 
 private const val CONVERSATION_TITLE_LINE_SPACING_DP = -2
+
+// Material's titleMedium size at 100% text size.
+private val BASE_TITLE_SIZE = 16.dp
+
+/** The timer badge; with [onClick] it opens the disappearing-messages picker instead of chat details. */
+@Composable
+@Suppress("FunctionNaming")
+private fun HeaderTimerBadge(
+    label: String,
+    labelStyle: TextStyle,
+    labelColor: Color,
+    onClick: (() -> Unit)?,
+) {
+    val clickModifier =
+        if (onClick == null) {
+            Modifier
+        } else {
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(
+                    onClickLabel = stringResource(R.string.conversation_header_timer_change),
+                    role = Role.Button,
+                    onClick = onClick,
+                ).testTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG)
+        }
+    Row(
+        modifier = clickModifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            painterResource(R.drawable.ic_timer),
+            contentDescription = null,
+            modifier = Modifier.size(12.dp).testTag("conversation.header.timer"),
+            tint = labelColor,
+        )
+        Text(label, style = labelStyle, color = labelColor, maxLines = 1, softWrap = false)
+    }
+}
+
+internal const val CONVERSATION_HEADER_TIMER_BUTTON_TAG = "conversation.header.timer.button"

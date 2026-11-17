@@ -28,6 +28,14 @@
         "test_ids": [
           "INT-011"
         ]
+      },
+      {
+        "surface": "Abandoned stored avatar decodes are skipped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt",
+        "anchor": "private fun skipsFetch(",
+        "test_ids": [
+          "MED-055"
+        ]
       }
     ]
   },

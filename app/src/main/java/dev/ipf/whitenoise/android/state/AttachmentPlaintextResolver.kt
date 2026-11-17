@@ -219,7 +219,7 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
 ): AttachmentPlaintext {
     promoteActiveAttachmentAcquisition(cacheKey, request, priority, demandIntent)
     val resolved =
-        memoizedAttachmentAcquisition(cacheKey, request, priority) {
+        memoizedAttachmentAcquisition(cacheKey, request, priority, isForegroundAutomatic(priority, demandIntent)) {
             val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
             val qualifiedRequest = request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
             if (!hasNativeAttachment(qualifiedRequest)) {

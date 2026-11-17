@@ -69,6 +69,15 @@ sealed interface MediaTrustDomain {
         override fun toString(): String = "Local"
     }
 
+    /** One opening of one local document. Reopening never inherits a previous parser process. */
+    data class DocumentSession(
+        val account: String,
+        val source: String,
+        val openId: String,
+    ) : MediaTrustDomain {
+        override fun toString(): String = "DocumentSession"
+    }
+
     /** No declared domain: the input gets a fresh worker generation of its own, the fail-safe default. */
     data object Unique : MediaTrustDomain
 

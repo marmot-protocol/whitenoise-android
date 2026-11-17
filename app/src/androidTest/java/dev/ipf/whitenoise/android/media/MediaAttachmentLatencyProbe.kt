@@ -446,7 +446,10 @@ class MediaAttachmentLatencyProbe {
                     }
                 }.awaitAll()
                 .also {
-                    assertTrue("host attachment concurrency must remain bounded", peak.get() in 1..3)
+                    assertTrue(
+                        "host attachment concurrency must remain bounded",
+                        peak.get() in 1..AttachmentDownloadGate.DEFAULT_PARALLELISM,
+                    )
                     assertEquals(0, active.get())
                 }
         }

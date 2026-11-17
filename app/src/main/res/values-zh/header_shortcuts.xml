@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="header_shortcuts_title">聊天标题栏快捷按钮</string>
+    <string name="header_shortcut_search">在聊天中搜索</string>
+    <string name="explanation_header_shortcut_search">在每个聊天的标题栏显示搜索按钮。它打开的搜索与聊天详情中的相同。仅适用于此设备。</string>
+    <string name="explanation_header_shortcut_mute">在每个聊天的标题栏显示静音按钮。静音时会询问时长；取消静音会立即生效。仅适用于此设备。</string>
+    <string name="explanation_header_shortcut_read_aloud">在每个聊天的标题栏显示朗读按钮。它会为该聊天开启或关闭新消息朗读，与聊天详情中的相同。仅适用于此设备。</string>
+    <string name="header_shortcuts_hint">标题栏按你勾选的顺序，显示聊天名称旁放得下的按钮。</string>
+    <string name="conversation_header_timer_change">更改阅后即焚消息计时器</string>
+    <string name="header_shortcut_members">成员</string>
+    <string name="explanation_header_shortcut_disappearing">在你可以更改阅后即焚消息计时器的聊天中显示计时器按钮。它会打开与聊天详情相同的选择器。仅适用于此设备。</string>
+    <string name="explanation_header_shortcut_members">在群聊标题栏中显示成员按钮。它会打开成员列表。仅适用于此设备。</string>
+    <string name="explanation_header_shortcut_add_members">在你可以添加成员的群聊中显示添加成员按钮。仅适用于此设备。</string>
+</resources>

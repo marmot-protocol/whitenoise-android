@@ -99,17 +99,47 @@ main() {
   fi
 }
 
+# Runs [main] in its own process group and kills that whole group at the hard deadline.
+# This does not rely on timeout(1): the Rust coreutils timeout on Ubuntu 26.04 runners
+# signals only its direct child, so a retrying curl and its sleeps outlived the budget.
+WORKER=""
+WATCHDOG=""
+run_with_deadline() {
+  local status=0
+  # Job control gives each background job its own process group, led by its own PID.
+  set -m
+  bash -c 'set -euo pipefail; main' &
+  WORKER=$!
+  (sleep "$BUDGET_SECONDS" && kill -KILL -- "-$WORKER" 2>/dev/null) &
+  WATCHDOG=$!
+  set +m
+  wait "$WORKER" || status=$?
+  stop_groups
+  return "$status"
+}
+
+# Kills the watchdog's and the worker's process groups, if started, and reaps them.
+stop_groups() {
+  local leader
+  for leader in "$WATCHDOG" "$WORKER"; do
+    if [[ -n "$leader" ]]; then
+      kill -KILL -- "-$leader" 2>/dev/null || true
+      wait "$leader" 2>/dev/null || true
+    fi
+  done
+}
+
 # The parent owns cleanup; the hard deadline kills the entire worker process group.
 mkdir -p "$LOCAL_REPO/$ARTIFACT_PATH"
 DOWNLOAD_DIR="$(mktemp -d "$LOCAL_REPO/$ARTIFACT_PATH/.prefetch.XXXXXX")"
-trap 'rm -rf -- "$DOWNLOAD_DIR"' EXIT
+# Both groups run outside this shell's own group, so an early exit must stop them before
+# the partial downloads go; TERM and INT exit through the same cleanup.
+trap 'stop_groups; rm -rf -- "$DOWNLOAD_DIR"' EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 export PINS CATALOG REMOTE FALLBACK_REMOTE LOCAL_REPO ARTIFACT_PATH DOWNLOAD_DIR
 export -f sha512_of check_robolectric_version download_jar fetch_jar main
-# Ubuntu 26.04's uutils timeout can fail to deliver SIGKILL to descendants.
-# Prefer the packaged GNU implementation to retain whole-group termination.
-timeout_bin="$(command -v gnutimeout || command -v timeout)"
-if ! "$timeout_bin" --signal=KILL "${BUDGET_SECONDS}s" \
-    bash -c 'set -euo pipefail; main'; then
+if ! run_with_deadline; then
   printf 'error: Android jar prefetch failed within its cumulative budget\n' >&2
   exit 1
 fi

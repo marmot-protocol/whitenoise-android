@@ -36,7 +36,7 @@ internal suspend fun ConversationController.evictCachedAttachment(
     withContext(Dispatchers.Main.immediate) {
         appState.removeMediaMemoryCacheEntry(cacheKey)
     }
-    withContext(Dispatchers.IO) { appState.diskMediaCache.remove(cacheKey) }
+    withContext(Dispatchers.IO) { appState.removeMediaDiskCacheEntry(cacheKey) }
 }
 
 /**

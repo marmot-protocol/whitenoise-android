@@ -275,7 +275,11 @@ class KeptMediaLiveStateTest {
     ): SwipeTestSurface {
         val surface = swipeTestSurface(ApplicationProvider.getApplicationContext(), false, mine, true)
         val record = surface.item.projected!!
-        val reference = MessageAttachments.acceptedReferences(record.media).single().copy(mediaType = mediaType)
+        // The shared fixture is named as a PDF; give each media type a matching name so the document extension
+        // hint cannot route the reference to a file card.
+        val fileName = "kept." + mediaType.substringAfter('/')
+        val accepted = MessageAttachments.acceptedReferences(record.media).single()
+        val reference = accepted.copy(mediaType = mediaType, fileName = fileName)
         runBlocking {
             surface.controller.testRefreshCurrentTimeline(SWIPE_TEST_ACCOUNT_REF) {
                 TimelinePageFfi(

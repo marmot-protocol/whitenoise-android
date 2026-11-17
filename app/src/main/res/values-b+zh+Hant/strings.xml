@@ -2660,4 +2660,12 @@
     <string name="emoji_name_marmot_smirk">壞笑的土撥鼠</string>
     <string name="emoji_name_marmot_cry">哭泣的土撥鼠</string>
     <string name="emoji_name_marmot_angry">生氣的土撥鼠</string>
+    <string name="document_rendered">呈現檢視</string>
+    <string name="document_source">原始碼</string>
+    <string name="document_html_omitted">已省略圖片、樣式和嵌入內容。</string>
+    <string name="document_html_unavailable">無法預覽此 HTML。檔案可能過大、過於複雜或使用不支援的編碼。</string>
+    <string name="document_pdf_unavailable">無法預覽此 PDF。檔案可能已損壞、受保護或過大。</string>
+    <string name="document_pdf_page">第 %1$d 頁，共 %2$d 頁</string>
+    <string name="document_zoom_reset">縮放 / 重設</string>
+    <string name="composer_preview_attachment">預覽附件</string>
 </resources>
