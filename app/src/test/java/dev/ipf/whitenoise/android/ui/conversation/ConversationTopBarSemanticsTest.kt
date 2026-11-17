@@ -215,21 +215,25 @@ class ConversationTopBarSemanticsTest {
     /** The default header has no shortcut buttons. */
     @Test fun headerWithoutShortcutsLight() = shortcutHeader("none_light", emptyList())
 
+    /** The default header in dark theme. */
     @Test fun headerWithoutShortcutsDark() = shortcutHeader("none_dark", emptyList(), dark = true)
 
     /** One chosen shortcut sits at the end of the header. */
     @Test fun headerWithOneShortcutLight() = shortcutHeader("one_light", listOf(HeaderShortcut.Search))
 
+    /** One shortcut in dark theme. */
     @Test fun headerWithOneShortcutDark() = shortcutHeader("one_dark", listOf(HeaderShortcut.Search), dark = true)
 
     /** Two shortcuts keep the person's order and leave the title its width. */
     @Test fun headerWithTwoShortcutsLight() = shortcutHeader("two_light", BOTH_SHORTCUTS)
 
+    /** Two shortcuts in dark theme. */
     @Test fun headerWithTwoShortcutsDark() = shortcutHeader("two_dark", BOTH_SHORTCUTS, dark = true)
 
     /** Search and an active Read aloud button share the header. */
     @Test fun headerWithReadAloudLight() = shortcutHeader("read_aloud_light", READ_ALOUD_SHORTCUTS)
 
+    /** Search and Read aloud in dark theme. */
     @Test fun headerWithReadAloudDark() = shortcutHeader("read_aloud_dark", READ_ALOUD_SHORTCUTS, dark = true)
 
     /** A narrow window at double font keeps two shortcuts, the members line and the tappable timer badge on screen. */
@@ -237,6 +241,7 @@ class ConversationTopBarSemanticsTest {
     @Config(qualifiers = "en-w320dp-h780dp-mdpi")
     fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", rtl = false)
 
+    /** The crowded header mirrored for a right-to-left language. */
     @Test
     @Config(qualifiers = "en-w320dp-h780dp-mdpi")
     fun crowdedHeaderLargeFontRtl() = crowdedHeader("crowded_large_font_rtl", rtl = true)

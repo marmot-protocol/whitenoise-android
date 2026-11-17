@@ -3894,12 +3894,14 @@ internal fun ConversationScreen(
         navigationState.searchOpen = true
     }
     val headerShortcuts = appState.headerShortcutPreferences.shortcuts
+    // Mute and Read aloud write through the active account, so like chat details they stay hidden while a
+    // notification-routed open is still waiting for its account switch.
+    val headerSettingsOwner = controller.isCurrentGroupMutationOwner(appState, appState.runtimeGeneration)
     // Read aloud mirrors the chat details auto-read choice and stays hidden without a usable speech engine.
     val headerReadAloudOn =
-        if (HeaderShortcut.ReadAloud in headerShortcuts && appState.ttsHasUsableEngine) {
+        if (headerSettingsOwner && HeaderShortcut.ReadAloud in headerShortcuts && appState.ttsHasUsableEngine) {
             val autoRead by appState.ttsAutoReadPreferences.state.collectAsState()
-            val accountRef = appState.activeAccountRef
-            accountRef?.let {
+            controller.boundAccountRef?.let {
                 resolveConversationAutoRead(
                     autoRead.globalDefaultEnabled,
                     appState.ttsAutoReadPreferences.overrideFor(it, controller.group.groupIdHex),
@@ -3908,9 +3910,18 @@ internal fun ConversationScreen(
         } else {
             null
         }
+
+    // The account can switch between composition and the tap, so the write rechecks the owner.
+    fun toggleHeaderReadAloud(on: Boolean?) {
+        if (!controller.isCurrentGroupMutationOwner(appState, appState.runtimeGeneration)) return
+        appState.setConversationAutoReadOverride(
+            controller.group.groupIdHex,
+            if (on == true) TtsAutoReadOverride.OFF else TtsAutoReadOverride.ON,
+        )
+    }
     // The mute state read runs only when the person put Mute/unmute in the header.
     val headerMuteControl =
-        if (HeaderShortcut.MuteUnmute in headerShortcuts) {
+        if (headerSettingsOwner && HeaderShortcut.MuteUnmute in headerShortcuts) {
             rememberConversationMuteControl(appState, controller)
         } else {
             null
@@ -4322,16 +4333,7 @@ internal fun ConversationScreen(
                                         muteControl = headerMuteControl,
                                         onSearch = openConversationSearch,
                                         readAloudOn = headerReadAloudOn,
-                                        onToggleReadAloud = {
-                                            appState.setConversationAutoReadOverride(
-                                                controller.group.groupIdHex,
-                                                if (headerReadAloudOn == true) {
-                                                    TtsAutoReadOverride.OFF
-                                                } else {
-                                                    TtsAutoReadOverride.ON
-                                                },
-                                            )
-                                        },
+                                        onToggleReadAloud = { toggleHeaderReadAloud(headerReadAloudOn) },
                                     )
                                 },
                                 onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,

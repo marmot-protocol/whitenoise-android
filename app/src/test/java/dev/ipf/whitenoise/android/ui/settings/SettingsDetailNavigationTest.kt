@@ -32,6 +32,7 @@ class SettingsDetailNavigationTest {
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ChatBubbleColors))
     }
 
+    /** Back from each Chats and Voice language subscreen returns to the hub that opened it. */
     @Test
     fun chatsAndVoiceLanguageSubscreensReturnToTheirHubs() {
         assertEquals(SettingsDetail.Chats, settingsDetailParent(SettingsDetail.CustomEmoji))

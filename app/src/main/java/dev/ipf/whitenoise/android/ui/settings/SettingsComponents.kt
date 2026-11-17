@@ -181,6 +181,7 @@ internal fun SettingsCheckbox(
     Checkbox(checked = checked, onCheckedChange = null, enabled = editable, modifier = Modifier.clearAndSetSemantics {})
 }
 
+/** Shared settings row whose trailing control, a switch or a check box, toggles the whole row. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 private fun SettingsToggleRow(

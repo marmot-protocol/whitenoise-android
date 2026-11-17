@@ -341,6 +341,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /** Chat details and the timer editor refuse protocol changes for groups the person can no longer change. */
     @Test
     fun groupDetailsGatesProtocolMutationsForTerminalGroups() {
         val source = groupDetailsSource().readText()
@@ -376,6 +377,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing GroupDetailsScreen.kt source file")
 
+    /** Main source file under the app package, found from either working directory. */
     private fun sourceFile(path: String): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$path"),

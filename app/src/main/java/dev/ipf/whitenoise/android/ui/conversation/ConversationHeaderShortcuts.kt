@@ -18,8 +18,8 @@ import dev.ipf.whitenoise.android.ui.group.ConversationMuteControl
 /**
  * The optional header buttons chosen in Chat header settings, in the order the person picked them. Each one
  * calls the same handler as its chat details action; [muteControl] is null when Mute/unmute is not chosen and
- * [readAloudOn] is null when this device has no usable speech engine. [searchModifier] lets the search field
- * grow out of the search button.
+ * [readAloudOn] is null when this device has no usable speech engine. Both are also null while the chat's
+ * account is not the active one.
  */
 @Composable
 internal fun RowScope.ConversationHeaderShortcuts(
@@ -28,14 +28,13 @@ internal fun RowScope.ConversationHeaderShortcuts(
     onSearch: () -> Unit,
     readAloudOn: Boolean? = null,
     onToggleReadAloud: () -> Unit = {},
-    searchModifier: Modifier = Modifier,
 ) {
     for (shortcut in shortcuts) {
         when (shortcut) {
             HeaderShortcut.Search ->
                 IconButton(
                     onClick = onSearch,
-                    modifier = searchModifier.testTag(CONVERSATION_HEADER_SEARCH_TAG),
+                    modifier = Modifier.testTag(CONVERSATION_HEADER_SEARCH_TAG),
                 ) {
                     Icon(
                         painterResource(R.drawable.ic_search),

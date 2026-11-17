@@ -52,6 +52,7 @@ class HeaderShortcutPreferencesTest {
         assertEquals(listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.ReadAloud), owner.shortcuts)
     }
 
+    /** Fresh private preferences file for one test case. */
     private fun preferences(name: String): SharedPreferences =
         ApplicationProvider
             .getApplicationContext<Context>()

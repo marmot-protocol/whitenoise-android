@@ -21,21 +21,34 @@ internal fun ChatHeaderSettingsScreen(
     onBack: () -> Unit,
 ) {
     val preferences = appState.headerShortcutPreferences
-    ChatHeaderSettingsContent(preferences.shortcuts, preferences::toggle, onBack)
+    ChatHeaderSettingsContent(
+        preferences.shortcuts,
+        preferences::toggle,
+        onBack,
+        readAloudAvailable = appState.ttsHasUsableEngine,
+    )
 }
 
-/** Check marks like the composer shortcut list; a full header disables the unchecked rows. */
+/**
+ * Check marks like the composer shortcut list; a full header disables the unchecked rows. Without a usable
+ * speech engine Read aloud is offered only while it is still checked, so the person can free its slot.
+ */
 @Composable
 internal fun ChatHeaderSettingsContent(
     shortcuts: List<HeaderShortcut>,
     onToggle: (HeaderShortcut) -> Unit,
     onBack: () -> Unit,
+    readAloudAvailable: Boolean = true,
 ) {
+    val offered =
+        HeaderShortcut.entries.filter {
+            it != HeaderShortcut.ReadAloud || readAloudAvailable || it in shortcuts
+        }
     SettingsScaffold(title = stringResource(R.string.header_shortcuts_title), onBack = onBack) {
         SettingsList {
             item(key = "search.ChatHeaderSettings.1") {
                 SettingsGroup {
-                    for (shortcut in HeaderShortcut.entries) {
+                    for (shortcut in offered) {
                         val checked = shortcut in shortcuts
                         // A full header keeps its choices; another one waits until the person unchecks one.
                         val full = !checked && shortcuts.size >= HeaderShortcutPreferences.MAX

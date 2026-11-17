@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -78,6 +81,26 @@ class ChatHeaderSettingsScreenTest {
             .performClick()
         rule.onNodeWithTag("chatHeader.mute").assertIsEnabled().performClick()
         assertEquals(listOf(HeaderShortcut.MuteUnmute), toggled)
+    }
+
+    /** Without a speech engine Read aloud is not offered, unless it is still checked and holding a slot. */
+    @Test fun readAloudNeedsASpeechEngineUnlessAlreadyChecked() {
+        val toggled = mutableListOf<HeaderShortcut>()
+        var shortcuts by mutableStateOf(listOf(HeaderShortcut.Search))
+        rule.setContent {
+            WhiteNoiseTheme {
+                ChatHeaderSettingsContent(shortcuts, { toggled += it }, {}, readAloudAvailable = false)
+            }
+        }
+        rule.onNodeWithTag("chatHeader.mute").assertExists()
+        rule.onNodeWithTag("chatHeader.read_aloud").assertDoesNotExist()
+        shortcuts = listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud)
+        rule
+            .onNodeWithTag("chatHeader.read_aloud")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        assertEquals(listOf(HeaderShortcut.ReadAloud), toggled)
     }
 
     /** Mounts the stateless screen under controlled theme, direction, text scale and chosen shortcuts. */
