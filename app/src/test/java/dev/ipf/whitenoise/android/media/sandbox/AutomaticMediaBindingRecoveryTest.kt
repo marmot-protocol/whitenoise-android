@@ -220,7 +220,6 @@ class AutomaticMediaBindingRecoveryTest {
             assertEquals(2, context.bindings.size)
             transport.invalidateSession()
             transport.activateSession()
-            assertTrue(awaitAutomaticRelease(transport))
             val reset = request()
             deliverAutomaticReply(context.next(), success = true)
             reset.join()

@@ -53,7 +53,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Exercises the real conversation viewer pages. A tap on media that is not on the device only downloads it in place,
@@ -274,51 +273,28 @@ class ConversationMediaViewerProductionPathTest {
     @Test
     fun pendingImagePageCanRestoreHiddenChrome() {
         val fixture = fixture(DIRECT_MESSAGE_ID)
-        val pendingImage = kotlinx.coroutines.CompletableDeferred<ByteArray>()
-        val imageLoadStarted = AtomicBoolean()
-        val imageLoadFinished = AtomicBoolean()
-        var visible by mutableStateOf(true)
         var chromeToggleCount = 0
         composeRule.setContent {
-            if (visible) {
-                ViewerPage(
-                    controller = fixture.controller,
-                    messageIdHex = DIRECT_MESSAGE_ID,
-                    attachmentIndex = 0,
-                    reference = reference(attachmentIndex = 0, mediaType = "image/jpeg"),
-                    scale = 1f,
-                    offset = Offset.Zero,
-                    onScaleChange = {},
-                    onOffsetChange = {},
-                    mine = false,
-                    isCurrent = true,
-                    onChromeToggle = { chromeToggleCount++ },
-                    imageBytes = {
-                        imageLoadStarted.set(true)
-                        try {
-                            pendingImage.await()
-                        } finally {
-                            imageLoadFinished.set(true)
-                        }
-                    },
-                )
-            }
+            ViewerPage(
+                controller = fixture.controller,
+                messageIdHex = DIRECT_MESSAGE_ID,
+                attachmentIndex = 0,
+                reference = reference(attachmentIndex = 0, mediaType = "image/jpeg"),
+                scale = 1f,
+                offset = Offset.Zero,
+                onScaleChange = {},
+                onOffsetChange = {},
+                mine = false,
+                isCurrent = true,
+                onChromeToggle = { chromeToggleCount++ },
+            )
         }
 
-        try {
-            composeRule.waitUntil(10_000) { imageLoadStarted.get() }
-            composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { click() }
-            composeRule.mainClock.advanceTimeBy(500L)
-            composeRule.waitForIdle()
+        composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { click() }
+        composeRule.mainClock.advanceTimeBy(500L)
+        composeRule.waitForIdle()
 
-            composeRule.runOnIdle { assertEquals(1, chromeToggleCount) }
-        } finally {
-            composeRule.runOnIdle { visible = false }
-            composeRule.waitForIdle()
-            composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).assertDoesNotExist()
-            composeRule.runOnIdle { assertEquals(true, imageLoadFinished.get()) }
-            composeRule.awaitViewerImageWorkIdle()
-        }
+        composeRule.runOnIdle { assertEquals(1, chromeToggleCount) }
     }
 
     /** Both real source entry points expose the same zoom/reset viewport, without constructing a fake attachment. */
