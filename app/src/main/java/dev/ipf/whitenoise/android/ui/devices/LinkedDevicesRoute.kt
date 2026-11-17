@@ -4,8 +4,10 @@ package dev.ipf.whitenoise.android.ui.devices
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -19,7 +21,10 @@ import dev.ipf.whitenoise.android.state.confirmMatch
 import dev.ipf.whitenoise.android.state.dismissMoveSibling
 import dev.ipf.whitenoise.android.state.start
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private const val FIRST_READ_GRACE_MS = 600L
 
 /** Which page of Linked devices is showing in place of the roster. Saved by slot so rotation keeps the page. */
 private data class LinkedDevicesPage(
@@ -69,9 +74,11 @@ private fun LinkedDevicesPages(
     DeviceLinkOfferSettled(appState, controller)
     DeviceManagementFailureEffect(appState, management)
     val openDevice = deviceSlot?.let { controller.roster.roster?.device(it) }
+    val firstRead = linkedDevicesFirstRead(controller, management)
     when {
         linking -> LinkThisDeviceRoute(controller, onClose = { linking = false })
         openDevice != null -> LinkedDeviceDetailRoute(openDevice, management, scope, onClose = { deviceSlot = null })
+        !firstRead -> LinkedDevicesContent(LinkedDeviceRosterState(), onBack, showLoading = false)
         else ->
             LinkedDevicesContent(
                 state = controller.roster,
@@ -97,6 +104,28 @@ private fun LinkedDevicesPages(
             repairing = false
         },
     )
+}
+
+/**
+ * False while the screen's first reads are still expected within a moment. It holds the roster, the linking actions
+ * and the sign-in review back until all three have been read once, so the screen opens in one frame instead of
+ * section by section. The reads are local and quick; past [FIRST_READ_GRACE_MS] the screen shows what it has, with
+ * its loading note, and fills in as usual.
+ */
+@Composable
+private fun linkedDevicesFirstRead(
+    controller: DeviceLinkController,
+    management: DeviceManagement,
+): Boolean {
+    var graceOver by remember(controller) { mutableStateOf(false) }
+    LaunchedEffect(controller) {
+        delay(FIRST_READ_GRACE_MS)
+        graceOver = true
+    }
+    val rosterRead = controller.roster.roster != null || controller.roster.readFailed
+    val linkRead = controller.link != null || controller.linkReadFailed
+    val read = rosterRead && linkRead && management.signIns.list.loaded
+    return read || graceOver
 }
 
 /**

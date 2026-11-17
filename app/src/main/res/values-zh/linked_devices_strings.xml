@@ -44,7 +44,7 @@
     <string name="link_device_this_title">关联此设备</string>
     <string name="link_device_this_detail">加入已与此账户关联的设备。</string>
     <string name="link_device_add_title">添加新设备</string>
-    <string name="link_device_add_steps">在新设备上登录此账户，打开设置、账户、已关联设备，然后选择关联此设备。在关联完成前，请让两台设备上的 White Noise 保持打开。</string>
+    <string name="link_device_add_steps">在新设备上登录此账户，并在询问时选择关联此设备。然后在这里确认表情符号。在关联完成前，请让两台设备上的 White Noise 保持打开。</string>
     <string name="link_device_external_signer">使用外部签名应用签名的账户暂时无法关联设备。</string>
     <string name="link_device_waiting_title">在另一台设备上打开 White Noise</string>
     <string name="link_device_waiting_detail">在已登录此账户的设备上打开 White Noise，并让两个应用都保持打开。那里会出现关联此设备的请求。</string>
@@ -158,4 +158,6 @@
     <string name="link_request_options">选项</string>
     <string name="link_request_options_detail">该设备会加入你的所有聊天并获得聊天记录。点按可重命名或更改这些设置。</string>
     <string name="explanation_link_request_options">打开新设备的名称及其接收的内容。</string>
+    <string name="device_move_advanced">高级</string>
+    <string name="setup_device_link_next">登录后，你可以将此设备与你的其他设备关联，并在这里看到相同的聊天。</string>
 </resources>

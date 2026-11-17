@@ -150,7 +150,7 @@ private fun ActiveProfileLinkRequest(
     DeviceLinkFailureEffect(appState, controller)
     Dialog(
         onDismissRequest = { watcher.hidePresented(blocked) },
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         DeviceLinkRequestContent(
             state = prompt.state,

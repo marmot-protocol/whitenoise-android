@@ -44,7 +44,7 @@
     <string name="link_device_this_title">Dieses Gerät verknüpfen</string>
     <string name="link_device_this_detail">Tritt den Geräten bei, die bereits mit diesem Konto verknüpft sind.</string>
     <string name="link_device_add_title">Neues Gerät hinzufügen</string>
-    <string name="link_device_add_steps">Melde dich auf dem neuen Gerät bei diesem Konto an, öffne Einstellungen, Konto, Verknüpfte Geräte und wähle „Dieses Gerät verknüpfen“. Lass White Noise auf beiden Geräten geöffnet, bis die Verknüpfung abgeschlossen ist.</string>
+    <string name="link_device_add_steps">Melde dich auf dem neuen Gerät bei diesem Konto an und wähle „Dieses Gerät verknüpfen“, wenn du gefragt wirst. Bestätige dann hier die Emojis. Lass White Noise auf beiden Geräten geöffnet, bis die Verknüpfung abgeschlossen ist.</string>
     <string name="link_device_external_signer">Für Konten, die mit einer externen Signier-App signieren, ist die Verknüpfung noch nicht verfügbar.</string>
     <string name="link_device_waiting_title">Öffne White Noise auf einem anderen Gerät</string>
     <string name="link_device_waiting_detail">Öffne White Noise auf einem Gerät, das bereits bei diesem Konto angemeldet ist, und lass beide Apps geöffnet. Dort erscheint eine Anfrage zum Verknüpfen dieses Geräts.</string>
@@ -158,4 +158,6 @@
     <string name="link_request_options">Optionen</string>
     <string name="link_request_options_detail">Das Gerät tritt allen deinen Chats bei und erhält deren Verlauf. Tippe, um es umzubenennen oder dies zu ändern.</string>
     <string name="explanation_link_request_options">Öffnet den Namen des neuen Geräts und was es erhält.</string>
+    <string name="device_move_advanced">Erweitert</string>
+    <string name="setup_device_link_next">Nach der Anmeldung kannst du dieses Gerät mit deinen anderen Geräten verknüpfen und hier dieselben Chats sehen.</string>
 </resources>

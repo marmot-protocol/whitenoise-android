@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingSingleDeviceNoticeFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import java.time.format.FormatStyle
 
 /** What MDK's device check found, which the "Chats on this device" step states before explaining what it means. */
@@ -49,13 +50,21 @@ internal fun SetupDeviceEvidence?.namesPublicationDate(): Boolean {
 /**
  * What this sign-in means for the user's chats. Each sign-in is a separate installation with its own chats, so the
  * copy never says this device is added, linked or synced. A check that found nothing needs no explanation, and one
- * that failed or has not run makes no claim about other apps either way.
+ * that failed or has not run makes no claim about other apps either way. A build with linked devices says instead
+ * that this device can be linked after sign-in, since its chats need not stay separate there.
  */
-internal fun setupDeviceExplanation(evidence: SetupDeviceEvidence?): List<Int> =
+internal fun setupDeviceExplanation(
+    evidence: SetupDeviceEvidence?,
+    linkedDevices: Boolean = linkedDevicesAvailable(),
+): List<Int> =
     when (evidence) {
         SetupDeviceEvidence.NoneFound -> emptyList()
         is SetupDeviceEvidence.OtherApps ->
-            listOf(R.string.setup_device_separate_chats, R.string.setup_device_new_chats_either_app)
+            if (linkedDevices) {
+                listOf(R.string.setup_device_link_next)
+            } else {
+                listOf(R.string.setup_device_separate_chats, R.string.setup_device_new_chats_either_app)
+            }
         SetupDeviceEvidence.Unchecked, null -> listOf(R.string.setup_device_separate_chats_if_other_app)
     }
 

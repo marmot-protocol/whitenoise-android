@@ -44,7 +44,7 @@
     <string name="link_device_this_title">Collega questo dispositivo</string>
     <string name="link_device_this_detail">Unisciti ai dispositivi già collegati a questo account.</string>
     <string name="link_device_add_title">Aggiungi un nuovo dispositivo</string>
-    <string name="link_device_add_steps">Sul nuovo dispositivo accedi a questo account, apri Impostazioni, Account, Dispositivi collegati e scegli Collega questo dispositivo. Tieni White Noise aperto su entrambi i dispositivi finché il collegamento non termina.</string>
+    <string name="link_device_add_steps">Sul nuovo dispositivo accedi a questo account e scegli Collega questo dispositivo quando ti viene chiesto. Poi conferma qui le emoji. Tieni White Noise aperto su entrambi i dispositivi finché il collegamento non termina.</string>
     <string name="link_device_external_signer">Il collegamento non è ancora disponibile per gli account che firmano con un’app di firma esterna.</string>
     <string name="link_device_waiting_title">Apri White Noise su un altro dispositivo</string>
     <string name="link_device_waiting_detail">Apri White Noise su un dispositivo che ha già effettuato l’accesso a questo account e tieni aperte entrambe le app. Lì comparirà una richiesta di collegare questo dispositivo.</string>
@@ -158,4 +158,6 @@
     <string name="link_request_options">Opzioni</string>
     <string name="link_request_options_detail">Il dispositivo entra in tutte le tue chat e ne riceve la cronologia. Tocca per rinominarlo o modificare queste scelte.</string>
     <string name="explanation_link_request_options">Apre il nome del nuovo dispositivo e ciò che riceve.</string>
+    <string name="device_move_advanced">Avanzate</string>
+    <string name="setup_device_link_next">Dopo l’accesso potrai collegare questo dispositivo agli altri tuoi dispositivi e vedere qui le stesse chat.</string>
 </resources>

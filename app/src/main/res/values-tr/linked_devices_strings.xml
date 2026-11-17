@@ -44,7 +44,7 @@
     <string name="link_device_this_title">Bu cihazı bağla</string>
     <string name="link_device_this_detail">Bu hesaba zaten bağlı cihazlara katılın.</string>
     <string name="link_device_add_title">Yeni cihaz ekle</string>
-    <string name="link_device_add_steps">Yeni cihazda bu hesapta oturum açın, Ayarlar, Hesap, Bağlı cihazlar bölümünü açıp Bu cihazı bağla seçeneğini seçin. Bağlama bitene kadar White Noise uygulamasını iki cihazda da açık tutun.</string>
+    <string name="link_device_add_steps">Yeni cihazda bu hesapta oturum açın ve sorulduğunda Bu cihazı bağla seçeneğini seçin. Ardından emojileri burada onaylayın. Bağlama bitene kadar White Noise uygulamasını iki cihazda da açık tutun.</string>
     <string name="link_device_external_signer">Harici bir imzalama uygulamasıyla imzalayan hesaplar için bağlama henüz kullanılamıyor.</string>
     <string name="link_device_waiting_title">White Noise uygulamasını başka bir cihazda açın</string>
     <string name="link_device_waiting_detail">Bu hesapta zaten oturum açılmış bir cihazda White Noise uygulamasını açın ve iki uygulamayı da açık tutun. Bu cihazı bağlama isteği orada görünür.</string>
@@ -158,4 +158,6 @@
     <string name="link_request_options">Seçenekler</string>
     <string name="link_request_options_detail">Cihaz tüm sohbetlerinize katılır ve geçmişlerini alır. Yeniden adlandırmak veya bunu değiştirmek için dokunun.</string>
     <string name="explanation_link_request_options">Yeni cihazın adını ve neler alacağını açar.</string>
+    <string name="device_move_advanced">Gelişmiş</string>
+    <string name="setup_device_link_next">Oturum açtıktan sonra bu cihazı diğer cihazlarınıza bağlayıp aynı sohbetleri burada görebilirsiniz.</string>
 </resources>

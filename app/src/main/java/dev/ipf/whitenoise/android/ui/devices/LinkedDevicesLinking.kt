@@ -85,20 +85,6 @@ internal fun NewDeviceLinkStateFfi?.inProgress(): Boolean {
 }
 
 /**
- * Whether the roster offers the link action. A link under way always keeps its way back in. Otherwise nothing is
- * offered until the roster is read, and a device that already has a sibling is offered a move only while no move is
- * pending.
- */
-internal fun offersLinkAction(
-    underWay: Boolean,
-    linked: Boolean?,
-    movePending: Boolean,
-): Boolean {
-    val offered = if (linked == true) !movePending else linked != null
-    return underWay || offered
-}
-
-/**
  * This device's moves between sets of the account's devices, as MDK reports them. Each shows its state, a note when
  * devices rejected earlier were already linked in the destination, and one reminder per recognized device left
  * behind. Dismissing a reminder only hides it; the reminders are guidance and never decide whom to trust.
@@ -175,29 +161,56 @@ internal fun LazyListScope.linkedDevicesLinking(
         return
     }
     val underWay = linking.newDevice.inProgress()
-    // Nothing is offered before the roster is read, except the way back into a link already under way. A linked
-    // device starts a move with the same request, and MDK takes no new one while a move is still pending.
-    val linked = state.roster?.hasOtherDevices
-    if (offersLinkAction(underWay, linked, linking.moves.any { it.pending() })) {
-        val title = if (linked == true) R.string.device_move_title else R.string.link_device_this_title
-        val detail = if (linked == true) R.string.device_move_detail else R.string.link_device_this_detail
+    // Nothing is offered before the roster is read, except the way back into a link already under way.
+    val unlinked = state.roster?.hasOtherDevices == false
+    if (underWay || unlinked) {
+        val detail = if (underWay) R.string.link_device_in_progress else R.string.link_device_this_detail
         item(key = "link-this-device") {
-            SettingsGroup {
-                row("link_this_device") { context ->
-                    SettingsLink(
-                        context = context,
-                        title = stringResource(title),
-                        onClick = onLinkThisDevice,
-                        modifier = Modifier.testTag(LINKED_DEVICES_LINK_THIS_TAG),
-                        explanation = stringResource(detail),
-                        subtitle = stringResource(if (underWay) R.string.link_device_in_progress else detail),
-                        enabled = !linking.busy,
-                        leading = { SettingsLeadingIcon(R.drawable.ic_link) },
-                    )
-                }
-            }
+            LinkThisDeviceRow(R.string.link_device_this_title, detail, !linking.busy, onLinkThisDevice)
         }
     }
     item(key = "section.add") { SettingsSection(stringResource(R.string.link_device_add_title)) }
     item(key = "add-steps") { SettingsExplainer(stringResource(R.string.link_device_add_steps)) }
+}
+
+/**
+ * Move this device, last on the screen under Advanced because few people need it. A linked device starts a move
+ * with the same request as a link, and MDK takes no new one while a move or a link is still under way.
+ */
+internal fun LazyListScope.linkedDevicesMoveAction(
+    state: LinkedDeviceRosterState,
+    linking: LinkedDevicesLinking,
+    onMoveThisDevice: () -> Unit,
+) {
+    val available = linking.availability == DeviceLinkAvailability.Available && !linking.newDevice.inProgress()
+    val linked = state.roster?.hasOtherDevices == true
+    if (!available || !linked || linking.moves.any { it.pending() }) return
+    item(key = "section.advanced") { SettingsSection(stringResource(R.string.device_move_advanced)) }
+    item(key = "move-this-device") {
+        LinkThisDeviceRow(R.string.device_move_title, R.string.device_move_detail, !linking.busy, onMoveThisDevice)
+    }
+}
+
+/** The row that starts this device's link or move, saying under its [title] what it does or how far it is. */
+@Composable
+private fun LinkThisDeviceRow(
+    title: Int,
+    detail: Int,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    SettingsGroup {
+        row("link_this_device") { context ->
+            SettingsLink(
+                context = context,
+                title = stringResource(title),
+                onClick = onClick,
+                modifier = Modifier.testTag(LINKED_DEVICES_LINK_THIS_TAG),
+                explanation = stringResource(detail),
+                subtitle = stringResource(detail),
+                enabled = enabled,
+                leading = { SettingsLeadingIcon(R.drawable.ic_link) },
+            )
+        }
+    }
 }

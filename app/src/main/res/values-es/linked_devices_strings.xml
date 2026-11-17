@@ -44,7 +44,7 @@
     <string name="link_device_this_title">Vincular este dispositivo</string>
     <string name="link_device_this_detail">Únete a los dispositivos ya vinculados a esta cuenta.</string>
     <string name="link_device_add_title">Añadir un dispositivo nuevo</string>
-    <string name="link_device_add_steps">En el dispositivo nuevo, inicia sesión en esta cuenta, abre Ajustes, Cuenta, Dispositivos vinculados y elige Vincular este dispositivo. Mantén White Noise abierto en ambos dispositivos hasta que termine la vinculación.</string>
+    <string name="link_device_add_steps">En el dispositivo nuevo, inicia sesión en esta cuenta y elige Vincular este dispositivo cuando se te pregunte. Después confirma aquí los emojis. Mantén White Noise abierto en ambos dispositivos hasta que termine la vinculación.</string>
     <string name="link_device_external_signer">La vinculación aún no está disponible para cuentas que firman con una app de firma externa.</string>
     <string name="link_device_waiting_title">Abre White Noise en otro dispositivo</string>
     <string name="link_device_waiting_detail">Abre White Noise en un dispositivo que ya tenga sesión iniciada en esta cuenta y mantén ambas apps abiertas. Allí aparecerá una solicitud para vincular este dispositivo.</string>
@@ -158,4 +158,6 @@
     <string name="link_request_options">Opciones</string>
     <string name="link_request_options_detail">El dispositivo se une a todos tus chats y recibe su historial. Toca para cambiarle el nombre o modificar esto.</string>
     <string name="explanation_link_request_options">Abre el nombre del nuevo dispositivo y lo que recibe.</string>
+    <string name="device_move_advanced">Avanzado</string>
+    <string name="setup_device_link_next">Después de iniciar sesión, podrás vincular este dispositivo con tus otros dispositivos y ver aquí los mismos chats.</string>
 </resources>

@@ -44,7 +44,7 @@
     <string name="link_device_this_title">連結此裝置</string>
     <string name="link_device_this_detail">加入已與此帳號連結的裝置。</string>
     <string name="link_device_add_title">新增裝置</string>
-    <string name="link_device_add_steps">在新裝置上登入此帳號，開啟設定、帳號、已連結裝置，然後選擇連結此裝置。連結完成前，請讓兩部裝置上的 White Noise 保持開啟。</string>
+    <string name="link_device_add_steps">在新裝置上登入此帳號，並在詢問時選擇連結此裝置。然後在這裡確認表情符號。連結完成前，請讓兩部裝置上的 White Noise 保持開啟。</string>
     <string name="link_device_external_signer">使用外部簽署應用程式簽署的帳號暫時無法連結裝置。</string>
     <string name="link_device_waiting_title">在另一部裝置上開啟 White Noise</string>
     <string name="link_device_waiting_detail">在已登入此帳號的裝置上開啟 White Noise，並讓兩個應用程式都保持開啟。那裡會出現連結此裝置的要求。</string>
@@ -158,4 +158,6 @@
     <string name="link_request_options">選項</string>
     <string name="link_request_options_detail">該裝置會加入你的所有聊天並取得聊天記錄。點按即可重新命名或變更這些設定。</string>
     <string name="explanation_link_request_options">開啟新裝置的名稱及其接收的內容。</string>
+    <string name="device_move_advanced">進階</string>
+    <string name="setup_device_link_next">登入後，你可以將此裝置與你的其他裝置連結，並在這裡看到相同的聊天。</string>
 </resources>

@@ -90,7 +90,7 @@ private fun DeviceLinkOfferSteps(
     }
     Dialog(
         onDismissRequest = offers::closeLinking,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         LinkThisDeviceRoute(controller, onClose = offers::closeLinking)
     }

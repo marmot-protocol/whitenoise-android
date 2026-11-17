@@ -44,7 +44,7 @@
     <string name="link_device_this_title">Associer cet appareil</string>
     <string name="link_device_this_detail">Rejoignez les appareils déjà associés à ce compte.</string>
     <string name="link_device_add_title">Ajouter un nouvel appareil</string>
-    <string name="link_device_add_steps">Sur le nouvel appareil, connectez-vous à ce compte, ouvrez Réglages, Compte, Appareils associés, puis choisissez Associer cet appareil. Gardez White Noise ouvert sur les deux appareils jusqu’à la fin de l’association.</string>
+    <string name="link_device_add_steps">Sur le nouvel appareil, connectez-vous à ce compte et choisissez Associer cet appareil lorsque cela vous est proposé. Confirmez ensuite les emojis ici. Gardez White Noise ouvert sur les deux appareils jusqu’à la fin de l’association.</string>
     <string name="link_device_external_signer">L’association n’est pas encore disponible pour les comptes qui signent avec une application de signature externe.</string>
     <string name="link_device_waiting_title">Ouvrez White Noise sur un autre appareil</string>
     <string name="link_device_waiting_detail">Ouvrez White Noise sur un appareil déjà connecté à ce compte et gardez les deux applications ouvertes. Une demande d’association de cet appareil y apparaît.</string>
@@ -158,4 +158,6 @@
     <string name="link_request_options">Options avancées</string>
     <string name="link_request_options_detail">L’appareil rejoint toutes vos discussions et reçoit leur historique. Touchez pour le renommer ou modifier cela.</string>
     <string name="explanation_link_request_options">Ouvre le nom du nouvel appareil et ce qu’il reçoit.</string>
+    <string name="device_move_advanced">Avancé</string>
+    <string name="setup_device_link_next">Après la connexion, vous pourrez associer cet appareil à vos autres appareils et voir les mêmes discussions ici.</string>
 </resources>

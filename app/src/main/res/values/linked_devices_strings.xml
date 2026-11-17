@@ -44,7 +44,7 @@
     <string name="link_device_this_title">Link this device</string>
     <string name="link_device_this_detail">Join the devices already linked to this account.</string>
     <string name="link_device_add_title">Add a new device</string>
-    <string name="link_device_add_steps">On the new device, sign in to this account, open Settings, Account, Linked devices and choose Link this device. Keep White Noise open on both devices until linking finishes.</string>
+    <string name="link_device_add_steps">On the new device, sign in to this account and choose Link this device when asked. Then confirm the emoji here. Keep White Noise open on both devices until linking finishes.</string>
     <string name="link_device_external_signer">Linking isn\'t available yet for accounts that sign with an external signer app.</string>
     <string name="link_device_waiting_title">Open White Noise on another device</string>
     <string name="link_device_waiting_detail">Open White Noise on a device that is already signed in to this account, and keep both apps open. A request to link this device appears there.</string>
@@ -158,4 +158,6 @@
     <string name="link_request_options">Options</string>
     <string name="link_request_options_detail">The device joins all your chats and gets their history. Tap to rename it or change this.</string>
     <string name="explanation_link_request_options">Opens the new device\'s name and what it receives.</string>
+    <string name="device_move_advanced">Advanced</string>
+    <string name="setup_device_link_next">After you sign in, you can link this device to your other devices and see the same chats here.</string>
 </resources>

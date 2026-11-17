@@ -43,6 +43,7 @@ internal const val LINKED_DEVICES_EXTERNAL_SIGNER_TAG = "linked_devices.external
  * security warning and this device's standing notices; below them the chat counts, any moves MDK reports, then
  * the linking actions: Link this device while it has no linked sibling (or to return to a link under way), Move
  * this device once it has, and what to do on another device to add it.
+ * [showLoading] false holds the loading note back while a first read is expected at once.
  */
 @Composable
 internal fun LinkedDevicesContent(
@@ -51,6 +52,7 @@ internal fun LinkedDevicesContent(
     linking: LinkedDevicesLinking = LinkedDevicesLinking(),
     actions: LinkedDevicesActions = LinkedDevicesActions(),
     health: LinkedDevicesHealth = LinkedDevicesHealth(),
+    showLoading: Boolean = true,
 ) {
     SettingsScaffold(title = stringResource(R.string.linked_devices), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag(LINKED_DEVICES_LIST_TAG)) {
@@ -58,11 +60,12 @@ internal fun LinkedDevicesContent(
             compromiseWarning(health.review, actions.review.onDismissWarning)
             linkedDevicesNotices(health, actions.onRepair)
             if (state.readFailed) linkedDevicesFailure(state.refreshing, actions.onRetry)
-            linkedDevicesRoster(state, actions.onOpenDevice)
+            linkedDevicesRoster(state, showLoading, actions.onOpenDevice)
             linkedDevicesChatCounts(health.counts)
             linkedDevicesMoves(linking, actions.onDismissMoveSibling)
             linkedDevicesLinking(state, linking, actions.onLinkThisDevice)
             if (linking.availability == DeviceLinkAvailability.Available) signInReview(health.review, actions.review)
+            linkedDevicesMoveAction(state, linking, actions.onLinkThisDevice)
         }
     }
 }
@@ -98,10 +101,12 @@ private fun LazyListScope.linkedDevicesFailure(
 /** The loading note before the first read, the empty note, or the grouped device rows. */
 private fun LazyListScope.linkedDevicesRoster(
     state: LinkedDeviceRosterState,
+    showLoading: Boolean,
     onOpenDevice: (String) -> Unit,
 ) {
     val roster = state.roster
     when {
+        roster == null && !state.readFailed && !showLoading -> Unit
         roster == null && !state.readFailed ->
             item(key = "loading") {
                 SettingsCallout(

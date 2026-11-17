@@ -182,6 +182,24 @@
           "SET-060",
           "SET-062"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_advanced",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_advanced",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "LinkThisDeviceRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "fun LinkThisDeviceRow(",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
       }
     ]
   },
