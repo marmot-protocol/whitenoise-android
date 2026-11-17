@@ -1,0 +1,1 @@
+Adds in-app PDF and HTML readers, a two-pane chat layout on wide screens, sticker packs and configurable chat shortcuts. Improves custom emoji, dictation, media previews, attachment delivery and recovery. Adds notification privacy options and audit log export. Updates MarmotKit to 0.17.0.

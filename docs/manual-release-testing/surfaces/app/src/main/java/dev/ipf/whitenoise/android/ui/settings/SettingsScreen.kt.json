@@ -45,6 +45,7 @@
         "anchor": "fun SettingsHomeContent(",
         "test_ids": [
           "SET-001",
+          "SET-019",
           "SET-042",
           "SET-043",
           "SET-044"
@@ -56,6 +57,7 @@
         "anchor": "fun SettingsHomeScreen(",
         "test_ids": [
           "SET-001",
+          "SET-019",
           "SET-042",
           "SET-043",
           "SET-044"
