@@ -53,6 +53,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Exercises the real conversation viewer pages. A tap on media that is not on the device only downloads it in place,
@@ -274,7 +275,8 @@ class ConversationMediaViewerProductionPathTest {
     fun pendingImagePageCanRestoreHiddenChrome() {
         val fixture = fixture(DIRECT_MESSAGE_ID)
         val pendingImage = kotlinx.coroutines.CompletableDeferred<ByteArray>()
-        val imageLoadStarted = java.util.concurrent.atomic.AtomicBoolean()
+        val imageLoadStarted = AtomicBoolean()
+        val imageLoadFinished = AtomicBoolean()
         var visible by mutableStateOf(true)
         var chromeToggleCount = 0
         composeRule.setContent {
@@ -293,7 +295,11 @@ class ConversationMediaViewerProductionPathTest {
                     onChromeToggle = { chromeToggleCount++ },
                     imageBytes = {
                         imageLoadStarted.set(true)
-                        pendingImage.await()
+                        try {
+                            pendingImage.await()
+                        } finally {
+                            imageLoadFinished.set(true)
+                        }
                     },
                 )
             }
@@ -308,6 +314,9 @@ class ConversationMediaViewerProductionPathTest {
             composeRule.runOnIdle { assertEquals(1, chromeToggleCount) }
         } finally {
             composeRule.runOnIdle { visible = false }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).assertDoesNotExist()
+            composeRule.runOnIdle { assertEquals(true, imageLoadFinished.get()) }
             composeRule.awaitViewerImageWorkIdle()
         }
     }
