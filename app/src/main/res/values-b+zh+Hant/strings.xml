@@ -69,6 +69,7 @@
     <string name="white_noise_couldnt_start">White Noise 無法啟動</string>
     <string name="startup_taking_too_long">啟動時間超出預期。請再試一次。</string>
     <string name="error_try_again">發生錯誤。請重試；如果問題持續發生，請複製錯誤報告。</string>
+    <string name="error_linked_devices_build_required">此帳號使用了已連結裝置，目前版本無法開啟。你的資料已保留。請覆蓋安裝支援已連結裝置的版本。</string>
     <string name="error_restart_app_before_retry">本機對話仍在載入中。請重新啟動 White Noise 後再試。</string>
     <string name="error_not_ready">White Noise 仍在為此帳號完成更新。通常不到一分鐘，並會自動重試。</string>
     <string name="chat_list_startup_slow">正在完成更新。聊天很快就會顯示，請保持 White Noise 開啟。</string>

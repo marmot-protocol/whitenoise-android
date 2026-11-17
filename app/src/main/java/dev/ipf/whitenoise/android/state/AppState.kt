@@ -4110,7 +4110,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Adds host stage attribution after an exception has unwound without retaining its sensitive text. */
     private fun bootstrapFailure(error: Throwable): ErrorPresentation =
-        privacySafeErrorPresentation("APP_BOOTSTRAP", error, startupDetail = StartupDiagnostics.failureDetail())
+        bootstrapFailurePresentation(error, StartupDiagnostics.failureDetail())
 
     /** Restores only a native signed-in profile; retained signed-out identities require an explicit selection. */
     private fun startupAccount(): AccountSummaryFfi? =

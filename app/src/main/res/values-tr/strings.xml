@@ -74,6 +74,7 @@
     <string name="white_noise_couldnt_start">White Noise başlatılamadı</string>
     <string name="startup_taking_too_long">Başlatma beklenenden uzun sürüyor. Lütfen tekrar deneyin.</string>
     <string name="error_try_again">Bir sorun oluştu. Tekrar deneyin; sorun devam ederse hata raporunu kopyalayın.</string>
+    <string name="error_linked_devices_build_required">Bu hesap bağlı cihazlar kullanıyor ve bu sürüm onu açamıyor. Verileriniz korunuyor. Bu sürümün üzerine bağlı cihazları destekleyen bir sürüm yükleyin.</string>
     <string name="error_restart_app_before_retry">Sohbet yerel olarak hâlâ yükleniyor. Tekrar denemeden önce White Noise’u yeniden başlatın.</string>
     <string name="error_not_ready">White Noise bu hesap için güncellemeyi hâlâ tamamlıyor. Genellikle bir dakikadan az sürer ve kendiliğinden yeniden dener.</string>
     <string name="chat_list_startup_slow">Güncelleme tamamlanıyor. Sohbetleriniz az sonra görünecek; lütfen White Noise’u açık tutun.</string>

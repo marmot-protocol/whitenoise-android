@@ -74,6 +74,7 @@
     <string name="white_noise_couldnt_start">White Noise konnte nicht gestartet werden</string>
     <string name="startup_taking_too_long">Der Start dauert länger als erwartet. Bitte versuche es erneut.</string>
     <string name="error_try_again">Etwas ist schiefgelaufen. Versuche es erneut. Wenn das Problem weiterhin besteht, kopiere den Fehlerbericht.</string>
+    <string name="error_linked_devices_build_required">Dieses Konto verwendet verknüpfte Geräte, die dieser Build nicht öffnen kann. Deine Daten bleiben erhalten. Installiere einen Build mit Unterstützung für verknüpfte Geräte über diesen.</string>
     <string name="error_restart_app_before_retry">Die Unterhaltung wird lokal noch geladen. Starte White Noise neu, bevor du es erneut versuchst.</string>
     <string name="error_not_ready">White Noise schließt für dieses Konto noch ein Update ab. Das dauert meist unter einer Minute und wird automatisch wiederholt.</string>
     <string name="chat_list_startup_slow">Das Update wird noch abgeschlossen. Deine Chats erscheinen gleich; bitte lass White Noise geöffnet.</string>

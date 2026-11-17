@@ -76,6 +76,7 @@
     <string name="white_noise_couldnt_start">Não foi possível iniciar o White Noise</string>
     <string name="startup_taking_too_long">A inicialização está demorando mais do que o esperado. Tente novamente.</string>
     <string name="error_try_again">Algo deu errado. Tente novamente; se o problema persistir, copie o relatório de erro.</string>
+    <string name="error_linked_devices_build_required">Esta conta usa dispositivos vinculados, que esta compilação não consegue abrir. Seus dados são mantidos. Instale por cima desta uma compilação compatível com dispositivos vinculados.</string>
     <string name="error_restart_app_before_retry">A conversa ainda está sendo carregada localmente. Reinicie o White Noise antes de tentar novamente.</string>
     <string name="error_not_ready">O White Noise ainda está a concluir uma atualização desta conta. Normalmente demora menos de um minuto e tenta novamente sozinho.</string>
     <string name="chat_list_startup_slow">Ainda a concluir a atualização. As suas conversas vão aparecer daqui a pouco; mantenha o White Noise aberto.</string>
