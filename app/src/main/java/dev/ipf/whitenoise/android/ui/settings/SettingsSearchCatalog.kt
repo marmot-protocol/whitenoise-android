@@ -638,6 +638,7 @@ private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
             SettingsDetail.Gestures,
             alias = R.string.settings_search_alias_gestures,
         ),
+        hubEntry("home.ChatHeader", R.string.header_shortcuts_title, R.string.chats, SettingsDetail.ChatHeader),
         hubEntry(
             "Chats.composer",
             R.string.composer_settings,

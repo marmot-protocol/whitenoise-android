@@ -33,7 +33,7 @@
       "manual_ids": [
         "SET-001"
       ],
-      "assertions": "Chats hub opens its group; Composer opens the shared immediately saving editor without Done or Cancel controls. Back returns to the Chats hub, then to Settings and Chats.",
+      "assertions": "Chats hub opens its group; Composer opens the shared immediately saving editor without Done or Cancel controls, and Chat header shortcuts opens its check list. Back returns to the Chats hub, then to Settings and Chats.",
       "postcondition": "none"
     },
     "settings-voice-language": {

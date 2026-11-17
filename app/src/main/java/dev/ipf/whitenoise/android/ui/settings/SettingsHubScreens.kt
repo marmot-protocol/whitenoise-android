@@ -141,6 +141,15 @@ internal fun ChatsScreen(
                             leading = { SettingsLeadingIcon(R.drawable.ic_edit_note) },
                         )
                     }
+                    row("chat_header") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.header_shortcuts_title),
+                            explanation = stringResource(R.string.explanation_organize_hub_chat_header),
+                            onClick = { onOpenDetail(SettingsDetail.ChatHeader) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_tune) },
+                        )
+                    }
                     row("enter_behavior") { context ->
                         SettingsLink(
                             context = context,

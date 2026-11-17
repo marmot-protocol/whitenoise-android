@@ -1,0 +1,85 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationMuteControl.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "string:chat_row_action_unmute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationMuteControl.kt",
+        "anchor": "R.string.chat_row_action_unmute",
+        "test_ids": [
+          "GRP-001",
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "string:mute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationMuteControl.kt",
+        "anchor": "R.string.mute",
+        "test_ids": [
+          "GRP-001",
+          "SET-058"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.chat_row_action_unmute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationMuteControl.kt",
+        "anchor": "R.string.chat_row_action_unmute",
+        "test_ids": [
+          "GRP-015",
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.mute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationMuteControl.kt",
+        "anchor": "R.string.mute",
+        "test_ids": [
+          "GRP-015",
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "Group details mute row reads the shared mute owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationMuteControl.kt",
+        "anchor": "appState.groupDetailsMuteDisplay(",
+        "test_ids": [
+          "GRP-015",
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_mute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationMuteControl.kt",
+        "anchor": "R.string.explanation_chat_info_mute",
+        "test_ids": [
+          "GRP-042",
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_unmute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationMuteControl.kt",
+        "anchor": "R.string.explanation_chat_info_unmute",
+        "test_ids": [
+          "GRP-042",
+          "SET-058"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "MuteDurationHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationMuteControl.kt",
+        "anchor": "fun MuteDurationHost(",
+        "test_ids": [
+          "GRP-015",
+          "SET-058"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="header_shortcuts_title">Schnellzugriffe in der Chat-Kopfzeile</string>
+    <string name="header_shortcut_search">Im Chat suchen</string>
+    <string name="explanation_header_shortcut_search">Zeigt in jeder Chat-Kopfzeile eine Suchschaltfläche. Sie öffnet dieselbe Suche wie die Chat-Details. Gilt nur auf diesem Gerät.</string>
+    <string name="explanation_header_shortcut_mute">Zeigt in jeder Chat-Kopfzeile eine Stummschalten-Schaltfläche. Beim Stummschalten wird nach der Dauer gefragt; das Aufheben gilt sofort. Gilt nur auf diesem Gerät.</string>
+    <string name="explanation_header_shortcut_read_aloud">Zeigt in jeder Chat-Kopfzeile eine Vorlese-Schaltfläche. Sie schaltet das Vorlesen neuer Nachrichten für diesen Chat ein oder aus, wie in den Chat-Details. Gilt nur auf diesem Gerät.</string>
+    <string name="header_shortcuts_hint">Die Kopfzeile zeigt so viele, wie neben den Chatnamen passen, in der Reihenfolge, in der du sie anhakst.</string>
+    <string name="conversation_header_timer_change">Timer für verschwindende Nachrichten ändern</string>
+    <string name="header_shortcut_members">Mitglieder</string>
+    <string name="explanation_header_shortcut_disappearing">Zeigt in Chats, in denen du den Timer für verschwindende Nachrichten ändern darfst, eine Timer-Schaltfläche. Sie öffnet dieselbe Auswahl wie die Chatdetails. Gilt nur auf diesem Gerät.</string>
+    <string name="explanation_header_shortcut_members">Zeigt in Gruppenchats eine Mitglieder-Schaltfläche in der Kopfzeile. Sie öffnet die Mitgliederliste. Gilt nur auf diesem Gerät.</string>
+    <string name="explanation_header_shortcut_add_members">Zeigt in Gruppenchats, in denen du Personen hinzufügen darfst, eine Schaltfläche zum Hinzufügen von Mitgliedern. Gilt nur auf diesem Gerät.</string>
+</resources>

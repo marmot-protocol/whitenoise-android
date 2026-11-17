@@ -27,6 +27,18 @@ name: settings-chats
     id: "composer.customize"
 - assertVisible:
     id: "settings.chats.group"
+- scrollUntilVisible:
+    element:
+      text: "Chat header shortcuts"
+    direction: DOWN
+- tapOn: "Chat header shortcuts"
+- assertVisible:
+    id: "chatHeader.search"
+- back
+- assertNotVisible:
+    id: "chatHeader.search"
+- assertVisible:
+    id: "settings.chats.group"
 - tapOn: "Back"
 - assertVisible: "Settings"
 - tapOn: "Back"

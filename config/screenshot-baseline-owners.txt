@@ -88,6 +88,18 @@
 *.ConversationTopBarSemanticsTest.compactHeaderKeepsAccessibleDetailsAndNativeTimer
 *.ConversationTopBarSemanticsTest.performanceSelectorIsClickableWithoutReplacingAccessibilityDescription
 *.ConversationTopBarSemanticsTest.preparedWindowTitleReplacesFallback
+*.ConversationTopBarSemanticsTest.headerWithoutShortcutsLight
+*.ConversationTopBarSemanticsTest.headerWithoutShortcutsDark
+*.ConversationTopBarSemanticsTest.headerWithOneShortcutLight
+*.ConversationTopBarSemanticsTest.headerWithOneShortcutDark
+*.ConversationTopBarSemanticsTest.headerWithTwoShortcutsLight
+*.ConversationTopBarSemanticsTest.headerWithTwoShortcutsDark
+*.ConversationTopBarSemanticsTest.crowdedHeaderLargeFont
+*.ConversationTopBarSemanticsTest.crowdedHeaderLargeFontRtl
+*.ConversationTopBarSemanticsTest.headerWithAllShortcutsLight
+*.ConversationTopBarSemanticsTest.headerWithAllShortcutsDark
+*.ConversationTopBarSemanticsTest.headerWithReadAloudLight
+*.ConversationTopBarSemanticsTest.headerWithReadAloudDark
 *.ConversationTtsFollowComposeTest.tallMediaBeforeSentenceUsesMeasuredSentenceGeometry
 *.ConversationTtsFollowComposeTest.resumeTargetControlLight
 *.ConversationTtsFollowComposeTest.resumeTargetControlDark
@@ -159,6 +171,12 @@
 *.ProfileNotificationOverrideScreenTest.customScreenDark
 *.ProfileNotificationOverrideScreenTest.customScreenAmoled
 *.ProfileNotificationOverrideScreenTest.customScreenLargeRtl
+# Chat header shortcut check marks: themes, every shortcut checked and large RTL text.
+*.ChatHeaderSettingsScreenTest.light
+*.ChatHeaderSettingsScreenTest.dark
+*.ChatHeaderSettingsScreenTest.amoled
+*.ChatHeaderSettingsScreenTest.allChecked
+*.ChatHeaderSettingsScreenTest.allCheckedLargeRtl
 # Configurable swipe settings: themes, physical directions and large RTL text.
 *.GestureSettingsScreenTest.light
 *.GestureSettingsScreenTest.dark
