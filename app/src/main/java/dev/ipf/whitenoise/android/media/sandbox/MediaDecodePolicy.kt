@@ -9,7 +9,9 @@ internal object MediaDecodePolicy {
     const val MAX_SOURCE_PIXELS = 200_000_000L
     const val DEADLINE_MS = 8000L
     const val WATCHDOG_MS = 6000L
-    const val VERSION = 2
+    const val VERSION = 3
+    const val PDF_INSPECT = 17
+    const val PDF_RENDER_PAGE = 18
     const val DECODE = 1
     const val INSPECT = 2
     const val SVG = 3

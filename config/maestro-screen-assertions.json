@@ -4796,8 +4796,8 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
-      "symbol": "MarkdownMessageBody",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WebLinkConfirmation.kt",
+      "symbol": "WebLinkConfirmation",
       "bindings": [
         {
           "case": "presentation-modal-link-confirmation",
@@ -6599,6 +6599,40 @@
               "text": "Privacy & Security"
             }
           }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+      "symbol": "DocumentAttachmentViewer",
+      "bindings": [
+        {
+          "case": "presentation-text-document-html",
+          "selector": {
+            "text": ".*<p>Fixture source paragraph</p>.*"
+          },
+          "scope": "Production HTML reader decodes fixture bytes and shows the original markup, including the <p> tag, on the Source tab. Sanitiser output, WebView rendering, link confirmation and PDF isolated-process pages unproven.",
+          "entry_assertion": {
+            "text": "Fixture page.html"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+      "symbol": "DocumentViewerFrame",
+      "bindings": [
+        {
+          "case": "presentation-text-document-html",
+          "selector": {
+            "text": "Fixture page.html"
+          },
+          "scope": "Reader frame title, Rendered/Source tabs and Close dispatch on fixture HTML bytes. Share/Save/Open-with overflow, PDF pages and native attachment download unproven.",
+          "entry_assertion": {
+            "text": "Fixture page.html"
+          },
+          "visible_on_entry": true
         }
       ]
     }

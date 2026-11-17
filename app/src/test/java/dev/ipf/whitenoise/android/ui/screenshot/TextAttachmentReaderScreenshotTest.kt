@@ -507,6 +507,54 @@ class TextAttachmentReaderScreenshotTest {
         assertEquals(0, read)
     }
 
+    @Test fun stagedTruncatedReaderLight() = stagedReader("staged_text_light.png", false, false)
+
+    @Test fun stagedTruncatedReaderAmoledLargeRtl() = stagedReader("staged_text_amoled_large_rtl.png", true, true)
+
+    @Test fun stagedReaderErrorHasRetryButNoExport() {
+        render(
+            markdownCandidate,
+            TextAttachmentReaderState.Unavailable(TextAttachmentUnavailableReason.DownloadFailed),
+            onReadAloud = null,
+            onOpenExternal = null,
+            onSave = null,
+            onShare = null,
+        )
+        composeRule.onNodeWithTag(TEXT_ATTACHMENT_READER_RETRY_TAG).assertIsDisplayed()
+        assertPreviewOnly()
+        captureMarkdown("staged_text_error.png")
+    }
+
+    private fun stagedReader(
+        name: String,
+        dark: Boolean,
+        large: Boolean,
+    ) {
+        render(
+            markdownCandidate,
+            TextAttachmentReaderState.Ready(markdownPreview(truncated = true)),
+            darkTheme = dark,
+            amoled = dark,
+            fontScale = if (large) 2f else 1f,
+            layoutDirection = if (large) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            onReadAloud = null,
+            onOpenExternal = null,
+            onSave = null,
+            onShare = null,
+        )
+        assertPreviewOnly()
+        composeRule.onNodeWithContentDescription(string(R.string.copy_text)).assertIsDisplayed()
+        captureMarkdown(name)
+    }
+
+    private fun assertPreviewOnly() {
+        composeRule.onNodeWithContentDescription(string(R.string.read_aloud)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.share)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.more_options)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.text_attachment_open_external)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.media_open)).assertDoesNotExist()
+    }
+
     /** Composes the surface under test with the given fixture. */
     private fun render(
         candidate: TextAttachmentCandidate,
@@ -518,10 +566,10 @@ class TextAttachmentReaderScreenshotTest {
         onDismiss: () -> Unit = {},
         onRetry: () -> Unit = {},
         onCopy: (String) -> Unit = {},
-        onReadAloud: (TextAttachmentPreview) -> Unit = {},
-        onOpenExternal: () -> Unit = {},
-        onSave: () -> Unit = {},
-        onShare: () -> Unit = {},
+        onReadAloud: ((TextAttachmentPreview) -> Unit)? = {},
+        onOpenExternal: (() -> Unit)? = {},
+        onSave: (() -> Unit)? = {},
+        onShare: (() -> Unit)? = {},
         shareBusy: Boolean = false,
     ) {
         composeRule.setContent {

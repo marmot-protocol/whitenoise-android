@@ -1,0 +1,41 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WebLinkConfirmation.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WebLinkConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WebLinkConfirmation.kt",
+        "anchor": "fun WebLinkConfirmation(",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WebLinkConfirmation.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.link_confirm_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WebLinkConfirmation.kt",
+        "anchor": "R.string.link_confirm_open",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.link_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WebLinkConfirmation.kt",
+        "anchor": "R.string.link_confirm_title",
+        "test_ids": [
+          "MED-056"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

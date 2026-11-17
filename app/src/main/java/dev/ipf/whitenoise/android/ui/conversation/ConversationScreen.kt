@@ -3767,8 +3767,34 @@ internal fun ConversationScreen(
 
     val pollVotesHost = remember(controller) { PollVotesHostState() }
     var mediaPreviewIndex by rememberSaveable(controller.boundAccountRef, chat.id) { mutableStateOf<Int?>(null) }
+    var stagedDocument by remember(controller, conversationAccountRef, chat.id, appState.runtimeGeneration) {
+        mutableStateOf<dev.ipf.whitenoise.android.ui.conversation.media.ComposerDocumentSelection?>(null)
+    }
     // Keyboard Send and dictation Send share this one claim, so only the first send captures the staged shelf.
     val attachmentSendClaim = remember(controller, chat.id) { StagedAttachmentSendClaim() }
+
+    stagedDocument?.let { selected ->
+        val account = conversationAccountRef
+        val runtime = appState.runtimeGeneration
+        dev.ipf.whitenoise.android.ui.conversation.media.ComposerDocumentReader(
+            selection = selected,
+            appState = appState,
+            account = account.toString(),
+            sourceIsCurrent = {
+                stagedDocument === selected &&
+                    account != null &&
+                    appState.activeAccountRef == account &&
+                    controller.boundAccountRef == account &&
+                    appState.runtimeGeneration == runtime &&
+                    selected.isCurrent(
+                        pendingDocumentUris,
+                        mediaDraftState.preparedDocuments,
+                        attachmentSendClaim.isHeld,
+                    )
+            },
+            onDismiss = { if (stagedDocument === selected) stagedDocument = null },
+        )
+    }
 
     /** Clears the media preview selection once no staged attachments remain. */
     @Composable
@@ -3810,6 +3836,8 @@ internal fun ConversationScreen(
                 withinLimit && !captionTooLong
             },
         ) { onAccepted, onRejected ->
+            // Clear synchronously: a refused send may release its claim before a snapshot observer runs.
+            stagedDocument = null
             val sendingMedia = pendingMediaSlots
             val sendingDocuments = pendingDocumentUris
             val canSettle = mediaDraftState.captureSendSettlement()
@@ -4527,6 +4555,16 @@ internal fun ConversationScreen(
                                                 enabled = !attachmentSendClaim.isHeld,
                                                 prepared = mediaDraftState.preparedPreviews(),
                                                 preparing = mediaDraftState.isPreparing,
+                                                preparedDocuments = mediaDraftState.preparedDocuments,
+                                                onOpenDocument = { uri ->
+                                                    if (!attachmentSendClaim.isHeld && !mediaDraftState.isPreparing) {
+                                                        mediaDraftState.preparedDocuments[uri]?.let { prepared ->
+                                                            stagedDocument =
+                                                                dev.ipf.whitenoise.android.ui.conversation.media
+                                                                    .ComposerDocumentSelection(uri, prepared)
+                                                        }
+                                                    }
+                                                },
                                                 onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
                                                 onRemoveMedia = { slot ->
                                                     if (!attachmentSendClaim.isHeld) {
@@ -4543,6 +4581,9 @@ internal fun ConversationScreen(
                                                                 index,
                                                                 mediaDraftState::releasePreparedDocument,
                                                             )
+                                                        if (stagedDocument?.uri !in pendingDocumentUris) {
+                                                            stagedDocument = null
+                                                        }
                                                     }
                                                 },
                                             )

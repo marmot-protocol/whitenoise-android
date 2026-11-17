@@ -56,9 +56,18 @@ object MediaReferenceSupport {
         sourceEpoch: ULong,
     ): MediaAttachmentReferenceFfi? = parseAllImetaTags(tags, sourceEpoch).firstOrNull()
 
-    fun isImageMedia(ref: MediaAttachmentReferenceFfi): Boolean = ref.mediaType.startsWith("image/", ignoreCase = true)
+    fun isImageMedia(ref: MediaAttachmentReferenceFfi): Boolean =
+        dev.ipf.whitenoise.android.ui.conversation.media
+            .documentAttachmentKind(ref.mediaType, ref.fileName) == null &&
+            ref.mediaType.startsWith("image/", ignoreCase = true)
 
-    fun isAudioMedia(ref: MediaAttachmentReferenceFfi): Boolean = ref.mediaType.startsWith("audio/", ignoreCase = true)
+    fun isAudioMedia(ref: MediaAttachmentReferenceFfi): Boolean =
+        dev.ipf.whitenoise.android.ui.conversation.media
+            .documentAttachmentKind(ref.mediaType, ref.fileName) == null &&
+            ref.mediaType.startsWith("audio/", ignoreCase = true)
 
-    fun isVideoMedia(ref: MediaAttachmentReferenceFfi): Boolean = ref.mediaType.startsWith("video/", ignoreCase = true)
+    fun isVideoMedia(ref: MediaAttachmentReferenceFfi): Boolean =
+        dev.ipf.whitenoise.android.ui.conversation.media
+            .documentAttachmentKind(ref.mediaType, ref.fileName) == null &&
+            ref.mediaType.startsWith("video/", ignoreCase = true)
 }
