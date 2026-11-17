@@ -2063,7 +2063,9 @@ class ConversationScrollCoordinatorTest {
     @Test
     fun conversationScreenRoutesEveryLazyListWriteThroughTheCoordinator() {
         val screen = sourceFile("ConversationScreen.kt").readText()
-        val coordinator = sourceFile("ConversationScrollCoordinator.kt").readText()
+        val coordinator =
+            sourceFile("ConversationScrollCoordinator.kt").readText() +
+                sourceFile("ConversationScrollWriter.kt").readText()
 
         assertFalse(
             "ConversationScreen must not mutate LazyListState directly",
