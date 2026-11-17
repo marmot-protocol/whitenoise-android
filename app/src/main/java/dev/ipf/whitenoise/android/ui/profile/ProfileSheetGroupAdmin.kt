@@ -37,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 
+/** Group admin actions the viewer may take on this profile's member; empty when the target is not a member. */
 internal fun profileSheetAdminActions(
     viewerIsMember: Boolean,
     viewerIsAdmin: Boolean,
@@ -53,10 +54,15 @@ internal fun profileSheetAdminActions(
     ).filter { it != GroupMemberMenuAction.StepDownAsAdmin }
 }
 
+/** Test tag for the profile sheet row that runs [action]. */
 internal fun adminActionRowTag(action: GroupMemberMenuAction): String = "profile-admin-action-${action.name}"
 
 internal const val PROFILE_SHEET_ADMIN_ACTIONS_TAG = "profile-sheet-admin-actions"
 
+/**
+ * Starts [mutation] for [action] unless another one is running, and clears the pending action when it ends.
+ * Returns false when a mutation was already in flight.
+ */
 internal fun runProfileSheetAdminMutation(
     action: GroupMemberMenuAction,
     isBusy: () -> Boolean,

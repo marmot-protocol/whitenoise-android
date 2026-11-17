@@ -248,6 +248,7 @@ internal fun ProfileAddToGroupsContent(
     }
 }
 
+/** Searchable picker of groups where [target] can be made an admin, with a confirmation before promoting. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun ProfileMakeAdminContent(
@@ -418,6 +419,7 @@ internal fun ProfileMakeAdminContent(
     }
 }
 
+/** Loading row, or a failure row with a retry button, shown while the group picker list is unavailable. */
 @Composable
 @Suppress("FunctionNaming")
 private fun ProfileGroupPickerPendingState(
