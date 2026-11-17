@@ -77,8 +77,8 @@ worked plan for a large screen split.
 ## Size ratchet
 
 `SourceFileSizeRatchetTest` counts lines in every Kotlin file under
-`app/src/main/java` (and `app/src/main/kotlin` if it exists). A trailing newline
-does not count, so the number matches `wc -l` for normally terminated files.
+`app/src/main/java`. Generated sources are not counted. A trailing newline does
+not count, so the number matches `wc -l` for normally terminated files.
 
 - A file not listed in `SourceFileSizeBaseline.kt` must stay within 600 lines.
 - A listed file must stay within its recorded limit.

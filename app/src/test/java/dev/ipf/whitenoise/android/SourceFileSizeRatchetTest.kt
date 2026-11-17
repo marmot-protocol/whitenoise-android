@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android
 
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 /** Matches detekt's `LargeClass.allowedLines` in config/detekt/detekt.yml. */
 internal const val SOURCE_FILE_LINE_BUDGET = 600
@@ -49,26 +48,24 @@ class SourceFileSizeRatchetTest {
 
     private fun List<String>.report(): String = joinToString("\n", prefix = "$REPORT_HEADER\n") { "- $it" }
 
-    /** Line counts keyed by path below the source root; a trailing newline does not add a line. */
-    private fun mainSourceLineCounts(): Map<String, Int> =
-        mainSourceRoots()
-            .flatMap { root ->
-                root
-                    .walkTopDown()
-                    .filter { it.isFile && it.extension == "kt" }
-                    .map {
-                        it.relativeTo(root).invariantSeparatorsPath to
-                            it
-                                .readText()
-                                .trimEnd()
-                                .lines()
-                                .size
-                    }.toList()
-            }.toMap()
-
-    private fun mainSourceRoots(): List<File> =
-        listOf(appModuleFile("src/main/java")) +
-            listOfNotNull(File(invariantGateRepositoryRoot(), "app/src/main/kotlin").takeIf(File::isDirectory))
+    /**
+     * Line counts keyed by path below `app/src/main/java`, the only hand-written source root; generated
+     * sources live elsewhere. A trailing newline does not add a line.
+     */
+    private fun mainSourceLineCounts(): Map<String, Int> {
+        val root = appModuleFile("src/main/java")
+        return root
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .associate {
+                it.relativeTo(root).invariantSeparatorsPath to
+                    it
+                        .readText()
+                        .trimEnd()
+                        .lines()
+                        .size
+            }
+    }
 
     private companion object {
         const val REPORT_HEADER = "Source file size ratchet (docs/code-structure.md):"
