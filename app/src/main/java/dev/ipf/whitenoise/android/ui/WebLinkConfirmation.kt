@@ -51,7 +51,11 @@ internal fun WebLinkConfirmation(
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { close { currentOnConfirm() } }) { Text(stringResource(R.string.link_confirm_open)) } },
+        confirmButton = {
+            TextButton(onClick = { close { currentOnConfirm() } }) {
+                Text(stringResource(R.string.link_confirm_open))
+            }
+        },
         dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
