@@ -99,14 +99,33 @@ main() {
   fi
 }
 
+# Runs [main] in its own process group and kills that whole group at the hard deadline.
+# This does not rely on timeout(1): the Rust coreutils timeout on Ubuntu 26.04 runners
+# signals only its direct child, so a retrying curl and its sleeps outlived the budget.
+run_with_deadline() {
+  local worker watchdog status=0
+  # Job control gives each background job its own process group, led by its own PID.
+  set -m
+  bash -c 'set -euo pipefail; main' &
+  worker=$!
+  (sleep "$BUDGET_SECONDS" && kill -KILL -- "-$worker" 2>/dev/null) &
+  watchdog=$!
+  set +m
+  wait "$worker" || status=$?
+  # Ends the watchdog's sleep, then any descendant the worker left behind.
+  kill -KILL -- "-$watchdog" 2>/dev/null || true
+  kill -KILL -- "-$worker" 2>/dev/null || true
+  wait "$watchdog" 2>/dev/null || true
+  return "$status"
+}
+
 # The parent owns cleanup; the hard deadline kills the entire worker process group.
 mkdir -p "$LOCAL_REPO/$ARTIFACT_PATH"
 DOWNLOAD_DIR="$(mktemp -d "$LOCAL_REPO/$ARTIFACT_PATH/.prefetch.XXXXXX")"
 trap 'rm -rf -- "$DOWNLOAD_DIR"' EXIT
 export PINS CATALOG REMOTE FALLBACK_REMOTE LOCAL_REPO ARTIFACT_PATH DOWNLOAD_DIR
 export -f sha512_of check_robolectric_version download_jar fetch_jar main
-if ! timeout --signal=KILL "${BUDGET_SECONDS}s" \
-    bash -c 'set -euo pipefail; main'; then
+if ! run_with_deadline; then
   printf 'error: Android jar prefetch failed within its cumulative budget\n' >&2
   exit 1
 fi
