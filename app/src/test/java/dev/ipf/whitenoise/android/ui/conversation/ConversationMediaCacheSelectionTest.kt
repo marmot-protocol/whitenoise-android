@@ -38,6 +38,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,6 +70,7 @@ class ConversationMediaCacheSelectionTest {
     fun cacheChangesWhileReadingDoNotRecomposeTheScreen() {
         val conversation = mountScreen(ConversationSurfaceState())
         composeRule.mainClock.autoAdvance = false
+        settleCompositions(SCREEN_SOURCE)
         val neutralTraceCounts = mutableMapOf<String, Int>()
         val cacheTraceCounts = mutableMapOf<String, Int>()
         val neutralRuns =
@@ -222,6 +224,27 @@ class ConversationMediaCacheSelectionTest {
         return conversation
     }
 
+    /**
+     * Advances frames until [QUIET_FRAMES] in a row recompose nothing in [source], pausing briefly in real time between
+     * them. Initial loads that mounting starts off the main thread can land well after `waitForIdle`, and one landing
+     * inside a counting window would be miscounted as a recomposition the window caused.
+     */
+    private fun settleCompositions(source: String) {
+        var quiet = 0
+        repeat(MAX_SETTLE_FRAMES) {
+            Thread.sleep(SETTLE_PAUSE_MS)
+            val runs =
+                countCompositions(source) {
+                    composeRule.runOnIdle { }
+                    composeRule.mainClock.advanceTimeByFrame()
+                    composeRule.waitForIdle()
+                }
+            quiet = if (runs == 0) quiet + 1 else 0
+            if (quiet == QUIET_FRAMES) return
+        }
+        fail("$source never stopped recomposing after the screen was mounted")
+    }
+
     /** Counts runs of composable bodies and lambdas whose source location contains [source] during [block]. */
     @OptIn(InternalComposeTracingApi::class)
     private fun countCompositions(
@@ -262,6 +285,9 @@ class ConversationMediaCacheSelectionTest {
 
     private companion object {
         const val SCREEN_SOURCE = "(ConversationScreen.kt:"
+        const val QUIET_FRAMES = 4
+        const val MAX_SETTLE_FRAMES = 80
+        const val SETTLE_PAUSE_MS = 25L
         const val KEPT_ATTACHMENT_SOURCE = "(KeptAttachmentPresentations.kt:"
         val MEDIA_ID = "a2".repeat(32)
         val SENDER = "cc".repeat(32)
