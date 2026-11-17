@@ -8,6 +8,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -229,6 +231,38 @@ class AttachmentDownloadSlotReleaseTest {
 
                 assertFalse(gate.isAdmitted("paused"))
                 assertFalse(gate.isQueuedForTest("paused"))
+            }
+        }
+
+    /**
+     * Work cancelled as it hands over a second pause, while its first re-acquire still queues, stops counting the key
+     * as admitted, so no later owner is mistaken for live native work.
+     */
+    @Test
+    fun cancellingTheHandoverOfASecondPauseEndsIt() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val pauseEnds = CompletableDeferred<Unit>()
+                val holderDone = CompletableDeferred<Unit>()
+                val paused =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("paused", ACCOUNT, AUTOMATIC) {
+                            withDownloadSlotReleased { pauseEnds.await() }
+                            while (!gate.isQueuedForTest("paused")) yield()
+                            currentCoroutineContext().job.cancel()
+                            withDownloadSlotReleased { error("a cancelled handover never runs the work") }
+                        }
+                    }
+                val holder = startHolding(gate, "holder", holderDone)
+                pauseEnds.complete(Unit)
+                runCatching { paused.await() }
+
+                assertTrue(paused.isCancelled)
+                assertFalse("the key no longer counts as admitted", gate.isAdmitted("paused"))
+                assertFalse(gate.isQueuedForTest("paused"))
+                holderDone.complete(Unit)
+                holder.await()
             }
         }
 
