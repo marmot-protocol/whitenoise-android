@@ -266,12 +266,12 @@ class ConversationTopBarSemanticsTest {
     /** Every shortcut chosen on a small phone at double font: only two fit, with the members line and timer badge. */
     @Test
     @Config(qualifiers = SMALL_PHONE)
-    fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", HeaderShortcut.entries.toList(), rtl = false)
+    fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", rtl = false)
 
     /** The crowded header mirrored for a right-to-left language. */
     @Test
     @Config(qualifiers = SMALL_PHONE)
-    fun crowdedHeaderLargeFontRtl() = crowdedHeader("crowded_large_font_rtl", HeaderShortcut.entries.toList(), rtl = true)
+    fun crowdedHeaderLargeFontRtl() = crowdedHeader("crowded_large_font_rtl", rtl = true)
 
     /** The first shortcuts that fit show in the chosen order; the rest wait for a wider window. */
     @Test
@@ -560,10 +560,9 @@ class ConversationTopBarSemanticsTest {
             .captureRoboImage("src/test/snapshots/conversation_header_shortcuts_$name.png")
     }
 
-    /** Records a three-member group with a one-day timer and [shortcuts] at double font scale. */
+    /** Records a three-member group with a one-day timer and every shortcut chosen at double font scale. */
     private fun crowdedHeader(
         name: String,
-        shortcuts: List<HeaderShortcut>,
         rtl: Boolean,
     ) {
         val appState = appState()
@@ -573,7 +572,7 @@ class ConversationTopBarSemanticsTest {
         controller.membersLoaded = true
         render(appState, controller, fontScale = 2f, rtl = rtl, onTimerClick = {}, actions = {
             ConversationHeaderShortcuts(
-                shortcuts,
+                HeaderShortcut.entries.toList(),
                 capacity = it,
                 muteControl = muteControl(appState),
                 onSearch = {},

@@ -301,7 +301,9 @@ internal fun ConversationTopBar(
                                                 avatarSource?.avatarSource?.isPeerSourced() == true,
                                     )
                                 }
-                                Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp),
+                                ) {
                                     EmojiLabel(
                                         presentedTitle,
                                         style = MaterialTheme.typography.titleMedium,

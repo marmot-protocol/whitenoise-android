@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -47,79 +48,69 @@ internal fun RowScope.ConversationHeaderShortcuts(
     onAddMembers: (() -> Unit)? = null,
 ) {
     val cell = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget)
-    val shown =
-        shortcuts
-            .filter { shortcut ->
-                when (shortcut) {
-                    HeaderShortcut.Search -> true
-                    HeaderShortcut.MuteUnmute -> muteControl != null
-                    HeaderShortcut.ReadAloud -> readAloudOn != null
-                    HeaderShortcut.DisappearingTimer -> onTimer != null
-                    HeaderShortcut.Members -> onMembers != null
-                    HeaderShortcut.AddMembers -> onAddMembers != null
-                }
-            }.take(capacity.coerceAtLeast(0))
-    for (shortcut in shown) {
-        when (shortcut) {
-            HeaderShortcut.Search ->
-                HeaderShortcutButton(
-                    R.drawable.ic_search,
-                    stringResource(R.string.header_shortcut_search),
-                    onSearch,
-                    cell.testTag(CONVERSATION_HEADER_SEARCH_TAG),
+    val actions =
+        listOfNotNull(
+            HeaderAction(HeaderShortcut.Search, R.drawable.ic_search, R.string.header_shortcut_search, onSearch),
+            muteControl?.let {
+                HeaderAction(HeaderShortcut.MuteUnmute, it.iconRes, it.labelRes, it::toggle, enabled = !it.pending)
+            },
+            readAloudOn?.let { on ->
+                val icon = if (on) R.drawable.ic_record_voice_over else R.drawable.ic_voice_over_off
+                HeaderAction(
+                    HeaderShortcut.ReadAloud,
+                    icon,
+                    R.string.tts_auto_read_title,
+                    onToggleReadAloud,
+                    checked = on,
                 )
-            HeaderShortcut.MuteUnmute ->
-                muteControl?.let { control ->
-                    HeaderShortcutButton(
-                        control.iconRes,
-                        stringResource(control.labelRes),
-                        control::toggle,
-                        cell.testTag(CONVERSATION_HEADER_MUTE_TAG),
-                        enabled = !control.pending,
-                    )
-                }
-            HeaderShortcut.ReadAloud ->
-                readAloudOn?.let { on ->
-                    IconToggleButton(
-                        checked = on,
-                        onCheckedChange = { onToggleReadAloud() },
-                        modifier = cell.testTag(CONVERSATION_HEADER_READ_ALOUD_TAG),
-                    ) {
-                        Icon(
-                            painterResource(if (on) R.drawable.ic_record_voice_over else R.drawable.ic_voice_over_off),
-                            contentDescription = stringResource(R.string.tts_auto_read_title),
-                            modifier = Modifier.size(ComposerShortcutIconSize),
-                        )
-                    }
-                }
-            HeaderShortcut.DisappearingTimer ->
-                onTimer?.let {
-                    HeaderShortcutButton(
-                        R.drawable.ic_timer,
-                        stringResource(R.string.conversation_header_timer_change),
-                        it,
-                        cell.testTag(CONVERSATION_HEADER_TIMER_TAG),
-                    )
-                }
-            HeaderShortcut.Members ->
-                onMembers?.let {
-                    HeaderShortcutButton(
-                        R.drawable.ic_group,
-                        stringResource(R.string.header_shortcut_members),
-                        it,
-                        cell.testTag(CONVERSATION_HEADER_MEMBERS_TAG),
-                    )
-                }
-            HeaderShortcut.AddMembers ->
-                onAddMembers?.let {
-                    HeaderShortcutButton(
-                        R.drawable.ic_group_add,
-                        stringResource(R.string.add_member),
-                        it,
-                        cell.testTag(CONVERSATION_HEADER_ADD_MEMBERS_TAG),
-                    )
-                }
-        }
+            },
+            onTimer?.let {
+                HeaderAction(
+                    HeaderShortcut.DisappearingTimer,
+                    R.drawable.ic_timer,
+                    R.string.conversation_header_timer_change,
+                    it,
+                )
+            },
+            onMembers?.let {
+                HeaderAction(HeaderShortcut.Members, R.drawable.ic_group, R.string.header_shortcut_members, it)
+            },
+            onAddMembers?.let {
+                HeaderAction(HeaderShortcut.AddMembers, R.drawable.ic_group_add, R.string.add_member, it)
+            },
+        ).associateBy { it.shortcut }
+    for (action in shortcuts.mapNotNull(actions::get).take(capacity.coerceAtLeast(0))) {
+        HeaderActionButton(action, cell.testTag(headerShortcutTag(action.shortcut)))
+    }
+}
+
+/** One header button; [checked] makes it an on/off toggle (read aloud). */
+private class HeaderAction(
+    val shortcut: HeaderShortcut,
+    @DrawableRes val iconRes: Int,
+    @StringRes val labelRes: Int,
+    val onClick: () -> Unit,
+    val enabled: Boolean = true,
+    val checked: Boolean? = null,
+)
+
+@Composable
+private fun HeaderActionButton(
+    action: HeaderAction,
+    modifier: Modifier,
+) {
+    val icon: @Composable () -> Unit = {
+        Icon(
+            painterResource(action.iconRes),
+            contentDescription = stringResource(action.labelRes),
+            modifier = Modifier.size(ComposerShortcutIconSize),
+        )
+    }
+    val checked = action.checked
+    if (checked != null) {
+        IconToggleButton(checked = checked, onCheckedChange = { action.onClick() }, modifier = modifier, content = icon)
+    } else {
+        IconButton(onClick = action.onClick, enabled = action.enabled, modifier = modifier, content = icon)
     }
 }
 
@@ -145,18 +136,15 @@ internal fun headerShortcutCapacity(
 private val HeaderFixedWidth = 100.dp
 private val HeaderMinTitleWidth = 72.dp
 
-@Composable
-private fun HeaderShortcutButton(
-    @DrawableRes iconRes: Int,
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier,
-    enabled: Boolean = true,
-) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = modifier) {
-        Icon(painterResource(iconRes), contentDescription = label, modifier = Modifier.size(ComposerShortcutIconSize))
+private fun headerShortcutTag(shortcut: HeaderShortcut): String =
+    when (shortcut) {
+        HeaderShortcut.Search -> CONVERSATION_HEADER_SEARCH_TAG
+        HeaderShortcut.MuteUnmute -> CONVERSATION_HEADER_MUTE_TAG
+        HeaderShortcut.ReadAloud -> CONVERSATION_HEADER_READ_ALOUD_TAG
+        HeaderShortcut.DisappearingTimer -> CONVERSATION_HEADER_TIMER_TAG
+        HeaderShortcut.Members -> CONVERSATION_HEADER_MEMBERS_TAG
+        HeaderShortcut.AddMembers -> CONVERSATION_HEADER_ADD_MEMBERS_TAG
     }
-}
 
 internal const val CONVERSATION_HEADER_SEARCH_TAG = "conversation.header.shortcut.search"
 internal const val CONVERSATION_HEADER_MUTE_TAG = "conversation.header.shortcut.mute"

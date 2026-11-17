@@ -34,8 +34,9 @@ class ConversationHeaderShortcutCoverageTest {
      */
     @Test
     fun groupShortcutsReuseTheDetailsRoutes() {
-        assertContains(conversation, "onTimer = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null")
-        assertContains(conversation, "onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null")
+        val openPicker = "if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null"
+        assertContains(conversation, "onTimer = $openPicker")
+        assertContains(conversation, "onTimerClick = $openPicker")
         assertContains(conversation, "autoOpenMembers = openMembersOnDetails")
         assertContains(conversation, "autoOpenAddMember = openAddMemberOnDetails")
         val addMembers = conversation.substringAfter("onAddMembers =").substringBefore("onTimerClick")
