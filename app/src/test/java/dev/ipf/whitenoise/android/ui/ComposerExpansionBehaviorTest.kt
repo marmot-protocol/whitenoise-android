@@ -1598,6 +1598,7 @@ class ComposerExpansionBehaviorTest {
         return BlankPoints(toolbarGaps.spread(), editorPadding.spread())
     }
 
+    /** Keeps at most the first, middle and last point so each scan stays short. */
     private fun List<Offset>.spread(): List<Offset> = if (size <= 3) this else listOf(first(), this[size / 2], last())
 
     private data class BlankPoints(
@@ -1609,10 +1610,12 @@ class ComposerExpansionBehaviorTest {
     private class RecordingKeyboard : SoftwareKeyboardController {
         var shows = 0
 
+        /** Counts keyboard requests. */
         override fun show() {
             shows++
         }
 
+        /** Hiding is not under test. */
         override fun hide() = Unit
     }
 

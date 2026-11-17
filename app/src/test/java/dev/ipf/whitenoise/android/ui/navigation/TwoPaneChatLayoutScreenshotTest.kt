@@ -56,6 +56,7 @@ class TwoPaneChatLayoutScreenshotTest {
     @Test
     fun listBesideOpenChatDark() = capture(darkTheme = true, openChat = true, name = "two_pane_open_chat_dark")
 
+    /** Golden: phone landscape with an open chat and a start-edge cutout, light theme. */
     @Test
     @Config(qualifiers = PHONE_LANDSCAPE)
     fun phoneLandscapeOpenChatLight() {
@@ -68,18 +69,21 @@ class TwoPaneChatLayoutScreenshotTest {
         )
     }
 
+    /** Golden: phone landscape with an open chat, dark theme. */
     @Test
     @Config(qualifiers = PHONE_LANDSCAPE)
     fun phoneLandscapeOpenChatDark() {
         capture(darkTheme = true, openChat = true, name = "two_pane_phone_landscape_dark", window = PHONE)
     }
 
+    /** Golden: phone landscape with an open chat, right-to-left. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w960dp-h432dp-mdpi")
     fun phoneLandscapeOpenChatRtl() {
         capture(darkTheme = true, openChat = true, name = "two_pane_phone_landscape_rtl", window = PHONE)
     }
 
+    /** Golden: phone landscape with no chat open and large text. */
     @Test
     @Config(qualifiers = PHONE_LANDSCAPE)
     fun phoneLandscapeEmptyPaneLargeText() {

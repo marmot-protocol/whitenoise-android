@@ -119,6 +119,8 @@ internal data class EmojiSetsState(
     val preview: EmojiSetFfi? = null,
     val artwork: ByteArray? = null,
     val busy: Boolean = false,
+    /** The opening relay sync. Rows stay usable; only Find and Refresh wait for it. */
+    val discovering: Boolean = false,
     val progress: EmojiSetInstallProgressFfi? = null,
     val cancelling: Boolean = false,
     val notice: EmojiSetNotice? = null,
@@ -136,12 +138,14 @@ internal class EmojiSetsController(
     private var activeInstall: EmojiSetInstall? = null
     private var closed = false
     private var search: String? = null
+    private var reads = 0
 
     /** Loads the existing projection without contacting relays or image hosts. */
     suspend fun load() = operate { refresh() }
 
-    /** Contacts only the account's discovery relays, then rereads the local projection. */
-    suspend fun discover(search: String) =
+    /** Contacts only the account's discovery relays, then rereads the local projection. Waits out the opening sync. */
+    suspend fun discover(search: String) {
+        if (state.discovering) return
         operate {
             val query = search.trim().ifBlank { null }
             val complete = backend.discover(query)
@@ -149,6 +153,32 @@ internal class EmojiSetsController(
             refresh()
             if (!complete) state = state.copy(notice = EmojiSetNotice.DiscoveryIncomplete)
         }
+    }
+
+    /**
+     * Syncs the unfiltered listing without locking the rows, then rereads the projection. True when every relay
+     * answered. Its notice never covers an open preview or a running operation.
+     */
+    @Suppress("TooGenericExceptionCaught") // Failure only leaves the local projection, which Refresh retries.
+    suspend fun discoverInBackground(): Boolean {
+        if (closed || state.busy || state.discovering) return false
+        state = state.copy(discovering = true)
+        var notice: EmojiSetNotice? = null
+        return try {
+            val complete = backend.discover(null)
+            refresh()
+            if (!complete) notice = EmojiSetNotice.DiscoveryIncomplete
+            complete
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            notice = EmojiSetNotice.Error
+            false
+        } finally {
+            state = state.copy(discovering = false)
+            if (notice != null && state.preview == null && !state.busy) state = state.copy(notice = notice)
+        }
+    }
 
     /** Opens metadata for an explicit pasted address. Artwork requires its own action. */
     suspend fun open(input: String) =
@@ -227,9 +257,11 @@ internal class EmojiSetsController(
         }
     }
 
-    /** Rereads the list for the current search. */
+    /** Rereads the list for the current search. The latest read to start wins, so an older one cannot land last. */
     private suspend fun refresh() {
-        state = state.copy(sets = backend.sets(search))
+        val read = ++reads
+        val sets = backend.sets(search)
+        if (read == reads) state = state.copy(sets = sets)
     }
 
     /** Runs one install, polling MDK's progress until it finishes, and cancels it if this coroutine is cancelled. */

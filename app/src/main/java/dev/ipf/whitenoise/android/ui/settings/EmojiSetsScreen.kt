@@ -97,9 +97,13 @@ internal fun EmojiSetsScreen(
         }
         LaunchedEffect(controller) {
             if (initialAddress == null) {
-                // Show the local projection at once, then discover like the sticker browser (#3882).
+                // Show the local projection at once, then sync once per account and runtime like the sticker
+                // browser, keeping the rows usable meanwhile (#3882). Refresh forces another sync.
                 controller.load()
-                controller.discover("")
+                val library = appState.emojiSetLibrary
+                if (!library.hasDiscovered(account, generation) && controller.discoverInBackground()) {
+                    library.markDiscovered(account, generation)
+                }
             } else {
                 controller.open(initialAddress)
             }
@@ -156,7 +160,7 @@ internal fun EmojiSetsContent(
                 // Repeats the current search; also the retry path for failed or partial discovery.
                 IconButton(
                     onClick = { onSearch(query.text.toString().trim()) },
-                    enabled = !state.busy,
+                    enabled = !state.busy && !state.discovering,
                     modifier = Modifier.testTag(EMOJI_SETS_REFRESH_TEST_TAG),
                 ) {
                     Icon(painterResource(R.drawable.ic_refresh), contentDescription = stringResource(R.string.refresh))
@@ -194,12 +198,12 @@ private fun EmojiSetBrowser(
     onShow: (EmojiSetFfi) -> Unit,
 ) {
     SettingsList {
-        item { EmojiSetQuery(field, busy = state.busy, onSearch = onSearch) }
-        item { EmojiSetStatus(state) }
+        item { EmojiSetQuery(field, busy = state.busy || state.discovering, onSearch = onSearch) }
+        item { EmojiSetStatus(state, syncing = state.discovering) }
         // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
         val discoveryFailed =
             state.notice == EmojiSetNotice.Error || state.notice == EmojiSetNotice.DiscoveryIncomplete
-        if (state.sets.isEmpty() && !state.busy && !discoveryFailed) {
+        if (state.sets.isEmpty() && !state.busy && !state.discovering && !discoveryFailed) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
         items(state.sets, key = { it.coordinate }) { set ->
@@ -448,16 +452,19 @@ private fun EmojiSetActions(
     }
 }
 
-/** Renders progress and the typed result of the most recent operation. */
+/** Renders progress, including the browser's opening sync, and the typed result of the most recent operation. */
 @Composable
-private fun EmojiSetStatus(state: EmojiSetsState) {
+private fun EmojiSetStatus(
+    state: EmojiSetsState,
+    syncing: Boolean = false,
+) {
     val progress = state.progress
     if (progress != null && progress.totalEmoji > 0u) {
         LinearProgressIndicator(
             progress = { progress.completedEmoji.toFloat() / progress.totalEmoji.toFloat() },
             modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         )
-    } else if (state.busy) {
+    } else if (state.busy || syncing) {
         LinearProgressIndicator(
             modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         )

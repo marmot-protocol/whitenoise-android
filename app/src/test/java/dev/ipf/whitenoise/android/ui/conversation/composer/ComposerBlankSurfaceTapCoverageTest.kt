@@ -9,12 +9,13 @@ import org.junit.Test
 /**
  * Unused composer surface opens the keyboard only for an empty, typeable draft, and every control
  * keeps its full hit target, including while disabled (#3857). Behavior is exercised by
- * ComposerExpansionBehaviorTest and ComposerToolbarProductionTest; this gate pins the wiring.
+ * ComposerExpansionBehaviorTest and ComposerToolbarEdgeTapTest; this gate pins the wiring.
  */
 class ComposerBlankSurfaceTapCoverageTest {
     private val pill = appModuleSource("$COMPOSER/ComposerPills.kt").functionBody("ComposerPill")
     private val tap = appModuleSource("$COMPOSER/ComposerBlankSurfaceTap.kt")
 
+    /** The tap stays behind the empty-draft guards and reuses the field's keyboard request. */
     @Test
     fun blankSurfaceTapIsGuardedAndSharesTheFieldsKeyboardRequest() {
         val call =
@@ -33,6 +34,7 @@ class ComposerBlankSurfaceTapCoverageTest {
         assertEquals("one blank-surface owner per composer", 1, owners)
     }
 
+    /** The tap ignores the resize strip, consumed child gestures, holds and multi-touch. */
     @Test
     fun blankSurfaceTapLeavesTheResizeStripChildGesturesAndHoldsAlone() {
         listOf(
@@ -46,6 +48,7 @@ class ComposerBlankSurfaceTapCoverageTest {
         ).forEach { rule -> assertTrue("blank-surface tap must keep `$rule`", rule in tap) }
     }
 
+    /** Toolbar slots, the identity avatar and the other controls claim their whole targets. */
     @Test
     fun everyComposerControlClaimsItsWholeTarget() {
         assertEquals(

@@ -173,6 +173,7 @@ class TwoPaneChatLayoutTest {
         }
     }
 
+    /** A pane that pads for horizontal safe-drawing insets, so its bounds show the inset it received. */
     @Composable
     private fun InsetContent(tag: String) {
         Box(

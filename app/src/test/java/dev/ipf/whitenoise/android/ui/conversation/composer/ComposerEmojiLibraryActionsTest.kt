@@ -51,11 +51,13 @@ class ComposerEmojiLibraryActionsTest {
     @get:Rule val composeRule = createComposeRule()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    /** Starts each test without a keyboard height remembered from another. */
     @Before
     fun clearRememberedKeyboardHeight() {
         composerImePaneHeightMemory.clear()
     }
 
+    /** Both pane actions are clickable, call their owner once and leave the draft intact. */
     @Test
     fun paneActionsOpenBrowseAndSettingsAndKeepTheDraft() {
         var browse = 0
@@ -81,6 +83,7 @@ class ComposerEmojiLibraryActionsTest {
         assertEquals("the draft survives both actions", "draft", text.valueState.value.text)
     }
 
+    /** Without a library owner the pane shows neither action. */
     @Test
     fun paneHidesLibraryActionsWithoutAnOwner() {
         render(ComposerTextState(TextFieldValue()), onBrowse = null, onSettings = null)
@@ -90,14 +93,17 @@ class ComposerEmojiLibraryActionsTest {
         composeRule.onNodeWithTag(EMOJI_PICKER_SETTINGS_TEST_TAG, useUnmergedTree = true).assertDoesNotExist()
     }
 
+    /** Golden: both actions in the light theme at default text size. */
     @Test
     fun paneActionsLight() = capture(fontScale = 1f, direction = LayoutDirection.Ltr, dark = false, name = "light")
 
+    /** Golden: both actions at 2x text, right-to-left, dark theme. */
     @Test
     fun paneActionsLargeRtlDark() {
         capture(fontScale = 2f, direction = LayoutDirection.Rtl, dark = true, name = "large_rtl_dark")
     }
 
+    /** Renders the open pane with both actions and records the [name] golden. */
     private fun capture(
         fontScale: Float,
         direction: LayoutDirection,
@@ -113,6 +119,7 @@ class ComposerEmojiLibraryActionsTest {
             .captureRoboImage("src/test/snapshots/composer_emoji_library_actions_$name.png")
     }
 
+    /** Focuses the field, then opens the emoji pane from the toolbar. */
     private fun openPane() {
         composeRule.onNode(hasSetTextAction()).requestFocus()
         composeRule.waitForIdle()
@@ -123,6 +130,7 @@ class ComposerEmojiLibraryActionsTest {
         composeRule.waitForIdle()
     }
 
+    /** Hosts the composer under the given text scale, direction and theme. */
     @Suppress("LongParameterList")
     private fun render(
         text: ComposerTextState,

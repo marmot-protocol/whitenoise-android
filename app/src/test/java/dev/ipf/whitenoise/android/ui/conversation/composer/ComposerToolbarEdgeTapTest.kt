@@ -61,13 +61,16 @@ class ComposerToolbarEdgeTapTest {
     private var keyboardShows = 0
     private val keyboard =
         object : SoftwareKeyboardController {
+            /** Counts keyboard requests. */
             override fun show() {
                 keyboardShows++
             }
 
+            /** Hiding is not under test. */
             override fun hide() = Unit
         }
 
+    /** Every edge of a shortcut's target runs that shortcut and never opens the keyboard. */
     @Test
     fun shortcutTargetEdgesRunTheirActionWithoutOpeningTheKeyboard() {
         renderCameraAndGallery()
@@ -87,6 +90,7 @@ class ComposerToolbarEdgeTapTest {
         assertEquals("a shortcut tap never requests the keyboard", 0, keyboardShows)
     }
 
+    /** A gap between controls opens the keyboard; holding a shortcut shows its label instead. */
     @Test
     fun blankToolbarGapOpensTheKeyboardAndHoldingAShortcutExplainsIt() {
         renderCameraAndGallery()
@@ -184,6 +188,7 @@ class ComposerToolbarEdgeTapTest {
         return camera to edges
     }
 
+    /** Points one pixel inside each edge of [bounds], at its midline. */
     private fun edgePoints(bounds: Rect): List<Offset> =
         listOf(
             Offset(bounds.left + 1f, bounds.center.y),
@@ -192,6 +197,7 @@ class ComposerToolbarEdgeTapTest {
             Offset(bounds.center.x, bounds.bottom - 1f),
         )
 
+    /** Hosts an always-expanded toolbar with Camera and Gallery. */
     private fun renderCameraAndGallery() =
         render(
             ComposerToolbarSettings(
@@ -200,6 +206,7 @@ class ComposerToolbarEdgeTapTest {
             ),
         )
 
+    /** Hosts the composer with fresh preferences and the given toolbar settings. */
     private fun render(
         settings: ComposerToolbarSettings,
         voiceController: VoiceRecordingController? = null,

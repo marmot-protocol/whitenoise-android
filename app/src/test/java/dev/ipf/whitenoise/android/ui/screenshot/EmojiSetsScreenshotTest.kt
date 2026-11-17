@@ -111,6 +111,7 @@ class EmojiSetsScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/emoji_sets_$name.png")
     }
 
+    /** Golden: an empty browser showing [notice] in place of the empty-library message. */
     private fun failedBrowser(
         name: String,
         notice: EmojiSetNotice,

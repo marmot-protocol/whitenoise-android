@@ -65,10 +65,13 @@ internal fun Modifier.composerBlankSurfaceTap(
 internal fun Modifier.composerControlTarget(): Modifier = this then ComposerControlTargetElement
 
 private data object ComposerControlTargetElement : ModifierNodeElement<ComposerControlTargetNode>() {
+    /** One stateless node per control; the element carries no parameters. */
     override fun create() = ComposerControlTargetNode()
 
+    /** Nothing to update: the element has no parameters. */
     override fun update(node: ComposerControlTargetNode) = Unit
 
+    /** Names the modifier in the layout inspector. */
     override fun InspectorInfo.inspectableProperties() {
         name = "composerControlTarget"
     }
@@ -77,6 +80,7 @@ private data object ComposerControlTargetElement : ModifierNodeElement<ComposerC
 private class ComposerControlTargetNode :
     Modifier.Node(),
     PointerInputModifierNode {
+    /** Consumes each new down on the Main pass, after the control's own handler has seen it. */
     override fun onPointerEvent(
         pointerEvent: PointerEvent,
         pass: PointerEventPass,
@@ -86,5 +90,6 @@ private class ComposerControlTargetNode :
         pointerEvent.changes.forEach { if (it.changedToDownIgnoreConsumed()) it.consume() }
     }
 
+    /** Holds no gesture state, so cancellation needs no cleanup. */
     override fun onCancelPointerInput() = Unit
 }
