@@ -4335,6 +4335,7 @@ internal fun ConversationScreen(
                                 actions = {
                                     ConversationHeaderShortcuts(
                                         shortcuts = headerShortcuts,
+                                        capacity = it,
                                         muteControl = headerMuteControl,
                                         onSearch = openConversationSearch,
                                         readAloudOn = headerReadAloudOn,

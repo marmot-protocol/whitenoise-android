@@ -96,7 +96,6 @@
 *.ConversationTopBarSemanticsTest.headerWithTwoShortcutsDark
 *.ConversationTopBarSemanticsTest.crowdedHeaderLargeFont
 *.ConversationTopBarSemanticsTest.crowdedHeaderLargeFontRtl
-*.ConversationTopBarSemanticsTest.fiveShortcutsLargeFont
 *.ConversationTopBarSemanticsTest.headerWithAllShortcutsLight
 *.ConversationTopBarSemanticsTest.headerWithAllShortcutsDark
 *.ConversationTopBarSemanticsTest.headerWithReadAloudLight

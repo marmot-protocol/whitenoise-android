@@ -32,6 +32,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -213,49 +214,99 @@ class ConversationTopBarSemanticsTest {
     }
 
     /** The default header has no shortcut buttons. */
-    @Test fun headerWithoutShortcutsLight() = shortcutHeader("none_light", emptyList())
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithoutShortcutsLight() = shortcutHeader("none_light", emptyList())
 
     /** The default header in dark theme. */
-    @Test fun headerWithoutShortcutsDark() = shortcutHeader("none_dark", emptyList(), dark = true)
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithoutShortcutsDark() = shortcutHeader("none_dark", emptyList(), dark = true)
 
     /** One chosen shortcut sits at the end of the header. */
-    @Test fun headerWithOneShortcutLight() = shortcutHeader("one_light", listOf(HeaderShortcut.Search))
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithOneShortcutLight() = shortcutHeader("one_light", listOf(HeaderShortcut.Search))
 
     /** One shortcut in dark theme. */
-    @Test fun headerWithOneShortcutDark() = shortcutHeader("one_dark", listOf(HeaderShortcut.Search), dark = true)
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithOneShortcutDark() = shortcutHeader("one_dark", listOf(HeaderShortcut.Search), dark = true)
 
     /** Two shortcuts keep the person's order and leave the title its width. */
-    @Test fun headerWithTwoShortcutsLight() = shortcutHeader("two_light", BOTH_SHORTCUTS)
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithTwoShortcutsLight() = shortcutHeader("two_light", BOTH_SHORTCUTS)
 
     /** Two shortcuts in dark theme. */
-    @Test fun headerWithTwoShortcutsDark() = shortcutHeader("two_dark", BOTH_SHORTCUTS, dark = true)
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithTwoShortcutsDark() = shortcutHeader("two_dark", BOTH_SHORTCUTS, dark = true)
 
     /** Search and an active Read aloud button share the header. */
-    @Test fun headerWithReadAloudLight() = shortcutHeader("read_aloud_light", READ_ALOUD_SHORTCUTS)
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithReadAloudLight() = shortcutHeader("read_aloud_light", READ_ALOUD_SHORTCUTS)
 
     /** Search and Read aloud in dark theme. */
-    @Test fun headerWithReadAloudDark() = shortcutHeader("read_aloud_dark", READ_ALOUD_SHORTCUTS, dark = true)
-
-    /** Every shortcut at once on a typical phone width, at the composer's compact pitch. */
-    @Test fun headerWithAllShortcutsLight() = shortcutHeader("all_light", HeaderShortcut.entries.toList())
-
-    /** Every shortcut at once in dark theme. */
-    @Test fun headerWithAllShortcutsDark() = shortcutHeader("all_dark", HeaderShortcut.entries.toList(), dark = true)
-
-    /** A narrow window at double font keeps three shortcuts, the members line and the tappable timer badge on screen. */
     @Test
-    @Config(qualifiers = "en-w320dp-h780dp-mdpi")
-    fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", THREE_SHORTCUTS, rtl = false)
+    @Config(qualifiers = PHONE)
+    fun headerWithReadAloudDark() = shortcutHeader("read_aloud_dark", READ_ALOUD_SHORTCUTS, dark = true)
+
+    /** With every shortcut chosen, a typical phone shows the first four and the chat name keeps half the bar. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithAllShortcutsLight() = shortcutHeader("all_light", HeaderShortcut.entries.toList())
+
+    /** Every shortcut chosen in dark theme. */
+    @Test
+    @Config(qualifiers = PHONE)
+    fun headerWithAllShortcutsDark() = shortcutHeader("all_dark", HeaderShortcut.entries.toList(), dark = true)
+
+    /** Every shortcut chosen on a small phone at double font: only two fit, with the members line and timer badge. */
+    @Test
+    @Config(qualifiers = SMALL_PHONE)
+    fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", HeaderShortcut.entries.toList(), rtl = false)
 
     /** The crowded header mirrored for a right-to-left language. */
     @Test
-    @Config(qualifiers = "en-w320dp-h780dp-mdpi")
-    fun crowdedHeaderLargeFontRtl() = crowdedHeader("crowded_large_font_rtl", THREE_SHORTCUTS, rtl = true)
+    @Config(qualifiers = SMALL_PHONE)
+    fun crowdedHeaderLargeFontRtl() = crowdedHeader("crowded_large_font_rtl", HeaderShortcut.entries.toList(), rtl = true)
 
-    /** Five shortcuts in the same narrow, double-font window: the title still keeps a readable start. */
+    /** The first shortcuts that fit show in the chosen order; the rest wait for a wider window. */
     @Test
-    @Config(qualifiers = "en-w320dp-h780dp-mdpi")
-    fun fiveShortcutsLargeFont() = crowdedHeader("five_large_font", FIVE_SHORTCUTS, rtl = false)
+    fun headerShowsOnlyTheShortcutsThatFit() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                capacity = it,
+                shortcuts = HeaderShortcut.entries.reversed(),
+                muteControl = muteControl(appState),
+                onSearch = {},
+                readAloudOn = true,
+                onTimer = {},
+                onMembers = {},
+                onAddMembers = {},
+            )
+        })
+        // 360dp at normal font fits three: the reversed list starts with Add members, Members and Timer.
+        for (tag in GROUP_SHORTCUT_TAGS) composeRule.onNodeWithTag(tag).assertExists()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_MUTE_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_SEARCH_TAG).assertDoesNotExist()
+    }
+
+    /** Capacity keeps the chat name at least as wide as the buttons and readable at large font sizes. */
+    @Test
+    fun shortcutCapacityLeavesTheChatNameRoom() {
+        assertEquals(3, headerShortcutCapacity(360.dp, 1f))
+        assertEquals(4, headerShortcutCapacity(411.dp, 1f))
+        assertEquals(2, headerShortcutCapacity(320.dp, 2f))
+        assertEquals(6, headerShortcutCapacity(600.dp, 1f))
+        assertEquals(0, headerShortcutCapacity(120.dp, 1f))
+        assertEquals(Int.MAX_VALUE, headerShortcutCapacity(Dp.Infinity, 1f))
+    }
 
     /** Timer, Members and Add members run their handlers and stay hidden when their handler is absent. */
     @Test
@@ -267,6 +318,7 @@ class ConversationTopBarSemanticsTest {
         render(appState, controller, actions = {
             val on = available.value
             ConversationHeaderShortcuts(
+                capacity = it,
                 shortcuts = listOf(HeaderShortcut.DisappearingTimer, HeaderShortcut.Members, HeaderShortcut.AddMembers),
                 muteControl = null,
                 onSearch = {},
@@ -294,6 +346,7 @@ class ConversationTopBarSemanticsTest {
         var searches = 0
         render(appState, controller, actions = {
             ConversationHeaderShortcuts(
+                capacity = it,
                 shortcuts = listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute),
                 muteControl = muteControl(appState, dialogOpen = dialogOpen),
                 onSearch = { searches += 1 },
@@ -315,6 +368,7 @@ class ConversationTopBarSemanticsTest {
         val readAloudOn = mutableStateOf<Boolean?>(false)
         render(appState, controller, actions = {
             ConversationHeaderShortcuts(
+                capacity = it,
                 shortcuts = listOf(HeaderShortcut.ReadAloud),
                 muteControl = null,
                 onSearch = {},
@@ -342,6 +396,7 @@ class ConversationTopBarSemanticsTest {
         val dialogOpen = mutableStateOf(false)
         render(appState, controller, actions = {
             ConversationHeaderShortcuts(
+                capacity = it,
                 shortcuts = listOf(HeaderShortcut.MuteUnmute),
                 muteControl = muteControl(appState, pending = true, dialogOpen = dialogOpen),
                 onSearch = {},
@@ -427,7 +482,7 @@ class ConversationTopBarSemanticsTest {
         onOpenDetails: () -> Unit = {},
         fontScale: Float = 1f,
         dark: Boolean = false,
-        actions: @Composable RowScope.() -> Unit = {},
+        actions: @Composable RowScope.(capacity: Int) -> Unit = {},
         rtl: Boolean = false,
         onTimerClick: (() -> Unit)? = null,
     ) {
@@ -451,7 +506,7 @@ class ConversationTopBarSemanticsTest {
         compactHeight: Boolean = false,
         frozen: Boolean = false,
         onOpenDetails: () -> Unit = {},
-        actions: @Composable RowScope.() -> Unit = {},
+        actions: @Composable RowScope.(capacity: Int) -> Unit = {},
         onTimerClick: (() -> Unit)? = null,
     ) {
         ConversationTopBar(
@@ -491,7 +546,8 @@ class ConversationTopBarSemanticsTest {
         render(appState, controller, dark = dark, actions = {
             ConversationHeaderShortcuts(
                 shortcuts,
-                muteControl(appState),
+                capacity = it,
+                muteControl = muteControl(appState),
                 onSearch = {},
                 readAloudOn = true,
                 onTimer = {},
@@ -518,7 +574,8 @@ class ConversationTopBarSemanticsTest {
         render(appState, controller, fontScale = 2f, rtl = rtl, onTimerClick = {}, actions = {
             ConversationHeaderShortcuts(
                 shortcuts,
-                muteControl(appState),
+                capacity = it,
+                muteControl = muteControl(appState),
                 onSearch = {},
                 readAloudOn = false,
                 onTimer = {},
@@ -629,8 +686,8 @@ class ConversationTopBarSemanticsTest {
         val GROUP_ID = "04" + "00".repeat(31)
         val BOTH_SHORTCUTS = listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search)
         val READ_ALOUD_SHORTCUTS = listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud)
-        val THREE_SHORTCUTS = listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute, HeaderShortcut.DisappearingTimer)
-        val FIVE_SHORTCUTS = THREE_SHORTCUTS + listOf(HeaderShortcut.Members, HeaderShortcut.AddMembers)
+        const val PHONE = "en-w411dp-h891dp-xxhdpi"
+        const val SMALL_PHONE = "en-w320dp-h780dp-xxhdpi"
         val GROUP_SHORTCUT_TAGS =
             listOf(CONVERSATION_HEADER_TIMER_TAG, CONVERSATION_HEADER_MEMBERS_TAG, CONVERSATION_HEADER_ADD_MEMBERS_TAG)
     }
