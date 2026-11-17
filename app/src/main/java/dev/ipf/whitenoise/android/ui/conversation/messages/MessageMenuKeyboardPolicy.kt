@@ -17,12 +17,13 @@ internal class MessageMenuKeyboardPolicy {
         replyTarget: String?,
         editTarget: String?,
         focusOwner: MessageMenuKeyboardOwner = MessageMenuKeyboardOwner.Composer,
+        restoreInFlight: Boolean = false,
     ): Boolean {
-        pendingRestore = imeOpen
+        pendingRestore = imeOpen || restoreInFlight
         owner = focusOwner
         replyAtOpen = replyTarget
         editAtOpen = editTarget
-        return imeOpen
+        return pendingRestore
     }
 
     /** Only a newly established target delegates the raise to Reply/Edit. Removal is a dismissal. */

@@ -20,7 +20,6 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -75,11 +74,15 @@ internal class ConversationReverseDragSelectionTest {
 
     @Test fun composerImeStaysClosedDuringAnchorOnlyDragAndEmptyRelease() = assertDragDoesNotRestoreIme()
 
-    @Test fun searchImeStaysClosedDuringAnchorOnlyDragAndCancellation() = assertDragDoesNotRestoreIme(search = true, cancelGesture = true)
+    @Test fun searchImeStaysClosedDuringAnchorOnlyDragAndCancellation() {
+        assertDragDoesNotRestoreIme(search = true, cancelGesture = true)
+    }
 
     @Test fun composerImeStaysClosedWhenHeldDragCrossesIntoSelection() = assertDragDoesNotRestoreIme(crossRow = true)
 
-    @Test fun searchImeStaysClosedWhenHeldDragCrossesIntoSelection() = assertDragDoesNotRestoreIme(search = true, crossRow = true)
+    @Test fun searchImeStaysClosedWhenHeldDragCrossesIntoSelection() {
+        assertDragDoesNotRestoreIme(search = true, crossRow = true)
+    }
 
     /** Exercises the screen's restore effect with a real held pointer before any row is selected. */
     @Suppress("LongMethod") // One held-pointer lifetime covers menu handoff, anchor-only drag, and release.
@@ -102,7 +105,8 @@ internal class ConversationReverseDragSelectionTest {
                     .map { it.key.removePrefix("msg:") }
                     .filter(ids::contains)
                     .first { id ->
-                        val bounds = composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
+                        val bounds =
+                            composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
                         bounds.top >= viewportBounds.top && bounds.bottom <= viewportBounds.bottom
                     }
             val row = composeRule.onNodeWithTag(messageBubbleRowTestTag(anchor))
@@ -355,7 +359,8 @@ internal class ConversationReverseDragSelectionTest {
                 timelineRecord(
                     messageId = index.toString(16).padStart(64, '0'),
                     timelineAt = index.toULong(),
-                    plaintext = if (keyboard == null) "edge message $index" else "edge message $index\nSecond line\nThird line",
+                    plaintext =
+                        if (keyboard == null) "edge message $index" else "edge message $index\nSecond line\nThird line",
                 ).let { record ->
                     if (keyboard == null) record else record.copy(contentTokens = plainPaintDocument(record.plaintext))
                 }
@@ -504,7 +509,8 @@ internal class ConversationReverseDragSelectionTest {
                 .filter(ids::contains)
         val endpoint =
             rows.minBy { id ->
-                val bounds = composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
+                val bounds =
+                    composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
                 when {
                     lastPointer.y < bounds.top -> bounds.top - lastPointer.y
                     lastPointer.y > bounds.bottom -> lastPointer.y - bounds.bottom

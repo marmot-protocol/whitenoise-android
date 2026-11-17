@@ -93,6 +93,7 @@ class ForwardAttentionFolderReactivityTest {
     }
 
     @Test
+    @Suppress("LongMethod") // One fixture owns both accounts, controller cleanup, and row assertions.
     fun accountSwitchUsesTheDestinationUnreadMentionsForTheSameChatIds() {
         val otherAccountRef = "bob"
         val otherAccountHex = "d0".repeat(32)

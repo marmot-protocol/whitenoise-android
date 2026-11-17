@@ -99,10 +99,14 @@ export PREFETCH_CALLS="$FIXTURE/calls" PREFETCH_EXPECTED_REMOTE="https://custom.
 export PREFETCH_PIDS="$FIXTURE/pids"
 assert_transport_stopped() {
   while read -r pid; do
-    if kill -0 "$pid" 2>/dev/null; then
-      state="$(ps -o stat= -p "$pid")"
-      [[ "$state" == Z* ]] || fail 'timed transport or its descendant is still running'
-    fi
+    # timeout sends SIGKILL to the group, but descendants can still be exiting
+    # when it returns. Allow only a bounded scheduling delay, never a live leak.
+    for ((attempt = 0; attempt < 20; attempt++)); do
+      state="$(ps -o stat= -p "$pid" 2>/dev/null || true)"
+      [[ -z "$state" || "$state" == Z* ]] && break
+      sleep 0.05
+    done
+    [[ -z "$state" || "$state" == Z* ]] || fail 'timed transport or its descendant is still running'
   done <"$PREFETCH_PIDS"
 }
 run_fake() {

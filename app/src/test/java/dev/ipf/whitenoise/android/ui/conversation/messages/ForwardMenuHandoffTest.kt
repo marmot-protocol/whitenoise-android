@@ -45,9 +45,13 @@ class ForwardMenuHandoffTest {
 
     @Test fun forwardingDoesNotDismissAndRestoreConversationSearch() = assertHandoff(MessageMenuKeyboardOwner.Search)
 
-    @Test fun mediaEligibilityLossClosesThePickerAndMenuWithoutRestoringTheKeyboard() = assertHandoff(MessageMenuKeyboardOwner.Composer, media = true)
+    @Test fun mediaEligibilityLossClosesThePickerAndMenuWithoutRestoringTheKeyboard() {
+        assertHandoff(MessageMenuKeyboardOwner.Composer, media = true)
+    }
 
-    @Test fun textSnapshotSurvivesLiveEligibilityLoss() = assertHandoff(MessageMenuKeyboardOwner.Composer, loseTextEligibility = true)
+    @Test fun textSnapshotSurvivesLiveEligibilityLoss() {
+        assertHandoff(MessageMenuKeyboardOwner.Composer, loseTextEligibility = true)
+    }
 
     @Suppress("LongMethod") // Keeps the production row, callbacks and picker assertions in one test fixture.
     private fun assertHandoff(

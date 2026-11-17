@@ -5068,6 +5068,8 @@ internal fun ConversationScreen(
                                                                     } else {
                                                                         MessageMenuKeyboardOwner.Composer
                                                                     },
+                                                                // A previous show request can outlive its zero inset.
+                                                                restoreInFlight = menuBackdropImeBottom != null,
                                                             )
                                                         ) {
                                                             menuComposerWasEditing =
