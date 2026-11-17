@@ -96,7 +96,7 @@ internal fun failureDetail(
  * The startup failure for [error]. A linked-device refusal is not retryable: the same build fails the same way, so
  * the screen names the remedy and keeps the copyable report without offering a retry that would loop.
  */
-internal fun bootstrapFailurePresentation(
+internal fun startupFailure(
     error: Throwable,
     startupDetail: String?,
 ): ErrorPresentation {

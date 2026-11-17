@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="linked_devices">Verknüpfte Geräte</string>
+    <string name="linked_devices_detail">Die mit diesem Konto verknüpften Geräte. Nachrichten, die du von einem davon sendest, erscheinen auf allen als deine.</string>
+    <string name="linked_devices_this_device">Dieses Gerät</string>
+    <string name="linked_devices_other_devices">Andere Geräte</string>
+    <string name="linked_devices_removing">Wird entfernt</string>
+    <string name="linked_devices_unnamed">Unbenanntes Gerät</string>
+    <string name="linked_devices_linked_on">Verknüpft am %1$s</string>
+    <string name="linked_devices_last_active">Zuletzt aktiv: %1$s</string>
+    <string name="linked_devices_no_activity_seen">Noch keine Aktivität gesehen</string>
+    <string name="linked_devices_status_inactive">Als inaktiv markiert</string>
+    <string name="linked_devices_status_leaving">Wird abgemeldet</string>
+    <string name="linked_devices_status_moved">Zu einer anderen Gerätegruppe gewechselt</string>
+    <string name="linked_devices_judged_inactive">Seit 30 Tagen keine Aktivität</string>
+    <string name="linked_devices_removal_pending">Entfernung läuft</string>
+    <string name="linked_devices_empty">Mit diesem Konto sind noch keine Geräte verknüpft.</string>
+    <string name="linked_devices_no_others">Es sind keine anderen Geräte verknüpft.</string>
+    <string name="linked_devices_load_failed">Verknüpfte Geräte konnten nicht geladen werden. Angezeigte Einträge sind möglicherweise veraltet.</string>
+    <string name="linked_devices_loading">Verknüpfte Geräte werden geladen…</string>
+    <string name="explanation_linked_devices_hub">Zeigt die mit diesem Konto verknüpften Geräte.</string>
+    <string name="explanation_linked_device_row">Ein mit diesem Konto verknüpftes Gerät. „Zuletzt aktiv“ gibt an, wann ein anderes Gerät es zuletzt in Betrieb gesehen hat, nicht ob es gerade online ist.</string>
+</resources>

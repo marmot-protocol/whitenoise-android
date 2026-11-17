@@ -1084,6 +1084,16 @@
           "SET-058"
         ]
       }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.linked_devices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.linked_devices",
+        "test_ids": [
+          "SET-059"
+        ]
+      }
     ]
   }
 }

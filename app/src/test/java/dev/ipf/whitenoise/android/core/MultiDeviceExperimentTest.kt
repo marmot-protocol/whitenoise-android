@@ -8,8 +8,8 @@ import dev.ipf.whitenoise.android.invariantGateRepositoryRoot
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.BootstrapStage
 import dev.ipf.whitenoise.android.state.BootstrapStageFailure
-import dev.ipf.whitenoise.android.state.bootstrapFailurePresentation
 import dev.ipf.whitenoise.android.state.failureDetail
+import dev.ipf.whitenoise.android.state.startupFailure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -157,7 +157,7 @@ class MultiDeviceExperimentTest {
     fun aRefusalAtStartupIsNotRetryable() {
         val refusal = MarmotKitException.Runtime(EXPERIMENTAL_DEVICE_GROUPS_REQUIRED)
         val failure = BootstrapStageFailure(BootstrapStage.RUNTIME_START, refusal)
-        val presentation = bootstrapFailurePresentation(failure, startupDetail = null)
+        val presentation = startupFailure(failure, startupDetail = null)
 
         assertEquals(AppText.Resource(R.string.error_linked_devices_build_required), presentation.message)
         assertFalse(presentation.retryable)
@@ -168,13 +168,15 @@ class MultiDeviceExperimentTest {
     /** Any other startup failure keeps the generic copy and its retry. */
     @Test
     fun anOrdinaryStartupFailureStaysRetryable() {
-        val presentation = bootstrapFailurePresentation(IllegalStateException("boom"), startupDetail = null)
+        val presentation = startupFailure(IllegalStateException("boom"), startupDetail = null)
 
         assertEquals(AppText.Resource(R.string.error_try_again), presentation.message)
         assertTrue(presentation.retryable)
     }
 
     /** Every Kotlin file compiled into the app's main source set. */
-    private fun mainSources(): List<File> =
-        appModuleFile("src/main/java").walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+    private fun mainSources(): List<File> {
+        val sources = appModuleFile("src/main/java").walkTopDown()
+        return sources.filter { it.isFile && it.extension == "kt" }.toList()
+    }
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="linked_devices">Linked devices</string>
+    <string name="linked_devices_detail">The devices linked to this account. Messages you send from any of them show as yours on all of them.</string>
+    <string name="linked_devices_this_device">This device</string>
+    <string name="linked_devices_other_devices">Other devices</string>
+    <string name="linked_devices_removing">Being removed</string>
+    <string name="linked_devices_unnamed">Unnamed device</string>
+    <string name="linked_devices_linked_on">Linked %1$s</string>
+    <string name="linked_devices_last_active">Last active %1$s</string>
+    <string name="linked_devices_no_activity_seen">No activity seen yet</string>
+    <string name="linked_devices_status_inactive">Marked inactive</string>
+    <string name="linked_devices_status_leaving">Signing out</string>
+    <string name="linked_devices_status_moved">Moved to another set of devices</string>
+    <string name="linked_devices_judged_inactive">No activity for 30 days</string>
+    <string name="linked_devices_removal_pending">Removal in progress</string>
+    <string name="linked_devices_empty">No devices are linked to this account yet.</string>
+    <string name="linked_devices_no_others">No other devices are linked.</string>
+    <string name="linked_devices_load_failed">Couldn\'t load linked devices. Anything shown may be out of date.</string>
+    <string name="linked_devices_loading">Loading linked devices…</string>
+    <string name="explanation_linked_devices_hub">Shows the devices linked to this account.</string>
+    <string name="explanation_linked_device_row">A device linked to this account. Last active is when another device last saw it running. It doesn\'t show whether the device is online now.</string>
+</resources>

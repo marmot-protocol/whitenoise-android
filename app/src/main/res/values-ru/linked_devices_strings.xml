@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="linked_devices">Связанные устройства</string>
+    <string name="linked_devices_detail">Устройства, связанные с этой учётной записью. Сообщения, отправленные с любого из них, отображаются как ваши на всех.</string>
+    <string name="linked_devices_this_device">Это устройство</string>
+    <string name="linked_devices_other_devices">Другие устройства</string>
+    <string name="linked_devices_removing">Удаляются</string>
+    <string name="linked_devices_unnamed">Устройство без названия</string>
+    <string name="linked_devices_linked_on">Связано %1$s</string>
+    <string name="linked_devices_last_active">Последняя активность: %1$s</string>
+    <string name="linked_devices_no_activity_seen">Активность пока не замечена</string>
+    <string name="linked_devices_status_inactive">Отмечено как неактивное</string>
+    <string name="linked_devices_status_leaving">Выполняется выход</string>
+    <string name="linked_devices_status_moved">Перемещено в другой набор устройств</string>
+    <string name="linked_devices_judged_inactive">Нет активности 30 дней</string>
+    <string name="linked_devices_removal_pending">Удаление выполняется</string>
+    <string name="linked_devices_empty">С этой учётной записью пока не связано ни одного устройства.</string>
+    <string name="linked_devices_no_others">Других связанных устройств нет.</string>
+    <string name="linked_devices_load_failed">Не удалось загрузить связанные устройства. Показанные данные могут быть устаревшими.</string>
+    <string name="linked_devices_loading">Загрузка связанных устройств…</string>
+    <string name="explanation_linked_devices_hub">Показывает устройства, связанные с этой учётной записью.</string>
+    <string name="explanation_linked_device_row">Устройство, связанное с этой учётной записью. Последняя активность показывает, когда другое устройство в последний раз видело его работающим, а не в сети ли оно сейчас.</string>
+</resources>

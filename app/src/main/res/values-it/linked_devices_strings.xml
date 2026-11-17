@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="linked_devices">Dispositivi collegati</string>
+    <string name="linked_devices_detail">I dispositivi collegati a questo account. I messaggi inviati da uno qualsiasi di essi risultano tuoi su tutti.</string>
+    <string name="linked_devices_this_device">Questo dispositivo</string>
+    <string name="linked_devices_other_devices">Altri dispositivi</string>
+    <string name="linked_devices_removing">In rimozione</string>
+    <string name="linked_devices_unnamed">Dispositivo senza nome</string>
+    <string name="linked_devices_linked_on">Collegato il %1$s</string>
+    <string name="linked_devices_last_active">Ultima attività: %1$s</string>
+    <string name="linked_devices_no_activity_seen">Nessuna attività rilevata finora</string>
+    <string name="linked_devices_status_inactive">Contrassegnato come inattivo</string>
+    <string name="linked_devices_status_leaving">Disconnessione in corso</string>
+    <string name="linked_devices_status_moved">Spostato in un altro insieme di dispositivi</string>
+    <string name="linked_devices_judged_inactive">Nessuna attività da 30 giorni</string>
+    <string name="linked_devices_removal_pending">Rimozione in corso</string>
+    <string name="linked_devices_empty">Nessun dispositivo è ancora collegato a questo account.</string>
+    <string name="linked_devices_no_others">Nessun altro dispositivo è collegato.</string>
+    <string name="linked_devices_load_failed">Impossibile caricare i dispositivi collegati. Quanto mostrato potrebbe non essere aggiornato.</string>
+    <string name="linked_devices_loading">Caricamento dei dispositivi collegati…</string>
+    <string name="explanation_linked_devices_hub">Mostra i dispositivi collegati a questo account.</string>
+    <string name="explanation_linked_device_row">Un dispositivo collegato a questo account. L’ultima attività indica quando un altro dispositivo lo ha visto in funzione l’ultima volta, non se è online adesso.</string>
+</resources>

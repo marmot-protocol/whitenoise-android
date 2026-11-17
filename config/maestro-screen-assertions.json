@@ -2083,6 +2083,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+      "symbol": "LinkedDevicesScreen",
+      "bindings": [],
+      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open it. Roster loading, empty, failed-read, pending-removal and account-switch states are covered by JVM tests and manual SET-059 on a linked-devices test build; add a direct assertion when the entry point ships."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
       "symbol": "ConversationNotificationSettingsScreen",
       "bindings": [

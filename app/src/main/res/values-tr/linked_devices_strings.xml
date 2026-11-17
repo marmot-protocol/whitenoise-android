@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="linked_devices">Bağlı cihazlar</string>
+    <string name="linked_devices_detail">Bu hesaba bağlı cihazlar. Bunlardan herhangi birinden gönderdiğiniz mesajlar hepsinde sizin olarak görünür.</string>
+    <string name="linked_devices_this_device">Bu cihaz</string>
+    <string name="linked_devices_other_devices">Diğer cihazlar</string>
+    <string name="linked_devices_removing">Kaldırılıyor</string>
+    <string name="linked_devices_unnamed">Adsız cihaz</string>
+    <string name="linked_devices_linked_on">%1$s tarihinde bağlandı</string>
+    <string name="linked_devices_last_active">Son etkinlik: %1$s</string>
+    <string name="linked_devices_no_activity_seen">Henüz etkinlik görülmedi</string>
+    <string name="linked_devices_status_inactive">Etkin değil olarak işaretlendi</string>
+    <string name="linked_devices_status_leaving">Oturum kapatılıyor</string>
+    <string name="linked_devices_status_moved">Başka bir cihaz kümesine taşındı</string>
+    <string name="linked_devices_judged_inactive">30 gündür etkinlik yok</string>
+    <string name="linked_devices_removal_pending">Kaldırma sürüyor</string>
+    <string name="linked_devices_empty">Bu hesaba henüz bağlı cihaz yok.</string>
+    <string name="linked_devices_no_others">Bağlı başka cihaz yok.</string>
+    <string name="linked_devices_load_failed">Bağlı cihazlar yüklenemedi. Gösterilenler güncel olmayabilir.</string>
+    <string name="linked_devices_loading">Bağlı cihazlar yükleniyor…</string>
+    <string name="explanation_linked_devices_hub">Bu hesaba bağlı cihazları gösterir.</string>
+    <string name="explanation_linked_device_row">Bu hesaba bağlı bir cihaz. Son etkinlik, başka bir cihazın onu en son ne zaman çalışırken gördüğünü gösterir, şu anda çevrimiçi olup olmadığını göstermez.</string>
+</resources>

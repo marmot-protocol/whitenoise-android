@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="linked_devices">Dispositivos vinculados</string>
+    <string name="linked_devices_detail">Os dispositivos vinculados a esta conta. As mensagens que você envia de qualquer um deles aparecem como suas em todos.</string>
+    <string name="linked_devices_this_device">Este aparelho</string>
+    <string name="linked_devices_other_devices">Outros dispositivos</string>
+    <string name="linked_devices_removing">Sendo removidos</string>
+    <string name="linked_devices_unnamed">Dispositivo sem nome</string>
+    <string name="linked_devices_linked_on">Vinculado em %1$s</string>
+    <string name="linked_devices_last_active">Última atividade: %1$s</string>
+    <string name="linked_devices_no_activity_seen">Nenhuma atividade vista ainda</string>
+    <string name="linked_devices_status_inactive">Marcado como inativo</string>
+    <string name="linked_devices_status_leaving">Saindo da conta</string>
+    <string name="linked_devices_status_moved">Movido para outro conjunto de dispositivos</string>
+    <string name="linked_devices_judged_inactive">Sem atividade há 30 dias</string>
+    <string name="linked_devices_removal_pending">Remoção em andamento</string>
+    <string name="linked_devices_empty">Ainda não há dispositivos vinculados a esta conta.</string>
+    <string name="linked_devices_no_others">Nenhum outro dispositivo está vinculado.</string>
+    <string name="linked_devices_load_failed">Não foi possível carregar os dispositivos vinculados. O que aparece pode estar desatualizado.</string>
+    <string name="linked_devices_loading">Carregando dispositivos vinculados…</string>
+    <string name="explanation_linked_devices_hub">Mostra os dispositivos vinculados a esta conta.</string>
+    <string name="explanation_linked_device_row">Um dispositivo vinculado a esta conta. A última atividade indica quando outro dispositivo o viu funcionando pela última vez, não se ele está online agora.</string>
+</resources>

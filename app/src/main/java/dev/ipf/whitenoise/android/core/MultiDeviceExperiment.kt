@@ -9,6 +9,12 @@ import dev.ipf.marmotkit.MarmotKitException
  */
 internal const val MULTI_DEVICE_EXPERIMENT = false
 
+/**
+ * Whether linked-device entry points are part of this build. Every screen, row and prompt for the feature asks
+ * this, so the feature is reachable exactly when the runtime opens with device groups.
+ */
+internal fun linkedDevicesAvailable(): Boolean = MULTI_DEVICE_EXPERIMENT
+
 /** The details MDK attaches to its runtime error when an ordinary opener meets an account that needs device groups. */
 internal const val EXPERIMENTAL_DEVICE_GROUPS_REQUIRED = "experimental_device_groups_required"
 

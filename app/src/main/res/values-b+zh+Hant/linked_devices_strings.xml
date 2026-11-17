@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="linked_devices">已連結裝置</string>
+    <string name="linked_devices_detail">與此帳號連結的裝置。你從其中任一裝置傳送的訊息，在所有裝置上都顯示為你傳送的。</string>
+    <string name="linked_devices_this_device">此裝置</string>
+    <string name="linked_devices_other_devices">其他裝置</string>
+    <string name="linked_devices_removing">正在移除</string>
+    <string name="linked_devices_unnamed">未命名裝置</string>
+    <string name="linked_devices_linked_on">連結於 %1$s</string>
+    <string name="linked_devices_last_active">上次活動：%1$s</string>
+    <string name="linked_devices_no_activity_seen">尚未看到活動</string>
+    <string name="linked_devices_status_inactive">已標記為不活躍</string>
+    <string name="linked_devices_status_leaving">正在登出</string>
+    <string name="linked_devices_status_moved">已移至另一組裝置</string>
+    <string name="linked_devices_judged_inactive">30 天沒有活動</string>
+    <string name="linked_devices_removal_pending">移除進行中</string>
+    <string name="linked_devices_empty">此帳號尚未連結任何裝置。</string>
+    <string name="linked_devices_no_others">沒有連結其他裝置。</string>
+    <string name="linked_devices_load_failed">無法載入已連結裝置。顯示的內容可能已過時。</string>
+    <string name="linked_devices_loading">正在載入已連結裝置…</string>
+    <string name="explanation_linked_devices_hub">顯示與此帳號連結的裝置。</string>
+    <string name="explanation_linked_device_row">與此帳號連結的裝置。上次活動表示其他裝置上次看到它運作的時間，並不表示它現在是否在線上。</string>
+</resources>

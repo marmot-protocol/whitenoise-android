@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="linked_devices">Appareils associés</string>
+    <string name="linked_devices_detail">Les appareils associés à ce compte. Les messages que vous envoyez depuis l’un d’eux apparaissent comme les vôtres sur tous.</string>
+    <string name="linked_devices_this_device">Cet appareil</string>
+    <string name="linked_devices_other_devices">Autres appareils</string>
+    <string name="linked_devices_removing">Suppression en cours</string>
+    <string name="linked_devices_unnamed">Appareil sans nom</string>
+    <string name="linked_devices_linked_on">Associé le %1$s</string>
+    <string name="linked_devices_last_active">Dernière activité : %1$s</string>
+    <string name="linked_devices_no_activity_seen">Aucune activité observée pour l’instant</string>
+    <string name="linked_devices_status_inactive">Marqué comme inactif</string>
+    <string name="linked_devices_status_leaving">Déconnexion en cours</string>
+    <string name="linked_devices_status_moved">Déplacé vers un autre ensemble d’appareils</string>
+    <string name="linked_devices_judged_inactive">Aucune activité depuis 30 jours</string>
+    <string name="linked_devices_removal_pending">Suppression en cours de traitement</string>
+    <string name="linked_devices_empty">Aucun appareil n’est encore associé à ce compte.</string>
+    <string name="linked_devices_no_others">Aucun autre appareil n’est associé.</string>
+    <string name="linked_devices_load_failed">Impossible de charger les appareils associés. Ce qui est affiché peut être obsolète.</string>
+    <string name="linked_devices_loading">Chargement des appareils associés…</string>
+    <string name="explanation_linked_devices_hub">Affiche les appareils associés à ce compte.</string>
+    <string name="explanation_linked_device_row">Un appareil associé à ce compte. La dernière activité indique quand un autre appareil l’a vu fonctionner pour la dernière fois, pas s’il est en ligne maintenant.</string>
+</resources>

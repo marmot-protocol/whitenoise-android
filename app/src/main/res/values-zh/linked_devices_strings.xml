@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="linked_devices">已关联设备</string>
+    <string name="linked_devices_detail">与此账户关联的设备。你从其中任一设备发送的消息，在所有设备上都显示为你发送的。</string>
+    <string name="linked_devices_this_device">此设备</string>
+    <string name="linked_devices_other_devices">其他设备</string>
+    <string name="linked_devices_removing">正在移除</string>
+    <string name="linked_devices_unnamed">未命名设备</string>
+    <string name="linked_devices_linked_on">关联于 %1$s</string>
+    <string name="linked_devices_last_active">上次活动：%1$s</string>
+    <string name="linked_devices_no_activity_seen">尚未看到活动</string>
+    <string name="linked_devices_status_inactive">已标记为不活跃</string>
+    <string name="linked_devices_status_leaving">正在退出登录</string>
+    <string name="linked_devices_status_moved">已移至另一组设备</string>
+    <string name="linked_devices_judged_inactive">30 天没有活动</string>
+    <string name="linked_devices_removal_pending">移除进行中</string>
+    <string name="linked_devices_empty">此账户尚未关联任何设备。</string>
+    <string name="linked_devices_no_others">没有关联其他设备。</string>
+    <string name="linked_devices_load_failed">无法加载已关联设备。显示的内容可能已过时。</string>
+    <string name="linked_devices_loading">正在加载已关联设备…</string>
+    <string name="explanation_linked_devices_hub">显示与此账户关联的设备。</string>
+    <string name="explanation_linked_device_row">与此账户关联的设备。上次活动表示其他设备上次看到它运行的时间，并不表示它现在是否在线。</string>
+</resources>

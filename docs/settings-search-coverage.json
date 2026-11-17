@@ -776,6 +776,10 @@
           "represented_by": "home.Relays"
         },
         {
+          "declaration": "\"linked_devices\"",
+          "represented_by": "Account.linked_devices"
+        },
+        {
           "declaration": "\"chat_folders\"",
           "represented_by": "home.ChatFolders"
         },
