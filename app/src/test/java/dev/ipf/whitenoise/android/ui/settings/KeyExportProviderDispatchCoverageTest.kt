@@ -39,6 +39,7 @@ class KeyExportProviderDispatchCoverageTest {
                 searchForOpening = true,
             )
         val save = screen.functionBody("saveExport")
+        val parts = ACCOUNT_KEYS_PARTS.joinToString("\n") { appModuleSource(it) }
 
         assertFalse("the picker callback opens the provider itself", "contentResolver" in launcher)
         assertTrue("the picker callback no longer uses saveExport", "saveExport(" in launcher)
@@ -47,7 +48,7 @@ class KeyExportProviderDispatchCoverageTest {
         assertEquals(
             "only writeKeyExport may receive the provider stream",
             1,
-            Regex("""\.openOutputStream\(""").findAll(screen).count(),
+            Regex("""\.openOutputStream\(""").findAll(parts).count(),
         )
         assertTrue(
             "stop and dispose must cancel a queued save",
@@ -156,5 +157,14 @@ class KeyExportProviderDispatchCoverageTest {
         const val WRITER = "src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyExportWrite.kt"
         const val CONTENT = "synthetic-private-key-for-test"
         const val TIMEOUT_SECONDS = 5L
+
+        /** The screen and the files split out of it, so the single-stream count still covers all of them. */
+        val ACCOUNT_KEYS_PARTS =
+            listOf(
+                ACCOUNT_KEYS,
+                "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+                "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
+                "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeProgressSheets.kt",
+            )
     }
 }
