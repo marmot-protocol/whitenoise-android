@@ -62,6 +62,11 @@ class LocalHtmlViewTest {
             assertNull(shadow.lastLoadDataWithBaseURL.baseUrl)
             assertEquals(document.html, shadow.lastLoadDataWithBaseURL.data)
             val client = shadow.webViewClient
+            // Only the document itself, a single main-frame data: GET, is ever served.
+            assertEquals(403, client.shouldInterceptRequest(browser, request("data:text/html,x", mainFrame = false))!!.statusCode)
+            assertEquals(403, client.shouldInterceptRequest(browser, request("data:text/html,x", method = "POST"))!!.statusCode)
+            assertNull(client.shouldInterceptRequest(browser, request("DATA:text/html,x")))
+            assertEquals(403, client.shouldInterceptRequest(browser, request("data:text/html,x"))!!.statusCode)
             for (url in listOf("https://example.org/", "file:///secret", "content://secret", "wn-document-link:0")) {
                 val response = client.shouldInterceptRequest(browser, request(url))
                 assertEquals(403, response!!.statusCode)
@@ -102,6 +107,7 @@ class LocalHtmlViewTest {
         gesture: Boolean = true,
         redirect: Boolean = false,
         mainFrame: Boolean = true,
+        method: String = "GET",
     ) = object : WebResourceRequest {
         override fun getUrl(): Uri = Uri.parse(value)
 
@@ -111,7 +117,7 @@ class LocalHtmlViewTest {
 
         override fun hasGesture(): Boolean = gesture
 
-        override fun getMethod(): String = "GET"
+        override fun getMethod(): String = method
 
         override fun getRequestHeaders(): Map<String, String> = emptyMap()
     }

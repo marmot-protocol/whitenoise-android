@@ -30,6 +30,7 @@ class LocalHtmlContainmentCoverageTest {
             "WebSettings.LOAD_NO_CACHE",
             "403",
             "request.hasGesture()",
+            "documentPending.compareAndSet(true, false)",
             "document.destination(",
             "request.deny()",
             "destroy()",

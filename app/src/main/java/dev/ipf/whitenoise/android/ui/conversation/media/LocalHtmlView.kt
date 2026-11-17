@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import java.io.ByteArrayInputStream
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** The only browser entry point: receives a fresh-tree projection, never sender HTML. */
 @Suppress("DEPRECATION", "FunctionNaming")
@@ -41,6 +42,8 @@ internal fun LocalHtmlView(
     val view =
         remember(document, fontScale) {
             var created: WebView? = null
+            // loadDataWithBaseURL arrives as one main-frame data: request; every later request is refused.
+            val documentPending = AtomicBoolean(true)
             runCatching {
                 object : WebView(context) {
                     override fun startActionMode(callback: ActionMode.Callback?): ActionMode? = null
@@ -118,7 +121,14 @@ internal fun LocalHtmlView(
                             override fun shouldInterceptRequest(
                                 view: WebView?,
                                 request: WebResourceRequest?,
-                            ): WebResourceResponse = denied()
+                            ): WebResourceResponse? =
+                                denied().takeUnless {
+                                    request != null &&
+                                        request.isForMainFrame &&
+                                        request.method == "GET" &&
+                                        request.url.scheme.equals("data", ignoreCase = true) &&
+                                        documentPending.compareAndSet(true, false)
+                                }
 
                             override fun shouldInterceptRequest(
                                 view: WebView?,

