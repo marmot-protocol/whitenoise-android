@@ -290,11 +290,15 @@ class ConversationMediaViewerProductionPathTest {
             )
         }
 
-        composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { click() }
-        composeRule.mainClock.advanceTimeBy(500L)
-        composeRule.waitForIdle()
+        try {
+            composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { click() }
+            composeRule.mainClock.advanceTimeBy(500L)
+            composeRule.waitForIdle()
 
-        composeRule.runOnIdle { assertEquals(1, chromeToggleCount) }
+            composeRule.runOnIdle { assertEquals(1, chromeToggleCount) }
+        } finally {
+            composeRule.awaitViewerImageWorkIdle()
+        }
     }
 
     /** Both real source entry points expose the same zoom/reset viewport, without constructing a fake attachment. */
