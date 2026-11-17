@@ -39,7 +39,7 @@ work = "2.12.0"
 okhttp = "5.5.1"
 # Local-only HTML attachment sanitizer (parse + allowlist walk); no runtime dependencies.
 jsoup = "1.24.1"
-roborazzi = "1.77.0"
+roborazzi = "1.79.0"
 robolectric = "4.17"
 kover = "0.9.11"
 osmdroid = "6.1.20"
