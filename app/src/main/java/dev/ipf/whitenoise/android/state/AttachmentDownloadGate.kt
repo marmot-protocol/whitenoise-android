@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
@@ -136,7 +137,8 @@ internal class AttachmentDownloadGate(
                 try {
                     withContext(created) { block() }
                 } finally {
-                    withContext(NonCancellable) { created.stopReacquiring() }
+                    // Work ending while a pause is still handed over drops the taps and visible demand made meanwhile.
+                    withContext(NonCancellable) { if (created.stopReacquiring()) forgetPending(key) }
                 }
             }
         } finally {
@@ -160,6 +162,7 @@ internal class AttachmentDownloadGate(
         companion object Key : CoroutineContext.Key<DownloadSlot>
 
         private var reacquiring: Job? = null
+        private val heldPause = AtomicBoolean(false)
 
         // The request this slot's own re-acquire registered, kept after it is withdrawn so its place can be reused.
         @Volatile private var queued: Waiter? = null
@@ -173,8 +176,9 @@ internal class AttachmentDownloadGate(
          * transfer. A [block] that throws, or a result that needs no more network work, leaves the permit given back,
          * stops counting the key as admitted, and then drops any promotion or visible demand made for it meanwhile,
          * so the ending work never waits for a permit and hands no priority to a later owner. Stopping automatic
-         * downloads also withdraws a background request still queuing, and the work keeps watching its transfer,
-         * which MDK pauses again once its permission is gone. One observer calls this at a time, never concurrently.
+         * downloads also withdraws a background request still queuing, while the work keeps watching its transfer
+         * and the key stays admitted until the work ends or pauses again, so a tap meanwhile still escalates it. One
+         * observer calls this at a time, never concurrently.
          */
         suspend fun <T> releasedWhile(
             requeueAfter: (T) -> Boolean,
@@ -195,21 +199,22 @@ internal class AttachmentDownloadGate(
                 val demand = withdrawn?.demand ?: held.demand
                 val result = block()
                 if (requeueAfter(result)) {
+                    // The pause now belongs to the slot. It ends once a permit is owned again, or when the work ends
+                    // or pauses again, but not when Stop automatic downloads withdraws the request, because the
+                    // transfer it watches goes on and a tap must still escalate it.
+                    heldPause.set(true)
                     reacquiring =
                         scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                            try {
-                                waiter =
-                                    gate.acquire(
-                                        cacheKey,
-                                        accountRef,
-                                        priority,
-                                        foreground,
-                                        keptDemand = demand,
-                                        onRegistered = { queued = it },
-                                    )
-                            } finally {
-                                gate.endPause(cacheKey)
-                            }
+                            waiter =
+                                gate.acquire(
+                                    cacheKey,
+                                    accountRef,
+                                    priority,
+                                    foreground,
+                                    keptDemand = demand,
+                                    onRegistered = { queued = it },
+                                )
+                            endHeldPause()
                         }
                     handedOff = true
                 }
@@ -222,12 +227,27 @@ internal class AttachmentDownloadGate(
             }
         }
 
-        /** Cancels a re-acquire still queuing, so work that has ended never waits for a slot it no longer needs. */
-        suspend fun stopReacquiring() {
-            val job = reacquiring ?: return
+        /**
+         * Withdraws a re-acquire still queuing, so work that has ended never waits for a slot it no longer needs, and
+         * ends the pause it carried, even when the join itself is cancelled. True when that pause was still held.
+         */
+        suspend fun stopReacquiring(): Boolean {
+            val job = reacquiring
             reacquiring = null
-            job.cancelAndJoin()
+            var ended = false
+            try {
+                job?.cancelAndJoin()
+            } finally {
+                ended = endHeldPause()
+            }
+            return ended
         }
+
+        /** Ends the pause handed over to the re-acquire, at most once. True when this call ended it. */
+        private fun endHeldPause(): Boolean =
+            heldPause.compareAndSet(true, false).also { ended ->
+                if (ended) gate.endPause(cacheKey)
+            }
     }
 
     /**

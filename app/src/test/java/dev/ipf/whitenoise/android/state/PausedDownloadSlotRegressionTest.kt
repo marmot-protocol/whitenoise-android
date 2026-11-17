@@ -134,6 +134,36 @@ class PausedDownloadSlotRegressionTest {
             assertEquals(5, fixture.calls.size)
         }
 
+    /**
+     * After Stop automatic downloads withdraws a resumed download's queued slot request, the transfer goes on, so a tap
+     * on it still asks MDK for it explicitly.
+     */
+    @Test
+    fun tappingAResumedDownloadAfterAutomaticDownloadsStopStillAsksMdkForIt() =
+        runTest(dispatcher) {
+            val visible = (0 until 4).map { index -> async { download(index) } }
+            val held = List(4) { fixture.entered.receive() }
+            val waiting = async { download(4) }
+            runCurrent()
+            val paused = held.single { it.reference == reference(0) }
+            paused.pause()
+            val next = withContext(Dispatchers.Default) { withTimeout(5_000L) { fixture.entered.receive() } }
+            paused.resume()
+            val key = qualifiedRequest(0).cacheKey()
+            withContext(Dispatchers.Default) { withTimeout(5_000L) { while (!gate().isQueuedForTest(key)) delay(1) } }
+            fixture.state.stopAutomaticAttachmentDownloads()
+            withContext(Dispatchers.Default) { withTimeout(5_000L) { while (gate().isQueuedForTest(key)) delay(1) } }
+
+            val tapped = async { download(0, AttachmentDownloadPriority.Interactive) }
+            runCurrent()
+            fixture.awaitExplicitDemands(1)
+
+            (held - paused + next).forEach { it.succeed(bytes(it.reference.fileName)) }
+            paused.succeed(bytes(paused.reference.fileName))
+            assertArrayEquals(bytes(reference(0).fileName), tapped.await())
+            (visible + waiting).awaitAll()
+        }
+
     /** The app's download gate, read the way the fixture injects its other private state. */
     private fun gate(): AttachmentDownloadGate =
         WhiteNoiseAppState::class.java

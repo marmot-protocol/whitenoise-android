@@ -266,6 +266,42 @@ class AttachmentDownloadSlotReleaseTest {
             }
         }
 
+    /**
+     * Stopping automatic downloads withdraws a resumed transfer's queued slot request, but the transfer goes on, so
+     * its key stays admitted until the work ends and a tap meanwhile still escalates it.
+     */
+    @Test
+    fun stoppingAutomaticDownloadsKeepsAResumedTransferAdmitted() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val pauseEnds = CompletableDeferred<Unit>()
+                val workDone = CompletableDeferred<Unit>()
+                val holderDone = CompletableDeferred<Unit>()
+                val paused =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("paused", ACCOUNT, AUTOMATIC) {
+                            withDownloadSlotReleased { pauseEnds.await() }
+                            workDone.await()
+                        }
+                    }
+                val holder = startHolding(gate, "holder", holderDone)
+                pauseEnds.complete(Unit)
+                while (!gate.isQueuedForTest("paused")) yield()
+
+                assertEquals("only the queued slot request is withdrawn", 1, gate.cancelQueuedAutomatic(ACCOUNT))
+                yield()
+                assertFalse(gate.isQueuedForTest("paused"))
+                assertTrue("the transfer goes on, so its key stays admitted", gate.isAdmitted("paused"))
+
+                workDone.complete(Unit)
+                paused.await()
+                assertFalse("the ended work no longer counts as admitted", gate.isAdmitted("paused"))
+                holderDone.complete(Unit)
+                holder.await()
+            }
+        }
+
     /** A pause that ends with nothing left to transfer finishes at once instead of queuing behind other downloads. */
     @Test
     fun aPauseThatEndsTheWorkDoesNotQueueAgain() =
