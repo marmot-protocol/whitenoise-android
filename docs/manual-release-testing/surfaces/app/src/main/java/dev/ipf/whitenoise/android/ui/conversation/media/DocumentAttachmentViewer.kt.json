@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "fun DocumentAttachmentViewer(",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "fun DocumentViewerFrame(",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "fun DocumentSource(",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "fun DocumentLoading(",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "fun DocumentViewerError(",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "fun DocumentLinkConfirmation(",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.close",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -64,7 +64,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.document_html_omitted",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -72,7 +72,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.document_html_unavailable",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -80,7 +80,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.document_rendered",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -88,7 +88,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.document_source",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -96,7 +96,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.more_options",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -104,7 +104,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.retry",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -112,7 +112,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.save",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -120,7 +120,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.share",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       },
       {
@@ -128,7 +128,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
         "anchor": "R.string.text_attachment_open_external",
         "test_ids": [
-          "MED-052"
+          "MED-054"
         ]
       }
     ]
