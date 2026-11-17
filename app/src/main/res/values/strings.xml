@@ -83,6 +83,7 @@
     <string name="refresh">Refresh</string>
     <string name="retry">Retry</string>
     <string name="error_try_again">Something went wrong. Try again; if it keeps happening, copy the error report.</string>
+    <string name="error_linked_devices_build_required">This account uses linked devices, which this build can\'t open. Your data is kept. Install a build that supports linked devices over this one.</string>
     <string name="error_restart_app_before_retry">The conversation is still loading locally. Restart White Noise before trying again.</string>
     <string name="error_not_ready">White Noise is still finishing an update for this account. This usually takes under a minute, and it retries on its own.</string>
     <string name="chat_list_startup_slow">Still finishing your update. Your chats will appear in a moment; please keep White Noise open.</string>

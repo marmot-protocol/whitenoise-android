@@ -76,6 +76,7 @@
     <string name="white_noise_couldnt_start">White Noise n’a pas pu démarrer</string>
     <string name="startup_taking_too_long">Le démarrage prend plus de temps que prévu. Veuillez réessayer.</string>
     <string name="error_try_again">Une erreur s’est produite. Réessayez ; si le problème persiste, copiez le rapport d’erreur.</string>
+    <string name="error_linked_devices_build_required">Ce compte utilise des appareils associés, que cette version ne peut pas ouvrir. Vos données sont conservées. Installez par-dessus une version compatible avec les appareils associés.</string>
     <string name="error_restart_app_before_retry">La conversation est toujours en cours de chargement local. Redémarrez White Noise avant de réessayer.</string>
     <string name="error_not_ready">White Noise termine encore une mise à jour pour ce compte. Cela prend en général moins d’une minute et réessaie automatiquement.</string>
     <string name="chat_list_startup_slow">La mise à jour se termine. Vos discussions vont apparaître dans un instant ; laissez White Noise ouvert.</string>
