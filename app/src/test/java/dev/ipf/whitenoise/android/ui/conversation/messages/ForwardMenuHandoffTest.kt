@@ -1,8 +1,14 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isDialog
@@ -47,7 +53,8 @@ class ForwardMenuHandoffTest {
     @Test fun forwardingDoesNotDismissAndRestoreConversationSearch() = assertHandoff(MessageMenuKeyboardOwner.Search)
 
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    @Test fun mediaEligibilityLossClosesThePickerAndMenuWithoutRestoringTheKeyboard() {
+    @Test
+    fun mediaEligibilityLossClosesThePickerAndMenuWithoutRestoringTheKeyboard() {
         assertHandoff(MessageMenuKeyboardOwner.Composer, media = true)
     }
 
@@ -88,7 +95,9 @@ class ForwardMenuHandoffTest {
         var menuOpen by mutableStateOf(true)
         var handoffs = 0
         var restorations = 0
+        lateinit var sourceView: View
         composeRule.setContent {
+            sourceView = LocalView.current
             WhiteNoiseTheme {
                 TimelineRowMessageBubble(
                     messageIdHex = record.messageIdHex,
@@ -130,7 +139,23 @@ class ForwardMenuHandoffTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Forward").performClick()
+        if (media) {
+            // Media forwarding waits for the real source layer, which idle synchronization does not draw.
+            composeRule.runOnIdle {
+                val bitmap = Bitmap.createBitmap(sourceView.width, sourceView.height, Bitmap.Config.ARGB_8888)
+                try {
+                    sourceView.draw(Canvas(bitmap))
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+            composeRule.waitForIdle()
+        }
+        composeRule
+            .onNodeWithText("Forward")
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertExists()
         composeRule.runOnIdle {
