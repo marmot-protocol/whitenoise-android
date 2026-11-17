@@ -106,15 +106,12 @@ internal fun ConversationDictationController.requestNativeMicrophoneUnblock(
 }
 
 private fun ConversationDictationController.dispatchNativeMicrophoneUnblock(pending: DictationMicrophoneRecovery) {
-    if (elapsedRealtime() >= pending.expiresAtElapsedRealtime) {
-        clearMicrophoneRecovery()
-        return
-    }
-    if (pending.dispatched || !pending.resumed || !microphoneHostReady() || !microphoneRecoveryAllowed()) return
-    if (platform.microphoneAccess() == ConversationDictationMicrophoneAccess.Granted) {
-        resumeMicrophoneSettingsRecovery()
-    } else {
-        registerNativeMicrophoneUnblock(pending)
+    when {
+        elapsedRealtime() >= pending.expiresAtElapsedRealtime -> clearMicrophoneRecovery()
+        pending.dispatched || !pending.resumed -> Unit
+        !microphoneHostReady() || !microphoneRecoveryAllowed() -> Unit
+        platform.microphoneAccess() == ConversationDictationMicrophoneAccess.Granted -> resumeMicrophoneSettingsRecovery()
+        else -> registerNativeMicrophoneUnblock(pending)
     }
 }
 
