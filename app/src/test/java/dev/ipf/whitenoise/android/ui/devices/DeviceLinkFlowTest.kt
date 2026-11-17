@@ -13,6 +13,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.DeviceGroupMoveSiblingFfi
+import dev.ipf.marmotkit.DeviceGroupMoveStateFfi
+import dev.ipf.marmotkit.DeviceGroupMoveViewFfi
 import dev.ipf.marmotkit.DeviceLinkEndReasonFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.marmotkit.NewDeviceLinkStateFfi
@@ -245,13 +248,71 @@ class DeviceLinkFlowTest {
         compose.onNodeWithText(context.getString(R.string.link_device_add_steps)).assertExists()
     }
 
-    /** An account that already has a sibling gets the steps for adding a device and no Link this device. */
+    /** An account that already has a sibling is offered a move, worded as one, beside the steps for adding a device. */
     @Test
-    fun aLinkedAccountIsNotOfferedLinkThisDevice() {
+    fun aLinkedAccountIsOfferedAMove() {
         roster(fixtureRosterState())
 
-        compose.onNodeWithTag(LINKED_DEVICES_LINK_THIS_TAG).assertDoesNotExist()
+        compose.onNodeWithTag(LINKED_DEVICES_LINK_THIS_TAG).assertExists()
+        compose.onNodeWithText(context.getString(R.string.device_move_title)).assertExists()
+        compose.onNodeWithText(context.getString(R.string.link_device_this_title)).assertDoesNotExist()
         compose.onNodeWithText(context.getString(R.string.link_device_add_steps)).assertExists()
+    }
+
+    /** While a move is pending no further move is offered, because MDK accepts none. */
+    @Test
+    fun noMoveIsOfferedWhileOneIsPending() {
+        listOf(DeviceGroupMoveStateFfi.WAITING_FOR_WELCOME, DeviceGroupMoveStateFfi.JOINING).forEach { state ->
+            assertTrue(move(state).pending())
+        }
+        listOf(DeviceGroupMoveStateFfi.MADE, DeviceGroupMoveStateFfi.FAILED).forEach { state ->
+            assertFalse(move(state).pending())
+        }
+        roster(fixtureRosterState(), LinkedDevicesLinking(moves = listOf(move(DeviceGroupMoveStateFfi.JOINING))))
+
+        compose.onNodeWithTag(LINKED_DEVICES_LINK_THIS_TAG).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(R.string.device_move_joining)).assertExists()
+    }
+
+    /** Waiting and joining are never worded as moved, and a failed move says the earlier trust stands. */
+    @Test
+    fun onlyAMadeMoveSaysTheDeviceMoved() {
+        assertEquals(R.string.device_move_waiting, deviceMoveStateLabel(DeviceGroupMoveStateFfi.WAITING_FOR_WELCOME))
+        assertEquals(R.string.device_move_joining, deviceMoveStateLabel(DeviceGroupMoveStateFfi.JOINING))
+        assertEquals(R.string.device_move_made, deviceMoveStateLabel(DeviceGroupMoveStateFfi.MADE))
+        assertEquals(R.string.device_move_failed, deviceMoveStateLabel(DeviceGroupMoveStateFfi.FAILED))
+    }
+
+    /** Only a reminder MDK still suppresses is shown, and dismissing it names its move and device. */
+    @Test
+    fun dismissingAReminderNamesItsMoveAndDevice() {
+        val dismissed = mutableListOf<Pair<String, String>>()
+        val made =
+            move(
+                DeviceGroupMoveStateFfi.MADE,
+                siblings =
+                    listOf(
+                        DeviceGroupMoveSiblingFfi("left", "Laptop", questionSuppressed = true),
+                        DeviceGroupMoveSiblingFfi("gone", "Old", questionSuppressed = false),
+                    ),
+                overridden = listOf("slot"),
+            )
+        compose.setContent {
+            WhiteNoiseTheme {
+                LinkedDevicesContent(
+                    state = fixtureRosterState(),
+                    onBack = {},
+                    linking = LinkedDevicesLinking(moves = listOf(made)),
+                    actions = LinkedDevicesActions(onDismissMoveSibling = { id, slot -> dismissed += id to slot }),
+                )
+            }
+        }
+
+        compose.onNodeWithText(context.getString(R.string.device_move_old_sibling, "Laptop")).assertExists()
+        compose.onNodeWithText(context.getString(R.string.device_move_overridden)).assertExists()
+        compose.onNodeWithTag("linked_devices.move.dismiss.gone").assertDoesNotExist()
+        compose.onNodeWithTag("linked_devices.move.dismiss.left").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(listOf("move-1" to "left"), dismissed) }
     }
 
     /** Link this device is not offered before the roster is read or after a failed read. */
@@ -333,12 +394,19 @@ class DeviceLinkFlowTest {
     ) {
         compose.setContent {
             WhiteNoiseTheme {
-                LinkedDevicesContent(state, {}, {}, linking, onLinkThisDevice)
+                LinkedDevicesContent(state, {}, linking, LinkedDevicesActions(onLinkThisDevice = onLinkThisDevice))
             }
         }
     }
 
     private companion object {
         val CODE = fixtureCode()
+
+        /** A move in [state] with the given reminders and overridden rejections. */
+        fun move(
+            state: DeviceGroupMoveStateFfi,
+            siblings: List<DeviceGroupMoveSiblingFfi> = emptyList(),
+            overridden: List<String> = emptyList(),
+        ) = DeviceGroupMoveViewFfi("move-1", state, siblings, overridden)
     }
 }

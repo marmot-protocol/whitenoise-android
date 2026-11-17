@@ -24,6 +24,8 @@ import dev.ipf.whitenoise.android.state.DeviceLinkController
 import dev.ipf.whitenoise.android.state.DeviceLinkRequest
 import dev.ipf.whitenoise.android.state.DeviceLinkRequestWatcher
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.decline
+import dev.ipf.whitenoise.android.state.link
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog

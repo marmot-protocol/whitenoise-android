@@ -70,4 +70,16 @@
     <string name="link_request_linked">O novo dispositivo está vinculado.</string>
     <string name="link_request_added_elsewhere">%1$s foi adicionado por %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">O dispositivo foi adicionado por outro dos seus dispositivos.</string>
+    <string name="device_move_section">Movendo este dispositivo</string>
+    <string name="device_move_waiting">Aguardando ser adicionado pelos outros dispositivos</string>
+    <string name="device_move_joining">Entrando nos outros dispositivos</string>
+    <string name="device_move_made">Este dispositivo foi movido para os outros dispositivos</string>
+    <string name="device_move_failed">A movimentação não terminou. Este dispositivo ainda confia nos dispositivos anteriores.</string>
+    <string name="device_move_title">Mover este dispositivo</string>
+    <string name="device_move_detail">Vincule este dispositivo a outro conjunto de dispositivos desta conta. Ele sai do conjunto atual e as conversas permanecem.</string>
+    <string name="device_move_old_sibling">%1$s ainda está no seu conjunto anterior. Para trazê-lo, vincule-o a partir desse dispositivo.</string>
+    <string name="device_move_old_sibling_unnamed">Um dispositivo ainda está no seu conjunto anterior. Para trazê-lo, vincule-o a partir desse dispositivo.</string>
+    <string name="device_move_dismiss">Dispensar lembrete</string>
+    <string name="device_move_dismiss_detail">Oculta este lembrete. Não vincula nem remove o dispositivo.</string>
+    <string name="device_move_overridden">Alguns dispositivos que você tinha rejeitado já estavam vinculados lá, então continuam vinculados.</string>
 </resources>

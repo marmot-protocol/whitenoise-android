@@ -70,4 +70,16 @@
     <string name="link_request_linked">Il nuovo dispositivo è collegato.</string>
     <string name="link_request_added_elsewhere">%1$s è stato aggiunto da %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Il dispositivo è stato aggiunto da un altro dei tuoi dispositivi.</string>
+    <string name="device_move_section">Spostamento di questo dispositivo</string>
+    <string name="device_move_waiting">In attesa di essere aggiunto dagli altri dispositivi</string>
+    <string name="device_move_joining">Unione agli altri dispositivi in corso</string>
+    <string name="device_move_made">Questo dispositivo è stato spostato tra gli altri dispositivi</string>
+    <string name="device_move_failed">Lo spostamento non è terminato. Questo dispositivo si fida ancora dei dispositivi precedenti.</string>
+    <string name="device_move_title">Sposta questo dispositivo</string>
+    <string name="device_move_detail">Collega questo dispositivo a un altro insieme di dispositivi di questo account. Lascia l’insieme attuale e le sue chat restano.</string>
+    <string name="device_move_old_sibling">%1$s è ancora nel tuo insieme precedente. Per portarlo con te, collegalo da quel dispositivo.</string>
+    <string name="device_move_old_sibling_unnamed">Un dispositivo è ancora nel tuo insieme precedente. Per portarlo con te, collegalo da quel dispositivo.</string>
+    <string name="device_move_dismiss">Ignora promemoria</string>
+    <string name="device_move_dismiss_detail">Nasconde questo promemoria. Non collega né rimuove il dispositivo.</string>
+    <string name="device_move_overridden">Alcuni dispositivi che avevi rifiutato erano già collegati lì, quindi restano collegati.</string>
 </resources>

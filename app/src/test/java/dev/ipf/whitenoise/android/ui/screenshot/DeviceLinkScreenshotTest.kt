@@ -10,6 +10,9 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.DeviceGroupMoveSiblingFfi
+import dev.ipf.marmotkit.DeviceGroupMoveStateFfi
+import dev.ipf.marmotkit.DeviceGroupMoveViewFfi
 import dev.ipf.marmotkit.DeviceLinkEndReasonFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.marmotkit.NewDeviceLinkStateFfi
@@ -133,7 +136,7 @@ class DeviceLinkScreenshotTest {
     /** The roster of an account with no sibling, offering Link this device and the steps for adding one. */
     @Test
     fun rosterUnlinkedLight() {
-        show(Look()) { LinkedDevicesContent(onlyThisDevice(), {}, {}) }
+        show(Look()) { LinkedDevicesContent(onlyThisDevice(), {}) }
         compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_unlinked_light.png")
     }
 
@@ -141,8 +144,27 @@ class DeviceLinkScreenshotTest {
     @Test
     fun rosterExternalSignerDark() {
         val linking = LinkedDevicesLinking(availability = DeviceLinkAvailability.ExternalSigner)
-        show(Look(dark = true)) { LinkedDevicesContent(onlyThisDevice(), {}, {}, linking) }
+        show(Look(dark = true)) { LinkedDevicesContent(onlyThisDevice(), {}, linking) }
         compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_external_signer_dark.png")
+    }
+
+    /** A finished move with a reminder about a device left behind and a note about rejections it overrode. */
+    @Test
+    fun rosterMoveMadeLight() {
+        val sibling = DeviceGroupMoveSiblingFfi("left", "Laptop", questionSuppressed = true)
+        val made = DeviceGroupMoveViewFfi("move", DeviceGroupMoveStateFfi.MADE, listOf(sibling), listOf("slot"))
+        show(Look()) { LinkedDevicesContent(onlyThisDevice(), {}, LinkedDevicesLinking(moves = listOf(made))) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_move_made_light.png")
+    }
+
+    /** A failed move in dark theme, RTL and large text. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1600dp-mdpi")
+    fun rosterMoveFailedDarkRtlLargeFont() {
+        val failed = DeviceGroupMoveViewFfi("move", DeviceGroupMoveStateFfi.FAILED, emptyList(), emptyList())
+        val linking = LinkedDevicesLinking(moves = listOf(failed))
+        show(Look(dark = true, rtl = true)) { LinkedDevicesContent(onlyThisDevice(), {}, linking) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_move_failed_dark_rtl_large_font.png")
     }
 
     /** A roster listing this device alone. */

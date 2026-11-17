@@ -70,4 +70,16 @@
     <string name="link_request_linked">新设备已关联。</string>
     <string name="link_request_added_elsewhere">%1$s 已由 %2$s 添加。</string>
     <string name="link_request_added_elsewhere_unnamed">该设备已由你的另一台设备添加。</string>
+    <string name="device_move_section">正在移动此设备</string>
+    <string name="device_move_waiting">正在等待其他设备添加</string>
+    <string name="device_move_joining">正在加入其他设备</string>
+    <string name="device_move_made">此设备已移至其他设备</string>
+    <string name="device_move_failed">移动未完成。此设备仍信任之前的设备。</string>
+    <string name="device_move_title">移动此设备</string>
+    <string name="device_move_detail">将此设备关联到此账户的另一组设备。它会离开当前这一组，聊天会保留。</string>
+    <string name="device_move_old_sibling">%1$s 仍在你之前的那组设备中。要把它带过来，请从那台设备发起关联。</string>
+    <string name="device_move_old_sibling_unnamed">有一台设备仍在你之前的那组设备中。要把它带过来，请从那台设备发起关联。</string>
+    <string name="device_move_dismiss">关闭提醒</string>
+    <string name="device_move_dismiss_detail">隐藏此提醒，不会关联或移除该设备。</string>
+    <string name="device_move_overridden">你曾拒绝的部分设备在那里已经关联，因此仍保持关联。</string>
 </resources>

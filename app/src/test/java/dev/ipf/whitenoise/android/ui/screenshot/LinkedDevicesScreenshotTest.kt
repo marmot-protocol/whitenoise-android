@@ -96,7 +96,7 @@ class LinkedDevicesScreenshotTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
-                    LinkedDevicesContent(state, onBack = {}, onRetry = {})
+                    LinkedDevicesContent(state, onBack = {})
                 }
             }
         }

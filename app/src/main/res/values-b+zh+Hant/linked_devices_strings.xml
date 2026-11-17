@@ -70,4 +70,16 @@
     <string name="link_request_linked">新裝置已連結。</string>
     <string name="link_request_added_elsewhere">%1$s 已由 %2$s 新增。</string>
     <string name="link_request_added_elsewhere_unnamed">該裝置已由你的另一部裝置新增。</string>
+    <string name="device_move_section">正在移動此裝置</string>
+    <string name="device_move_waiting">正在等待其他裝置新增</string>
+    <string name="device_move_joining">正在加入其他裝置</string>
+    <string name="device_move_made">此裝置已移至其他裝置</string>
+    <string name="device_move_failed">移動未完成。此裝置仍信任先前的裝置。</string>
+    <string name="device_move_title">移動此裝置</string>
+    <string name="device_move_detail">將此裝置連結到此帳號的另一組裝置。它會離開目前這一組，聊天會保留。</string>
+    <string name="device_move_old_sibling">%1$s 仍在你先前的那組裝置中。要把它帶過來，請從那部裝置發起連結。</string>
+    <string name="device_move_old_sibling_unnamed">有一部裝置仍在你先前的那組裝置中。要把它帶過來，請從那部裝置發起連結。</string>
+    <string name="device_move_dismiss">關閉提醒</string>
+    <string name="device_move_dismiss_detail">隱藏此提醒，不會連結或移除該裝置。</string>
+    <string name="device_move_overridden">你曾拒絕的部分裝置在那裡已經連結，因此仍保持連結。</string>
 </resources>

@@ -185,6 +185,7 @@ class LinkedDevicesContentTest {
         state: LinkedDeviceRosterState,
         onRetry: () -> Unit = {},
     ) {
-        compose.setContent { WhiteNoiseTheme { LinkedDevicesContent(state, onBack = {}, onRetry = onRetry) } }
+        val actions = LinkedDevicesActions(onRetry = onRetry)
+        compose.setContent { WhiteNoiseTheme { LinkedDevicesContent(state, onBack = {}, actions = actions) } }
     }
 }

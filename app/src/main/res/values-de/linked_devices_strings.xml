@@ -70,4 +70,16 @@
     <string name="link_request_linked">Das neue Gerät ist verknüpft.</string>
     <string name="link_request_added_elsewhere">%1$s wurde von %2$s hinzugefügt.</string>
     <string name="link_request_added_elsewhere_unnamed">Das Gerät wurde von einem anderen deiner Geräte hinzugefügt.</string>
+    <string name="device_move_section">Dieses Gerät wird verschoben</string>
+    <string name="device_move_waiting">Warten, bis die anderen Geräte es hinzufügen</string>
+    <string name="device_move_joining">Tritt den anderen Geräten bei</string>
+    <string name="device_move_made">Dieses Gerät wurde zu den anderen Geräten verschoben</string>
+    <string name="device_move_failed">Das Verschieben wurde nicht abgeschlossen. Dieses Gerät vertraut weiterhin seinen bisherigen Geräten.</string>
+    <string name="device_move_title">Dieses Gerät verschieben</string>
+    <string name="device_move_detail">Verknüpfe dieses Gerät mit einer anderen Gerätegruppe dieses Kontos. Es verlässt die aktuelle Gruppe, und seine Chats bleiben erhalten.</string>
+    <string name="device_move_old_sibling">%1$s ist noch in deiner bisherigen Gruppe. Um es mitzunehmen, verknüpfe es von diesem Gerät aus.</string>
+    <string name="device_move_old_sibling_unnamed">Ein Gerät ist noch in deiner bisherigen Gruppe. Um es mitzunehmen, verknüpfe es von diesem Gerät aus.</string>
+    <string name="device_move_dismiss">Erinnerung ausblenden</string>
+    <string name="device_move_dismiss_detail">Blendet diese Erinnerung aus. Das Gerät wird dadurch weder verknüpft noch entfernt.</string>
+    <string name="device_move_overridden">Einige Geräte, die du abgelehnt hattest, waren dort bereits verknüpft und bleiben es.</string>
 </resources>

@@ -70,4 +70,16 @@
     <string name="link_request_linked">Yeni cihaz bağlandı.</string>
     <string name="link_request_added_elsewhere">%1$s, %2$s tarafından eklendi.</string>
     <string name="link_request_added_elsewhere_unnamed">Cihaz, başka bir cihazınız tarafından eklendi.</string>
+    <string name="device_move_section">Bu cihaz taşınıyor</string>
+    <string name="device_move_waiting">Diğer cihazların eklemesi bekleniyor</string>
+    <string name="device_move_joining">Diğer cihazlara katılıyor</string>
+    <string name="device_move_made">Bu cihaz diğer cihazlara taşındı</string>
+    <string name="device_move_failed">Taşıma tamamlanmadı. Bu cihaz hâlâ önceki cihazlarına güveniyor.</string>
+    <string name="device_move_title">Bu cihazı taşı</string>
+    <string name="device_move_detail">Bu cihazı bu hesabın başka bir cihaz kümesine bağlayın. Şu anki kümeden ayrılır ve sohbetleri kalır.</string>
+    <string name="device_move_old_sibling">%1$s hâlâ önceki kümenizde. Onu da getirmek için o cihazdan bağlayın.</string>
+    <string name="device_move_old_sibling_unnamed">Bir cihaz hâlâ önceki kümenizde. Onu da getirmek için o cihazdan bağlayın.</string>
+    <string name="device_move_dismiss">Hatırlatıcıyı kapat</string>
+    <string name="device_move_dismiss_detail">Bu hatırlatıcıyı gizler. Cihazı bağlamaz veya kaldırmaz.</string>
+    <string name="device_move_overridden">Reddettiğiniz bazı cihazlar orada zaten bağlıydı, bu yüzden bağlı kalıyor.</string>
 </resources>

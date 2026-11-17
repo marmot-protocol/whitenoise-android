@@ -44,6 +44,13 @@ internal interface DeviceLinkNative {
         accountRef: String,
         promptId: String,
     ): DeviceLinkSnapshotFfi
+
+    /** Ends one old-sibling recognition hint of a move. Presentation only: it never links or rejects that slot. */
+    suspend fun dismissDeviceGroupMoveSibling(
+        accountRef: String,
+        moveId: String,
+        slotIdHex: String,
+    ): DeviceLinkSnapshotFfi
 }
 
 /**
@@ -69,6 +76,7 @@ internal enum class DeviceLinkCommand {
     Cancel,
     Link,
     Decline,
+    DismissMoveSibling,
 }
 
 /** A command that failed, kept until the screen has shown it once. */
@@ -180,34 +188,6 @@ internal class DeviceLinkController(
         }
     }
 
-    /** Asks a device already signed in to link this one. */
-    suspend fun start() {
-        command(DeviceLinkCommand.Start) { native.startDeviceLink(accountRef) }
-    }
-
-    /** Tells MDK the user sees the same emoji on both screens. */
-    suspend fun confirmMatch() {
-        command(DeviceLinkCommand.ConfirmMatch) { native.confirmDeviceLinkMatch(accountRef) }
-    }
-
-    /** Cancels this device's own link. */
-    suspend fun cancel() {
-        command(DeviceLinkCommand.Cancel) { native.cancelDeviceLink(accountRef) }
-    }
-
-    /** Links the device behind [promptId] with the user's [choices]. */
-    suspend fun link(
-        promptId: String,
-        choices: DeviceLinkChoices,
-    ) {
-        command(DeviceLinkCommand.Link) { native.linkDevice(accountRef, promptId, choices) }
-    }
-
-    /** Answers [promptId] Not now. Closing a prompt without calling this answers nothing. */
-    suspend fun decline(promptId: String) {
-        command(DeviceLinkCommand.Decline) { native.declineDeviceLink(accountRef, promptId) }
-    }
-
     /** Forgets the failure once the screen has shown it, so it is announced once. */
     fun failureShown() {
         failure = null
@@ -219,14 +199,14 @@ internal class DeviceLinkController(
      * dropped too.
      */
     @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure is shown to the user once.
-    private suspend fun command(
+    suspend fun command(
         kind: DeviceLinkCommand,
-        run: suspend () -> DeviceLinkSnapshotFfi,
+        run: suspend DeviceLinkNative.(accountRef: String) -> DeviceLinkSnapshotFfi,
     ) {
         if (!current || !commands.tryLock()) return
         try {
             running = kind
-            val snapshot = run()
+            val snapshot = native.run(accountRef)
             if (current) {
                 linkReads.withLock {
                     link = snapshot
@@ -295,3 +275,34 @@ internal fun deviceLinkInvalidation(
             DeviceLinkInvalidation.Link.takeIf { event.accountLabel == accountRef }
         else -> null
     }
+
+/** Asks a device already signed in to link this one. */
+internal suspend fun DeviceLinkController.start() = command(DeviceLinkCommand.Start) { startDeviceLink(it) }
+
+/** Tells MDK the user sees the same emoji on both screens. */
+internal suspend fun DeviceLinkController.confirmMatch() {
+    command(DeviceLinkCommand.ConfirmMatch) { confirmDeviceLinkMatch(it) }
+}
+
+/** Cancels this device's own link. */
+internal suspend fun DeviceLinkController.cancel() = command(DeviceLinkCommand.Cancel) { cancelDeviceLink(it) }
+
+/** Links the device behind [promptId] with the user's [choices]. */
+internal suspend fun DeviceLinkController.link(
+    promptId: String,
+    choices: DeviceLinkChoices,
+) = command(DeviceLinkCommand.Link) { linkDevice(it, promptId, choices) }
+
+/** Answers [promptId] Not now. Closing a prompt without calling this answers nothing. */
+internal suspend fun DeviceLinkController.decline(promptId: String) {
+    command(DeviceLinkCommand.Decline) { declineDeviceLink(it, promptId) }
+}
+
+/**
+ * Hides the reminder that [slotIdHex] stayed behind when this device moved. This changes what is shown only: the
+ * device is neither linked nor removed, and no trust changes.
+ */
+internal suspend fun DeviceLinkController.dismissMoveSibling(
+    moveId: String,
+    slotIdHex: String,
+) = command(DeviceLinkCommand.DismissMoveSibling) { dismissDeviceGroupMoveSibling(it, moveId, slotIdHex) }

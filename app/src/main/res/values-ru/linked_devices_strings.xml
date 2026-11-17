@@ -70,4 +70,16 @@
     <string name="link_request_linked">Новое устройство связано.</string>
     <string name="link_request_added_elsewhere">%1$s добавлено устройством %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Устройство добавлено другим вашим устройством.</string>
+    <string name="device_move_section">Перемещение этого устройства</string>
+    <string name="device_move_waiting">Ожидание добавления другими устройствами</string>
+    <string name="device_move_joining">Присоединение к другим устройствам</string>
+    <string name="device_move_made">Это устройство перемещено к другим устройствам</string>
+    <string name="device_move_failed">Перемещение не завершилось. Это устройство по-прежнему доверяет прежним устройствам.</string>
+    <string name="device_move_title">Переместить это устройство</string>
+    <string name="device_move_detail">Свяжите это устройство с другим набором устройств этой учётной записи. Оно покинет текущий набор, а его чаты останутся.</string>
+    <string name="device_move_old_sibling">%1$s всё ещё в прежнем наборе. Чтобы перенести его, свяжите его с того устройства.</string>
+    <string name="device_move_old_sibling_unnamed">Одно устройство всё ещё в прежнем наборе. Чтобы перенести его, свяжите его с того устройства.</string>
+    <string name="device_move_dismiss">Скрыть напоминание</string>
+    <string name="device_move_dismiss_detail">Скрывает это напоминание. Устройство при этом не связывается и не удаляется.</string>
+    <string name="device_move_overridden">Некоторые отклонённые вами устройства уже были связаны там, поэтому остаются связанными.</string>
 </resources>

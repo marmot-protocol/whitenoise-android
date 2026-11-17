@@ -70,4 +70,16 @@
     <string name="link_request_linked">The new device is linked.</string>
     <string name="link_request_added_elsewhere">%1$s was added by %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">The device was added by another of your devices.</string>
+    <string name="device_move_section">Moving this device</string>
+    <string name="device_move_waiting">Waiting to be added by the other devices</string>
+    <string name="device_move_joining">Joining the other devices</string>
+    <string name="device_move_made">This device moved to the other devices</string>
+    <string name="device_move_failed">The move didn\'t finish. This device still trusts its earlier devices.</string>
+    <string name="device_move_title">Move this device</string>
+    <string name="device_move_detail">Link this device to a different set of this account\'s devices. It leaves the set it is in now, and its chats stay.</string>
+    <string name="device_move_old_sibling">%1$s is still in your earlier set. To bring it along, link it from that device.</string>
+    <string name="device_move_old_sibling_unnamed">A device is still in your earlier set. To bring it along, link it from that device.</string>
+    <string name="device_move_dismiss">Dismiss reminder</string>
+    <string name="device_move_dismiss_detail">Hides this reminder. It doesn\'t link or remove the device.</string>
+    <string name="device_move_overridden">Some devices you had rejected were already linked there, so they stay linked.</string>
 </resources>

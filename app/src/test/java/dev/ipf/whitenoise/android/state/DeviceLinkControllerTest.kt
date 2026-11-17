@@ -70,6 +70,16 @@ class DeviceLinkControllerTest {
             return commandResult()
         }
 
+        /** Records the dismissal with its move and device and answers with the scripted result. */
+        override suspend fun dismissDeviceGroupMoveSibling(
+            accountRef: String,
+            moveId: String,
+            slotIdHex: String,
+        ): DeviceLinkSnapshotFfi {
+            commands += "dismiss:$accountRef:$moveId:$slotIdHex"
+            return commandResult()
+        }
+
         /** Counts the read and answers with the scripted snapshot. */
         override suspend fun deviceLinkSnapshot(accountRef: String): DeviceLinkSnapshotFfi {
             linkReads++
@@ -399,6 +409,7 @@ class DeviceLinkControllerTest {
             controller.cancel()
             controller.link("p1", choices)
             controller.decline("p2")
+            controller.dismissMoveSibling("m1", "slot")
 
             assertEquals(
                 listOf(
@@ -407,6 +418,7 @@ class DeviceLinkControllerTest {
                     "cancel:$ACCOUNT",
                     "link:$ACCOUNT:p1:$choices",
                     "decline:$ACCOUNT:p2",
+                    "dismiss:$ACCOUNT:m1:slot",
                 ),
                 native.commands,
             )

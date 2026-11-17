@@ -70,4 +70,16 @@
     <string name="link_request_linked">El dispositivo nuevo está vinculado.</string>
     <string name="link_request_added_elsewhere">%2$s añadió %1$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Otro de tus dispositivos añadió el dispositivo.</string>
+    <string name="device_move_section">Traslado de este dispositivo</string>
+    <string name="device_move_waiting">Esperando a que los otros dispositivos lo añadan</string>
+    <string name="device_move_joining">Uniéndose a los otros dispositivos</string>
+    <string name="device_move_made">Este dispositivo se movió a los otros dispositivos</string>
+    <string name="device_move_failed">El traslado no terminó. Este dispositivo sigue confiando en sus dispositivos anteriores.</string>
+    <string name="device_move_title">Mover este dispositivo</string>
+    <string name="device_move_detail">Vincula este dispositivo a otro conjunto de dispositivos de esta cuenta. Deja el conjunto en el que está ahora y sus chats se conservan.</string>
+    <string name="device_move_old_sibling">%1$s sigue en tu conjunto anterior. Para traerlo, vincúlalo desde ese dispositivo.</string>
+    <string name="device_move_old_sibling_unnamed">Un dispositivo sigue en tu conjunto anterior. Para traerlo, vincúlalo desde ese dispositivo.</string>
+    <string name="device_move_dismiss">Descartar recordatorio</string>
+    <string name="device_move_dismiss_detail">Oculta este recordatorio. No vincula ni elimina el dispositivo.</string>
+    <string name="device_move_overridden">Algunos dispositivos que habías rechazado ya estaban vinculados allí, así que siguen vinculados.</string>
 </resources>
