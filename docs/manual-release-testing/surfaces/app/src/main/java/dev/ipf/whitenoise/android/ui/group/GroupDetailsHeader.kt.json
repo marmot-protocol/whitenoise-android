@@ -1,0 +1,128 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji prompt: GroupDetailsHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: GroupDetailsHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "GroupDetailsHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "fun GroupDetailsHeader(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:add_group_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.add_group_description",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:archive_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.archive_chat",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:copy_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.copy_public_key",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:edit_group_name_and_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.edit_group_name_and_description",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:not_copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.not_copied",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:profile_view_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.profile_view_picture",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "GRP-001",
+          "SYS-007"
+        ]
+      },
+      {
+        "surface": "R.string.copy_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.copy_public_key",
+        "test_ids": [
+          "GRP-001",
+          "SYS-007"
+        ]
+      },
+      {
+        "surface": "R.string.not_copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.not_copied",
+        "test_ids": [
+          "GRP-001",
+          "SYS-007"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_copy_peer_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsHeader.kt",
+        "anchor": "R.string.explanation_chat_info_copy_peer_public_key",
+        "test_ids": [
+          "GRP-042"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
