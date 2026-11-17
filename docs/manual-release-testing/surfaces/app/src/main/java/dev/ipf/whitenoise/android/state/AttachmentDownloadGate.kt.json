@@ -10,6 +10,14 @@
         "test_ids": [
           "MED-024"
         ]
+      },
+      {
+        "surface": "Download gate: a paused transfer gives back its slot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadGate.kt",
+        "anchor": "internal suspend fun <T> withDownloadSlotReleased(",
+        "test_ids": [
+          "MED-024"
+        ]
       }
     ]
   },

@@ -5,12 +5,15 @@ import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.functionBody
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -145,6 +148,67 @@ class NativeAttachmentFeedTest {
             assertTrue(feed.closed.get())
         }
 
+    /**
+     * A transfer that resumes after its pause queues for a download slot in the background and keeps being watched,
+     * so READY arriving while every slot is taken ends observation at once and withdraws the queued request (#3819).
+     */
+    @Test
+    fun `a resumed transfer reaching ready while its slot request queues finishes at once`() =
+        runBlocking {
+            val gate = AttachmentDownloadGate(parallelism = 1)
+            val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
+            val otherDone = CompletableDeferred<Unit>()
+            val observer = async { observeWithSlot(gate, feed) }
+            // The observer must own the only slot first, so "other" can only get it through the pause.
+            withTimeout(WAIT_MILLIS) { while (!gate.isAdmitted("paused")) delay(1) }
+            val other = async { holdSlot(gate, otherDone) }
+
+            withTimeout(WAIT_MILLIS) { while (!gate.isAdmitted("other")) delay(1) }
+            feed.deliver(AttachmentTransferStateFfi.DOWNLOADING)
+            withTimeout(WAIT_MILLIS) { while (!gate.isQueuedForTest("paused")) delay(1) }
+            feed.deliver(AttachmentTransferStateFfi.READY)
+            withTimeout(WAIT_MILLIS) { observer.await() }
+
+            assertFalse("the queued slot request was withdrawn", gate.isQueuedForTest("paused"))
+            assertTrue("the other download still holds the only slot", other.isActive)
+            assertTrue(feed.closed.get())
+            otherDone.complete(Unit)
+            other.await()
+        }
+
+    /** A pause that ends with the transfer READY finishes at once instead of queuing behind other downloads. */
+    @Test
+    fun `a pause that ends ready finishes without waiting for a slot`() =
+        runBlocking {
+            val gate = AttachmentDownloadGate(parallelism = 1)
+            val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
+            val otherDone = CompletableDeferred<Unit>()
+            val observer = async { observeWithSlot(gate, feed) }
+            val other = async { holdSlot(gate, otherDone) }
+
+            withTimeout(WAIT_MILLIS) { while (!gate.isAdmitted("other")) delay(1) }
+            feed.deliver(AttachmentTransferStateFfi.READY)
+            withTimeout(WAIT_MILLIS) { observer.await() }
+
+            assertTrue("the other download still holds the only slot", other.isActive)
+            otherDone.complete(Unit)
+            other.await()
+        }
+
+    /** Holds a slot as another download would, until [done] completes. */
+    private suspend fun holdSlot(
+        gate: AttachmentDownloadGate,
+        done: CompletableDeferred<Unit>,
+    ) = gate.withPermit("other", ACCOUNT, AttachmentDownloadPriority.Automatic) { done.await() }
+
+    /** Observes [feed] inside a held gate slot, as a bubble's acquisition does, starting from a paused transfer. */
+    private suspend fun observeWithSlot(
+        gate: AttachmentDownloadGate,
+        feed: ScriptedFeed,
+    ) = gate.withPermit("paused", ACCOUNT, AttachmentDownloadPriority.Automatic) {
+        awaitNativeAttachment(open = { feed }) { AttachmentTransferStateFfi.PAUSED }
+    }
+
     /** A pause that outlasts the grace ends observation with the paused exception and releases the feed. */
     @Test
     fun `a pause that outlasts the grace ends observation`() =
@@ -194,5 +258,6 @@ class NativeAttachmentFeedTest {
 
         const val WAIT_MILLIS = 5_000L
         const val PAUSE_GRACE_MILLIS = 200L
+        const val ACCOUNT = "account-a"
     }
 }
