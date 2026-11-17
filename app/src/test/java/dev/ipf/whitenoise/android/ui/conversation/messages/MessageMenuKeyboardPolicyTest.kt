@@ -7,12 +7,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessageMenuKeyboardPolicyTest {
+    /** Checks that a closed keyboard creates no hide or restore intent. */
     @Test fun closedKeyboardNeverHidesOrRestores() {
         val policy = MessageMenuKeyboardPolicy()
         assertFalse(policy.open(false, null, null))
         assertNull(policy.close(null, null))
     }
 
+    /** Checks that dismissal restores the composer once when its reply target is unchanged. */
     @Test fun dismissalRestoresOnceAndKeepsAnExistingReply() {
         val policy = MessageMenuKeyboardPolicy()
         assertTrue(policy.open(true, "existing-reply", null))
@@ -20,6 +22,7 @@ class MessageMenuKeyboardPolicyTest {
         assertNull(policy.close("existing-reply", null))
     }
 
+    /** Checks that reopening captures an in-flight search restore before its inset becomes visible. */
     @Test fun reopeningBeforeKeyboardReturnTakesBackThePendingShow() {
         val policy = MessageMenuKeyboardPolicy()
         policy.open(true, null, null, MessageMenuKeyboardOwner.Search)
@@ -39,6 +42,7 @@ class MessageMenuKeyboardPolicyTest {
         assertNull(policy.close(null, null))
     }
 
+    /** Checks that entering selection consumes an in-flight keyboard restore. */
     @Test fun selectingDuringKeyboardReturnDiscardsThePendingShow() {
         val policy = MessageMenuKeyboardPolicy()
         assertTrue(policy.open(false, null, null, restoreInFlight = true))
@@ -46,6 +50,7 @@ class MessageMenuKeyboardPolicyTest {
         assertFalse(policy.open(false, null, null))
     }
 
+    /** Checks that new reply or edit targets take over keyboard restoration from the menu. */
     @Test fun replyAndEditOwnTheirSingleKeyboardRaise() {
         val policy = MessageMenuKeyboardPolicy()
         policy.open(true, null, null)
@@ -55,6 +60,7 @@ class MessageMenuKeyboardPolicyTest {
         assertFalse(policy.pendingRestore)
     }
 
+    /** Checks explicit cancellation and a fresh controller policy leave no restore intent. */
     @Test fun leavingBackgroundingAndChangingControllerDiscardTheIntent() {
         val policy = MessageMenuKeyboardPolicy()
         repeat(3) {
@@ -66,6 +72,7 @@ class MessageMenuKeyboardPolicyTest {
         assertNull(MessageMenuKeyboardPolicy().close(null, null))
     }
 
+    /** Checks search ownership and restoration when existing reply or edit targets are cleared. */
     @Test fun searchRestoresItsOwnEditorAndClearedTargetsAreDismissals() {
         val policy = MessageMenuKeyboardPolicy()
         policy.open(true, "reply", null, MessageMenuKeyboardOwner.Search)
@@ -75,6 +82,7 @@ class MessageMenuKeyboardPolicyTest {
         assertNull(policy.close(null, null))
     }
 
+    /** Checks that selection discards restoration and cannot restore on a later close. */
     @Test fun selectConsumesRestoreWithoutReopeningTheKeyboard() {
         val policy = MessageMenuKeyboardPolicy()
         policy.open(true, null, null)
@@ -83,6 +91,7 @@ class MessageMenuKeyboardPolicyTest {
         assertNull(policy.close(null, null))
     }
 
+    /** Checks synchronous pause cancellation and consumption of its resume marker. */
     @Test fun pauseCancellationCanBeReadWithoutACompositionFrame() {
         val policy = MessageMenuKeyboardPolicy()
         policy.open(true, null, null)

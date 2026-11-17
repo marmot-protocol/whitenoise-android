@@ -48,14 +48,17 @@ import org.robolectric.annotation.Config
 class FocusedMessageImeOverlayTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Checks action scrolling keeps a standard-size left-to-right preview fixed and the final action reachable. */
     @Test
     fun scrollingActionsKeepsTheLiftedMessageVisibleAndLastActionReachable() =
         assertActionsScrollWithoutMovingPreview(fontScale = 1f, layoutDirection = LayoutDirection.Ltr)
 
+    /** Checks action scrolling preserves the preview and final action with doubled text size and RTL layout. */
     @Test
     fun largeTextAndRtlStillKeepTheMessageVisibleAndLastActionReachable() =
         assertActionsScrollWithoutMovingPreview(fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
 
+    /** Checks a tall preview leaves room to scroll to and invoke the final action. */
     @Test
     fun tallMediaPreviewLeavesAnActionViewportAndLastActionReachable() =
         assertActionsScrollWithoutMovingPreview(
@@ -100,6 +103,7 @@ class FocusedMessageImeOverlayTest {
         composeRule.runOnIdle { assertEquals(1, deletes) }
     }
 
+    /** Checks doubled text size leaves media artwork and its footer visible inside the preview frame. */
     @Test
     fun tallMediaPreviewAtLargeFontKeepsArtworkAndFooterInsideFullHeightFrame() {
         showLongTextMenu(onDelete = {}, preview = { tallMediaPreview() })
@@ -120,6 +124,7 @@ class FocusedMessageImeOverlayTest {
         }
     }
 
+    /** Checks keyboard animation hides destructive targets and preserves the stack position when revealed. */
     @Test
     fun steppedImeInsetsDoNotMoveTheLiftedStackInTheFullHeightFrame() {
         lateinit var popupView: View
@@ -162,6 +167,7 @@ class FocusedMessageImeOverlayTest {
         }
     }
 
+    /** Checks the overlay frame respects both side and tall top display cutouts. */
     @Test
     fun menuAvoidsASideCutoutAndACutoutTallerThanTheStatusBar() {
         lateinit var popupView: View
@@ -186,6 +192,7 @@ class FocusedMessageImeOverlayTest {
         assertTrue("tall cutout stays outside the frame", frame.top >= 80f)
     }
 
+    /** Checks a persistently visible keyboard dismisses the hidden menu exactly once after the deadline. */
     @Test
     fun refusedKeyboardHideDismissesTheHiddenMenuWithinABoundedTime() {
         lateinit var popupView: View
@@ -216,6 +223,7 @@ class FocusedMessageImeOverlayTest {
         composeRule.runOnIdle { assertEquals(1, dismissals) }
     }
 
+    /** Checks closing the keyboard cancels pending timeout dismissal and reveals actions. */
     @Test
     fun closingTheImeCancelsTheRefusedHideTimeout() {
         lateinit var popupView: View
@@ -237,6 +245,7 @@ class FocusedMessageImeOverlayTest {
         composeRule.onNodeWithText("Delete").assertExists()
     }
 
+    /** Applies keyboard visibility and bottom inset values to the supplied root view. */
     private fun dispatchImeInsets(
         view: View,
         bottom: Int,
@@ -252,6 +261,7 @@ class FocusedMessageImeOverlayTest {
         }
     }
 
+    /** Mounts a full action menu at doubled text size with configurable preview and callbacks. */
     private fun showLongTextMenu(
         onDelete: () -> Unit,
         onDismiss: () -> Unit = {},
@@ -294,6 +304,7 @@ class FocusedMessageImeOverlayTest {
         }
     }
 
+    /** Renders the production text preview with a long excerpt, reply, and timestamp. */
     @Composable
     private fun longTextPreview() {
         FocusedTextMessagePreview(
@@ -308,6 +319,7 @@ class FocusedMessageImeOverlayTest {
         )
     }
 
+    /** Renders a captioned tall media fixture with a reply and timestamp. */
     @Composable
     private fun tallMediaPreview() {
         FocusedTextMessagePreview(
@@ -330,6 +342,7 @@ class FocusedMessageImeOverlayTest {
         )
     }
 
+    /** Checks preview bounds stay fixed while scrolling to and invoking the final action. */
     private fun assertActionsScrollWithoutMovingPreview(
         fontScale: Float,
         layoutDirection: LayoutDirection,
@@ -395,6 +408,7 @@ class FocusedMessageImeOverlayTest {
         assertEquals("the final action must remain reachable", 1, lastActionClicks)
     }
 
+    /** Checks all preview edges remain inside the overlay frame within rounding tolerance. */
     private fun assertPreviewWithinFrame(
         bounds: Rect,
         message: String,

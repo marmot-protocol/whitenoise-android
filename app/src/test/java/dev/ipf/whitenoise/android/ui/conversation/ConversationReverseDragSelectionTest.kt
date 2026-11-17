@@ -72,14 +72,18 @@ internal class ConversationReverseDragSelectionTest {
     private lateinit var edgeController: ConversationController
     private lateinit var edgeSubscription: ScriptedConversationTimelineSubscription
 
+    /** Checks an anchor-only composer drag consumes restoration even when released without selection. */
     @Test fun composerImeStaysClosedDuringAnchorOnlyDragAndEmptyRelease() = assertDragDoesNotRestoreIme()
 
+    /** Checks cancelling an anchor-only search drag cannot replay keyboard restoration. */
     @Test fun searchImeStaysClosedDuringAnchorOnlyDragAndCancellation() {
         assertDragDoesNotRestoreIme(search = true, cancelGesture = true)
     }
 
+    /** Checks crossing into selection keeps the composer keyboard closed through release. */
     @Test fun composerImeStaysClosedWhenHeldDragCrossesIntoSelection() = assertDragDoesNotRestoreIme(crossRow = true)
 
+    /** Checks crossing into selection keeps the search keyboard closed through release. */
     @Test fun searchImeStaysClosedWhenHeldDragCrossesIntoSelection() {
         assertDragDoesNotRestoreIme(search = true, crossRow = true)
     }
@@ -161,13 +165,16 @@ internal class ConversationReverseDragSelectionTest {
     private class DragKeyboard : SoftwareKeyboardController {
         var showRequests = 0
 
+        /** Records keyboard show requests so gesture tests can detect unintended restoration. */
         override fun show() {
             showRequests += 1
         }
 
+        /** Leaves inset changes under explicit test control when production requests a keyboard hide. */
         override fun hide() = Unit
     }
 
+    /** Applies a synthetic keyboard inset to the real conversation root view. */
     private fun dispatchDragImeBottom(bottom: Int) {
         composeRule.runOnUiThread {
             ViewCompat.dispatchApplyWindowInsets(

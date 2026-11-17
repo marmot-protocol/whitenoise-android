@@ -40,6 +40,7 @@ class MenuImeBackdropTest {
     private var live by mutableIntStateOf(0)
     private var displayed = 0
 
+    /** Mounts a measured backdrop fixture with a frozen inset and a manually advanced clock. */
     private fun content(initial: Int?) {
         frozen = initial
         composeRule.mainClock.autoAdvance = false
@@ -58,12 +59,14 @@ class MenuImeBackdropTest {
         composeRule.waitForIdle()
     }
 
+    /** Advances one Compose frame and returns the measured backdrop height. */
     private fun frame(): Int {
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.waitForIdle()
         return displayed
     }
 
+    /** Checks a continuous handoff to the live inset and release without a final geometry jump. */
     private fun finishAt(target: Int) {
         val samples = mutableListOf(displayed)
         repeat(20) { samples += frame() }
@@ -77,6 +80,7 @@ class MenuImeBackdropTest {
         assertEquals("Dropping the override adds no final jump", target, frame())
     }
 
+    /** Checks that live inset changes do not recompose the caller outside a restore handoff. */
     @Test
     fun insetFramesDoNotRecomposeTheCallerWithoutAnActiveReturn() {
         var compositions = 0
@@ -97,6 +101,7 @@ class MenuImeBackdropTest {
         }
     }
 
+    /** Checks that opening with no keyboard leaves geometry tracking live insets. */
     @Test
     fun closedKeyboardCreatesNoHoldAndItsNextRiseTracksLiveGeometry() {
         content(captureMenuImeBackdrop(displayedBottom = null, liveBottom = 0))
@@ -110,6 +115,7 @@ class MenuImeBackdropTest {
         assertEquals(0, captureMenuImeBackdrop(displayedBottom = 0, liveBottom = 300))
     }
 
+    /** Checks that a partial inset stays frozen until a continuous restore handoff begins. */
     @Test
     fun partialSnapshotStaysFrozenThenMovesContinuouslyToFullKeyboard() {
         content(120)
@@ -120,6 +126,7 @@ class MenuImeBackdropTest {
         finishAt(300)
     }
 
+    /** Checks a continuous handoff when the restored keyboard is shorter than the snapshot. */
     @Test
     fun shorterReturnedKeyboardDoesNotJumpAtRelease() {
         content(320)
@@ -131,6 +138,7 @@ class MenuImeBackdropTest {
         finishAt(180)
     }
 
+    /** Checks the restore wait deadline and a continuous release to a closed keyboard. */
     @Test
     fun failedRestorationWaitIsBoundedAndZeroEndpointReleasesContinuously() =
         runTest {
@@ -143,6 +151,7 @@ class MenuImeBackdropTest {
             finishAt(0)
         }
 
+    /** Checks that cancelling a handoff cannot release a later menu snapshot. */
     @Test
     fun cancellationCannotReleaseAReplacementMenu() {
         content(320)
@@ -159,6 +168,7 @@ class MenuImeBackdropTest {
         composeRule.runOnIdle { assertEquals(120, frozen) }
     }
 
+    /** Checks retargeting during release and freezing the displayed height when the menu reopens. */
     @Test
     fun timeoutHandoffRetargetsAndReopeningFreezesTheVisibleHeight() {
         content(320)

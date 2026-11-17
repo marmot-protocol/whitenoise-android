@@ -48,20 +48,25 @@ import org.robolectric.annotation.GraphicsMode
 class ForwardMenuHandoffTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Checks that forwarding consumes the composer restore through picker dismissal. */
     @Test fun forwardingDoesNotDismissAndRestoreTheComposer() = assertHandoff(MessageMenuKeyboardOwner.Composer)
 
+    /** Checks that forwarding consumes the search restore through picker dismissal. */
     @Test fun forwardingDoesNotDismissAndRestoreConversationSearch() = assertHandoff(MessageMenuKeyboardOwner.Search)
 
+    /** Checks media eligibility loss retires both windows without restoring the keyboard. */
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     @Test
     fun mediaEligibilityLossClosesThePickerAndMenuWithoutRestoringTheKeyboard() {
         assertHandoff(MessageMenuKeyboardOwner.Composer, media = true)
     }
 
+    /** Checks the text picker snapshot remains usable after its source loses eligibility. */
     @Test fun textSnapshotSurvivesLiveEligibilityLoss() {
         assertHandoff(MessageMenuKeyboardOwner.Composer, loseTextEligibility = true)
     }
 
+    /** Exercises the real row and picker handoff, eligibility changes, and keyboard restore suppression. */
     @Suppress("LongMethod") // Keeps the production row, callbacks and picker assertions in one test fixture.
     private fun assertHandoff(
         owner: MessageMenuKeyboardOwner,
@@ -180,6 +185,7 @@ class ForwardMenuHandoffTest {
         composeRule.runOnIdle { assertEquals(0, restorations) }
     }
 
+    /** Draws the source view so a newly opened media menu has a captured layer. */
     private fun drawMediaSource(sourceView: View) {
         // Each menu opening creates a source layer, which idle synchronization alone does not draw.
         composeRule.runOnIdle {
@@ -193,6 +199,7 @@ class ForwardMenuHandoffTest {
         composeRule.waitForIdle()
     }
 
+    /** Builds a synthetic PDF attachment reference for the media eligibility scenario. */
     private fun mediaReference() =
         MediaAttachmentReferenceFfi(
             locators = listOf(MediaLocatorFfi("blossom-v1", "https://media.example/document.pdf")),
@@ -207,6 +214,7 @@ class ForwardMenuHandoffTest {
             thumbhash = null,
         )
 
+    /** Builds a synthetic received text record in the requested group. */
     private fun forwardRecord(group: String) =
         AppMessageRecordFfi(
             messageIdHex = "33".repeat(32),

@@ -44,4 +44,5 @@ internal fun Modifier.focusedStackInputGuard(visible: Boolean): Modifier =
         },
     )
 
+/** Hides or reveals the lifted stack without changing its layout geometry. */
 internal fun Modifier.focusedStackAlpha(visible: Boolean): Modifier = graphicsLayer { alpha = if (visible) 1f else 0f }

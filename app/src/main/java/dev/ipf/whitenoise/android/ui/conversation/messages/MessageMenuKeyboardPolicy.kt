@@ -12,6 +12,7 @@ internal class MessageMenuKeyboardPolicy {
     private var replyAtOpen: String? = null
     private var editAtOpen: String? = null
 
+    /** Captures the keyboard owner and targets; returns whether this menu owns a pending restore. */
     fun open(
         imeOpen: Boolean,
         replyTarget: String?,
@@ -40,15 +41,18 @@ internal class MessageMenuKeyboardPolicy {
         return restore
     }
 
+    /** Marks restoration cancelled for resume and discards the current menu restore intent. */
     fun pause() {
         resumeRestoreCancelled = true
         cancel()
     }
 
+    /** Clears the pause cancellation marker after the resume handler consumes it. */
     fun resumeConsumed() {
         resumeRestoreCancelled = false
     }
 
+    /** Discards the pending restore and captured targets without clearing the resume cancellation marker. */
     fun cancel() {
         pendingRestore = false
         replyAtOpen = null
