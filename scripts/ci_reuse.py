@@ -47,6 +47,10 @@ CACHE_INPUT_FILES = {'gradle.properties', 'gradlew', 'scripts/prepare_marmotkit_
                      'scripts/prepare-marmotkit-artifact.sh', 'scripts/prefetch-robolectric-android-all.sh',
                      *TRUSTED_CODE}
 CACHE_INPUT_SUFFIXES = ('.gradle', '.gradle.kts', '.lockfile')
+# Android lint results are cached per set of lint inputs, and master pushes are the only writers.
+# A reused push skips the unit suites but must keep refreshing lint when these inputs change.
+LINT_INPUT_PREFIX = 'app/src/'
+LINT_EXCLUDED_PREFIXES = ('app/src/test/', 'app/src/androidTest/')
 
 
 class GhApi:
@@ -99,17 +103,33 @@ def is_cache_input(path):
             or path.endswith(CACHE_INPUT_SUFFIXES))
 
 
-def cache_inputs_changed(before):
-    """Return True when the push touched a cache input, or when that cannot be told."""
+def is_lint_input(path):
+    """Tell whether a path is an app source set that Android lint analyzes (never tests)."""
+    return path.startswith(LINT_INPUT_PREFIX) and not path.startswith(LINT_EXCLUDED_PREFIXES)
+
+
+def pushed_paths(before):
+    """List the paths a push changed, or None when the pushed range cannot be listed."""
     if not SHA_PATTERN.fullmatch(before or '') or set(before) == {'0'}:
-        return True
+        return None
     try:
         completed = subprocess.run(['git', 'diff', '--no-renames', '--name-only', '-z', before, 'HEAD'],
                                    capture_output=True, check=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
-        return True
-    paths = [path.decode('utf-8', 'replace') for path in completed.stdout.split(b'\0') if path]
-    return not paths or any(is_cache_input(path) for path in paths)
+        return None
+    return [path.decode('utf-8', 'replace') for path in completed.stdout.split(b'\0') if path] or None
+
+
+def cache_inputs_changed(before):
+    """Return True when the push touched a cache input, or when that cannot be told."""
+    paths = pushed_paths(before)
+    return paths is None or any(is_cache_input(path) for path in paths)
+
+
+def lint_inputs_changed(before):
+    """Return True when the push touched an app source set lint analyzes, or when that cannot be told."""
+    paths = pushed_paths(before)
+    return paths is None or any(is_lint_input(path) for path in paths)
 
 
 def ci_run_is_trusted(run, repo, event, complete=True):
@@ -196,9 +216,13 @@ def lookup(api, repo, event, action, ci_mode, tree, head_sha, blobs):
 
 
 def decide(api, repo, event, action, ci_mode, docs_only, tree, head_sha, setting,
-           blobs=None, cache_inputs=lambda: True):
-    """Return the reuse outputs. Anything but a verified match selects full validation."""
-    outputs = {'reuse': NONE, 'reuse_run': '', 'tree': tree}
+           blobs=None, cache_inputs=lambda: True, lint_inputs=lambda: True):
+    """Return the reuse outputs. Anything but a verified match selects full validation.
+
+    `lint_writer` tells a reused push whether it must still run the Android lint jobs, which
+    are the only writers of the lint cache that pull requests and merge groups restore.
+    """
+    outputs = {'reuse': NONE, 'reuse_run': '', 'tree': tree, 'lint_writer': 'false'}
     mode = SETTINGS.get(setting, 'off')
     if mode == 'off':
         return outputs, 'reuse disabled'
@@ -215,6 +239,8 @@ def decide(api, repo, event, action, ci_mode, docs_only, tree, head_sha, setting
     if mode == 'shadow':
         return outputs, f'shadow: would reuse {kind} result from run {run_id}'
     outputs.update(reuse=kind, reuse_run=run_id)
+    if kind == 'push':
+        outputs['lint_writer'] = str(lint_inputs()).lower()
     return outputs, f'reusing {kind} result from run {run_id}'
 
 
@@ -249,7 +275,8 @@ def main():
         tree = ''
     outputs, reason = decide(GhApi(), args.repo, args.event, args.action, args.mode,
                              args.docs_only, tree, args.head_sha, args.setting,
-                             trusted_blobs(), lambda: cache_inputs_changed(args.before))
+                             trusted_blobs(), lambda: cache_inputs_changed(args.before),
+                             lambda: lint_inputs_changed(args.before))
     publish(outputs, reason)
 
 

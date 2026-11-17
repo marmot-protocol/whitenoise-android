@@ -75,6 +75,7 @@ jobs:
       reuse: ${{ steps.reuse.outputs.reuse }}
       reuse_run: ${{ steps.reuse.outputs.reuse_run }}
       tree: ${{ steps.reuse.outputs.tree }}
+      lint_writer: ${{ steps.reuse.outputs.lint_writer }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -139,7 +140,7 @@ jobs:
               --mode "$CI_MODE" --docs-only "$CI_DOCS_ONLY" --head-sha "$CI_HEAD_SHA" \
               --before "$CI_BEFORE_SHA" --setting "$ANDROID_CI_REUSE"; then
             echo '::warning title=Validation reuse::The lookup failed, so this run validates in full.'
-            printf 'reuse=none\nreuse_run=\ntree=\n' >> "$GITHUB_OUTPUT"
+            printf 'reuse=none\nreuse_run=\ntree=\nlint_writer=false\n' >> "$GITHUB_OUTPUT"
           fi
 
       # Other PR-controlled code runs only now, after the classifier and the lookup have written
@@ -866,7 +867,9 @@ jobs:
           retention-days: 14
   static-analysis:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.precheck != 'true'
+    # A reused master push still lints when it changed lint inputs: pushes are the only writers of
+    # the lint cache that pull requests and merge groups restore.
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse == 'none' || (needs.changes.outputs.reuse == 'push' && needs.changes.outputs.lint_writer == 'true')) && needs.changes.outputs.precheck != 'true'
     name: Android lint (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     # A full lint analysis without a cache hit runs 20 to 25 minutes, so 30 left no room for a slow runner.
@@ -1458,8 +1461,9 @@ jobs:
           REQUIRED_JOB: Compile, test, ktlint, detekt, Android lint
         run: |
           set -uo pipefail
-          # Stop watching before the job timeout. One request a minute keeps a run to
-          # about 90 of the token's hourly budget.
+          # Stop watching before the job timeout. Each poll makes one jobs request, and a valid
+          # branch adds one matching-refs request: up to about 160 per run, or about 120 per
+          # hour, of the token's 1,000-request hourly budget shared by the repository's jobs.
           deadline=$((SECONDS + 80 * 60))
           # Look up the group's branch only when the event names one; otherwise watch
           # for failed jobs alone.
@@ -1543,6 +1547,7 @@ jobs:
             (.changes.outputs.precheck == "true") as $precheck |
             ($event == "pull_request" and $draft == "false" and ($precheck | not) and ($full | not)) as $is_ready |
             .changes.outputs.reuse as $reuse |
+            .changes.outputs.lint_writer as $lint |
             (["pull_request", "merge_group", "push", "schedule", "workflow_dispatch"] | index($event) != null) and
             ($draft == "true" or $draft == "false") and ($event == "pull_request" or $draft == "false") and
             (keys == ["build-contracts", "changes", "compile-tests", "compose-compiler", "coverage", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
@@ -1555,6 +1560,8 @@ jobs:
             (.changes.result == "success") and
             ($reuse == "none" or $reuse == "tree" or $reuse == "push") and
             (($reuse == "none") or (.changes.outputs.docs_only == "false" and (.changes.outputs.reuse_run | test("^[0-9]+$")))) and
+            (.changes.outputs.lint_writer == "true" or .changes.outputs.lint_writer == "false") and
+            (($reuse == "push") or (.changes.outputs.lint_writer == "false")) and
             (($reuse != "tree") or ((.changes.outputs.ci_mode == "full" or .changes.outputs.ci_mode == "precheck") and
               ($event == "pull_request" and $draft == "false"))) and
             (($reuse != "push") or ($event == "push" and $full)) and
@@ -1570,6 +1577,7 @@ jobs:
               elif $reuse == "push" then (
                 if .key == "changes" or .key == "tooling-contracts" or .key == "build-contracts" then .value.result == "success"
                 elif .key == "compose-compiler" then .value.result == (if $campaigns == "false" then "skipped" else "success" end)
+                elif .key == "static-analysis" then .value.result == (if $lint == "true" then "success" else "skipped" end)
                 else .value.result == "skipped" end)
               elif $precheck and (.key == "tests" or .key == "coverage" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
               elif .key == "compose-compiler" and ($campaigns == "false" or $is_draft or $event == "pull_request" or $event == "merge_group") then .value.result == "skipped"

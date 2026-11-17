@@ -159,8 +159,11 @@ Identical content is validated once, in two places. A merge group never reuses a
 - A **master push** of the commit a merge group already validated, shown by that run's
   aggregate job having passed (the queue merges at that moment, before the run itself
   finishes), skips the suites. It keeps `tooling-contracts` (the source-bound manual
-  testing guide), `build-contracts` (Gradle cache refresh and the optional Maestro APK)
-  and, for risky diffs, the Compose reports. A push that changes a cache input (Gradle
+  testing guide), `build-contracts` (Gradle cache refresh and the optional Maestro APK),
+  the Android lint jobs when the push changed an app source set (pushes are the only
+  writers of the lint cache that PRs and merge groups restore, and the unit suites are
+  the expensive part that is skipped) and, for risky diffs, the Compose reports. A push
+  that changes a cache input (Gradle
   files, the wrapper, lock files, the MarmotKit pin or the reuse code itself) validates
   fully so the master caches stay fresh. The nightly run refreshes the writers a reused
   push skips. This lookup uses no proof, only the merge group runs GitHub creates for the

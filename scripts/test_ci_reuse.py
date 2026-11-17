@@ -2,6 +2,7 @@
 
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -64,10 +65,11 @@ def contents(sha=HEAD, blobs=BLOBS):
 
 
 def decide(api, event='pull_request', action='ready_for_review', mode='full', docs_only='false', tree=TREE,
-           head_sha=SHA, setting='enforce', blobs=BLOBS, cache_inputs=lambda: False):
+           head_sha=SHA, setting='enforce', blobs=BLOBS, cache_inputs=lambda: False,
+           lint_inputs=lambda: False):
     """Run the production decision with a fake API and return its outputs and reason."""
     return ci_reuse.decide(api, REPO, event, action, mode, docs_only, tree, head_sha, setting,
-                           blobs, cache_inputs)
+                           blobs, cache_inputs, lint_inputs)
 
 
 class TreeReuseTest(unittest.TestCase):
@@ -81,7 +83,7 @@ class TreeReuseTest(unittest.TestCase):
     def test_ready_run_reuses_a_full_pull_request_result_for_the_same_tree(self):
         """A full-lane ready run on an attested tree skips the heavy jobs."""
         outputs, reason = decide(self.attested('full'))
-        self.assertEqual(outputs, {'reuse': 'tree', 'reuse_run': '11', 'tree': TREE})
+        self.assertEqual(outputs, {'reuse': 'tree', 'reuse_run': '11', 'tree': TREE, 'lint_writer': 'false'})
         self.assertIn('run 11', reason)
 
     def test_full_ready_run_rejects_a_precheck_result(self):
@@ -229,7 +231,7 @@ class PushReuseTest(unittest.TestCase):
     def test_push_reuses_a_merge_group_whose_aggregate_passed(self):
         """The queue lands the tested commit unchanged, so its result applies."""
         outputs, _ = decide(self.api(), event='push')
-        self.assertEqual(outputs, {'reuse': 'push', 'reuse_run': '21', 'tree': TREE})
+        self.assertEqual(outputs, {'reuse': 'push', 'reuse_run': '21', 'tree': TREE, 'lint_writer': 'false'})
 
     def test_push_reuses_a_run_whose_watcher_is_still_finishing(self):
         """The queue merges when the aggregate passes, before the run itself has finished."""
@@ -249,6 +251,50 @@ class PushReuseTest(unittest.TestCase):
                     {'head_repository': {'full_name': 'someone/else'}}):
             with self.subTest(bad=bad):
                 self.assertEqual(decide(self.api(bad), event='push')[0]['reuse'], 'none')
+
+    def test_reused_push_keeps_the_lint_writers_only_when_lint_inputs_changed(self):
+        """Pushes are the only lint cache writers, so a reused push that changed lint inputs still lints."""
+        outputs, _ = decide(self.api(), event='push', lint_inputs=lambda: True)
+        self.assertEqual((outputs['reuse'], outputs['lint_writer']), ('push', 'true'))
+        outputs, _ = decide(self.api(), event='push', lint_inputs=lambda: False)
+        self.assertEqual((outputs['reuse'], outputs['lint_writer']), ('push', 'false'))
+        # A result that does not reuse a push never asks for the lint writers.
+        for kwargs in ({'event': 'push', 'cache_inputs': lambda: True}, {'event': 'push', 'setting': 'off'}):
+            self.assertEqual(decide(self.api(), lint_inputs=lambda: True, **kwargs)[0]['lint_writer'], 'false')
+
+    def test_lint_inputs_are_app_source_sets_but_never_tests(self):
+        """Main and flavor sources feed lint, while tests, docs, scripts and workflows do not."""
+        for path in ('app/src/main/java/org/example/Screen.kt', 'app/src/main/res/values/strings.xml',
+                     'app/src/zapstore/java/org/example/Update.kt', 'app/src/play/AndroidManifest.xml'):
+            with self.subTest(path=path):
+                self.assertTrue(ci_reuse.is_lint_input(path))
+        for path in ('app/src/test/java/org/example/ScreenTest.kt', 'app/src/androidTest/java/org/example/A.kt',
+                     'app/src/test/snapshots/screen.png', 'docs/ci-request-policy.md', 'scripts/ci_reuse.py'):
+            with self.subTest(path=path):
+                self.assertFalse(ci_reuse.is_lint_input(path))
+
+    def test_push_range_listing_serves_both_questions(self):
+        """One pushed-range listing answers the cache question and the lint question, failing closed."""
+        listing = subprocess.CompletedProcess(['git'], 0, stdout=b'docs/a.md\0app/src/main/java/A.kt\0')
+        with unittest.mock.patch('subprocess.run', return_value=listing):
+            self.assertEqual(ci_reuse.pushed_paths(BEFORE), ['docs/a.md', 'app/src/main/java/A.kt'])
+            self.assertTrue(ci_reuse.lint_inputs_changed(BEFORE))
+            self.assertFalse(ci_reuse.cache_inputs_changed(BEFORE))
+        tests_only = subprocess.CompletedProcess(['git'], 0, stdout=b'app/src/test/java/ATest.kt\0docs/a.md\0')
+        with unittest.mock.patch('subprocess.run', return_value=tests_only):
+            self.assertFalse(ci_reuse.lint_inputs_changed(BEFORE))
+        self.assertIsNone(ci_reuse.pushed_paths(''))
+        self.assertTrue(ci_reuse.lint_inputs_changed(None))
+        with unittest.mock.patch('subprocess.run', side_effect=subprocess.CalledProcessError(1, ['git'])):
+            self.assertIsNone(ci_reuse.pushed_paths(BEFORE))
+            self.assertTrue(ci_reuse.lint_inputs_changed(BEFORE))
+
+    def test_required_job_matches_the_validate_job_name(self):
+        """The aggregate job the push lookup trusts is the workflow's required check."""
+        workflow = pathlib.Path(ci_reuse.__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'
+        match = re.search(r'^  validate:\n    name: (.+?)\$\{\{', workflow.read_text(), re.MULTILINE)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group(1), ci_reuse.REQUIRED_JOB)
 
     def test_push_that_changes_a_cache_input_keeps_refreshing_the_caches(self):
         """Master pushes are the cache writers, so one touching cache inputs runs its writer jobs."""

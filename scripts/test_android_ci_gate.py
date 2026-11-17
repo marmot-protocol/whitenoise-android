@@ -127,7 +127,7 @@ class AndroidCiGateTest(unittest.TestCase):
         outcomes = {job: {'result': 'success', 'outputs': {}} for job in self.dependencies}
         outcomes['changes']['outputs'] = {'docs_only': 'false', 'supplemental_campaigns': 'true', 'precheck': 'false', 'ci_mode': 'legacy-pr' if event == 'pull_request' else 'full',
                                          'full_matrix': 'false' if event == 'pull_request' else 'true',
-                                         'reuse': 'none', 'reuse_run': '', 'tree': ''}
+                                         'reuse': 'none', 'reuse_run': '', 'tree': '', 'lint_writer': 'false'}
         if event != 'pull_request' or draft == 'true':
             outcomes['secondary-variant']['result'] = 'skipped'
         # Compose compiler reports run on master, nightly and dispatch only.
@@ -445,19 +445,22 @@ class AndroidCiGateTest(unittest.TestCase):
 
     PUSH_KEPT = ('changes', 'tooling-contracts', 'build-contracts')
 
-    def test_push_reuse_still_runs_cache_writers_the_guide_and_risky_compose_reports(self):
-        """A reused push skips the suites but keeps the cache writer, manual guide and Compose reports."""
+    def test_push_reuse_still_runs_cache_writers_the_guide_lint_and_risky_compose_reports(self):
+        """A reused push skips the unit suites but keeps cache writers, the guide, lint when needed and Compose reports."""
         for campaigns, compose in (('true', 'success'), ('false', 'skipped')):
-            base = self.successful_outcomes('push')
-            base['changes']['outputs']['supplemental_campaigns'] = campaigns
-            outcomes = self.reused_outcomes(base, 'push', self.PUSH_KEPT + (('compose-compiler',) if compose == 'success' else ()))
-            with self.subTest(campaigns=campaigns):
-                self.assertEqual(self.run_gate(outcomes, 'push').returncode, 0)
-                for job in self.dependencies:
-                    for result in ('failure', 'cancelled', 'skipped' if outcomes[job]['result'] == 'success' else 'success'):
-                        bad = json.loads(json.dumps(outcomes))
-                        bad[job]['result'] = result
-                        self.assertNotEqual(self.run_gate(bad, 'push').returncode, 0, (campaigns, job, result))
+            for lint in ('true', 'false'):
+                base = self.successful_outcomes('push')
+                base['changes']['outputs'].update(supplemental_campaigns=campaigns, lint_writer=lint)
+                kept = self.PUSH_KEPT + (('compose-compiler',) if compose == 'success' else ()) + (
+                    ('static-analysis',) if lint == 'true' else ())
+                outcomes = self.reused_outcomes(base, 'push', kept)
+                with self.subTest(campaigns=campaigns, lint=lint):
+                    self.assertEqual(self.run_gate(outcomes, 'push').returncode, 0)
+                    for job in self.dependencies:
+                        for result in ('failure', 'cancelled', 'skipped' if outcomes[job]['result'] == 'success' else 'success'):
+                            bad = json.loads(json.dumps(outcomes))
+                            bad[job]['result'] = result
+                            self.assertNotEqual(self.run_gate(bad, 'push').returncode, 0, (campaigns, lint, job, result))
 
     def test_reuse_needs_a_recorded_run_and_a_matching_context(self):
         """A reuse claim without a numeric run, or in the wrong event or lane, is rejected."""
@@ -478,6 +481,15 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertNotEqual(self.run_gate(tree, event).returncode, 0, event)
         for event in ('pull_request', 'merge_group', 'schedule', 'workflow_dispatch'):
             self.assertNotEqual(self.run_gate(push, event).returncode, 0, event)
+        # The lint-writer claim must be well formed and only a reused push may make it.
+        for value in ('', 'yes', None):
+            changed = json.loads(json.dumps(push))
+            changed['changes']['outputs']['lint_writer'] = value
+            self.assertNotEqual(self.run_gate(changed, 'push').returncode, 0, value)
+        for outcomes, event in ((tree, 'pull_request'), (self.successful_outcomes('merge_group'), 'merge_group')):
+            changed = json.loads(json.dumps(outcomes))
+            changed['changes']['outputs']['lint_writer'] = 'true'
+            self.assertNotEqual(self.run_gate(changed, event).returncode, 0, event)
         # A draft run never reuses, and neither does the documentation shortcut or an unselected lane.
         self.assertNotEqual(self.run_gate(self.reused_outcomes(self.successful_outcomes('merge_group'), 'tree'),
                                           draft='true').returncode, 0)
@@ -492,13 +504,17 @@ class AndroidCiGateTest(unittest.TestCase):
         for name in ('offline-zsp', 'compile-tests', 'static-analysis', 'tests', 'coverage', 'secondary-variant'):
             header = self.job_block(self.workflow, name).split('    steps:', 1)[0]
             self.assertIn("needs.changes.outputs.reuse == 'none'", header, name)
+        # Pushes are the only lint cache writers, so a reused push that changed lint inputs still lints.
+        lint = self.job_block(self.workflow, 'static-analysis').split('    steps:', 1)[0]
+        self.assertIn("(needs.changes.outputs.reuse == 'none' || (needs.changes.outputs.reuse == 'push' && "
+                      "needs.changes.outputs.lint_writer == 'true'))", lint)
         # A reused push keeps the job that refreshes Gradle caches and stages the Maestro APK, the
         # one that assembles the manual testing guide, and the Compose reports master pushes own.
         for name in ('tooling-contracts', 'build-contracts', 'compose-compiler'):
             header = self.job_block(self.workflow, name).split('    steps:', 1)[0]
             self.assertIn("needs.changes.outputs.reuse != 'tree'", header, name)
             self.assertNotIn("reuse == 'none'", header, name)
-        for output in ('reuse', 'reuse_run', 'tree'):
+        for output in ('reuse', 'reuse_run', 'tree', 'lint_writer'):
             self.assertIn(f'      {output}: ${{{{ steps.reuse.outputs.{output} }}}}\n', self.changes)
         self.assertIn('      actions: read\n', self.changes)
         self.assertNotIn('actions: write', self.changes)
@@ -507,7 +523,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/ci_reuse.py', lookup)
         self.assertIn('--before "$CI_BEFORE_SHA"', lookup)
         self.assertIn('CI_BEFORE_SHA: ${{ github.event.before }}', lookup)
-        self.assertIn("printf 'reuse=none\\nreuse_run=\\ntree=\\n' >> \"$GITHUB_OUTPUT\"", lookup)
+        self.assertIn("printf 'reuse=none\\nreuse_run=\\ntree=\\nlint_writer=false\\n' >> \"$GITHUB_OUTPUT\"", lookup)
         for name in ('Write the validated tree proof', 'Retain the validated tree proof'):
             step = self.named_step(self.gate, name)
             for condition in ('success()', "github.event_name == 'pull_request'",
