@@ -99,6 +99,32 @@ class AttachmentDownloadSlotReleaseTest {
             }
         }
 
+    /**
+     * A transfer that resumed but is still queuing for a slot keeps counting as admitted, so a tap during that wait
+     * still escalates it.
+     */
+    @Test
+    fun aResumedHolderQueuingForASlotStillCountsAsAdmitted() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val pauseEnds = CompletableDeferred<Unit>()
+                val holderDone = CompletableDeferred<Unit>()
+                val paused =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("paused", ACCOUNT, AUTOMATIC) { withDownloadSlotReleased { pauseEnds.await() } }
+                    }
+                val holder = startHolding(gate, "holder", holderDone)
+                pauseEnds.complete(Unit)
+                while (!gate.isQueuedForTest("paused")) yield()
+
+                assertTrue("a queued resumed request still counts as admitted", gate.isAdmitted("paused"))
+                holderDone.complete(Unit)
+                listOf(paused, holder).awaitAll()
+                assertFalse(gate.isAdmitted("paused"))
+            }
+        }
+
     /** A pause that ends with nothing left to transfer finishes at once instead of queuing behind other downloads. */
     @Test
     fun aPauseThatEndsTheWorkDoesNotQueueAgain() =
