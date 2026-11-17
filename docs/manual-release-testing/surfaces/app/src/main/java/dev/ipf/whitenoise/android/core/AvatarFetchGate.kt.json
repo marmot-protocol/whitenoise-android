@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarFetchGate.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Notification avatar fetch lane and failure cooldown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarFetchGate.kt",
+        "anchor": "internal class AvatarFetchGate(",
+        "test_ids": [
+          "INT-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
