@@ -1,0 +1,91 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: MediaLibraryVoiceTab",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "SenderAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "fun SenderAvatar(",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "VoiceLibraryRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "fun VoiceLibraryRow(",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "VoiceLibraryTab",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "fun VoiceLibraryTab(",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "VoiceLibraryActionIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "fun VoiceLibraryActionIcon(",
+        "test_ids": [
+          "MED-037"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:shared_media_empty_voice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "R.string.shared_media_empty_voice",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "string:shared_media_voice_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "R.string.shared_media_voice_failed",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "string:voice_message_pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "R.string.voice_message_pause",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "string:voice_message_play",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "R.string.voice_message_play",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "string:media_tap_to_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryVoiceTab.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": [
+          "MED-037"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -175,7 +175,11 @@ class FreshSweepCoverageTest {
                 )
         val conversationLeave = source.section("suspend fun leaveGroup(displayName", "fun dismissConversationNotifications")
         val accept = source.section("suspend fun acceptInvite", "suspend fun declineInvite")
-        val invite = source.section("suspend fun inviteMembers", "suspend fun removeMember")
+        val invite =
+            source.section(
+                "suspend fun ConversationController.inviteMembers",
+                "suspend fun ConversationController.removeMember",
+            )
 
         assertTrue(chatListLeave.contains("withContext(NonCancellable)"))
         assertTrue(conversationLeave.contains("withContext(NonCancellable)"))

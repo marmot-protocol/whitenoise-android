@@ -140,13 +140,13 @@ class ErrorPresentationTest {
             "ui/profile/ProfileEditScreen.kt" to listOf("PROFILE_EDIT_LOAD"),
             "ui/conversation/media/MediaViewer.kt" to
                 listOf("MEDIA_VIEWER_IMAGE_SHARE", "MEDIA_VIEWER_VIDEO_SHARE"),
+            "ui/medialibrary/MediaLibraryVoiceTab.kt" to listOf("MEDIA_LIBRARY_VOICE_LOAD"),
             "ui/medialibrary/MediaLibrary.kt" to
                 listOf(
-                    "MEDIA_LIBRARY_VOICE_LOAD",
                     "MEDIA_LIBRARY_FILE_OPEN",
                     "MEDIA_LIBRARY_FILE_SHARE",
-                    "MEDIA_LIBRARY_URL_OPEN",
                 ),
+            "ui/medialibrary/MediaLibraryUrlTab.kt" to listOf("MEDIA_LIBRARY_URL_OPEN"),
         )
 
     private fun assertMigratedOperations(
