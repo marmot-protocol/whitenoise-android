@@ -110,7 +110,9 @@ private fun ConversationDictationController.dispatchNativeMicrophoneUnblock(pend
         elapsedRealtime() >= pending.expiresAtElapsedRealtime -> clearMicrophoneRecovery()
         pending.dispatched || !pending.resumed -> Unit
         !microphoneHostReady() || !microphoneRecoveryAllowed() -> Unit
-        platform.microphoneAccess() == ConversationDictationMicrophoneAccess.Granted -> resumeMicrophoneSettingsRecovery()
+        platform.microphoneAccess() == ConversationDictationMicrophoneAccess.Granted -> {
+            resumeMicrophoneSettingsRecovery()
+        }
         else -> registerNativeMicrophoneUnblock(pending)
     }
 }
