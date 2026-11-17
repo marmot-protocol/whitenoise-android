@@ -273,30 +273,41 @@ class ConversationMediaViewerProductionPathTest {
     @Test
     fun pendingImagePageCanRestoreHiddenChrome() {
         val fixture = fixture(DIRECT_MESSAGE_ID)
+        val pendingImage = kotlinx.coroutines.CompletableDeferred<ByteArray>()
+        val imageLoadStarted = java.util.concurrent.atomic.AtomicBoolean()
+        var visible by mutableStateOf(true)
         var chromeToggleCount = 0
         composeRule.setContent {
-            ViewerPage(
-                controller = fixture.controller,
-                messageIdHex = DIRECT_MESSAGE_ID,
-                attachmentIndex = 0,
-                reference = reference(attachmentIndex = 0, mediaType = "image/jpeg"),
-                scale = 1f,
-                offset = Offset.Zero,
-                onScaleChange = {},
-                onOffsetChange = {},
-                mine = false,
-                isCurrent = true,
-                onChromeToggle = { chromeToggleCount++ },
-            )
+            if (visible) {
+                ViewerPage(
+                    controller = fixture.controller,
+                    messageIdHex = DIRECT_MESSAGE_ID,
+                    attachmentIndex = 0,
+                    reference = reference(attachmentIndex = 0, mediaType = "image/jpeg"),
+                    scale = 1f,
+                    offset = Offset.Zero,
+                    onScaleChange = {},
+                    onOffsetChange = {},
+                    mine = false,
+                    isCurrent = true,
+                    onChromeToggle = { chromeToggleCount++ },
+                    imageBytes = {
+                        imageLoadStarted.set(true)
+                        pendingImage.await()
+                    },
+                )
+            }
         }
 
         try {
+            composeRule.waitUntil(10_000) { imageLoadStarted.get() }
             composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { click() }
             composeRule.mainClock.advanceTimeBy(500L)
             composeRule.waitForIdle()
 
             composeRule.runOnIdle { assertEquals(1, chromeToggleCount) }
         } finally {
+            composeRule.runOnIdle { visible = false }
             composeRule.awaitViewerImageWorkIdle()
         }
     }
