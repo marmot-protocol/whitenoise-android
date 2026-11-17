@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -135,6 +136,67 @@ internal fun SettingsSwitch(
     enabled: Boolean = true,
     busy: Boolean = false,
     leading: (@Composable () -> Unit)?,
+) = SettingsToggleRow(
+    context,
+    title,
+    checked,
+    onCheckedChange,
+    modifier,
+    explanation,
+    subtitle,
+    enabled,
+    busy,
+    leading,
+    Role.Switch,
+) { editable ->
+    Switch(checked = checked, onCheckedChange = null, enabled = editable, modifier = Modifier.clearAndSetSemantics {})
+}
+
+/** [SettingsSwitch] for a pick-from-a-list choice: the same whole-row toggle with a decorative check box. */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+internal fun SettingsCheckbox(
+    context: SettingsRowContext,
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    explanation: String? = null,
+    subtitle: String? = null,
+    enabled: Boolean = true,
+    leading: (@Composable () -> Unit)?,
+) = SettingsToggleRow(
+    context,
+    title,
+    checked,
+    onCheckedChange,
+    modifier,
+    explanation,
+    subtitle,
+    enabled,
+    busy = false,
+    leading,
+    Role.Checkbox,
+) { editable ->
+    Checkbox(checked = checked, onCheckedChange = null, enabled = editable, modifier = Modifier.clearAndSetSemantics {})
+}
+
+/** Shared settings row whose trailing control, a switch or a check box, toggles the whole row. */
+@Suppress("FunctionNaming", "LongParameterList")
+@Composable
+private fun SettingsToggleRow(
+    context: SettingsRowContext,
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier,
+    explanation: String?,
+    subtitle: String?,
+    enabled: Boolean,
+    busy: Boolean,
+    leading: (@Composable () -> Unit)?,
+    toggleRole: Role,
+    control: @Composable (editable: Boolean) -> Unit,
 ) {
     val editable = enabled && !busy
     ListItem(
@@ -147,22 +209,13 @@ internal fun SettingsSwitch(
                 .settingsRowBorder(context)
                 .explainOnLongPress(explanation, title)
                 .semantics {
-                    role = Role.Switch
+                    role = toggleRole
                     settingsRow = Unit
                 },
         enabled = editable,
         leadingContent = settingsLeadingSlot(leading, editable),
         supportingContent = subtitle?.let { { SettingsRowSupportingText(it, editable) } },
-        trailingContent = {
-            SettingsRowTrailing(busy) {
-                Switch(
-                    checked = checked,
-                    onCheckedChange = null,
-                    enabled = editable,
-                    modifier = Modifier.clearAndSetSemantics {},
-                )
-            }
-        },
+        trailingContent = { SettingsRowTrailing(busy) { control(editable) } },
         colors = settingsRowColors(context),
         content = { SettingsRowTitle(title, editable) },
     )

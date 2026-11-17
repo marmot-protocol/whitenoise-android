@@ -267,6 +267,55 @@ internal class IsolatedMediaTransport(
             }
         }
 
+    /** FD-only document requests share a worker only within this opening. */
+    @Suppress("ComplexCondition", "CyclomaticComplexMethod")
+    internal fun pdf(
+        file: File,
+        domain: MediaTrustDomain.DocumentSession,
+        page: Int,
+        edge: Int,
+        render: Boolean,
+    ): PdfResult? =
+        serialized(domain) { ticket ->
+            if (page !in 0 until PdfPagePolicy.MAX_PAGES || edge !in 1..PdfPagePolicy.MAX_EDGE) return@serialized null
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { input ->
+                if (input.statSize !in 1..PdfPagePolicy.MAX_INPUT || !claimWorker(ticket)) return@serialized null
+                val capacity = if (render) PdfPagePolicy.bytes(edge, edge) ?: return@serialized null else Int.SIZE_BYTES
+                withOutput("document-page", capacity) { output ->
+                    val spec =
+                        MediaDecodeRequest(
+                            edge,
+                            false,
+                            if (render) MediaDecodePolicy.PDF_RENDER_PAGE else MediaDecodePolicy.PDF_INSPECT,
+                            pdfPage = page,
+                        )
+                    val reply = exchange(ticket, input, output, spec) ?: return@withOutput null
+                    val count = reply.getInt("pdfPages")
+                    if (reply.getInt("pdfStatus") != 0 ||
+                        count !in 1..PdfPagePolicy.MAX_PAGES ||
+                        page >= count ||
+                        PdfPagePolicy.size(
+                            reply.getInt("pdfWidth").toDouble(),
+                            reply.getInt("pdfHeight").toDouble(),
+                            edge,
+                        ) == null
+                    ) {
+                        return@withOutput null
+                    }
+                    if (render &&
+                        PdfPagePolicy.bytes(
+                            reply.getInt("width"),
+                            reply.getInt("height"),
+                        ) == null
+                    ) {
+                        return@withOutput null
+                    }
+                    val bitmap = if (render) copyPixels(ticket, reply, output, edge) ?: return@withOutput null else null
+                    PdfResult(count, reply.getInt("pdfWidth"), reply.getInt("pdfHeight"), bitmap)
+                }
+            }
+        }
+
     override fun exif(bytes: ByteArray): Int? =
         serialized(MediaTrustScope.current()) { ticket ->
             val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.EXIF)
@@ -655,6 +704,7 @@ internal class IsolatedMediaTransport(
             putInt("version", MediaDecodePolicy.VERSION)
             putInt("operation", request.operation)
             putInt("edge", request.edge)
+            putInt("pdfPage", request.pdfPage)
             putBoolean("oriented", request.option)
             putLong("offset", request.offset)
             putLong("length", request.length ?: input.statSize)
@@ -771,4 +821,12 @@ internal data class MediaDecodeRequest(
     val region: MediaImageRegion? = null,
     val positionUs: Long = 0L,
     val svgRegion: ViewerSvgRegion? = null,
+    val pdfPage: Int = 0,
+)
+
+internal data class PdfResult(
+    val pages: Int,
+    val width: Int,
+    val height: Int,
+    val bitmap: Bitmap?,
 )

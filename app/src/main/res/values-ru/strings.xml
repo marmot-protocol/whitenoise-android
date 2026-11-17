@@ -2790,4 +2790,12 @@
     <string name="emoji_name_marmot_smirk">Ухмыляющийся сурок</string>
     <string name="emoji_name_marmot_cry">Плачущий сурок</string>
     <string name="emoji_name_marmot_angry">Сердитый сурок</string>
+    <string name="document_rendered">Просмотр</string>
+    <string name="document_source">Исходный текст</string>
+    <string name="document_html_omitted">Изображения, стили и встроенное содержимое пропущены.</string>
+    <string name="document_html_unavailable">Не удалось показать HTML. Возможно, файл слишком большой, сложный или использует неподдерживаемую кодировку.</string>
+    <string name="document_pdf_unavailable">Не удалось показать PDF. Возможно, файл повреждён, защищён или слишком большой.</string>
+    <string name="document_pdf_page">Страница %1$d из %2$d</string>
+    <string name="document_zoom_reset">Масштаб / сброс</string>
+    <string name="composer_preview_attachment">Предпросмотр вложения</string>
 </resources>

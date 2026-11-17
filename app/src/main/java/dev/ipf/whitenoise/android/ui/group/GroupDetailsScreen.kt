@@ -102,21 +102,14 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.authoritativeConversationMuteSettings
 import dev.ipf.whitenoise.android.state.collapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.conversationNotifyMode
-import dev.ipf.whitenoise.android.state.conversationRestoreNotifyMode
 import dev.ipf.whitenoise.android.state.conversationVibrationPattern
 import dev.ipf.whitenoise.android.state.folderMemberIds
-import dev.ipf.whitenoise.android.state.groupDetailsMuteDisplay
 import dev.ipf.whitenoise.android.state.inviteProfileToGroups
-import dev.ipf.whitenoise.android.state.isConversationMutePending
-import dev.ipf.whitenoise.android.state.muteConversationFor
-import dev.ipf.whitenoise.android.state.muteConversationUntil
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.profileAddableGroupsState
-import dev.ipf.whitenoise.android.state.setConversationNotifyMode
 import dev.ipf.whitenoise.android.state.setConversationVibrationPattern
 import dev.ipf.whitenoise.android.state.updateCollapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.ui.EmojiLabel
@@ -296,6 +289,9 @@ internal fun GroupDetailsScreen(
     // details screen is mounted so the initial invite path reuses later-add UI.
     autoOpenAddMember: Boolean = false,
     onAutoOpenAddMemberConsumed: () -> Unit = {},
+    // When true (header Members shortcut), open the members page directly; Back from it leaves details.
+    autoOpenMembers: Boolean = false,
+    onAutoOpenMembersConsumed: () -> Unit = {},
     // Close details and raise the conversation's message search.
     onOpenSearch: (() -> Unit)? = null,
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
@@ -309,7 +305,11 @@ internal fun GroupDetailsScreen(
         val reviewRuntime = remember(controller) { appState.runtimeGeneration }
         val detailsScrollState = key(controller) { rememberScrollState() }
         val membersScrollState = key(controller) { rememberScrollState() }
-        var membersExpanded by remember(controller) { mutableStateOf(false) }
+        // Saved together so a recreated shortcut-opened Members page reopens with its Back-to-chat origin.
+        var membersExpanded by rememberSaveable(controller.group.groupIdHex) {
+            mutableStateOf(autoOpenMembers && !controller.isDm)
+        }
+        var membersAutoOpened by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(autoOpenMembers) }
         var memberSearchOpen by remember(controller) { mutableStateOf(false) }
         var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
         var memberSearchRetry by remember(controller) { mutableIntStateOf(0) }
@@ -324,7 +324,6 @@ internal fun GroupDetailsScreen(
         var showEditGroup by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-        var showMuteDurationDialog by remember(controller) { mutableStateOf(false) }
         var showVibrationPatternDialog by remember { mutableStateOf(false) }
         var showDmAddToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var mediaLibraryCategory by remember(controller) { mutableStateOf<SharedContentCategory?>(null) }
@@ -412,7 +411,7 @@ internal fun GroupDetailsScreen(
         val isDm = controller.isDm
         val groupTerminal = controller.group.disbanding || controller.group.disbanded
         val rosterReady = controller.memberRosterState == GroupRosterLoadState.READY
-        val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin && !groupTerminal
+        val canEdit = controller.canEditGroupSettings
         // Presentation-only: a warm member seed plus the admin list on the group
         // record enables administration on the first frame; the invite commit
         // still requires the authoritative roster inside the controller.
@@ -431,6 +430,13 @@ internal fun GroupDetailsScreen(
                     elapsedMs = SystemClock.elapsedRealtime() - detailsOpenedAtMs,
                     rosterState = controller.memberRosterState,
                 )
+            }
+        }
+        LaunchedEffect(autoOpenMembers) {
+            if (autoOpenMembers && !isDm) {
+                membersAutoOpened = true
+                membersExpanded = true
+                onAutoOpenMembersConsumed()
             }
         }
         LaunchedEffect(autoOpenAddMember, canAdministerMembers) {
@@ -517,7 +523,9 @@ internal fun GroupDetailsScreen(
                 target = detailsDestination,
                 depth = if (detailsDestination == "details") 0 else 1,
                 ownerKey = controller to appState.runtimeGeneration,
-                suppressMotion = addMemberAutoOpened && detailsDestination == "add-members",
+                suppressMotion =
+                    (addMemberAutoOpened && detailsDestination == "add-members") ||
+                        (membersAutoOpened && detailsDestination == "members"),
                 animationsEnabled = rememberConversationMotionEnabled(),
             )
 
@@ -574,33 +582,8 @@ internal fun GroupDetailsScreen(
             remember(appState.activeAccountRef, controller.group.groupIdHex, vibrationSelections) {
                 appState.conversationVibrationPattern(controller.group.groupIdHex)
             }
-        var targetedMuteSettings by remember(appState.activeAccountRef, controller.group.groupIdHex) {
-            mutableStateOf<dev.ipf.marmotkit.ChatNotificationSettingsFfi?>(null)
-        }
-        LaunchedEffect(appState.activeAccountRef, controller.group.groupIdHex, controller.latestChatListRow) {
-            targetedMuteSettings = null
-            if (controller.latestChatListRow == null) {
-                targetedMuteSettings = appState.authoritativeConversationMuteSettings(controller.group.groupIdHex)
-            }
-        }
-        val muteDisplay =
-            appState.groupDetailsMuteDisplay(
-                controller.group.groupIdHex,
-                controller.latestChatListRow,
-                targetedMuteSettings,
-            )
-        val conversationMuted = muteDisplay.muted
-        val muteCommandPending = appState.isConversationMutePending(controller.group.groupIdHex)
-        // Android retains only the All/Only-mentions preference behind MDK's mute.
-        val conversationRestoreMode =
-            remember(
-                appState.activeAccountRef,
-                controller.group.groupIdHex,
-                notificationModes,
-            ) {
-                appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
-            }
-        val conversationMuteExpiry = muteDisplay.mutedUntilMs
+        // Shared with the optional header shortcut so both run the same mute/unmute commands.
+        val muteControl = rememberConversationMuteControl(appState, controller)
 
         suspend fun refreshMlsDetails() {
             if (!appState.developerMode) return
@@ -794,9 +777,6 @@ internal fun GroupDetailsScreen(
         var showAutoReadPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showTranslationPicker by remember(controller) { mutableStateOf(false) }
         var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-        var pendingDisappearingSecs by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
-            mutableStateOf<Long?>(null)
-        }
         var showFolderPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
 
         mediaLibraryCategory?.let { category ->
@@ -826,31 +806,7 @@ internal fun GroupDetailsScreen(
             return@PreparedGroupAvatarContent
         }
 
-        if (showMuteDurationDialog) {
-            MuteDurationDialog(
-                onDismiss = { showMuteDurationDialog = false },
-                onSelect = { target ->
-                    showMuteDurationDialog = false
-                    when (target) {
-                        is MuteTarget.After ->
-                            appState.muteConversationFor(
-                                controller.group.groupIdHex,
-                                target.durationMillis,
-                            )
-                        is MuteTarget.At ->
-                            appState.muteConversationUntil(
-                                controller.group.groupIdHex,
-                                target.expiryMillis,
-                            )
-                        MuteTarget.Always ->
-                            appState.muteConversationFor(
-                                controller.group.groupIdHex,
-                                durationMillis = 0L,
-                            )
-                    }
-                },
-            )
-        }
+        MuteDurationHost(muteControl)
 
         if (showNotificationSettings) {
             BackHandler { showNotificationSettings = false }
@@ -861,19 +817,14 @@ internal fun GroupDetailsScreen(
                     conversationTitle = conversationTitle,
                     conversationAvatarUrl = controller.avatarUrl,
                     isDm = isDm,
-                    isMuted = conversationMuted,
-                    muteCommandPending = muteCommandPending,
-                    muteExpiryMillis = conversationMuteExpiry,
-                    notifyForMode = conversationRestoreMode,
+                    isMuted = muteControl.muted,
+                    muteCommandPending = muteControl.pending,
+                    muteExpiryMillis = muteControl.mutedUntilMs,
+                    notifyForMode = muteControl.restoreMode,
                     vibrationPattern = conversationVibrationPattern,
                     onBack = { showNotificationSettings = false },
                     onToggleMute = { turnOn ->
-                        if (turnOn) {
-                            showMuteDurationDialog = true
-                        } else {
-                            // Unmute back to the All/Only-mentions preference the mute hid.
-                            appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
-                        }
+                        if (turnOn) muteControl.requestMute() else muteControl.unmute()
                     },
                     onChooseVibrationPattern = { showVibrationPatternDialog = true },
                 )
@@ -1530,7 +1481,10 @@ internal fun GroupDetailsScreen(
                                     SettingsLink(
                                         context = rowContext,
                                         title = stringResource(R.string.see_all_members),
-                                        onClick = { membersExpanded = true },
+                                        onClick = {
+                                            membersAutoOpened = false
+                                            membersExpanded = true
+                                        },
                                         leading = {
                                             SettingsLeadingIcon(R.drawable.ic_group)
                                         },
@@ -1562,10 +1516,11 @@ internal fun GroupDetailsScreen(
             }
         }
         if (membersExpanded && !isDm) {
-            BackHandler { membersExpanded = false }
+            val closeMembers = { if (membersAutoOpened) onBack() else membersExpanded = false }
+            BackHandler(onBack = closeMembers)
             detailsRoute {
                 GroupMembersScreen(
-                    onBack = { membersExpanded = false },
+                    onBack = closeMembers,
                     scrollState = membersScrollState,
                     feedback = groupFeedback,
                     content = memberContent,
@@ -1725,33 +1680,18 @@ internal fun GroupDetailsScreen(
                         )
                     }
                     QuickInfoAction(
-                        label =
-                            stringResource(if (conversationMuted) R.string.chat_row_action_unmute else R.string.mute),
-                        icon = if (conversationMuted) R.drawable.ic_volume_up else R.drawable.ic_notifications_off,
-                        enabled = !muteCommandPending,
-                        explanation =
-                            chatsExplanation(
-                                if (conversationMuted) R.string.chat_row_action_unmute else R.string.mute,
-                                if (conversationMuted) {
-                                    R.string.explanation_chat_info_unmute
-                                } else {
-                                    R.string.explanation_chat_info_mute
-                                },
-                            ),
-                        onClick = {
-                            if (conversationMuted) {
-                                appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
-                            } else {
-                                showMuteDurationDialog = true
-                            }
-                        },
+                        label = stringResource(muteControl.labelRes),
+                        icon = muteControl.iconRes,
+                        enabled = !muteControl.pending,
+                        explanation = chatsExplanation(muteControl.labelRes, muteControl.explanationRes),
+                        onClick = muteControl::toggle,
                         modifier = Modifier.weight(1f),
                     )
                     QuickInfoAction(
                         label = stringResource(R.string.disappearing),
                         icon = R.drawable.ic_timer,
                         state = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
-                        enabled = canEdit && !mutationsBlocked,
+                        enabled = disappearingTimerEditable(canEdit, mutationsBlocked),
                         explanation =
                             chatsExplanation(
                                 R.string.disappearing,
@@ -2025,51 +1965,20 @@ internal fun GroupDetailsScreen(
                     )
                 }
 
-                if (showDisappearingPicker) {
-                    DisappearingMessagesPickerDialog(
-                        currentSecs = controller.group.disappearingMessageSecs.toLong(),
-                        onDismiss = { showDisappearingPicker = false },
-                        onPick = { secs ->
-                            showDisappearingPicker = false
-                            val currentSecs = controller.group.disappearingMessageSecs.toLong()
-                            // Only turning the timer ON (from off) or SHORTENING it prunes
-                            // existing history, so confirm just those. An unchanged pick is
-                            // a no-op; turning off or relaxing (lengthening) the window
-                            // prunes nothing, so apply it directly without the destructive
-                            // warning (#674 review).
-                            val needsConfirm = secs > 0L && (currentSecs == 0L || secs < currentSecs)
-                            when {
-                                secs == currentSecs -> Unit
-                                needsConfirm -> pendingDisappearingSecs = secs
-                                else ->
-                                    runGroupMutation(
-                                        action = GroupMutationAction.DisappearingMessages,
-                                        mutation = { controller.updateMessageRetention(secs.toULong()) },
-                                    )
-                            }
-                        },
-                    )
-                }
-
-                pendingDisappearingSecs?.let { secs ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.disappearing_confirm_title),
-                        message =
-                            stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
-                        confirmLabel = stringResource(R.string.disappearing_confirm_button),
-                        onConfirm = {
-                            pendingDisappearingSecs = null
-                            runGroupMutation(
-                                action = GroupMutationAction.DisappearingMessages,
-                                mutation = { controller.updateMessageRetention(secs.toULong()) },
-                            )
-                        },
-                        onDismiss = { pendingDisappearingSecs = null },
-                        destructive = true,
-                        identity = ownIdentity,
-                        confirmEnabled = canEdit && !mutationsBlocked,
-                    )
-                }
+                DisappearingTimerEditor(
+                    open = showDisappearingPicker,
+                    currentSecs = controller.group.disappearingMessageSecs.toLong(),
+                    editable = disappearingTimerEditable(canEdit, mutationsBlocked),
+                    identity = ownIdentity,
+                    resetKeys = arrayOf(controller, appState.activeAccountRef, appState.runtimeGeneration),
+                    onDismiss = { showDisappearingPicker = false },
+                    onApply = { secs ->
+                        runGroupMutation(
+                            action = GroupMutationAction.DisappearingMessages,
+                            mutation = { controller.updateMessageRetention(secs.toULong()) },
+                        )
+                    },
+                )
 
                 // Rows shared by the DM technical group and the group lifecycle group.
 

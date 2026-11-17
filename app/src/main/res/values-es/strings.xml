@@ -2705,4 +2705,12 @@
     <string name="emoji_name_marmot_smirk">Marmota con sonrisa pícara</string>
     <string name="emoji_name_marmot_cry">Marmota llorando</string>
     <string name="emoji_name_marmot_angry">Marmota enfadada</string>
+    <string name="document_rendered">Vista</string>
+    <string name="document_source">Código fuente</string>
+    <string name="document_html_omitted">Se omiten imágenes, estilos y contenido incrustado.</string>
+    <string name="document_html_unavailable">No se puede mostrar este HTML. Puede ser demasiado grande, complejo o usar una codificación no compatible.</string>
+    <string name="document_pdf_unavailable">No se puede mostrar este PDF. Puede estar dañado, protegido o ser demasiado grande.</string>
+    <string name="document_pdf_page">Página %1$d de %2$d</string>
+    <string name="document_zoom_reset">Ampliar / restablecer</string>
+    <string name="composer_preview_attachment">Vista previa del archivo adjunto</string>
 </resources>

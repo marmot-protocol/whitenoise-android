@@ -640,6 +640,34 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/media",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "conversation/media",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -1325,6 +1353,20 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatHeaderSettingsScreen.kt",
       "calls": {
         "SettingsList": 1
       },

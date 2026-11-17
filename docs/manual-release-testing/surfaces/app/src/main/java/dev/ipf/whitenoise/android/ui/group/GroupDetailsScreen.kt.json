@@ -151,6 +151,14 @@
         "test_ids": [
           "GRP-042"
         ]
+      },
+      {
+        "surface": "Chat header Members shortcut page",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "membersAutoOpened",
+        "test_ids": [
+          "SET-058"
+        ]
       }
     ],
     "settings_controls": [
@@ -238,14 +246,6 @@
         "surface": "string:chat_row_action_delete_group",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.chat_row_action_delete_group",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:chat_row_action_unmute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.chat_row_action_unmute",
         "test_ids": [
           "GRP-001"
         ]
@@ -342,30 +342,6 @@
         "surface": "string:disappearing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.disappearing",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:disappearing_confirm_button",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing_confirm_button",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:disappearing_confirm_message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing_confirm_message",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:disappearing_confirm_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing_confirm_title",
         "test_ids": [
           "GRP-001"
         ]
@@ -518,14 +494,6 @@
         "surface": "string:mls_state_unavailable",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.mls_state_unavailable",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:mute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.mute",
         "test_ids": [
           "GRP-001"
         ]
@@ -945,14 +913,6 @@
         ]
       },
       {
-        "surface": "R.string.chat_row_action_unmute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.chat_row_action_unmute",
-        "test_ids": [
-          "GRP-015"
-        ]
-      },
-      {
         "surface": "R.string.copied",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.copied",
@@ -1035,14 +995,6 @@
         "anchor": "R.string.mls_state_unavailable",
         "test_ids": [
           "GRP-001"
-        ]
-      },
-      {
-        "surface": "R.string.mute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.mute",
-        "test_ids": [
-          "GRP-015"
         ]
       },
       {
@@ -1193,14 +1145,6 @@
         ]
       },
       {
-        "surface": "Group details mute row reads the shared mute owner",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "appState.groupDetailsMuteDisplay(",
-        "test_ids": [
-          "GRP-015"
-        ]
-      },
-      {
         "surface": "R.string.explanation_chat_info_copy_chat_link",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.explanation_chat_info_copy_chat_link",
@@ -1217,14 +1161,6 @@
         ]
       },
       {
-        "surface": "R.string.explanation_chat_info_mute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.explanation_chat_info_mute",
-        "test_ids": [
-          "GRP-042"
-        ]
-      },
-      {
         "surface": "R.string.explanation_chat_info_relays",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.explanation_chat_info_relays",
@@ -1236,14 +1172,6 @@
         "surface": "R.string.explanation_chat_info_step_down",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.explanation_chat_info_step_down",
-        "test_ids": [
-          "GRP-042"
-        ]
-      },
-      {
-        "surface": "R.string.explanation_chat_info_unmute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.explanation_chat_info_unmute",
         "test_ids": [
           "GRP-042"
         ]

@@ -1270,3 +1270,9 @@ claiming the corresponding performance qualification. The hosted
 existing cache, frame and process-memory counters on the same synthetic scroll
 workload around repeated application callbacks. Its raw PSS/heap samples are
 measurements, not a forced-GC estimate or a guaranteed process-memory reduction.
+
+## Display-thumbnail diagnostics
+
+`adb shell setprop log.tag.DisplayThumbnailStats DEBUG` enables fixed `HIT`, `MISS`, `WRITE_ATTEMPT`, `ORIGINAL_MATERIALIZE` and `ORIGINAL_CHUNK` log categories. Restore the prior tag setting after qualification. Logging is disabled at the default INFO threshold and contains no identities, locators, media or sizes. Chunk markers count actual binding invocations, including failed calls. Materialization and write markers count attempts. These counters distinguish avoided original reads from a warm memory cache on release-like builds, including devices without ftrace support. The original-read path uses its existing bridge call without a new timing span.
+
+Encrypted display-cache identities are reconciled against batched native transfer snapshots after bootstrap and on a foreground return more than 15 minutes after the last complete pass, and by the existing hourly background maintenance. Android scheduling can delay background work. The pinned runtime has no global media-removal event; [mdk#3491](https://github.com/marmot-protocol/mdk/issues/3491) proposes one, which would replace this polling. Local and received deletion events also request targeted cache eviction. MDK supplies removal decisions. A removal state removes the original and its derivatives. Any other state without a retained body removes only the derivatives, unless this device still holds its own original. Reconciliation preserves failed native reads and keeps already-painted memory pixels within their existing presentation lifetime.

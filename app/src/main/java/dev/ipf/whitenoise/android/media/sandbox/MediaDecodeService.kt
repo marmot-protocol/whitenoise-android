@@ -112,7 +112,8 @@ class MediaDecodeService : Service() {
             putBoolean("internetGranted", permission == android.content.pm.PackageManager.PERMISSION_GRANTED)
         }
 
-    @Suppress("ReturnCount") // Each metadata-only operation returns before pixel allocation.
+    // Each metadata-only operation returns before pixel allocation.
+    @Suppress("ReturnCount", "CyclomaticComplexMethod")
     private fun imageOperation(
         input: ParcelFileDescriptor,
         output: SharedMemory,
@@ -121,6 +122,9 @@ class MediaDecodeService : Service() {
     ): Bundle {
         val operation = data.getInt("operation")
         if (MediaDecodeDebugFixtures.hang(operation)) return response
+        if (operation == MediaDecodePolicy.PDF_INSPECT || operation == MediaDecodePolicy.PDF_RENDER_PAGE) {
+            return PdfPageDecoder.execute(input, output, data, response)
+        }
         val bytes = readDecoderInput(input) ?: return response
         if (MediaDecodeDebugFixtures.canary(operation)) {
             return MediaDecodeDebugFixtures.retainCanary(bytes, input, operation, response)

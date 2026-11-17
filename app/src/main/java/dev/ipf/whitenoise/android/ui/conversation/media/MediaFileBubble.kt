@@ -106,7 +106,15 @@ internal fun MediaFileBubble(
     val lifecycleOwner = LocalLifecycleOwner.current
     val pillKey = "$messageIdHex#$attachmentIndex"
     var openRequested by remember(pillKey) { mutableStateOf(false) }
-    var readerOpen by rememberSaveable(pillKey) { mutableStateOf(false) }
+    var readerOpen by rememberSaveable(
+        controller,
+        pillKey,
+        reference,
+        appState.runtimeGeneration,
+    ) {
+        mutableStateOf(false)
+    }
+
     val initiallyAvailable =
         remember(controller, pillKey, mine) {
             controller.hasCachedAttachmentInMemory(messageIdHex, attachmentIndex)
@@ -138,10 +146,12 @@ internal fun MediaFileBubble(
         remember(reference.mediaType, reference.fileName) {
             resolveAttachmentPresentation(reference.mediaType, reference.fileName)
         }
-    val textCandidate =
+    val readerTarget =
         remember(reference.mediaType, reference.fileName) {
-            textAttachmentCandidate(reference.mediaType, reference.fileName)
+            attachmentReaderTarget(reference.mediaType, reference.fileName)
         }
+    val documentKind = readerTarget?.documentKind
+    val textCandidate = readerTarget?.textCandidate
     val usesDurableInstallerHandoff =
         remember(mine, reference.mediaType, reference.fileName) {
             !mine && isAndroidPackageOpenCandidate(reference.mediaType, reference.fileName)
@@ -416,7 +426,7 @@ internal fun MediaFileBubble(
                                         reference,
                                         priority = AttachmentDownloadPriority.Interactive,
                                     )
-                                } else if (textCandidate != null) {
+                                } else if (documentKind != null || textCandidate != null) {
                                     readerOpen = true
                                 } else if (usesDurableInstallerHandoff) {
                                     controller.requestAttachmentInstallerHandoff(
@@ -454,7 +464,46 @@ internal fun MediaFileBubble(
                 }.takeUnless { heldUntilDelivered },
         )
     }
-    if (readerOpen && textCandidate != null) {
+    if (readerOpen && documentKind != null) {
+        val actions =
+            rememberTextAttachmentNativeActions(
+                controller,
+                appState,
+                messageIdHex,
+                attachmentIndex,
+                reference,
+                mine,
+            )
+        androidx.compose.runtime.key(actions) {
+            DocumentAttachmentViewer(
+                kind = documentKind,
+                name = reference.fileName,
+                account = controller.boundAccountRef.toString(),
+                source = "$pillKey:${reference.sourceEpoch}:${reference.ciphertextSha256}",
+                actions = actions,
+                loadBytes = { loadTextReaderBytes(controller, messageIdHex, attachmentIndex, reference, mine) },
+                // The renderer reads a private copy that no FileProvider path exposes and is deleted on close.
+                withPdfFile = { use ->
+                    check(actions.isCurrent())
+                    withPrivatePdfFile(
+                        context.cacheDir,
+                        { attachmentSource(controller, messageIdHex, attachmentIndex, reference, mine) },
+                    ) { file ->
+                        check(actions.isCurrent())
+                        use(file)
+                    }
+                },
+                onOpenExternal = {
+                    if (actions.isCurrent()) {
+                        readerOpen = false
+                        openRequested =
+                            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                    }
+                },
+                onDismiss = { readerOpen = false },
+            )
+        }
+    } else if (readerOpen && textCandidate != null) {
         val readerActions =
             rememberTextAttachmentNativeActions(
                 controller,
@@ -468,10 +517,7 @@ internal fun MediaFileBubble(
             actions = readerActions,
             candidate = textCandidate,
             appState = appState,
-            senderKey = senderKey,
-            senderDisplayName = senderDisplayName,
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
+            speechContext = TextAttachmentSpeechContext(senderKey, senderDisplayName, messageIdHex, attachmentIndex),
             // One byte past the preview limit is enough to tell an over-limit file apart, so the reader never
             // reads the rest of a large file onto the heap.
             loadBytes = {

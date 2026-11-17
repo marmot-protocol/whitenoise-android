@@ -15,6 +15,9 @@
     "Composer": [
       "settings-chats"
     ],
+    "ChatHeader": [
+      "settings-chats"
+    ],
     "ActionColor": [
       "nested-action-color"
     ],

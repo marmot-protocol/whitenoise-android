@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.read_aloud",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -16,7 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fun TextAttachmentFilenameDialog(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-056"
         ]
       },
       {
@@ -24,7 +26,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fun TextAttachmentLoading(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-056"
         ]
       },
       {
@@ -32,7 +35,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fun TextAttachmentMetadata(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-056"
         ]
       },
       {
@@ -40,7 +44,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fun TextAttachmentReaderBottomBar(",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -48,7 +53,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fun TextAttachmentReaderContent(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-056"
         ]
       },
       {
@@ -56,7 +62,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fun TextAttachmentReaderDialog(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-056"
         ]
       },
       {
@@ -64,7 +71,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fun TextAttachmentReaderScreen(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-056"
         ]
       },
       {
@@ -73,7 +81,8 @@
         "anchor": "fun TextAttachmentReaderTopBar(",
         "test_ids": [
           "MED-001",
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -81,7 +90,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fun TextAttachmentReadyBody(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-056"
         ]
       },
       {
@@ -89,7 +99,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fun TextAttachmentTruncatedNotice(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-056"
         ]
       }
     ],
@@ -99,7 +110,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.bytes_count",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -107,7 +119,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.save",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -115,7 +128,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.share",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       }
     ],
@@ -125,7 +139,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.back",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -133,7 +148,17 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.copy_text",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.media_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": [
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -141,7 +166,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.more_options",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -149,7 +175,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.text_attachment_open_external",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -157,7 +184,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.text_attachment_reader_title",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -165,7 +193,17 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.tts_bar_error",
         "test_ids": [
-          "MED-010"
+          "MED-010",
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "Readable active document speech at scroll edge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fadeEnabled = playback == null",
+        "test_ids": [
+          "MED-010",
+          "MED-056"
         ]
       },
       {
@@ -176,15 +214,8 @@
           "SCR-001",
           "SCR-002",
           "SCR-003",
-          "SCR-004"
-        ]
-      },
-      {
-        "surface": "Readable active document speech at scroll edge",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
-        "anchor": "fadeEnabled = playback == null",
-        "test_ids": [
-          "MED-010"
+          "SCR-004",
+          "MED-056"
         ]
       }
     ]

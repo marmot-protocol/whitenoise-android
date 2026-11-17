@@ -16,3 +16,16 @@ name: inbound-share-document-expired-grant-rotation
     id: conversation.composer.attachment.0
 - assertNotVisible:
     id: conversation.composer.attachment.1
+- extendedWaitUntil:
+    notVisible:
+      id: conversation.attachments.preparing
+    timeout: 15000
+- tapOn:
+    id: conversation.composer.attachment.0
+- assertVisible:
+    id: text-attachment-reader
+- assertNotVisible: Share
+- assertNotVisible: Read aloud
+- back
+- assertVisible:
+    id: conversation.composer.attachment.0

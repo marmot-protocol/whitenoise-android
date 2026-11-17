@@ -71,6 +71,30 @@ class MediaDecodeReplyTest {
         assertEquals(true, received)
     }
 
+    @Test
+    fun pdfReplyFieldsAreBoundedAndSeparateFromImageMetadata() {
+        val decoded =
+            roundTrip(
+                Bundle().apply {
+                    putInt("pdfPages", 1000)
+                    putInt("pdfWidth", 612)
+                    putInt("pdfHeight", 792)
+                },
+            )
+        assertEquals(1000, decoded.getInt("pdfPages"))
+        assertEquals(612, decoded.getInt("pdfWidth"))
+        for (bundle in listOf(
+            Bundle().apply { putInt("pdfPages", 1001) },
+            Bundle().apply { putInt("pdfStatus", 2) },
+            Bundle().apply {
+                putInt("pdfWidth", Int.MAX_VALUE)
+                putInt("pdfHeight", 1)
+            },
+        )) {
+            assertThrows(IllegalArgumentException::class.java) { roundTrip(bundle) }
+        }
+    }
+
     private fun roundTrip(result: Bundle): Bundle {
         val target =
             object : android.os.Binder() {

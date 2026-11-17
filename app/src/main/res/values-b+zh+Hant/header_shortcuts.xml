@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="header_shortcuts_title">聊天標題列快捷按鈕</string>
+    <string name="header_shortcut_search">在聊天中搜尋</string>
+    <string name="explanation_header_shortcut_search">在每個聊天的標題列顯示搜尋按鈕。它開啟的搜尋與聊天詳細資料中的相同。僅適用於這部裝置。</string>
+    <string name="explanation_header_shortcut_mute">在每個聊天的標題列顯示靜音按鈕。靜音時會詢問時長；取消靜音會立即生效。僅適用於這部裝置。</string>
+    <string name="explanation_header_shortcut_read_aloud">在每個聊天的標題列顯示朗讀按鈕。它會為該聊天開啟或關閉新訊息朗讀，與聊天詳細資料中的相同。僅適用於這部裝置。</string>
+    <string name="header_shortcuts_hint">標題列依你勾選的順序，顯示聊天名稱旁放得下的按鈕。</string>
+    <string name="conversation_header_timer_change">變更閱後即焚訊息計時器</string>
+    <string name="header_shortcut_members">成員</string>
+    <string name="explanation_header_shortcut_disappearing">在你可以變更閱後即焚訊息計時器的聊天中顯示計時器按鈕。它會開啟與聊天詳細資料相同的選擇器。僅適用於此裝置。</string>
+    <string name="explanation_header_shortcut_members">在群組聊天標題列中顯示成員按鈕。它會開啟成員清單。僅適用於此裝置。</string>
+    <string name="explanation_header_shortcut_add_members">在你可以新增成員的群組聊天中顯示新增成員按鈕。僅適用於此裝置。</string>
+</resources>

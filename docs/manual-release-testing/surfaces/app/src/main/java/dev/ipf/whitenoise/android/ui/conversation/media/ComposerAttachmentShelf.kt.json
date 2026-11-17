@@ -9,7 +9,8 @@
         "anchor": "fun ComposerAttachmentFilename(",
         "test_ids": [
           "MED-003",
-          "MED-009"
+          "MED-009",
+          "MED-056"
         ]
       },
       {
@@ -19,7 +20,8 @@
         "test_ids": [
           "MED-003",
           "MED-009",
-          "MED-026"
+          "MED-026",
+          "MED-056"
         ]
       },
       {
@@ -28,7 +30,8 @@
         "anchor": "fun ComposerAttachmentShelfCard(",
         "test_ids": [
           "MED-003",
-          "MED-009"
+          "MED-009",
+          "MED-056"
         ]
       },
       {
@@ -37,7 +40,8 @@
         "anchor": "fun ComposerAttachmentShelfItem(",
         "test_ids": [
           "MED-003",
-          "MED-009"
+          "MED-009",
+          "MED-056"
         ]
       },
       {
@@ -47,7 +51,8 @@
         "test_ids": [
           "MED-003",
           "MED-009",
-          "MED-026"
+          "MED-026",
+          "MED-056"
         ]
       }
     ],
@@ -58,7 +63,8 @@
         "anchor": "R.string.gif",
         "test_ids": [
           "MED-003",
-          "MED-009"
+          "MED-009",
+          "MED-056"
         ]
       },
       {
@@ -67,7 +73,8 @@
         "anchor": "R.string.media_attachment_remove",
         "test_ids": [
           "MED-003",
-          "MED-009"
+          "MED-009",
+          "MED-056"
         ]
       },
       {
@@ -76,7 +83,8 @@
         "anchor": "R.string.reply_media_document",
         "test_ids": [
           "MED-003",
-          "MED-009"
+          "MED-009",
+          "MED-056"
         ]
       },
       {
@@ -85,7 +93,16 @@
         "anchor": "R.string.reply_media_video",
         "test_ids": [
           "MED-003",
-          "MED-009"
+          "MED-009",
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "string:composer_preview_attachment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "R.string.composer_preview_attachment",
+        "test_ids": [
+          "MED-056"
         ]
       }
     ],
@@ -95,7 +112,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
         "anchor": "rememberShelfAnimation",
         "test_ids": [
-          "MED-031"
+          "MED-031",
+          "MED-056"
         ]
       }
     ]

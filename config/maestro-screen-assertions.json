@@ -2165,6 +2165,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerEditor.kt",
+      "symbol": "DisappearingTimerEditor",
+      "bindings": [
+        {
+          "case": "groups-retention-cancel",
+          "selector": {
+            "text": "Disappearing messages"
+          },
+          "scope": "chat details opens the shared timer editor's picker; Cancel keeps the original timer.",
+          "entry_assertion": {
+            "text": "Disappearing messages"
+          },
+          "opened_by": {
+            "text": "Disappearing"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
       "symbol": "GroupChangeConfirmationDialog",
       "bindings": [
@@ -3537,6 +3556,26 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatHeaderSettingsScreen.kt",
+      "symbol": "ChatHeaderSettingsScreen",
+      "bindings": [
+        {
+          "case": "settings-chats",
+          "selector": {
+            "id": "chatHeader.search"
+          },
+          "scope": "Chats opens the chat header shortcut check list; Back restores Chats. Assertions authored only, no toggle persistence, limit state, header rendering or device execution proof.",
+          "entry_assertion": {
+            "id": "chatHeader.search"
+          },
+          "opened_by": {
+            "text": "Chat header shortcuts"
+          }
+        }
+      ],
+      "remaining": "Toggle persistence, the two-shortcut limit, header button rendering and actions, read-aloud engine availability and visual qualification remain separate; this navigation case is unexecuted."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ComposerSettingsScreen.kt",
       "symbol": "ComposerSettingsScreen",
       "bindings": [
@@ -4740,8 +4779,8 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
-      "symbol": "MarkdownMessageBody",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WebLinkConfirmation.kt",
+      "symbol": "WebLinkConfirmation",
       "bindings": [
         {
           "case": "presentation-modal-link-confirmation",
@@ -6543,6 +6582,40 @@
               "text": "Privacy & Security"
             }
           }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+      "symbol": "DocumentAttachmentViewer",
+      "bindings": [
+        {
+          "case": "presentation-text-document-html",
+          "selector": {
+            "text": ".*<p>Fixture source paragraph</p>.*"
+          },
+          "scope": "Production HTML reader decodes fixture bytes and shows the original markup, including the <p> tag, on the Source tab. Sanitiser output, WebView rendering, link confirmation and PDF isolated-process pages unproven.",
+          "entry_assertion": {
+            "text": "Fixture page.html"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+      "symbol": "DocumentViewerFrame",
+      "bindings": [
+        {
+          "case": "presentation-text-document-html",
+          "selector": {
+            "text": "Fixture page.html"
+          },
+          "scope": "Reader frame title, Rendered/Source tabs and Close dispatch on fixture HTML bytes. Share/Save/Open-with overflow, PDF pages and native attachment download unproven.",
+          "entry_assertion": {
+            "text": "Fixture page.html"
+          },
+          "visible_on_entry": true
         }
       ]
     }

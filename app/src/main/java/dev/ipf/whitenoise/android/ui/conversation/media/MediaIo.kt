@@ -509,6 +509,12 @@ internal fun classifyAttachmentOpen(
             } else {
                 AttachmentOpenClassification.InvalidAndroidPackage
             }
+        fileName
+            .substringAfterLast(
+                '.',
+                "",
+            ).lowercase(java.util.Locale.ROOT) in ACTIVE_CONTENT_EXTENSIONS ->
+            AttachmentOpenClassification.Ready(INERT_TEXT_MIME)
         isActiveContentMime(openMime) -> AttachmentOpenClassification.Ready(INERT_TEXT_MIME)
         else -> AttachmentOpenClassification.Ready(openMime)
     }
@@ -1102,6 +1108,7 @@ internal fun sweepStaleSharedMedia(
     // Large-send snapshots belong to one process's retry state; an earlier process's are orphans at any age.
     // Run on its own so a failure above cannot leave hundreds of MiB of plaintext behind.
     runCatching { sweepOrphanedUploadSources(context.cacheDir) }
+    runCatching { sweepOrphanedDocumentReaderFiles(context.cacheDir) }
 }
 
 /** Files in `shared_media` older than this are considered safe to delete —

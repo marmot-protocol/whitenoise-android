@@ -85,6 +85,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WhiteNoise"
         android:zygotePreloadName="dev.ipf.whitenoise.android.media.sandbox.MediaZygotePreload">
+        <!-- The document reader's WebView must not upload usage metrics about sender documents. -->
+        <meta-data
+            android:name="android.webkit.WebView.MetricsOptOut"
+            android:value="true" />
 
         <!-- Still-image workers start from this app's own zygote where the OS uses one (#3373).
              zygotePreloadName stays fully qualified: Android resolves it against the package

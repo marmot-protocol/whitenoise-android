@@ -2883,4 +2883,12 @@
     <string name="emoji_name_marmot_smirk">Smirking marmot</string>
     <string name="emoji_name_marmot_cry">Crying marmot</string>
     <string name="emoji_name_marmot_angry">Angry marmot</string>
+    <string name="document_rendered">Rendered</string>
+    <string name="document_source">Source</string>
+    <string name="document_html_omitted">Images, styles and embedded content are omitted.</string>
+    <string name="document_html_unavailable">This HTML cannot be previewed. It may be too large, too complex or use an unsupported encoding.</string>
+    <string name="document_pdf_unavailable">This PDF cannot be previewed. It may be damaged, protected or too large.</string>
+    <string name="document_pdf_page">Page %1$d of %2$d</string>
+    <string name="document_zoom_reset">Zoom / reset</string>
+    <string name="composer_preview_attachment">Preview attachment</string>
 </resources>

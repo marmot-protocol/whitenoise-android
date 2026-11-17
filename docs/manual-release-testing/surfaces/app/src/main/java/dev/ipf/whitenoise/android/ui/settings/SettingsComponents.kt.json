@@ -51,6 +51,23 @@
         "test_ids": [
           "CON-048"
         ]
+      },
+      {
+        "surface": "SettingsCheckbox",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsCheckbox(",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "SettingsToggleRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsToggleRow(",
+        "test_ids": [
+          "SET-002",
+          "SET-058"
+        ]
       }
     ]
   },

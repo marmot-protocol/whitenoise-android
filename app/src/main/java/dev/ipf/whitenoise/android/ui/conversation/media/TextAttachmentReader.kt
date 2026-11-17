@@ -134,19 +134,23 @@ internal suspend fun WhiteNoiseAppState.speakTextAttachment(
     }
 }
 
+internal data class TextAttachmentSpeechContext(
+    val senderKey: String,
+    val senderDisplayName: String,
+    val messageIdHex: String,
+    val attachmentIndex: Int,
+)
+
 /** Full-screen dialog reading a text attachment. */
 @Composable
-@Suppress("LongParameterList", "LongMethod")
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod") // Explicit optional speech and export actions.
 internal fun TextAttachmentReaderDialog(
     actions: TextAttachmentNativeActions,
     candidate: TextAttachmentCandidate,
     appState: WhiteNoiseAppState,
-    senderKey: String,
-    senderDisplayName: String,
-    messageIdHex: String,
-    attachmentIndex: Int,
+    speechContext: TextAttachmentSpeechContext?,
     loadBytes: suspend () -> ByteArray,
-    onOpenExternal: suspend () -> Unit,
+    onOpenExternal: (suspend () -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     var loadGeneration by remember(candidate, actions) { mutableIntStateOf(0) }
@@ -163,10 +167,17 @@ internal fun TextAttachmentReaderDialog(
             TextAttachmentSpeechOwner(appState.ttsController, actions::isCurrent, appState::ownsCurrentAccountSpeech)
         }
     LaunchedEffect(actions, state) {
+        val identity = speechContext ?: return@LaunchedEffect
         val preview = (state as? TextAttachmentReaderState.Ready)?.preview ?: return@LaunchedEffect
         val prepared =
             withContext(Dispatchers.Default) {
-                textAttachmentTtsEntry(preview, senderKey, senderDisplayName, messageIdHex, attachmentIndex)
+                textAttachmentTtsEntry(
+                    preview,
+                    identity.senderKey,
+                    identity.senderDisplayName,
+                    identity.messageIdHex,
+                    identity.attachmentIndex,
+                )
             }
         if (actions.isCurrent()) entry = prepared
     }
@@ -176,16 +187,17 @@ internal fun TextAttachmentReaderDialog(
         preview: TextAttachmentPreview,
         hit: RenderedTextHit? = null,
     ) {
+        val identity = speechContext ?: return
         if (!actions.isCurrent() || speechRequested) return
         speechRequested = true
         scope.launch {
             try {
                 appState.speakTextAttachment(
                     preview,
-                    senderKey,
-                    senderDisplayName,
-                    messageIdHex,
-                    attachmentIndex,
+                    identity.senderKey,
+                    identity.senderDisplayName,
+                    identity.messageIdHex,
+                    identity.attachmentIndex,
                     actions,
                     hit,
                 )
@@ -234,16 +246,24 @@ internal fun TextAttachmentReaderDialog(
                     appState.present(R.string.copied)
                 }
             },
-            onReadAloud = { preview -> start(preview) },
-            onSave = { scope.launch { actions.save() } },
-            onShare = { scope.launch { actions.share() } },
+            onReadAloud = if (speechContext != null) ({ preview -> start(preview) }) else null,
+            onSave = if (actions.canSave) ({ scope.launch { actions.save() } }) else null,
+            onShare = if (actions.canShare) ({ scope.launch { actions.share() } }) else null,
             shareBusy = actions.sharing,
             readAloudBusy = speechRequested,
-            onOpenExternal = { scope.launch { onOpenExternal() } },
+            onOpenExternal =
+                onOpenExternal?.let { open ->
+                    {
+                        scope.launch { open() }
+                        Unit
+                    }
+                },
             mentionDisplayName = appState::mentionDisplayName,
             onNostrProfileTap = appState::presentProfile,
             transport = {
-                if (dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost.current == null) {
+                if (speechContext != null &&
+                    dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost.current == null
+                ) {
                     TtsTransportBar(appState)
                 }
             },
@@ -265,10 +285,10 @@ internal fun TextAttachmentReaderScreen(
     onDismiss: () -> Unit,
     onRetry: () -> Unit,
     onCopy: (String) -> Unit,
-    onReadAloud: (TextAttachmentPreview) -> Unit,
-    onOpenExternal: () -> Unit,
-    onSave: () -> Unit = {},
-    onShare: () -> Unit = {},
+    onReadAloud: ((TextAttachmentPreview) -> Unit)?,
+    onOpenExternal: (() -> Unit)?,
+    onSave: (() -> Unit)? = {},
+    onShare: (() -> Unit)? = {},
     shareBusy: Boolean = false,
     readAloudBusy: Boolean = false,
     modifier: Modifier = Modifier,
@@ -300,9 +320,15 @@ internal fun TextAttachmentReaderScreen(
                     onCopy = { preview?.let { onCopy(selection.selectedText(it.text)) } },
                     canCopy = preview?.text?.isNotEmpty() == true,
                     // A selection reads just that range, otherwise reading starts from the top of the document.
-                    onReadAloud = {
-                        preview?.let { onReadAloud(textAttachmentSelectedPreview(it, selection.selectedText(it.text))) }
-                    },
+                    onReadAloud =
+                        onReadAloud?.let { read ->
+                            {
+                                preview?.let {
+                                    read(textAttachmentSelectedPreview(it, selection.selectedText(it.text)))
+                                }
+                                Unit
+                            }
+                        },
                     canRead = !readAloudBusy && preview?.text?.isNotBlank() == true,
                 )
                 TopNoticeSlot()
@@ -349,13 +375,13 @@ internal fun TextAttachmentReaderScreen(
 @Suppress("LongParameterList", "LongMethod")
 private fun TextAttachmentReaderTopBar(
     onDismiss: () -> Unit,
-    onOpenExternal: () -> Unit,
-    onSave: () -> Unit,
-    onShare: () -> Unit,
+    onOpenExternal: (() -> Unit)?,
+    onSave: (() -> Unit)?,
+    onShare: (() -> Unit)?,
     shareBusy: Boolean,
     onCopy: () -> Unit,
     canCopy: Boolean,
-    onReadAloud: () -> Unit,
+    onReadAloud: (() -> Unit)?,
     canRead: Boolean,
 ) {
     var more by remember { mutableStateOf(false) }
@@ -373,8 +399,13 @@ private fun TextAttachmentReaderTopBar(
             }
         },
         actions = {
-            IconButton(onClick = onReadAloud, enabled = canRead) {
-                Icon(painterResource(R.drawable.ic_volume_up), contentDescription = stringResource(R.string.read_aloud))
+            if (onReadAloud != null) {
+                IconButton(onClick = onReadAloud, enabled = canRead) {
+                    Icon(
+                        painterResource(R.drawable.ic_volume_up),
+                        contentDescription = stringResource(R.string.read_aloud),
+                    )
+                }
             }
             IconButton(onClick = onCopy, enabled = canCopy) {
                 Icon(
@@ -382,29 +413,37 @@ private fun TextAttachmentReaderTopBar(
                     contentDescription = stringResource(R.string.copy_text),
                 )
             }
-            IconButton(onClick = onShare, enabled = !shareBusy) {
-                Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share))
-            }
-            Box {
-                IconButton(onClick = { more = true }) {
-                    Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
+            if (onShare != null) {
+                IconButton(onClick = onShare, enabled = !shareBusy) {
+                    Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share))
                 }
-                WhiteNoiseDropdownMenu(
-                    expanded = more,
-                    onDismissRequest = { more = false },
-                    items =
-                        listOf(
-                            WhiteNoiseMenuItem(
-                                label = stringResource(R.string.save),
-                                icon = R.drawable.ic_download,
-                                onClick = onSave,
+            }
+            if (onSave != null || onOpenExternal != null) {
+                Box {
+                    IconButton(onClick = { more = true }) {
+                        Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
+                    }
+                    WhiteNoiseDropdownMenu(
+                        expanded = more,
+                        onDismissRequest = { more = false },
+                        items =
+                            listOfNotNull(
+                                onSave?.let {
+                                    WhiteNoiseMenuItem(
+                                        label = stringResource(R.string.save),
+                                        icon = R.drawable.ic_download,
+                                        onClick = it,
+                                    )
+                                },
+                                onOpenExternal?.let {
+                                    WhiteNoiseMenuItem(
+                                        label = stringResource(R.string.text_attachment_open_external),
+                                        onClick = it,
+                                    )
+                                },
                             ),
-                            WhiteNoiseMenuItem(
-                                label = stringResource(R.string.text_attachment_open_external),
-                                onClick = onOpenExternal,
-                            ),
-                        ),
-                )
+                    )
+                }
             }
         },
     )
@@ -527,7 +566,7 @@ private fun TextAttachmentReaderContent(
     state: TextAttachmentReaderState,
     selection: TextAttachmentSelectionController,
     onRetry: () -> Unit,
-    onOpenExternal: () -> Unit,
+    onOpenExternal: (() -> Unit)?,
     onCopyLink: (String) -> Unit,
     mentionDisplayName: ((String) -> String?)?,
     onNostrProfileTap: ((String) -> Unit)?,
@@ -572,7 +611,7 @@ private fun TextAttachmentReadyBody(
     mentionDisplayName: ((String) -> String?)?,
     onNostrProfileTap: ((String) -> Unit)?,
     onCopyLink: (String) -> Unit,
-    onOpenExternal: () -> Unit,
+    onOpenExternal: (() -> Unit)?,
     speech: TextAttachmentTtsUi? = null,
 ) {
     Column(
@@ -606,7 +645,7 @@ private fun TextAttachmentReadyBody(
 }
 
 @Composable
-private fun TextAttachmentTruncatedNotice(onOpenExternal: () -> Unit) {
+private fun TextAttachmentTruncatedNotice(onOpenExternal: (() -> Unit)?) {
     Surface(
         color = MaterialTheme.colorScheme.tertiaryContainer,
         contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -627,8 +666,10 @@ private fun TextAttachmentTruncatedNotice(onOpenExternal: () -> Unit) {
                     modifier = Modifier.weight(1f),
                 )
             }
-            TextButton(onClick = onOpenExternal, modifier = Modifier.align(Alignment.End)) {
-                Text(stringResource(R.string.media_open))
+            if (onOpenExternal != null) {
+                TextButton(onClick = onOpenExternal, modifier = Modifier.align(Alignment.End)) {
+                    Text(stringResource(R.string.media_open))
+                }
             }
         }
     }
