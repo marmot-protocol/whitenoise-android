@@ -78,7 +78,8 @@ private const val MAX_STARTUP_COPY_FIELDS = 7
  * profile, relay list or KeyPackage) replaces the generic retry copy, because retrying cannot help; a caller's
  * specific detail is kept. Nothing was published, though a refused KeyPackage stays prepared locally. An account MDK
  * refused because this build opens without device groups always gets the compatible-build copy: its data is kept
- * and no retry on this build can open it.
+ * and no retry on this build can open it. An account whose other devices unlinked this one cannot sign in here
+ * again, so it is told to sign out and wipe instead of to retry.
  */
 internal fun failureDetail(
     throwable: Throwable,
@@ -86,6 +87,7 @@ internal fun failureDetail(
 ): AppText =
     when {
         throwable.requiresExperimentalDeviceGroups() -> AppText.Resource(R.string.error_linked_devices_build_required)
+        throwable is MarmotKitException.AccountUnlinked -> AppText.Resource(R.string.error_account_unlinked)
         detail == AppText.Resource(R.string.error_try_again) &&
             throwable is MarmotKitException.EventTooLarge &&
             throwable.artifact == OversizedArtifactFfi.OTHER -> AppText.Resource(R.string.error_update_too_large)

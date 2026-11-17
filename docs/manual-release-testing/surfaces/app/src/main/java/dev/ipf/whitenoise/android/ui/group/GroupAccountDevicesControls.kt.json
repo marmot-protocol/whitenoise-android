@@ -1,0 +1,73 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices in groups: R.string.group_account_devices_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+        "anchor": "R.string.group_account_devices_confirm",
+        "test_ids": [
+          "GRP-043"
+        ]
+      },
+      {
+        "surface": "Linked devices in groups: R.string.group_account_devices_confirm_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+        "anchor": "R.string.group_account_devices_confirm_message",
+        "test_ids": [
+          "GRP-043"
+        ]
+      },
+      {
+        "surface": "Linked devices in groups: R.string.group_account_devices_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+        "anchor": "R.string.group_account_devices_confirm_title",
+        "test_ids": [
+          "GRP-043"
+        ]
+      },
+      {
+        "surface": "Linked devices in groups: R.string.group_account_devices_enable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+        "anchor": "R.string.group_account_devices_enable",
+        "test_ids": [
+          "GRP-043"
+        ]
+      },
+      {
+        "surface": "Linked devices in groups: R.string.group_account_devices_enable_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+        "anchor": "R.string.group_account_devices_enable_detail",
+        "test_ids": [
+          "GRP-043"
+        ]
+      },
+      {
+        "surface": "Linked devices in groups: R.string.group_account_devices_enabled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+        "anchor": "R.string.group_account_devices_enabled",
+        "test_ids": [
+          "GRP-043"
+        ]
+      },
+      {
+        "surface": "Linked devices in groups: R.string.linked_devices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+        "anchor": "R.string.linked_devices",
+        "test_ids": [
+          "GRP-043"
+        ]
+      },
+      {
+        "surface": "GroupAccountDevicesConfirmDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+        "anchor": "fun GroupAccountDevicesConfirmDialog(",
+        "test_ids": [
+          "GRP-043"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

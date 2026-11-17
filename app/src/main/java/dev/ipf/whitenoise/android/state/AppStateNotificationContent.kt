@@ -1306,6 +1306,10 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                         rewindRestoreFailure(event)?.let { failure ->
                             launch(Dispatchers.Main) { presentRewindRestoreFailure(failure) }
                         }
+                        // Another of the account's devices removed this one: MDK has signed the account out here.
+                        deviceUnlinkedAccount(event)?.let { account ->
+                            launch(Dispatchers.Main) { presentDeviceUnlinked(account) }
+                        }
                         val received = (event as? MarmotEventFfi.MessageReceived)?.received
                         // Only the cheap kind and sender check runs here; the suppression reads run with the
                         // lookup, as a child of this loop, so they never delay the next event.

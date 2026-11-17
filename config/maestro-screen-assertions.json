@@ -6679,6 +6679,12 @@
       "symbol": "SignInReviewDialog",
       "bindings": [],
       "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this surface. Its states and actions are covered by JVM tests and the linked-devices manual scenarios on a test build; add a direct assertion when the entry point ships."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
+      "symbol": "GroupAccountDevicesConfirmDialog",
+      "bindings": [],
+      "remaining": "Linked devices is compiled out of ordinary builds, so no flow can open this surface. Its states and actions are covered by JVM tests and the linked-devices manual scenarios on a test build; add a direct assertion when the entry point ships."
     }
   ]
 }

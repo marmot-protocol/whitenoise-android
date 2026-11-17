@@ -35,6 +35,22 @@
         "test_ids": [
           "SET-001"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.wipe_report_left_to_other_devices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeProgressSheets.kt",
+        "anchor": "R.string.wipe_report_left_to_other_devices",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.wipe_report_other_devices_not_reached",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeProgressSheets.kt",
+        "anchor": "R.string.wipe_report_other_devices_not_reached",
+        "test_ids": [
+          "SET-065"
+        ]
       }
     ],
     "settings_controls": [

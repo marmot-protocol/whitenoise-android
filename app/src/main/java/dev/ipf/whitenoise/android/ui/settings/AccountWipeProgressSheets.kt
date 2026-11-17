@@ -121,6 +121,16 @@ internal fun WipeOutcomeSheet(
                 style = MaterialTheme.typography.titleLarge,
             )
             report.stages.forEach { stage -> WipeOutcomeStageRow(stage) }
+            // Chats handed to the account's other devices are not counted as left, a failed handoff is said plainly.
+            if (report.chatsLeftToOtherDevices > 0) {
+                Text(stringResource(R.string.wipe_report_left_to_other_devices, report.chatsLeftToOtherDevices))
+            }
+            if (report.otherDevicesNotReached) {
+                Text(
+                    stringResource(R.string.wipe_report_other_devices_not_reached),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                 ProfileKeyActionLabel(stringResource(R.string.close), R.drawable.ic_close)
             }
