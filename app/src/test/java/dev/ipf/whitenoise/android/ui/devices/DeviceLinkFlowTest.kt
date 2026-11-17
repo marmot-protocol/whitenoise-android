@@ -159,7 +159,7 @@ class DeviceLinkFlowTest {
         }
     }
 
-    /** Both choices start on, as MDK offers them, and one tap links under the default name with options closed. */
+    /** Both choices start on, as MDK offers them, and one tap links under the placeholder name, options closed. */
     @Test
     fun bothChoicesStartOn() {
         var linked: DeviceLinkChoices? = null
@@ -168,8 +168,8 @@ class DeviceLinkFlowTest {
         compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).assertDoesNotExist()
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
-        val defaultName = context.getString(R.string.link_request_default_label)
-        compose.runOnIdle { assertEquals(DeviceLinkChoices(label = defaultName), linked) }
+        val placeholder = context.getString(R.string.link_request_default_label)
+        compose.runOnIdle { assertEquals(DeviceLinkChoices(label = placeholder), linked) }
     }
 
     /** A name over MDK's byte limit says so, cannot be submitted, and keeps the options open when they are toggled. */

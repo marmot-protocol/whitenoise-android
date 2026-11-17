@@ -7,9 +7,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -147,7 +150,7 @@ private fun ActiveProfileLinkRequest(
     LaunchedEffect(controller.link) {
         controller.link?.let { watcher.accept(request.accountRef, it, blocked) }
     }
-    DeviceLinkFailureEffect(appState, controller)
+    val failed = rememberDeviceLinkFailed(controller)
     Dialog(
         onDismissRequest = { watcher.hidePresented(blocked) },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -158,8 +161,29 @@ private fun ActiveProfileLinkRequest(
             onLink = { choices -> scope.launch { controller.link(request.promptId, choices) } },
             onDecline = { scope.launch { controller.decline(request.promptId) } },
             onClose = { watcher.hidePresented(blocked) },
+            failed = failed,
         )
     }
+}
+
+/**
+ * Whether [controller]'s last command failed, for a step drawn over the whole window where the app's failure notice
+ * would sit unseen behind it. The flag clears when the next command starts.
+ */
+@Composable
+internal fun rememberDeviceLinkFailed(controller: DeviceLinkController): Boolean {
+    var failed by remember(controller) { mutableStateOf(false) }
+    val failure = controller.failure
+    val running = controller.running
+    LaunchedEffect(failure, running) {
+        if (failure != null) {
+            failed = true
+            controller.failureShown()
+        } else if (running != null) {
+            failed = false
+        }
+    }
+    return failed
 }
 
 /** Shows a failed link command once as the app's copyable failure notice. */

@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.settings.SettingsCallout
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -39,6 +40,7 @@ internal const val DEVICE_LINK_CODE_TAG = "device_link.code"
 internal const val DEVICE_LINK_STEP_TAG = "device_link.step"
 internal const val DEVICE_LINK_PRIMARY_TAG = "device_link.primary"
 internal const val DEVICE_LINK_SECONDARY_TAG = "device_link.secondary"
+internal const val DEVICE_LINK_FAILED_TAG = "device_link.failed"
 
 /** What the user can do on a link step. Each maps to one native call or to leaving the step. */
 internal enum class DeviceLinkAction(
@@ -171,7 +173,8 @@ internal fun DeviceLinkCode(
 /**
  * The shared layout of a link step: a heading, one explanation announced when it changes, the comparison code when
  * there is one, any extra [content], then the step's actions. While a command runs the main action shows progress
- * and neither action can be pressed again, so a second tap submits nothing.
+ * and neither action can be pressed again, so a second tap submits nothing. [failed] says the last action did not go
+ * through, on the step itself, because a notice behind a full-window step would not be seen.
  */
 @Composable
 internal fun DeviceLinkStepLayout(
@@ -181,6 +184,7 @@ internal fun DeviceLinkStepLayout(
     onBack: () -> Unit,
     onAction: (DeviceLinkAction) -> Unit,
     primaryEnabled: Boolean = true,
+    failed: Boolean = false,
     content: @Composable () -> Unit = {},
 ) {
     SettingsScaffold(title = screenTitle, onBack = onBack) {
@@ -207,6 +211,16 @@ internal fun DeviceLinkStepLayout(
             if (step.code.isNotEmpty()) item(key = "code") { DeviceLinkCode(step.code, block) }
             item(key = "content") {
                 Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField)) { content() }
+            }
+            if (failed) {
+                val polite = LiveRegionMode.Polite
+                item(key = "failed") {
+                    SettingsCallout(
+                        text = stringResource(R.string.link_device_action_failed),
+                        isError = true,
+                        modifier = Modifier.testTag(DEVICE_LINK_FAILED_TAG).semantics { liveRegion = polite },
+                    )
+                }
             }
             item(key = "actions") {
                 Column(block, verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {

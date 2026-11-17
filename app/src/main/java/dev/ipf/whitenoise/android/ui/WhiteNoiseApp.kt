@@ -89,6 +89,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestHost
+import dev.ipf.whitenoise.android.ui.devices.DeviceSelfNameEffect
 import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
@@ -863,6 +864,7 @@ internal fun WhiteNoiseApp(
         val linkBlocked = appState.appLock.screenVisible || groupChangeQuestion != null
         DeviceLinkRequestHost(appState, blocked = linkBlocked)
         DeviceLinkOfferHost(appState, blocked = linkBlocked)
+        DeviceSelfNameEffect(appState)
     }
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(

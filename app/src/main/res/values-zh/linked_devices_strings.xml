@@ -156,7 +156,7 @@
     <string name="link_offer_reminder">关联此设备，即可看到你其他设备上的聊天。</string>
     <string name="link_request_default_label">新设备</string>
     <string name="link_request_options">选项</string>
-    <string name="link_request_options_detail">该设备会加入你的所有聊天并获得聊天记录。点按可重命名或更改这些设置。</string>
+    <string name="link_request_options_detail">该设备会自行命名，加入你的所有聊天并获得聊天记录。点按可更改这些设置。</string>
     <string name="explanation_link_request_options">打开新设备的名称及其接收的内容。</string>
     <string name="device_move_advanced">高级</string>
     <string name="setup_device_link_next">登录后，你可以将此设备与你的其他设备关联，并在这里看到相同的聊天。</string>

@@ -156,7 +156,7 @@
     <string name="link_offer_reminder">Свяжите это устройство, чтобы видеть чаты с других ваших устройств.</string>
     <string name="link_request_default_label">Новое устройство</string>
     <string name="link_request_options">Параметры</string>
-    <string name="link_request_options_detail">Устройство присоединится ко всем вашим чатам и получит их историю. Нажмите, чтобы переименовать его или изменить это.</string>
+    <string name="link_request_options_detail">Устройство само задаст себе название, присоединится ко всем вашим чатам и получит их историю. Нажмите, чтобы изменить это.</string>
     <string name="explanation_link_request_options">Открывает название нового устройства и то, что оно получает.</string>
     <string name="device_move_advanced">Дополнительно</string>
     <string name="setup_device_link_next">После входа вы сможете связать это устройство с другими вашими устройствами и видеть здесь те же чаты.</string>

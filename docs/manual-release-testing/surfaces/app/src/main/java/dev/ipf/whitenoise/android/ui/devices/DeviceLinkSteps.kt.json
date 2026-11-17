@@ -250,6 +250,15 @@
         "test_ids": [
           "SET-060"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_action_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",
+        "anchor": "R.string.link_device_action_failed",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
       }
     ]
   },

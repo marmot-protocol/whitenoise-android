@@ -91,10 +91,11 @@ private fun addedElsewhereStep(state: DeviceLinkPromptStateFfi.AddedElsewhere): 
 
 /**
  * A link request as the approving device shows it. While MDK shows the code, Link device is one tap: the new device
- * gets a default name, joins the account's chats and receives their history (both on, as MDK offers them). Options
- * opens the name and the two choices for anyone who wants to change them, and a name over MDK's limit keeps them
- * open. The choices stay as entered if a submission fails. [onLink] receives them; [onDecline] is Not now; [onClose]
- * leaves without answering.
+ * gets a placeholder name, which it replaces with its model, and joins the account's chats with their history
+ * (both on, as MDK offers them). Options opens the name and the two choices for anyone who wants to change them,
+ * and a name over MDK's limit keeps them open. The choices stay as entered if a submission fails. [onLink]
+ * receives them; [onDecline] is Not now; [onClose] leaves without answering; [failed] says the last answer did not
+ * go through.
  */
 @Composable
 internal fun DeviceLinkRequestContent(
@@ -103,12 +104,19 @@ internal fun DeviceLinkRequestContent(
     onLink: (DeviceLinkChoices) -> Unit,
     onDecline: () -> Unit,
     onClose: () -> Unit,
+    failed: Boolean = false,
 ) {
-    val label = rememberTextFieldState(initialText = stringResource(R.string.link_request_default_label))
+    val label = rememberTextFieldState()
     var optionsOpen by rememberSaveable { mutableStateOf(false) }
     var addToAllChats by rememberSaveable { mutableStateOf(true) }
     var bringHistory by rememberSaveable { mutableStateOf(true) }
-    val name = label.text.toString().trim()
+    // MDK requires a name, so an empty field sends the placeholder the new device then replaces with its model.
+    val placeholder = stringResource(R.string.link_request_default_label)
+    val name =
+        label.text
+            .toString()
+            .trim()
+            .ifEmpty { placeholder }
     val nameFits = deviceLabelFits(name)
     val step = deviceLinkRequestStep(state) { IdentityFormatter.clockTime(it) }
     DeviceLinkStepLayout(
@@ -117,6 +125,7 @@ internal fun DeviceLinkRequestContent(
         running = running,
         onBack = onClose,
         primaryEnabled = nameFits,
+        failed = failed,
         onAction = { action ->
             when (action) {
                 DeviceLinkAction.Link -> onLink(DeviceLinkChoices(name, addToAllChats, bringHistory))
@@ -225,6 +234,7 @@ internal fun LinkThisDeviceContent(
     running: DeviceLinkCommand?,
     onBack: () -> Unit,
     onAction: (DeviceLinkAction) -> Unit,
+    failed: Boolean = false,
 ) {
     DeviceLinkStepLayout(
         screenTitle = stringResource(R.string.link_device_this_title),
@@ -232,5 +242,6 @@ internal fun LinkThisDeviceContent(
         running = running,
         onBack = onBack,
         onAction = onAction,
+        failed = failed,
     )
 }

@@ -255,6 +255,7 @@ private fun LinkedDeviceDetailRoute(
 internal fun LinkThisDeviceRoute(
     controller: DeviceLinkController,
     onClose: () -> Unit,
+    failed: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     val state = controller.link?.newDevice ?: NewDeviceLinkStateFfi.WaitingForAnswer
@@ -263,6 +264,7 @@ internal fun LinkThisDeviceRoute(
         step = newDeviceLinkStep(state),
         running = controller.running,
         onBack = onClose,
+        failed = failed,
         onAction = { action ->
             when (action) {
                 DeviceLinkAction.ConfirmMatch -> scope.launch { controller.confirmMatch() }

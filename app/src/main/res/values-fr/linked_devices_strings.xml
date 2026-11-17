@@ -156,7 +156,7 @@
     <string name="link_offer_reminder">Associez cet appareil pour voir les discussions de vos autres appareils.</string>
     <string name="link_request_default_label">Nouvel appareil</string>
     <string name="link_request_options">Options avancées</string>
-    <string name="link_request_options_detail">L’appareil rejoint toutes vos discussions et reçoit leur historique. Touchez pour le renommer ou modifier cela.</string>
+    <string name="link_request_options_detail">L’appareil se nomme lui-même, rejoint toutes vos discussions et reçoit leur historique. Touchez pour modifier cela.</string>
     <string name="explanation_link_request_options">Ouvre le nom du nouvel appareil et ce qu’il reçoit.</string>
     <string name="device_move_advanced">Avancé</string>
     <string name="setup_device_link_next">Après la connexion, vous pourrez associer cet appareil à vos autres appareils et voir les mêmes discussions ici.</string>
