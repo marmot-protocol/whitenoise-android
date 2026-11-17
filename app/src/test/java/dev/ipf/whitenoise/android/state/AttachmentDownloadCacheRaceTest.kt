@@ -83,10 +83,10 @@ class AttachmentDownloadCacheRaceTest {
             val allHoldersStarted = CompletableDeferred<Unit>()
             var startedHolders = 0
             val holders =
-                List(3) { index ->
+                List(SLOTS) { index ->
                     val holder = request("holder-$index")
                     appState.memoizedDownload(holder.cacheKey(), holder, AttachmentDownloadPriority.Automatic) {
-                        if (++startedHolders == 3) allHoldersStarted.complete(Unit)
+                        if (++startedHolders == SLOTS) allHoldersStarted.complete(Unit)
                         release.await()
                         byteArrayOf(7)
                     }
@@ -117,10 +117,10 @@ class AttachmentDownloadCacheRaceTest {
             val started = CompletableDeferred<Unit>()
             var holdersStarted = 0
             val holders =
-                List(3) { index ->
+                List(SLOTS) { index ->
                     val holder = request("occupied-$index")
                     appState.memoizedDownload(holder.cacheKey(), holder, AttachmentDownloadPriority.Automatic) {
-                        if (++holdersStarted == 3) started.complete(Unit)
+                        if (++holdersStarted == SLOTS) started.complete(Unit)
                         release.await()
                         byteArrayOf(7)
                     }
@@ -225,5 +225,10 @@ class AttachmentDownloadCacheRaceTest {
             key: String,
             value: String?,
         ) = Unit
+    }
+
+    private companion object {
+        /** Every download slot, so the next request queues. */
+        const val SLOTS = AttachmentDownloadGate.DEFAULT_PARALLELISM
     }
 }

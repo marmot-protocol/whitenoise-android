@@ -248,7 +248,7 @@ internal class AttachmentDownloadGate(
                 val registered = Waiter(key, accountRef, effectivePriority)
                 keyedWaiters.register(registered)
                 if (effectivePriority == AttachmentDownloadPriority.Automatic) {
-                    registered.demand = if (foreground) ++lastForegroundDemand else pendingDemand ?: 0
+                    registered.demand = pendingDemand ?: if (foreground) ++lastForegroundDemand else 0
                     queueAutomaticLocked(registered)
                 } else {
                     interactive.addLast(registered)

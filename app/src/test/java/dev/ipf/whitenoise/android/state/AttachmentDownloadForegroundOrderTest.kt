@@ -53,11 +53,11 @@ class AttachmentDownloadForegroundOrderTest {
                         start(gate, "background-0", started),
                         start(gate, "background-1", started),
                         start(gate, "background-2", started),
-                        start(gate, "tap", started, priority = INTERACTIVE),
                     )
                 gate.bringForward("background-2")
+                val tap = start(gate, "tap", started, priority = INTERACTIVE)
                 release.complete(Unit)
-                (queued + holder).awaitAll()
+                (queued + tap + holder).awaitAll()
 
                 assertEquals(listOf("holder", "tap", "background-2", "background-0", "background-1"), started)
             }
@@ -194,6 +194,34 @@ class AttachmentDownloadForegroundOrderTest {
                 val started = mutableListOf<String>()
                 val holder = start(gate, "holder", started) { release.await() }
                 val older = queuedOwner(acquisitions, gate, "older", started)
+                acquisitions.acquire("older", AUTOMATIC, foreground = true) { error("a join never starts an owner") }
+                val newer = start(gate, "newer", started, foreground = true)
+                kotlinx.coroutines.yield()
+                release.complete(Unit)
+                listOf(holder, older, newer).awaitAll()
+
+                assertEquals(listOf("holder", "newer", "older"), started)
+            }
+        }
+
+    /**
+     * A visible owner that a second bubble joins before it registers keeps that earlier demand: a newer visible
+     * request that registers first still goes ahead of it.
+     */
+    @Test
+    fun aLateRegisteringVisibleOwnerKeepsItsJoinedDemand() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val acquisitions = InFlightAttachmentAcquisitions(this, gate)
+                val release = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                val holder = start(gate, "holder", started) { release.await() }
+                val older =
+                    acquisitions.acquire("older", AUTOMATIC, foreground = true) {
+                        gate.withPermit("older", ACCOUNT, AUTOMATIC, foreground = true) { started += "older" }
+                        AttachmentAcquisitionOutcome.LegacyBytes(byteArrayOf())
+                    }
                 acquisitions.acquire("older", AUTOMATIC, foreground = true) { error("a join never starts an owner") }
                 val newer = start(gate, "newer", started, foreground = true)
                 kotlinx.coroutines.yield()
