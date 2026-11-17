@@ -19,7 +19,8 @@
           "MED-001",
           "MED-003",
           "MED-026",
-          "MED-042"
+          "MED-042",
+          "MED-023"
         ]
       },
       {
@@ -45,7 +46,8 @@
         "test_ids": [
           "MED-001",
           "MED-026",
-          "MED-042"
+          "MED-042",
+          "MED-023"
         ]
       },
       {
@@ -114,6 +116,14 @@
         "anchor": "fun MediaImageBubble(",
         "test_ids": [
           "MED-044"
+        ]
+      },
+      {
+        "surface": "Persistent image fallback validates native retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "val nativeState = controller.displayAttachmentNativeState(",
+        "test_ids": [
+          "MED-023"
         ]
       }
     ]

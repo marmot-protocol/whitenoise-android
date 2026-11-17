@@ -99,9 +99,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
-import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
-import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaThumbnail
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
@@ -726,6 +724,7 @@ class WhiteNoiseAppState private constructor(
 
     internal fun removeMediaMemoryCacheEntry(cacheKey: String) {
         assertMainThread { "removeMediaMemoryCacheEntry" }
+        displayThumbnails.retirePending(cacheKey)
         mediaPlaintextCache.remove(cacheKey)
         if (mediaThumbnailCache.remove(cacheKey) != null) mediaThumbnailRevisionState.update { it + 1L }
         bumpMediaCacheRevision()
@@ -737,28 +736,15 @@ class WhiteNoiseAppState private constructor(
         return (mediaPlaintextCache.keysSnapshot() + mediaThumbnailCache.keysSnapshot()).toSet()
     }
 
-    /**
-     * Persistent (L2) cache of decrypted attachment bytes. Survives process
-     * restart so re-opening a chat after a kill doesn't re-download every
-     * visible image. Sits behind [mediaPlaintextCache] (L1):
-     *
-     *   L1 hit → return
-     *   L2 hit → hydrate L1, return
-     *   miss   → FFI download, store in both
-     *
-     * Lives in `cacheDir/decrypted-media/` — Android's not-backed-up cache
-     * surface, encrypted with a Keystore-backed AES-GCM key. Sign-out wipes it
-     * alongside L1 so account A's decrypted media doesn't linger after switch.
-     */
-    internal val diskMediaCache =
-        DiskByteCache(
-            cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
-            maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
-            maxEntryBytes = DISK_MEDIA_CACHE_MAX_ENTRY_BYTES,
-            maxInMemoryEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES,
-            keyProvider = AndroidKeystoreDiskByteCacheKeyProvider(),
-            onMutation = ::bumpMediaCacheRevision,
-        )
+    /** Encrypted retained originals, separate from the bounded display derivatives. */
+    internal val diskMediaCache = createOriginalMediaCache(appContext, ::bumpMediaCacheRevision)
+    internal val displayThumbnails = createDisplayThumbnailCache(appContext)
+
+    /** Serializes presentation-owned encoders whose queued bitmap references are weak and cancellable. */
+    internal val displayThumbnailWritePermit = kotlinx.coroutines.sync.Semaphore(1)
+    internal val displayThumbnailReconciliationMutex = kotlinx.coroutines.sync.Mutex()
+    internal var displayThumbnailReconciliationJob: Job? = null
+    internal var displayThumbnailReconciliationRequested = false
 
     @Volatile
     private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime
@@ -4080,6 +4066,7 @@ class WhiteNoiseAppState private constructor(
                 check(activated || accountSetup.controller != null) { "startup account activation did not complete" }
             }
             bootstrapCompleted = true
+            scheduleDisplayThumbnailReconciliation()
         } catch (error: Throwable) {
             if (error is CancellationException) {
                 // The process-owned listener keeps retrying independently, but
@@ -5212,6 +5199,7 @@ class WhiteNoiseAppState private constructor(
      */
     private fun clearInMemoryMediaCaches() {
         assertMainThread { "clearInMemoryMediaCaches" }
+        displayThumbnails.retirePending()
         pendingSendDiagnostics.clear()
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
@@ -5294,7 +5282,7 @@ class WhiteNoiseAppState private constructor(
                 // Each target holds decrypted plaintext, so wipe them independently
                 // and best-effort: a failure in one (IO error, locked file) must not
                 // skip the others, and a swallowed failure should still be visible.
-                runCatchingCancellable { diskMediaCache.clear() }
+                runCatchingCancellable { clearMediaDiskCaches() }
                     .onFailure {
                         appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
                     }
@@ -6733,6 +6721,7 @@ class WhiteNoiseAppState private constructor(
             localNotificationPresenter.reconcileNotificationGroup()
             refreshNotificationBatteryPolicy()
             notificationScope.launch { catchUpAfterForegroundActivation() }
+            scheduleForegroundDisplayThumbnailReconciliation()
         }
         if (shouldStartBackgroundConnectionForForeground(foreground)) {
             notificationDelivery.startBackgroundConnectionService()
@@ -8415,7 +8404,10 @@ class WhiteNoiseAppState private constructor(
             mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
             // Wipe pre-encryption cache entries promptly after upgrade without doing
             // directory I/O in this main-thread constructor.
-            mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+            mutationsScope.launch(Dispatchers.IO) {
+                diskMediaCache.prepare()
+                displayThumbnails.prepare()
+            }
             mutationsScope.launch(Dispatchers.IO) { contactPictureStore.cleanOrphans() }
             // Load the persisted per-chat channel scopes before the settings UI
             // can request them, without blocking the main-thread constructor.

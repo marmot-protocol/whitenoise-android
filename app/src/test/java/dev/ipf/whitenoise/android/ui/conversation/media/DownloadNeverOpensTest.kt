@@ -13,6 +13,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -161,7 +163,12 @@ class DownloadNeverOpensTest {
         awaitDescribed(text(R.string.media_tap_to_download))
         val revision = composeRule.runOnIdle { fixture.state.attachmentOpens.revision }
 
-        composeRule.onNodeWithTag(fileAttachmentCardTestTag(request(0).messageIdHex, 0)).performClick()
+        val cardTag = fileAttachmentCardTestTag(request(0).messageIdHex, 0)
+        // Download semantics can exist while the first local-cache probe still keeps this card disabled.
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.onAllNodes(hasTestTag(cardTag) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(cardTag).performClick()
         awaitSingleTransfer()
         composeRule.runOnIdle { fixture.calls.single().succeed(byteArrayOf(5, 6, 7, 8)) }
         // The card's type glyph replaces its Download action once the file is on the device.

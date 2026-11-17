@@ -29,6 +29,7 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
+import dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -59,7 +60,13 @@ internal class MediaDownloadIntegrationFixture(
     private val root = Files.createTempDirectory("media-host-regression").toFile()
     private val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
     private val diskRoot = java.io.File(root, "encrypted")
+
     val disk = DiskByteCache(diskRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider)
+    val thumbnailRoot = java.io.File(root, "thumbnails")
+    val thumbnails =
+        PersistentDisplayThumbnails(
+            DiskByteCache(thumbnailRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider),
+        )
 
     /** Bumped whenever a native job is admitted, so a fixture feed opened before admission can wait for it. */
     private val jobAdmissions = MutableStateFlow(0L)
@@ -72,7 +79,28 @@ internal class MediaDownloadIntegrationFixture(
     val retryDemands = AtomicInteger()
 
     /** Chunk reads of retained plaintext, each of which the host writes into a lease file. */
+    private val nativePhases = ConcurrentHashMap<String, AttachmentTransferStateFfi>()
+
+    /** Simulates MDK's hourly cleanup or a later reacquisition without changing Android policy. */
+    fun setNativePhase(
+        index: Int,
+        phase: AttachmentTransferStateFfi,
+    ) {
+        val request = qualifiedRequest(index)
+        val target = AttachmentLocalTargetFfi(request.messageIdHex, checkNotNull(request.sourceMessageIdHex), 0u)
+        nativePhases[key(request.accountRef, request.groupIdHex, target)] = phase
+    }
+
     val nativeAssetReads = AtomicInteger()
+
+    /** Native progress feeds actually opened, distinct from one-shot metadata probes. */
+    val nativeSubscriptions = AtomicInteger()
+
+    /** Overrides retained-asset length to exercise bounded presentation without allocating a large fixture. */
+    var nativeAssetDeclaredBytes: ULong? = null
+
+    /** Observes a caller's native metadata read without changing the returned transfer state. */
+    var onNativeSnapshot: () -> Unit = {}
 
     /** Automatic requests still to refuse as policy-blocked, as MDK does before the host's approval lands. */
     val automaticPolicyBlocks = AtomicInteger()
@@ -110,7 +138,15 @@ internal class MediaDownloadIntegrationFixture(
         ).also {
             field("marmotRuntime").set(it, AppMarmotRuntime("test", nativeBoundary()))
             field("diskMediaCache").set(it, disk)
+            field("displayThumbnails").set(it, thumbnails)
         }
+
+    /** Models account activation without native sign-in, retaining every test cache and conversation owner. */
+    @Suppress("UNCHECKED_CAST")
+    fun activateAccount(account: String) {
+        val delegate = field("activeAccountRef\$delegate").get(state) as androidx.compose.runtime.MutableState<String?>
+        delegate.value = account
+    }
 
     /** A suspended native result; each test chooses when and whether verified bytes arrive. */
     class Call(
@@ -185,8 +221,9 @@ internal class MediaDownloadIntegrationFixture(
                 "attachmentLocalAssets" ->
                     targets(args!!).map { target ->
                         val key = key(args[0] as String, args[1] as String, target)
-                        jobs[key]?.bytes?.let { AttachmentLocalAssetFfi(key, it.size.toULong()) }
-                            ?: AttachmentLocalAssetFfi(null, 0u)
+                        jobs[key]?.bytes?.let {
+                            AttachmentLocalAssetFfi(key, nativeAssetDeclaredBytes ?: it.size.toULong())
+                        } ?: AttachmentLocalAssetFfi(null, 0u)
                     }
                 "readAttachmentAsset" -> {
                     nativeAssetReads.incrementAndGet()
@@ -205,16 +242,18 @@ internal class MediaDownloadIntegrationFixture(
                         )
                     }
                 }
-                "attachmentTransferSnapshot" ->
+                "attachmentTransferSnapshot" -> {
+                    onNativeSnapshot()
                     AttachmentTransferSnapshotFfi(
                         targets(args!!).map {
                             status(key(args[0] as String, args[1] as String, it))
                         },
                     )
-                "subscribeAttachmentTransfers" ->
-                    subscription(
-                        key(args!![0] as String, args[1] as String, targets(args).single()),
-                    )
+                }
+                "subscribeAttachmentTransfers" -> {
+                    nativeSubscriptions.incrementAndGet()
+                    subscription(key(args!![0] as String, args[1] as String, targets(args).single()))
+                }
                 "requestAutomaticAttachment", "requestExplicitAttachment", "downloadAttachmentAgain" -> {
                     val key = key(args!![0] as String, args[1] as String, args[2] as AttachmentLocalTargetFfi)
                     val automatic = method.name.substringBefore('-') == "requestAutomaticAttachment"
@@ -347,14 +386,15 @@ internal class MediaDownloadIntegrationFixture(
     private fun status(key: String): AttachmentTransferStatusFfi {
         val call = jobs[key]
         val state =
-            when {
-                call == null -> AttachmentTransferStateFfi.NOT_REQUESTED
-                call.bytes != null -> AttachmentTransferStateFfi.READY
-                call.failure != null -> AttachmentTransferStateFfi.FAILED
-                call.result.isCancelled -> AttachmentTransferStateFfi.CANCELLED
-                call.paused -> AttachmentTransferStateFfi.PAUSED
-                else -> AttachmentTransferStateFfi.DOWNLOADING
-            }
+            nativePhases[key]
+                ?: when {
+                    call == null -> AttachmentTransferStateFfi.NOT_REQUESTED
+                    call.bytes != null -> AttachmentTransferStateFfi.READY
+                    call.failure != null -> AttachmentTransferStateFfi.FAILED
+                    call.result.isCancelled -> AttachmentTransferStateFfi.CANCELLED
+                    call.paused -> AttachmentTransferStateFfi.PAUSED
+                    else -> AttachmentTransferStateFfi.DOWNLOADING
+                }
         return AttachmentTransferStatusFfi(if (call == null) null else key, state, 0u, 0u, null, null)
     }
 

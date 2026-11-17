@@ -1333,6 +1333,9 @@ private fun WhiteNoiseAppState.handleNotificationContentEvent(
     removedNotificationMessages(event).forEach { message ->
         recordNotificationContentRemoval(message)
         scope.launch {
+            removeMessageDisplayThumbnails(message.accountRef, message.groupIdHex, message.messageIdHex)
+        }
+        scope.launch {
             runCatchingCancellable { retractNotificationContent(message) }
                 .onFailure { appStateDebug(it) { "notification retraction failed" } }
         }
