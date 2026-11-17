@@ -151,4 +151,11 @@
     <string name="device_move_dismiss">关闭提醒</string>
     <string name="device_move_dismiss_detail">隐藏此提醒，不会关联或移除该设备。</string>
     <string name="device_move_overridden">你曾拒绝的部分设备在那里已经关联，因此仍保持关联。</string>
+    <string name="link_offer_title">要关联此设备吗？</string>
+    <string name="link_offer_detail">此账户已在另一台设备上使用。关联此设备即可在这里看到相同的聊天。你需要在两台设备上比对一组简短的表情符号。</string>
+    <string name="link_offer_reminder">关联此设备，即可看到你其他设备上的聊天。</string>
+    <string name="link_request_default_label">新设备</string>
+    <string name="link_request_options">选项</string>
+    <string name="link_request_options_detail">该设备会加入你的所有聊天并获得聊天记录。点按可重命名或更改这些设置。</string>
+    <string name="explanation_link_request_options">打开新设备的名称及其接收的内容。</string>
 </resources>

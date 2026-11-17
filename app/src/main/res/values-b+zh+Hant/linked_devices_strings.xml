@@ -151,4 +151,11 @@
     <string name="device_move_dismiss">關閉提醒</string>
     <string name="device_move_dismiss_detail">隱藏此提醒，不會連結或移除該裝置。</string>
     <string name="device_move_overridden">你曾拒絕的部分裝置在那裡已經連結，因此仍保持連結。</string>
+    <string name="link_offer_title">要連結此裝置嗎？</string>
+    <string name="link_offer_detail">此帳號已在另一部裝置上使用。連結此裝置即可在這裡看到相同的聊天。你需要在兩部裝置上比對一組簡短的表情符號。</string>
+    <string name="link_offer_reminder">連結此裝置，即可看到你其他裝置上的聊天。</string>
+    <string name="link_request_default_label">新裝置</string>
+    <string name="link_request_options">選項</string>
+    <string name="link_request_options_detail">該裝置會加入你的所有聊天並取得聊天記錄。點按即可重新命名或變更這些設定。</string>
+    <string name="explanation_link_request_options">開啟新裝置的名稱及其接收的內容。</string>
 </resources>

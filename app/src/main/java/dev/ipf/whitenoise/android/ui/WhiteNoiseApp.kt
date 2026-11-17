@@ -87,6 +87,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalPendingCameraCaptureFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
+import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestHost
 import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
@@ -859,7 +860,9 @@ internal fun WhiteNoiseApp(
     }
     // Link requests from any signed-in profile, held back while the app is locked or a group change waits on an answer.
     if (linkedDevicesAvailable() && appState.phase == AppPhase.Ready) {
-        DeviceLinkRequestHost(appState, blocked = appState.appLock.screenVisible || groupChangeQuestion != null)
+        val linkBlocked = appState.appLock.screenVisible || groupChangeQuestion != null
+        DeviceLinkRequestHost(appState, blocked = linkBlocked)
+        DeviceLinkOfferHost(appState, blocked = linkBlocked)
     }
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(

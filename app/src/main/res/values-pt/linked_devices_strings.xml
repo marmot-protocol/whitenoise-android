@@ -151,4 +151,11 @@
     <string name="device_move_dismiss">Dispensar lembrete</string>
     <string name="device_move_dismiss_detail">Oculta este lembrete. Não vincula nem remove o dispositivo.</string>
     <string name="device_move_overridden">Alguns dispositivos que você tinha rejeitado já estavam vinculados lá, então continuam vinculados.</string>
+    <string name="link_offer_title">Vincular este dispositivo?</string>
+    <string name="link_offer_detail">Esta conta já está em outro dispositivo. Vincule este para ver as mesmas conversas aqui. Você vai comparar um código curto de emojis nos dois dispositivos.</string>
+    <string name="link_offer_reminder">Vincule este dispositivo para ver as conversas dos seus outros dispositivos.</string>
+    <string name="link_request_default_label">Novo dispositivo</string>
+    <string name="link_request_options">Opções</string>
+    <string name="link_request_options_detail">O dispositivo entra em todas as suas conversas e recebe o histórico delas. Toque para renomeá-lo ou alterar isso.</string>
+    <string name="explanation_link_request_options">Abre o nome do novo dispositivo e o que ele recebe.</string>
 </resources>

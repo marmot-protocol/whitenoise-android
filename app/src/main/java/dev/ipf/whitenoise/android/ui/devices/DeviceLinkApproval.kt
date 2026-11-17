@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.state.DeviceLinkChoices
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.state.deviceLabelFits
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
@@ -31,6 +32,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 internal const val DEVICE_LINK_LABEL_TAG = "device_link.label"
 internal const val DEVICE_LINK_ADD_TO_CHATS_TAG = "device_link.add_to_chats"
 internal const val DEVICE_LINK_BRING_HISTORY_TAG = "device_link.bring_history"
+internal const val DEVICE_LINK_OPTIONS_TAG = "device_link.options"
 
 /**
  * The step for a link request on a device already signed in. Link device and Not now are offered only while MDK
@@ -88,10 +90,11 @@ private fun addedElsewhereStep(state: DeviceLinkPromptStateFfi.AddedElsewhere): 
 }
 
 /**
- * A link request as the approving device shows it. While MDK shows the code, the user names the new device and
- * chooses whether it joins the account's chats and receives their history (both on, as MDK offers them) before
- * Link device. The choices stay as entered if a submission fails. [onLink] receives them; [onDecline] is Not now;
- * [onClose] leaves without answering.
+ * A link request as the approving device shows it. While MDK shows the code, Link device is one tap: the new device
+ * gets a default name, joins the account's chats and receives their history (both on, as MDK offers them). Options
+ * opens the name and the two choices for anyone who wants to change them, and a name over MDK's limit keeps them
+ * open. The choices stay as entered if a submission fails. [onLink] receives them; [onDecline] is Not now; [onClose]
+ * leaves without answering.
  */
 @Composable
 internal fun DeviceLinkRequestContent(
@@ -101,7 +104,8 @@ internal fun DeviceLinkRequestContent(
     onDecline: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val label = rememberTextFieldState()
+    val label = rememberTextFieldState(initialText = stringResource(R.string.link_request_default_label))
+    var optionsOpen by rememberSaveable { mutableStateOf(false) }
     var addToAllChats by rememberSaveable { mutableStateOf(true) }
     var bringHistory by rememberSaveable { mutableStateOf(true) }
     val name = label.text.toString().trim()
@@ -122,6 +126,9 @@ internal fun DeviceLinkRequestContent(
         },
     ) {
         if (state is DeviceLinkPromptStateFfi.Comparing) {
+            DeviceLinkOptionsRow(onToggle = { optionsOpen = !optionsOpen })
+        }
+        if (state is DeviceLinkPromptStateFfi.Comparing && (optionsOpen || !nameFits)) {
             DeviceLinkChoiceFields(
                 label = label,
                 tooLong = stringResource(R.string.link_request_label_too_long).takeUnless { nameFits },
@@ -130,6 +137,24 @@ internal fun DeviceLinkRequestContent(
                 enabled = running == null,
                 onAddToAllChats = { addToAllChats = it },
                 onBringHistory = { bringHistory = it },
+            )
+        }
+    }
+}
+
+/** The row that opens and closes the approving user's choices, saying what applies while they stay closed. */
+@Composable
+private fun DeviceLinkOptionsRow(onToggle: () -> Unit) {
+    SettingsGroup {
+        row("options") { context ->
+            SettingsAction(
+                context = context,
+                title = stringResource(R.string.link_request_options),
+                subtitle = stringResource(R.string.link_request_options_detail),
+                onClick = onToggle,
+                modifier = Modifier.testTag(DEVICE_LINK_OPTIONS_TAG),
+                explanation = stringResource(R.string.explanation_link_request_options),
+                leading = { SettingsLeadingIcon(R.drawable.ic_expand_more) },
             )
         }
     }

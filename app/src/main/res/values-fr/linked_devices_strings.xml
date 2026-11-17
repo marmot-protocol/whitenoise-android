@@ -151,4 +151,11 @@
     <string name="device_move_dismiss">Ignorer le rappel</string>
     <string name="device_move_dismiss_detail">Masque ce rappel. Cela n’associe ni ne supprime l’appareil.</string>
     <string name="device_move_overridden">Certains appareils que vous aviez refusés y étaient déjà associés ; ils le restent.</string>
+    <string name="link_offer_title">Associer cet appareil ?</string>
+    <string name="link_offer_detail">Ce compte est déjà utilisé sur un autre appareil. Associez celui-ci pour voir les mêmes discussions ici. Vous comparerez un court code d’emojis sur les deux appareils.</string>
+    <string name="link_offer_reminder">Associez cet appareil pour voir les discussions de vos autres appareils.</string>
+    <string name="link_request_default_label">Nouvel appareil</string>
+    <string name="link_request_options">Options avancées</string>
+    <string name="link_request_options_detail">L’appareil rejoint toutes vos discussions et reçoit leur historique. Touchez pour le renommer ou modifier cela.</string>
+    <string name="explanation_link_request_options">Ouvre le nom du nouvel appareil et ce qu’il reçoit.</string>
 </resources>

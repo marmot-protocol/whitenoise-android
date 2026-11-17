@@ -1,0 +1,117 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_this_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "R.string.link_device_this_title",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_offer_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "R.string.link_offer_detail",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_offer_reminder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "R.string.link_offer_reminder",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_offer_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "R.string.link_offer_title",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_request_not_now",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "R.string.link_request_not_now",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "DeviceLinkOfferDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "fun DeviceLinkOfferDialog(",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "DeviceLinkOfferHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "fun DeviceLinkOfferHost(",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "DeviceLinkOfferSettled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "fun DeviceLinkOfferSettled(",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "DeviceLinkOfferSteps",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "fun DeviceLinkOfferSteps(",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "DeviceLinkReminder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "fun DeviceLinkReminder(",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "DeviceLinkReminderBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
+        "anchor": "fun DeviceLinkReminderBanner(",
+        "test_ids": [
+          "ACC-025",
+          "SET-060"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

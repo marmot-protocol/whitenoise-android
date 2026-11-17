@@ -66,6 +66,7 @@ private fun LinkedDevicesPages(
     var reviewingSlot by rememberSaveable(key) { mutableStateOf<String?>(null) }
     var repairing by rememberSaveable(key) { mutableStateOf(false) }
     DeviceLinkFailureEffect(appState, controller)
+    DeviceLinkOfferSettled(appState, controller)
     DeviceManagementFailureEffect(appState, management)
     val openDevice = deviceSlot?.let { controller.roster.roster?.device(it) }
     when {
@@ -222,7 +223,7 @@ private fun LinkedDeviceDetailRoute(
  * roster offers the way back in. Only Cancel cancels, and Try again starts a fresh request.
  */
 @Composable
-private fun LinkThisDeviceRoute(
+internal fun LinkThisDeviceRoute(
     controller: DeviceLinkController,
     onClose: () -> Unit,
 ) {

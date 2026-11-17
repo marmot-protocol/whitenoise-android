@@ -151,4 +151,11 @@
     <string name="device_move_dismiss">Hatırlatıcıyı kapat</string>
     <string name="device_move_dismiss_detail">Bu hatırlatıcıyı gizler. Cihazı bağlamaz veya kaldırmaz.</string>
     <string name="device_move_overridden">Reddettiğiniz bazı cihazlar orada zaten bağlıydı, bu yüzden bağlı kalıyor.</string>
+    <string name="link_offer_title">Bu cihaz bağlansın mı?</string>
+    <string name="link_offer_detail">Bu hesap zaten başka bir cihazda. Aynı sohbetleri burada görmek için bu cihazı bağlayın. Her iki cihazda kısa bir emoji kodunu karşılaştıracaksınız.</string>
+    <string name="link_offer_reminder">Diğer cihazlarınızdaki sohbetleri görmek için bu cihazı bağlayın.</string>
+    <string name="link_request_default_label">Yeni cihaz</string>
+    <string name="link_request_options">Seçenekler</string>
+    <string name="link_request_options_detail">Cihaz tüm sohbetlerinize katılır ve geçmişlerini alır. Yeniden adlandırmak veya bunu değiştirmek için dokunun.</string>
+    <string name="explanation_link_request_options">Yeni cihazın adını ve neler alacağını açar.</string>
 </resources>

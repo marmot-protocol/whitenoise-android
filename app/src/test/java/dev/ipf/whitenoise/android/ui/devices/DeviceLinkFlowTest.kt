@@ -11,7 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.DeviceGroupMoveSiblingFfi
 import dev.ipf.marmotkit.DeviceGroupMoveStateFfi
@@ -149,7 +149,8 @@ class DeviceLinkFlowTest {
         var linked: DeviceLinkChoices? = null
         request(DeviceLinkPromptStateFfi.Comparing(CODE), onLink = { linked = it })
 
-        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextInput("  Desk  ")
+        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextReplacement("  Desk  ")
         compose.onNodeWithTag(DEVICE_LINK_BRING_HISTORY_TAG).performScrollTo().performClick()
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
@@ -158,24 +159,28 @@ class DeviceLinkFlowTest {
         }
     }
 
-    /** Both choices start on, as MDK offers them. */
+    /** Both choices start on, as MDK offers them, and one tap links under the default name with options closed. */
     @Test
     fun bothChoicesStartOn() {
         var linked: DeviceLinkChoices? = null
         request(DeviceLinkPromptStateFfi.Comparing(CODE), onLink = { linked = it })
 
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).assertDoesNotExist()
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
 
-        compose.runOnIdle { assertEquals(DeviceLinkChoices(), linked) }
+        val defaultName = context.getString(R.string.link_request_default_label)
+        compose.runOnIdle { assertEquals(DeviceLinkChoices(label = defaultName), linked) }
     }
 
-    /** A name over MDK's byte limit says so and cannot be submitted. */
+    /** A name over MDK's byte limit says so, cannot be submitted, and keeps the options open when they are toggled. */
     @Test
     fun anOverlongNameCannotBeSubmitted() {
         var links = 0
         request(DeviceLinkPromptStateFfi.Comparing(CODE), onLink = { links++ })
 
-        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextInput("a".repeat(65))
+        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextReplacement("a".repeat(65))
+        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
 
         compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().assertIsNotEnabled()
         compose.onNodeWithText(context.getString(R.string.link_request_label_too_long)).assertExists()

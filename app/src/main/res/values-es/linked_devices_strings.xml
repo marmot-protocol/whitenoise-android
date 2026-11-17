@@ -151,4 +151,11 @@
     <string name="device_move_dismiss">Descartar recordatorio</string>
     <string name="device_move_dismiss_detail">Oculta este recordatorio. No vincula ni elimina el dispositivo.</string>
     <string name="device_move_overridden">Algunos dispositivos que habías rechazado ya estaban vinculados allí, así que siguen vinculados.</string>
+    <string name="link_offer_title">¿Vincular este dispositivo?</string>
+    <string name="link_offer_detail">Esta cuenta ya está en otro dispositivo. Vincula este para ver aquí los mismos chats. Compararás un código corto de emojis en ambos dispositivos.</string>
+    <string name="link_offer_reminder">Vincula este dispositivo para ver los chats de tus otros dispositivos.</string>
+    <string name="link_request_default_label">Dispositivo nuevo</string>
+    <string name="link_request_options">Opciones</string>
+    <string name="link_request_options_detail">El dispositivo se une a todos tus chats y recibe su historial. Toca para cambiarle el nombre o modificar esto.</string>
+    <string name="explanation_link_request_options">Abre el nombre del nuevo dispositivo y lo que recibe.</string>
 </resources>

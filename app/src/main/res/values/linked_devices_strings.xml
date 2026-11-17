@@ -151,4 +151,11 @@
     <string name="device_move_dismiss">Dismiss reminder</string>
     <string name="device_move_dismiss_detail">Hides this reminder. It doesn\'t link or remove the device.</string>
     <string name="device_move_overridden">Some devices you had rejected were already linked there, so they stay linked.</string>
+    <string name="link_offer_title">Link this device?</string>
+    <string name="link_offer_detail">This account is already on another device. Link this one to see the same chats here. You\'ll compare a short emoji code on both devices.</string>
+    <string name="link_offer_reminder">Link this device to see your chats from your other devices.</string>
+    <string name="link_request_default_label">New device</string>
+    <string name="link_request_options">Options</string>
+    <string name="link_request_options_detail">The device joins all your chats and gets their history. Tap to rename it or change this.</string>
+    <string name="explanation_link_request_options">Opens the new device\'s name and what it receives.</string>
 </resources>

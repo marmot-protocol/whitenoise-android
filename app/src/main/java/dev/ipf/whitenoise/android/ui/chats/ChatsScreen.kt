@@ -148,6 +148,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberScrollEdgeFadeMotion
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
+import dev.ipf.whitenoise.android.ui.devices.DeviceLinkReminder
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
@@ -2642,6 +2643,7 @@ internal fun ChatsScreen(
                             onDismiss = { appState.launchMutation { owner.dismissAll() } },
                         )
                     }
+                    if (!searchActive && !browsingAttachments) DeviceLinkReminder(appState)
                 },
             ) {
                 val unreadOwnerAvailable =

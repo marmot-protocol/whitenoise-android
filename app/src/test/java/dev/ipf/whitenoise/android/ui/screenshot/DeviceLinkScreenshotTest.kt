@@ -20,7 +20,9 @@ import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.state.LinkedDeviceRoster
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkAvailability
+import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferDialog
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOtherProfileDialog
+import dev.ipf.whitenoise.android.ui.devices.DeviceLinkReminderBanner
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestContent
 import dev.ipf.whitenoise.android.ui.devices.LinkThisDeviceContent
 import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesContent
@@ -93,18 +95,40 @@ class DeviceLinkScreenshotTest {
         newDevice("device_link_new_ended_amoled", ended, Look(dark = true, amoled = true))
     }
 
-    /** The approving device comparing, with the name field and both choices on. */
+    /** The approving device comparing, with Link device one tap away and the choices behind Options. */
     @Test
     fun requestComparingLight() {
         request("device_link_request_comparing_light", DeviceLinkPromptStateFfi.Comparing(fixtureCode()))
     }
 
-    /** The approval choices wrap in dark theme, RTL and large text. */
+    /** The approval step wraps in dark theme, RTL and large text. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h2200dp-mdpi")
     fun requestComparingDarkRtlLargeFont() {
         val comparing = DeviceLinkPromptStateFfi.Comparing(fixtureCode())
         request("device_link_request_comparing_dark_rtl_large_font", comparing, Look(dark = true, rtl = true))
+    }
+
+    /** The offer to link this device after a sign-in that found the account elsewhere. */
+    @Test
+    fun offerLight() {
+        show(Look()) { DeviceLinkOfferDialog(onLink = {}, onNotNow = {}) }
+        compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/device_link_offer_light.png")
+    }
+
+    /** The chat list's reminder after Not now. */
+    @Test
+    fun reminderLight() {
+        show(Look()) { DeviceLinkReminderBanner(onLink = {}, onDismiss = {}) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_reminder_light.png")
+    }
+
+    /** The reminder's actions wrap in dark theme, RTL and large text. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h900dp-mdpi")
+    fun reminderDarkRtlLargeFont() {
+        show(Look(dark = true, rtl = true)) { DeviceLinkReminderBanner(onLink = {}, onDismiss = {}) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_reminder_dark_rtl_large_font.png")
     }
 
     /** The approving device while the new device joins, with the action showing progress. */
