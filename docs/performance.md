@@ -405,7 +405,7 @@ below for this probe: that runner intentionally replaces the existing dev app.
 
 The network phase makes 20 sequential native calls for the first image with no
 Android plaintext cache, then 20 batches of the sixteen distinct references
-through the actual three-slot gate (340 native download calls total, roughly
+through the actual four-slot gate (340 native download calls total, roughly
 22 MiB of image payload). The transport and server caches may already be warm;
 only the Android plaintext cache is bypassed. Each batch asserts the host
 concurrency bound and byte equality. Reports separate per-request latency
@@ -452,7 +452,7 @@ PSS separately with `dumpsys meminfo`; RSS counts shared zygote pages per proces
 Run `MediaDownloadHostRegressionTest` for the actual app-state download and
 encrypted-cache path with a suspended synthetic native boundary, and
 `MediaImageBubbleLatencyTest` for the production Compose image bubble. The
-host tests assert distinct-request ownership, three-slot admission, explicit
+host tests assert distinct-request ownership, four-slot admission, explicit
 priority promotion, useful progress alongside a delayed native call, no
 host retry loop after native timeout/integrity failure, account isolation, and
 cache reuse after the caller leaves and returns. The Compose tests cover decoded

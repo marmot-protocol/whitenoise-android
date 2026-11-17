@@ -25,6 +25,15 @@ internal enum class AttachmentDemandIntent {
     Retry,
 }
 
+/**
+ * An automatic request a visible bubble made, as opposed to durable background work, which only observes. It queues
+ * ahead of background automatic work, so the images on screen are fetched first.
+ */
+internal fun isForegroundAutomatic(
+    priority: AttachmentDownloadPriority,
+    demandIntent: AttachmentDemandIntent,
+): Boolean = priority == AttachmentDownloadPriority.Automatic && demandIntent != AttachmentDemandIntent.Observe
+
 /** Admits one deliberate retry before platform work or a viewer can observe the replacement acquisition. */
 internal suspend fun WhiteNoiseAppState.requestAttachmentRetry(request: AttachmentTransferRequest) {
     val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()

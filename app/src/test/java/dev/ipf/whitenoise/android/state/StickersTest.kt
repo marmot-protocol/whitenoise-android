@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerPackFfi
+import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -17,6 +18,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.URI
+import java.net.URLDecoder
 
 /** Sticker image caching and the pack library's loading, discovery and sync rules. */
 class StickersTest {
@@ -364,6 +367,77 @@ class StickersTest {
             assertEquals(null, library(null).shareLink(pack("a")))
         }
 
+    /** White Noise's packs are fetched through links naming its relays, and only an Add installs one, via that link. */
+    @Test
+    fun whiteNoisePacksAreFetchedThroughItsRelaysAndInstallOnlyOnAdd() =
+        runTest {
+            val lookups = mutableListOf<String>()
+            val installs = mutableListOf<String>()
+            val library =
+                StickerLibrary(
+                    packs = { _, _ -> emptyList() },
+                    syncPacks = {},
+                    fetchPack = { input -> packAt(linkedCoordinate(input)).also { lookups += input } },
+                    installPack = { input ->
+                        installs += input
+                        packAt(linkedCoordinate(input), installed = true)
+                    },
+                    uninstallPack = { error("unused") },
+                )
+
+            val offered = library.whiteNoisePacks()
+            val links = WhiteNoiseStickerPacks.coordinates.map(WhiteNoiseStickerPacks::link)
+            assertEquals(WhiteNoiseStickerPacks.coordinates, offered.map { it.coordinate })
+            assertEquals(links, lookups)
+            assertEquals(emptyList<String>(), installs)
+
+            library.install(offered.first())
+            assertEquals(links.take(1), installs)
+        }
+
+    /** An installed or unreachable White Noise pack is left out of the offer. */
+    @Test
+    fun installedOrUnreachableWhiteNoisePacksAreLeftOut() =
+        runTest {
+            val (originals, marmot) = WhiteNoiseStickerPacks.coordinates
+            val library =
+                StickerLibrary(
+                    packs = { _, _ -> listOf(packAt(originals, installed = true)) },
+                    syncPacks = {},
+                    fetchPack = { input ->
+                        check(linkedCoordinate(input) != marmot) { "relay unreachable" }
+                        packAt(linkedCoordinate(input))
+                    },
+                    installPack = { error("unused") },
+                    uninstallPack = { error("unused") },
+                )
+            library.loadInstalledIfNeeded()
+
+            assertEquals(emptyList<StickerPackFfi>(), library.whiteNoisePacks())
+        }
+
+    /** Each White Noise link names the pack and every White Noise bootstrap relay. */
+    @Test
+    fun whiteNoiseLinksNameEveryBootstrapRelay() {
+        for (coordinate in WhiteNoiseStickerPacks.coordinates) {
+            val link = URI(WhiteNoiseStickerPacks.link(coordinate))
+            val parameters =
+                link.rawQuery.split('&').map { part ->
+                    val (name, value) = part.split('=', limit = 2)
+                    name to URLDecoder.decode(value, "UTF-8")
+                }
+            assertEquals("https", link.scheme)
+            assertEquals(listOf(coordinate), parameters.filter { it.first == "a" }.map { it.second })
+            assertEquals(MarmotClient.bootstrapRelays, parameters.filter { it.first == "relay" }.map { it.second })
+        }
+    }
+
+    /** The pack coordinate a Sonar link names. */
+    private fun linkedCoordinate(link: String): String {
+        val encoded = link.substringAfter("a=").substringBefore('&')
+        return URLDecoder.decode(encoded, "UTF-8")
+    }
+
     private companion object {
         val KEY = StickerKey(coordinate("pack"), "wave", "ab".repeat(32))
 
@@ -381,6 +455,12 @@ class StickersTest {
                 null,
                 null,
             )
+
+        /** A pack at an arbitrary [coordinate], such as one of White Noise's defaults. */
+        fun packAt(
+            coordinate: String,
+            installed: Boolean = false,
+        ) = pack(coordinate.substringAfterLast(':'), installed).copy(coordinate = coordinate)
 
         fun pack(
             id: String,

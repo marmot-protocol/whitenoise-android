@@ -31,6 +31,7 @@ internal class AutomaticBacklogStoppedException : CancellationException("automat
  * permit so a short-lived concurrency hiccup self-heals before the UI exposes a
  * manual retry affordance.
  */
+@Suppress("TooManyFunctions") // Each lane change (promote, bring forward, forget) is one small locked operation.
 internal class AttachmentDownloadGate(
     parallelism: Int = DEFAULT_PARALLELISM,
 ) {
@@ -44,7 +45,12 @@ internal class AttachmentDownloadGate(
         var priority: AttachmentDownloadPriority,
         val admitted: CompletableDeferred<Unit> = CompletableDeferred(),
         var ownsPermit: Boolean = false,
-    )
+        var demand: Long = 0,
+    ) {
+        /** Whether this request is still waiting in the automatic lane. */
+        val queuedAutomatic: Boolean
+            get() = !ownsPermit && priority == AttachmentDownloadPriority.Automatic
+    }
 
     /** Tracks stale replacements while enforcing one permit owner per caller key. */
     private class KeyedWaiters {
@@ -73,6 +79,8 @@ internal class AttachmentDownloadGate(
     private val interactive = ArrayDeque<Waiter>()
     private val keyedWaiters = KeyedWaiters()
     private val pendingPromotions = mutableSetOf<String>()
+    private val pendingForeground = mutableMapOf<String, Long>()
+    private var lastForegroundDemand = 0L
     private val anonymousKey = AtomicLong()
     private var activePermits = 0
     private var consecutiveInteractiveAdmissions = 0
@@ -91,13 +99,20 @@ internal class AttachmentDownloadGate(
             block = block,
         )
 
+    /**
+     * Runs [block] while holding one permit for [key]. A [foreground] automatic request, one a visible bubble made,
+     * queues ahead of every other automatic request, the newest first, as MDK orders its own automatic queue.
+     * Background work queues behind them in arrival order. Interactive requests still go first, except that after
+     * [MAX_INTERACTIVE_BURST] of them in a row one automatic request, the front of that queue, is admitted.
+     */
     suspend fun <T> withPermit(
         key: String,
         accountRef: String?,
         priority: AttachmentDownloadPriority,
+        foreground: Boolean = false,
         block: suspend () -> T,
     ): T {
-        val waiter = acquire(key, accountRef, priority)
+        val waiter = acquire(key, accountRef, priority, foreground)
         try {
             return block()
         } finally {
@@ -126,6 +141,33 @@ internal class AttachmentDownloadGate(
                 }
             true
         }
+
+    /**
+     * Moves a queued automatic request for [key], one a visible bubble asked for again after joining it, to the front
+     * of the automatic queue. Interactive requests keep their lane, which wins except for the one automatic admission
+     * every [MAX_INTERACTIVE_BURST] taps. Joined work can exist before its owner registers here, so the demand is kept,
+     * with its order among visible requests, until the key registers or [forgetForeground] drops it.
+     */
+    fun bringForward(key: String) {
+        synchronized(lock) {
+            val demand = ++lastForegroundDemand
+            val waiters = keyedWaiters.forKey(key)
+            if (waiters == null) {
+                pendingForeground[key] = demand
+                return
+            }
+            waiters.filter(Waiter::queuedAutomatic).forEach { waiter ->
+                automatic.remove(waiter)
+                waiter.demand = demand
+                automatic.addFirst(waiter)
+            }
+        }
+    }
+
+    /** Drops a [bringForward] still waiting for [key]'s owner, once that owner has finished without registering. */
+    fun forgetForeground(key: String) {
+        synchronized(lock) { pendingForeground.remove(key) }
+    }
 
     /** True only while this attachment currently owns one of the bounded native-work permits. */
     fun isAdmitted(key: String): Boolean =
@@ -180,14 +222,20 @@ internal class AttachmentDownloadGate(
         }
     }
 
+    /**
+     * Registers one waiter for [key] and suspends until it owns a permit. A [foreground] automatic request, or one
+     * whose key a visible bubble asked for before registration, queues by that visible demand.
+     */
     private suspend fun acquire(
         key: String,
         accountRef: String?,
         priority: AttachmentDownloadPriority,
+        foreground: Boolean,
     ): Waiter {
         val waiter =
             synchronized(lock) {
                 val promotedBeforeRegistration = pendingPromotions.remove(key)
+                val pendingDemand = pendingForeground.remove(key)
                 val effectivePriority =
                     if (
                         priority == AttachmentDownloadPriority.Interactive ||
@@ -199,7 +247,12 @@ internal class AttachmentDownloadGate(
                     }
                 val registered = Waiter(key, accountRef, effectivePriority)
                 keyedWaiters.register(registered)
-                lane(effectivePriority).addLast(registered)
+                if (effectivePriority == AttachmentDownloadPriority.Automatic) {
+                    registered.demand = pendingDemand ?: if (foreground) ++lastForegroundDemand else 0
+                    queueAutomaticLocked(registered)
+                } else {
+                    interactive.addLast(registered)
+                }
                 admitAvailableLocked()
                 registered
             }
@@ -222,6 +275,15 @@ internal class AttachmentDownloadGate(
             }
             throw cancellation
         }
+    }
+
+    /**
+     * Keeps the automatic queue ordered newest visible demand first, then background work in arrival order. A demand
+     * made before its owner registered keeps its place among later visible requests.
+     */
+    private fun queueAutomaticLocked(waiter: Waiter) {
+        val position = automatic.indexOfFirst { it.demand < waiter.demand }
+        if (waiter.demand == 0L || position < 0) automatic.addLast(waiter) else automatic.add(position, waiter)
     }
 
     private fun release(waiter: Waiter) {
@@ -277,7 +339,8 @@ internal class AttachmentDownloadGate(
         }
 
     internal companion object {
-        const val DEFAULT_PARALLELISM = 3
+        /** MarmotKit's own attachment transfer limit; under host-managed mode this gate decides what reaches it. */
+        const val DEFAULT_PARALLELISM = 4
         const val MAX_INTERACTIVE_BURST = 3
         const val DEFAULT_MAX_ATTEMPTS = 3
         const val DEFAULT_INITIAL_RETRY_BACKOFF_MILLIS = 150L

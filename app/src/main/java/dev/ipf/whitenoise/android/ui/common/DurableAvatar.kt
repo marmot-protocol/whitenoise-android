@@ -58,7 +58,10 @@ internal fun rememberDurableAvatar(
                 var completedRevision: Long? = null
                 AvatarLoadRecovery.revision.first { revision ->
                     if (completedRevision != revision) {
-                        appState.durableAvatar(ownedAsset, accountRef, domain = domain)?.let { value = it }
+                        // A row that leaves the screen before its decode starts lets the decode be skipped.
+                        appState
+                            .durableAvatar(ownedAsset, accountRef, domain = domain, abandonable = true)
+                            ?.let { value = it }
                         // A recovery during the read remains available for the next attempt.
                         completedRevision = revision
                     }

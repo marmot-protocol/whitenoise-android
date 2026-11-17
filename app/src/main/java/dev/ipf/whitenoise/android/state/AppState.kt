@@ -1869,7 +1869,7 @@ class WhiteNoiseAppState private constructor(
             },
         )
     private val inFlightAttachmentAcquisitions =
-        InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate::promote)
+        InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate)
 
     /** Captures one runtime so later replacement cannot receive an older owner's sample. */
     private fun runtimeHostPerformanceEmitter(runtime: AppMarmotRuntime): HostPerformanceEmitter =
@@ -3678,22 +3678,22 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Chooses and owns exactly one network path before any native or legacy
-     * acquisition starts. A later explicit tap joins an automatic owner (and
-     * promotes its gate priority) instead of starting MarmotKit beside the
-     * already-running legacy download.
+     * Chooses and owns exactly one network path before any native or legacy acquisition starts. A later explicit tap
+     * joins an automatic owner and promotes it instead of starting MarmotKit beside the already-running legacy
+     * download. A [foreground] request, one a visible bubble made, queues ahead of background automatic work.
      */
     internal fun memoizedAttachmentAcquisition(
         cacheKey: String,
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
+        foreground: Boolean = false,
         block: suspend CoroutineScope.() -> AttachmentAcquisitionOutcome,
     ): Deferred<AttachmentAcquisitionOutcome> =
-        inFlightAttachmentAcquisitions.acquire(cacheKey, priority) {
+        inFlightAttachmentAcquisitions.acquire(cacheKey, priority, foreground) {
             val owner = this
             val queueAttempt = beginHostPerformance(HostPerformanceOperationFfi.MEDIA_QUEUE_WAIT)
             try {
-                attachmentDownloadGate.withPermit(cacheKey, request.accountRef, priority) {
+                attachmentDownloadGate.withPermit(cacheKey, request.accountRef, priority, foreground) {
                     queueAttempt.success()
                     val cached =
                         cachedMediaPlaintext(cacheKey)

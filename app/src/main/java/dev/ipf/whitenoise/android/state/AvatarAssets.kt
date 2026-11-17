@@ -51,13 +51,16 @@ internal fun AvatarAssetFfi.cacheKey(accountRef: String): String? {
  * only for targets a screen names; the acquired bytes arrive as a later projection with a new content
  * revision, which re-keys the caller. Missing or deferred local bytes remain a lazy placeholder; the
  * caller never substitutes a second URL acquisition for an authoritative MDK asset. The decode runs in
- * [domain]'s worker, or the domain the chat list names for this asset when null.
+ * [domain]'s worker, or the domain the chat list names for this asset when null. Only callers serving a screen
+ * that is showing (rows, the cold-start prewarm, prepared avatar windows) pass [abandonable], letting a decode
+ * that is still queued once all of them have left be skipped.
  */
 internal suspend fun WhiteNoiseAppState.durableAvatar(
     asset: AvatarAssetFfi?,
     accountRef: String? = activeAccountRef,
     acquireMissing: Boolean = true,
     domain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
+    abandonable: Boolean = false,
 ): ImageBitmap? {
     val ownedAsset = asset?.copy()
     val lifetime = AvatarImageLoader.currentCacheLifetime()
@@ -68,7 +71,7 @@ internal suspend fun WhiteNoiseAppState.durableAvatar(
     val key = account?.let { renderable?.cacheKey(it) }
     if (reference == null || key == null || account == null) return null
     val decodeDomain = domain ?: durableAvatarDomain(renderable, account)
-    return AvatarImageLoader.loadStored(key, lifetime, decodeDomain) {
+    return AvatarImageLoader.loadStored(key, lifetime, decodeDomain, abandonable) {
         readDurableAvatarBytes(account, checkNotNull(renderable))
     }
 }

@@ -67,8 +67,10 @@ internal class MediaDownloadIntegrationFixture(
         PersistentDisplayThumbnails(
             DiskByteCache(thumbnailRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider),
         )
-    private val jobs = ConcurrentHashMap<String, Call>()
+
+    /** Bumped whenever a native job is admitted, so a fixture feed opened before admission can wait for it. */
     private val jobAdmissions = MutableStateFlow(0L)
+    private val jobs = ConcurrentHashMap<String, Call>()
     val calls = CopyOnWriteArrayList<Call>()
     val entered = Channel<Call>(Channel.UNLIMITED)
     val cancellationObserved = CompletableDeferred<Unit>()
@@ -397,8 +399,9 @@ internal class MediaDownloadIntegrationFixture(
     }
 
     /**
-     * Emits an initial snapshot; later observation awaits native work without owning or cancelling it. A paused
-     * job is reported once per subscription, then the feed waits for the job to end.
+     * Emits an initial snapshot; later observation awaits native work without owning or cancelling it. Like a real
+     * native feed, one opened before admission stays open until a job exists, and one that has reported READY never
+     * emits again. A paused job is reported once per subscription, then the feed waits for the job to end.
      */
     private fun subscription(key: String): AttachmentTransferSubscription {
         val initialSnapshot = AttachmentTransferSnapshotFfi(listOf(status(key)))
@@ -412,7 +415,6 @@ internal class MediaDownloadIntegrationFixture(
                     initialSnapshot
                 } else {
                     if (readyDelivered) awaitCancellation()
-                    // Real native observers remain open when subscribed before acquisition is admitted.
                     jobAdmissions.first { jobs[key] != null }
                     val call = checkNotNull(jobs[key])
                     call.observed.complete(Unit)
