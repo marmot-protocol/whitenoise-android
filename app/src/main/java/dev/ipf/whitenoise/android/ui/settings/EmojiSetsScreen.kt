@@ -14,6 +14,8 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +53,9 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** The browser's Refresh action, which repeats discovery for the current query. */
+internal const val EMOJI_SETS_REFRESH_TEST_TAG = "emoji_sets.refresh"
 
 private val EmojiSetSpacing = 8.dp
 private val EmojiSetEntrySpacing = 4.dp
@@ -90,7 +96,13 @@ internal fun EmojiSetsScreen(
             }
         }
         LaunchedEffect(controller) {
-            if (initialAddress == null) controller.load() else controller.open(initialAddress)
+            if (initialAddress == null) {
+                // Show the local projection at once, then discover like the sticker browser (#3882).
+                controller.load()
+                controller.discover("")
+            } else {
+                controller.open(initialAddress)
+            }
         }
         DisposableEffect(controller) { onDispose(controller::close) }
         BackHandler(onBack = back)
@@ -135,7 +147,23 @@ internal fun EmojiSetsContent(
         } else {
             { EmojiSetsAccountTitle(title, profileName) }
         }
-    SettingsScaffold(title = title, onBack = onBack, titleContent = accountTitle) {
+    SettingsScaffold(
+        title = title,
+        onBack = onBack,
+        titleContent = accountTitle,
+        topBarActions = {
+            if (state.preview == null) {
+                // Repeats the current search; also the retry path for failed or partial discovery.
+                IconButton(
+                    onClick = { onSearch(query.text.toString().trim()) },
+                    enabled = !state.busy,
+                    modifier = Modifier.testTag(EMOJI_SETS_REFRESH_TEST_TAG),
+                ) {
+                    Icon(painterResource(R.drawable.ic_refresh), contentDescription = stringResource(R.string.refresh))
+                }
+            }
+        },
+    ) {
         val set = state.preview
         if (set == null) {
             EmojiSetBrowser(state, query, onSearch, onShow)
@@ -194,7 +222,10 @@ private fun EmojiSetBrowser(
             }
         }
         item { EmojiSetStatus(state) }
-        if (state.sets.isEmpty() && !state.busy) {
+        // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
+        val discoveryFailed =
+            state.notice == EmojiSetNotice.Error || state.notice == EmojiSetNotice.DiscoveryIncomplete
+        if (state.sets.isEmpty() && !state.busy && !discoveryFailed) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
         items(state.sets, key = { it.coordinate }) { set ->

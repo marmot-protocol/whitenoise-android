@@ -18,23 +18,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
@@ -64,6 +71,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTU
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOverlayBackRegistrar
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerResizeStripHeight
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -75,6 +83,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
+import kotlin.math.max
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -85,6 +94,8 @@ class ComposerExpansionBehaviorTest {
     val composeRule = createComposeRule()
 
     private val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+    private val keyboard = RecordingKeyboard()
+    private lateinit var focusManager: FocusManager
 
     /** A stationary resize-strip tap leaves expansion, draft, selection, and focus unchanged. */
     @Test
@@ -115,6 +126,74 @@ class ComposerExpansionBehaviorTest {
             "the composer surface must not expose an ordinary click action",
             !pillSurface().fetchSemanticsNode().config.contains(SemanticsActions.OnClick),
         )
+    }
+
+    /** Short taps on unused padding and toolbar gaps of an empty expanded composer open the keyboard (#3857). */
+    @Test
+    fun emptyExpandedComposerBlankTapsOpenKeyboard() = assertBlankTapsOpenKeyboard()
+
+    /** Mirrored geometry keeps the same blank-surface contract. */
+    @Test
+    fun emptyExpandedComposerBlankTapsOpenKeyboardInRtl() = assertBlankTapsOpenKeyboard(layoutDirection = LayoutDirection.Rtl)
+
+    /** Larger text moves the editor and toolbar without opening dead zones. */
+    @Test
+    fun emptyExpandedComposerBlankTapsOpenKeyboardAtLargeFont() = assertBlankTapsOpenKeyboard(fontScale = 1.5f)
+
+    /** A narrow window packs controls closer without hiding the remaining gaps. */
+    @Test
+    fun emptyExpandedComposerBlankTapsOpenKeyboardInNarrowWindow() = assertBlankTapsOpenKeyboard(width = 280)
+
+    /** The dedicated resize strip stays drag-only for an empty draft too. */
+    @Test
+    fun emptyComposerResizeStripTapDoesNotFocusOrShowKeyboard() {
+        render("")
+        expandEmptyComposer()
+        val editor = composeRule.onNode(hasSetTextAction())
+
+        resizeGesture().performTouchInput { click(center) }
+        composeRule.waitForIdle()
+
+        editor.assertIsNotFocused()
+        assertEquals("the resize strip must never request the keyboard", 0, keyboard.shows)
+        assertResizeHandleToggleLabel(R.string.composer_collapse)
+    }
+
+    /** Holding a blank gap stays a hold: no focus and no keyboard (#2563). */
+    @Test
+    fun blankSurfaceHoldDoesNotFocusOrShowKeyboard() {
+        render("")
+        expandEmptyComposer()
+        val editor = composeRule.onNode(hasSetTextAction())
+        val point = blankComposerPoints().toolbarGaps.first()
+
+        composeRule.onRoot().performTouchInput { longClick(point) }
+        composeRule.waitForIdle()
+
+        editor.assertIsNotFocused()
+        assertEquals("a held finger is not a request to type", 0, keyboard.shows)
+    }
+
+    /** A draft keeps its caret, selection and expansion when a toolbar gap is tapped. */
+    @Test
+    fun nonEmptyDraftBlankTapKeepsSelection() {
+        val draft = longDraft()
+        val selection = TextRange(draft.indexOf("controls"), draft.indexOf("controls") + "controls".length)
+        render(draft)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performClick()
+        editor.performTextInputSelection(selection)
+        performAccessibleResizeAction()
+        composeRule.waitForIdle()
+        assertResizeHandleToggleLabel(R.string.composer_collapse)
+        val shows = keyboard.shows
+
+        composeRule.onRoot().performTouchInput { click(blankComposerPoints().toolbarGaps.first()) }
+        composeRule.waitForIdle()
+
+        assertEditorState(editor, draft, selection)
+        assertEquals("a draft is outside the empty-surface contract", shows, keyboard.shows)
+        assertResizeHandleToggleLabel(R.string.composer_collapse)
     }
 
     /** The named accessibility resize action still expands and collapses monotonically. */
@@ -1182,7 +1261,9 @@ class ComposerExpansionBehaviorTest {
             CompositionLocalProvider(
                 LocalLayoutDirection provides layoutDirection,
                 LocalDensity provides Density(density.density, fontScale),
+                LocalSoftwareKeyboardController provides keyboard,
             ) {
+                focusManager = LocalFocusManager.current
                 WhiteNoiseTheme {
                     Surface(modifier = Modifier.width(width.dp).height(720.dp)) {
                         Box(contentAlignment = Alignment.BottomCenter) {
@@ -1420,6 +1501,119 @@ class ComposerExpansionBehaviorTest {
             "Nothing in the draft is replaced.\n" +
             "The final paragraph stays visible while editing."
 
+    /** Expands an empty composer through its accessible resize action. */
+    private fun expandEmptyComposer() {
+        performAccessibleResizeAction()
+        composeRule.waitForIdle()
+        assertResizeHandleToggleLabel(R.string.composer_collapse)
+    }
+
+    /**
+     * Taps each sampled blank point twice: from an unfocused editor, then again while focused with
+     * the keyboard dismissed. Both must request the keyboard without resizing or editing the draft.
+     */
+    private fun assertBlankTapsOpenKeyboard(
+        width: Int = 360,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        fontScale: Float = 1f,
+    ) {
+        render("", width = width, layoutDirection = layoutDirection, fontScale = fontScale)
+        expandEmptyComposer()
+        val expandedHeight = composerHeight()
+        val editor = composeRule.onNode(hasSetTextAction())
+        val points = blankComposerPoints()
+        assertTrue("no blank toolbar gap was found", points.toolbarGaps.isNotEmpty())
+        assertTrue("no blank editor padding was found", points.editorPadding.isNotEmpty())
+
+        for (point in points.toolbarGaps + points.editorPadding) {
+            composeRule.runOnIdle { focusManager.clearFocus(force = true) }
+            editor.assertIsNotFocused()
+            val unfocusedShows = keyboard.shows
+            composeRule.onRoot().performTouchInput { click(point) }
+            composeRule.waitForIdle()
+            editor.assertIsFocused()
+            assertTrue("blank tap at $point must show the keyboard", keyboard.shows > unfocusedShows)
+
+            val focusedShows = keyboard.shows
+            composeRule.onRoot().performTouchInput { click(point) }
+            composeRule.waitForIdle()
+            editor.assertIsFocused()
+            assertTrue("repeat blank tap at $point must show the keyboard", keyboard.shows > focusedShows)
+
+            assertResizeHandleToggleLabel(R.string.composer_collapse)
+            assertTrue(
+                "blank tap at $point must keep the expanded height",
+                abs(composerHeight() - expandedHeight) <= 1f,
+            )
+            assertEquals("", editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        }
+    }
+
+    /** Touch bounds of every clickable, holdable or editable node, including minimum touch targets. */
+    private fun controlTouchBounds(): List<Rect> =
+        listOf(
+            SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick),
+            SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick),
+            hasSetTextAction(),
+        ).flatMap { matcher ->
+            composeRule.onAllNodes(matcher, useUnmergedTree = true).fetchSemanticsNodes().map { it.touchBoundsInRoot }
+        }
+
+    /**
+     * Scans the pill for points outside the resize strip, the rounded corners and every control's
+     * touch target. Returns the first, middle and last of each group so every gap region is hit.
+     */
+    private fun blankComposerPoints(): BlankPoints {
+        val surface = pillSurface().fetchSemanticsNode().boundsInRoot
+        val stripPx = with(composeRule.density) { ComposerResizeStripHeight.toPx() }
+        val stripBottom = max(resizeGesture().fetchSemanticsNode().boundsInRoot.bottom, surface.top + stripPx)
+        val controls = controlTouchBounds().map { it.inflate(BLANK_CONTROL_MARGIN_PX) }
+        val send =
+            composeRule
+                .onNodeWithContentDescription(app.getString(R.string.send))
+                .fetchSemanticsNode()
+                .touchBoundsInRoot
+        val toolbarGaps = mutableListOf<Offset>()
+        val editorPadding = mutableListOf<Offset>()
+        var y = stripBottom + BLANK_CONTROL_MARGIN_PX
+        while (y < surface.bottom - BLANK_EDGE_INSET_PX) {
+            var x = surface.left + BLANK_EDGE_INSET_PX
+            while (x < surface.right - BLANK_EDGE_INSET_PX) {
+                val point = Offset(x, y)
+                val inCorner =
+                    (x < surface.left + BLANK_CORNER_PX || x > surface.right - BLANK_CORNER_PX) &&
+                        (y < surface.top + BLANK_CORNER_PX || y > surface.bottom - BLANK_CORNER_PX)
+                if (!inCorner && controls.none { it.contains(point) }) {
+                    when {
+                        y >= send.top && y <= send.bottom -> toolbarGaps += point
+                        y < send.top -> editorPadding += point
+                    }
+                }
+                x += BLANK_SCAN_STEP_PX
+            }
+            y += BLANK_SCAN_STEP_PX
+        }
+        return BlankPoints(toolbarGaps.spread(), editorPadding.spread())
+    }
+
+    private fun List<Offset>.spread(): List<Offset> = if (size <= 3) this else listOf(first(), this[size / 2], last())
+
+    private data class BlankPoints(
+        val toolbarGaps: List<Offset>,
+        val editorPadding: List<Offset>,
+    )
+
+    /** Counts keyboard requests so focus alone cannot pass a blank-tap assertion. */
+    private class RecordingKeyboard : SoftwareKeyboardController {
+        var shows = 0
+
+        override fun show() {
+            shows++
+        }
+
+        override fun hide() = Unit
+    }
+
     private data class ComposerGeometry(
         val composer: Rect,
         val pill: Rect,
@@ -1430,5 +1624,9 @@ class ComposerExpansionBehaviorTest {
         const val TAG = "expandable-composer"
         const val ACCOUNT = "account"
         const val GROUP = "group"
+        const val BLANK_CONTROL_MARGIN_PX = 4f
+        const val BLANK_EDGE_INSET_PX = 4f
+        const val BLANK_CORNER_PX = 24f
+        const val BLANK_SCAN_STEP_PX = 6f
     }
 }

@@ -476,6 +476,9 @@ internal fun ComposerBar(
     onShareContact: (() -> Unit)? = null,
     onCreatePoll: (() -> Unit)? = null,
     onOpenStickers: (() -> Unit)? = null,
+    // Rail actions of the inline emoji keyboard; each button is hidden while its callback is null.
+    onBrowseEmojiSets: (() -> Unit)? = null,
+    onOpenEmojiSettings: (() -> Unit)? = null,
     onPasteImageUris: ((List<Uri>) -> Unit)? = null,
     voiceRecordingController: dev.ipf.whitenoise.android.audio.VoiceRecordingController? = null,
     voiceReview: VoiceRecordingReview? = null,
@@ -2247,6 +2250,8 @@ internal fun ComposerBar(
                             onSearchContentHeightChange = { measured ->
                                 if (measured > 0.dp) composerEmojiSearchRowHeight = measured
                             },
+                            onBrowseSets = onBrowseEmojiSets,
+                            onOpenSettings = onOpenEmojiSettings,
                         )
                     }
                 }

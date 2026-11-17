@@ -3,14 +3,20 @@ package dev.ipf.whitenoise.android.ui.navigation
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
@@ -30,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.common.WindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowWidthClass
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,6 +81,68 @@ class TwoPaneChatLayoutTest {
         composeRule.onNodeWithTag(TWO_PANE_LIST_TAG).assertIsDisplayed()
 
         assertEquals(1, conversationIdentities.size)
+    }
+
+    /**
+     * Short, wide windows such as a phone held horizontally split the panes 45:55 after the divider;
+     * taller expanded windows keep the fixed 360dp list (#3866).
+     */
+    @Test
+    fun shortExpandedWindowsBalanceThePanes() {
+        val size = mutableStateOf(DpSize(EXPANDED_WIDTH, SHORT_HEIGHT))
+        mountFrame(size)
+        val expected =
+            listOf(
+                DpSize(840.dp, 400.dp) to 377.55.dp,
+                DpSize(960.dp, 432.dp) to 431.55.dp,
+                DpSize(1080.dp, 432.dp) to 485.55.dp,
+                DpSize(840.dp, 480.dp) to TwoPaneListWidth,
+                DpSize(1280.dp, 800.dp) to TwoPaneListWidth,
+            )
+        expected.forEach { (window, listWidth) ->
+            size.value = window
+            composeRule.waitForIdle()
+            val list = composeRule.onNodeWithTag(TWO_PANE_LIST_TAG).getUnclippedBoundsInRoot()
+            val conversation = composeRule.onNodeWithTag(FRAME_CONVERSATION_TAG).getUnclippedBoundsInRoot()
+            assertEquals("list at $window", listWidth.value, (list.right - list.left).value, PANE_TOLERANCE)
+            assertTrue("conversation keeps the majority at $window", conversation.right - conversation.left > list.right - list.left)
+            assertEquals(
+                "panes fill $window",
+                window.width.value,
+                (conversation.right - list.left).value,
+                PANE_TOLERANCE,
+            )
+        }
+    }
+
+    /** Crossing the 480dp short-window height changes only the proportion, never the conversation. */
+    @Test
+    fun crossingTheShortHeightKeepsTheConversationPaneComposition() {
+        val size = mutableStateOf(DpSize(EXPANDED_WIDTH, SHORT_HEIGHT))
+        val identities = mountFrame(size)
+        size.value = DpSize(EXPANDED_WIDTH, 480.dp)
+        composeRule.waitForIdle()
+        size.value = DpSize(EXPANDED_WIDTH, SHORT_HEIGHT)
+        composeRule.waitForIdle()
+        assertEquals(1, identities.size)
+    }
+
+    /** Mounts only the frame inside a window of [size]; returns each conversation-pane composition identity. */
+    private fun mountFrame(size: MutableState<DpSize>): List<Any> {
+        val identities = mutableListOf<Any>()
+        composeRule.setContent {
+            CompositionLocalProvider(LocalWindowLayout provides WindowLayout.fromSize(size.value)) {
+                Box(Modifier.size(size.value)) {
+                    TwoPaneChatFrame(twoPane = true, listPane = { Text("list") }) {
+                        val identity = remember { Any() }
+                        SideEffect { if (identities.lastOrNull() !== identity) identities += identity }
+                        Box(Modifier.fillMaxSize().testTag(FRAME_CONVERSATION_TAG))
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        return identities
     }
 
     /** With no chat open, the list sits beside a placeholder; opening a chat keeps the list on screen. */
@@ -206,6 +275,9 @@ class TwoPaneChatLayoutTest {
         val EXPANDED_WIDTH = 840.dp
         val BELOW_EXPANDED_WIDTH = 839.dp
         val HEIGHT = 800.dp
+        val SHORT_HEIGHT = 400.dp
+        const val PANE_TOLERANCE = 1f
+        const val FRAME_CONVERSATION_TAG = "frame_conversation"
         const val DRAFT = "Draft kept across the fold"
     }
 }

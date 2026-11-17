@@ -254,6 +254,14 @@
         ]
       },
       {
+        "surface": "setting:refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.refresh",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
         "surface": "setting:remove",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
         "anchor": "R.string.remove",

@@ -2089,6 +2089,7 @@ internal fun ConversationScreen(
     var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
     var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     var stickerSheetOpen by remember(chat.id) { mutableStateOf(false) }
+    var emojiLibraryPages by remember(chat.id) { mutableStateOf(emptyList<ConversationEmojiLibraryPage>()) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
         rememberOriginGuardedResultLauncher(
@@ -4654,6 +4655,19 @@ internal fun ConversationScreen(
                             } else {
                                 null
                             },
+                        // Installed sets belong to the active account, which also owns the picker's library.
+                        onBrowseEmojiSets =
+                            if (draftAccountRef != null && draftAccountRef == appState.activeAccountRef) {
+                                { emojiLibraryPages = listOf(ConversationEmojiLibraryPage.Sets) }
+                            } else {
+                                null
+                            },
+                        onOpenEmojiSettings =
+                            if (draftAccountRef != null && draftAccountRef == appState.activeAccountRef) {
+                                { emojiLibraryPages = listOf(ConversationEmojiLibraryPage.Settings) }
+                            } else {
+                                null
+                            },
                         onPasteImageUris = { uris ->
                             imageDropImport.import(
                                 uris = uris,
@@ -5575,6 +5589,12 @@ internal fun ConversationScreen(
                 onDismiss = { stickerSheetOpen = false },
             )
         }
+
+        ConversationEmojiLibraryOverlay(
+            appState = appState,
+            pages = emojiLibraryPages,
+            onPagesChange = { emojiLibraryPages = it },
+        )
 
         if (shareUserPickerOpen) {
             val activeHex = conversationSelfAccountIdHex

@@ -17,7 +17,8 @@
           "CON-024",
           "SET-004",
           "CON-017",
-          "CON-030"
+          "CON-030",
+          "CON-050"
         ]
       },
       {
@@ -68,7 +69,7 @@
       {
         "surface": "Composer sending identity slot",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
-        "anchor": "sendingIdentity?.invoke(Modifier)",
+        "anchor": "sendingIdentity?.invoke(Modifier.composerControlTarget())",
         "test_ids": [
           "CON-035"
         ]
@@ -104,6 +105,14 @@
         "anchor": "R.string.explanation_composer_draft_top",
         "test_ids": [
           "CON-049"
+        ]
+      },
+      {
+        "surface": "Empty composer blank-surface tap",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": ".composerBlankSurfaceTap(",
+        "test_ids": [
+          "CON-050"
         ]
       }
     ],

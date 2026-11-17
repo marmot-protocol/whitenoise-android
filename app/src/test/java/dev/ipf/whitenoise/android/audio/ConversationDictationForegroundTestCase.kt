@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService.C
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -62,6 +63,12 @@ internal abstract class ConversationDictationForegroundTestCase {
                 shadowOf(service.foreground.dictation.actionIntent(action, "test-token")).savedIntent.component,
             )
         }
+    }
+
+    /** Active dictation uses the microphone mark, never the message mark. */
+    protected fun assertActiveDictationIcon(notification: Notification) {
+        assertEquals(R.drawable.ic_stat_dictation, notification.smallIcon.resId)
+        assertNotEquals(R.drawable.ic_stat_whitenoise, notification.smallIcon.resId)
     }
 
     /**
