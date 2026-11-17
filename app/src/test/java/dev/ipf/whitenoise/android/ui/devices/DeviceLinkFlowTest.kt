@@ -58,6 +58,18 @@ class DeviceLinkFlowTest {
         }
     }
 
+    /** With no link and nothing starting, the step offers a new attempt and no Cancel; while starting it waits. */
+    @Test
+    fun aLinkThatNeverStartedIsNotShownAsWaiting() {
+        val idle = notStartedLinkStep(starting = false)
+        val starting = notStartedLinkStep(starting = true)
+
+        assertEquals(DeviceLinkAction.TryAgain, idle.primary)
+        assertEquals(DeviceLinkAction.Close, idle.secondary)
+        assertEquals(R.string.link_device_waiting_title, starting.title)
+        assertNull(starting.primary)
+    }
+
     /** Joining is not shown as linked: only MDK's Linked state gets the linked wording and Done. */
     @Test
     fun onlyLinkedSaysTheDeviceIsLinked() {

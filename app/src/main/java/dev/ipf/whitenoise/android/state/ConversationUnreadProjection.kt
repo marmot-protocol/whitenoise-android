@@ -16,13 +16,13 @@ internal fun firstUnreadReceivedIndex(
     if (unreadCount <= 0 || timeline.isEmpty()) return -1
     var seen = 0
     for (index in timeline.indices.reversed()) {
-        val record = timeline[index].record
+        val row = timeline[index]
         // Derived-state rows (kind 1009 edits, 1210 group system events)
         // arrive as `received` but never count as new chat — skip them so
         // an avatar change or in-place edit doesn't inflate the unread
         // badge or shift the "first unread" anchor away from real
         // messages.
-        if (record.isUnreadEligible()) {
+        if (row.isUnreadEligible()) {
             seen += 1
             if (seen == unreadCount) return index
         }
@@ -52,7 +52,7 @@ internal fun countUnreadIncoming(
             timeline.indexOfFirst { it.record.messageIdHex == id }
         } ?: -1
     return timeline.drop(anchorIdx + 1).count {
-        it.record.isUnreadEligible()
+        it.isUnreadEligible()
     }
 }
 
@@ -73,7 +73,7 @@ internal fun reconciledConversationEntryUnreadCount(
     } else {
         val loadedReceived =
             timeline.count { message ->
-                message.record.isUnreadEligible()
+                message.isUnreadEligible()
             }
         val anchorLoaded =
             !readAnchorMessageId.isNullOrBlank() &&
@@ -109,7 +109,7 @@ internal fun unreadCountDivergenceReport(
     if (projectionUnread <= timelineUnread) return null
     val loadedReceived =
         timeline.count { row ->
-            row.record.isUnreadEligible()
+            row.isUnreadEligible()
         }
     if (projectionUnread > loadedReceived) return null
     return UnreadCountDivergenceReport(
@@ -138,6 +138,9 @@ internal fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind =
 
 /** Only incoming chat rows contribute to unread counts; derived edits and system events do not. */
 internal fun AppMessageRecordFfi.isUnreadEligible(): Boolean = direction == "received" && !isDerivedStateKind(kind)
+
+/** A timeline row counts as unread only when it is incoming chat from someone else, never the account's own message. */
+internal fun TimelineMessage.isUnreadEligible(): Boolean = !fromOtherOwnDevice && record.isUnreadEligible()
 
 /**
  * Message ids of unread received mentions in [timeline], oldest first — drives

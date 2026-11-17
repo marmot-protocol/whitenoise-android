@@ -62,6 +62,18 @@ class ConversationUnreadTest {
         assertEquals(null, retired.pendingMessageId)
     }
 
+    /** The account's own message from another of its devices is never unread nor the place an unread jump lands. */
+    @Test
+    fun ownMessageFromAnotherDeviceIsNeverUnread() {
+        val own = received("own").copy(fromOtherOwnDevice = true)
+        val timeline = listOf(received("r1"), own, received("r2"))
+
+        assertEquals(1, countUnreadIncoming(timeline, readAnchorMessageId = "r1"))
+        assertEquals(2, firstUnreadReceivedIndex(timeline, unreadCount = 1))
+        assertEquals(0, firstUnreadReceivedIndex(timeline, unreadCount = 2))
+        assertEquals(0, countUnreadIncoming(listOf(received("r1"), own), readAnchorMessageId = "r1"))
+    }
+
     @Test
     fun unreadJump_freezesFirstEligibleArrivalUntilStackResets() {
         val ready =

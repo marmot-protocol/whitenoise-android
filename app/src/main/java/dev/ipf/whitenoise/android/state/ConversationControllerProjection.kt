@@ -530,9 +530,11 @@ internal fun ConversationController.timelineMessageFromProjection(
         } else {
             actionRecord
         }.withRecordedAtOverride(localTimelineTimestampOverrides[record.messageIdHex])
+    val mine = MessageProjector.isMine(actionRecord, conversationAccountIdHex)
     return TimelineMessage(
         id = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}",
         record = displayRecord,
+        fromOtherOwnDevice = mine && !MessageProjector.isSentFromThisDevice(actionRecord),
         status =
             when {
                 streamId != null -> MessageStatus.Streaming

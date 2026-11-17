@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.state.DeviceLinkChoices
 import dev.ipf.whitenoise.android.state.DeviceLinkController
@@ -20,7 +21,31 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-private const val DEVICE_LINK_SUBSCRIPTION_RETRY_MS = 2_000L
+private const val EVENT_STREAM_RETRY_MS = 2_000L
+
+/**
+ * Runs [follow] against MDK's event stream for as long as [lifecycle] is started, and again after each time the
+ * stream ends, so a closed stream or a failed subscription never leaves a screen without updates. [follow] receives
+ * the stream's next-event read, or null when the stream could not be opened and it should read once instead. The
+ * subscription is always released, off the main thread, even when the caller is cancelled.
+ */
+internal suspend fun WhiteNoiseAppState.followEventsWhileStarted(
+    lifecycle: Lifecycle,
+    retryMs: Long = EVENT_STREAM_RETRY_MS,
+    follow: suspend (nextEvent: (suspend () -> MarmotEventFfi?)?) -> Unit,
+) {
+    lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+        while (true) {
+            val subscription = runCatchingCancellable { marmotIo { subscribeEvents() } }.getOrNull()
+            try {
+                follow(subscription?.let { stream -> { withContext(Dispatchers.IO) { stream.next() } } })
+            } finally {
+                subscription?.let { withContext(NonCancellable + Dispatchers.IO) { runCatching { it.destroy() } } }
+            }
+            delay(retryMs)
+        }
+    }
+}
 
 /** MDK's linked-device reads and link commands through the app's runtime, on its native IO dispatcher. */
 internal class RuntimeDeviceLink(
@@ -89,21 +114,12 @@ internal fun rememberDeviceLinkController(appState: WhiteNoiseAppState): DeviceL
     DisposableEffect(controller) { onDispose { controller?.retire() } }
     LaunchedEffect(controller, lifecycle) {
         val owner = controller ?: return@LaunchedEffect
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                val subscription = runCatchingCancellable { appState.marmotIo { subscribeEvents() } }.getOrNull()
-                try {
-                    if (subscription == null) {
-                        owner.refreshRoster()
-                        owner.refreshLink()
-                    } else {
-                        owner.observe { withContext(Dispatchers.IO) { subscription.next() } }
-                    }
-                } finally {
-                    subscription?.let { withContext(NonCancellable + Dispatchers.IO) { runCatching { it.destroy() } } }
-                }
-                // A closed stream or a failed subscription must not leave the screen without updates.
-                delay(DEVICE_LINK_SUBSCRIPTION_RETRY_MS)
+        appState.followEventsWhileStarted(lifecycle) { nextEvent ->
+            if (nextEvent == null) {
+                owner.refreshRoster()
+                owner.refreshLink()
+            } else {
+                owner.observe(nextEvent)
             }
         }
     }

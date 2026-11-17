@@ -18,9 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DeviceLinkController
@@ -30,18 +28,11 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.decline
 import dev.ipf.whitenoise.android.state.link
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 internal const val DEVICE_LINK_OTHER_PROFILE_TAG = "device_link.other_profile"
 internal const val DEVICE_LINK_REVIEW_TAG = "device_link.review"
-
-private const val DEVICE_LINK_REQUEST_RETRY_MS = 2_000L
 
 /**
  * The profiles whose link requests the shell watches: signed in, and signing with a key held on this device.
@@ -56,7 +47,8 @@ internal fun deviceLinkWatchedAccounts(accounts: List<AccountSummaryFfi>): List<
  * Presents link requests from any signed-in profile above the app shell. Requests are read while the app is in the
  * foreground: each return to the foreground re-reads MDK before anything is presented, so a request that expired in
  * the background shows as ended rather than reappearing, and nothing runs or notifies while the app is away.
- * [blocked] holds new presentations back while the app is locked or another protected flow is on screen.
+ * [blocked] holds new presentations back, and takes down one already showing, while the app is locked or another
+ * protected flow is on screen.
  *
  * A request on the active profile opens its comparison. A request on another profile is only announced: Review
  * activates that profile and re-reads its prompt before the comparison is shown, and nothing is answered for a
@@ -80,24 +72,16 @@ internal fun DeviceLinkRequestHost(
         }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(watcher, lifecycle, accounts) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                val subscription = runCatchingCancellable { appState.marmotIo { subscribeEvents() } }.getOrNull()
-                try {
-                    watcher.refresh(currentAccounts.value, currentBlocked.value)
-                    while (subscription != null) {
-                        val event = withContext(Dispatchers.IO) { subscription.next() } ?: break
-                        watcher.onEvent(event, currentAccounts.value, currentBlocked.value)
-                    }
-                } finally {
-                    subscription?.let { withContext(NonCancellable + Dispatchers.IO) { runCatching { it.destroy() } } }
-                }
-                delay(DEVICE_LINK_REQUEST_RETRY_MS)
+        appState.followEventsWhileStarted(lifecycle) { nextEvent ->
+            watcher.refresh(currentAccounts.value, currentBlocked.value)
+            while (nextEvent != null) {
+                watcher.onEvent(nextEvent() ?: break, currentAccounts.value, currentBlocked.value)
             }
         }
     }
     LaunchedEffect(watcher, blocked) { watcher.reoffer(blocked) }
-    val request = watcher.queue.presented ?: return
+    // A request already on screen is taken down while the app is locked, so nothing can be answered until unlock.
+    val request = watcher.queue.presented?.takeUnless { blocked } ?: return
     if (request.accountRef == appState.activeAccountRef) {
         ActiveProfileLinkRequest(appState, watcher, request, blocked)
     } else {

@@ -11,7 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import dev.ipf.marmotkit.NewDeviceLinkStateFfi
+import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.state.DeviceLinkController
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
 import dev.ipf.whitenoise.android.state.LinkedDeviceRow
@@ -258,10 +258,13 @@ internal fun LinkThisDeviceRoute(
     failed: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
-    val state = controller.link?.newDevice ?: NewDeviceLinkStateFfi.WaitingForAnswer
+    val state = controller.link?.newDevice
+    // Waiting is shown only while a start is running or before MDK has been read, never for a link that isn't there.
+    val unread = controller.link == null && !controller.linkReadFailed
+    val starting = unread || controller.running == DeviceLinkCommand.Start
     BackHandler(onBack = onClose)
     LinkThisDeviceContent(
-        step = newDeviceLinkStep(state),
+        step = state?.let(::newDeviceLinkStep) ?: notStartedLinkStep(starting),
         running = controller.running,
         onBack = onClose,
         failed = failed,

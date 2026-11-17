@@ -7,18 +7,11 @@ import android.content.res.Configuration
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DeviceSelfNaming
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.deviceModelLabel
-import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import java.util.Locale
 
 private const val DEVICE_SELF_NAME_RETRY_MS = 5_000L
@@ -54,20 +47,8 @@ internal fun DeviceSelfNameEffect(appState: WhiteNoiseAppState) {
                 rename = { ref, slot, label -> appState.marmotIo { renameLinkedDevice(ref, slot, label) } },
                 placeholders = placeholderDeviceLabels(appState.appContext),
             )
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                val subscription = runCatchingCancellable { appState.marmotIo { subscribeEvents() } }.getOrNull()
-                try {
-                    if (subscription == null) {
-                        naming.nameIfUnnamed()
-                    } else {
-                        naming.observe { withContext(Dispatchers.IO) { subscription.next() } }
-                    }
-                } finally {
-                    subscription?.let { withContext(NonCancellable + Dispatchers.IO) { runCatching { it.destroy() } } }
-                }
-                delay(DEVICE_SELF_NAME_RETRY_MS)
-            }
+        appState.followEventsWhileStarted(lifecycle, DEVICE_SELF_NAME_RETRY_MS) { nextEvent ->
+            if (nextEvent == null) naming.nameIfUnnamed() else naming.observe(nextEvent)
         }
     }
 }

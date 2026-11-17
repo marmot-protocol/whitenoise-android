@@ -58,9 +58,10 @@ internal fun DeviceLinkOfferHost(
     appState: WhiteNoiseAppState,
     blocked: Boolean,
 ) {
-    val accountIdHex = appState.linkOfferAccount() ?: return
     val offers = remember { DeviceLinkOffers.shared(appState.appContext) }
-    if (blocked) return
+    val accountIds = appState.accounts.map { it.accountIdHex }
+    LaunchedEffect(accountIds) { offers.retainAccounts(accountIds) }
+    val accountIdHex = appState.linkOfferAccount()?.takeUnless { blocked } ?: return
     if (offers.linkingFor == accountIdHex) {
         DeviceLinkOfferSteps(appState, offers)
     } else if (offers.stage(accountIdHex) == DeviceLinkOfferStage.Offer) {
@@ -72,8 +73,9 @@ internal fun DeviceLinkOfferHost(
 }
 
 /**
- * This device's linking steps over the whole window. Opening them re-reads MDK first and starts a request only when
- * none is under way, so reopening never starts a second one. Closing only hides the steps.
+ * This device's linking steps over the whole window. The tap that opens them re-reads MDK and starts a request
+ * only when the read succeeded and none is under way. Steps redrawn later, after a lock or a rotation, start
+ * nothing: an ended link stays ended until the user chooses Try again. Closing only hides the steps.
  */
 @Composable
 private fun DeviceLinkOfferSteps(
@@ -86,7 +88,9 @@ private fun DeviceLinkOfferSteps(
     LaunchedEffect(controller) {
         controller.refreshLink()
         val state = controller.link?.newDevice
-        if (!state.inProgress() && state !is NewDeviceLinkStateFfi.Linked) controller.start()
+        val startable = !controller.linkReadFailed && !state.inProgress() && state !is NewDeviceLinkStateFfi.Linked
+        // Only the tap that opened the steps starts a request. Redrawn steps show MDK's state, ended or not.
+        if (offers.takeStartRequest() && startable) controller.start()
     }
     Dialog(
         onDismissRequest = offers::closeLinking,

@@ -23,9 +23,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.ChatHistoryImportStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
@@ -36,17 +34,11 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatHistoryTransfer
 import dev.ipf.whitenoise.android.state.importedHistoryBoundary
-import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.devices.followEventsWhileStarted
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 
 internal const val IMPORTED_HISTORY_BOUNDARY_TAG = "conversation.imported_history.boundary"
 internal const val HISTORY_TRANSFER_NOTICE_TAG = "conversation.history_transfer"
-
-private const val HISTORY_IMPORT_SUBSCRIPTION_RETRY_MS = 2_000L
 
 /** MDK's history-import state for the conversation on screen; a function so readers follow later changes. */
 internal val LocalChatHistoryImport = compositionLocalOf<() -> ChatHistoryImportStateFfi?> { { null } }
@@ -75,20 +67,8 @@ internal fun rememberChatHistoryImport(
             )
         }
     LaunchedEffect(imports, lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                val subscription = runCatchingCancellable { appState.marmotIo { subscribeEvents() } }.getOrNull()
-                try {
-                    if (subscription == null) {
-                        imports.refresh()
-                    } else {
-                        imports.observe { withContext(Dispatchers.IO) { subscription.next() } }
-                    }
-                } finally {
-                    subscription?.let { withContext(NonCancellable + Dispatchers.IO) { runCatching { it.destroy() } } }
-                }
-                delay(HISTORY_IMPORT_SUBSCRIPTION_RETRY_MS)
-            }
+        appState.followEventsWhileStarted(lifecycle) { nextEvent ->
+            if (nextEvent == null) imports.refresh() else imports.observe(nextEvent)
         }
     }
     return remember(imports, groupIdHex) { { imports.state(groupIdHex) } }

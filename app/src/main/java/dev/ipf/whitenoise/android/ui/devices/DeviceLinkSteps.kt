@@ -116,6 +116,22 @@ internal fun newDeviceLinkStep(state: NewDeviceLinkStateFfi): DeviceLinkStep =
             )
     }
 
+/**
+ * The step while MDK reports no link for this device. While a request is [starting] it reads as waiting; otherwise
+ * nothing was sent, so it offers to try again and never a Cancel that has nothing to cancel.
+ */
+internal fun notStartedLinkStep(starting: Boolean): DeviceLinkStep =
+    if (starting) {
+        newDeviceLinkStep(NewDeviceLinkStateFfi.WaitingForAnswer).copy(secondary = DeviceLinkAction.Close)
+    } else {
+        DeviceLinkStep(
+            title = R.string.link_device_this_title,
+            detail = R.string.link_device_this_detail,
+            primary = DeviceLinkAction.TryAgain,
+            secondary = DeviceLinkAction.Close,
+        )
+    }
+
 /** The sentence for why MDK ended a link. Each reason keeps its own wording so none reads as another. */
 @StringRes
 internal fun deviceLinkEndReason(reason: DeviceLinkEndReasonFfi): Int =

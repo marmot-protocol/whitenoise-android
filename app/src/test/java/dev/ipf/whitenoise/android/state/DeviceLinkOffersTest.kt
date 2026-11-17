@@ -78,6 +78,31 @@ class DeviceLinkOffersTest {
         assertNull(offers.stage(ACCOUNT))
     }
 
+    /** Only the tap that opens the steps may start a request, and only once. */
+    @Test
+    fun onlyTheOpeningTapStartsARequest() {
+        val offers = DeviceLinkOffers(preferences)
+
+        assertFalse(offers.takeStartRequest())
+        offers.openLinking(ACCOUNT)
+
+        assertTrue(offers.takeStartRequest())
+        assertFalse(offers.takeStartRequest())
+    }
+
+    /** An account removed from the device leaves no stage behind; the others keep theirs. */
+    @Test
+    fun aRemovedAccountLeavesNoStage() {
+        val offers = DeviceLinkOffers(preferences)
+        offers.recordSignIn(ACCOUNT, otherInstallationFound = true)
+        offers.recordSignIn(OTHER, otherInstallationFound = true)
+
+        offers.retainAccounts(listOf(OTHER.uppercase()))
+
+        assertNull(offers.stage(ACCOUNT))
+        assertEquals(DeviceLinkOfferStage.Offer, offers.stage(OTHER))
+    }
+
     /** Opening and closing the linking steps changes no recorded stage. */
     @Test
     fun openingTheStepsKeepsTheStage() {

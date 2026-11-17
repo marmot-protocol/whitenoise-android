@@ -39,9 +39,23 @@ internal class DeviceLinkOffers(
     var linkingFor by mutableStateOf<String?>(null)
         private set
 
-    /** Opens the linking steps for [accountIdHex]. */
+    // Set by the tap that opens the steps and taken once, so only that tap can start a request.
+    private var startRequested = false
+
+    /** Opens the linking steps for [accountIdHex] because the user asked to link this device. */
     fun openLinking(accountIdHex: String) {
         linkingFor = accountIdHex
+        startRequested = true
+    }
+
+    /**
+     * Whether the tap that opened the steps still has to start a request. True once per tap: steps redrawn after a
+     * lock, a rotation or a restart never start another request by themselves.
+     */
+    fun takeStartRequest(): Boolean {
+        val requested = startRequested
+        startRequested = false
+        return requested
     }
 
     /** Closes the linking steps. The link itself carries on in MDK. */
@@ -65,6 +79,17 @@ internal class DeviceLinkOffers(
     /** Not now: the offer becomes the chat list's reminder. */
     fun postpone(accountIdHex: String) = write(accountIdHex, DeviceLinkOfferStage.Reminder)
 
+    /** Forgets every stage of an account not in [accountIdsHex], so nothing outlives an account removed here. */
+    fun retainAccounts(accountIdsHex: Collection<String>) {
+        val kept = accountIdsHex.mapTo(mutableSetOf(), ::key)
+        val stale = preferences.all.keys.filter { it.startsWith(STAGE_PREFIX) && it !in kept }
+        if (stale.isEmpty()) return
+        val editor = preferences.edit()
+        stale.forEach(editor::remove)
+        editor.apply()
+        revision++
+    }
+
     /** Ends the offer, because the user dismissed the reminder or the device is linked. */
     fun clear(accountIdHex: String) = write(accountIdHex, null)
 
@@ -78,10 +103,11 @@ internal class DeviceLinkOffers(
         revision++
     }
 
-    private fun key(accountIdHex: String) = "stage." + accountIdHex.trim().lowercase(Locale.ROOT)
+    private fun key(accountIdHex: String) = STAGE_PREFIX + accountIdHex.trim().lowercase(Locale.ROOT)
 
     internal companion object {
         const val PREFERENCES_NAME = "whitenoise.device_link_offers"
+        private const val STAGE_PREFIX = "stage."
 
         @Volatile
         private var shared: DeviceLinkOffers? = null

@@ -6,9 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SignInResponseFfi
@@ -21,13 +19,6 @@ import dev.ipf.whitenoise.android.state.SignInReviewController
 import dev.ipf.whitenoise.android.state.SignInReviewNative
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-
-private const val DEVICE_EVENTS_RETRY_MS = 2_000L
 
 /** MDK's device-management calls through the app's runtime, on its native IO dispatcher. */
 internal class RuntimeLinkedDeviceManagement(
@@ -157,19 +148,9 @@ internal fun rememberDeviceManagement(appState: WhiteNoiseAppState): DeviceManag
     DisposableEffect(management) { onDispose { management?.retire() } }
     LaunchedEffect(management, lifecycle) {
         val owner = management ?: return@LaunchedEffect
-        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                val subscription = runCatchingCancellable { appState.marmotIo { subscribeEvents() } }.getOrNull()
-                try {
-                    owner.refresh()
-                    while (subscription != null) {
-                        owner.onEvent(withContext(Dispatchers.IO) { subscription.next() } ?: break)
-                    }
-                } finally {
-                    subscription?.let { withContext(NonCancellable + Dispatchers.IO) { runCatching { it.destroy() } } }
-                }
-                delay(DEVICE_EVENTS_RETRY_MS)
-            }
+        appState.followEventsWhileStarted(lifecycle) { nextEvent ->
+            owner.refresh()
+            while (nextEvent != null) owner.onEvent(nextEvent() ?: break)
         }
     }
     return management

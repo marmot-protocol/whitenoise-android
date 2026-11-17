@@ -259,6 +259,14 @@
           "ACC-025",
           "SET-060"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_this_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",
+        "anchor": "R.string.link_device_this_detail",
+        "test_ids": [
+          "SET-060"
+        ]
       }
     ]
   },

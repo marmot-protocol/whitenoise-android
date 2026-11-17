@@ -91,13 +91,15 @@ internal fun ConversationController.localExpiryRow(
             record.retentionSeconds?.takeIf { authoritativeExpiry != null && it > 0uL }
                 ?: message.retentionAtSendSeconds?.takeIf { it > 0uL },
         readAnchoredAtSeconds = readAnchoredAtSeconds[record.messageIdHex],
+        // The account's own message from another device expires like its own sends, with no read deferral.
         deferSendTimeExpiry =
-            isDisappearingSendTimeExpiryDeferred(
-                record = record,
-                lastReadMessageId = lastReadMessageId,
-                lastReadTimelineAt = persistedLastReadTimelineAt,
-                messageOrder = messageOrder,
-            ),
+            !message.fromOtherOwnDevice &&
+                isDisappearingSendTimeExpiryDeferred(
+                    record = record,
+                    lastReadMessageId = lastReadMessageId,
+                    lastReadTimelineAt = persistedLastReadTimelineAt,
+                    messageOrder = messageOrder,
+                ),
     )
 }
 
