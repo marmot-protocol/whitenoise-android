@@ -537,7 +537,12 @@ internal fun ConversationController.timelineMessageFromProjection(
             when {
                 streamId != null -> MessageStatus.Streaming
                 MessageProjector.isMine(actionRecord, conversationAccountIdHex) ->
-                    if (record.sourceMessageIdHex == null && !record.recipientConfirmed) {
+                    // Only this installation's own send can still be waiting on delivery. The account's rows from
+                    // another device or from imported history are already delivered, whatever their source event.
+                    if (MessageProjector.isSentFromThisDevice(actionRecord) &&
+                        record.sourceMessageIdHex == null &&
+                        !record.recipientConfirmed
+                    ) {
                         MessageStatus.Pending
                     } else {
                         MessageStatus.Sent

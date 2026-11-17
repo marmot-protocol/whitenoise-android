@@ -291,12 +291,23 @@ object MessageProjector {
             .filterNot { it == '\uFE0E' || it == '\uFE0F' }
             .ifBlank { emoji }
 
+    /**
+     * Whether [message] was written by this account, on this device or another of its devices. Authorship decides how
+     * the row reads (as the account's own) and what the author may do to it; it says nothing about delivery.
+     */
     fun isMine(
         message: AppMessageRecordFfi,
         myAccountId: String?,
     ): Boolean =
-        message.direction == "sent" ||
+        isSentFromThisDevice(message) ||
             (myAccountId != null && message.sender.equals(myAccountId, ignoreCase = true))
+
+    /**
+     * Whether this installation sent [message]. Only such a row has a local delivery state: MDK projects it before
+     * it publishes and fills in its source event on delivery. A row this account wrote on another device, or one
+     * that arrived in imported history, is received here and was never a local send, even without a source event.
+     */
+    fun isSentFromThisDevice(message: AppMessageRecordFfi): Boolean = message.direction == "sent"
 
     fun isDeleted(
         messageIdHex: String,

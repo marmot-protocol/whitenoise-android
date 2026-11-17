@@ -17,11 +17,15 @@ internal const val LOCAL_PUBLISH_FAILED = "local_publish_failed"
 /** Discards in flight, keyed by account, group and message, so a repeated tap makes one native call. */
 private val durableDiscardsInFlight: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
-/** Whether [record] is an own send MDK recorded but never confirmed publishing, which MDK can discard. */
+/**
+ * Whether [record] is a send from this installation that MDK recorded but never confirmed publishing, which MDK can
+ * discard. MDK discards only its own outgoing rows, so a row the account wrote on another device never qualifies.
+ */
 internal fun ConversationController.isDurableFailedRecord(record: TimelineMessageRecordFfi?): Boolean =
     record != null &&
         !record.deleted &&
         record.invalidationStatus == LOCAL_PUBLISH_FAILED &&
+        record.direction == "sent" &&
         isMessageMine(TimelineProjector.toAppMessageRecord(record))
 
 /** The row form of [isDurableFailedRecord], used by the bubble's Discard actions. */

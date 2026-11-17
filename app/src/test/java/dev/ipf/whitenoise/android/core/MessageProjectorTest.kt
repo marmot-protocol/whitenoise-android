@@ -386,6 +386,8 @@ class MessageProjectorTest {
         assertTrue(MessageProjector.isMine(sent, myAccountId = "me"))
         assertFalse(MessageProjector.isMine(received, myAccountId = "me"))
         assertTrue(MessageProjector.isMine(receivedFromMe, myAccountId = "abc123"))
+        assertTrue(MessageProjector.isSentFromThisDevice(sent))
+        assertFalse(MessageProjector.isSentFromThisDevice(receivedFromMe))
         assertTrue(MessageProjector.isDeleted("m1", setOf("m1")))
         assertFalse(MessageProjector.isDeleted("m2", setOf("m1")))
     }

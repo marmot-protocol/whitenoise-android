@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -102,9 +103,19 @@ internal suspend fun WhiteNoiseAppState.notificationMessageRecord(update: Notifi
  */
 private suspend fun WhiteNoiseAppState.scheduleIncomingAttachmentDownloads(update: NotificationUpdateFfi) {
     val messageIdHex = update.messageIdHex
-    if (update.trigger != NotificationTriggerFfi.NEW_MESSAGE || update.isFromSelf || messageIdHex == null) return
+    if (messageIdHex == null || !needsIncomingAttachmentDownload(update, linkedDevicesAvailable())) return
     scheduleReceivedMessageAttachments(update.accountRef, update.groupIdHex, messageIdHex, update.timestampMs)
 }
+
+/**
+ * Whether a new-message [update] may carry attachments this device still has to fetch. Without linked devices a
+ * self update is this installation's own send, whose media is already local. With them it can be the account's
+ * message from another device, which arrives here like any received message.
+ */
+internal fun needsIncomingAttachmentDownload(
+    update: NotificationUpdateFfi,
+    linkedDevices: Boolean,
+): Boolean = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && (!update.isFromSelf || linkedDevices)
 
 /**
  * The receipt scheduling both receipt sources share, for one received message of [accountRef]'s group
