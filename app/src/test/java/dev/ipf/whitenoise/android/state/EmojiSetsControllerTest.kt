@@ -338,7 +338,11 @@ class EmojiSetsControllerTest {
             sync.join()
 
             assertEquals(listOf(backend.set), controller.state.sets)
-            assertNull(controller.state.sets.single().installed)
+            assertNull(
+                controller.state.sets
+                    .single()
+                    .installed,
+            )
         }
 }
 
