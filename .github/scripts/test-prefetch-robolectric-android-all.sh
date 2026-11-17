@@ -99,10 +99,15 @@ export PREFETCH_CALLS="$FIXTURE/calls" PREFETCH_EXPECTED_REMOTE="https://custom.
 export PREFETCH_PIDS="$FIXTURE/pids"
 assert_transport_stopped() {
   while read -r pid; do
-    if kill -0 "$pid" 2>/dev/null; then
-      state="$(ps -o stat= -p "$pid")"
-      [[ "$state" == Z* ]] || fail 'timed transport or its descendant is still running'
-    fi
+    # SIGKILL delivery can precede the kernel's final process-state transition.
+    # Bound that transition wait; a surviving transport still fails the contract.
+    for attempt in {1..50}; do
+      kill -0 "$pid" 2>/dev/null || break
+      state="$(ps -o stat= -p "$pid" || true)"
+      [[ -z "$state" || "$state" == Z* ]] && break
+      ((attempt < 50)) || fail 'timed transport or its descendant is still running'
+      sleep 0.02
+    done
   done <"$PREFETCH_PIDS"
 }
 run_fake() {
