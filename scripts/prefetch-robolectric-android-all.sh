@@ -105,7 +105,10 @@ DOWNLOAD_DIR="$(mktemp -d "$LOCAL_REPO/$ARTIFACT_PATH/.prefetch.XXXXXX")"
 trap 'rm -rf -- "$DOWNLOAD_DIR"' EXIT
 export PINS CATALOG REMOTE FALLBACK_REMOTE LOCAL_REPO ARTIFACT_PATH DOWNLOAD_DIR
 export -f sha512_of check_robolectric_version download_jar fetch_jar main
-if ! timeout --signal=KILL "${BUDGET_SECONDS}s" \
+# Ubuntu 26.04's uutils timeout can fail to deliver SIGKILL to descendants.
+# Prefer the packaged GNU implementation to retain whole-group termination.
+timeout_bin="$(command -v gnutimeout || command -v timeout)"
+if ! "$timeout_bin" --signal=KILL "${BUDGET_SECONDS}s" \
     bash -c 'set -euo pipefail; main'; then
   printf 'error: Android jar prefetch failed within its cumulative budget\n' >&2
   exit 1

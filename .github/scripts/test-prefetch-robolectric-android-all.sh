@@ -95,18 +95,19 @@ else
 fi
 FAKE_CURL
 chmod +x "$FIXTURE/bin/curl"
+# Exercise the GNU compatibility name used on Ubuntu 26.04.
+export PREFETCH_GNU_TIMEOUT="$(command -v gnutimeout || command -v timeout)"
+export PREFETCH_TIMEOUT_CALLS="$FIXTURE/timeout-calls"
+cat >"$FIXTURE/bin/gnutimeout" <<'GNU_TIMEOUT'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$PREFETCH_TIMEOUT_CALLS"
+exec "$PREFETCH_GNU_TIMEOUT" "$@"
+GNU_TIMEOUT
+chmod +x "$FIXTURE/bin/gnutimeout"
 export PREFETCH_CALLS="$FIXTURE/calls" PREFETCH_EXPECTED_REMOTE="https://custom.invalid/only"
 export PREFETCH_PIDS="$FIXTURE/pids"
 assert_transport_stopped() {
   while read -r pid; do
-    # timeout has sent SIGKILL, but descendants may not have been scheduled yet.
-    # Allow signal delivery without weakening the live-process assertion.
-    for attempt in {1..20}; do
-      kill -0 "$pid" 2>/dev/null || break
-      state="$(ps -o stat= -p "$pid" || true)"
-      [[ -z "$state" || "$state" == Z* ]] && break
-      sleep 0.1
-    done
     if kill -0 "$pid" 2>/dev/null; then
       state="$(ps -o stat= -p "$pid" || true)"
       [[ -z "$state" || "$state" == Z* ]] || fail 'timed transport or its descendant is still running'
@@ -133,6 +134,7 @@ fi
 [[ -z "$(find "$FIXTURE/stall-m2" -type f)" ]] || fail 'stalled partial was retained/admitted'
 [[ -z "$(find "$FIXTURE/stall-m2" -name '.prefetch.*')" ]] || fail 'owned partial directory was retained'
 assert_transport_stopped
+grep -Fq -- '--signal=KILL 3s' "$PREFETCH_TIMEOUT_CALLS" || fail 'GNU timeout compatibility path was not selected'
 # The first successful jar and the second stalled429 share exactly one deadline.
 export PREFETCH_MODE=cumulative
 export PREFETCH_GOOD_JAR="$remote/org/robolectric/android-all-instrumented/$VERSION/$JAR"
