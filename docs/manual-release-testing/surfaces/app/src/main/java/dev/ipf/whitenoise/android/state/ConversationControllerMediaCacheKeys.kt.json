@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMediaCacheKeys.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "A just-sent photo or video seeds its confirmed bubble with the poster its pending bubble showed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMediaCacheKeys.kt",
+        "anchor": "internal suspend fun decodeMediaThumbnailOffMain(",
+        "test_ids": [
+          "MED-007"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

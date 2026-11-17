@@ -66,6 +66,6 @@ class SourceBlockTestHelpersTest {
     }
 
     private companion object {
-        const val CONVERSATION_CONTROLLER_MAX_LINES = 4_431
+        const val CONVERSATION_CONTROLLER_MAX_LINES = 4_073
     }
 }
