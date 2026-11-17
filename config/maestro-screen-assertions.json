@@ -2980,7 +2980,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
       "symbol": "ProfileSheetModerationConfirmDialog",
       "bindings": [
         {
@@ -5600,7 +5600,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
       "symbol": "ProfileAddToGroupsScreen",
       "bindings": [
         {
