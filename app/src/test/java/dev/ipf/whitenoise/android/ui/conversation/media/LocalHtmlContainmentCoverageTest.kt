@@ -50,5 +50,9 @@ class LocalHtmlContainmentCoverageTest {
             )
         assertTrue("LocalHtmlPolicy.sanitize(decoded.text)" in owner)
         assertTrue("if (actions.isCurrent()) openMarkdownLink" in owner)
+        val manifest = appModuleSource("src/main/AndroidManifest.xml").replace(Regex("\\s+"), " ")
+        assertTrue(
+            "android:name=\"android.webkit.WebView.MetricsOptOut\" android:value=\"true\"" in manifest,
+        )
     }
 }

@@ -71,6 +71,7 @@ internal fun DocumentAttachmentViewer(
     var original by remember(actions) { mutableStateOf<String?>(null) }
     var html by remember(actions) { mutableStateOf<LocalHtmlDocument?>(null) }
     var error by remember(actions) { mutableStateOf(false) }
+    var retryable by remember(actions) { mutableStateOf(false) }
     var sourceTab by remember(actions) { mutableStateOf(false) }
     var pendingLink by remember(actions) { mutableStateOf<String?>(null) }
     var generation by remember(actions) { mutableIntStateOf(0) }
@@ -78,22 +79,28 @@ internal fun DocumentAttachmentViewer(
     LaunchedEffect(actions, generation) {
         if (kind != DocumentAttachmentKind.Html) return@LaunchedEffect
         error = false
+        retryable = false
         html = null
         original = null
-        val result =
-            runCatchingCancellable {
-                val decoded = withContext(Dispatchers.Default) { decodeTextAttachment(loadBytes()) }
-                check(decoded is TextAttachmentDecodeResult.Success)
-                val sanitized = withContext(Dispatchers.Default) { LocalHtmlPolicy.sanitize(decoded.text) }
-                decoded.text to sanitized
+        // Only a failed load can succeed on retry; size, encoding and sanitizer limits are deterministic.
+        val bytes = runCatchingCancellable { loadBytes() }
+        val decoded =
+            bytes.getOrNull()?.let {
+                withContext(Dispatchers.Default) { decodeTextAttachment(it) } as? TextAttachmentDecodeResult.Success
             }
-        if (actions.isCurrent()) {
-            result
-                .onSuccess { (text, document) ->
-                    original = text
-                    html = document
-                }.onFailure { error = true }
+        if (!actions.isCurrent()) return@LaunchedEffect
+        if (decoded == null) {
+            error = true
+            retryable = bytes.isFailure
+            return@LaunchedEffect
         }
+        // Source stays readable even when the sender markup exceeds the sanitizer's structure limits.
+        original = decoded.text
+        val sanitized =
+            runCatchingCancellable {
+                withContext(Dispatchers.Default) { LocalHtmlPolicy.sanitize(decoded.text) }
+            }
+        if (actions.isCurrent()) sanitized.onSuccess { html = it }.onFailure { error = true }
     }
     PlaybackDialog(
         onDismissRequest = onDismiss,
@@ -119,7 +126,11 @@ internal fun DocumentAttachmentViewer(
             } else if (sourceTab && original != null) {
                 DocumentSource(original!!, name)
             } else if (error) {
-                DocumentViewerError(R.string.document_html_unavailable, { generation++ }, onOpenExternal)
+                DocumentViewerError(
+                    R.string.document_html_unavailable,
+                    if (retryable) ({ generation++ }) else null,
+                    onOpenExternal,
+                )
             } else {
                 val document = html
                 if (document == null) {
@@ -293,12 +304,12 @@ internal fun DocumentLoading() {
 @Suppress("FunctionNaming")
 internal fun DocumentViewerError(
     message: Int,
-    onRetry: () -> Unit,
+    onRetry: (() -> Unit)?,
     onOpenExternal: (() -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxWidth().padding(24.dp)) {
         Text(stringResource(message), color = Color.White)
-        TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+        if (onRetry != null) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
         if (onOpenExternal != null) {
             TextButton(onClick = onOpenExternal) {
                 Text(stringResource(R.string.text_attachment_open_external))
