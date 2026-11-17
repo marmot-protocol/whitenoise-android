@@ -107,9 +107,10 @@ Every merge group, master push, nightly and manual run uses the full core matrix
 both complete unit/golden suites and comparison evidence, current coverage gates,
 both lint variants, compile/style/security/ZSP contracts and baseline
 packaging. Compose compiler reports run only on `master` pushes, nightly and manual
-dispatch. Merge groups do not use the PR documentation shortcut. Master remains
-full in this first rollout; removing duplicate master work requires separately
-reviewed accepted-integration provenance and a full fallback.
+dispatch. Merge groups do not use the PR documentation shortcut and never reuse a
+result. A master push of the commit its merge group already validated reuses that
+result (see [Same-content reuse](#same-content-reuse)). Every other master push stays
+full.
 
 A live `ci:full` label selects that same full core matrix on a PR, including a
 draft. Changing a label does not start or cancel CI; request a fresh run with
@@ -121,7 +122,12 @@ Independent review/controller full-preflight holds persist after label removal;
 verify their exact accepted run before admission.
 
 Only merge-group executions use distinct run IDs and disable cancellation.
-PR, master, scheduled and manual runs retain same-ref supersession.
+PR, master, scheduled and manual runs retain same-ref supersession. A merge-group
+run stops at its first failed job, so the queue ejects that PR at once instead of
+after the slowest job, and it also stops when the queue drops its group. The
+`merge-group-fail-fast` job holds `actions: write` for that, runs no repository
+code and is not one of the aggregate's needs; the aggregate still runs, sees the
+cancelled jobs and fails.
 Unit execution has a 30-minute step budget within the 40-minute job budget,
 leaving time to retain failure reports and timing evidence. A timeout fails the gate; every retry requires a retained diagnosis.
 
@@ -133,6 +139,46 @@ Queue core suite jobs must succeed; precheck-only compiler runners must skip. A 
 successful current integration CI and independent authorization.
 Activation, failure recovery and rollback are specified in the
 [serial queue contract](android-serial-merge-queue.md#pr-precheck-activation).
+
+## Same-content reuse
+
+Identical content is validated once, in two places. A merge group never reuses a result.
+
+- A **ready-for-review** run reuses the draft result when the head's tree is unchanged,
+  so marking a draft ready runs no checks. The run still starts, only to report the
+  required check name for the ready head. A PR run that completes the precheck or full
+  lane uploads a seven-day proof named `android-ci-attest-<lane>-<tree>`, where the tree
+  is the checked-out commit's tree. `scripts/ci_reuse.py` finds a proof for the same tree
+  (a full proof also satisfies a precheck request) and re-verifies it against the Actions
+  API: a completed, successful run of this workflow, started by a pull request from this
+  repository, whose workflow, `scripts/ci_reuse.py` and `scripts/check_ci_changes.py` are
+  byte-identical to the code now running. The classifier and this lookup run first in the
+  job, in Python's isolated mode, before any step that runs other PR-controlled code. A
+  fork, an expired proof, a skipped run that merely reused another result and any API or
+  parsing error select normal validation.
+- A **master push** of the commit a merge group already validated, shown by that run's
+  aggregate job having passed (the queue merges at that moment, before the run itself
+  finishes), skips the suites. It keeps `tooling-contracts` (the source-bound manual
+  testing guide), `build-contracts` (Gradle cache refresh and the optional Maestro APK)
+  and, for risky diffs, the Compose reports. A push that changes a cache input (Gradle
+  files, the wrapper, lock files, the MarmotKit pin or the reuse code itself) validates
+  fully so the master caches stay fresh. The nightly run refreshes the writers a reused
+  push skips. This lookup uses no proof, only the merge group runs GitHub creates for the
+  exact commit.
+
+A proof is only an artifact name, and any code that runs inside a same-repository PR run,
+such as a build script or a test, can upload an artifact with any name. A proof therefore
+only relieves the PR's own check. The merge queue re-runs the full matrix on every group,
+and the aggregate rejects a reused PR result in a merge group even if the outputs claim
+one. Reusing a PR result in the queue would need an attestation written by a workflow whose
+code PRs cannot change.
+
+The aggregate accepts skipped jobs only for a recorded reuse (`reuse` and `reuse_run`
+outputs of the classifier job), only in the matching event, never for drafts or
+documentation-only runs, and rejects every other skip. The repository variable
+`ANDROID_CI_REUSE` selects the behavior: `enforce` reuses, unset or `shadow` only
+reports what it would reuse in the job summary, and `off` disables reuse. Review the
+shadow decisions of a few runs before setting `enforce`; setting `off` is the rollback.
 
 ## Documentation-only core validation
 
@@ -185,7 +231,9 @@ publishing contract, Zapstore lint and unit/screenshot tests, compilation, ktlin
 detekt. They defer coverage, baseline packaging, Compose reports, the Play check,
 emulator workflows and release verification. `ready_for_review` starts a new run
 with every applicable lane, so the required aggregate is recomputed for the ready
-head. The aggregate accepts the draft skips only when the event is a draft PR,
+head. In activated queue mode the draft and ready lanes are identical, so that run
+reuses the draft result when the head's tree is unchanged and runs no checks (see
+[Same-content reuse](#same-content-reuse)). The aggregate accepts the draft skips only when the event is a draft PR,
 and on drafts it reports as `Compile, test, ktlint, detekt, Android lint (draft
 fast lane)`. The required context therefore comes only from a ready run, so a
 green draft result cannot satisfy it after the PR is marked ready.
@@ -197,7 +245,9 @@ Compose compiler reports run after integration (`master` pushes, nightly and
 manual dispatch) and are skipped on PRs and merge groups. Independent unsigned
 APK reproduction remains a supplemental campaign. A complete raw diff permits
 its deferral for
-known ordinary Kotlin/Java source, main resources, committed goldens and prose.
+known ordinary Kotlin/Java source, main resources, committed goldens, the detekt
+baseline (`config/detekt/detekt-baseline.xml`, which every lane already enforces
+through `:app:detekt`) and prose.
 Validated invariant/manual-surface metadata also permits deferral while remaining
 non-docs-only. Build, packaging, native pins, manifests, CI/tooling, executable/symlink changes,
 unknown inputs or unavailable evidence run reproduction. In full mode, all other compilation,
