@@ -197,13 +197,14 @@ private fun EmojiSetBrowser(
     onSearch: (String) -> Unit,
     onShow: (EmojiSetFfi) -> Unit,
 ) {
+    val loading = state.busy || state.discovering
     SettingsList {
-        item { EmojiSetQuery(field, busy = state.busy || state.discovering, onSearch = onSearch) }
+        item { EmojiSetQuery(field, busy = loading, onSearch = onSearch) }
         item { EmojiSetStatus(state, syncing = state.discovering) }
         // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
         val discoveryFailed =
             state.notice == EmojiSetNotice.Error || state.notice == EmojiSetNotice.DiscoveryIncomplete
-        if (state.sets.isEmpty() && !state.busy && !state.discovering && !discoveryFailed) {
+        if (state.sets.isEmpty() && !loading && !discoveryFailed) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
         items(state.sets, key = { it.coordinate }) { set ->
