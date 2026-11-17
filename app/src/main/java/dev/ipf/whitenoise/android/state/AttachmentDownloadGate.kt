@@ -116,7 +116,9 @@ internal class AttachmentDownloadGate(
      * Runs [block] while holding one permit for [key]. A [foreground] automatic request, one a visible bubble made,
      * queues ahead of every other automatic request, the newest first, as MDK orders its own automatic queue.
      * Background work queues behind them in arrival order. Interactive requests still go first, except that after
-     * [MAX_INTERACTIVE_BURST] of them in a row one automatic request, the front of that queue, is admitted.
+     * [MAX_INTERACTIVE_BURST] of them in a row one automatic request, the front of that queue, is admitted. The permit
+     * travels in [block]'s context as a [DownloadSlot]; a re-acquire it started after a pause and that is still queuing
+     * when [block] ends is withdrawn.
      */
     suspend fun <T> withPermit(
         key: String,
@@ -158,6 +160,8 @@ internal class AttachmentDownloadGate(
         companion object Key : CoroutineContext.Key<DownloadSlot>
 
         private var reacquiring: Job? = null
+        private var queuedPriority: AttachmentDownloadPriority? = null
+        private var queuedDemand: Long? = null
 
         /**
          * Gives the permit back while [block] runs. When [requeueAfter] accepts the result, it queues for the permit
@@ -166,16 +170,29 @@ internal class AttachmentDownloadGate(
          * permit is owned again, queuing included, the key still counts as admitted, so a tap on it still escalates
          * the native transfer. A [block] that throws, or a result that needs no more network work, leaves the permit
          * given back, stops counting the key as admitted, and then drops any promotion or visible demand made for it
-         * meanwhile, so the ending work never waits for a permit and hands no priority to a later owner.
+         * meanwhile, so the ending work never waits for a permit and hands no priority to a later owner. Stopping
+         * automatic downloads also withdraws a background request still queuing; the work keeps watching its
+         * transfer, which MDK pauses again once its permission is gone. One observer calls this at a time; it is not
+         * for concurrent use.
          */
         suspend fun <T> releasedWhile(
             requeueAfter: (T) -> Boolean,
             block: suspend () -> T,
         ): T {
-            // A second pause ends a re-acquire still queuing from the first one.
+            // Counted as admitted before anything is given up, so a tap during the handover is never lost.
+            gate.beginPause(cacheKey)
+            // A second pause withdraws a re-acquire still queuing from the first one, keeping the place it had gained.
+            gate.queuedPlace(cacheKey)?.let { (priority, demand) ->
+                queuedPriority = priority
+                queuedDemand = demand
+            }
             stopReacquiring()
             val held = waiter
-            gate.releaseForPause(held)
+            gate.release(held)
+            val priority = queuedPriority ?: held.priority
+            val demand = queuedDemand ?: held.demand
+            queuedPriority = null
+            queuedDemand = null
             var handedOff = false
             try {
                 val result = block()
@@ -187,9 +204,9 @@ internal class AttachmentDownloadGate(
                                     gate.acquire(
                                         cacheKey,
                                         accountRef,
-                                        held.priority,
+                                        priority,
                                         foreground,
-                                        keptDemand = held.demand,
+                                        keptDemand = demand,
                                     )
                             } finally {
                                 gate.endPause(cacheKey)
@@ -278,15 +295,25 @@ internal class AttachmentDownloadGate(
             keyedWaiters.forKey(key).orEmpty().any { !it.ownsPermit }
         }
 
-    /** Gives [waiter]'s permit back while its native transfer is paused, keeping its key counted as admitted. */
-    private fun releaseForPause(waiter: Waiter) {
-        synchronized(lock) {
-            pausedOwners[waiter.key] = pausedOwners.getOrDefault(waiter.key, 0) + 1
-            release(waiter)
-        }
+    /** Starts counting [key] as admitted for one pause, before its permit or queued request is given up. */
+    private fun beginPause(key: String) {
+        synchronized(lock) { pausedOwners[key] = pausedOwners.getOrDefault(key, 0) + 1 }
     }
 
-    /** Ends one pause that [releaseForPause] began for [key]. */
+    /**
+     * The lane and visible demand of the request for [key] still queuing for a permit, if any, so a request withdrawn
+     * when its transfer pauses again can queue later with a tap's promotion or a newer demand it gained meanwhile.
+     */
+    private fun queuedPlace(key: String): Pair<AttachmentDownloadPriority, Long>? =
+        synchronized(lock) {
+            keyedWaiters
+                .forKey(key)
+                .orEmpty()
+                .firstOrNull { !it.ownsPermit }
+                ?.let { it.priority to it.demand }
+        }
+
+    /** Ends one pause that [beginPause] began for [key]. */
     private fun endPause(key: String) {
         synchronized(lock) {
             val remaining = pausedOwners.getOrDefault(key, 0) - 1

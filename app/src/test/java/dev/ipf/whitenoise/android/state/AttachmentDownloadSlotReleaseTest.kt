@@ -6,6 +6,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -154,6 +156,79 @@ class AttachmentDownloadSlotReleaseTest {
                 assertTrue("the other download still holds the only slot", holder.isActive)
                 holderDone.complete(Unit)
                 holder.await()
+            }
+        }
+
+    /**
+     * A transfer that pauses again while its slot request still queues stays admitted throughout, withdraws that
+     * request, and queues again later with the tap's promotion it gained meanwhile, ahead of background work.
+     */
+    @Test
+    fun aSecondPauseKeepsTheTapItsQueuedRequestGained() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val firstPauseEnds = CompletableDeferred<Unit>()
+                val secondPauseEnds = CompletableDeferred<Unit>()
+                val holderDone = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                var admittedDuringSecondPause = false
+                var withdrawnDuringSecondPause = false
+                val paused =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("paused", ACCOUNT, AUTOMATIC) {
+                            withDownloadSlotReleased { firstPauseEnds.await() }
+                            gate.promote("paused")
+                            withDownloadSlotReleased {
+                                admittedDuringSecondPause = gate.isAdmitted("paused")
+                                withdrawnDuringSecondPause = !gate.isQueuedForTest("paused")
+                                secondPauseEnds.await()
+                            }
+                            while (gate.isQueuedForTest("paused")) yield()
+                            started += "paused"
+                        }
+                    }
+                val holder = startHolding(gate, "holder", holderDone)
+                firstPauseEnds.complete(Unit)
+                yield()
+                val background = startRecording(gate, "background", started)
+                secondPauseEnds.complete(Unit)
+                yield()
+                holderDone.complete(Unit)
+                listOf(paused, holder, background).awaitAll()
+
+                assertTrue(admittedDuringSecondPause)
+                assertTrue("the queued request was withdrawn for the second pause", withdrawnDuringSecondPause)
+                assertEquals("the tapped request goes before background work", listOf("paused", "background"), started)
+            }
+        }
+
+    /** Cancelling the work while its slot request queues leaks no permit and leaves the key unadmitted. */
+    @Test
+    fun cancellingWorkWhileItsSlotRequestQueuesLeaksNothing() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val pauseEnds = CompletableDeferred<Unit>()
+                val holderDone = CompletableDeferred<Unit>()
+                val paused =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("paused", ACCOUNT, AUTOMATIC) {
+                            withDownloadSlotReleased { pauseEnds.await() }
+                            awaitCancellation()
+                        }
+                    }
+                val holder = startHolding(gate, "holder", holderDone)
+                pauseEnds.complete(Unit)
+                while (!gate.isQueuedForTest("paused")) yield()
+                paused.cancelAndJoin()
+                holderDone.complete(Unit)
+                holder.await()
+                val next = CompletableDeferred<Unit>()
+                startHolding(gate, "next", next).also { next.complete(Unit) }.await()
+
+                assertFalse(gate.isAdmitted("paused"))
+                assertFalse(gate.isQueuedForTest("paused"))
             }
         }
 
