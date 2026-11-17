@@ -151,6 +151,14 @@
         "test_ids": [
           "GRP-042"
         ]
+      },
+      {
+        "surface": "Chat header Members shortcut page",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "membersAutoOpened",
+        "test_ids": [
+          "SET-058"
+        ]
       }
     ],
     "settings_controls": [
