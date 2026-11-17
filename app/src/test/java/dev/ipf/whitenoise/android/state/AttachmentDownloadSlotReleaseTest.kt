@@ -52,9 +52,9 @@ class AttachmentDownloadSlotReleaseTest {
             }
         }
 
-    /** Work that fails during the pause ends with its error and leaves the slot free for the next request. */
+    /** Work that fails during the pause ends with its error and leaves no permit held behind it. */
     @Test
-    fun workEndingDuringThePauseLeavesTheSlotFree() =
+    fun workFailingDuringThePauseHoldsNoPermit() =
         runBlocking {
             withTimeout(TEST_TIMEOUT) {
                 val gate = AttachmentDownloadGate(parallelism = 1)

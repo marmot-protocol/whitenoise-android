@@ -150,15 +150,20 @@ internal class AttachmentDownloadGate(
             block: suspend () -> T,
         ): T {
             val held = waiter
+            // A nested release of a slot already given back has no permit to give.
+            if (!held.ownsPermit) return block()
             gate.releaseForPause(held)
+            var finished = false
             val result =
                 try {
-                    block()
+                    block().also { finished = true }
                 } finally {
                     gate.endPause(cacheKey)
+                    // Work ending by an error must not leave a tap's promotion or visible demand made meanwhile.
+                    if (!finished) gate.forgetPending(cacheKey)
                 }
             if (requeueAfter(result)) {
-                waiter = gate.acquire(cacheKey, accountRef, held.priority, foreground)
+                waiter = gate.acquire(cacheKey, accountRef, held.priority, foreground, keptDemand = held.demand)
             } else {
                 gate.forgetPending(cacheKey)
             }
@@ -297,13 +302,15 @@ internal class AttachmentDownloadGate(
 
     /**
      * Registers one waiter for [key] and suspends until it owns a permit. A [foreground] automatic request, or one
-     * whose key a visible bubble asked for before registration, queues by that visible demand.
+     * whose key a visible bubble asked for before registration, queues by that visible demand. A request queuing again
+     * after a pause passes its [keptDemand], so it keeps its place instead of jumping ahead of newer visible requests.
      */
     private suspend fun acquire(
         key: String,
         accountRef: String?,
         priority: AttachmentDownloadPriority,
         foreground: Boolean,
+        keptDemand: Long? = null,
     ): Waiter {
         val waiter =
             synchronized(lock) {
@@ -321,7 +328,7 @@ internal class AttachmentDownloadGate(
                 val registered = Waiter(key, accountRef, effectivePriority)
                 keyedWaiters.register(registered)
                 if (effectivePriority == AttachmentDownloadPriority.Automatic) {
-                    registered.demand = pendingDemand ?: if (foreground) ++lastForegroundDemand else 0
+                    registered.demand = pendingDemand ?: keptDemand ?: if (foreground) ++lastForegroundDemand else 0
                     queueAutomaticLocked(registered)
                 } else {
                     interactive.addLast(registered)
@@ -429,7 +436,10 @@ internal class AttachmentDownloadGate(
 internal suspend fun <T> withDownloadSlotReleased(
     requeueAfter: (T) -> Boolean = { true },
     block: suspend () -> T,
-): T = currentCoroutineContext()[AttachmentDownloadGate.DownloadSlot]?.releasedWhile(requeueAfter, block) ?: block()
+): T {
+    val slot = currentCoroutineContext()[AttachmentDownloadGate.DownloadSlot] ?: return block()
+    return slot.releasedWhile(requeueAfter, block)
+}
 
 /**
  * Conservative classifier for the current MDK media error surface.
