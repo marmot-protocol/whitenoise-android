@@ -3261,7 +3261,8 @@ class ConversationDictationControllerTest {
         for (lockedReturn in listOf(false, true)) {
             for (elapsed in listOf(29_999L, 30_000L, 30_001L)) {
                 var locked = false
-                val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+                val platform =
+                    FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
                 val draft = TextFieldValue("Keep", TextRange(2))
                 val f = fixture(draft = draft, platform = platform, appLocked = { locked })
                 f.controller.requestStart(ACCOUNT, GROUP, draft)

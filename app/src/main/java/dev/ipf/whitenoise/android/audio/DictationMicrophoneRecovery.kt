@@ -57,11 +57,11 @@ internal fun ConversationDictationController.armMicrophoneSettingsRecovery(nativ
 
 internal fun ConversationDictationController.resumeMicrophoneSettingsRecovery(): Boolean {
     val pending = microphoneSettingsRecovery ?: return false
-    if (elapsedRealtime() >= pending.expiresAtElapsedRealtime) {
-        clearMicrophoneRecovery()
-        return false
-    }
     return when {
+        elapsedRealtime() >= pending.expiresAtElapsedRealtime -> {
+            clearMicrophoneRecovery()
+            false
+        }
         !pending.resumed -> true
         else -> {
             val restored =
@@ -110,8 +110,7 @@ private fun ConversationDictationController.dispatchNativeMicrophoneUnblock(pend
         clearMicrophoneRecovery()
         return
     }
-    if (pending.dispatched || !pending.resumed) return
-    if (!microphoneHostReady() || !microphoneRecoveryAllowed()) return
+    if (pending.dispatched || !pending.resumed || !microphoneHostReady() || !microphoneRecoveryAllowed()) return
     if (platform.microphoneAccess() == ConversationDictationMicrophoneAccess.Granted) {
         resumeMicrophoneSettingsRecovery()
     } else {
