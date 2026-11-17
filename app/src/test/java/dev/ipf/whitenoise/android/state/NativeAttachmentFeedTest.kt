@@ -7,13 +7,13 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.functionBody
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -149,11 +149,11 @@ class NativeAttachmentFeedTest {
         }
 
     /**
-     * A transfer still downloading after its pause queues for a download slot again before it goes on, so it cannot
-     * run beside the request that took its slot meanwhile (#3819).
+     * A transfer that resumes after its pause queues for a download slot in the background and keeps being watched,
+     * so READY arriving while every slot is taken ends observation at once and withdraws the queued request (#3819).
      */
     @Test
-    fun `a transfer still downloading after its pause waits for a slot again`() =
+    fun `a resumed transfer reaching ready while its slot request queues finishes at once`() =
         runBlocking {
             val gate = AttachmentDownloadGate(parallelism = 1)
             val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
@@ -165,13 +165,15 @@ class NativeAttachmentFeedTest {
 
             withTimeout(WAIT_MILLIS) { while (!gate.isAdmitted("other")) delay(1) }
             feed.deliver(AttachmentTransferStateFfi.DOWNLOADING)
+            withTimeout(WAIT_MILLIS) { while (!gate.isQueuedForTest("paused")) delay(1) }
             feed.deliver(AttachmentTransferStateFfi.READY)
-            delay(SETTLE_MILLIS)
-            assertTrue("the resumed transfer waits for the slot", observer.isActive)
+            withTimeout(WAIT_MILLIS) { observer.await() }
 
-            otherDone.complete(Unit)
-            withTimeout(WAIT_MILLIS) { listOf(observer, other).awaitAll() }
+            assertFalse("the queued slot request was withdrawn", gate.isQueuedForTest("paused"))
+            assertTrue("the other download still holds the only slot", other.isActive)
             assertTrue(feed.closed.get())
+            otherDone.complete(Unit)
+            other.await()
         }
 
     /** A pause that ends with the transfer READY finishes at once instead of queuing behind other downloads. */
@@ -256,7 +258,6 @@ class NativeAttachmentFeedTest {
 
         const val WAIT_MILLIS = 5_000L
         const val PAUSE_GRACE_MILLIS = 200L
-        const val SETTLE_MILLIS = 100L
         const val ACCOUNT = "account-a"
     }
 }

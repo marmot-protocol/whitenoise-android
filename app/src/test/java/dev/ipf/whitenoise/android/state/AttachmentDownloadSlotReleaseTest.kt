@@ -17,40 +17,39 @@ import java.io.IOException
 
 /** A download that MDK holds paused gives its gate slot to other downloads until the pause ends (#3819). */
 class AttachmentDownloadSlotReleaseTest {
-    /** While the holder waits out a pause, the next request runs; afterwards the holder queues for a slot again. */
+    /**
+     * While the holder waits out a pause, the next request runs. Afterwards the holder goes on with its work at once
+     * and queues for a slot in the background, getting it back once the next request finishes.
+     */
     @Test
-    fun aPausedHolderLetsTheNextRequestRunThenQueuesAgain() =
+    fun aPausedHolderLetsTheNextRequestRunThenQueuesInTheBackground() =
         runBlocking {
             withTimeout(TEST_TIMEOUT) {
                 val gate = AttachmentDownloadGate(parallelism = 1)
-                val events = mutableListOf<String>()
                 val pauseEnds = CompletableDeferred<Unit>()
-                val secondRunning = CompletableDeferred<Unit>()
-                val secondDone = CompletableDeferred<Unit>()
+                val holderWorkDone = CompletableDeferred<Unit>()
+                val nextDone = CompletableDeferred<Unit>()
+                var resumedWithoutASlot = false
                 val paused =
                     async(start = CoroutineStart.UNDISPATCHED) {
-                        gate.withPermit("paused", ACCOUNT, AttachmentDownloadPriority.Automatic) {
-                            events += "paused started"
+                        gate.withPermit("paused", ACCOUNT, AUTOMATIC) {
                             withDownloadSlotReleased { pauseEnds.await() }
-                            events += "paused resumed"
+                            resumedWithoutASlot = gate.isQueuedForTest("paused")
+                            holderWorkDone.await()
                         }
                     }
-                val next =
-                    async(start = CoroutineStart.UNDISPATCHED) {
-                        gate.withPermit("next", ACCOUNT, AttachmentDownloadPriority.Automatic) {
-                            events += "next started"
-                            secondRunning.complete(Unit)
-                            secondDone.await()
-                        }
-                    }
-                secondRunning.await()
+                val next = startHolding(gate, "next", nextDone)
+                assertTrue("the next request took the paused holder's slot", gate.isAdmitted("next"))
                 pauseEnds.complete(Unit)
                 yield()
-                assertEquals("the resumed holder waits for a free slot", 2, events.size)
-                secondDone.complete(Unit)
-                listOf(paused, next).awaitAll()
 
-                assertEquals(listOf("paused started", "next started", "paused resumed"), events)
+                assertTrue("the holder went on while its slot request queued", resumedWithoutASlot)
+                nextDone.complete(Unit)
+                next.await()
+                while (gate.isQueuedForTest("paused")) yield()
+                assertTrue("the holder owns a slot again", gate.isAdmitted("paused"))
+                holderWorkDone.complete(Unit)
+                paused.await()
             }
         }
 
@@ -109,10 +108,14 @@ class AttachmentDownloadSlotReleaseTest {
             withTimeout(TEST_TIMEOUT) {
                 val gate = AttachmentDownloadGate(parallelism = 1)
                 val pauseEnds = CompletableDeferred<Unit>()
+                val workDone = CompletableDeferred<Unit>()
                 val holderDone = CompletableDeferred<Unit>()
                 val paused =
                     async(start = CoroutineStart.UNDISPATCHED) {
-                        gate.withPermit("paused", ACCOUNT, AUTOMATIC) { withDownloadSlotReleased { pauseEnds.await() } }
+                        gate.withPermit("paused", ACCOUNT, AUTOMATIC) {
+                            withDownloadSlotReleased { pauseEnds.await() }
+                            workDone.await()
+                        }
                     }
                 val holder = startHolding(gate, "holder", holderDone)
                 pauseEnds.complete(Unit)
@@ -120,8 +123,37 @@ class AttachmentDownloadSlotReleaseTest {
 
                 assertTrue("a queued resumed request still counts as admitted", gate.isAdmitted("paused"))
                 holderDone.complete(Unit)
-                listOf(paused, holder).awaitAll()
+                holder.await()
+                workDone.complete(Unit)
+                paused.await()
                 assertFalse(gate.isAdmitted("paused"))
+            }
+        }
+
+    /**
+     * Work that ends while its resumed request is still queuing returns at once: the queued request is withdrawn and
+     * the key stops counting as admitted, while the other download keeps its slot.
+     */
+    @Test
+    fun workEndingWhileItsSlotRequestQueuesWithdrawsTheRequest() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val pauseEnds = CompletableDeferred<Unit>()
+                val holderDone = CompletableDeferred<Unit>()
+                val paused =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        gate.withPermit("paused", ACCOUNT, AUTOMATIC) { withDownloadSlotReleased { pauseEnds.await() } }
+                    }
+                val holder = startHolding(gate, "holder", holderDone)
+                pauseEnds.complete(Unit)
+                paused.await()
+
+                assertFalse("no request is left queuing", gate.isQueuedForTest("paused"))
+                assertFalse(gate.isAdmitted("paused"))
+                assertTrue("the other download still holds the only slot", holder.isActive)
+                holderDone.complete(Unit)
+                holder.await()
             }
         }
 
@@ -173,6 +205,8 @@ class AttachmentDownloadSlotReleaseTest {
                     async(start = CoroutineStart.UNDISPATCHED) {
                         gate.withPermit("older", ACCOUNT, AUTOMATIC, foreground = true) {
                             withDownloadSlotReleased { pauseEnds.await() }
+                            // Its slot request queues in the background; record when it owns the slot again.
+                            while (gate.isQueuedForTest("older")) yield()
                             started += "older"
                         }
                     }

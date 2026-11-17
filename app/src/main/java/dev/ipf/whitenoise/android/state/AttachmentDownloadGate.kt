@@ -4,8 +4,15 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.core.isMediaReferenceRefusal
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
@@ -118,20 +125,31 @@ internal class AttachmentDownloadGate(
         foreground: Boolean = false,
         block: suspend () -> T,
     ): T {
-        val slot = DownloadSlot(this, key, accountRef, foreground, acquire(key, accountRef, priority, foreground))
+        val first = acquire(key, accountRef, priority, foreground)
+        var slot: DownloadSlot? = null
         try {
-            return withContext(slot) { block() }
+            return coroutineScope {
+                val created = DownloadSlot(this@AttachmentDownloadGate, this, key, accountRef, foreground, first)
+                slot = created
+                try {
+                    withContext(created) { block() }
+                } finally {
+                    withContext(NonCancellable) { created.stopReacquiring() }
+                }
+            }
         } finally {
-            release(slot.waiter)
+            release(slot?.waiter ?: first)
         }
     }
 
     /**
      * The permit one [withPermit] call holds, carried in its coroutine context so code deep inside the work, such as a
-     * native transfer observer, can give it back for a while with [withDownloadSlotReleased].
+     * native transfer observer, can give it back for a while with [withDownloadSlotReleased]. Its [scope] owns a
+     * re-acquire that is still queuing, which ends with the work.
      */
     internal class DownloadSlot internal constructor(
         private val gate: AttachmentDownloadGate,
+        private val scope: CoroutineScope,
         private val cacheKey: String,
         private val accountRef: String?,
         private val foreground: Boolean,
@@ -139,38 +157,60 @@ internal class AttachmentDownloadGate(
     ) : AbstractCoroutineContextElement(DownloadSlot) {
         companion object Key : CoroutineContext.Key<DownloadSlot>
 
+        private var reacquiring: Job? = null
+
         /**
-         * Gives the permit back while [block] runs, then queues for it again as the same request when [requeueAfter]
-         * accepts the result, keeping its original visible demand. Until it owns a permit again, queuing included, the
-         * key still counts as admitted, so a tap on it still escalates the native transfer. A [block] that throws, or a
-         * result that needs no more network work, leaves the permit given back and drops any promotion or visible
-         * demand made for the key meanwhile, so the ending work neither waits for a permit only to release it nor
-         * hands its priority to a later owner. A nested call on a slot already given back just runs [block].
+         * Gives the permit back while [block] runs. When [requeueAfter] accepts the result, it queues for the permit
+         * again in the background, as the same request with its original visible demand, and returns at once: the
+         * work goes on watching its transfer, so READY or a failure is never held up waiting for a slot. Until the
+         * permit is owned again, queuing included, the key still counts as admitted, so a tap on it still escalates
+         * the native transfer. A [block] that throws, or a result that needs no more network work, leaves the permit
+         * given back, stops counting the key as admitted, and then drops any promotion or visible demand made for it
+         * meanwhile, so the ending work never waits for a permit and hands no priority to a later owner.
          */
         suspend fun <T> releasedWhile(
             requeueAfter: (T) -> Boolean,
             block: suspend () -> T,
         ): T {
+            // A second pause ends a re-acquire still queuing from the first one.
+            stopReacquiring()
             val held = waiter
-            // A nested release of a slot already given back has no permit to give.
-            if (!held.ownsPermit) return block()
             gate.releaseForPause(held)
-            // The key stays counted as admitted until it owns a permit again, including while it queues for one, so a
-            // tap at any point of the pause still escalates the native transfer. Work that ends without queuing again
-            // stops counting as admitted first, then drops any promotion or visible demand made meanwhile, so no tap
-            // can slip a promotion in after that drop.
-            var dropPending = true
+            var handedOff = false
             try {
                 val result = block()
                 if (requeueAfter(result)) {
-                    waiter = gate.acquire(cacheKey, accountRef, held.priority, foreground, keptDemand = held.demand)
-                    dropPending = false
+                    reacquiring =
+                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                            try {
+                                waiter =
+                                    gate.acquire(
+                                        cacheKey,
+                                        accountRef,
+                                        held.priority,
+                                        foreground,
+                                        keptDemand = held.demand,
+                                    )
+                            } finally {
+                                gate.endPause(cacheKey)
+                            }
+                        }
+                    handedOff = true
                 }
                 return result
             } finally {
-                gate.endPause(cacheKey)
-                if (dropPending) gate.forgetPending(cacheKey)
+                if (!handedOff) {
+                    gate.endPause(cacheKey)
+                    gate.forgetPending(cacheKey)
+                }
             }
+        }
+
+        /** Cancels a re-acquire still queuing, so work that has ended never waits for a slot it no longer needs. */
+        suspend fun stopReacquiring() {
+            val job = reacquiring ?: return
+            reacquiring = null
+            job.cancelAndJoin()
         }
     }
 
@@ -438,9 +478,9 @@ internal class AttachmentDownloadGate(
 }
 
 /**
- * Gives back the download slot this coroutine holds, if any, while [block] runs, then queues for it again when
- * [requeueAfter] accepts the result. A transfer MDK holds paused does no network work, so its slot can serve other
- * downloads until the pause ends.
+ * Gives back the download slot this coroutine holds, if any, while [block] runs, then queues for it again in the
+ * background when [requeueAfter] accepts the result. A transfer MDK holds paused does no network work, so its slot can
+ * serve other downloads until the pause ends.
  */
 internal suspend fun <T> withDownloadSlotReleased(
     requeueAfter: (T) -> Boolean = { true },
