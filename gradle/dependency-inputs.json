@@ -11,6 +11,11 @@
     ":app project coreLibraryDesugaring",
     ":app project detekt",
     ":app project detektPlugins",
+    ":app project devPlayBenchmarkReleaseAndroidTestAnnotationProcessorClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestCompileClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestImplementationDependenciesMetadata",
+    ":app project devPlayBenchmarkReleaseAndroidTestLintChecksClasspath",
+    ":app project devPlayBenchmarkReleaseAndroidTestRuntimeClasspath",
     ":app project devPlayBenchmarkReleaseAnnotationProcessorClasspath",
     ":app project devPlayBenchmarkReleaseCompileClasspath",
     ":app project devPlayBenchmarkReleaseImplementationDependenciesMetadata",
@@ -49,6 +54,11 @@
     ":app project devPlayNonMinifiedReleaseUnitTestImplementationDependenciesMetadata",
     ":app project devPlayNonMinifiedReleaseUnitTestLintChecksClasspath",
     ":app project devPlayNonMinifiedReleaseUnitTestRuntimeClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestAnnotationProcessorClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestCompileClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestImplementationDependenciesMetadata",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestLintChecksClasspath",
+    ":app project devZapstoreBenchmarkReleaseAndroidTestRuntimeClasspath",
     ":app project devZapstoreBenchmarkReleaseAnnotationProcessorClasspath",
     ":app project devZapstoreBenchmarkReleaseCompileClasspath",
     ":app project devZapstoreBenchmarkReleaseImplementationDependenciesMetadata",
@@ -93,6 +103,7 @@
     ":app project kotlinCompilerClasspath",
     ":app project kotlinCompilerPluginClasspath",
     ":app project kotlinCompilerPluginClasspathDevPlayBenchmarkRelease",
+    ":app project kotlinCompilerPluginClasspathDevPlayBenchmarkReleaseAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevPlayBenchmarkReleaseUnitTest",
     ":app project kotlinCompilerPluginClasspathDevPlayDebug",
     ":app project kotlinCompilerPluginClasspathDevPlayDebugAndroidTest",
@@ -100,6 +111,7 @@
     ":app project kotlinCompilerPluginClasspathDevPlayNonMinifiedRelease",
     ":app project kotlinCompilerPluginClasspathDevPlayNonMinifiedReleaseUnitTest",
     ":app project kotlinCompilerPluginClasspathDevZapstoreBenchmarkRelease",
+    ":app project kotlinCompilerPluginClasspathDevZapstoreBenchmarkReleaseAndroidTest",
     ":app project kotlinCompilerPluginClasspathDevZapstoreBenchmarkReleaseUnitTest",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebug",
     ":app project kotlinCompilerPluginClasspathDevZapstoreDebugAndroidTest",
@@ -349,7 +361,7 @@
   ],
   "files": {
     "app/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "app/gradle.lockfile": "5cedaec7526aa71bba4eae78c6d2c6fe5fa14887b7cd63ea0dd406184b5e9792",
+    "app/gradle.lockfile": "1a8cc9eecbf007f03d9f0ddb87d0796af9ab0a76617d40f1e63abf841f87da70",
     "benchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "benchmark/gradle.lockfile": "8f5b6089f9e4d6f680afd0047fdcea1dbaceb7e63f3ee3fa869caaf0001917db",
     "buildscript-gradle.lockfile": "d7c11bfd5e58533d1a4b2492e004e19c61a2c6d718e3aafd9c089a8ca498a94d",
@@ -889,13 +901,13 @@
     }
   ],
   "reviewed_from": {
-    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/44291609576/artifacts/14420879745",
+    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/44297229187/artifacts/14423694008",
     "repository": "marmot-protocol/whitenoise-android",
     "retained": {
       "path": "gradle/dependency-evidence/capture.json",
-      "sha256": "16d14494455737a226c3b61e0f130b12139685dd652c04ec5b684be26d356de1"
+      "sha256": "6b6a03f5cfb30250688d36969fd64fc5135664b5c63cdfb3f9599dc9f54ea4ff"
     },
-    "source_sha": "e7bd9cded93a48792e8b37f43d850895164713ad"
+    "source_sha": "2b3e83f57a870101128fca301c1b78f94d5e3d55"
   },
   "schema": 1,
   "supplemental_tools": {
