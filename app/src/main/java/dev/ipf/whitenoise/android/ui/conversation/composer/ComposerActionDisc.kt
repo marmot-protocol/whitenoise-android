@@ -49,7 +49,11 @@ internal fun ComposerActionDisc(
 ) {
     val outline = amoledOutlineBorder(enabled)
     ComposerToolbarTargets {
-        IconButton(onClick = onClick, enabled = enabled, modifier = modifier.width(width).height(48.dp)) {
+        IconButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier.composerControlTarget().width(width).height(48.dp),
+        ) {
             Surface(
                 modifier = Modifier.size(32.dp),
                 shape = CircleShape,

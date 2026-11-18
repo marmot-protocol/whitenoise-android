@@ -325,28 +325,6 @@ private fun Modifier.keepComposerSelectionVisibleDuringLayout(
         }
     }
 
-/** Deduplicates identical measure-time caret corrections; see the caller. */
-private class ComposerLayoutCaretCorrectionGate {
-    private var lastSelection: ComposerSelectionLayout? = null
-    private var lastViewport: Int = -1
-    private var lastMaxScroll: Int = -1
-
-    /** Allows a layout correction only when selection or viewport geometry differs from the last correction. */
-    fun shouldCorrect(
-        selection: ComposerSelectionLayout,
-        viewport: Int,
-        maxScroll: Int,
-    ): Boolean {
-        val changed = selection != lastSelection || viewport != lastViewport || maxScroll != lastMaxScroll
-        if (changed) {
-            lastSelection = selection
-            lastViewport = viewport
-            lastMaxScroll = maxScroll
-        }
-        return changed
-    }
-}
-
 private const val COMPOSER_PLACEHOLDER_FADE_MILLIS = 150
 
 /**
@@ -1436,7 +1414,23 @@ internal fun ComposerPill(
                         morphing = morphing,
                     ).onGloballyPositioned { sendMotion?.sourceSurface = it },
         ) {
-            Box(Modifier.composerFabContent()) {
+            Box(
+                Modifier
+                    .composerBlankSurfaceTap(
+                        enabled =
+                            inputContentVisible &&
+                                inputFocusEnabled &&
+                                textFieldValue.text.isEmpty() &&
+                                voiceReviewContent == null &&
+                                recordingContent == null,
+                    ) {
+                        // Shares the field's own typing tap, including an editor that kept focus
+                        // after the keyboard closed.
+                        textToolbar.hide()
+                        selectingWithoutKeyboard = false
+                        showKeyboardAfterTouchTap = composerFocus.requestFocus()
+                    }.composerFabContent(),
+            ) {
                 // Keep resize semantics inside the surface; an underlying sibling is pruned by Android.
                 if (inputContentVisible) {
                     Box(
@@ -1840,7 +1834,7 @@ internal fun ComposerPill(
                                     ) { shortcut, slotModifier ->
                                         ComposerConfiguredAction(
                                             shortcut = shortcut,
-                                            modifier = slotModifier,
+                                            modifier = slotModifier.composerControlTarget(),
                                             bindings = toolbar,
                                             enabled =
                                                 inputContentVisible &&
@@ -1872,7 +1866,7 @@ internal fun ComposerPill(
                                 }
                             } else {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (inputContentVisible) sendingIdentity?.invoke(Modifier)
+                                    if (inputContentVisible) sendingIdentity?.invoke(Modifier.composerControlTarget())
                                     if (hasAttachmentAction) {
                                         Box(
                                             modifier =
@@ -2001,7 +1995,7 @@ internal fun ComposerPill(
                                 ) { shortcut, slotModifier ->
                                     ComposerConfiguredAction(
                                         shortcut = shortcut,
-                                        modifier = slotModifier,
+                                        modifier = slotModifier.composerControlTarget(),
                                         bindings = checkNotNull(toolbar),
                                         enabled =
                                             inputContentVisible &&

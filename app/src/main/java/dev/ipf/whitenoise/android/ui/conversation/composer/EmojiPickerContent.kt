@@ -191,6 +191,8 @@ internal fun EmojiPickerContent(
     selectionEnabled: Boolean = true,
     searchBehindIcon: Boolean = false,
     onSearchContentHeightChange: (Dp) -> Unit = {},
+    onBrowseSets: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
 ) {
     val search = rememberEmojiSearchState(searchBehindIcon)
     val query = search.query
@@ -248,6 +250,8 @@ internal fun EmojiPickerContent(
             onBackspace = onBackspace,
             onSearchActiveChange = onSearchActiveChange,
             modifier = modifier,
+            onBrowseSets = onBrowseSets,
+            onOpenSettings = onOpenSettings,
         )
         return
     }

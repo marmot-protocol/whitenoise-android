@@ -76,6 +76,8 @@ internal fun ComposerEmojiKeyboard(
     onBackspace: (() -> Unit)?,
     onSearchActiveChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onBrowseSets: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     Crossfade(
@@ -112,6 +114,8 @@ internal fun ComposerEmojiKeyboard(
                     onSearch = search::open,
                     onCategory = onCategory,
                     onBackspace = onBackspace,
+                    onBrowseSets = onBrowseSets,
+                    onOpenSettings = onOpenSettings,
                 )
             }
         }
@@ -119,8 +123,9 @@ internal fun ComposerEmojiKeyboard(
 }
 
 /**
- * Bottom rail of the composer's emoji keyboard: search at the start, one rounded toggle per section
- * in equal-width slots, and backspace at the end. The toggles scroll only when they cannot fit.
+ * Bottom rail of the composer's emoji keyboard: search, Browse sets and the emoji settings cog at the
+ * start, one rounded toggle per section in equal-width slots, and backspace alone at the end so a
+ * quick delete never lands on navigation. The toggles scroll only when they cannot fit.
  */
 @Suppress("LongParameterList")
 @Composable
@@ -132,6 +137,8 @@ internal fun ComposerEmojiRail(
     onCategory: (EmojiCategory) -> Unit,
     onBackspace: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    onBrowseSets: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
 ) {
     val iconColors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
     Row(
@@ -144,6 +151,27 @@ internal fun ComposerEmojiRail(
             modifier = Modifier.testTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG),
         ) {
             Icon(painterResource(R.drawable.ic_search), contentDescription = stringResource(R.string.emoji_search_hint))
+        }
+        if (onBrowseSets != null) {
+            IconButton(
+                onClick = onBrowseSets,
+                colors = iconColors,
+                modifier = Modifier.testTag(EMOJI_PICKER_BROWSE_SETS_TEST_TAG),
+            ) {
+                Icon(painterResource(R.drawable.ic_add), contentDescription = stringResource(R.string.emoji_sets_title))
+            }
+        }
+        if (onOpenSettings != null) {
+            IconButton(
+                onClick = onOpenSettings,
+                colors = iconColors,
+                modifier = Modifier.testTag(EMOJI_PICKER_SETTINGS_TEST_TAG),
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_emoji_settings),
+                    contentDescription = stringResource(R.string.custom_emoji),
+                )
+            }
         }
         BoxWithConstraints(Modifier.weight(1f)) {
             val slot = maxOf(ComposerEmojiRailToggleSize, maxWidth / categories.size.coerceAtLeast(1))

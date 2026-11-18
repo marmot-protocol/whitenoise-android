@@ -256,7 +256,7 @@
       "manual_ids": [
         "CON-010"
       ],
-      "assertions": "Emoji picker opens and dismisses without sending or removing history.",
+      "assertions": "Emoji picker opens and dismisses without sending or removing history; the emoji rail opens emoji sets over the conversation and Back returns to it.",
       "postcondition": "none"
     },
     "conversation-stickers-empty-cancel": {
