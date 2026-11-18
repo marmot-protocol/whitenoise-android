@@ -168,21 +168,6 @@ internal fun planCollectionOperation(
 internal val AttachmentCollectionOperation.ownedByComposerDraft: Boolean
     get() = chunks.none { it.state == CollectionChunkState.ACCEPTED }
 
-/**
- * Asks MDK about every unsettled chunk that recorded a token and has no queued send in this process. Accepted
- * tokens settle as sent; any other chunk returns to planned with its token cleared, so it is sent afresh.
- * A probe that fails leaves the chunk as it is.
- */
-internal suspend fun reconcileCollectionTokens(
-    operation: AttachmentCollectionOperation,
-    stillQueued: (String) -> Boolean,
-    tokenStatus: suspend (String) -> CollectionTokenStatus?,
-    nowMs: Long,
-): AttachmentCollectionOperation {
-    val statuses = collectionTokenStatuses(operation, stillQueued, tokenStatus)
-    return operation.withTokenStatuses(statuses, nowMs)
-}
-
 /** MDK's answer for each recorded token of an unsettled chunk not queued here; a failed probe is unresolved. */
 internal suspend fun collectionTokenStatuses(
     operation: AttachmentCollectionOperation,
