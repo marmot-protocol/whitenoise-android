@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
+  "legacy_sha256": "930c6694f045a12162bf5ac1b8f43e93cd4d8f7f330f77a7f93f7836b0f2edd3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "pollVotesPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
+        "anchor": "internal suspend fun ConversationController.pollVotesPage(",
+        "test_ids": [
+          "MSG-032"
+        ]
+      },
+      {
+        "surface": "string:poll_create_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
+        "anchor": "R.string.poll_create_failed",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_vote_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
+        "anchor": "R.string.poll_vote_failed",
+        "test_ids": [
+          "MSG-021"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
+        "surface": "Poll sent as a reply carries the reply tags",
+        "anchor": "createTaggedPoll(",
+        "test_ids": [
+          "MSG-021"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

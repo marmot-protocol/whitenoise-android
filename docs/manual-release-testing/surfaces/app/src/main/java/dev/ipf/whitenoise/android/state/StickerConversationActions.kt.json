@@ -57,6 +57,16 @@
           "MSG-046"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/StickerConversationActions.kt",
+        "surface": "Sticker sent as a reply carries the reply tags",
+        "anchor": "sendTaggedSticker(",
+        "test_ids": [
+          "MSG-045"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

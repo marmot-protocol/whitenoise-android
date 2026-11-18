@@ -161,6 +161,7 @@ import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.sendSticker
 import dev.ipf.whitenoise.android.state.setUserBlocked
+import dev.ipf.whitenoise.android.state.snapshotReply
 import dev.ipf.whitenoise.android.state.tracedPagingSection
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
@@ -4498,20 +4499,8 @@ internal fun ConversationScreen(
                         onShareContact = {
                             contactPickerLauncher.launch(Unit)
                         },
-                        onCreatePoll =
-                            if (!controller.isDirectConversation) {
-                                { pollCreateOpen = true }
-                            } else {
-                                null
-                            },
-                        // MDK sends stickers without a reply target, so the action stays hidden
-                        // while replying or editing.
-                        onOpenStickers =
-                            if (controller.replyingTo == null && controller.editingMessageId == null) {
-                                { stickerSheetOpen = true }
-                            } else {
-                                null
-                            },
+                        onCreatePoll = controller.createPollAction { pollCreateOpen = true },
+                        onOpenStickers = controller.stickerSheetAction { stickerSheetOpen = true },
                         // Installed sets belong to the active account, which also owns the picker's library.
                         onBrowseEmojiSets =
                             if (draftAccountRef != null && draftAccountRef == appState.activeAccountRef) {
@@ -5459,10 +5448,12 @@ internal fun ConversationScreen(
             PollCreateDialog(
                 onDismiss = { pollCreateOpen = false },
                 onSubmit = { question, options, type, deadlineDurationSeconds, onResult ->
+                    // The reply is captured at submit, so a later selection is neither sent nor cleared.
+                    val reply = controller.snapshotReply()
                     appState.launchMutation {
                         var created = false
                         try {
-                            created = controller.createPoll(question, options, type, deadlineDurationSeconds)
+                            created = controller.createPoll(question, options, type, deadlineDurationSeconds, reply)
                         } finally {
                             onResult(created)
                         }
@@ -5477,7 +5468,9 @@ internal fun ConversationScreen(
                 appState = appState,
                 onSend = { sticker ->
                     stickerSheetOpen = false
-                    appState.launchMutation { controller.sendSticker(sticker) }
+                    // The reply is captured at the tap, so a later selection is neither sent nor cleared.
+                    val reply = controller.snapshotReply()
+                    appState.launchMutation { controller.sendSticker(sticker, reply) }
                 },
                 onDismiss = { stickerSheetOpen = false },
             )

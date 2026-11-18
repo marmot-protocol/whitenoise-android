@@ -1,23 +1,15 @@
 package dev.ipf.whitenoise.android.state
 
-import androidx.test.core.app.ApplicationProvider
-import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AppBlobEndpointFfi
-import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
-import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.marmotkit.AppProtocolProfileFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
-import dev.ipf.marmotkit.GroupLifecycleStateFfi
-import dev.ipf.marmotkit.GroupMemberDetailsFfi
-import dev.ipf.marmotkit.GroupRosterFfi
-import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.PollTypeFfi
-import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
-import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
-import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.state.ConversationActionFixtures.GROUP_ID
+import dev.ipf.whitenoise.android.state.ConversationActionFixtures.MESSAGE_ID
+import dev.ipf.whitenoise.android.state.ConversationActionFixtures.TARGET_REF
+import dev.ipf.whitenoise.android.state.ConversationActionFixtures.appState
+import dev.ipf.whitenoise.android.state.ConversationActionFixtures.controller
+import dev.ipf.whitenoise.android.state.ConversationActionFixtures.native
+import dev.ipf.whitenoise.android.state.ConversationActionFixtures.summary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -33,7 +25,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
-import java.lang.reflect.Proxy
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -79,6 +70,7 @@ class PollConversationActionsTest {
             listOf(TARGET_REF, GROUP_ID, MESSAGE_ID, "native-option").forEach { assertFalse(logs.contains(it)) }
         }
 
+    /** Creating a poll waits for another commit on the same group before it reaches MDK. */
     @Test
     fun pollCreationAlsoWaitsForTheGroupMutationLock() =
         runTest {
@@ -86,7 +78,7 @@ class PollConversationActionsTest {
             val state =
                 appState(
                     native { name, _ ->
-                        assertEquals("createPoll", name)
+                        assertEquals("createTaggedPoll", name)
                         entered.countDown()
                         summary()
                     },
@@ -99,7 +91,13 @@ class PollConversationActionsTest {
                 }
             val creation =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    controller.createPoll("Lunch?", listOf("Soup", "Salad"), PollTypeFfi.SINGLE_CHOICE, null)
+                    controller.createPoll(
+                        "Lunch?",
+                        listOf("Soup", "Salad"),
+                        PollTypeFfi.SINGLE_CHOICE,
+                        null,
+                        controller.snapshotReply(),
+                    )
                 }
             assertFalse(entered.await(150, TimeUnit.MILLISECONDS))
             release.complete(Unit)
@@ -189,148 +187,4 @@ class PollConversationActionsTest {
                 assertEquals(disposition, controller.castPollVote(MESSAGE_ID, listOf("native-option")))
             }
         }
-
-    private suspend fun controller(state: WhiteNoiseAppState) =
-        ConversationController(
-            state,
-            group(),
-            initialMemberSnapshot = memberSnapshot(),
-            accountRefOverride = TARGET_REF,
-            groupRosterReader = { _, _ ->
-                GroupRosterFfi(
-                    GROUP_ID,
-                    listOf(GroupMemberDetailsFfi(TARGET_ID, TARGET_REF, true, true, true, "npub-$TARGET_ID", null)),
-                    1uL,
-                    1uL,
-                    SelfMembershipFfi.MEMBER,
-                    1u,
-                    GroupLifecycleStateFfi.STABLE,
-                )
-            },
-        ).also {
-            it.retryMembers()
-            assertTrue(it.canSendMessages)
-        }
-
-    private fun native(call: (String, Array<out Any?>) -> Any?): MarmotInterface =
-        Proxy.newProxyInstance(
-            MarmotInterface::class.java.classLoader,
-            arrayOf(MarmotInterface::class.java),
-        ) { proxy, method, args ->
-            when (val name = method.name.substringBefore('-')) {
-                "toString" -> "poll-test-native"
-                "hashCode" -> System.identityHashCode(proxy)
-                "equals" -> proxy === args?.firstOrNull()
-                else -> call(name, args.orEmpty())
-            }
-        } as MarmotInterface
-
-    private fun summary(disposition: SendAcceptDispositionFfi = SendAcceptDispositionFfi.PUBLISHED) =
-        SendSummaryFfi(1u, listOf(MESSAGE_ID), disposition, SendMaintenanceDispositionFfi.READY)
-
-    /** Builds an app state on the given native interface with the previous account active. */
-    private fun appState(native: MarmotInterface) =
-        WhiteNoiseAppState(
-            context = ApplicationProvider.getApplicationContext(),
-            draftStore = DraftStore(NoopDraftPersistence()),
-            accountIdHexResolver = { PREVIOUS_ID },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = PREVIOUS_REF,
-                        accountIdHex = PREVIOUS_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                        unlinked = false,
-                    ),
-                    AccountSummaryFfi(
-                        label = TARGET_REF,
-                        accountIdHex = TARGET_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                        unlinked = false,
-                    ),
-                ),
-            activeAccountRef = PREVIOUS_REF,
-            initialMarmotRuntime = AppMarmotRuntime("test", native),
-        )
-
-    private fun memberSnapshot() =
-        GroupMemberSnapshot(
-            listOf(
-                AppGroupMemberRecordFfi(
-                    memberIdHex = TARGET_ID,
-                    account = TARGET_REF,
-                    local = true,
-                ),
-            ),
-        )
-
-    private fun group() =
-        AppGroupRecordFfi(
-            groupIdHex = GROUP_ID,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Pinned group",
-            description = "",
-            admins = listOf(TARGET_ID),
-            relays = listOf("wss://relay.example"),
-            nostrGroupIdHex = "04".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.example",
-                            ),
-                        ),
-                ),
-            disappearingMessageSecs = 0uL,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            leaveBlocked = false,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
-
-    private class NoopDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
-
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
-
-    private companion object {
-        const val PREVIOUS_REF = "alice"
-        const val TARGET_REF = "bob"
-        val PREVIOUS_ID = "a1".repeat(32)
-        val TARGET_ID = "e5".repeat(32)
-        val GROUP_ID = "b2".repeat(32)
-        val MESSAGE_ID = "c3".repeat(32)
-    }
 }

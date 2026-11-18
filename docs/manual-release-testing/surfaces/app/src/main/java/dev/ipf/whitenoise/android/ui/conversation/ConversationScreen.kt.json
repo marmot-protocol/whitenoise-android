@@ -356,6 +356,22 @@
         "test_ids": [
           "MSG-004"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Create poll hidden while replying to an unsent message",
+        "anchor": "controller.createPollAction { pollCreateOpen = true }",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Stickers offered while replying, hidden while editing",
+        "anchor": "controller.stickerSheetAction { stickerSheetOpen = true }",
+        "test_ids": [
+          "MSG-045"
+        ]
       }
     ]
   },
