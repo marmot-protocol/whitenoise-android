@@ -10,6 +10,14 @@
         "test_ids": [
           "PRO-002"
         ]
+      },
+      {
+        "surface": "Bounded profile image decode size",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarDecodeSizing.kt",
+        "anchor": "fun boundedDecodeDimension(",
+        "test_ids": [
+          "PRO-002"
+        ]
       }
     ]
   },

@@ -528,6 +528,18 @@ class CommittedBudgetTest(unittest.TestCase):
         self.assertNotIn('exit 1', warn)
         self.assertIn("always() && matrix.phase == 'baseline'", steps['Upload benchmark DEX method report'])
 
+    def test_required_check_measures_every_shipping_variant_in_merge_groups(self):
+        """Every shipping budget in the config is a phase of the required build check in the merge queue."""
+        workflow = (REPO_ROOT / '.github/workflows/android-ci.yml').read_text(encoding='utf-8')
+        phase_line = next(line for line in workflow.splitlines() if line.strip().startswith('phase: '))
+        merge_group = re.search(r"github\.event_name == 'merge_group' \|\| .*?&& '(\[[^']*\])'", phase_line)
+        self.assertIsNotNone(merge_group, phase_line)
+        phases = json.loads(merge_group.group(1))
+        config = json.loads((REPO_ROOT / 'config/dex-method-budgets.json').read_text(encoding='utf-8'))
+        shipping = {name for name, entry in config['variants'].items() if entry['kind'] == 'shipping'}
+        self.assertEqual(shipping, {phase for phase in phases if phase.endswith('ZapstoreRelease')})
+        self.assertEqual(['tooling', 'baseline'], phases[:2])
+
     def test_every_measured_variant_has_a_reviewed_budget_of_the_right_kind(self):
         """Workflow --variant arguments and config entries match, and kinds follow the build type."""
         workflows = ''.join(path.read_text(encoding='utf-8')

@@ -353,14 +353,6 @@ object MessageProjector {
     /** True for mutation records that update another bubble instead of rendering a new row. */
     fun isControlMutationKind(kind: ULong): Boolean = kind == KindReaction || kind == KindDelete || kind == KindEdit
 
-    /**
-     * For a kind-1009 edit record, the target message id from its single
-     * `e` tag, or null when malformed/missing. Use this to route an edit
-     * back to the message it replaces; never derive an edit target from
-     * any other tag — spec wire format pins the reference to `e`.
-     */
-    fun editTargetMessageId(message: AppMessageRecordFfi): String? = if (message.kind == KindEdit) tagValues(message, EventRefTag).firstOrNull() else null
-
     fun isStreamStart(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentStreamStart
 
     fun isAgentOperation(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentOperation

@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTaggedSendActions.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTaggedSendActions.kt",
+        "surface": "Create poll hidden while replying to an unsent message",
+        "anchor": "internal fun ConversationController.createPollAction(",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTaggedSendActions.kt",
+        "surface": "Stickers offered while replying, hidden while editing",
+        "anchor": "internal fun ConversationController.stickerSheetAction(",
+        "test_ids": [
+          "MSG-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

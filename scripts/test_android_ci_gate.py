@@ -701,7 +701,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_build_phases(self):
         """Packaging runs independently, with phase-specific diagnostics."""
         self.assertIn(
-            """phase: ${{ fromJSON(((github.event.pull_request.draft && needs.changes.outputs.full_matrix != 'true') || needs.changes.outputs.precheck == 'true') && '["tooling"]' || '["tooling", "baseline"]') }}""",
+            """phase: ${{ fromJSON(((github.event.pull_request.draft && needs.changes.outputs.full_matrix != 'true') || needs.changes.outputs.precheck == 'true') && '["tooling"]' || ((github.event_name == 'merge_group' || (github.event_name == 'pull_request' && needs.changes.outputs.full_matrix == 'true')) && '["tooling", "baseline", "productionZapstoreRelease", "stagingZapstoreRelease"]' || '["tooling", "baseline"]')) }}""",
             self.build_contracts)
         self.assertIn('fail-fast: false', self.build_contracts)
         for name, phase in (
@@ -713,6 +713,50 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertIn(f"if: matrix.phase == '{phase}'", step)
         self.assertIn('android-ci-reports-build-contracts-${{ matrix.phase }}', self.build_contracts)
         self.assertIn('android-ci-gradle-profiles-build-contracts-${{ matrix.phase }}', self.build_contracts)
+
+    def test_shipping_phases_fail_the_required_check_on_a_dex_budget_violation(self):
+        """Each shipping phase budgets its own unsigned R8 build, and nothing turns a failure into a pass."""
+        steps = ('Assemble shipping R8 APK for the DEX method budget', 'Locate shipping R8 APK',
+                 'Enforce shipping post-R8 DEX method budget')
+        for name in steps:
+            with self.subTest(step=name):
+                step = self.named_step(self.build_contracts, name)
+                self.assertIn("        if: endsWith(matrix.phase, 'ZapstoreRelease')\n", step)
+                self.assertNotIn('continue-on-error', step)
+                self.assertNotIn('|| true', step)
+        # Each step must measure its own phase, so the staging leg can never budget a production build.
+        for name in steps[:2]:
+            self.assertIn('          SHIPPING_VARIANT: ${{ matrix.phase }}\n',
+                          self.named_step(self.build_contracts, name))
+        build = self.named_step(self.build_contracts, steps[0])
+        self.assertIn("WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'", build)
+        self.assertNotIn('KEYSTORE', build)
+        self.assertNotIn('allowUnconfiguredProductionFirebase', build)
+        self.assertIn('./gradlew ":app:assemble$task" -x ":app:lintVital$task"', build)
+        # The audit flag keeps or drops staging code, so the budget measures the value staging ships with.
+        staging_apk = WORKFLOW.with_name('android-staging-apk.yml').read_text()
+        for name, value in (('WHITENOISE_AUDIT_RUNTIME_REQUIRED', "'true'"),
+                            ('WHITENOISE_AUDIT_DATA_MODE', 'obfuscated_sensitive_data')):
+            with self.subTest(flag=name):
+                self.assertIn(f'          {name}: {value}\n', build)
+                self.assertIn(f"printf '{name}={value.strip(chr(39))}\\n'", staging_apk)
+        budget = self.named_step(self.build_contracts, steps[2])
+        self.assertIn('        run: >-\n          python3 scripts/dex_method_budget.py\n', budget)
+        self.assertIn('          DEX_BUDGET_VARIANT: ${{ matrix.phase }}\n', budget)
+        self.assertIn('--apk "$DEX_BUDGET_APK_PATH"', budget)
+        self.assertIn('DEX_BUDGET_APK_PATH: ${{ steps.shipping_apk.outputs.path }}', budget)
+        self.assertIn('--mapping "app/build/outputs/mapping/$DEX_BUDGET_VARIANT/mapping.txt"', budget)
+        self.assertIn('--variant "$DEX_BUDGET_VARIANT"', budget)
+        self.assertIn('${{ github.sha }}', budget)
+        positions = [self.build_contracts.index(f'      - name: {name}\n') for name in steps]
+        self.assertEqual(sorted(positions), positions)
+        report = self.named_step(self.build_contracts, 'Upload shipping DEX method report')
+        self.assertIn("if: ${{ always() && endsWith(matrix.phase, 'ZapstoreRelease') }}", report)
+        # A retried shipping phase must replace its earlier attempt's artifacts rather than fail on the name.
+        timings = self.named_step(self.build_contracts, 'Upload Gradle timing reports')
+        for upload in (report, timings):
+            self.assertIn('          overwrite: true\n', upload)
+        self.assertIn('build-contracts', self.dependencies)
 
     def test_dependency_qualification_follows_a_restored_committed_trust_root(self):
         """After a capture, qualification runs only once the trust-root check has restored and proved committed bytes."""
@@ -817,7 +861,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertTrue(all(' --no-daemon ' not in step for step in invocations + [api]))
 
         for name in ('Compile (Kotlin)', 'ktlint and detekt',
-                     'Assemble app for Baseline Profile verification'):
+                     'Assemble app for Baseline Profile verification',
+                     'Assemble shipping R8 APK for the DEX method budget'):
             isolated = self.named_step(self.build_contracts, name)
             self.assertIn(' --no-daemon ', isolated)
             self.assertNotIn(' --daemon ', isolated)

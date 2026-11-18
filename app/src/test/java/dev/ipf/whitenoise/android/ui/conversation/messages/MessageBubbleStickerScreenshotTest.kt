@@ -109,6 +109,15 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
     /** Mirrored rows at 200% text keep the sticker size and wrap only the caption and footer. */
     @Test fun stickerRowsRtlLarge() = capture("rtl_large", AppThemeMode.Light, rtlLarge = true)
 
+    /** Light rows: a sticker sent as a reply draws the quoted message in a bubble above the sticker. */
+    @Test fun repliedStickerRowsLight() = captureReplies("light", AppThemeMode.Light)
+
+    /** AMOLED outlines the quote bubble and keeps the sticker below it on pure black. */
+    @Test fun repliedStickerRowsAmoled() = captureReplies("amoled", AppThemeMode.Amoled)
+
+    /** Mirrored rows at 200% text wrap the quoted message, never the sticker. */
+    @Test fun repliedStickerRowsRtlLarge() = captureReplies("rtl_large", AppThemeMode.Light, rtlLarge = true)
+
     /** The long-press overlay keeps a bare sticker's artwork instead of an empty bubble. */
     @Test
     fun focusedBareStickerKeepsItsArtwork() {
@@ -144,13 +153,54 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
         composeRule.onNodeWithTag("sticker-message-warning", useUnmergedTree = true).assertExists()
     }
 
+    /** Captures the bare and captioned rows, received then sent, after the sent sticker's artwork loads. */
     private fun capture(
         name: String,
         mode: AppThemeMode,
         rtlLarge: Boolean = false,
     ) {
-        appState.updateThemeMode(mode)
         val rows = stickerRows()
+        renderRows(rows, mode, rtlLarge)
+        // Robolectric reports no network, so auto-download is off: sent stickers load, received ones wait for a tap.
+        val sent = StickerKey.from(STICKERS[1])
+        awaitLoaded(sent)
+        assertFalse("The sent sticker failed to load", controller.stickerAssets.hasFailed(sent))
+        composeRule.onAllNodesWithTag("message.sticker", useUnmergedTree = true).assertCountEquals(rows.size)
+        // The bare rows' "Sticker" preview label must never reach the timeline.
+        composeRule.onAllNodesWithTag("sticker-message-footer", useUnmergedTree = true).assertCountEquals(2)
+        composeRule.onNodeWithText("Sent caption", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Received caption", useUnmergedTree = true).assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_sticker_rows_$name.png")
+    }
+
+    /** Captures a received and a sent sticker that each reply to a message: the quote bubble, then the sticker. */
+    private fun captureReplies(
+        name: String,
+        mode: AppThemeMode,
+        rtlLarge: Boolean = false,
+    ) {
+        val rows =
+            listOf(false, true).map { mine ->
+                val (index, ref) = if (mine) 230 to STICKERS[1] else 220 to STICKERS[0]
+                fileTimelineMessage(index, "", mine = mine, attachments = emptyList(), hasReply = true, sticker = ref)
+            }
+        renderRows(rows, mode, rtlLarge)
+        val sent = StickerKey.from(STICKERS[1])
+        awaitLoaded(sent)
+        assertFalse("The sent sticker failed to load", controller.stickerAssets.hasFailed(sent))
+        composeRule.onAllNodesWithTag("message.sticker", useUnmergedTree = true).assertCountEquals(rows.size)
+        // The timestamp moves into the quote bubble, so no row draws the bare sticker's own footer.
+        composeRule.onAllNodesWithTag("sticker-message-footer", useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_sticker_reply_$name.png")
+    }
+
+    /** Renders [rows] in a themed column, mirrored at 200% text when [rtlLarge] is set. */
+    private fun renderRows(
+        rows: List<TimelineMessage>,
+        mode: AppThemeMode,
+        rtlLarge: Boolean,
+    ) {
+        appState.updateThemeMode(mode)
         composeRule.setContent {
             val direction = if (rtlLarge) LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
@@ -168,16 +218,6 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
                 }
             }
         }
-        // Robolectric reports no network, so auto-download is off: sent stickers load, received ones wait for a tap.
-        val sent = StickerKey.from(STICKERS[1])
-        awaitLoaded(sent)
-        assertFalse("The sent sticker failed to load", controller.stickerAssets.hasFailed(sent))
-        composeRule.onAllNodesWithTag("message.sticker", useUnmergedTree = true).assertCountEquals(rows.size)
-        // The bare rows' "Sticker" preview label must never reach the timeline.
-        composeRule.onAllNodesWithTag("sticker-message-footer", useUnmergedTree = true).assertCountEquals(2)
-        composeRule.onNodeWithText("Sent caption", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("Received caption", useUnmergedTree = true).assertExists()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_sticker_rows_$name.png")
     }
 
     /**

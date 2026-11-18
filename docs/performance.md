@@ -1155,8 +1155,8 @@ artifact and largest sizes it was reviewed against.
 
 | Variant | Measured in | Compiler | Budget (code units / registers) | On violation |
 | --- | --- | --- | ---: | --- |
-| `productionZapstoreRelease` | Android Release Runtime Verify, API 36 lane | R8 full mode, obfuscated | 13,106 / 13,106 | Fails the lane after ART verification |
-| `stagingZapstoreRelease` | Android Release Runtime Verify, the shipping ARM64 APK in the Android 17 lane | R8 full mode, obfuscated | 13,106 / 13,106 | Fails the lane after ART verification |
+| `productionZapstoreRelease` | Android CI `build-contracts` phase of the same name, and Android Release Runtime Verify, API 36 lane | R8 full mode, obfuscated | 13,106 / 13,106 | Fails the required check in a merge group or full-matrix PR, and the release-runtime lane after ART verification |
+| `stagingZapstoreRelease` | Android CI `build-contracts` phase of the same name, and Android Release Runtime Verify, the shipping ARM64 APK in the Android 17 lane | R8 full mode, obfuscated | 13,106 / 13,106 | Fails the required check in a merge group or full-matrix PR, and the release-runtime lane after ART verification |
 | `devZapstoreBenchmarkRelease` | Android CI baseline phase, the universal APK the Baseline Profile check reads | D8 only, unminified | 16,382 / 16,382 | Warning annotation only |
 
 The assumptions behind each budget:
@@ -1165,11 +1165,28 @@ The assumptions behind each budget:
   left about 1,400 code units of growth above the largest shipping method and
   kept 3,277 between the budget and the limit, so a failure arrives while a
   split is still a planned change rather than a fix for interpreted code. Only
-  obfuscated R8 output with its own mapping is accepted. The budget step runs
-  before the emulator but continues on error, so ART verification still runs;
-  the lane's last step then fails. These lanes run on release-input pull
-  requests, `master` pushes, the merge queue, tags and nightly, and they are not
-  required checks. Each variant's budget was reviewed against its own build.
+  obfuscated R8 output with its own mapping is accepted. Each budget is enforced
+  in two places:
+  - **The required check blocks the merge.** Android CI's `build-contracts` job
+    has one phase per shipping variant. Each phase builds the unsigned x86_64
+    APK, whose DEX every ABI ships, and runs the budget without
+    `continue-on-error`. These phases run in every merge group and on
+    full-matrix pull requests, so a Kotlin-only pull request that pushes a
+    method over budget is ejected from the queue. Before this gate, only the
+    release-runtime lanes measured, so
+    [#3828](https://github.com/marmot-protocol/whitenoise-android/pull/3828)
+    merged `ConversationScreen` at 13,668 code units and
+    [#3925](https://github.com/marmot-protocol/whitenoise-android/pull/3925)
+    split it again.
+  - **Release runtime keeps measuring after merge.** Its budget step runs
+    before the emulator but continues on error, so ART verification still
+    runs, and the lane's last step then fails. These lanes run on release-input
+    pull requests, `master` pushes, the merge queue, tags and nightly, and they
+    are not required checks.
+
+  To see a size before queueing, add the `ci:full` label and re-run the pull
+  request's Android CI, or dispatch `android-release-runtime.yml` on the
+  branch. Each variant's budget was reviewed against its own build.
   Production enables fewer debug-only code paths
   (`ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS` is false), so its largest method was
   `ConversationScreen` at 11,130 code units, while staging's `MessageBubble`
@@ -1190,8 +1207,8 @@ The assumptions behind each budget:
 
 When a budget fails, the log names the source method, its residual identity and
 DEX file, and its size against the budget. The JSON and Markdown reports are in
-the lane's report artifact (`dex-method-budget-benchmark` for the benchmark
-check). Prefer splitting the method, using the patterns from the PRs above.
+the lane's report artifact (`dex-method-budget-<variant>` for the Android CI
+phases, `dex-method-budget-benchmark` for the benchmark check). Prefer splitting the method, using the patterns from the PRs above.
 Raising a shipping budget is a reviewed change to the config: record the new
 measurement in `basis` and justify the margin in the PR.
 
