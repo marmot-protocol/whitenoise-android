@@ -4,13 +4,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Regression coverage for the group-recovery card's list row (#2621).
+ * Index-mapping invariants for the reversed conversation list.
  *
- * The transcript emits that card as a lazy row above the timeline whenever the
- * conversation carries visible recovery state, but the structural-row count
- * used to omit it. Every timeline-index to list-index mapping was therefore one
- * row short while the card was on screen, which anchored scroll restores,
- * read receipts and the tail follower to the wrong message.
+ * Structural rows such as the group-recovery card (#2621) are emitted above the
+ * timeline, at the high-index end of the reversed list, so the newest row and
+ * every tail-relative timeline mapping must stay put whatever sits above them.
  */
 class ConversationGroupRecoveryRowIndexTest {
     /**
