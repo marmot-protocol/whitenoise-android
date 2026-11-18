@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMenuImeHandoff.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "conversationMenuImeBackdrop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMenuImeHandoff.kt",
+        "anchor": "fun conversationMenuImeBackdrop(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Backgrounding closes the message menu and cancels its keyboard return",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMenuImeHandoff.kt",
+        "anchor": "menuIme.pause()",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "A closed message menu hands the keyboard back to the input it hid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMenuImeHandoff.kt",
+        "anchor": "fun restoreAfterClose(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

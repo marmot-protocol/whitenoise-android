@@ -41,23 +41,13 @@ class FreshSweepCoverageTest {
         val rememberInputs = projectionsBlock.substring(rememberStart, rememberEnd)
 
         assertTrue("timeline changes must invalidate projections", "renderedTimeline" in rememberInputs)
-        assertTrue("deletions must invalidate projections", "controller.deletedMessageIds" in projectionsBlock)
-        assertTrue("edits must invalidate projections", "controller.editsByTarget" in projectionsBlock)
+        assertTrue("deletions must invalidate projections", "controller.deletedMessageIds" in rememberInputs)
+        assertTrue("edits must invalidate projections", "controller.editsByTarget" in rememberInputs)
         assertTrue("retention expiry must invalidate projections", "eligibilityNowSeconds" in rememberInputs)
-        assertTrue("copy text must be projected once per timeline change", "MessageProjector.copyableText" in projectionsBlock)
-        assertTrue("forward text must be projected once per timeline change", "MessageProjector.forwardableText" in projectionsBlock)
+        // The remembered computation lives in its own file so the screen method stays within its DEX budget.
         assertTrue(
-            "convergence-invalidated text must remain available to bulk copy",
-            "copyableText =" in projectionsBlock &&
-                "if (persistedFailure)" in projectionsBlock &&
-                "MessageProjector.copyableText(record, editedText)" in projectionsBlock,
-        )
-        assertTrue(
-            "convergence-invalidated text must remain unavailable to bulk forward",
-            Regex(
-                "forwardableText\\s*=\\s*if \\(invalidated\\)\\s*\\{\\s*null\\s*}\\s*else\\s*\\{\\s*" +
-                    "MessageProjector\\.forwardableText\\(\\s*record,\\s*editedText,?\\s*\\)",
-            ).containsMatchIn(projectionsBlock),
+            "remembered projections must run the shared projection",
+            "projectSelectableMessages(renderedTimeline, controller, eligibilityNowSeconds)" in projectionsBlock,
         )
         assertFalse("profile changes must not rebuild text projections", "appState.profileRevisionForCompose" in projectionsBlock)
         // The whole-timeline selectable map must never key on the profile
@@ -82,6 +72,40 @@ class FreshSweepCoverageTest {
         assertTrue("names resolve lazily on the selected set", "appState.displayName(" in actionItemsBlock)
         assertFalse("selection must not re-project copy text", "MessageProjector.copyableText" in actionItemsBlock)
         assertTrue("copy text must derive from cached action items", "batchCopyText(actionItems)" in actionItemsBlock)
+    }
+
+    /** Selection projections snapshot copy and forward text from the controller and never read profile state. */
+    @Test
+    fun selectableMessageProjectionsSnapshotTextFromTheirRealInputs() {
+        val source = source("ui/conversation/ConversationSelectableMessages.kt")
+        val projection =
+            source.functionBody("projectSelectableMessages") + source.functionBody("selectableMessageProjection")
+
+        assertTrue("each message must be projected", "selectableMessageProjection(item, controller" in projection)
+        assertTrue("projected deletions must come from the controller", "controller.deletedMessageIds" in projection)
+        assertTrue("projected edits must come from the controller", "controller.editsByTarget" in projection)
+        assertTrue(
+            "copy text must be projected once per timeline change",
+            "MessageProjector.copyableText" in projection,
+        )
+        assertTrue(
+            "forward text must be projected once per timeline change",
+            "MessageProjector.forwardableText" in projection,
+        )
+        assertTrue(
+            "convergence-invalidated text must remain available to bulk copy",
+            "copyableText =" in projection &&
+                "if (persistedFailure)" in projection &&
+                "MessageProjector.copyableText(record, editedText)" in projection,
+        )
+        assertTrue(
+            "convergence-invalidated text must remain unavailable to bulk forward",
+            Regex(
+                "forwardableText\\s*=\\s*if \\(invalidated\\)\\s*\\{\\s*null\\s*}\\s*else\\s*\\{\\s*" +
+                    "MessageProjector\\.forwardableText\\(\\s*record,\\s*editedText,?\\s*\\)",
+            ).containsMatchIn(projection),
+        )
+        assertFalse("projections must not read the profile revision", "profileRevisionForCompose" in source)
     }
 
     /** Every unread-derived state must invalidate when its visible controller or projection inputs change. */
