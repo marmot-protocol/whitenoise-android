@@ -5973,6 +5973,11 @@
             <sha256 value="8268fc84e545aa8de0f9799f63b3c90a9e37c8dd1c286cf456a037f345672691" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="com.google.firebase" name="firebase-bom" version="35.2.0">
+         <artifact name="firebase-bom-35.2.0.pom">
+            <sha256 value="134de8ff81d245d730ffccedeafd5c7e4e84d405c5dfb6498555ebe5a00fea05" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="com.google.firebase" name="firebase-common" version="23.0.0">
          <artifact name="firebase-common-23.0.0.aar">
             <sha256 value="f8595dd404aa37bb4a92824ffd7b0325428432079ce4908ea3f97af1c6b33f0f" origin="Independent official supplier audit" />
@@ -6075,6 +6080,14 @@
             <sha256 value="b2be54306428da010ff7a00d7e8f98e3dd8ca2b90fe971c1c7618bc1dd0a8826" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="com.google.firebase" name="firebase-messaging" version="26.0.2">
+         <artifact name="firebase-messaging-26.0.2.aar">
+            <sha256 value="5d5e60fe3415614efa85054c5216d31918102d54d6e98b2707a0a86b9a451497" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="firebase-messaging-26.0.2.pom">
+            <sha256 value="6346ab4a84c256ffd69ab244ebe9ec7879b34f64781ed97699d1a690a827eca6" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="com.google.flatbuffers" name="flatbuffers-java" version="1.12.0">
          <artifact name="flatbuffers-java-1.12.0.jar">
             <sha256 value="3f8c088b4dd04a9858721f2e162508c94db0dd86f961e306ee63ef2eda871bf7" origin="Independent official supplier audit" />
@@ -6088,6 +6101,11 @@
             <sha256 value="e63a460e70b907e70c7e1d9bc458be75a3e0c37ed394cdbfe165f06b4be533f9" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="com.google.gms.google-services" name="com.google.gms.google-services.gradle.plugin" version="4.6.0">
+         <artifact name="com.google.gms.google-services.gradle.plugin-4.6.0.pom">
+            <sha256 value="219cb91b3d72555fe3a0d919ad18d3635e6329b02eadafb129b844e21d23347f" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="com.google.gms" name="google-services" version="4.5.0">
          <artifact name="google-services-4.5.0.jar">
             <sha256 value="cb92b1a3323d1b6a86ca4da1fa1302043e88fb3d50b7c105d237696d8a246cc0" origin="Independent official supplier audit" />
@@ -6097,6 +6115,17 @@
          </artifact>
          <artifact name="google-services-4.5.0.pom">
             <sha256 value="721213ba1d497a8206452813a2d09e356b61a742b1eaf9e0c43d4e560ba7e180" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="com.google.gms" name="google-services" version="4.6.0">
+         <artifact name="google-services-4.6.0.jar">
+            <sha256 value="9371829d9cd6abd85a3449d8979fbde97fd299fabeff359e464666fc8588de2e" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="google-services-4.6.0.module">
+            <sha256 value="5c0c413eddf911970f2462cab97e5da88909ef0e6d47ed73f3dda8a83287c83f" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="google-services-4.6.0.pom">
+            <sha256 value="5254c8a91ff990270bc90c315c7bda9326e884f91213c860adf46590eb94c112" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="com.google.guava" name="failureaccess" version="1.0.1">
