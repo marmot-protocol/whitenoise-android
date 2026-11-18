@@ -319,6 +319,22 @@ class EmojiSetsControllerTest {
             }
         }
 
+    /** A failed opening read stops reporting once the opening sync rereads the list. */
+    @Test
+    fun backgroundSyncClearsAFailedOpeningRead() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            backend.beforeSets = { error("read failure") }
+            val controller = EmojiSetsController(backend) {}
+            controller.load()
+            assertEquals(EmojiSetNotice.Error, controller.state.notice)
+
+            backend.beforeSets = {}
+            assertTrue(controller.discoverInBackground())
+            assertNull(controller.state.notice)
+            assertEquals(listOf(backend.set), controller.state.sets)
+        }
+
     /** A slow opening reread cannot replace the list a later removal already reread. */
     @Test
     fun staleSyncReadCannotOverwriteANewerList() =

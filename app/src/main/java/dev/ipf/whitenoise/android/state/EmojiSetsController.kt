@@ -157,12 +157,13 @@ internal class EmojiSetsController(
 
     /**
      * Syncs the unfiltered listing without locking the rows, then rereads the projection. True when every relay
-     * answered. Its notice never covers an open preview or a running operation.
+     * answered. Starting it clears the opening read's notice, and its own notice never covers an open preview or a
+     * running operation.
      */
     @Suppress("TooGenericExceptionCaught") // Failure only leaves the local projection, which Refresh retries.
     suspend fun discoverInBackground(): Boolean {
         if (closed || state.busy || state.discovering) return false
-        state = state.copy(discovering = true)
+        state = state.copy(discovering = true, notice = null)
         var notice: EmojiSetNotice? = null
         return try {
             val complete = backend.discover(null)
