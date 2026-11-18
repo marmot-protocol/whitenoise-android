@@ -40,6 +40,8 @@ data class OnboardingSavedAccountUi(
     val shortIdentity: String,
     val avatarUrl: String?,
     val recoveryRequired: Boolean = false,
+    /** Another of the account's devices unlinked this one, so it can only be removed here and signed in anew. */
+    val unlinked: Boolean = false,
 )
 
 internal fun onboardingSavedAccounts(appState: WhiteNoiseAppState): List<OnboardingSavedAccountUi> =
@@ -55,6 +57,7 @@ internal fun onboardingSavedAccounts(appState: WhiteNoiseAppState): List<Onboard
                 shortIdentity = shortIdentity,
                 avatarUrl = appState.avatarUrl(account.accountIdHex),
                 recoveryRequired = appState.onboardingRecoveryRequired(account.label),
+                unlinked = account.unlinked,
             )
         }
 
@@ -78,7 +81,8 @@ internal fun OnboardingSavedAccountActions(
     fun select(account: OnboardingSavedAccountUi) {
         if (!enabled || reactivatingAccountLabel != null) return
         pickerVisible = false
-        if (account.recoveryRequired) recoveryAccountLabel = account.label else onContinue(account.label)
+        val needsConsent = account.recoveryRequired || account.unlinked
+        if (needsConsent) recoveryAccountLabel = account.label else onContinue(account.label)
     }
     continuing?.let { account ->
         WhiteNoiseButton(
@@ -106,13 +110,13 @@ internal fun OnboardingSavedAccountActions(
     if (recoveryAccount != null && enabled && reactivatingAccountLabel == null) {
         AlertDialog(
             onDismissRequest = { recoveryAccountLabel = null },
-            title = { Text(stringResource(R.string.onboarding_recover_setup_title)) },
-            text = { Text(stringResource(R.string.onboarding_recover_setup_explanation)) },
+            title = { Text(stringResource(savedAccountConsentTitle(recoveryAccount))) },
+            text = { Text(stringResource(savedAccountConsentDetail(recoveryAccount))) },
             confirmButton = {
                 TextButton(onClick = {
                     recoveryAccountLabel = null
                     onRecover(recoveryAccount.label)
-                }) { Text(stringResource(R.string.onboarding_recover_setup_confirm)) }
+                }) { Text(stringResource(savedAccountConsentConfirm(recoveryAccount))) }
             },
             dismissButton = {
                 TextButton(onClick = { recoveryAccountLabel = null }) { Text(stringResource(R.string.cancel)) }
@@ -161,8 +165,22 @@ internal fun RetainedProfilesSheet(
 /** Recovery labels continue to name the potentially destructive operation instead of implying an ordinary resume. */
 @Composable
 private fun onboardingSavedAccountActionLabel(account: OnboardingSavedAccountUi): String =
-    if (account.recoveryRequired) {
+    if (account.unlinked) {
+        stringResource(R.string.unlinked_account_remove_for, account.displayName)
+    } else if (account.recoveryRequired) {
         stringResource(R.string.onboarding_recover_setup_for, account.displayName)
     } else {
         stringResource(R.string.onboarding_continue_as, account.displayName)
     }
+
+/** The consent title: an unlinked device is named as such, anything else is setup recovery. */
+private fun savedAccountConsentTitle(account: OnboardingSavedAccountUi): Int =
+    if (account.unlinked) R.string.device_unlinked_title else R.string.onboarding_recover_setup_title
+
+/** What the user agrees to: removing an unlinked account from this device, or recovering its setup. */
+private fun savedAccountConsentDetail(account: OnboardingSavedAccountUi): Int =
+    if (account.unlinked) R.string.unlinked_account_remove_detail else R.string.onboarding_recover_setup_explanation
+
+/** The confirming action, which names the removal for an unlinked account. */
+private fun savedAccountConsentConfirm(account: OnboardingSavedAccountUi): Int =
+    if (account.unlinked) R.string.unlinked_account_remove_confirm else R.string.onboarding_recover_setup_confirm

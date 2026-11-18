@@ -32,8 +32,8 @@
     <string name="group_account_devices_limit">已連結裝置暫時無法加入，因為某個帳號在此聊天中的裝置過多。</string>
     <string name="toast_couldnt_enable_account_devices">無法允許已連結裝置</string>
     <string name="device_unlinked_title">此裝置已被取消連結</string>
-    <string name="device_unlinked_detail">你的另一部裝置已將此裝置從 %1$s 中移除。該帳號已在此登出。請使用登出並清除來清理剩餘資料，然後重新登入以重新連結此裝置。</string>
-    <string name="error_account_unlinked">此裝置已被取消與此帳號的連結，因此無法在此登入。請使用登出並清除，然後重新登入以重新連結此裝置。</string>
+    <string name="device_unlinked_detail">你的另一部裝置已將此裝置從 %1$s 中移除。該帳號已在此登出。若要在此重新使用，請先將其從此裝置移除，然後登入並重新連結此裝置。</string>
+    <string name="error_account_unlinked">此裝置已被取消與此帳號的連結，因此無法在此登入。請將該帳號從此裝置移除，然後重新登入以重新連結此裝置。</string>
     <string name="wipe_report_left_to_other_devices">交由你的其他裝置完成的聊天：%1$d</string>
     <string name="wipe_report_other_devices_not_reached">無法請你的其他裝置完成此裝置的登出。在你從其中一部裝置移除它之前，它們可能仍會列出此裝置。</string>
     <string name="history_imported_from_device">從 %1$s 匯入</string>
@@ -87,7 +87,7 @@
     <string name="link_request_rate_limited">此裝置最近處理了過多的連結要求。可在 %1$s 再試一次。</string>
     <string name="link_request_cannot_link">新裝置上的應用程式暫時無法連結。需要更新。</string>
     <string name="link_request_too_many">此帳號已有 20 部連結裝置。請先移除一部，再連結其他裝置。</string>
-    <string name="link_request_linking">正在等待新裝置確認並加入。請讓兩個應用程式都保持開啟。</string>
+    <string name="link_request_linking">你已核准此裝置。它正在加入，通常不到一分鐘。請保持兩個應用程式都開啟。</string>
     <string name="link_request_linked">新裝置已連結。</string>
     <string name="link_request_added_elsewhere">%1$s 已由 %2$s 新增。</string>
     <string name="link_request_added_elsewhere_unnamed">該裝置已由你的另一部裝置新增。</string>
@@ -160,4 +160,10 @@
     <string name="explanation_link_request_options">開啟新裝置的名稱及其接收的內容。</string>
     <string name="device_move_advanced">進階</string>
     <string name="setup_device_link_next">登入後，你可以將此裝置與你的其他裝置連結，並在這裡看到相同的聊天。</string>
+    <string name="unlinked_account_remove_for">從此裝置移除 %1$s</string>
+    <string name="unlinked_account_remove_detail">你的另一部裝置已取消此裝置的連結，因此該帳號無法在此登入。移除只會刪除此裝置上的聊天和資料，你的其他裝置會保留全部內容。之後請重新登入以連結此裝置。</string>
+    <string name="unlinked_account_remove_confirm">從此裝置移除</string>
+    <string name="unlinked_account_remove_failed">無法將該帳號從此裝置移除。請再試一次。</string>
+    <string name="chats_arriving_title">正在把你的聊天帶到這裡</string>
+    <string name="chats_arriving_detail">你的其他裝置正在把此裝置加入你的聊天。這可能需要一兩分鐘。</string>
 </resources>

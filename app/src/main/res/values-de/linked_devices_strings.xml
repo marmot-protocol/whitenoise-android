@@ -32,8 +32,8 @@
     <string name="group_account_devices_limit">Verknüpfte Geräte können noch nicht beitreten, weil ein Konto zu viele Geräte in diesem Chat hat.</string>
     <string name="toast_couldnt_enable_account_devices">Verknüpfte Geräte konnten nicht zugelassen werden</string>
     <string name="device_unlinked_title">Dieses Gerät wurde getrennt</string>
-    <string name="device_unlinked_detail">Ein anderes deiner Geräte hat dieses Gerät aus %1$s entfernt. Das Konto ist hier abgemeldet. Verwende „Abmelden und löschen“, um die Reste zu entfernen, und melde dich dann erneut an, um dieses Gerät neu zu verknüpfen.</string>
-    <string name="error_account_unlinked">Dieses Gerät wurde von diesem Konto getrennt und kann sich hier nicht anmelden. Verwende „Abmelden und löschen“ und melde dich dann erneut an, um dieses Gerät neu zu verknüpfen.</string>
+    <string name="device_unlinked_detail">Ein anderes deiner Geräte hat dieses Gerät aus %1$s entfernt. Das Konto ist hier abgemeldet. Um es hier wieder zu nutzen, entferne es von diesem Gerät, melde dich dann an und verknüpfe dieses Gerät neu.</string>
+    <string name="error_account_unlinked">Dieses Gerät wurde von diesem Konto getrennt und kann sich hier nicht anmelden. Entferne das Konto von diesem Gerät und melde dich dann erneut an, um dieses Gerät neu zu verknüpfen.</string>
     <string name="wipe_report_left_to_other_devices">Chats, die deine anderen Geräte abschließen: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Deine anderen Geräte konnten nicht gebeten werden, die Abmeldung dieses Geräts abzuschließen. Sie führen dieses Gerät möglicherweise weiter auf, bis du es von einem von ihnen entfernst.</string>
     <string name="history_imported_from_device">Importiert von %1$s</string>
@@ -87,7 +87,7 @@
     <string name="link_request_rate_limited">Dieses Gerät hat zuletzt zu viele Verknüpfungsanfragen beantwortet. Es kann es um %1$s erneut versuchen.</string>
     <string name="link_request_cannot_link">Die App auf dem neuen Gerät kann noch nicht verknüpft werden. Sie muss aktualisiert werden.</string>
     <string name="link_request_too_many">Dieses Konto hat bereits 20 verknüpfte Geräte. Entferne eines, bevor du ein weiteres verknüpfst.</string>
-    <string name="link_request_linking">Warten, bis das neue Gerät bestätigt und beitritt. Lass beide Apps geöffnet.</string>
+    <string name="link_request_linking">Du hast dieses Gerät bestätigt. Es tritt jetzt bei, was meist weniger als eine Minute dauert. Lass beide Apps geöffnet.</string>
     <string name="link_request_linked">Das neue Gerät ist verknüpft.</string>
     <string name="link_request_added_elsewhere">%1$s wurde von %2$s hinzugefügt.</string>
     <string name="link_request_added_elsewhere_unnamed">Das Gerät wurde von einem anderen deiner Geräte hinzugefügt.</string>
@@ -160,4 +160,10 @@
     <string name="explanation_link_request_options">Öffnet den Namen des neuen Geräts und was es erhält.</string>
     <string name="device_move_advanced">Erweitert</string>
     <string name="setup_device_link_next">Nach der Anmeldung kannst du dieses Gerät mit deinen anderen Geräten verknüpfen und hier dieselben Chats sehen.</string>
+    <string name="unlinked_account_remove_for">%1$s von diesem Gerät entfernen</string>
+    <string name="unlinked_account_remove_detail">Ein anderes deiner Geräte hat dieses Gerät getrennt, daher kann sich dieses Konto hier nicht anmelden. Beim Entfernen werden seine Chats und Daten nur von diesem Gerät gelöscht. Deine anderen Geräte behalten alles. Melde dich danach erneut an, um dieses Gerät zu verknüpfen.</string>
+    <string name="unlinked_account_remove_confirm">Von diesem Gerät entfernen</string>
+    <string name="unlinked_account_remove_failed">Das Konto konnte nicht von diesem Gerät entfernt werden. Versuche es erneut.</string>
+    <string name="chats_arriving_title">Deine Chats werden hierher gebracht</string>
+    <string name="chats_arriving_detail">Deine anderen Geräte fügen dieses Gerät zu deinen Chats hinzu. Das kann ein bis zwei Minuten dauern.</string>
 </resources>

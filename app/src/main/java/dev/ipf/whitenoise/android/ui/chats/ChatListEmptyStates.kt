@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatsArrivingHint
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 
 /** Empty filtering remains specific to query, unread folder, or the selected folder's contents. */
@@ -41,16 +43,29 @@ internal fun ChatListNoResults(
     }
 }
 
-/** Keeps the existing actionable first-chat entry while adopting the prototype's title/detail presentation. */
+/** The empty chat list for the profile in view, which says so when its chats are still arriving after linking. */
 @Suppress("FunctionNaming")
 @Composable
-internal fun EmptyChats(onCreate: () -> Unit) {
+internal fun EmptyChats(
+    appState: WhiteNoiseAppState,
+    onCreate: () -> Unit,
+) = EmptyChats(onCreate, arriving = ChatsArrivingHint.showsFor(appState.activeAccount?.accountIdHex))
+
+/**
+ * Keeps the existing actionable first-chat entry while adopting the prototype's title/detail presentation. While
+ * [arriving], a newly linked device says its chats are on their way instead of claiming there are none.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun EmptyChats(
+    onCreate: () -> Unit,
+    arriving: Boolean = false,
+) {
+    val title = if (arriving) R.string.chats_arriving_title else R.string.chat_rows_no_chats_title
+    val detail = if (arriving) R.string.chats_arriving_detail else R.string.chat_rows_no_chats_detail
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            WhiteNoiseEmptyState(
-                title = stringResource(R.string.chat_rows_no_chats_title),
-                detail = stringResource(R.string.chat_rows_no_chats_detail),
-            )
+            WhiteNoiseEmptyState(title = stringResource(title), detail = stringResource(detail))
             Button(onClick = onCreate, modifier = Modifier.padding(horizontal = 24.dp)) {
                 Text(stringResource(R.string.new_chat))
             }

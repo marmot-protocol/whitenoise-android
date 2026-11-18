@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.state.IdentityImportOutcome
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
+import dev.ipf.whitenoise.android.state.removeUnlinkedAccount
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import kotlinx.coroutines.launch
 
@@ -172,14 +173,20 @@ internal fun OnboardingScreen(
                 inFlightAction = OnboardingAction.Importing
                 appState.launchMutation {
                     try {
-                        val recovered = appState.recoverSetup(accountRef)
-                        appState.presentTransient(
-                            if (recovered) {
-                                R.string.onboarding_recover_setup_success
-                            } else {
-                                R.string.onboarding_recover_setup_failed
-                            },
-                        )
+                        // The consent covered one of two things: removing an unlinked account, or recovering setup.
+                        if (savedAccounts.any { it.label == accountRef && it.unlinked }) {
+                            val removed = appState.removeUnlinkedAccount(accountRef)
+                            if (!removed) appState.present(R.string.unlinked_account_remove_failed)
+                        } else {
+                            val recovered = appState.recoverSetup(accountRef)
+                            appState.presentTransient(
+                                if (recovered) {
+                                    R.string.onboarding_recover_setup_success
+                                } else {
+                                    R.string.onboarding_recover_setup_failed
+                                },
+                            )
+                        }
                     } finally {
                         inFlightAction = OnboardingAction.Idle
                     }

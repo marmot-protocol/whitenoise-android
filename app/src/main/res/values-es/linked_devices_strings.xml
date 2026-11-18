@@ -32,8 +32,8 @@
     <string name="group_account_devices_limit">Los dispositivos vinculados aún no pueden unirse porque una cuenta tiene demasiados dispositivos en este chat.</string>
     <string name="toast_couldnt_enable_account_devices">No se pudieron permitir los dispositivos vinculados</string>
     <string name="device_unlinked_title">Este dispositivo fue desvinculado</string>
-    <string name="device_unlinked_detail">Otro de tus dispositivos eliminó este de %1$s. La cuenta ha cerrado sesión aquí. Usa Cerrar sesión y borrar para eliminar lo que queda y vuelve a iniciar sesión para vincular este dispositivo de nuevo.</string>
-    <string name="error_account_unlinked">Este dispositivo fue desvinculado de esta cuenta, así que no puede iniciar sesión aquí. Usa Cerrar sesión y borrar y vuelve a iniciar sesión para vincular este dispositivo de nuevo.</string>
+    <string name="device_unlinked_detail">Otro de tus dispositivos eliminó este de %1$s. La cuenta ha cerrado sesión aquí. Para volver a usarla aquí, quítala de este dispositivo, luego inicia sesión y vincula este dispositivo de nuevo.</string>
+    <string name="error_account_unlinked">Este dispositivo fue desvinculado de esta cuenta, así que no puede iniciar sesión aquí. Quita la cuenta de este dispositivo y vuelve a iniciar sesión para vincularlo de nuevo.</string>
     <string name="wipe_report_left_to_other_devices">Chats que terminarán tus otros dispositivos: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">No se pudo pedir a tus otros dispositivos que terminaran de cerrar la sesión de este. Puede que sigan mostrando este dispositivo hasta que lo elimines desde uno de ellos.</string>
     <string name="history_imported_from_device">Importado desde %1$s</string>
@@ -87,7 +87,7 @@
     <string name="link_request_rate_limited">Este dispositivo respondió a demasiadas solicitudes de vinculación recientemente. Podrá volver a intentarlo a las %1$s.</string>
     <string name="link_request_cannot_link">La app del dispositivo nuevo aún no se puede vincular. Necesita una actualización.</string>
     <string name="link_request_too_many">Esta cuenta ya tiene 20 dispositivos vinculados. Elimina uno antes de vincular otro.</string>
-    <string name="link_request_linking">Esperando a que el dispositivo nuevo confirme y se una. Mantén ambas apps abiertas.</string>
+    <string name="link_request_linking">Aprobaste este dispositivo. Se está uniendo ahora, lo que suele tardar menos de un minuto. Mantén ambas apps abiertas.</string>
     <string name="link_request_linked">El dispositivo nuevo está vinculado.</string>
     <string name="link_request_added_elsewhere">%2$s añadió %1$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Otro de tus dispositivos añadió el dispositivo.</string>
@@ -160,4 +160,10 @@
     <string name="explanation_link_request_options">Abre el nombre del nuevo dispositivo y lo que recibe.</string>
     <string name="device_move_advanced">Avanzado</string>
     <string name="setup_device_link_next">Después de iniciar sesión, podrás vincular este dispositivo con tus otros dispositivos y ver aquí los mismos chats.</string>
+    <string name="unlinked_account_remove_for">Quitar %1$s de este dispositivo</string>
+    <string name="unlinked_account_remove_detail">Otro de tus dispositivos desvinculó este, así que esta cuenta no puede iniciar sesión aquí. Al quitarla se borran sus chats y datos solo de este dispositivo. Tus otros dispositivos lo conservan todo. Después, vuelve a iniciar sesión para vincular este dispositivo.</string>
+    <string name="unlinked_account_remove_confirm">Quitar de este dispositivo</string>
+    <string name="unlinked_account_remove_failed">No se pudo quitar la cuenta de este dispositivo. Inténtalo de nuevo.</string>
+    <string name="chats_arriving_title">Trayendo tus chats aquí</string>
+    <string name="chats_arriving_detail">Tus otros dispositivos están añadiendo este a tus chats. Puede tardar uno o dos minutos.</string>
 </resources>

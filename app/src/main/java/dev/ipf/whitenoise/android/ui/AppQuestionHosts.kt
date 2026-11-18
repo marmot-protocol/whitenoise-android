@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.state.ownsGroupChange
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestHost
 import dev.ipf.whitenoise.android.ui.devices.DeviceSelfNameEffect
+import dev.ipf.whitenoise.android.ui.devices.UnlinkedAccountPromptHost
 import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
 
 /**
@@ -35,5 +36,6 @@ internal fun AppQuestionHosts(appState: WhiteNoiseAppState) {
         DeviceLinkRequestHost(appState, blocked = linkBlocked)
         DeviceLinkOfferHost(appState, blocked = linkBlocked)
         DeviceSelfNameEffect(appState)
+        UnlinkedAccountPromptHost(appState, blocked = appState.appLock.screenVisible)
     }
 }

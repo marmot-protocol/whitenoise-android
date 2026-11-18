@@ -1,0 +1,177 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+  "legacy_sha256": "f5e9d0121acf65d620312a312cf1d8cb2efc701e3ac4da35cb55fcea20447cea",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: OnboardingSavedAccountUi",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "OnboardingSavedAccountActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "fun OnboardingSavedAccountActions(",
+        "test_ids": [
+          "ONB-009",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "RetainedProfilesSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "fun RetainedProfilesSheet(",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "onboardingSavedAccountActionLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "fun onboardingSavedAccountActionLabel(",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_unlinked_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.device_unlinked_title",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_remove_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.unlinked_account_remove_confirm",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_remove_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.unlinked_account_remove_detail",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_remove_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.unlinked_account_remove_for",
+        "test_ids": [
+          "SET-065"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_choose_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_choose_profile",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_continue_as",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_continue_as",
+        "test_ids": [
+          "ONB-009"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_recover_setup_confirm",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_recover_setup_explanation",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_recover_setup_for",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_recover_setup_title",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_signing_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "R.string.onboarding_signing_in",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: OnboardingSavedAccountUi",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

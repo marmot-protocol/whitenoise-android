@@ -32,8 +32,8 @@
     <string name="group_account_devices_limit">Dispositivos vinculados ainda não podem entrar porque uma conta tem dispositivos demais nesta conversa.</string>
     <string name="toast_couldnt_enable_account_devices">Não foi possível permitir dispositivos vinculados</string>
     <string name="device_unlinked_title">Este dispositivo foi desvinculado</string>
-    <string name="device_unlinked_detail">Outro dos seus dispositivos removeu este de %1$s. A conta foi desconectada aqui. Use Sair e apagar para limpar o que restou e entre de novo para vincular este dispositivo novamente.</string>
-    <string name="error_account_unlinked">Este dispositivo foi desvinculado desta conta, então não pode entrar aqui. Use Sair e apagar e entre de novo para vincular este dispositivo novamente.</string>
+    <string name="device_unlinked_detail">Outro dos seus dispositivos removeu este de %1$s. A conta foi desconectada aqui. Para usá-la aqui de novo, remova-a deste dispositivo, depois entre e vincule este dispositivo novamente.</string>
+    <string name="error_account_unlinked">Este dispositivo foi desvinculado desta conta, então não pode entrar aqui. Remova a conta deste dispositivo e entre de novo para vinculá-lo novamente.</string>
     <string name="wipe_report_left_to_other_devices">Conversas que seus outros dispositivos vão concluir: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Não foi possível pedir aos seus outros dispositivos que concluíssem a saída deste. Eles podem continuar listando este dispositivo até você removê-lo de um deles.</string>
     <string name="history_imported_from_device">Importado de %1$s</string>
@@ -87,7 +87,7 @@
     <string name="link_request_rate_limited">Este dispositivo respondeu a solicitações de vinculação demais recentemente. Ele poderá tentar de novo às %1$s.</string>
     <string name="link_request_cannot_link">O app do novo dispositivo ainda não pode ser vinculado. Ele precisa de uma atualização.</string>
     <string name="link_request_too_many">Esta conta já tem 20 dispositivos vinculados. Remova um antes de vincular outro.</string>
-    <string name="link_request_linking">Aguardando o novo dispositivo confirmar e entrar. Mantenha os dois apps abertos.</string>
+    <string name="link_request_linking">Você aprovou este dispositivo. Ele está entrando agora, o que costuma levar menos de um minuto. Mantenha os dois apps abertos.</string>
     <string name="link_request_linked">O novo dispositivo está vinculado.</string>
     <string name="link_request_added_elsewhere">%1$s foi adicionado por %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">O dispositivo foi adicionado por outro dos seus dispositivos.</string>
@@ -160,4 +160,10 @@
     <string name="explanation_link_request_options">Abre o nome do novo dispositivo e o que ele recebe.</string>
     <string name="device_move_advanced">Avançado</string>
     <string name="setup_device_link_next">Depois de entrar, você poderá vincular este dispositivo aos seus outros dispositivos e ver as mesmas conversas aqui.</string>
+    <string name="unlinked_account_remove_for">Remover %1$s deste dispositivo</string>
+    <string name="unlinked_account_remove_detail">Outro dos seus dispositivos desvinculou este, então esta conta não pode entrar aqui. Remover apaga as conversas e os dados dela somente deste dispositivo. Seus outros dispositivos mantêm tudo. Depois, entre de novo para vincular este dispositivo.</string>
+    <string name="unlinked_account_remove_confirm">Remover deste dispositivo</string>
+    <string name="unlinked_account_remove_failed">Não foi possível remover a conta deste dispositivo. Tente novamente.</string>
+    <string name="chats_arriving_title">Trazendo suas conversas para cá</string>
+    <string name="chats_arriving_detail">Seus outros dispositivos estão adicionando este às suas conversas. Isso pode levar um ou dois minutos.</string>
 </resources>

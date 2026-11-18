@@ -6720,6 +6720,13 @@
       "second_device": ["ACC-025"]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedAccountPrompt.kt",
+      "symbol": "UnlinkedAccountPrompt",
+      "bindings": [],
+      "remaining": "This prompt appears only after another device of the same account removes this one, which the single-emulator runner cannot provide. Its text and its one action are covered by JVM tests and manual SET-065; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["SET-065"]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
       "symbol": "DeviceLinkOfferSteps",
       "bindings": [],

@@ -14,7 +14,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -25,6 +28,7 @@ import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
+import dev.ipf.whitenoise.android.state.ChatsArrivingHint
 import dev.ipf.whitenoise.android.state.DeviceLinkController
 import dev.ipf.whitenoise.android.state.DeviceLinkOfferStage
 import dev.ipf.whitenoise.android.state.DeviceLinkOffers
@@ -32,6 +36,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.start
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import kotlinx.coroutines.delay
+
+/** How long an empty chat list keeps saying chats are arriving after this device linked. */
+private const val CHATS_ARRIVING_HINT_MS = 180_000L
 
 internal const val DEVICE_LINK_OFFER_TAG = "device_link.offer"
 internal const val DEVICE_LINK_OFFER_LINK_TAG = "device_link.offer.link"
@@ -61,6 +69,12 @@ internal fun DeviceLinkOfferHost(
     val offers = remember { DeviceLinkOffers.shared(appState.appContext) }
     val accountIds = appState.accounts.map { it.accountIdHex }
     LaunchedEffect(accountIds) { offers.retainAccounts(accountIds) }
+    LaunchedEffect(ChatsArrivingHint.shown) {
+        if (ChatsArrivingHint.shown) {
+            delay(CHATS_ARRIVING_HINT_MS)
+            ChatsArrivingHint.end()
+        }
+    }
     val accountIdHex = appState.linkOfferAccount()?.takeUnless { blocked } ?: return
     if (offers.linkingFor == accountIdHex) {
         DeviceLinkOfferSteps(appState, offers)
@@ -100,17 +114,26 @@ private fun DeviceLinkOfferSteps(
     }
 }
 
-/** Ends the active account's offer and reminder once MDK says this device is linked or lists another device. */
+/**
+ * Ends the active account's offer and reminder once MDK says this device is linked or lists another device. When
+ * the link completes while this is on screen, it also starts the chat list's hint that chats are still arriving.
+ */
 @Composable
 internal fun DeviceLinkOfferSettled(
     appState: WhiteNoiseAppState,
     controller: DeviceLinkController,
 ) {
-    val linked = controller.link?.newDevice is NewDeviceLinkStateFfi.Linked
+    val state = controller.link?.newDevice
+    val linked = state is NewDeviceLinkStateFfi.Linked
     val settled = linked || controller.roster.roster?.hasOtherDevices == true
     val accountIdHex = appState.activeAccount?.accountIdHex
-    LaunchedEffect(settled, accountIdHex) {
-        if (settled && accountIdHex != null) DeviceLinkOffers.shared(appState.appContext).clear(accountIdHex)
+    var sawProgress by remember(accountIdHex) { mutableStateOf(false) }
+    LaunchedEffect(state, settled, accountIdHex) {
+        val offers = DeviceLinkOffers.shared(appState.appContext)
+        if (state.inProgress()) sawProgress = true
+        if (settled && accountIdHex != null) offers.clear(accountIdHex)
+        // Only a link seen in progress here is fresh, a device linked long ago has nothing arriving.
+        if (linked && sawProgress && accountIdHex != null) ChatsArrivingHint.mark(accountIdHex)
     }
 }
 

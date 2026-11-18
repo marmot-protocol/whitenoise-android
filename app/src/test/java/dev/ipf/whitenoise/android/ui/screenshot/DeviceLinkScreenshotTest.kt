@@ -19,6 +19,7 @@ import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.state.LinkedDeviceRoster
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
+import dev.ipf.whitenoise.android.ui.chats.EmptyChats
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkAvailability
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferDialog
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOtherProfileDialog
@@ -27,6 +28,7 @@ import dev.ipf.whitenoise.android.ui.devices.DeviceLinkRequestContent
 import dev.ipf.whitenoise.android.ui.devices.LinkThisDeviceContent
 import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesContent
 import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesLinking
+import dev.ipf.whitenoise.android.ui.devices.UnlinkedAccountPrompt
 import dev.ipf.whitenoise.android.ui.devices.fixtureCode
 import dev.ipf.whitenoise.android.ui.devices.fixtureDevice
 import dev.ipf.whitenoise.android.ui.devices.newDeviceLinkStep
@@ -114,6 +116,30 @@ class DeviceLinkScreenshotTest {
     fun offerLight() {
         show(Look()) { DeviceLinkOfferDialog(onLink = {}, onNotNow = {}) }
         compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/device_link_offer_light.png")
+    }
+
+    /** The prompt that covers the app once another device unlinked this one. */
+    @Test
+    fun unlinkedPromptLight() {
+        show(Look()) { UnlinkedAccountPrompt(onRemove = {}) }
+        compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/device_link_unlinked_prompt_light.png")
+    }
+
+    /** The same prompt in dark theme, RTL and large text. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h900dp-mdpi")
+    fun unlinkedPromptDarkRtlLargeFont() {
+        show(Look(dark = true, rtl = true)) { UnlinkedAccountPrompt(onRemove = {}) }
+        compose
+            .onNode(isDialog())
+            .captureRoboImage("src/test/snapshots/device_link_unlinked_prompt_dark_rtl_large_font.png")
+    }
+
+    /** A newly linked device's empty chat list while its chats are still arriving. */
+    @Test
+    fun chatsArrivingLight() {
+        show(Look()) { EmptyChats(onCreate = {}, arriving = true) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_chats_arriving_light.png")
     }
 
     /** The chat list's reminder after Not now. */

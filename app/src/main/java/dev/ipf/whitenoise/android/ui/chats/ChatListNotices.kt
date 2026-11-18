@@ -6,10 +6,12 @@ import androidx.compose.runtime.Composable
 import dev.ipf.whitenoise.android.state.AccountHistoryNotices
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkReminder
+import dev.ipf.whitenoise.android.ui.devices.OwnDeviceChatAdmission
 
 /**
  * The chat list's notice slot: the account's history notice when [showHistoryNotice], then the reminder to link
- * this device when [showLinkReminder]. Search and the attachment browser show neither.
+ * this device when [showLinkReminder]. Search and the attachment browser show neither. It also admits chats one of
+ * the account's own devices added this device to, which needs no room on screen.
  */
 @Composable
 internal fun ChatListNotices(
@@ -25,4 +27,5 @@ internal fun ChatListNotices(
         )
     }
     if (showLinkReminder) DeviceLinkReminder(appState)
+    OwnDeviceChatAdmission(appState)
 }

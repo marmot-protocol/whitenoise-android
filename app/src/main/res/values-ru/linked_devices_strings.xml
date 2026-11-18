@@ -32,8 +32,8 @@
     <string name="group_account_devices_limit">Связанные устройства пока не могут вступить, потому что у одной из учётных записей слишком много устройств в этом чате.</string>
     <string name="toast_couldnt_enable_account_devices">Не удалось разрешить связанные устройства</string>
     <string name="device_unlinked_title">Это устройство отвязано</string>
-    <string name="device_unlinked_detail">Другое ваше устройство удалило это устройство из %1$s. Учётная запись вышла здесь. Используйте «Выйти и стереть», чтобы удалить оставшееся, затем войдите снова, чтобы заново связать это устройство.</string>
-    <string name="error_account_unlinked">Это устройство отвязано от этой учётной записи, поэтому войти здесь нельзя. Используйте «Выйти и стереть», затем войдите снова, чтобы заново связать это устройство.</string>
+    <string name="device_unlinked_detail">Другое ваше устройство удалило это устройство из %1$s. Учётная запись вышла здесь. Чтобы снова пользоваться ею здесь, удалите её с этого устройства, затем войдите и заново свяжите это устройство.</string>
+    <string name="error_account_unlinked">Это устройство отвязано от этой учётной записи, поэтому войти здесь нельзя. Удалите учётную запись с этого устройства, затем войдите снова, чтобы заново связать его.</string>
     <string name="wipe_report_left_to_other_devices">Чатов, выход из которых завершат другие ваши устройства: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Не удалось попросить другие ваши устройства завершить выход этого устройства. Они могут продолжать показывать его, пока вы не удалите его с одного из них.</string>
     <string name="history_imported_from_device">Импортировано с устройства %1$s</string>
@@ -87,7 +87,7 @@
     <string name="link_request_rate_limited">Это устройство недавно ответило на слишком много запросов на связывание. Повторить можно в %1$s.</string>
     <string name="link_request_cannot_link">Приложение на новом устройстве пока нельзя связать. Его нужно обновить.</string>
     <string name="link_request_too_many">У этой учётной записи уже 20 связанных устройств. Удалите одно, прежде чем связывать другое.</string>
-    <string name="link_request_linking">Ожидание, пока новое устройство подтвердит и присоединится. Не закрывайте оба приложения.</string>
+    <string name="link_request_linking">Вы одобрили это устройство. Оно присоединяется, обычно это занимает меньше минуты. Не закрывайте оба приложения.</string>
     <string name="link_request_linked">Новое устройство связано.</string>
     <string name="link_request_added_elsewhere">%1$s добавлено устройством %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">Устройство добавлено другим вашим устройством.</string>
@@ -160,4 +160,10 @@
     <string name="explanation_link_request_options">Открывает название нового устройства и то, что оно получает.</string>
     <string name="device_move_advanced">Дополнительно</string>
     <string name="setup_device_link_next">После входа вы сможете связать это устройство с другими вашими устройствами и видеть здесь те же чаты.</string>
+    <string name="unlinked_account_remove_for">Удалить %1$s с этого устройства</string>
+    <string name="unlinked_account_remove_detail">Другое ваше устройство отвязало это устройство, поэтому эта учётная запись не может войти здесь. Удаление стирает её чаты и данные только с этого устройства. На других ваших устройствах всё сохранится. Затем войдите снова, чтобы связать это устройство.</string>
+    <string name="unlinked_account_remove_confirm">Удалить с этого устройства</string>
+    <string name="unlinked_account_remove_failed">Не удалось удалить учётную запись с этого устройства. Повторите попытку.</string>
+    <string name="chats_arriving_title">Переносим ваши чаты сюда</string>
+    <string name="chats_arriving_detail">Другие ваши устройства добавляют это устройство в ваши чаты. Это может занять минуту-две.</string>
 </resources>

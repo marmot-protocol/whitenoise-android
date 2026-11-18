@@ -32,8 +32,8 @@
     <string name="group_account_devices_limit">Les appareils associés ne peuvent pas encore rejoindre la discussion, car un compte y a trop d’appareils.</string>
     <string name="toast_couldnt_enable_account_devices">Impossible d’autoriser les appareils associés</string>
     <string name="device_unlinked_title">Cet appareil a été dissocié</string>
-    <string name="device_unlinked_detail">Un autre de vos appareils a retiré celui-ci de %1$s. Le compte est déconnecté ici. Utilisez Se déconnecter et effacer pour supprimer ce qui reste, puis reconnectez-vous pour associer de nouveau cet appareil.</string>
-    <string name="error_account_unlinked">Cet appareil a été dissocié de ce compte et ne peut donc pas s’y connecter. Utilisez Se déconnecter et effacer, puis reconnectez-vous pour associer de nouveau cet appareil.</string>
+    <string name="device_unlinked_detail">Un autre de vos appareils a retiré celui-ci de %1$s. Le compte est déconnecté ici. Pour l’utiliser de nouveau ici, retirez-le de cet appareil, puis connectez-vous et associez de nouveau cet appareil.</string>
+    <string name="error_account_unlinked">Cet appareil a été dissocié de ce compte et ne peut donc pas s’y connecter. Retirez le compte de cet appareil, puis reconnectez-vous pour l’associer de nouveau.</string>
     <string name="wipe_report_left_to_other_devices">Discussions que vos autres appareils termineront : %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Vos autres appareils n’ont pas pu être sollicités pour terminer la déconnexion de celui-ci. Ils peuvent continuer à l’afficher jusqu’à ce que vous le supprimiez depuis l’un d’eux.</string>
     <string name="history_imported_from_device">Importé depuis %1$s</string>
@@ -87,7 +87,7 @@
     <string name="link_request_rate_limited">Cet appareil a répondu à trop de demandes d’association récemment. Il pourra réessayer à %1$s.</string>
     <string name="link_request_cannot_link">L’application du nouvel appareil ne peut pas encore être associée. Elle doit être mise à jour.</string>
     <string name="link_request_too_many">Ce compte a déjà 20 appareils associés. Supprimez-en un avant d’en associer un autre.</string>
-    <string name="link_request_linking">En attente de la confirmation et de l’arrivée du nouvel appareil. Gardez les deux applications ouvertes.</string>
+    <string name="link_request_linking">Vous avez approuvé cet appareil. Il se joint maintenant, ce qui prend généralement moins d’une minute. Gardez les deux applications ouvertes.</string>
     <string name="link_request_linked">Le nouvel appareil est associé.</string>
     <string name="link_request_added_elsewhere">%1$s a été ajouté par %2$s.</string>
     <string name="link_request_added_elsewhere_unnamed">L’appareil a été ajouté par un autre de vos appareils.</string>
@@ -160,4 +160,10 @@
     <string name="explanation_link_request_options">Ouvre le nom du nouvel appareil et ce qu’il reçoit.</string>
     <string name="device_move_advanced">Avancé</string>
     <string name="setup_device_link_next">Après la connexion, vous pourrez associer cet appareil à vos autres appareils et voir les mêmes discussions ici.</string>
+    <string name="unlinked_account_remove_for">Retirer %1$s de cet appareil</string>
+    <string name="unlinked_account_remove_detail">Un autre de vos appareils a dissocié celui-ci, ce compte ne peut donc pas se connecter ici. Le retirer supprime ses discussions et ses données de cet appareil uniquement. Vos autres appareils conservent tout. Reconnectez-vous ensuite pour associer cet appareil.</string>
+    <string name="unlinked_account_remove_confirm">Retirer de cet appareil</string>
+    <string name="unlinked_account_remove_failed">Impossible de retirer le compte de cet appareil. Réessayez.</string>
+    <string name="chats_arriving_title">Vos discussions arrivent ici</string>
+    <string name="chats_arriving_detail">Vos autres appareils ajoutent celui-ci à vos discussions. Cela peut prendre une à deux minutes.</string>
 </resources>

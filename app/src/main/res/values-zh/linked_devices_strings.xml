@@ -32,8 +32,8 @@
     <string name="group_account_devices_limit">已关联设备暂时无法加入，因为某个账户在此聊天中的设备过多。</string>
     <string name="toast_couldnt_enable_account_devices">无法允许已关联设备</string>
     <string name="device_unlinked_title">此设备已被取消关联</string>
-    <string name="device_unlinked_detail">你的另一台设备已将此设备从 %1$s 中移除。该账户已在此退出登录。请使用退出登录并清除来清理剩余数据，然后重新登录以重新关联此设备。</string>
-    <string name="error_account_unlinked">此设备已被取消与此账户的关联，因此无法在此登录。请使用退出登录并清除，然后重新登录以重新关联此设备。</string>
+    <string name="device_unlinked_detail">你的另一台设备已将此设备从 %1$s 中移除。该账户已在此退出登录。若要在此重新使用，请先将其从此设备移除，然后登录并重新关联此设备。</string>
+    <string name="error_account_unlinked">此设备已被取消与此账户的关联，因此无法在此登录。请将该账户从此设备移除，然后重新登录以重新关联此设备。</string>
     <string name="wipe_report_left_to_other_devices">交由你的其他设备完成的聊天：%1$d</string>
     <string name="wipe_report_other_devices_not_reached">无法请你的其他设备完成此设备的退出登录。在你从其中一台设备移除它之前，它们可能仍会列出此设备。</string>
     <string name="history_imported_from_device">从 %1$s 导入</string>
@@ -87,7 +87,7 @@
     <string name="link_request_rate_limited">此设备最近处理了过多的关联请求。可在 %1$s 重试。</string>
     <string name="link_request_cannot_link">新设备上的应用暂时无法关联。需要更新。</string>
     <string name="link_request_too_many">此账户已有 20 台关联设备。请先移除一台，再关联其他设备。</string>
-    <string name="link_request_linking">正在等待新设备确认并加入。请让两个应用都保持打开。</string>
+    <string name="link_request_linking">你已批准此设备。它正在加入，通常不到一分钟。请保持两个应用都打开。</string>
     <string name="link_request_linked">新设备已关联。</string>
     <string name="link_request_added_elsewhere">%1$s 已由 %2$s 添加。</string>
     <string name="link_request_added_elsewhere_unnamed">该设备已由你的另一台设备添加。</string>
@@ -160,4 +160,10 @@
     <string name="explanation_link_request_options">打开新设备的名称及其接收的内容。</string>
     <string name="device_move_advanced">高级</string>
     <string name="setup_device_link_next">登录后，你可以将此设备与你的其他设备关联，并在这里看到相同的聊天。</string>
+    <string name="unlinked_account_remove_for">从此设备移除 %1$s</string>
+    <string name="unlinked_account_remove_detail">你的另一台设备已取消此设备的关联，因此该账户无法在此登录。移除只会删除此设备上的聊天和数据，你的其他设备会保留全部内容。之后请重新登录以关联此设备。</string>
+    <string name="unlinked_account_remove_confirm">从此设备移除</string>
+    <string name="unlinked_account_remove_failed">无法将该账户从此设备移除。请重试。</string>
+    <string name="chats_arriving_title">正在把你的聊天带到这里</string>
+    <string name="chats_arriving_detail">你的其他设备正在把此设备加入你的聊天。这可能需要一两分钟。</string>
 </resources>
