@@ -36,6 +36,16 @@ class SourceSizeBaselineCheckTest(unittest.TestCase):
         with self.assertRaises(BaselineError):
             parse(TEXT + '\ninternal val extra = mapOf("dev/A.kt" to 700)\n')
 
+    def test_code_after_map_fails_closed(self):
+        with self.assertRaises(BaselineError):
+            parse(TEXT.rstrip('\n') + '.plus("dev/A.kt" to 700)\n')
+        with self.assertRaisesRegex(BaselineError, 'after'):
+            parse(TEXT.rstrip('\n') + '\n        .plus(emptyMap())\n')
+
+    def test_changed_declaration_fails_closed(self):
+        with self.assertRaises(BaselineError):
+            parse(TEXT.replace('Map<String, Int> =\n', 'Map<String, Int> = extra +\n'))
+
     def test_duplicate_entry_fails(self):
         line = TEXT.splitlines()[[i for i, s in enumerate(TEXT.splitlines()) if 'mapOf(' in s][0] + 1]
         with self.assertRaisesRegex(BaselineError, 'duplicate'):
