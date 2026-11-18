@@ -164,6 +164,196 @@ class KeystoreSecureStoreTest {
         assertEquals(emptyMap<String, String>(), store().readAll())
     }
 
+    /** Counts key requests, one per Keystore-backed open or seal. */
+    private class CountingKeyProvider(
+        private val secret: SecretKey,
+    ) : SecureStoreKeyProvider {
+        var uses = 0
+
+        /** Hands out the key and counts the request. */
+        override fun secretKey(): SecretKey = secret.also { uses++ }
+    }
+
+    /** A store over the shared test file with the read cache on. */
+    private fun cachingStore(provider: SecureStoreKeyProvider) =
+        KeystoreSecureStore(context = context, fileName = FILE, keyProvider = provider, cacheReads = true)
+
+    /** A caching store opens an unchanged payload once, however often it is read. */
+    @Test
+    fun cachingStoreOpensAnUnchangedPayloadOnce() {
+        store().write("a", "first")
+        val provider = CountingKeyProvider(key)
+        val subject = cachingStore(provider)
+
+        repeat(5) { assertEquals(mapOf("a" to "first"), subject.readAll()) }
+
+        assertEquals(1, provider.uses)
+    }
+
+    /** The default store keeps opening the payload on every read, so only opted-in stores hold plaintext. */
+    @Test
+    fun defaultStoreOpensThePayloadOnEveryRead() {
+        store().write("a", "first")
+        val provider = CountingKeyProvider(key)
+        val subject = KeystoreSecureStore(context = context, fileName = FILE, keyProvider = provider)
+
+        repeat(3) { subject.readAll() }
+
+        assertEquals(3, provider.uses)
+    }
+
+    /** Short-lived caching stores over one file and key provider share a single open. */
+    @Test
+    fun cachingStoresWithOneKeyProviderShareAnOpen() {
+        store().write("a", "first")
+        val provider = CountingKeyProvider(key)
+
+        repeat(4) { assertEquals(mapOf("a" to "first"), cachingStore(provider).readAll()) }
+
+        assertEquals(1, provider.uses)
+    }
+
+    /** A payload written through another store is opened again instead of served from the cache. */
+    @Test
+    fun cachingStoreSeesAWriteMadeThroughAnotherStore() {
+        store().write("a", "first")
+        val provider = CountingKeyProvider(key)
+        val subject = cachingStore(provider)
+        subject.readAll()
+
+        store().write("a", "second")
+
+        assertEquals(mapOf("a" to "second"), subject.readAll())
+        assertEquals(2, provider.uses)
+    }
+
+    /** A caching store reads back what it just sealed without opening it, for every write path. */
+    @Test
+    fun cachingStoreReadsItsOwnWritesWithoutOpeningThem() {
+        val provider = CountingKeyProvider(key)
+        val subject = cachingStore(provider)
+
+        subject.write("a", "first")
+        assertEquals(mapOf("a" to "first"), subject.readAll())
+        assertTrue(subject.putAllDurably(mapOf("b" to "second")))
+        assertEquals(mapOf("a" to "first", "b" to "second"), subject.readAll())
+        assertTrue(subject.replaceAllDurably(mapOf("c" to "third")))
+        assertEquals(mapOf("c" to "third"), subject.readAll())
+
+        assertEquals(3, provider.uses)
+        assertEquals(mapOf("c" to "third"), store().readAll())
+    }
+
+    /** What a caching store serves after a write equals what a fresh open of the same payload yields. */
+    @Test
+    fun cachedWriteMatchesAFreshOpenForTextThatDoesNotSurviveEncoding() {
+        val subject = cachingStore(CountingKeyProvider(key))
+
+        subject.write("a", "lone\uD83D surrogate")
+
+        assertEquals(store().readAll(), subject.readAll())
+    }
+
+    /** A caller cannot change the map a caching store hands out, so later reads stay what was sealed. */
+    @Test
+    fun cachedMapCannotBeModifiedByACaller() {
+        store().write("a", "first")
+        store().write("b", "second")
+        val subject = cachingStore(CountingKeyProvider(key))
+
+        assertThrows(UnsupportedOperationException::class.java) {
+            @Suppress("UNCHECKED_CAST")
+            (subject.readAll() as MutableMap<String, String>)["a"] = "changed"
+        }
+
+        assertEquals(mapOf("a" to "first", "b" to "second"), subject.readAll())
+    }
+
+    /** A cached payload is never served to a store holding a different key. */
+    @Test
+    fun cachedPayloadIsNotServedToAnotherKey() {
+        store().write("a", "first")
+        cachingStore(CountingKeyProvider(key)).readAll()
+        val otherKey = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+
+        assertThrows(GeneralSecurityException::class.java) { cachingStore(CountingKeyProvider(otherKey)).readAll() }
+    }
+
+    /** A store with the cache off never fills the cache a caching store reads from. */
+    @Test
+    fun storeWithTheCacheOffDoesNotFillTheSharedCache() {
+        val provider = CountingKeyProvider(key)
+        val plain = KeystoreSecureStore(context = context, fileName = FILE, keyProvider = provider)
+        plain.write("a", "secret")
+        plain.readAll()
+        val usesBefore = provider.uses
+
+        assertEquals(mapOf("a" to "secret"), cachingStore(provider).readAll())
+
+        assertEquals(usesBefore + 1, provider.uses)
+    }
+
+    /** A store with the cache off is never served from a caching store's cache. */
+    @Test
+    fun storeWithTheCacheOffIsNotServedFromTheSharedCache() {
+        val provider = CountingKeyProvider(key)
+        cachingStore(provider).write("a", "secret")
+        val usesBefore = provider.uses
+
+        KeystoreSecureStore(context = context, fileName = FILE, keyProvider = provider).readAll()
+
+        assertEquals(usesBefore + 1, provider.uses)
+    }
+
+    /** After a clear, the same ciphertext put back is opened again, so the cached copy was dropped. */
+    @Test
+    fun clearingDropsTheCachedPayload() {
+        val provider = CountingKeyProvider(key)
+        val subject = cachingStore(provider)
+        val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        val clears = listOf<() -> Unit>({ subject.clear() }, { subject.clearDurably() }, { subject.readAll() })
+        for (clear in clears) {
+            subject.write("a", "first")
+            val sealed = prefs.getString("payload", null)
+            prefs.edit().remove("payload").commit()
+            clear()
+            prefs.edit().putString("payload", sealed).commit()
+            val usesBefore = provider.uses
+
+            assertEquals(mapOf("a" to "first"), subject.readAll())
+
+            assertEquals(usesBefore + 1, provider.uses)
+        }
+    }
+
+    /** A full-length payload the cipher rejects fails on every read and is never cached as a value. */
+    @Test
+    fun rejectedPayloadIsNotCached() {
+        val subject = cachingStore(CountingKeyProvider(key))
+        subject.write("a", "first")
+        val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        val raw = Base64.decode(prefs.getString("payload", null), Base64.NO_WRAP)
+        raw[raw.size - 1] = (raw[raw.size - 1] + 1).toByte()
+        prefs.edit().putString("payload", Base64.encodeToString(raw, Base64.NO_WRAP)).commit()
+
+        assertThrows(GeneralSecurityException::class.java) { subject.readAll() }
+        assertThrows(GeneralSecurityException::class.java) { subject.readAll() }
+    }
+
+    /** A fresh read reaches the key even for a cached payload, so a broken key is noticed. */
+    @Test
+    fun freshReadOpensACachedPayloadAgain() {
+        store().write("a", "first")
+        val provider = CountingKeyProvider(key)
+        val subject = cachingStore(provider)
+        subject.readAll()
+
+        assertEquals(mapOf("a" to "first"), subject.readAll(fresh = true))
+        assertEquals(mapOf("a" to "first"), subject.readAll())
+
+        assertEquals(2, provider.uses)
+    }
+
     private companion object {
         const val FILE = "test.keystore.store"
         const val IV_BYTES = 12

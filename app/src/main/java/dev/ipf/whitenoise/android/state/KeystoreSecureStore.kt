@@ -7,6 +7,8 @@ import android.util.Base64
 import org.json.JSONObject
 import java.security.GeneralSecurityException
 import java.security.KeyStore
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -82,6 +84,18 @@ internal class AndroidKeystoreSecretKeyProvider(
  * removes the deterministic-key-encryption problem entirely. These stores hold
  * a handful of small values, so rewriting the blob per write is cheap.
  *
+ * Every read opens the blob through the Keystore, which is a round trip to
+ * secure hardware on a phone. A store read many times between writes passes
+ * `cacheReads` to reuse the last payload opened or sealed for its file and key
+ * provider, by this instance or another one, since callers build short-lived
+ * stores over one file. The cache is keyed by the stored ciphertext, so a
+ * payload written by anyone else is never served from it. It holds the
+ * decrypted map in process memory for the life of the process: a write
+ * replaces it and only a clear drops it. Leave it off for secrets that should
+ * not outlive the call that needed them. A cached read also does not prove the
+ * Keystore still works, so a caller that must fail closed on an unavailable
+ * key asks [readAll] for a fresh open.
+ *
  * Callers are expected to catch [GeneralSecurityException] and recover by
  * clearing the store, exactly as they did with the previous implementation.
  * Every operation honours that contract: the Keystore, Base64, and JSON layers
@@ -96,27 +110,44 @@ internal class KeystoreSecureStore(
     private val context: Context,
     private val fileName: String,
     private val keyProvider: SecureStoreKeyProvider,
+    private val cacheReads: Boolean = false,
 ) {
     private val lock = Any()
     private val prefs by lazy {
         context.applicationContext.getSharedPreferences(fileName, Context.MODE_PRIVATE)
     }
 
-    fun readAll(): Map<String, String> =
+    private val cacheKey = fileName to keyProvider
+
+    // The last payload opened or sealed for this file and key, and the map it decodes to.
+    private var opened: Pair<String, Map<String, String>>?
+        get() = if (cacheReads) OPENED[cacheKey] else null
+        set(value) {
+            if (!cacheReads) return
+            if (value == null) OPENED.remove(cacheKey) else OPENED[cacheKey] = value
+        }
+
+    /**
+     * Every stored value. [fresh] opens the payload through the Keystore even when it is cached, for
+     * callers that must notice a key that stopped working.
+     */
+    fun readAll(fresh: Boolean = false): Map<String, String> =
         asSecurityFailure {
             synchronized(lock) {
-                val sealed = prefs.getString(PAYLOAD_KEY, null) ?: return@asSecurityFailure emptyMap()
-                decrypt(sealed)
+                val sealed = prefs.getString(PAYLOAD_KEY, null)
+                if (sealed == null) opened = null
+                sealed?.let { if (fresh) decrypt(it) else open(it) } ?: emptyMap()
             }
         }
 
+    /** Sets or removes one value, merging with the stored payload, and writes only when it changed. */
     fun write(
         key: String,
         value: String?,
     ) {
         asSecurityFailure {
             synchronized(lock) {
-                val current = prefs.getString(PAYLOAD_KEY, null)?.let(::decrypt) ?: emptyMap()
+                val current = prefs.getString(PAYLOAD_KEY, null)?.let(::open) ?: emptyMap()
                 val updated = if (value == null) current - key else current + (key to value)
                 if (updated != current) {
                     prefs.edit().putString(PAYLOAD_KEY, encrypt(updated)).apply()
@@ -133,7 +164,7 @@ internal class KeystoreSecureStore(
     fun putAllDurably(values: Map<String, String>): Boolean =
         asSecurityFailure {
             synchronized(lock) {
-                val current = prefs.getString(PAYLOAD_KEY, null)?.let(::decrypt) ?: emptyMap()
+                val current = prefs.getString(PAYLOAD_KEY, null)?.let(::open) ?: emptyMap()
                 prefs.edit().putString(PAYLOAD_KEY, encrypt(current + values)).commit()
             }
         }
@@ -149,12 +180,20 @@ internal class KeystoreSecureStore(
             }
         }
 
+    /** Removes the stored payload and the cached copy of it. */
     fun clear() {
-        synchronized(lock) { prefs.edit().clear().apply() }
+        synchronized(lock) {
+            opened = null
+            prefs.edit().clear().apply()
+        }
     }
 
     /** Clears a workflow receipt before its owner starts a fresh attempt. */
-    fun clearDurably(): Boolean = synchronized(lock) { prefs.edit().clear().commit() }
+    fun clearDurably(): Boolean =
+        synchronized(lock) {
+            opened = null
+            prefs.edit().clear().commit()
+        }
 
     // Anything the Keystore/Base64/JSON layers raise becomes the one exception
     // type callers are documented to handle. Errors (OOM and friends) are not
@@ -171,15 +210,30 @@ internal class KeystoreSecureStore(
             throw GeneralSecurityException("secure store operation failed", error)
         }
 
+    /** Seals [values] and, for a caching store, remembers what opening the result will return. */
     private fun encrypt(values: Map<String, String>): String {
         val plaintext = JSONObject(values.toMap()).toString().toByteArray(Charsets.UTF_8)
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, keyProvider.secretKey())
         val iv = cipher.iv
         val ciphertext = cipher.doFinal(plaintext)
-        return Base64.encodeToString(iv + ciphertext, Base64.NO_WRAP)
+        val sealed = Base64.encodeToString(iv + ciphertext, Base64.NO_WRAP)
+        // Remember what opening these exact bytes yields, never the caller's map — the two differ
+        // for text that does not survive UTF-8, and the cache must match a real open.
+        if (cacheReads) opened = sealed to decode(plaintext)
+        return sealed
     }
 
+    /**
+     * The map sealed in [sealed]. A payload already opened or sealed for this file and key is
+     * returned without another Keystore round trip, and anything else is decrypted.
+     */
+    private fun open(sealed: String): Map<String, String> {
+        opened?.takeIf { it.first == sealed }?.let { return it.second }
+        return decrypt(sealed)
+    }
+
+    /** Opens [sealed] through the Keystore and, for a caching store, remembers the result. */
     private fun decrypt(sealed: String): Map<String, String> {
         val raw = Base64.decode(sealed, Base64.NO_WRAP)
         if (raw.size <= IV_BYTES) throw GeneralSecurityException("sealed payload is truncated")
@@ -189,16 +243,23 @@ internal class KeystoreSecureStore(
             keyProvider.secretKey(),
             GCMParameterSpec(GCM_TAG_BITS, raw, 0, IV_BYTES),
         )
-        val plaintext = cipher.doFinal(raw, IV_BYTES, raw.size - IV_BYTES)
+        val values = decode(cipher.doFinal(raw, IV_BYTES, raw.size - IV_BYTES))
+        opened = sealed to values
+        return values
+    }
+
+    /** Reads a decrypted payload. A caching store hands out a map callers cannot modify. */
+    private fun decode(plaintext: ByteArray): Map<String, String> {
         val json = JSONObject(String(plaintext, Charsets.UTF_8))
-        return json
-            .keys()
-            .asSequence()
-            .mapNotNull { key -> (json.opt(key) as? String)?.let { key to it } }
-            .toMap()
+        val values = json.keys().asSequence().mapNotNull { key -> (json.opt(key) as? String)?.let { key to it } }
+        return values.toMap().let { if (cacheReads) Collections.unmodifiableMap(it) else it }
     }
 
     companion object {
+        // Shared by every caching instance of one file and key provider. Each entry is the result of
+        // a real open or seal of exactly that ciphertext, so sharing it cannot serve another payload.
+        private val OPENED =
+            ConcurrentHashMap<Pair<String, SecureStoreKeyProvider>, Pair<String, Map<String, String>>>()
         private const val PAYLOAD_KEY = "payload"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val IV_BYTES = 12

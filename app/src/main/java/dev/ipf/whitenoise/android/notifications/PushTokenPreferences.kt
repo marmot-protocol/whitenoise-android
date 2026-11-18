@@ -28,6 +28,17 @@ internal class PushTokenPreferences(
             values().mapValues { decode(it.value) }
         }
 
+    /**
+     * Opens the payload through the Keystore even when it is cached. The recovery gate calls this
+     * before it reads the values, so an unavailable key fails there while ordinary reads are cached.
+     */
+    fun openFresh() {
+        read {
+            prepare()
+            store.readAll(fresh = true)
+        }
+    }
+
     override fun contains(key: String): Boolean =
         read {
             prepare()
