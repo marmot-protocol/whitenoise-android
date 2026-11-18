@@ -325,28 +325,6 @@ private fun Modifier.keepComposerSelectionVisibleDuringLayout(
         }
     }
 
-/** Deduplicates identical measure-time caret corrections; see the caller. */
-private class ComposerLayoutCaretCorrectionGate {
-    private var lastSelection: ComposerSelectionLayout? = null
-    private var lastViewport: Int = -1
-    private var lastMaxScroll: Int = -1
-
-    /** Allows a layout correction only when selection or viewport geometry differs from the last correction. */
-    fun shouldCorrect(
-        selection: ComposerSelectionLayout,
-        viewport: Int,
-        maxScroll: Int,
-    ): Boolean {
-        val changed = selection != lastSelection || viewport != lastViewport || maxScroll != lastMaxScroll
-        if (changed) {
-            lastSelection = selection
-            lastViewport = viewport
-            lastMaxScroll = maxScroll
-        }
-        return changed
-    }
-}
-
 private const val COMPOSER_PLACEHOLDER_FADE_MILLIS = 150
 
 /**
