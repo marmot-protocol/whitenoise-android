@@ -7195,6 +7195,11 @@
             <sha256 value="936ce541fc94945d8e9e027fa07fbf89588e03fe4e676e0b10617445da7a2578" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="io.github.takahirom.roborazzi" name="io.github.takahirom.roborazzi.gradle.plugin" version="1.79.0">
+         <artifact name="io.github.takahirom.roborazzi.gradle.plugin-1.79.0.pom">
+            <sha256 value="e6c7b278a9b1d5bc85cf0916eab9e5108e97dce508722c319b4a3d9a282e9ddd" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="io.github.takahirom.roborazzi" name="roborazzi-compose" version="1.76.0">
          <artifact name="roborazzi-compose-1.76.0.aar">
             <sha256 value="7f064c546264c830182de055d1c6517c68e71ea98248d3427878c3ef9d605530" origin="Independent official supplier audit" />
@@ -7215,6 +7220,17 @@
          </artifact>
          <artifact name="roborazzi-compose-1.77.0.pom">
             <sha256 value="6a81bad7e94472096b79334668debf50a1676cb7917affd5814ffd27214cbd53" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="io.github.takahirom.roborazzi" name="roborazzi-compose" version="1.79.0">
+         <artifact name="roborazzi-compose-1.79.0.aar">
+            <sha256 value="7f064c546264c830182de055d1c6517c68e71ea98248d3427878c3ef9d605530" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-compose-1.79.0.module">
+            <sha256 value="4f63584af088b779bb5da90fded4583119ad6f7d61e138f139cdea4b4f96d8de" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-compose-1.79.0.pom">
+            <sha256 value="a5c80be822226bfc63d1b43208263c9903fa04112428c22e824459951d3a055d" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="io.github.takahirom.roborazzi" name="roborazzi-core-android" version="1.76.0">
@@ -7239,6 +7255,17 @@
             <sha256 value="1b39e025246120ca101c02664033243936d9f36114c519bee249505a243c76c7" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="io.github.takahirom.roborazzi" name="roborazzi-core-android" version="1.79.0">
+         <artifact name="roborazzi-core-android-1.79.0.module">
+            <sha256 value="faf950594f22880a7773f5725e154dd2c2131526e3c01ebcfcab2980d12d94cc" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-core-android-1.79.0.pom">
+            <sha256 value="8d96fb58428705d965a1b931dcd46a94b9550790c073046ff676d6029e70507b" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-core.aar">
+            <sha256 value="5dbc095dbd41775c378b7044db9ed89aac28576de1f58e9d5dc97c9109605e5c" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="io.github.takahirom.roborazzi" name="roborazzi-core-jvm" version="1.76.0">
          <artifact name="roborazzi-core-jvm-1.76.0.module">
             <sha256 value="80dde9bbf9e733e3b713c3263b915578dac4553037b759a192d0aabeda1d6ec0" origin="Independent official supplier audit" />
@@ -7261,6 +7288,17 @@
             <sha256 value="e170b49c1a56ce47efd4f471b1dbd7e7443be1b9509abf95636c073b76312cf3" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="io.github.takahirom.roborazzi" name="roborazzi-core-jvm" version="1.79.0">
+         <artifact name="roborazzi-core-jvm-1.79.0.module">
+            <sha256 value="ceb435351af9e65459a1fcd9c0d6223e7a4a6561b4f2f08909ed667efaea4d25" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-core-jvm-1.79.0.pom">
+            <sha256 value="c6b2553108d9631e4441b33b4cdc339eacf2133982bff518f77a46a24c514aa7" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-core-jvm.jar">
+            <sha256 value="90a39cf83d59d5199ee9fd8da6329693b2b1e7294c251c59586e9bfae763fee3" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="io.github.takahirom.roborazzi" name="roborazzi-core" version="1.76.0">
          <artifact name="roborazzi-core-1.76.0.module">
             <sha256 value="c0467838547080af4c9267520800bbcc1c0e07b26b792c6d980783d4e2033e8f" origin="Independent official supplier audit" />
@@ -7275,6 +7313,14 @@
          </artifact>
          <artifact name="roborazzi-core-1.77.0.pom">
             <sha256 value="d6ea5a01c6147cafd2e43e68fc6664a959cd5bca90380198e5b90d739e28c4ed" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="io.github.takahirom.roborazzi" name="roborazzi-core" version="1.79.0">
+         <artifact name="roborazzi-core-1.79.0.module">
+            <sha256 value="c7d8abafac90572a251d0f29711e7854e3cf7082fdce333d350ec382bf97e9fe" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-core-1.79.0.pom">
+            <sha256 value="06a07f04d7cc69ecd908e9a5c1a5a3d9d318abcee205b97a089f410b4e3ac1bf" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="io.github.takahirom.roborazzi" name="roborazzi-gradle-plugin" version="1.76.0">
@@ -7299,6 +7345,17 @@
             <sha256 value="1b4be6f2897d07c1805e4ff71c75f250eefc749a9a0218cff242f880e47fe163" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="io.github.takahirom.roborazzi" name="roborazzi-gradle-plugin" version="1.79.0">
+         <artifact name="roborazzi-gradle-plugin-1.79.0.jar">
+            <sha256 value="157894bfbc949966affc5a304fc95ebd0f0a52f3798b406873c10e99c2cfdf2a" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-gradle-plugin-1.79.0.module">
+            <sha256 value="487280174754b2de66acfec8b2ad6fa586894420f16de10ba7a4e37beace10ed" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-gradle-plugin-1.79.0.pom">
+            <sha256 value="00ff6ad4ff1eccd3114dd455526c13307471f2043d3f0df2ceb99eb379774ff3" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="io.github.takahirom.roborazzi" name="roborazzi-junit-rule" version="1.76.0">
          <artifact name="roborazzi-junit-rule-1.76.0.aar">
             <sha256 value="186b9feda0b9afe1339f12a3ea87132f7e62063b6fc94fe38914121e64ff7c7e" origin="Independent official supplier audit" />
@@ -7319,6 +7376,17 @@
          </artifact>
          <artifact name="roborazzi-junit-rule-1.77.0.pom">
             <sha256 value="8237d358b35934cc50814ca78adcae39b84083e4f13e13082ed266ce7b4d6c82" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="io.github.takahirom.roborazzi" name="roborazzi-junit-rule" version="1.79.0">
+         <artifact name="roborazzi-junit-rule-1.79.0.aar">
+            <sha256 value="186b9feda0b9afe1339f12a3ea87132f7e62063b6fc94fe38914121e64ff7c7e" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-junit-rule-1.79.0.module">
+            <sha256 value="059bd5600d395692183f2d63dbd9b9da5995b765c85a1e017b4f306b1033e0d0" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-junit-rule-1.79.0.pom">
+            <sha256 value="af9ac6c6d036eadd77c025f967ca8f5ece6feb76d3f125a0e29f25d96beedf66" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="io.github.takahirom.roborazzi" name="roborazzi-painter-jvm" version="1.76.0">
@@ -7343,6 +7411,17 @@
             <sha256 value="67e330e939575d4d8d8fca173317f258368cae43ed8101cc1d442a3c308d1b8f" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="io.github.takahirom.roborazzi" name="roborazzi-painter-jvm" version="1.79.0">
+         <artifact name="roborazzi-painter-jvm-1.79.0.module">
+            <sha256 value="9e09f360174cc798f3af4948fa42f4938ce87a552f9e72b2f37dcb5e668176a2" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-painter-jvm-1.79.0.pom">
+            <sha256 value="b29b7e3e849bf20d9da3f876b3d2cf3714747e3b7103eca17aad9df1c7969ad2" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-painter-jvm.jar">
+            <sha256 value="f2c35e57406db6a39be6f444e6ad362a6d8f1fad5044917164e8d840b104c8c8" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="io.github.takahirom.roborazzi" name="roborazzi-painter" version="1.76.0">
          <artifact name="roborazzi-painter-1.76.0.module">
             <sha256 value="906a6d339f1f11b44dac51b42f2b0e78e3bfc40c7e3c8c9a38d102121f398193" origin="Independent official supplier audit" />
@@ -7357,6 +7436,14 @@
          </artifact>
          <artifact name="roborazzi-painter-1.77.0.pom">
             <sha256 value="9117b61434c7d5c496259f4ee4013ed7aa449646a8ac94f04d79a5b6e678c5b3" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="io.github.takahirom.roborazzi" name="roborazzi-painter" version="1.79.0">
+         <artifact name="roborazzi-painter-1.79.0.module">
+            <sha256 value="1af5d9c4740708695e1e78eacef1e3a370e962a071b553a73b2d4cc6e2509a6c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-painter-1.79.0.pom">
+            <sha256 value="33aac4365d80651396032648e417bdbbda0a68bd3c46508aec0aa5d9c3ff6820" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="io.github.takahirom.roborazzi" name="roborazzi" version="1.76.0">
@@ -7379,6 +7466,17 @@
          </artifact>
          <artifact name="roborazzi-1.77.0.pom">
             <sha256 value="edcf2e52901e22c7a1bb65dd666b873c81257c6fa77fb847640a8442800dc838" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="io.github.takahirom.roborazzi" name="roborazzi" version="1.79.0">
+         <artifact name="roborazzi-1.79.0.aar">
+            <sha256 value="ec2b78c569be974ab46bd6dc976ff98015b3558da2ccb170f79f3e1d92492927" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-1.79.0.module">
+            <sha256 value="c8400a1a46d8a62935ff3c8a9865d1b9b03c40ad0e834cdc74754a3aa9693ac9" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="roborazzi-1.79.0.pom">
+            <sha256 value="1ea127a902bd5887b9e7152c373339a3b4b1cbd338c255c20cd0cadcb6f10bd3" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="io.netty" name="netty-bom" version="4.2.19.Final">
