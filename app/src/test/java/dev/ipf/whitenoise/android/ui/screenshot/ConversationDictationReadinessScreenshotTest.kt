@@ -334,11 +334,12 @@ class ConversationDictationReadinessScreenshotTest {
             darkTheme = darkTheme,
             fontScale = fontScale,
             rtl = rtl,
-            state = ConversationDictationState.Failed(
-                initial.sessionId,
-                initial.target,
-                ConversationDictationFailure.MicrophoneMuted,
-            ),
+            state =
+                ConversationDictationState.Failed(
+                    initial.sessionId,
+                    initial.target,
+                    ConversationDictationFailure.MicrophoneMuted,
+                ),
         )
     }
 
