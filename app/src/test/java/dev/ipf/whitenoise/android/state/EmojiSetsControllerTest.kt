@@ -299,7 +299,7 @@ class EmojiSetsControllerTest {
             assertEquals(listOf(backend.set), controller.state.sets)
         }
 
-    /** An incomplete or failed opening sync reports itself only when no preview is open. */
+    /** An incomplete or failed opening sync reports itself in the list, after any open preview closes. */
     @Test
     fun backgroundSyncNoticeNeverCoversAPreview() =
         runTest {
@@ -315,6 +315,8 @@ class EmojiSetsControllerTest {
                     assertFalse(controller.discoverInBackground())
                     assertEquals(if (previewOpen) null else notice, controller.state.notice)
                     assertFalse(controller.state.discovering)
+                    if (previewOpen) controller.dismissPreview()
+                    assertEquals(notice, controller.state.notice)
                 }
             }
         }

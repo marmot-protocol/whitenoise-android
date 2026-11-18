@@ -140,6 +140,9 @@ internal class EmojiSetsController(
     private var search: String? = null
     private var reads = 0
 
+    /** The opening sync's notice, held while a preview or an operation covers the list. */
+    private var heldSyncNotice: EmojiSetNotice? = null
+
     /** Loads the existing projection without contacting relays or image hosts. */
     suspend fun load() = operate { refresh() }
 
@@ -147,6 +150,7 @@ internal class EmojiSetsController(
     suspend fun discover(search: String) {
         if (state.discovering) return
         operate {
+            heldSyncNotice = null
             val query = search.trim().ifBlank { null }
             val complete = backend.discover(query)
             this.search = query
@@ -157,12 +161,13 @@ internal class EmojiSetsController(
 
     /**
      * Syncs the unfiltered listing without locking the rows, then rereads the projection. True when every relay
-     * answered. Starting it clears the opening read's notice, and its own notice never covers an open preview or a
-     * running operation.
+     * answered. Starting it clears the opening read's notice. Its own notice waits until no preview or operation
+     * covers the list and never replaces a notice already shown there.
      */
     @Suppress("TooGenericExceptionCaught") // Failure only leaves the local projection, which Refresh retries.
     suspend fun discoverInBackground(): Boolean {
         if (closed || state.busy || state.discovering) return false
+        heldSyncNotice = null
         state = state.copy(discovering = true, notice = null)
         var notice: EmojiSetNotice? = null
         return try {
@@ -177,7 +182,8 @@ internal class EmojiSetsController(
             false
         } finally {
             state = state.copy(discovering = false)
-            if (notice != null && state.preview == null && !state.busy) state = state.copy(notice = notice)
+            heldSyncNotice = notice
+            releaseHeldSyncNotice()
         }
     }
 
@@ -195,7 +201,9 @@ internal class EmojiSetsController(
 
     /** Leaves the set preview without discarding the list. */
     fun dismissPreview() {
-        if (!state.busy) state = state.copy(preview = null, artwork = null, notice = null, installedWithSkips = null)
+        if (state.busy) return
+        state = state.copy(preview = null, artwork = null, notice = null, installedWithSkips = null)
+        releaseHeldSyncNotice()
     }
 
     /** Downloads one explicit preview through MDK's hardened image fetch. */
@@ -321,7 +329,15 @@ internal class EmojiSetsController(
             state = state.copy(notice = EmojiSetNotice.Error)
         } finally {
             state = state.copy(busy = false)
+            releaseHeldSyncNotice()
         }
+    }
+
+    /** Shows the held sync notice once the list is visible, unless another notice already reports there. */
+    private fun releaseHeldSyncNotice() {
+        if (state.preview != null || state.busy) return
+        if (state.notice == null) state = state.copy(notice = heldSyncNotice)
+        heldSyncNotice = null
     }
 
     /** Never retries the install with a different version without a second user decision. */
