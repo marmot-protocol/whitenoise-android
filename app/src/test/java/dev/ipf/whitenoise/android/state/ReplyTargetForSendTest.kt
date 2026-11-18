@@ -19,6 +19,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -63,6 +64,29 @@ class ReplyTargetForSendTest {
             controller.replyingTo = record(PENDING_ID)
             controller.timeline = listOf(localSend(record(MESSAGE_ID), MessageStatus.Sent))
 
+            controller.send("Reply")
+
+            val (_, args) = recorder.calls.single { it.first == "replyToMessageWithClientToken" }
+            assertEquals(listOf(TARGET_REF, GROUP_ID, MESSAGE_ID, "Reply"), args.take(4))
+        }
+
+    /**
+     * A text MDK accepted before its row was projected still shows the client token on that row. The reply
+     * takes the event id from the acceptance map, and polls and stickers are offered for it.
+     */
+    @Test
+    fun replyToATextAcceptedBeforeProjectionPublishesItsEventId() =
+        runTest {
+            val recorder =
+                NativeRecorder("replyToMessageWithClientToken") { args ->
+                    LocalSendAcceptanceFfi(clientToken = args[4] as String, messageIdHex = REPLY_ID)
+                }
+            val controller = controller(appState(recorder.engine), customEmojiReader = { emptyList() })
+            controller.timeline = listOf(localSend(record(PENDING_ID), MessageStatus.Pending))
+            controller.acceptedPendingTextOptimisticIds[MESSAGE_ID] = PENDING_ID
+            controller.replyingTo = record(PENDING_ID)
+
+            assertTrue(controller.replyAllowsTaggedSend())
             controller.send("Reply")
 
             val (_, args) = recorder.calls.single { it.first == "replyToMessageWithClientToken" }
