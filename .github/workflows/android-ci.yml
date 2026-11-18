@@ -7,7 +7,8 @@ name: Android CI
 # credentials.
 #
 # Scope: compile + unit tests + ktlint + detekt + Android lint. APK build artifacts are a
-# separate workflow (see issue #247).
+# separate workflow (see issue #247). Merge groups and full-matrix pull requests also
+# build both shipping R8 variants, unsigned, and fail on their post-R8 DEX method budgets.
 #
 # Activated queue mode uses compile/style/security PR prechecks and full
 # integration suites. Unset/unknown modes preserve prior PR validation.
@@ -362,8 +363,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Drafts keep compile/ktlint/detekt and defer release packaging.
-        phase: ${{ fromJSON(((github.event.pull_request.draft && needs.changes.outputs.full_matrix != 'true') || needs.changes.outputs.precheck == 'true') && '["tooling"]' || '["tooling", "baseline"]') }}
+        # Drafts keep compile/ktlint/detekt and defer release packaging. The shipping R8
+        # phases run only where a merge is decided: every merge group and full-matrix pull
+        # requests. Master, nightly and dispatch runs leave them to release-runtime.
+        phase: ${{ fromJSON(((github.event.pull_request.draft && needs.changes.outputs.full_matrix != 'true') || needs.changes.outputs.precheck == 'true') && '["tooling"]' || ((github.event_name == 'merge_group' || (github.event_name == 'pull_request' && needs.changes.outputs.full_matrix == 'true')) && '["tooling", "baseline", "productionZapstoreRelease", "stagingZapstoreRelease"]' || '["tooling", "baseline"]')) }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -474,8 +477,8 @@ jobs:
           printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
 
       # benchmarkRelease is unminified D8 output. Its budget warns when a benchmarked
-      # method reaches ART's compile limit but never blocks merges; the shipping R8
-      # budgets fail in the release-runtime lanes.
+      # method reaches ART's compile limit but never blocks merges, the shipping R8
+      # budgets below do.
       - name: Check benchmark DEX method budget
         id: dex_budget_benchmark
         if: matrix.phase == 'baseline'
@@ -503,6 +506,70 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: dex-method-budget-benchmark
+          path: app/build/reports/dex-method-budget/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Release-runtime also budgets these variants but is neither required nor run on
+      # Kotlin-only pull requests, so an over-budget method could merge (#3828). Each
+      # shipping phase builds one R8 variant and fails this required check on a violation.
+      # Signing never changes the DEX, and the unsigned path also skips production's
+      # Firebase resource check. One ABI suffices because every ABI ships the same DEX.
+      - name: Assemble shipping R8 APK for the DEX method budget
+        if: endsWith(matrix.phase, 'ZapstoreRelease')
+        env:
+          WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
+          SHIPPING_VARIANT: ${{ matrix.phase }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          task="${SHIPPING_VARIANT^}"
+          ./gradlew ":app:assemble$task" -x ":app:lintVital$task" \
+            -Pandroid.injected.build.abi=x86_64 \
+            --build-cache --profile --no-daemon --stacktrace
+
+      - name: Locate shipping R8 APK
+        id: shipping_apk
+        if: endsWith(matrix.phase, 'ZapstoreRelease')
+        env:
+          SHIPPING_VARIANT: ${{ matrix.phase }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          flavor="${SHIPPING_VARIANT%Release}"
+          mapfile -t matches < <(
+            for apk_dir in "app/build/outputs/apk/$flavor/release" "app/build/intermediates/apk/$flavor/release"; do
+              [[ -d "$apk_dir" ]] || continue
+              find "$apk_dir" -maxdepth 1 -type f -name '*x86_64*release*.apk'
+            done | sort
+          )
+          if [[ ${#matches[@]} -ne 1 ]]; then
+            printf 'Expected one x86_64 %s APK, found %d\n' "$SHIPPING_VARIANT" "${#matches[@]}" >&2
+            printf '%s\n' "${matches[@]}" >&2
+            exit 1
+          fi
+          printf 'path=%s\n' "${matches[0]}" >> "$GITHUB_OUTPUT"
+
+      # Never continue on error: a violation or an input error fails the required check.
+      - name: Enforce shipping post-R8 DEX method budget
+        if: endsWith(matrix.phase, 'ZapstoreRelease')
+        env:
+          DEX_BUDGET_APK_PATH: ${{ steps.shipping_apk.outputs.path }}
+          DEX_BUDGET_VARIANT: ${{ matrix.phase }}
+          DEX_BUDGET_SOURCE_SHA: ${{ github.sha }}
+        run: >-
+          python3 scripts/dex_method_budget.py
+          --apk "$DEX_BUDGET_APK_PATH"
+          --mapping "app/build/outputs/mapping/$DEX_BUDGET_VARIANT/mapping.txt"
+          --variant "$DEX_BUDGET_VARIANT"
+          --source-sha "$DEX_BUDGET_SOURCE_SHA"
+          --report-dir app/build/reports/dex-method-budget
+
+      - name: Upload shipping DEX method report
+        if: ${{ always() && endsWith(matrix.phase, 'ZapstoreRelease') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dex-method-budget-${{ matrix.phase }}
           path: app/build/reports/dex-method-budget/
           if-no-files-found: ignore
           retention-days: 7
