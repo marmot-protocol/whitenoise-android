@@ -425,6 +425,7 @@ class ConversationUnreadBadgeTest {
             id = "msg:$id",
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = id,
                     direction = direction,
                     groupIdHex = "group",

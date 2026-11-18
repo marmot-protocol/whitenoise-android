@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppQuestionHosts.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "App-level question before overriding a refused group change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppQuestionHosts.kt",
+        "anchor": "GroupChangeConfirmationDialog(groupChangeQuestion, appState)",
+        "test_ids": [
+          "GRP-032",
+          "GRP-034"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "AppQuestionHosts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppQuestionHosts.kt",
+        "anchor": "fun AppQuestionHosts(",
+        "test_ids": [
+          "SET-060"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

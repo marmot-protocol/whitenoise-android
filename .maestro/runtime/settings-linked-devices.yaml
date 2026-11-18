@@ -1,0 +1,39 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: settings-linked-devices
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
+- tapOn: "Linked devices"
+- assertVisible:
+    id: "linked_devices.list"
+- assertVisible: "This device"
+- assertVisible: "No other devices are linked."
+- assertVisible:
+    id: "linked_devices.link_this_device"
+- tapOn:
+    below: "This device"
+    text: "White Noise Android.*"
+- assertVisible:
+    id: "device_detail.list"
+- tapOn:
+    id: "device_detail.rename"
+- assertVisible:
+    id: "device_detail.rename.field"
+- assertVisible:
+    id: "device_detail.rename.save"
+- back
+- assertVisible:
+    id: "device_detail.list"
+- back
+- assertVisible:
+    id: "linked_devices.list"
+- back
+- assertVisible:
+    id: "settings.account.group"
+- back
+- assertVisible: "Settings"

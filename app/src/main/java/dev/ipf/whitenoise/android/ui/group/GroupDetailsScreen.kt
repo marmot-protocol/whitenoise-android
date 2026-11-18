@@ -106,7 +106,6 @@ import dev.ipf.whitenoise.android.state.inviteProfileToGroups
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.profileAddableGroupsState
-import dev.ipf.whitenoise.android.state.refreshManagementState
 import dev.ipf.whitenoise.android.state.removeMember
 import dev.ipf.whitenoise.android.state.setConversationVibrationPattern
 import dev.ipf.whitenoise.android.state.stepDownAsAdmin
@@ -2593,44 +2592,6 @@ private fun PushTokenDebugRows(
         updatedAtText,
         copyValue = updatedAtText,
     )
-}
-
-private enum class GroupMutationAction {
-    SaveProfile,
-    InviteMember,
-    RemoveMember,
-    PromoteAdmin,
-    DemoteAdmin,
-    SelfDemoteAdmin,
-    TransferAdmin,
-    DisappearingMessages,
-    Archive,
-    Delete,
-    Reset,
-    Leave,
-    CancelLeave,
-    EnableDisbanding,
-    EnableAccountDevices,
-    Disband,
-}
-
-private data class ActiveGroupMutation(
-    val action: GroupMutationAction,
-    val target: String? = null,
-)
-
-/** Visible details follow settled membership as well as metadata, without polling equal native records. */
-@Suppress("FunctionNaming") // Compose effect follows the same naming convention as other composables.
-@Composable
-internal fun GroupManagementSnapshotRefreshEffect(controller: ConversationController) {
-    LaunchedEffect(
-        controller,
-        controller.group,
-        controller.members,
-        controller.memberRosterState,
-    ) {
-        controller.refreshManagementState()
-    }
 }
 
 /** Each opening, including equal singleton actions, gets a fresh one-use presentation identity. */

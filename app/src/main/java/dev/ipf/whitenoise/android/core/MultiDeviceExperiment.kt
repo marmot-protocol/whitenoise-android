@@ -3,11 +3,11 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.marmotkit.MarmotKitException
 
 /**
- * Compile-time switch for linked devices. It is a literal so that only a source change can turn the feature on,
- * never a Gradle property, environment variable, intent, deep link or preference. While it is false the runtime
- * opens through MDK's ordinary constructor and every linked-device entry point stays out of the app.
+ * Compile-time switch for linked devices. It is a literal so that only a source change can alter it, never a Gradle
+ * property, environment variable, intent, deep link or preference. It is on because MDK now opens every runtime
+ * with device groups: a build without these screens could not answer a link request its own account receives.
  */
-internal const val MULTI_DEVICE_EXPERIMENT = false
+internal const val MULTI_DEVICE_EXPERIMENT = true
 
 /**
  * Whether linked-device entry points are part of this build. Every screen, row and prompt for the feature asks

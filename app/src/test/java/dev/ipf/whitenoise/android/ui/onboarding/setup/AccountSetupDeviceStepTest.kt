@@ -78,12 +78,11 @@ class AccountSetupDeviceStepTest {
         composeRule.onAllNodesWithText(UNCHECKED_NOTE).assertCountEquals(1)
     }
 
-    /** On the routine step, found keys are stated once and explained as a separate installation with its own chats. */
+    /** On the routine step, found keys are stated once and explained as a device that can be linked after sign-in. */
     @Test fun foundKeysAreStatedOnceOnTheRoutineStep() {
         show(AccountSetupState(snapshot = foundSignInsSnapshot()))
         composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(1)
-        composeRule.onNodeWithText(SEPARATE_CHATS_HELP).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(EITHER_APP_HELP).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(LINK_NEXT_HELP).performScrollTo().assertIsDisplayed()
     }
 
     /** When the step shows its native finding, the notice does not repeat the same sentence. */
@@ -144,7 +143,8 @@ class AccountSetupDeviceStepTest {
             "We found messaging keys this account published from another app or device, most recently on"
         const val SEPARATE_CHATS_HELP =
             "This device will have its own separate chats. Chats in the other app stay there and won’t appear here."
-        const val EITHER_APP_HELP = "When someone starts a new chat with you, it may arrive in either app."
+        const val LINK_NEXT_HELP =
+            "After you sign in, you can link this device to your other devices and see the same chats here."
         const val IF_OTHER_APP_HELP =
             "If you use another app for messaging, this device will have its own separate chats, " +
                 "and chats in that app won’t appear here."

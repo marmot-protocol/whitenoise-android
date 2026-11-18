@@ -263,6 +263,7 @@ class MediaInventoryTest {
         body: MarkdownDocumentFfi = text(""),
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "incoming",
             groupIdHex = "group",

@@ -108,16 +108,6 @@ private suspend fun WhiteNoiseAppState.scheduleIncomingAttachmentDownloads(updat
 }
 
 /**
- * Whether a new-message [update] may carry attachments this device still has to fetch. Without linked devices a
- * self update is this installation's own send, whose media is already local. With them it can be the account's
- * message from another device, which arrives here like any received message.
- */
-internal fun needsIncomingAttachmentDownload(
-    update: NotificationUpdateFfi,
-    linkedDevices: Boolean,
-): Boolean = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && (!update.isFromSelf || linkedDevices)
-
-/**
  * The receipt scheduling both receipt sources share, for one received message of [accountRef]'s group
  * [groupIdHex]: a bounded authoritative lookup of its attachments, each queued under its own type's policy.
  */
@@ -1298,18 +1288,7 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                     while (event != null) {
                         backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                         handleNotificationContentEvent(event, readReconciliations, scope = this)
-                        // MDK drops an oversized queued group change without retrying it, so the user is told.
-                        queuedSizeRefusal(event)?.let { refusal ->
-                            launch(Dispatchers.Main) { presentQueuedSizeRefusal(refusal) }
-                        }
-                        // A chat MDK could not return to its latest state needs a full restart to retry.
-                        rewindRestoreFailure(event)?.let { failure ->
-                            launch(Dispatchers.Main) { presentRewindRestoreFailure(failure) }
-                        }
-                        // Another of the account's devices removed this one: MDK has signed the account out here.
-                        deviceUnlinkedAccount(event)?.let { account ->
-                            launch(Dispatchers.Main) { presentDeviceUnlinked(account) }
-                        }
+                        presentEventNotices(event, scope = this)
                         val received = (event as? MarmotEventFfi.MessageReceived)?.received
                         // Only the cheap kind and sender check runs here; the suppression reads run with the
                         // lookup, as a child of this loop, so they never delay the next event.

@@ -661,6 +661,7 @@ class GroupSystemEventsTest {
         plaintext: String,
         direction: String,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "message",
         direction = direction,
         groupIdHex = "group",

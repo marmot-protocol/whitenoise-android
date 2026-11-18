@@ -2085,6 +2085,7 @@
     <string name="setup_device_unknown">Nous n’avons pas pu déterminer si une autre installation existe. Continuez uniquement si vous souhaitez utiliser cet appareil.</string>
     <string name="setup_profile_publish_help">Enregistrez ce profil dans votre compte Nostr.</string>
     <string name="setup_replacement_warning">Les recommandations conservent toutes les entrées de relais existantes, même celles qui ne sont pas affichées ici. Une liste personnalisée supprime les relais omis. Les changements affectent aussi vos autres applications Nostr.</string>
+    <string name="setup_repair_inconclusive_warning">Certaines sources n\'ont pas répondu à cette vérification. Une liste plus récente, que cet appareil n\'a pas pu voir, existe peut-être, et vos relais actuels fonctionnent peut-être encore dans d\'autres applications. N\'enregistrez que si vous acceptez ce risque.</string>
     <string name="setup_inbox_list">Relais de réception</string>
     <string name="setup_read_list">Relais de lecture</string>
     <string name="setup_write_list">Relais d’écriture</string>
@@ -2113,6 +2114,7 @@
     <string name="setup_action_continue_without">Pas maintenant</string>
     <string name="setup_action_use_recommended_relays">Corriger la configuration des relais</string>
     <string name="setup_action_edit_relays">Vérifier les relais</string>
+    <string name="setup_action_remove_unusable_relays">Retirer les relais inutilisables</string>
     <string name="setup_action_edit_profile">Modifier le profil</string>
     <string name="setup_action_edit_follows">Modifier les abonnements</string>
     <string name="setup_action_approve_repair">Enregistrer les modifications</string>

@@ -38,10 +38,10 @@ class MultiDeviceExperimentTest {
         )
     }
 
-    /** Master builds compile the feature off. */
+    /** Builds ship linked devices, matching the device groups MDK opens every runtime with. */
     @Test
-    fun theSwitchIsOff() {
-        assertFalse(MULTI_DEVICE_EXPERIMENT)
+    fun theSwitchIsOn() {
+        assertTrue(MULTI_DEVICE_EXPERIMENT)
     }
 
     /** The switch is a source literal, so no build input can stand behind the constant. */
@@ -50,7 +50,7 @@ class MultiDeviceExperimentTest {
         val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/core/MultiDeviceExperiment.kt")
         val declarations = source.lines().filter { it.contains("MULTI_DEVICE_EXPERIMENT =") }
 
-        assertEquals(listOf("internal const val MULTI_DEVICE_EXPERIMENT = false"), declarations)
+        assertEquals(listOf("internal const val MULTI_DEVICE_EXPERIMENT = true"), declarations)
     }
 
     /** Neither the Gradle build nor the manifest names the switch, so no property, intent or deep link reaches it. */

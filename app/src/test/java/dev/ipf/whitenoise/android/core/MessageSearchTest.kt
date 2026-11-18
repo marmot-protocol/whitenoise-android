@@ -101,6 +101,7 @@ class MessageSearchTest {
         tags: List<MessageTagFfi> = emptyList(),
         at: UInt = 1u,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = id,
         direction = direction,
         groupIdHex = "group",

@@ -2097,6 +2097,7 @@
     <string name="setup_device_unknown">Es konnte nicht festgestellt werden, ob eine weitere Installation existiert. Fahre nur fort, wenn du dieses Gerät verwenden möchtest.</string>
     <string name="setup_profile_publish_help">Speichere dieses Profil in deinem Nostr-Konto.</string>
     <string name="setup_replacement_warning">Empfehlungen behalten alle vorhandenen Relay-Einträge bei, auch die hier nicht angezeigten. Eine eigene Liste entfernt ausgelassene Relays. Änderungen betreffen auch deine anderen Nostr-Apps.</string>
+    <string name="setup_repair_inconclusive_warning">Einige Quellen haben bei dieser Prüfung nicht geantwortet. Es könnte eine neuere Liste geben, die dieses Gerät nicht sehen konnte, und deine aktuellen Relays funktionieren in anderen Apps vielleicht weiterhin. Speichere nur, wenn du dieses Risiko akzeptierst.</string>
     <string name="setup_inbox_list">Posteingangs-Relays</string>
     <string name="setup_read_list">Lese-Relays</string>
     <string name="setup_write_list">Schreib-Relays</string>
@@ -2125,6 +2126,7 @@
     <string name="setup_action_continue_without">Nicht jetzt</string>
     <string name="setup_action_use_recommended_relays">Relay-Einrichtung korrigieren</string>
     <string name="setup_action_edit_relays">Relays prüfen</string>
+    <string name="setup_action_remove_unusable_relays">Nicht nutzbare Relays entfernen</string>
     <string name="setup_action_edit_profile">Profil bearbeiten</string>
     <string name="setup_action_edit_follows">Kontaktliste bearbeiten</string>
     <string name="setup_action_approve_repair">Änderungen speichern</string>

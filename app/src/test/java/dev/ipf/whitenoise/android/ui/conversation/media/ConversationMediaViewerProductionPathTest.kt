@@ -564,6 +564,7 @@ class ConversationMediaViewerProductionPathTest {
             id = "msg:$messageIdHex",
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = messageIdHex,
                     direction = "received",
                     groupIdHex = GROUP_ID,

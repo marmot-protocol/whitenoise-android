@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayCapabilityFfi
+import dev.ipf.marmotkit.OnboardingRelayRemovalReasonFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
 import dev.ipf.marmotkit.OnboardingRelayTagChangeFfi
 import dev.ipf.marmotkit.OnboardingRelayTagDispositionFfi
@@ -147,6 +148,7 @@ class AccountSetupContentScreenshotTest {
                         tag.endpoint,
                         tag.role,
                         OnboardingRelayCapabilityFfi.NONE,
+                        OnboardingRelayRemovalReasonFfi.NONE,
                     )
                 }
         }
@@ -519,6 +521,7 @@ class AccountSetupContentScreenshotTest {
                                 read.endpoint,
                                 read.role,
                                 OnboardingRelayCapabilityFfi.NONE,
+                                OnboardingRelayRemovalReasonFfi.NONE,
                             ),
                             OnboardingRelayTagChangeFfi(
                                 OnboardingRelayTagDispositionFfi.REMOVED,
@@ -528,6 +531,7 @@ class AccountSetupContentScreenshotTest {
                                 old.endpoint,
                                 old.role,
                                 OnboardingRelayCapabilityFfi.NONE,
+                                OnboardingRelayRemovalReasonFfi.NONE,
                             ),
                             OnboardingRelayTagChangeFfi(
                                 OnboardingRelayTagDispositionFfi.ADDED,
@@ -537,6 +541,7 @@ class AccountSetupContentScreenshotTest {
                                 added.endpoint,
                                 added.role,
                                 OnboardingRelayCapabilityFfi.WRITE,
+                                OnboardingRelayRemovalReasonFfi.NONE,
                             ),
                         ),
                 )

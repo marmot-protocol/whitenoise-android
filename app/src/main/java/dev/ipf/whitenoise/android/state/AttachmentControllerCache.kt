@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.isSentFromThisDevice
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -102,7 +102,7 @@ internal fun ConversationController.nativeAttachmentSourceId(messageIdHex: Strin
  * installation sent can be awaiting delivery; the account's rows from another device or imported history cannot.
  */
 internal fun ConversationController.awaitingDelivery(item: TimelineMessage): Boolean =
-    MessageProjector.isSentFromThisDevice(item.record) &&
+    item.record.isSentFromThisDevice() &&
         item.projected?.sourceMessageIdHex == null &&
         item.projected?.recipientConfirmed != true &&
         timelineRecords[item.record.messageIdHex]?.sourceMessageIdHex == null &&

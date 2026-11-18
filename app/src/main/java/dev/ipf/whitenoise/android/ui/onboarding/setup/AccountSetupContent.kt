@@ -381,8 +381,11 @@ private fun SetupProposalContent(
             EmojiLabel(profile.about.orEmpty())
         }
     } else if (proposal.relayRepair != null) {
+        // MDK built this on a check some source never answered, so approving it is the user's informed risk.
+        if (proposal.inconclusive) SetupNotice(stringResource(R.string.setup_repair_inconclusive_warning))
         SetupRelayRepairContent(checkNotNull(proposal.relayRepair), findings)
     } else {
+        if (proposal.inconclusive) SetupNotice(stringResource(R.string.setup_repair_inconclusive_warning))
         if (proposal.previousEventId != null) SetupNotice(stringResource(R.string.setup_replacement_warning))
         val listTitle =
             if (proposal.step == OnboardingStepFfi.INBOX_RELAYS) {

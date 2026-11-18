@@ -2078,6 +2078,7 @@
     <string name="setup_device_unknown">Başka bir kurulum olup olmadığını belirleyemedik. Yalnızca bu cihazı kullanmak istiyorsanız devam edin.</string>
     <string name="setup_profile_publish_help">Bu profili Nostr hesabınıza kaydedin.</string>
     <string name="setup_replacement_warning">Öneriler, burada gösterilmeyenler dahil mevcut tüm aktarıcı kayıtlarını korur. Özel bir liste, dışarıda bırakılan aktarıcıları kaldırır. Değişiklikler diğer Nostr uygulamalarınızı da etkiler.</string>
+    <string name="setup_repair_inconclusive_warning">Bazı kaynaklar bu denetime yanıt vermedi. Bu cihazın göremediği daha yeni bir liste olabilir ve mevcut aktarıcılarınız diğer uygulamalarda hâlâ çalışıyor olabilir. Yalnızca bu riski kabul ediyorsanız kaydedin.</string>
     <string name="setup_inbox_list">Gelen kutusu röleleri</string>
     <string name="setup_read_list">Okuma röleleri</string>
     <string name="setup_write_list">Yazma röleleri</string>
@@ -2106,6 +2107,7 @@
     <string name="setup_action_continue_without">Şimdi değil</string>
     <string name="setup_action_use_recommended_relays">Aktarıcı kurulumunu düzelt</string>
     <string name="setup_action_edit_relays">Aktarıcıları incele</string>
+    <string name="setup_action_remove_unusable_relays">Kullanılamayan aktarıcıları kaldır</string>
     <string name="setup_action_edit_profile">Profili düzenle</string>
     <string name="setup_action_edit_follows">Takipleri düzenle</string>
     <string name="setup_action_approve_repair">Değişiklikleri kaydet</string>

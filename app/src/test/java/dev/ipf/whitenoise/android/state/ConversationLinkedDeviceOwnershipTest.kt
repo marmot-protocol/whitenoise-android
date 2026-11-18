@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.HistoryImportSourceFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.core.isSentFromThisDevice
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -102,8 +103,8 @@ class ConversationLinkedDeviceOwnershipTest {
         val sibling = TimelineProjector.toAppMessageRecord(siblingLive)
         val peer = sibling.copy(sender = "someone-else")
 
-        assertTrue(MessageProjector.isMine(local, account) && MessageProjector.isSentFromThisDevice(local))
-        assertTrue(MessageProjector.isMine(sibling, account) && !MessageProjector.isSentFromThisDevice(sibling))
-        assertFalse(MessageProjector.isMine(peer, account) || MessageProjector.isSentFromThisDevice(peer))
+        assertTrue(MessageProjector.isMine(local, account) && local.isSentFromThisDevice())
+        assertTrue(MessageProjector.isMine(sibling, account) && !sibling.isSentFromThisDevice())
+        assertFalse(MessageProjector.isMine(peer, account) || peer.isSentFromThisDevice())
     }
 }

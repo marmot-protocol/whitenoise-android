@@ -2045,6 +2045,7 @@
     <string name="setup_device_unknown">无法确定是否存在另一处安装。仅在你想使用此设备时继续。</string>
     <string name="setup_profile_publish_help">将此资料保存到你的 Nostr 账号。</string>
     <string name="setup_replacement_warning">推荐方案会保留所有现有中继条目，包括此处未显示的条目。自定义列表会移除未包含的中继。更改也会影响你的其他 Nostr 应用。</string>
+    <string name="setup_repair_inconclusive_warning">部分来源未响应此次检查。可能存在此设备未能看到的更新列表，而你当前的中继在其他应用中可能仍然可用。仅在你接受此风险时保存。</string>
     <string name="setup_inbox_list">收件箱中继器</string>
     <string name="setup_read_list">读取中继器</string>
     <string name="setup_write_list">写入中继器</string>
@@ -2073,6 +2074,7 @@
     <string name="setup_action_continue_without">暂时跳过</string>
     <string name="setup_action_use_recommended_relays">修复中继设置</string>
     <string name="setup_action_edit_relays">检查中继</string>
+    <string name="setup_action_remove_unusable_relays">移除无法使用的中继</string>
     <string name="setup_action_edit_profile">编辑个人资料</string>
     <string name="setup_action_edit_follows">编辑关注列表</string>
     <string name="setup_action_approve_repair">保存更改</string>

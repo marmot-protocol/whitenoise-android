@@ -68,6 +68,7 @@ private fun ChatListMessagePreviewFfi.toInitialTimelineMessage(groupIdHex: Strin
     if (status == null || !isRenderableInitialSeed(groupIdHex)) return null
     val record =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = messageIdHex,
             direction = if (deliveryState == ChatListMessageDeliveryStateFfi.NOT_APPLICABLE) "received" else "sent",
             groupIdHex = groupIdHex,

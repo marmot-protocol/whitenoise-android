@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.core.isSentFromThisDevice
 import dev.ipf.whitenoise.android.core.withAuthoritativeEdits
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -534,23 +535,8 @@ internal fun ConversationController.timelineMessageFromProjection(
     return TimelineMessage(
         id = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}",
         record = displayRecord,
-        fromOtherOwnDevice = mine && !MessageProjector.isSentFromThisDevice(actionRecord),
-        status =
-            when {
-                streamId != null -> MessageStatus.Streaming
-                MessageProjector.isMine(actionRecord, conversationAccountIdHex) ->
-                    // Only this installation's own send can still be waiting on delivery. The account's rows from
-                    // another device or from imported history are already delivered, whatever their source event.
-                    if (MessageProjector.isSentFromThisDevice(actionRecord) &&
-                        record.sourceMessageIdHex == null &&
-                        !record.recipientConfirmed
-                    ) {
-                        MessageStatus.Pending
-                    } else {
-                        MessageStatus.Sent
-                    }
-                else -> MessageStatus.Received
-            },
+        fromOtherOwnDevice = mine && !actionRecord.isSentFromThisDevice(),
+        status = projectedMessageStatus(streaming = streamId != null, mine = mine, actionRecord, record),
         projected = record,
         timelineOrder = localTimelineOrderOverrides[record.messageIdHex] ?: 0uL,
         authoritativeOrder =

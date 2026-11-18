@@ -92,6 +92,7 @@ class BatchAttachmentSaveSelectionTest {
                 ),
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = id,
                     direction = "received",
                     groupIdHex = "group",

@@ -553,6 +553,7 @@ class MessageBatchActionsTest {
             action = BatchMessageActionItem(id, "alice", "Alice", id, id, canDeleteForEveryone = canDeleteForEveryone),
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = id,
                     direction = "received",
                     groupIdHex = "group",

@@ -209,6 +209,15 @@
       "assertions": "Private key remains concealed when opening and leaving Profile Keys; no reveal or clipboard export.",
       "postcondition": "none"
     },
+    "settings-linked-devices": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-059",
+        "SET-063"
+      ],
+      "assertions": "Linked devices opens from Account with this device listed and no other device; this device's page opens and its rename dialog shows its field and Save, then Back leaves each without renaming.",
+      "postcondition": "none"
+    },
     "navigation-profile-edit-cancel": {
       "suite": "navigation",
       "manual_ids": [

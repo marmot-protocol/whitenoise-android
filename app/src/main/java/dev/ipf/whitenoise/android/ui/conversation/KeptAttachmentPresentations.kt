@@ -16,7 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.MessageAttachments
-import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.isSentFromThisDevice
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -152,7 +152,7 @@ private fun rememberKeptAttachmentTransfer(
     }
     // Only an attachment this installation sent is already on disk before its cache entry resolves. One the account
     // sent from another device has to be downloaded here like any received attachment, so it keeps native progress.
-    val sentHere = MessageProjector.isSentFromThisDevice(message.record)
+    val sentHere = message.record.isSentFromThisDevice()
     val progress = if (sentHere && !cacheResolved) null else native
     return TileTransfer(
         state = attachmentFilePresentationState(host, progress, cancellation),

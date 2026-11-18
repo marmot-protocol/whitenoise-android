@@ -5,11 +5,13 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [official 0.17.0 adoption](marmotkit-0.17.0.md) records Android's pin and
-consumer changes. The [official 0.16.0 adoption](marmotkit-0.16.0.md) records the
+The [November 18 nightly](marmotkit-nightly-20261118.md) is the current
+testing-only pin. Replace it with the formal `marmotkit-v0.18.0` release once MDK
+publishes one. The [official 0.17.0 adoption](marmotkit-0.17.0.md) records the
 populated upgrade baseline.
 
-The [official 0.15.0 release](marmotkit-0.15.0.md), the
+The [official 0.16.0 adoption](marmotkit-0.16.0.md), the
+[official 0.15.0 release](marmotkit-0.15.0.md), the
 [November 9 nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261109),
 [8 November nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261108),
 [6 November nightly](marmotkit-nightly-20261106.md),
@@ -71,12 +73,12 @@ execute: no ignored recovery case can satisfy adoption.
 
 The populated campaign builds current master and the candidate with one disposable
 signer and isolated `.mdkqualification` package. It fails closed if master no
-longer pins the reviewed 0.16.0 source `a2e0558a`. Qualification
+longer pins the reviewed 0.17.0 source `4df811ae`. Qualification
 sources must compile against both runtimes: when a MarmotKit type differs, keep the
 candidate's form in the qualification package and the baseline's form under
 `scripts/mdk-baseline-overlay/` as `<File>.kt.txt`, which the staging script copies
-over the candidate file in the baseline checkout. The group creation overlay
-extracts the group ID from the return type each release supplies. Dispatch once on the candidate
+over the candidate file in the baseline checkout. No source differs for the current
+pair, so the directory holds no overlay. Dispatch once on the candidate
 branch and reuse a matching active run:
 
 ```bash

@@ -163,6 +163,7 @@ class ConversationInitialTimelineTest {
     /** Builds the sent kind-9 test message record with the given text. */
     private fun record(plaintext: String) =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = MESSAGE_ID,
             direction = "sent",
             groupIdHex = GROUP_ID,

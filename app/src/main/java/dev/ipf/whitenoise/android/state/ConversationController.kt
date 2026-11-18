@@ -1845,8 +1845,7 @@ class ConversationController(
         }
         val replyTarget = replyTargetForSend(replyingTo?.messageIdHex).getOrElse { return }
         val sendHostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEND)
-        val outboundVisibleAttempt =
-            appState.beginHostPerformance(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE)
+        val outboundVisibleAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE)
 
         // WNPerf assigns an opaque process-local operation id only while the
         // user has explicitly enabled the bounded diagnostic session.
@@ -1859,6 +1858,7 @@ class ConversationController(
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, group.disappearingMessageSecs)
         val optimistic =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = tempId,
                 direction = "sent",
                 groupIdHex = group.groupIdHex,

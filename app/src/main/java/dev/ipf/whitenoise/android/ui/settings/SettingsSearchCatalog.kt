@@ -595,7 +595,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         addAll(settingsSearchAdditionalControls())
     }
 
-private fun hubEntry(
+internal fun hubEntry(
     id: String,
     title: Int,
     category: Int,
@@ -630,15 +630,6 @@ private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
             account = true,
         ),
         hubEntry("home.Relays", R.string.relays, R.string.account, SettingsDetail.Relays, account = true),
-        hubEntry(
-            "Account.linked_devices",
-            R.string.linked_devices,
-            R.string.account,
-            SettingsDetail.Account,
-            "search.Account.1",
-            "linked_devices",
-            account = true,
-        ),
         hubEntry("home.ChatFolders", R.string.chat_folders_title, R.string.chats, SettingsDetail.ChatFolders),
         hubEntry(
             "home.Gestures",
@@ -736,4 +727,4 @@ private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
             R.string.notifications,
             SettingsDetail.NotificationDelivery,
         ),
-    )
+    ) + linkedDevicesSearchEntry()

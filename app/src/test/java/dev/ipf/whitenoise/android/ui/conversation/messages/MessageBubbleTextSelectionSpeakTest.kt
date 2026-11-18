@@ -1394,6 +1394,7 @@ class MessageBubbleTextSelectionSpeakTest {
             id = "msg:$messageId",
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = messageId,
                     direction = "received",
                     groupIdHex = GROUP_ID,

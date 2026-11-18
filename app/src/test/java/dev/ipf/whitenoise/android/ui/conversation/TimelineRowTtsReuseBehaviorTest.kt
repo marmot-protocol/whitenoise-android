@@ -229,6 +229,7 @@ class TimelineRowTtsReuseBehaviorTest {
         messageIdHex: String,
         plaintext: String,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = messageIdHex,
         direction = "received",
         groupIdHex = GROUP_ID,

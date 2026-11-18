@@ -34,7 +34,7 @@ class SetupDeviceEvidenceTest {
         assertNull(latestPublication(0uL))
     }
 
-    /** Only a possible other installation is explained as a separate one, finding none needs no explanation. */
+    /** A possible other installation is explained as one this device can link to, finding none needs no explanation. */
     @Test
     fun explanationDescribesASeparateInstallationOnlyWhenAnotherAppMayExist() {
         val unchecked = listOf(R.string.setup_device_separate_chats_if_other_app)
@@ -43,8 +43,12 @@ class SetupDeviceEvidenceTest {
         assertEquals(unchecked, setupDeviceExplanation(SetupDeviceEvidence.Unchecked))
         assertEquals(unchecked, setupDeviceExplanation(null))
         assertEquals(
-            listOf(R.string.setup_device_separate_chats, R.string.setup_device_new_chats_either_app),
+            listOf(R.string.setup_device_link_next),
             setupDeviceExplanation(SetupDeviceEvidence.OtherApps(null)),
+        )
+        assertEquals(
+            listOf(R.string.setup_device_separate_chats, R.string.setup_device_new_chats_either_app),
+            setupDeviceExplanation(SetupDeviceEvidence.OtherApps(null), linkedDevices = false),
         )
     }
 
