@@ -729,8 +729,16 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn('KEYSTORE', build)
         self.assertNotIn('allowUnconfiguredProductionFirebase', build)
         self.assertIn('./gradlew ":app:assemble$task" -x ":app:lintVital$task"', build)
+        # The audit flag keeps or drops staging code, so the budget measures the value staging ships with.
+        staging_apk = WORKFLOW.with_name('android-staging-apk.yml').read_text()
+        for name, value in (('WHITENOISE_AUDIT_RUNTIME_REQUIRED', "'true'"),
+                            ('WHITENOISE_AUDIT_DATA_MODE', 'obfuscated_sensitive_data')):
+            with self.subTest(flag=name):
+                self.assertIn(f'          {name}: {value}\n', build)
+                self.assertIn(f"printf '{name}={value.strip(chr(39))}\\n'", staging_apk)
         budget = self.named_step(self.build_contracts, steps[2])
-        self.assertIn('${{ steps.shipping_apk.outputs.path }}', budget)
+        self.assertIn('--apk "$DEX_BUDGET_APK_PATH"', budget)
+        self.assertIn('DEX_BUDGET_APK_PATH: ${{ steps.shipping_apk.outputs.path }}', budget)
         self.assertIn('--mapping "app/build/outputs/mapping/$DEX_BUDGET_VARIANT/mapping.txt"', budget)
         self.assertIn('--variant "$DEX_BUDGET_VARIANT"', budget)
         self.assertIn('${{ github.sha }}', budget)

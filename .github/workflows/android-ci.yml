@@ -515,10 +515,14 @@ jobs:
       # shipping phase builds one R8 variant and fails this required check on a violation.
       # Signing never changes the DEX, and the unsigned path also skips production's
       # Firebase resource check. One ABI suffices because every ABI ships the same DEX.
+      # The audit pair matches the distributed staging APK (android-staging-apk.yml), whose
+      # readiness code R8 would otherwise drop, and production ignores both.
       - name: Assemble shipping R8 APK for the DEX method budget
         if: endsWith(matrix.phase, 'ZapstoreRelease')
         env:
           WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'
+          WHITENOISE_AUDIT_RUNTIME_REQUIRED: 'true'
+          WHITENOISE_AUDIT_DATA_MODE: obfuscated_sensitive_data
           SHIPPING_VARIANT: ${{ matrix.phase }}
         shell: bash
         run: |
