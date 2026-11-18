@@ -1304,7 +1304,6 @@ internal fun ConversationScreen(
         controller.canSendMessages &&
             controller.editingMessageId == null &&
             controller.replyingTo == null
-
     val timelineUnderlayEnabled =
         composerGate == ComposerGate.COMPOSER &&
             !selectionMode &&
@@ -4504,6 +4503,7 @@ internal fun ConversationScreen(
                             rememberConversationGiphyPicker(
                                 controller,
                                 attachmentOrigin,
+                                composerGate = composerGate,
                                 presentationAvailable = !transcriptRoutedAway && !freezeRoutePresentation,
                                 onAccepted = ::revealSentMessage,
                             ),

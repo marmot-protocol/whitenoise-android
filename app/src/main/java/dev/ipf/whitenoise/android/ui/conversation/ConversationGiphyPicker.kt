@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.media.GiphySearchSheet
 
 /** Owns the transient picker and returns its launcher only while this conversation can send GIFs. */
@@ -15,11 +16,16 @@ import dev.ipf.whitenoise.android.ui.conversation.media.GiphySearchSheet
 internal fun rememberConversationGiphyPicker(
     controller: ConversationController,
     attachmentOrigin: String,
+    composerGate: ComposerGate,
     presentationAvailable: Boolean,
     onAccepted: () -> Unit,
 ): (() -> Unit)? {
     var open by remember(attachmentOrigin) { mutableStateOf(false) }
-    val available = controller.canSendMessages && controller.editingMessageId == null && presentationAvailable
+    val available =
+        composerGate == ComposerGate.COMPOSER &&
+            controller.canSendMessages &&
+            controller.editingMessageId == null &&
+            presentationAvailable
     LaunchedEffect(available) {
         if (!available) open = false
     }
