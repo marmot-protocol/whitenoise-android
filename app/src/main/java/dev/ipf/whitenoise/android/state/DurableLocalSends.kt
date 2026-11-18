@@ -194,16 +194,3 @@ private suspend fun MarmotInterface.uploadOrAdmitComposerSubmission(
         recoveredWithoutUpload = false,
     )
 }
-
-/** Upload-only preparation does not claim acceptance; publication still uses the captured draft revision. */
-internal suspend fun MarmotInterface.uploadComposerMediaWithToken(
-    account: String,
-    group: String,
-    request: MediaUploadRequestFfi,
-    token: String,
-): MediaUploadResultFfi {
-    require(!request.send) { "composer preparation must not also publish" }
-    // An already admitted submission must never re-upload non-idempotent blobs.
-    check(localSendStatus(account, group, token) == null) { "local submission already owns this upload" }
-    return uploadMediaWithClientToken(account, group, request, token).upload
-}
