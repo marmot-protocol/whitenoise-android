@@ -92,4 +92,8 @@ Never raise a limit and never add an entry. If the test fails because a file
 grew, move the new code into a topic file or split the file first. The failure
 message names the file and its current count.
 
+`scripts/check_source_size_baseline.py` enforces that rule in the `Validate tooling
+and documentation contracts` CI job: it compares the baseline with the pull
+request's base and fails when an entry is added or a limit rises.
+
 Both files live in `app/src/test/java/dev/ipf/whitenoise/android/`.

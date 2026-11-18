@@ -66,28 +66,13 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
 
 ## Code structure
 
-Large files are being split into topic files; new code must not regrow them.
 Follow [code structure](docs/code-structure.md) and the ownership maps for the
 [conversation controller](docs/conversation-controller-ownership.md) and
 [chat-list controller](docs/chat-list-controller-ownership.md).
 
-- Put new feature code in a focused topic file in the owning package, never at
-  the end of a large file. Extend owners through their topic files: `state/AppState<Topic>.kt`
-  (`WhiteNoiseAppState` extensions), `state/ChatsController<Topic>.kt`,
-  `state/ConversationController<Topic>.kt` and
-  `audio/ConversationDictationController<Topic>.kt`. Screens put sections in sibling
-  files (`ConversationTopBar.kt`, `ManageStorageSections.kt`). Add a new topic file
-  when none fits.
-- Budgets follow [detekt](config/detekt/detekt.yml): 600 lines per file/class
-  (`LargeClass`), 60 per function (`LongMethod`), 5 function/6 constructor
-  parameters (`LongParameterList`), 11 functions per file/class (`TooManyFunctions`).
-- Before adding to a file over budget, split it in a separate pure-move commit
-  (no behaviour change, unchanged screenshot goldens), or put the new code in a new topic file.
-- `SourceFileSizeRatchetTest` fails when a main Kotlin file not in
-  `SourceFileSizeBaseline.kt` exceeds 600 lines, or a listed file exceeds its limit.
-  When a change shrinks a listed file, lower its limit to the new count in the same
-  change; the test requires deleting the entry once the file is within 600. Never
-  raise or add a limit.
+- New code goes in a topic file in the owning package, never at the end of a file over 600 lines.
+- Split an oversized file as a pure move first.
+- Never raise or add an entry in `SourceFileSizeBaseline.kt`.
 
 ## Task guides
 
