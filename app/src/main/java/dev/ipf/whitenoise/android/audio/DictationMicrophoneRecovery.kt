@@ -127,8 +127,15 @@ private fun ConversationDictationController.registerNativeMicrophoneUnblock(pend
             }
         }.getOrNull()
     when {
-        unregister == null -> clearMicrophoneRecovery()
-        microphoneSettingsRecovery !== pending -> unregister()
+        unregister == null && microphoneSettingsRecovery === pending -> {
+            // Registration may return null because access was restored between platform checks.
+            val restored =
+                runCatching(platform::microphoneAccess).getOrNull() == ConversationDictationMicrophoneAccess.Granted
+            if ((!restored || !resumeMicrophoneSettingsRecovery()) && microphoneSettingsRecovery === pending) {
+                clearMicrophoneRecovery()
+            }
+        }
+        microphoneSettingsRecovery !== pending -> unregister?.invoke()
         else -> pending.unregister = unregister
     }
 }

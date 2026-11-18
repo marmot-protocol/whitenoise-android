@@ -2905,6 +2905,88 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun nullNativeRegistrationAfterGrantStartsRequestedCaptureExactlyOnce() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        platform.onNativeRegistration = {
+            platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        }
+
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+
+        assertTrue(platform.session.started)
+        assertTrue(f.controller.state is ConversationDictationState.Starting)
+        assertNull(f.controller.microphoneSettingsRecovery)
+        assertNull(platform.nativeChanged)
+        f.controller.onMicrophoneHostResumed()
+        f.controller.onAppForegrounded()
+        assertEquals(1, platform.sessions.size)
+        assertEquals(1, platform.captureSessionsStarted)
+        assertEquals(TextFieldValue("Keep"), f.drafts.getValue(key()))
+        f.controller.cancel()
+    }
+
+    @Test
+    fun nullNativeRegistrationWithoutGrantDiscardsRecovery() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        platform.onNativeRegistration = {}
+
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+
+        assertEquals(
+            ConversationDictationFailure.MicrophoneMuted,
+            (f.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertNull(f.controller.microphoneSettingsRecovery)
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
+        assertEquals(0, platform.captureSessionsStarted)
+    }
+
+    @Test
+    fun nullNativeRegistrationGrantWaitsForUnlockAndRespectsCancellationOrOriginChange() {
+        for (endRecovery in listOf("unlock", "cancel", "origin")) {
+            var locked = false
+            val platform =
+                FakePlatform(
+                    nativeUnblockSupported = true,
+                    microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+                )
+            val f = fixture(draft = TextFieldValue("Keep"), platform = platform, appLocked = { locked })
+            platform.onNativeRegistration = {
+                platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+                locked = true
+            }
+
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+
+            assertFalse(platform.session.started)
+            assertNotNull(f.controller.microphoneSettingsRecovery)
+            when (endRecovery) {
+                "cancel" -> f.controller.cancel()
+                "origin" -> f.controller.onMicrophoneOriginChanged("another-account", GROUP)
+            }
+            locked = false
+            f.controller.onAppForegrounded()
+            f.controller.onMicrophoneHostResumed()
+            assertEquals(endRecovery == "unlock", platform.session.started)
+            assertEquals(if (endRecovery == "unlock") 1 else 0, platform.captureSessionsStarted)
+            assertNull(f.controller.microphoneSettingsRecovery)
+            f.controller.cancel()
+        }
+    }
+
+    @Test
     fun runtimePermissionGrantDispatchesNativeUnblockWithoutStartingCapture() {
         val platform = FakePlatform(nativeUnblockSupported = true, hasPermission = false)
         val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
@@ -9971,10 +10053,16 @@ class ConversationDictationControllerTest {
         var nativeRequests = 0
         var nativeCleanup = 0
         var nativeChanged: (() -> Unit)? = null
+        var onNativeRegistration: (() -> Unit)? = null
 
         override fun requestMicrophoneUnblock(onChanged: () -> Unit): (() -> Unit)? {
             if (!nativeUnblockSupported) return null
             nativeRequests += 1
+            onNativeRegistration?.let { hook ->
+                onNativeRegistration = null
+                hook()
+                return null
+            }
             nativeChanged = onChanged
             return { nativeCleanup += 1 }
         }
