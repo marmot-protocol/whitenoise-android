@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.awaitConversationCondition
@@ -15,7 +17,6 @@ import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,7 +42,7 @@ class SelectableMessageProjectionTest {
         assertNull(selections.getValue(PERSISTED_FAILURE).action.copyableText)
     }
 
-    /** Text that lost convergence never forwards, while the same text on a valid row carries a forward payload. */
+    /** Text that lost convergence never forwards, while the same text on a valid row forwards that exact text. */
     @Test
     fun losingBranchTextIsBlockedFromForwardWhileValidTextForwards() {
         val invalidated =
@@ -55,7 +56,14 @@ class SelectableMessageProjectionTest {
         assertNull(invalidated.forwardPayload)
         assertEquals(ForwardBlockedReason.Unsupported, invalidated.forwardBlockedReason)
         assertEquals(TEXT, valid.forwardableText)
-        assertNotNull(valid.forwardPayload)
+        assertEquals(
+            ForwardMessagePayload.Text(
+                sourceGroupIdHex = ConversationTimelineTestIds.GROUP_ID,
+                sourceMessageIdHex = VALID,
+                text = TEXT,
+            ),
+            valid.forwardPayload,
+        )
         assertNull(valid.forwardBlockedReason)
     }
 
