@@ -38,4 +38,30 @@ class FocusedMessageTerminalActionsTest {
         afterExit!!()
         assertEquals(origin, received)
     }
+
+    @Test
+    fun pickerHandoffRetainsMenuForBothActivationPaths() {
+        var closeCalls = 0
+        var clicks = 0
+        var received: Rect? = null
+        val origin = Rect(1f, 2f, 3f, 4f)
+        val action =
+            FocusedMessageAction(
+                "Forward",
+                null,
+                true,
+                false,
+                {},
+                { clicks++ },
+                onClickAt = { received = it },
+                dismissBeforeActivation = false,
+            ).withTerminalCallbacks { closeCalls++ }
+
+        action.onClick()
+        action.onClickAt!!(origin)
+
+        assertEquals(1, clicks)
+        assertEquals(origin, received)
+        assertEquals(0, closeCalls)
+    }
 }

@@ -183,6 +183,8 @@ internal fun MessageActionMenu(
                         MessageActionKind.Forward -> onForwardAt
                         else -> null
                     },
+                // Forward transfers ownership to a picker above the still-open menu.
+                dismissBeforeActivation = kind != MessageActionKind.Forward,
                 destructive = kind == null,
                 icon = { MessageActionIcon(kind) },
                 explanation = Explanation(label, stringResource(messageActionExplanationRes(kind))),

@@ -107,6 +107,7 @@ internal data class FocusedMessageAction(
     val onClick: () -> Unit,
     val onClickAt: ((Rect?) -> Unit)? = null,
     val explanation: Explanation? = null,
+    val dismissBeforeActivation: Boolean = true,
 )
 
 /**
