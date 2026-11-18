@@ -55,13 +55,18 @@ class PushTokenStore(
     private val preferences: SharedPreferences,
     private val recoveryStatus: () -> PushStorageRecovery = { PushStorageRecovery.Ready },
     private val retryImport: () -> Unit = {},
+    private val proveKey: () -> Unit = {},
 ) {
     /** Observes retained storage without interpreting unavailable data as an empty cleanup queue. */
     internal fun recoveryState(retry: Boolean = false): PushStorageRecovery =
         synchronized(LOCK) {
             try {
                 if (retry) retryImport()
-                preferences.all // Resolve lazy migration before inspecting durable safety state.
+                // Cached reads cannot show a key that stopped working, so resolve lazy migration and
+                // open the payload for real first. Then decode every value before inspecting durable
+                // safety state.
+                proveKey()
+                preferences.all
                 recoveryStatus()
             } catch (_: Exception) {
                 PushStorageRecovery.StorageUnavailable
@@ -519,10 +524,14 @@ class PushTokenStore(
                 lateinit var secure: PushTokenPreferences
                 secure =
                     PushTokenPreferences(
+                        // Every getter reads the whole store and a push wake makes dozens of them, so
+                        // the decrypted push state (token, pending account sets, wake counters, import
+                        // receipts) stays in process memory for the life of the process.
                         KeystoreSecureStore(
                             appContext,
                             "whitenoise.push.tokens.keystore",
                             keyProvider,
+                            cacheReads = true,
                         ),
                         LOCK,
                         prepare = {
@@ -568,6 +577,7 @@ class PushTokenStore(
                 // cleanup or unavailable Keystore fails closed instead of appearing empty.
                 PushTokenStore(
                     secure,
+                    proveKey = { secure.openFresh() },
                     recoveryStatus = {
                         when {
                             safety.getBoolean("cleanup_unknown", false) ||

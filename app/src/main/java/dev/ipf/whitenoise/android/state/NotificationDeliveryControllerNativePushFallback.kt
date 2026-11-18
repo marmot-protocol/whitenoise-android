@@ -26,7 +26,11 @@ internal suspend fun NotificationDeliveryController.reconcileUnavailableNativePu
                     readSettings = { request, account -> request.runtime.marmot.notificationSettings(account) },
                     publishActiveSettings = { localNotificationSettings = it },
                     publishPersistentConnectionEnabled = { backgroundConnectionEnabled = true },
-                    publishComplete = pushTokenStore::clearPendingNativePushRegistrationSync,
+                    publishComplete = {
+                        withContext(pushWakeStorageDispatcher) {
+                            pushTokenStore.clearPendingNativePushRegistrationSync()
+                        }
+                    },
                     removeFingerprint = { perAccountSyncedFingerprints.remove(it.accountRef) },
                     setNativePushDisabled = { it.runtime.marmot.setNativePushEnabled(it.accountRef, false) },
                     clearRegistration = this::clearPushRegistrationForOwnerLocked,
@@ -59,7 +63,9 @@ private suspend fun NotificationDeliveryController.clearPushRegistrationForOwner
         withContext(Dispatchers.IO) { owner.runtime.marmot.clearPushRegistration(owner.accountRef) }
     }.onSuccess { outcome ->
         logPushRegistrationShareOutcome("capability fallback clear", owner.accountRef, outcome)
-        if (ownsNativePushFallback(owner)) pushTokenStore.clearPending(owner.accountRef)
+        if (ownsNativePushFallback(owner)) {
+            withContext(pushWakeStorageDispatcher) { pushTokenStore.clearPending(owner.accountRef) }
+        }
     }.onFailure { failure ->
         appStateDebug { "capability fallback clear failed (queued for retry): ${failure.readableMessage()}" }
     }
