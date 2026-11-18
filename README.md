@@ -185,6 +185,10 @@ for seven days.
 reproduction) run on `master` pushes, nightly, tags, manual dispatch and in the
 merge queue. Pull requests run them only when release, signing, build or
 dependency inputs change, and not while draft. Neither is a required check.
+The required Android CI check enforces the post-R8 DEX method budgets itself:
+in every merge group and full-matrix pull request, `build-contracts` builds
+both shipping R8 variants and fails on an over-budget method (see
+[DEX method-size budgets](docs/performance.md#dex-method-size-budgets)).
 
 Pushes to `master` also run `.github/workflows/android-staging-apk.yml`, which
 builds and uploads a signed `arm64-v8a` staging release APK for internal

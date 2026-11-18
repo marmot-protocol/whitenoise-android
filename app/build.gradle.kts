@@ -1353,6 +1353,15 @@ tasks.withType<Test>().configureEach {
             rootProject.file("scripts/verify_dependency_security.py"),
         ).withPropertyName("dependencySecurityPolicy")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // AndroidReleaseRuntimeWorkflowCoverageTest reads the workflows that enforce DEX method budgets and the ART
+    // verifier from disk, so a workflow-only edit must rerun it instead of reusing a cached pass.
+    inputs
+        .files(
+            rootProject.file(".github/workflows/android-ci.yml"),
+            rootProject.file(".github/workflows/android-release-runtime.yml"),
+            rootProject.file("scripts/verify-release-runtime.sh"),
+        ).withPropertyName("releaseRuntimeWorkflowGates")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     // Any instrumented Kotlin test can be registered, even without the CoverageTest suffix. Unit-test tasks do
     // not compile these sources, so their additions, deletions and renames must invalidate cached validation.
     inputs
