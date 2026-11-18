@@ -13,10 +13,6 @@
           "represented_by": "home.Account"
         },
         {
-          "declaration": "\"app_updates\"",
-          "represented_by": "Home.update_controls"
-        },
-        {
           "declaration": "\"profile\"",
           "represented_by": "Account.share_connect"
         },
@@ -834,6 +830,14 @@
         {
           "declaration": "\"developer_tools\"",
           "represented_by": "home.DeveloperTools"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsAppUpdates.kt": {
+      "controls": [
+        {
+          "declaration": "\"app_updates\"",
+          "represented_by": "Home.update_controls"
         }
       ]
     }
