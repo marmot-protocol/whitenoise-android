@@ -527,6 +527,7 @@ internal fun ComposerBar(
     // True from the moment Back asks the keyboard to hide until focus clears. The
     // composer collapses in that same frame so height and IME animate together.
     composerDismissInProgress: Boolean = false,
+    preserveComposerEditingLayout: Boolean = false,
     onBottomInputChanged: () -> Unit = {},
     onTimelineComposerMeasured: (foregroundHeightPx: Int, compactHeightPx: Int) -> Unit = { _, _ -> },
     onKeyboardRestoreFromCustomInput: () -> Unit = {},
@@ -746,6 +747,7 @@ internal fun ComposerBar(
             composerTextEditOwnerId = editingMessageId
             onBottomInputChanged()
             runCatching { composerFocus.requestFocus() }
+            softwareKeyboardController?.show()
         } else if (preEditFieldValue != null) {
             // Edit cancelled or submitted: restore the draft the user had
             // been composing before they tapped Edit (text + original caret).
@@ -987,17 +989,19 @@ internal fun ComposerBar(
     }
     // Starting a reply (swipe-to-reply or long-press → Reply both set the
     // controller's replyingTo) focuses the composer and raises the IME. Fire
-    // only on the null → non-null edge so a recomposition mid-reply doesn't
-    // re-toggle the keyboard while the user is already typing.
-    var hadReplyTarget by remember { mutableStateOf(replyingTo != null) }
-    LaunchedEffect(replyingTo) {
+    // on a changed target, so changing an existing reply also raises the IME after
+    // the message menu hid it. Layout reanchoring still needs only the presence edge.
+    var previousReplyTarget by remember { mutableStateOf(replyingTo?.messageIdHex) }
+    LaunchedEffect(replyingTo?.messageIdHex) {
         val hasReplyTarget = replyingTo != null
-        if (shouldReanchorBottomInputForReplyTargetChange(hadReplyTarget, hasReplyTarget)) {
+        if (shouldReanchorBottomInputForReplyTargetChange(previousReplyTarget != null, hasReplyTarget)) {
             onBottomInputChanged()
+        }
+        if (hasReplyTarget && previousReplyTarget != replyingTo?.messageIdHex) {
             runCatching { composerFocus.requestFocus() }
             keyboardController?.show()
         }
-        hadReplyTarget = hasReplyTarget
+        previousReplyTarget = replyingTo?.messageIdHex
     }
     // Single send path shared by the FAB and the Enter key (#404). Clears the
     // visible input and scrolls to newest only after the controller commits the
@@ -2039,7 +2043,8 @@ internal fun ComposerBar(
                                 replyingTo != null ||
                                 dictationActiveInComposer ||
                                 hasPendingAttachments ||
-                                composerEmojiPickerOpen,
+                                composerEmojiPickerOpen ||
+                                preserveComposerEditingLayout,
                         sendAccessoryContent =
                             if (editingMessageId != null) {
                                 { ComposerEditPill(onCancelEdit = onCancelEdit) }

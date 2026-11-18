@@ -103,13 +103,14 @@ internal fun DestinationFolderFilters(
     selected: List<String>,
     onReviewSelected: () -> Unit,
     modifier: Modifier = Modifier,
+    alwaysShow: Boolean = false,
 ) {
     LaunchedEffect(rows.map { it.first.id }, selected.isEmpty()) {
         val deleted = state.folderId != null && rows.none { it.first.id == state.folderId }
         val noSelection = state.reviewingSelected && selected.isEmpty()
         if (deleted || noSelection) state.selectFolder(null)
     }
-    if (rows.isEmpty() && selected.isEmpty()) return
+    if (!alwaysShow && rows.isEmpty() && selected.isEmpty()) return
     val title = stringResource(R.string.destination_filter_label)
     val color = MaterialTheme.colorScheme.surfaceContainerHigh
     Row(

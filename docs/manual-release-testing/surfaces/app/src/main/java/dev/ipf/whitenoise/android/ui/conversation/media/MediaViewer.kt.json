@@ -40,15 +40,6 @@
         ]
       },
       {
-        "surface": "StableMediaViewerPager",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "fun StableMediaViewerPager(",
-        "test_ids": [
-          "MED-001",
-          "MED-033"
-        ]
-      },
-      {
         "surface": "ViewerPage",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun ViewerPage(",

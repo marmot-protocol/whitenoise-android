@@ -1,0 +1,211 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji prompt: ProfileSheetGroupPickers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ProfileAddToGroupsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "fun ProfileAddToGroupsContent(",
+        "test_ids": [
+          "ACC-008",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "ProfileGroupPickerPendingState",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "fun ProfileGroupPickerPendingState(",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "ProfileMakeAdminContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "fun ProfileMakeAdminContent(",
+        "test_ids": [
+          "GRP-007",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "ProfileAddToGroupsContent UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "fun ProfileAddToGroupsContent(",
+        "test_ids": [
+          "ACC-002",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "ProfileAddToGroupsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "fun ProfileAddToGroupsScreen(",
+        "test_ids": [
+          "ACC-002",
+          "ACC-008"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:make_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.make_admin",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:make_admin_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.make_admin",
+        "test_ids": [
+          "ACC-007"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Stored group-avatar surface: R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.forward_search_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.forward_search_chats",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.members_count",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_add_to_groups_confirm_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.profile_add_to_groups_confirm_label",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_add_to_groups_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.profile_add_to_groups_description",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_add_to_groups_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.profile_add_to_groups_title",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_make_admin_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.profile_make_admin_description",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_make_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.profile_make_admin_description",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_no_addable_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.profile_no_addable_groups",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_no_promotable_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.profile_no_promotable_groups",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "R.string.person_add_to_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.person_add_to_group",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "Recipient-scoped add-to-groups state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "remember(appState.activeAccountRef, appState.runtimeGeneration, target.accountIdHex)",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Group picker pending state: R.string.profile_addable_groups_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.profile_addable_groups_loading",
+        "test_ids": [
+          "ACC-008",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Group picker pending state: R.string.profile_addable_groups_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.profile_addable_groups_failed",
+        "test_ids": [
+          "ACC-008",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Group picker pending state: R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "ACC-008",
+          "GRP-034"
+        ]
+      }
+    ]
+  }
+}

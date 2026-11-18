@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
 import android.provider.Settings
+import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
@@ -9,12 +10,23 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
@@ -29,6 +41,7 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_MENU_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -58,6 +71,123 @@ internal class ConversationReverseDragSelectionTest {
     private lateinit var edgeEvidence: EdgeEvidence
     private lateinit var edgeController: ConversationController
     private lateinit var edgeSubscription: ScriptedConversationTimelineSubscription
+
+    /** Checks an anchor-only composer drag consumes restoration even when released without selection. */
+    @Test fun composerImeStaysClosedDuringAnchorOnlyDragAndEmptyRelease() = assertDragDoesNotRestoreIme()
+
+    /** Checks cancelling an anchor-only search drag cannot replay keyboard restoration. */
+    @Test fun searchImeStaysClosedDuringAnchorOnlyDragAndCancellation() {
+        assertDragDoesNotRestoreIme(search = true, cancelGesture = true)
+    }
+
+    /** Checks crossing into selection keeps the composer keyboard closed through release. */
+    @Test fun composerImeStaysClosedWhenHeldDragCrossesIntoSelection() = assertDragDoesNotRestoreIme(crossRow = true)
+
+    /** Checks crossing into selection keeps the search keyboard closed through release. */
+    @Test fun searchImeStaysClosedWhenHeldDragCrossesIntoSelection() {
+        assertDragDoesNotRestoreIme(search = true, crossRow = true)
+    }
+
+    /** Exercises the screen's restore effect with a real held pointer before any row is selected. */
+    @Suppress("LongMethod") // One held-pointer lifetime covers menu handoff, anchor-only drag, and release.
+    private fun assertDragDoesNotRestoreIme(
+        search: Boolean = false,
+        crossRow: Boolean = false,
+        cancelGesture: Boolean = false,
+    ) {
+        val keyboard = DragKeyboard()
+        withScrollableConversation(keyboard = keyboard, searchInitially = search) { surface, evidence, ids ->
+            if (!search) composeRule.onNode(hasSetTextAction()).performClick()
+            composeRule.onNode(hasSetTextAction() and isFocused()).assertIsFocused()
+            // A compact synthetic IME leaves room to prove the pointer remains inside the anchor.
+            dispatchDragImeBottom(48)
+            viewportBounds = transcript().fetchSemanticsNode().boundsInRoot
+            val anchor =
+                evidence
+                    .latest()
+                    .visibleItems
+                    .map { it.key.removePrefix("msg:") }
+                    .filter(ids::contains)
+                    .first { id ->
+                        val bounds =
+                            composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
+                        bounds.top >= viewportBounds.top && bounds.bottom <= viewportBounds.bottom
+                    }
+            val row = composeRule.onNodeWithTag(messageBubbleRowTestTag(anchor))
+            val point = row.fetchSemanticsNode().boundsInRoot.center
+            val host = composeRule.onNodeWithTag("reverse-drag-conversation-host")
+            host.performTouchInput {
+                down(point)
+                advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+                move()
+            }
+            dispatchDragImeBottom(0)
+            composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertExists()
+            val showsBeforeDrag = keyboard.showRequests
+            val bounds = row.fetchSemanticsNode().boundsInRoot
+            // Tall fixture rows leave enough vertical travel to exceed slop without crossing the anchor.
+            val heldPoint = Offset(bounds.center.x, bounds.bottom - 4f)
+            // A held range drag requests frames until release; advance its clock explicitly.
+            composeRule.mainClock.autoAdvance = false
+            host.performTouchInput { moveTo(heldPoint) }
+            advanceFrames(2)
+            composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertDoesNotExist()
+            assertTrue("the anchor-only drag has no selection yet", surface.selectedMessages.isEmpty())
+            assertEquals("a held drag must consume the menu restore", showsBeforeDrag, keyboard.showRequests)
+            composeRule.onAllNodes(hasSetTextAction() and isFocused()).assertCountEquals(0)
+            if (crossRow) {
+                val neighbor =
+                    evidence
+                        .latest()
+                        .visibleItems
+                        .map { it.key.removePrefix("msg:") }
+                        .first { it in ids && it != anchor }
+                val neighborPoint =
+                    composeRule
+                        .onNodeWithTag(messageBubbleRowTestTag(neighbor))
+                        .fetchSemanticsNode()
+                        .boundsInRoot.center
+                host.performTouchInput { moveTo(neighborPoint) }
+                advanceFrames(2)
+                assertTrue("crossing a row enters selection", surface.selectedMessages.isNotEmpty())
+                assertEquals(showsBeforeDrag, keyboard.showRequests)
+            }
+            host.performTouchInput { if (cancelGesture) cancel() else up() }
+            composeRule.mainClock.autoAdvance = true
+            composeRule.waitForIdle()
+            if (!crossRow) assertTrue(surface.selectedMessages.isEmpty())
+            assertEquals("release/cancel cannot replay the consumed restore", showsBeforeDrag, keyboard.showRequests)
+        }
+    }
+
+    private lateinit var dragView: View
+
+    private class DragKeyboard : SoftwareKeyboardController {
+        var showRequests = 0
+
+        /** Records keyboard show requests so gesture tests can detect unintended restoration. */
+        override fun show() {
+            showRequests += 1
+        }
+
+        /** Leaves inset changes under explicit test control when production requests a keyboard hide. */
+        override fun hide() = Unit
+    }
+
+    /** Applies a synthetic keyboard inset to the real conversation root view. */
+    private fun dispatchDragImeBottom(bottom: Int) {
+        composeRule.runOnUiThread {
+            ViewCompat.dispatchApplyWindowInsets(
+                dragView.rootView,
+                WindowInsetsCompat
+                    .Builder()
+                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, bottom))
+                    .setVisible(WindowInsetsCompat.Type.ime(), bottom > 0)
+                    .build(),
+            )
+        }
+        composeRule.waitForIdle()
+    }
 
     /** A top-edge hold selects older rows and settles at the natural oldest boundary before capture. */
     @Test
@@ -228,6 +358,8 @@ internal class ConversationReverseDragSelectionTest {
     @Suppress("LongMethod") // Controller, page, and Compose lifetime must be retired by one fixture owner.
     private fun withScrollableConversation(
         olderPageAvailable: Boolean = false,
+        keyboard: DragKeyboard? = null,
+        searchInitially: Boolean = false,
         block: (ConversationSurfaceState, EdgeEvidence, List<String>) -> Unit,
     ) {
         val group = conversationTimelineTestGroup()
@@ -237,8 +369,11 @@ internal class ConversationReverseDragSelectionTest {
                 timelineRecord(
                     messageId = index.toString(16).padStart(64, '0'),
                     timelineAt = index.toULong(),
-                    plaintext = "edge message $index",
-                )
+                    plaintext =
+                        if (keyboard == null) "edge message $index" else "edge message $index\nSecond line\nThird line",
+                ).let { record ->
+                    if (keyboard == null) record else record.copy(contentTokens = plainPaintDocument(record.plaintext))
+                }
             }
         val subscription =
             ScriptedConversationTimelineSubscription(
@@ -270,7 +405,7 @@ internal class ConversationReverseDragSelectionTest {
                 startOnConstruction = true,
             )
         edgeController = controller
-        val surface = ConversationSurfaceState()
+        val surface = ConversationSurfaceState().apply { searchOpen.value = searchInitially }
         val evidence = EdgeEvidence()
         edgeEvidence = evidence
         val app = ApplicationProvider.getApplicationContext<Context>()
@@ -282,7 +417,11 @@ internal class ConversationReverseDragSelectionTest {
             awaitConversationCondition { controller.timeline.size == records.size }
             val chat = ChatListItem(group, null, null, 1, memberSnapshot = members)
             composeRule.setContent {
-                CompositionLocalProvider(LocalConversationScrollEvidenceSink provides evidence) {
+                dragView = LocalView.current
+                CompositionLocalProvider(
+                    LocalConversationScrollEvidenceSink provides evidence,
+                    LocalSoftwareKeyboardController provides (keyboard ?: LocalSoftwareKeyboardController.current),
+                ) {
                     WhiteNoiseTheme {
                         Box(Modifier.fillMaxSize().testTag("reverse-drag-conversation-host")) {
                             ConversationScreen(
@@ -380,7 +519,8 @@ internal class ConversationReverseDragSelectionTest {
                 .filter(ids::contains)
         val endpoint =
             rows.minBy { id ->
-                val bounds = composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
+                val bounds =
+                    composeRule.onNodeWithTag(messageBubbleRowTestTag(id)).fetchSemanticsNode().boundsInRoot
                 when {
                     lastPointer.y < bounds.top -> bounds.top - lastPointer.y
                     lastPointer.y > bounds.bottom -> lastPointer.y - bounds.bottom

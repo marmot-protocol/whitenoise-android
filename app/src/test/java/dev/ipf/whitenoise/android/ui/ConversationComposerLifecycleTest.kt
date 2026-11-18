@@ -19,6 +19,7 @@ import androidx.lifecycle.LifecycleRegistry
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.ConversationComposerLifecycleEffect
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageMenuKeyboardPolicy
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,6 +35,37 @@ import org.robolectric.annotation.Config
 class ConversationComposerLifecycleTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun cancelledMessageMenuSuppressesEvenFocusCapturedBeforePauseRecomposition() {
+        val lifecycleOwner = TestLifecycleOwner()
+        val policy = MessageMenuKeyboardPolicy()
+        var restore = false
+        var clear = false
+        composeRule.setContent {
+            ConversationComposerLifecycleEffect(
+                observerKey = lifecycleOwner,
+                lifecycleOwner = lifecycleOwner,
+                composerFocused = true,
+                searchOpen = false,
+                hasActiveEditOrReplySession = true,
+                suppressFocusRestore = { policy.resumeRestoreCancelled },
+                onPause = { policy.pause() },
+                onResume = { focus, clearFocus ->
+                    restore = focus
+                    clear = clearFocus
+                },
+            )
+        }
+        composeRule.runOnIdle {
+            lifecycleOwner.handle(Lifecycle.Event.ON_START)
+            lifecycleOwner.handle(Lifecycle.Event.ON_RESUME)
+            lifecycleOwner.handle(Lifecycle.Event.ON_PAUSE)
+            lifecycleOwner.handle(Lifecycle.Event.ON_RESUME)
+        }
+        assertFalse(restore)
+        assertTrue(clear)
+    }
 
     @Test
     fun focusedComposerRestoresExactEditingStateAfterPauseResume() {

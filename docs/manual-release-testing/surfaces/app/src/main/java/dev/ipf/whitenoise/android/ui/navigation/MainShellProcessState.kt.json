@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellProcessState.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Retire cached conversation owners when the media session changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellProcessState.kt",
+        "anchor": "val mediaUploadEpoch = appState.mediaUploadSessionEpoch()",
+        "test_ids": [
+          "MSG-023"
+        ]
+      },
+      {
+        "surface": "Notification-owned route survives its own account switch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellProcessState.kt",
+        "anchor": "private fun retainedNotificationRouteForReplacement(",
+        "test_ids": [
+          "NTF-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
