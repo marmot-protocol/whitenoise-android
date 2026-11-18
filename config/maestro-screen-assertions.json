@@ -2225,7 +2225,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsDiagnostics.kt",
       "symbol": "DeveloperInfoPanel",
       "bindings": [
         {
@@ -2274,7 +2274,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditPhotoMenu.kt",
       "symbol": "GroupEditPhotoMenu",
       "bindings": [
         {
