@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -64,7 +63,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -100,7 +98,6 @@ import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
-import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -112,7 +109,6 @@ import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.core.timelineRowKind
-import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.BlockOutcome
@@ -129,7 +125,6 @@ import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MessageAvailability
-import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.StagedAttachmentSendClaim
 import dev.ipf.whitenoise.android.state.StagedAttachmentSender
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -157,7 +152,6 @@ import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
 import dev.ipf.whitenoise.android.state.markInboundMessageVisibleForHostPerformance
 import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
-import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
@@ -244,7 +238,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.LocalConversationSear
 import dev.ipf.whitenoise.android.ui.conversation.messages.LocalKeptMessages
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageMenuKeyboardOwner
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageMenuKeyboardPolicy
 import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardRequestHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageDetailsRecipients
@@ -729,7 +722,8 @@ internal fun ConversationScreen(
     // non-focusable (#284), so long-pressing several bubbles would otherwise
     // stack several popovers; deriving each bubble's open state from this one id
     // makes opening one close any other.
-    var openActionMenuId by remember(controller) { mutableStateOf<String?>(null) }
+    val openActionMenuIdState = remember(controller) { mutableStateOf<String?>(null) }
+    var openActionMenuId by openActionMenuIdState
     DismissMessageActionMenuOnScroll(listState) {
         openActionMenuId = null
     }
@@ -1023,92 +1017,7 @@ internal fun ConversationScreen(
             selectionMediaCacheRevision,
             eligibilityNowSeconds,
         ) {
-            renderedTimeline
-                .mapNotNull { item ->
-                    val record = item.record
-                    val messageId = record.messageIdHex
-                    if (
-                        !isBatchSelectableMessage(
-                            messageId = messageId,
-                            userVisibleMessage = MessageProjector.isChatKind(record.kind),
-                            // A pending send joins a batch so its accepted text can be forwarded (#2794), while a
-                            // sent message with an edit in flight stays out of selection as before.
-                            committedMessage =
-                                item.status == MessageStatus.Received ||
-                                    item.status == MessageStatus.Sent ||
-                                    item.isPendingSend,
-                            projectedDeleted = item.projected?.deleted == true,
-                            deletedMessageIds = controller.deletedMessageIds,
-                        )
-                    ) {
-                        return@mapNotNull null
-                    }
-                    val invalidated = item.projected?.invalidationStatus != null
-                    val persistedFailure =
-                        item.projected?.let(::usesPersistedFailurePresentation) == true
-                    val editedText =
-                        controller.editsByTarget[messageId]
-                            ?.latestText
-                            ?.takeIf { record.kind == 9uL }
-                    val mediaReferences = controller.mediaReferencesFor(item)
-                    val forwardEligibility =
-                        if (invalidated || persistedFailure) {
-                            ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
-                        } else if (item.isPendingSend) {
-                            MessageProjector.pendingForwardEligibility(
-                                message = record,
-                                mediaReferences = mediaReferences,
-                                editedText = editedText,
-                                nowSeconds = eligibilityNowSeconds,
-                            )
-                        } else {
-                            MessageProjector.forwardEligibility(
-                                message = record,
-                                mediaReferences = mediaReferences,
-                                editedText = editedText,
-                                cachedAttachmentIndices =
-                                    controller
-                                        .attachmentsFor(item)
-                                        .map { it.index }
-                                        .filterTo(mutableSetOf()) { attachmentIndex ->
-                                            controller.hasCachedAttachment(messageId, attachmentIndex)
-                                        },
-                                nowSeconds = eligibilityNowSeconds,
-                            )
-                        }
-                    BatchMessageSelection(
-                        action =
-                            BatchMessageActionItem(
-                                messageId = messageId,
-                                senderId = record.sender,
-                                senderDisplayName = record.sender,
-                                copyableText =
-                                    if (persistedFailure) {
-                                        null
-                                    } else {
-                                        MessageProjector.copyableText(record, editedText)
-                                    },
-                                forwardableText =
-                                    if (invalidated) {
-                                        null
-                                    } else {
-                                        MessageProjector.forwardableText(record, editedText)
-                                    },
-                                // Same authoritative accessor the single-message
-                                // surface and the mutation guard use, so bulk
-                                // routing never diverges from per-message policy.
-                                canDeleteForEveryone = controller.deleteCapabilityFor(record).canDeleteForEveryone,
-                                hasSaveableMedia = mediaReferences.isNotEmpty(),
-                                forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload,
-                                forwardBlockedReason =
-                                    (forwardEligibility as? ForwardEligibility.Blocked)?.reason,
-                                pendingSend = item.isPendingSend,
-                            ),
-                        record = record,
-                        status = item.status,
-                        timelineOrder = item.timelineOrder,
-                    )
-                }.associateBy { it.action.messageId }
+            projectSelectableMessages(renderedTimeline, controller, eligibilityNowSeconds)
         }
     // Display names are deliberately NOT resolved here: this map spans the
     // whole loaded timeline and profileRevisionForCompose bumps on any profile
@@ -1665,92 +1574,20 @@ internal fun ConversationScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     // Scoped to the actual controller: neither account/runtime replacement nor route exit
     // can reuse a menu's pending keyboard restoration.
-    val menuIme = remember(controller) { MessageMenuKeyboardPolicy() }
-    var menuBackdropImeBottom by remember(controller) { mutableStateOf<Int?>(null) }
-    var menuBackdropImeReturning by remember(controller) { mutableStateOf(false) }
-    val displayedMenuImeBottom =
-        animatedMenuImeBackdrop(
-            frozenBottom = menuBackdropImeBottom,
-            returning = menuBackdropImeReturning,
-            liveBottom = { imeInsets.getBottom(density) },
-            onReleased = {
-                menuBackdropImeBottom = null
-                menuBackdropImeReturning = false
-            },
-        )
-    var menuComposerWasEditing by remember(controller) { mutableStateOf(false) }
-    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
-        if (openActionMenuId != null || menuIme.pendingRestore || menuBackdropImeBottom != null) {
-            menuIme.pause()
-            openActionMenuId = null
-            focusManager.clearFocus(force = true)
-            keyboardController?.hide()
-            menuBackdropImeBottom = null
-            menuBackdropImeReturning = false
-        }
-    }
+    val menuIme = remember(controller) { ConversationMenuImeHandoff() }
     val suppressMenuImeRestore = selectionMode || dragAnchorTimelineId != null
-    LaunchedEffect(openActionMenuId, routeTransitionInProgress, transcriptRoutedAway, suppressMenuImeRestore) {
-        if (routeTransitionInProgress || transcriptRoutedAway) {
-            menuIme.cancel()
-            menuBackdropImeBottom = null
-            menuBackdropImeReturning = false
-        } else if (openActionMenuId == null) {
-            val restoreOwner =
-                menuIme.close(
-                    replyTarget = controller.replyingTo?.messageIdHex,
-                    editTarget = controller.editingMessageId,
-                    selectionMode = suppressMenuImeRestore,
-                )
-            if (suppressMenuImeRestore) {
-                keyboardController?.hide()
-                menuBackdropImeBottom = null
-                menuBackdropImeReturning = false
-            } else if (restoreOwner != null) {
-                val focusTarget =
-                    when (restoreOwner) {
-                        MessageMenuKeyboardOwner.Search ->
-                            navigationState.searchFocusRequester.takeIf { navigationState.searchOpen }
-                        MessageMenuKeyboardOwner.Composer -> composerFocus.takeUnless { navigationState.searchOpen }
-                    }
-                if (
-                    focusTarget != null &&
-                    runCatching { focusTarget.requestFocus(FocusDirection.Enter) }.getOrDefault(false)
-                ) {
-                    keyboardController?.show()
-                } else {
-                    menuBackdropImeReturning = true
-                }
-                // Failed focus starts the continuous return immediately.
-            }
-        }
-    }
-    val menuImeTargetInsets = WindowInsets.imeAnimationTarget
-    LaunchedEffect(openActionMenuId, menuBackdropImeBottom != null) {
-        if (openActionMenuId == null && menuBackdropImeBottom != null && !menuBackdropImeReturning) {
-            // The return may use a shorter keyboard. Hand geometry back at its actual
-            // settled target, rather than waiting for the previous keyboard height.
-            awaitMenuImeRestore(
-                readInset = { imeInsets.getBottom(density) },
-                readTargetInset = { menuImeTargetInsets.getBottom(density) },
-                awaitFrame = { withFrameNanos { } },
-            )
-            // Settlement and timeout both enter a continuous handoff. Neither may
-            // swap a partial snapshot straight to a different live keyboard height.
-            menuBackdropImeReturning = true
-        }
-    }
+    val displayedMenuImeBottom =
+        conversationMenuImeBackdrop(
+            handoff = menuIme,
+            openActionMenuIdState = openActionMenuIdState,
+            controller = controller,
+            navigationState = navigationState,
+            composerFocus = composerFocus,
+            routeTransitionInProgress = routeTransitionInProgress,
+            transcriptRoutedAway = transcriptRoutedAway,
+            suppressRestore = suppressMenuImeRestore,
+        )
     val scope = rememberCoroutineScope()
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        if (menuIme.resumeRestoreCancelled) {
-            scope.launch {
-                // Let every resume observer consume the cancellation before a later
-                // user focus can establish the next ordinary foreground session.
-                withFrameNanos { }
-                menuIme.resumeConsumed()
-            }
-        }
-    }
     val exitConversationRoute =
         rememberConversationExitHandler(
             identity = chat.id,
@@ -3364,7 +3201,7 @@ internal fun ConversationScreen(
             timelineViewport = timelineViewport,
             bottomChromeHeightObserver = bottomChromeHeightObserver,
             composerFocused = composerFocused,
-            suppressComposerFocusRestore = { menuIme.resumeRestoreCancelled },
+            suppressComposerFocusRestore = { menuIme.policy.resumeRestoreCancelled },
             searchOpen = navigationState.searchOpen,
             hasActiveEditOrReplySession = controller.editingMessageId != null || controller.replyingTo != null,
             composerFocus = composerFocus,
@@ -4724,7 +4561,7 @@ internal fun ConversationScreen(
                             ) &&
                                 !freezeRoutePresentation,
                         autoFocusConsumedState = composerAutoFocusConsumed,
-                        preserveComposerEditingLayout = menuBackdropImeBottom != null && menuComposerWasEditing,
+                        preserveComposerEditingLayout = menuIme.preservesComposerEditingLayout,
                         composerFocus = composerFocus,
                         onComposerFocusChanged = { focused ->
                             if (focused) composerDismissInProgress = false
@@ -5133,7 +4970,7 @@ internal fun ConversationScreen(
                                                     if (open) clearTextSelection()
                                                     if (open) {
                                                         if (openActionMenuId == null &&
-                                                            menuIme.open(
+                                                            menuIme.policy.open(
                                                                 imeIsOpen,
                                                                 controller.replyingTo?.messageIdHex,
                                                                 controller.editingMessageId,
@@ -5144,19 +4981,19 @@ internal fun ConversationScreen(
                                                                         MessageMenuKeyboardOwner.Composer
                                                                     },
                                                                 // A previous show request can outlive its zero inset.
-                                                                restoreInFlight = menuBackdropImeBottom != null,
+                                                                restoreInFlight = menuIme.backdropBottom != null,
                                                             )
                                                         ) {
-                                                            menuComposerWasEditing =
+                                                            menuIme.composerWasEditing =
                                                                 composerFocused &&
                                                                 !composerDismissInProgress
                                                             // Freeze the visible handoff geometry.
-                                                            menuBackdropImeBottom =
+                                                            menuIme.backdropBottom =
                                                                 captureMenuImeBackdrop(
                                                                     displayedMenuImeBottom,
                                                                     imeInsets.getBottom(density),
                                                                 )
-                                                            menuBackdropImeReturning = false
+                                                            menuIme.backdropReturning = false
                                                             focusManager.clearFocus(force = true)
                                                             keyboardController?.hide()
                                                         }
@@ -5166,10 +5003,9 @@ internal fun ConversationScreen(
                                                     }
                                                 },
                                                 onForwardMenuHandoff = {
-                                                    menuIme.cancel()
-                                                    menuBackdropImeBottom = null
-                                                    menuBackdropImeReturning = false
-                                                    menuComposerWasEditing = false
+                                                    menuIme.policy.cancel()
+                                                    menuIme.releaseBackdrop()
+                                                    menuIme.composerWasEditing = false
                                                     focusManager.clearFocus(force = true)
                                                     keyboardController?.hide()
                                                 },
