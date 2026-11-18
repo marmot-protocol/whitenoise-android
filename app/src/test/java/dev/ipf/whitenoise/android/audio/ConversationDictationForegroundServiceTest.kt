@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
@@ -106,6 +107,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
                 .orEmpty()
         assertFalse(title.contains("account", ignoreCase = true))
         assertFalse(title.contains("group", ignoreCase = true))
+        assertActiveDictationIcon(notification)
         assertNativeNotificationActions(service, harness, notification)
         assertEquals("Starting dictation…", notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
         assertFalse(notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
@@ -126,6 +128,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
                 .single()
                 .notification
         assertEquals("Transcribing…", processing.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+        assertActiveDictationIcon(processing)
         assertFalse(processing.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
         assertNativeNotificationActions(service, harness, processing)
 
@@ -161,6 +164,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
 
         val backgroundRefresh = service.foreground.foregroundNotification()
         assertEquals("Dictation active", backgroundRefresh.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertActiveDictationIcon(backgroundRefresh)
         assertNativeNotificationActions(service, harness, backgroundRefresh)
         lifecycle.destroy()
     }
@@ -187,6 +191,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
             "White Noise is connected",
             restored.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
         )
+        assertEquals(R.drawable.ic_stat_whitenoise, restored.smallIcon.resId)
         lifecycle.destroy()
     }
 
@@ -494,6 +499,7 @@ internal class ConversationDictationForegroundServiceStartTest : ConversationDic
                     "Dictation needs attention",
                     notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
                 )
+                assertEquals(R.drawable.ic_stat_whitenoise, notification.smallIcon.resId)
                 assertNull(notification.contentView)
                 assertEquals(1, notification.actions.size)
                 assertEquals(

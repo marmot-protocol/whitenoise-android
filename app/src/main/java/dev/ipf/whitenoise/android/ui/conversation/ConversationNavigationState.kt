@@ -1,12 +1,16 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
+import dev.ipf.whitenoise.android.state.ConversationController
 import kotlinx.coroutines.Job
 
 internal data class ConversationSearchScrollAnchor(
@@ -61,4 +65,26 @@ internal class ConversationNavigationState(
         targetNavigation.cancel()
         targetHighlight.clear()
     }
+}
+
+/** Remembers navigation state per controller and cancels all controller-owned jobs on disposal. */
+@Composable
+internal fun rememberConversationNavigationState(
+    controller: ConversationController,
+    initialFollowedLatestId: String?,
+    initialSeedTailAwaitingAuthoritative: Boolean,
+    surfaceState: ConversationSurfaceState,
+): ConversationNavigationState {
+    val state =
+        remember(controller, surfaceState) {
+            ConversationNavigationState(
+                initialFollowedLatestId = initialFollowedLatestId,
+                initialSeedTailAwaitingAuthoritative = initialSeedTailAwaitingAuthoritative,
+                surfaceState = surfaceState,
+            )
+        }
+    DisposableEffect(state) {
+        onDispose(state::cancelJobs)
+    }
+    return state
 }

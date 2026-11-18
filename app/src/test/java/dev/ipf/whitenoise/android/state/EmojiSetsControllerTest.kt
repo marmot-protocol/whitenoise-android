@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.InstalledEmojiSetStateFfi
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -273,6 +274,125 @@ class EmojiSetsControllerTest {
             assertEquals(complete, controller.state.preview)
             assertEquals(0, changes)
         }
+
+    /** The opening sync leaves the rows usable, holds back Find and lands its reread when the relays answer. */
+    @Test
+    fun backgroundSyncKeepsRowsUsable() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            val relays = CompletableDeferred<Boolean>()
+            backend.onDiscover = { relays.await() }
+            val controller = EmojiSetsController(backend) {}
+
+            val sync = async { controller.discoverInBackground() }
+            runCurrent()
+            assertTrue(controller.state.discovering)
+            assertFalse(controller.state.busy)
+            controller.discover("forest")
+            assertEquals(1, backend.discoverCalls)
+            controller.show(backend.set)
+            assertEquals(backend.set, controller.state.preview)
+
+            relays.complete(true)
+            assertTrue(sync.await())
+            assertFalse(controller.state.discovering)
+            assertEquals(listOf(backend.set), controller.state.sets)
+        }
+
+    /** An incomplete or failed opening sync reports itself in the list, after any open preview closes. */
+    @Test
+    fun backgroundSyncNoticeNeverCoversAPreview() =
+        runTest {
+            val outcomes: List<suspend () -> Boolean> = listOf({ false }, { error("relay failure") })
+            val notices = listOf(EmojiSetNotice.DiscoveryIncomplete, EmojiSetNotice.Error)
+            outcomes.zip(notices).forEach { (outcome, notice) ->
+                listOf(false, true).forEach { previewOpen ->
+                    val backend = FakeEmojiSetsBackend()
+                    backend.onDiscover = outcome
+                    val controller = EmojiSetsController(backend) {}
+                    if (previewOpen) controller.show(backend.set)
+
+                    assertFalse(controller.discoverInBackground())
+                    assertEquals(if (previewOpen) null else notice, controller.state.notice)
+                    assertFalse(controller.state.discovering)
+                    if (previewOpen) controller.dismissPreview()
+                    assertEquals(notice, controller.state.notice)
+                }
+            }
+        }
+
+    /** A failed opening read stops reporting once the opening sync rereads the list. */
+    @Test
+    fun backgroundSyncClearsAFailedOpeningRead() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            backend.beforeSets = { error("read failure") }
+            val controller = EmojiSetsController(backend) {}
+            controller.load()
+            assertEquals(EmojiSetNotice.Error, controller.state.notice)
+
+            backend.beforeSets = {}
+            assertTrue(controller.discoverInBackground())
+            assertNull(controller.state.notice)
+            assertEquals(listOf(backend.set), controller.state.sets)
+        }
+
+    /** A slow opening reread cannot replace the list a later removal already reread. */
+    @Test
+    fun staleSyncReadCannotOverwriteANewerList() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            backend.set = backend.set.copy(installed = InstalledEmojiSetStateFfi("old", 0u, 0u, 1u, 100u, false))
+            val staleRead = CompletableDeferred<Unit>()
+            backend.beforeSets = { staleRead.await() }
+            val controller = EmojiSetsController(backend) {}
+            val sync = launch { controller.discoverInBackground() }
+            runCurrent()
+
+            backend.beforeSets = {}
+            controller.show(backend.set)
+            controller.remove()
+            staleRead.complete(Unit)
+            sync.join()
+
+            assertEquals(listOf(backend.set), controller.state.sets)
+            assertNull(
+                controller.state.sets
+                    .single()
+                    .installed,
+            )
+        }
+
+    /** A newer read that fails cannot discard the list an earlier removal reread. */
+    @Test
+    fun failedSyncReadKeepsARemovalsList() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            backend.set = backend.set.copy(installed = InstalledEmojiSetStateFfi("old", 0u, 0u, 1u, 100u, false))
+            val relays = CompletableDeferred<Boolean>()
+            backend.onDiscover = { relays.await() }
+            val controller = EmojiSetsController(backend) {}
+            val sync = launch { controller.discoverInBackground() }
+            runCurrent()
+
+            controller.show(backend.set)
+            val removalRead = CompletableDeferred<Unit>()
+            backend.beforeSets = { removalRead.await() }
+            val removal = launch { controller.remove() }
+            runCurrent()
+
+            backend.beforeSets = { error("read failure") }
+            relays.complete(true)
+            sync.join()
+            removalRead.complete(Unit)
+            removal.join()
+
+            assertNull(
+                controller.state.sets
+                    .single()
+                    .installed,
+            )
+        }
 }
 
 private class FakeEmojiSetsBackend : EmojiSetsBackend {
@@ -283,9 +403,22 @@ private class FakeEmojiSetsBackend : EmojiSetsBackend {
     var beforeCurrent: suspend () -> Unit = {}
     var beforeNewInstall: () -> Unit = {}
 
-    override suspend fun sets(search: String?) = listOf(set)
+    var beforeSets: suspend () -> Unit = {}
+    var onDiscover: suspend () -> Boolean = { true }
+    var discoverCalls = 0
 
-    override suspend fun discover(search: String?) = true
+    /** Snapshots the projection before [beforeSets], so a held read returns what it saw when it started. */
+    override suspend fun sets(search: String?): List<EmojiSetFfi> {
+        val snapshot = listOf(set)
+        beforeSets()
+        return snapshot
+    }
+
+    /** Counts relay syncs; [onDiscover] can hold or fail one. */
+    override suspend fun discover(search: String?): Boolean {
+        discoverCalls++
+        return onDiscover()
+    }
 
     override suspend fun fetch(input: String) = set
 

@@ -323,28 +323,6 @@ private val InitialTimelineBackfillNoProgressError =
                 "No backward timeline progress was observed.",
     )
 
-/** Remembers navigation state per controller and cancels all controller-owned jobs on disposal. */
-@Composable
-private fun rememberConversationNavigationState(
-    controller: ConversationController,
-    initialFollowedLatestId: String?,
-    initialSeedTailAwaitingAuthoritative: Boolean,
-    surfaceState: ConversationSurfaceState,
-): ConversationNavigationState {
-    val state =
-        remember(controller, surfaceState) {
-            ConversationNavigationState(
-                initialFollowedLatestId = initialFollowedLatestId,
-                initialSeedTailAwaitingAuthoritative = initialSeedTailAwaitingAuthoritative,
-                surfaceState = surfaceState,
-            )
-        }
-    DisposableEffect(state) {
-        onDispose(state::cancelJobs)
-    }
-    return state
-}
-
 // One combined limit for every composer intake path, media and documents together (#2576). Sends are
 // split into bounded chunks, so the count no longer bounds a single message's payload.
 // A reply is still one message, so ConversationMediaSender keeps it to ATTACHMENT_CHUNK_MAX_ITEMS.
@@ -2134,6 +2112,7 @@ internal fun ConversationScreen(
     var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
     var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     var stickerSheetOpen by remember(chat.id) { mutableStateOf(false) }
+    var emojiLibraryPages by remember(chat.id) { mutableStateOf(emptyList<ConversationEmojiLibraryPage>()) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
         rememberOriginGuardedResultLauncher(
@@ -4725,6 +4704,19 @@ internal fun ConversationScreen(
                             } else {
                                 null
                             },
+                        // Installed sets belong to the active account, which also owns the picker's library.
+                        onBrowseEmojiSets =
+                            if (draftAccountRef != null && draftAccountRef == appState.activeAccountRef) {
+                                { emojiLibraryPages = listOf(ConversationEmojiLibraryPage.Sets) }
+                            } else {
+                                null
+                            },
+                        onOpenEmojiSettings =
+                            if (draftAccountRef != null && draftAccountRef == appState.activeAccountRef) {
+                                { emojiLibraryPages = listOf(ConversationEmojiLibraryPage.Settings) }
+                            } else {
+                                null
+                            },
                         onPasteImageUris = { uris ->
                             imageDropImport.import(
                                 uris = uris,
@@ -5691,6 +5683,12 @@ internal fun ConversationScreen(
                 onDismiss = { stickerSheetOpen = false },
             )
         }
+
+        ConversationEmojiLibraryOverlay(
+            appState = appState,
+            pages = emojiLibraryPages,
+            onPagesChange = { emojiLibraryPages = it },
+        )
 
         if (shareUserPickerOpen) {
             val activeHex = conversationSelfAccountIdHex

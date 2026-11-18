@@ -51,6 +51,8 @@ class ConversationAnchoringSourceCoverageTest {
     @Test
     fun conversationAnchoringLifecycleFollowsController() {
         val source = conversationScreenSource().motionOwnerSource()
+        val navigationState =
+            conversationScreenSource().parentFile.resolve("ConversationNavigationState.kt").readText()
         val entrySnapshotIndex = source.indexOf("val entryUnreadSnapshot =")
         val scrollRestoreIndex = source.indexOf("val scrollRestore =")
         val unreadJumpOwner =
@@ -65,7 +67,7 @@ class ConversationAnchoringSourceCoverageTest {
                 "remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration)",
                 "mutableStateOf(ConversationUnreadJumpState())",
             ) &&
-                source.containsAll(
+                (source + navigationState).containsAll(
                     "ConversationNavigationState(",
                     "onDispose(state::cancelJobs)",
                     "var lastFollowedLatestId: String? = initialFollowedLatestId",
