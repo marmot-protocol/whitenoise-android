@@ -7,6 +7,10 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
+        // Google's byte-for-byte copy of Maven Central, tried first. Shared CI runners hit Central's per-address
+        // limit whenever an artifact is not cached yet — HTTP 429, then 403 — and the build fails. Strict checksum
+        // verification covers every repository, and Central stays the fallback for anything not yet synced.
+        maven("https://maven-central.storage-download.googleapis.com/maven2/") { name = "GoogleMavenCentralMirror" }
         mavenCentral()
         gradlePluginPortal {
             content {
@@ -26,6 +30,8 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
+        // The same Maven Central copy as for plugins above, tried before Central itself.
+        maven("https://maven-central.storage-download.googleapis.com/maven2/") { name = "GoogleMavenCentralMirror" }
         mavenCentral()
     }
 }
