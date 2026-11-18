@@ -13,14 +13,6 @@
         ]
       },
       {
-        "surface": "Dictation caller-audio capability probe",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
-        "anchor": "private class ConversationDictationCallerAudioProbe(",
-        "test_ids": [
-          "DIC-003"
-        ]
-      },
-      {
         "surface": "Dictation platform-error cause mapping",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
         "anchor": "fun Int.toConversationDictationFailure()",

@@ -26,14 +26,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,14 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
-import dev.ipf.whitenoise.android.audio.clearMicrophoneRecovery
-import dev.ipf.whitenoise.android.audio.onMicrophoneHostPaused
-import dev.ipf.whitenoise.android.audio.onMicrophoneHostResumed
-import dev.ipf.whitenoise.android.audio.onMicrophoneOriginChanged
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.core.ChatLink
 import dev.ipf.whitenoise.android.core.ChatLinkParse
@@ -555,56 +548,7 @@ internal fun WhiteNoiseApp(
         // the UI but the biometric sheet waits for the real decision.
         if (appState.appLock.screenVisible && !appState.appLock.evaluationPending) onRequestAppUnlock()
     }
-    LaunchedEffect(
-        dictationState,
-        appState.activeAccountRef,
-        appState.activeConversationGroupIdHex,
-        appState.pendingProfileNpub,
-    ) {
-        if (appState.pendingProfileNpub != null) dictation.clearMicrophoneRecovery()
-        dictation.onMicrophoneOriginChanged(appState.activeAccountRef, appState.activeConversationGroupIdHex)
-    }
-    val microphoneLifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(dictation, microphoneLifecycle) {
-        // App lock may defer acceptance, but a profile or replacement conversation consumes the return.
-        dictation.microphoneOriginValid = {
-            val target = dictation.state.target
-            target != null &&
-                appState.pendingProfileNpub == null &&
-                target.matchesConversation(
-                    appState.activeAccountRef.orEmpty(),
-                    appState.activeConversationGroupIdHex.orEmpty(),
-                )
-        }
-        dictation.microphoneHostReady = {
-            val target = dictation.state.target
-            microphoneLifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
-                target != null &&
-                target.matchesConversation(
-                    appState.activeAccountRef.orEmpty(),
-                    appState.activeConversationGroupIdHex.orEmpty(),
-                ) &&
-                appState.isConversationDictationOriginVisible(target.accountRef, target.groupIdHex)
-        }
-        val observer =
-            LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_PAUSE -> dictation.onMicrophoneHostPaused()
-                    Lifecycle.Event.ON_RESUME -> dictation.onMicrophoneHostResumed()
-                    Lifecycle.Event.ON_STOP -> {
-                        if (dictation.microphoneSettingsRecovery?.native == true) dictation.clearMicrophoneRecovery()
-                    }
-                    else -> Unit
-                }
-            }
-        microphoneLifecycle.addObserver(observer)
-        onDispose {
-            microphoneLifecycle.removeObserver(observer)
-            dictation.microphoneOriginValid = { false }
-            dictation.microphoneHostReady = { false }
-            dictation.clearMicrophoneRecovery()
-        }
-    }
+    ConversationDictationMicrophoneEffects(appState, dictation, dictationState)
     LaunchedEffect(dictationPermissionRequestId) {
         if (dictationPermissionRequestId > 0L && dictation.state is ConversationDictationState.PermissionRequired) {
             if (dictation.beginPermissionRequest(dictationPermissionRequestId)) {

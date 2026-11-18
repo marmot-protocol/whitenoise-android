@@ -22,3 +22,14 @@ internal fun conversationDictationControllerSource(): String {
     val files = conversationDictationControllerFiles()
     return files.joinToString("\n") { it.readText() }
 }
+
+/** Reads the Android adapter and its platform topic declarations. */
+internal fun androidConversationDictationPlatformSource(): String {
+    val audio = appModuleFile("src/main/java/dev/ipf/whitenoise/android/audio")
+    val topics =
+        audio
+            .listFiles { file -> file.name.matches(Regex("""(?:AndroidConversationDictationPlatform\w+|ConversationDictationCallerAudioProbe)\.kt""")) }
+            .orEmpty()
+            .sortedBy(File::getName)
+    return (listOf(File(audio, "AndroidConversationDictationPlatform.kt")) + topics).joinToString("\n") { it.readText() }
+}

@@ -110,8 +110,7 @@ class ConversationDictationCompatibilityContractTest {
         val activity = projectFile("app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt").readText()
         val controller = conversationDictationControllerSource()
         val platform =
-            projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt")
-                .readText()
+            androidConversationDictationPlatformSource()
 
         assertFalse("DICTATION_START_EXPERIMENT" in activity)
         assertFalse("ConversationDictationStartExperiment" in controller)
@@ -163,8 +162,7 @@ class ConversationDictationCompatibilityContractTest {
         }
 
         val platform =
-            projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt")
-                .readText()
+            androidConversationDictationPlatformSource()
 
         // Capability detection must never open a recorder: it hands over a descriptor only.
         assertFalse("AudioRecord(" in platform)

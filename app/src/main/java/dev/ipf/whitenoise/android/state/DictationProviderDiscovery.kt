@@ -18,3 +18,7 @@ internal suspend fun discoverDictationProvidersForSettings(
     }
     return providers
 }
+
+/** Settings discovery is lifecycle-local; protocol data never enters this platform snapshot. */
+internal suspend fun WhiteNoiseAppState.discoverDictationProviders(): List<ConversationDictationProvider> =
+    discoverDictationProvidersForSettings(appContext, conversationDictationPreferences)
