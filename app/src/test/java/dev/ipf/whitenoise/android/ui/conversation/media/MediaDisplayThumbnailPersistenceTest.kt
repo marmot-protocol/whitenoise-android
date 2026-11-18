@@ -235,7 +235,9 @@ class MediaDisplayThumbnailPersistenceTest {
         composeRule.setContent { WhiteNoiseTheme { state = ObserveLoad() } }
         composeRule.waitUntil(10_000) {
             composeRule.waitForIdle()
-            state?.startDownload == true && state?.downloadActionReady == true && fixture.state.hasInteractive(transfer) &&
+            state?.startDownload == true &&
+                state?.downloadActionReady == true &&
+                fixture.state.hasInteractive(transfer) &&
                 metadataOwners.isNotEmpty() && metadataOwners.all { it.isCompleted }
         }
         // At zero layout size the visual effect cannot read native state. Finish metadata owners before
