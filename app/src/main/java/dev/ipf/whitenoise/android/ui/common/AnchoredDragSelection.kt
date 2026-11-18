@@ -141,6 +141,7 @@ internal fun Modifier.longPressOrVerticalDrag(
             if (!currentEnabled) return@awaitEachGesture
             longPress.consume()
             val origin = longPress.position
+            var displacement = Offset.Zero
             var dragging = false
             var rangeActivated = false
             var horizontalGestureWon = false
@@ -169,7 +170,10 @@ internal fun Modifier.longPressOrVerticalDrag(
                         currentGestureCancel()
                         break
                     }
-                    val displacement = change.position - origin
+                    // Both positions are expressed in the current local coordinates.
+                    // Their delta excludes movement of this row during IME/layout changes;
+                    // comparing against the saved local origin would mistake that for a drag.
+                    displacement += change.position - change.previousPosition
                     if (!dragging && !horizontalGestureWon) {
                         val verticalDistance = abs(displacement.y)
                         val horizontalDistance = abs(displacement.x)
@@ -177,7 +181,7 @@ internal fun Modifier.longPressOrVerticalDrag(
                             verticalDistance > viewConfiguration.touchSlop &&
                                 verticalDistance >= horizontalDistance -> {
                                 dragging = true
-                                currentDragStart(origin)
+                                currentDragStart(change.position - displacement)
                                 rangeActivated = currentDrag(change.position)
                             }
                             horizontalDistance > viewConfiguration.touchSlop &&

@@ -10,7 +10,9 @@ class GodComposableDecompositionCoverageTest {
     @Test
     fun conversationMediaWorkLivesOutsideConversationScreenComposition() {
         val screenSource = source("conversation/ConversationScreen.kt").readText()
-        val sender = source("conversation/ConversationMediaSender.kt").readText()
+        val sender =
+            source("conversation/ConversationMediaSender.kt").readText() +
+                source("conversation/ConversationAttachmentReader.kt").readText()
 
         assertTrue(
             "ConversationScreen must remember one media sender holder",

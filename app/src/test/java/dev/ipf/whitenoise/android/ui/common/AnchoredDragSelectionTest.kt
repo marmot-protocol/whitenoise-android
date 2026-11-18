@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -188,6 +189,57 @@ class AnchoredDragSelectionTest {
         assertEquals(1, dragStarts)
         assertTrue(dragMoves >= 1)
         assertEquals(1, dragEnds)
+    }
+
+    @Test
+    fun movingRowUnderStationaryHoldDoesNotStartRangeSelection() {
+        verifyHoldAcrossRowMovement(moveFinger = false)
+    }
+
+    @Test
+    fun fingerMovementAfterRowMovesStillStartsRangeSelection() {
+        verifyHoldAcrossRowMovement(moveFinger = true)
+    }
+
+    private fun verifyHoldAcrossRowMovement(moveFinger: Boolean) {
+        val rowOffset = mutableStateOf(100.dp)
+        var dragStarts = 0
+        var releases = 0
+        composeRule.setContent {
+            Box(Modifier.size(400.dp).testTag("stationary-window")) {
+                Box(
+                    Modifier
+                        .offset(y = rowOffset.value)
+                        .size(200.dp)
+                        .longPressOrVerticalDrag(
+                            onLongPressRelease = { releases++ },
+                            onDragStart = { dragStarts++ },
+                            onDrag = { true },
+                            onDragEnd = {},
+                            onGestureCancel = {},
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithTag("stationary-window").performTouchInput {
+            down(Offset(width / 4f, height / 2f))
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset.Zero)
+        }
+        composeRule.runOnIdle { rowOffset.value = 40.dp }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("stationary-window").performTouchInput {
+            moveBy(Offset.Zero)
+        }
+        composeRule.runOnIdle { assertEquals(0, dragStarts) }
+        composeRule.onNodeWithTag("stationary-window").performTouchInput {
+            if (moveFinger) moveBy(Offset(0f, viewConfiguration.touchSlop + 24f))
+            up()
+        }
+        composeRule.runOnIdle {
+            assertEquals(if (moveFinger) 1 else 0, dragStarts)
+            assertEquals(if (moveFinger) 0 else 1, releases)
+        }
     }
 
     @Test

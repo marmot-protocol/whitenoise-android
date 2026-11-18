@@ -3,7 +3,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,7 +19,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,7 +26,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -40,7 +36,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,8 +61,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.state.nativeFolderMembership
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
-import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -223,10 +216,14 @@ internal fun MessageActionMenu(
                 },
             )
         }
+    // The transcript can reflow as the menu dismisses the IME. Its lifted copy
+    // stays anchored to the bubble at the original press position.
+    val pressedBounds = remember { anchorBoundsInWindow }
+    val pressedY = remember { anchorWindowYPx }
     FocusedMessageActions(
         initiatingHoldActive = initiatingHoldActive,
-        sourceBounds = anchorBoundsInWindow,
-        touchY = anchorWindowYPx,
+        sourceBounds = pressedBounds,
+        touchY = pressedY,
         mine = mine,
         actions = actions,
         quickReactions = quickReactionEmojis,
@@ -331,26 +328,6 @@ internal fun forwardTargetMembersPreview(
         ?.takeIf { it.isNotBlank() }
 }
 
-/**
- * Folder bulk-select rows restricted to the owning account's current eligible destinations.
- * Saved manual membership can contain the origin or removed chats, so intersect before
- * counting or toggling and retain the same destination order as the individual rows.
- */
-internal fun forwardFolderBulkRows(
-    appState: WhiteNoiseAppState,
-    targets: List<ChatListItem>,
-    groupTitleCopy: GroupTitleCopy,
-    ownerAccountRef: String? = appState.activeAccountRef,
-    ownerAccountIdHex: String? = appState.activeAccount?.accountIdHex,
-): List<Pair<ChatFolder, List<String>>> =
-    destinationFolderMembershipRows(
-        appState,
-        targets,
-        groupTitleCopy,
-        ownerAccountRef,
-        ownerAccountIdHex,
-    ).filter { (folder, memberIds) -> folder.name.isNotBlank() && memberIds.size >= 2 }
-
 /** Resolves all saved folders against the same bounded, eligible account-owned destinations. */
 internal fun destinationFolderMembershipRows(
     appState: WhiteNoiseAppState,
@@ -416,50 +393,6 @@ internal fun forwardTargetDisplayTitle(
                 soleSelfMember = item.presentationActiveAccountIsSoleMember,
             )
     }
-
-/**
- * True only when neither chat rows nor folder rows would render — no rows at
- * all only when there are no chat rows to show AND no folder rows matched,
- * because a query hitting only a folder name must still render that folder.
- */
-internal fun forwardPickerHasNoRows(
-    targetsEmpty: Boolean,
-    filteredEmpty: Boolean,
-    foldersEmpty: Boolean,
-): Boolean = (targetsEmpty || filteredEmpty) && foldersEmpty
-
-internal fun visibleForwardFolderRows(
-    rows: List<Pair<ChatFolder, List<String>>>,
-    query: String,
-): List<Pair<ChatFolder, List<String>>> {
-    if (query.isBlank()) return rows
-    return rows.filter { (folder, _) -> folder.name.contains(query.trim(), ignoreCase = true) }
-}
-
-private fun LazyListScope.forwardFolderSection(
-    rows: List<Pair<ChatFolder, List<String>>>,
-    selected: SnapshotStateList<String>,
-) {
-    if (rows.isEmpty()) return
-    item { SectionHeader(stringResource(R.string.chat_folders_title)) }
-    items(rows, key = { (folder, _) -> "folder:" + folder.id }) { (folder, memberIds) ->
-        val triState = chatFolderTriState(memberIds, selected.toSet())
-        ListItem(
-            modifier =
-                Modifier.clickable {
-                    val nextSelection = forwardSelectionAfterFolderToggle(selected, memberIds)
-                    selected.clear()
-                    selected.addAll(nextSelection)
-                },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            leadingContent = { TriStateCheckbox(state = triState, onClick = null) },
-            headlineContent = { EmojiLabel(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            supportingContent = {
-                Text(pluralStringResource(R.plurals.chat_folder_chat_count, memberIds.size, memberIds.size))
-            },
-        )
-    }
-}
 
 /** Forward details: the operation summary, slow-aware preparation progress and one row per destination. */
 @Composable

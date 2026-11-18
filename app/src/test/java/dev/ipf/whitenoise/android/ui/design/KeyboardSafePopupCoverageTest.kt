@@ -160,8 +160,8 @@ class KeyboardSafePopupCoverageTest {
 
         assertTrue("Native commands must reach the focused presentation", "FocusedMessageActions(" in body)
         listOf(
-            "sourceBounds = anchorBoundsInWindow",
-            "touchY = anchorWindowYPx",
+            "sourceBounds = pressedBounds",
+            "touchY = pressedY",
             "actions = actions",
             "previewReady = previewReady",
             "onDismiss = onDismissRequest",
@@ -180,15 +180,18 @@ class KeyboardSafePopupCoverageTest {
                 "): IntOffset = IntOffset.Zero" in focusedSource,
         )
         assertTrue(
-            "The travel range must be the frame the system bars and keyboard leave behind",
-            "windowInsetsPadding(WindowInsets.safeDrawing)" in focusedBody &&
+            "The travel range must be the full-height frame the system bars leave behind",
+            "windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))" in focusedBody &&
                 "frameHeightPx = constraints.maxHeight" in focusedBody,
         )
         assertTrue(
             "Frozen message bounds and the original touch point must own where the stack rests",
             "anchorCenterPx = sourceBounds?.center?.y ?: touchY?.roundToInt()" in focusedBody &&
                 "topInsetPx = topInsetPx" in focusedBody &&
-                "WindowInsets.safeDrawing.getTop(LocalDensity.current)" in focusedBody &&
+                (
+                    "WindowInsets.systemBars.union(WindowInsets.displayCutout)" +
+                        ".getTop(LocalDensity.current)"
+                ) in focusedBody &&
                 "previewCenterInStackPx = previewCenterInStackPx" in focusedBody,
         )
         assertTrue(
@@ -198,13 +201,24 @@ class KeyboardSafePopupCoverageTest {
                 scrollBinding in scrollSource,
         )
         assertTrue(
-            "The stack must remain transparent until its layout, its placement and the preview are ready",
-            "measured = it.width > 0 && it.height > 0" in focusedBody &&
-                "alpha = if (measured && previewReady && travel.placed) 1f else 0f" in focusedBody,
-        )
-        assertTrue(
             "A re-shown popup reports no height on its first frame and must not be placed on it",
             "if (stackHeightPx <= 0) return@LaunchedEffect" in focusedSource,
+        )
+    }
+
+    @Test
+    fun hiddenMessageStackRemainsInvisibleInaccessibleAndInert() {
+        val focusedBody = focusedMessageActionsSource().readText().functionBody("FocusedMessageActions")
+        val visibilitySource = messageActionsSource().resolveSibling("FocusedMessageStackVisibility.kt").readText()
+        assertTrue(
+            "The stack must remain transparent until its layout, its placement and the preview are ready",
+            "measured = it.width > 0 && it.height > 0" in focusedBody &&
+                "stackVisible = measured && previewReady && travel.placed && !imeVisible" in focusedBody &&
+                ".focusedStackAlpha(stackVisible)" in focusedBody &&
+                ".focusedStackInputGuard(stackVisible)" in focusedBody &&
+                "alpha = if (visible) 1f else 0f" in visibilitySource &&
+                "Modifier.clearAndSetSemantics {}.pointerInput(Unit)" in visibilitySource &&
+                "awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }" in visibilitySource,
         )
     }
 

@@ -19,7 +19,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.messages.FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessagePickerContent
 import dev.ipf.whitenoise.android.ui.conversation.messages.PickerStateListener
-import dev.ipf.whitenoise.android.ui.conversation.messages.forwardFolderChipTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -41,7 +40,7 @@ class ForwardAttentionFolderReactivityTest {
 
     @Test
     fun unreadMentionFolderTracksReadPinAndDirectStateWithoutRemounting() {
-        val appState = emptyAppState()
+        val appState = emptyAppState(profiles = mutableMapOf(PEER_B to profile("Person B")))
         val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
         seedAttentionChats(controller, ACCOUNT_REF, ACCOUNT_HEX)
         appState.attachChatsController(controller)
@@ -54,13 +53,12 @@ class ForwardAttentionFolderReactivityTest {
         val mentioned = attentionRow(GROUP_B)
         try {
             renderPicker(appState)
-            val chip = composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id))
-            chip.assertExists()
+            val chip = composeRule.onNodeWithTag("destination.filter.${folder.id}")
             val filterTag = "destination.filter.${folder.id}"
             composeRule.onNodeWithTag("destination.filters").performScrollToNode(hasTestTag(filterTag))
             composeRule.onNodeWithTag(filterTag).performClick().assertIsSelected()
 
-            // Forward folder chips require two eligible targets; losing one must hide the chip.
+            // The folder pill remains available while its visible chat membership changes.
             val excludedRows =
                 listOf(
                     mentioned.copy(unreadMention = false, unreadMentionCount = 0uL), // ordinary unread
@@ -82,10 +80,12 @@ class ForwardAttentionFolderReactivityTest {
                 )
             excludedRows.forEach { excluded ->
                 publishAndAwaitRevision(controller, excluded)
-                chip.assertDoesNotExist()
+                chip.assertExists()
+                composeRule.onNodeWithText("Person B").assertDoesNotExist()
                 composeRule.onNodeWithTag(filterTag).assertIsSelected()
                 publishAndAwaitRevision(controller, mentioned)
                 chip.assertExists()
+                composeRule.onNodeWithText("Person B").assertExists()
             }
         } finally {
             cleanUp(appState, listOf(controller))
@@ -93,11 +93,13 @@ class ForwardAttentionFolderReactivityTest {
     }
 
     @Test
+    @Suppress("LongMethod") // One fixture owns both accounts, controller cleanup, and row assertions.
     fun accountSwitchUsesTheDestinationUnreadMentionsForTheSameChatIds() {
         val otherAccountRef = "bob"
         val otherAccountHex = "d0".repeat(32)
         val appState =
             emptyAppState(
+                profiles = mutableMapOf(PEER_A to profile("Person A"), PEER_B to profile("Person B")),
                 accounts = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX), testAccount(otherAccountRef, otherAccountHex)),
             )
         val activeController = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
@@ -121,9 +123,10 @@ class ForwardAttentionFolderReactivityTest {
                     seedAttentionChats(controller, owner, otherAccountHex, hasMention = false)
                 },
             )
-            val activeChip = composeRule.onNodeWithTag(forwardFolderChipTestTag(folders.getValue(ACCOUNT_REF).id))
+            val activeChip = composeRule.onNodeWithTag("destination.filter.${folders.getValue(ACCOUNT_REF).id}")
             val destinationChip =
-                composeRule.onNodeWithTag(forwardFolderChipTestTag(folders.getValue(otherAccountRef).id))
+                composeRule.onNodeWithTag("destination.filter.${folders.getValue(otherAccountRef).id}")
+            scrollToFolder(folders.getValue(ACCOUNT_REF).id)
             activeChip.assertExists()
             composeRule.onNodeWithTag(FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG).performClick()
             composeRule.onNodeWithText(otherAccountRef).performClick()
@@ -131,23 +134,36 @@ class ForwardAttentionFolderReactivityTest {
                 selectedOwner == otherAccountRef && destinationController != null
             }
             activeChip.assertDoesNotExist()
-            destinationChip.assertDoesNotExist()
+            scrollToFolder(folders.getValue(otherAccountRef).id)
+            destinationChip.assertExists()
+            destinationChip.performClick().assertIsSelected()
+            composeRule.onNodeWithText("Person A").assertDoesNotExist()
+            composeRule.onNodeWithText("Person B").assertDoesNotExist()
 
             val destination = requireNotNull(destinationController)
             publishAndAwaitRevision(destination, attentionRow(GROUP_A), otherAccountRef)
-            destinationChip.assertDoesNotExist()
+            destinationChip.assertIsSelected()
+            composeRule.onNodeWithText("Person A").assertExists()
+            composeRule.onNodeWithText("Person B").assertDoesNotExist()
             publishAndAwaitRevision(destination, attentionRow(GROUP_B), otherAccountRef)
-            destinationChip.assertExists()
+            destinationChip.assertIsSelected()
+            composeRule.onNodeWithText("Person A").assertExists()
+            composeRule.onNodeWithText("Person B").assertExists()
             activeChip.assertDoesNotExist()
 
             composeRule.onNodeWithTag(FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG).performClick()
             composeRule.onNodeWithText(ACCOUNT_REF).performClick()
             composeRule.waitUntil(timeoutMillis = 5_000) { selectedOwner == ACCOUNT_REF }
+            scrollToFolder(folders.getValue(ACCOUNT_REF).id)
             activeChip.assertExists()
             destinationChip.assertDoesNotExist()
         } finally {
             cleanUp(appState, listOfNotNull(activeController, destinationController))
         }
+    }
+
+    private fun scrollToFolder(folderId: String) {
+        composeRule.onNodeWithTag("destination.filters").performScrollToNode(hasTestTag("destination.filter.$folderId"))
     }
 
     private fun seedAttentionChats(

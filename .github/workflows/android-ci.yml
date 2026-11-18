@@ -213,6 +213,15 @@ jobs:
             python3 scripts/check_manual_test_guide.py --base "$PR_BASE_SHA"
           fi
 
+      - name: Check the source file size baseline only shrinks
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          python3 -m unittest scripts/test_check_source_size_baseline.py
+          if [[ -n "$BASE_SHA" ]]; then
+            python3 scripts/check_source_size_baseline.py --base "$BASE_SHA"
+          fi
+
       - name: Assemble the source-bound manual testing guide
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}

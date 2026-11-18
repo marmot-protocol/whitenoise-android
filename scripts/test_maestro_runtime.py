@@ -1104,6 +1104,18 @@ class RuntimeEvidenceTest(unittest.TestCase):
                         self.assertIn(command['setOrientation'], allowed)
         self.assertGreater(rotations, 0)
 
+    def test_forward_sender_assertion_matches_localized_accessibility_description(self):
+        strings = ET.parse(runtime.ROOT / 'app/src/main/res/values/strings.xml').getroot()
+        template = next(item.text for item in strings if item.get('name') == 'share_sending_as_value')
+        description = template.replace('%1$s', 'Maestro Alice')
+        flow = runtime.ROOT / '.maestro/runtime/actions-forward-cancel.yaml'
+        commands = list(yaml.safe_load_all(flow.read_text()))[1]
+        self.assertIn({'assertVisible': {'text': description}}, commands)
+        bindings = json.loads((runtime.ROOT / 'config/maestro-screen-assertions.json').read_text())
+        screen = next(item for item in bindings["screens"] if item["symbol"] == "ForwardMessageSheet")
+        binding = next(item for item in screen["bindings"] if item["case"] == "actions-forward-cancel")
+        self.assertEqual(binding["selector"], {"text": description})
+
     def test_screen_inventory_keeps_partial_and_unexecuted_requirements_visible(self):
         """Screen discovery cannot transform same-ID flow links into complete or executed coverage."""
         result = inventory()

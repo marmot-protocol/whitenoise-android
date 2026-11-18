@@ -19,14 +19,17 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -55,7 +58,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
@@ -270,7 +272,7 @@ private val FocusedMoreIconSize = 24.dp
 internal const val FOCUSED_ACTION_MENU_SCROLL_TEST_TAG = "focused-action-menu-scroll"
 internal const val FOCUSED_REACTION_RAIL_TEST_TAG = "focused-reaction-rail"
 
-/** Prototype reaction rail, inert real-message preview and grouped command menu; preserves the host IME. */
+/** Reaction rail, inert message preview and commands in the full-height frame after the host hides IME. */
 @Composable
 @Suppress("LongMethod", "LongParameterList")
 internal fun FocusedMessageActions(
@@ -324,7 +326,7 @@ internal fun FocusedMessageActions(
                     .fillMaxSize()
                     // The overlay owns the whole window now, so the travel range is the part of it
                     // the stack may actually occupy rather than the part the system bars cover.
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
                     // A tap reaching the frame landed beside the stack, on nothing, and dismisses
                     // exactly as the scrim underneath it would have before the frame covered it.
                     .focusedDismissOnTap(
@@ -334,7 +336,7 @@ internal fun FocusedMessageActions(
         ) {
             // The lifted bubble reports a window coordinate; the frame below starts under the top
             // inset. The stack would rest a status bar too low without converting between them.
-            val topInsetPx = WindowInsets.safeDrawing.getTop(LocalDensity.current)
+            val topInsetPx = WindowInsets.systemBars.union(WindowInsets.displayCutout).getTop(LocalDensity.current)
             // The theme scales its typography by the app's text-size setting; sp also carries the system scale.
             val textScale = MaterialTheme.typography.bodyLarge.fontSize.value / Typography.bodyLarge.fontSize.value
             val emojiSize = with(LocalDensity.current) { (FocusedReactionEmojiSize.value * textScale).sp.toDp() }
@@ -368,6 +370,9 @@ internal fun FocusedMessageActions(
                     topInsetPx = topInsetPx,
                     previewCenterInStackPx = previewCenterInStackPx,
                 )
+            val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+            focusedMessageImeDismissEffect(imeVisible, onDismiss)
+            val stackVisible = measured && previewReady && travel.placed && !imeVisible
             Column(
                 modifier =
                     Modifier
@@ -379,22 +384,25 @@ internal fun FocusedMessageActions(
                         .onSizeChanged {
                             measured = it.width > 0 && it.height > 0
                             stackHeightPx = it.height
-                        }.graphicsLayer { alpha = if (measured && previewReady && travel.placed) 1f else 0f }
+                        }.focusedStackAlpha(stackVisible)
                         // Children consume their own taps first, so a tap that reaches the column
                         // landed on empty stack space or its padding and dismisses like the scrim.
                         .focusedDismissOnTap(
                             initiatingHoldActive = { currentInitiatingHold },
                             onDismiss = { currentOnDismiss() },
                         ).padding(horizontal = FocusedStackHorizontalPadding, vertical = FocusedOverlayShadowSafeInset)
+                        .focusedStackInputGuard(stackVisible)
                         .semantics {
-                            paneTitle = title
-                            customActions =
-                                listOf(
-                                    CustomAccessibilityAction(close) {
-                                        currentOnDismiss()
-                                        true
-                                    },
-                                )
+                            if (stackVisible) {
+                                paneTitle = title
+                                customActions =
+                                    listOf(
+                                        CustomAccessibilityAction(close) {
+                                            currentOnDismiss()
+                                            true
+                                        },
+                                    )
+                            }
                         }.testTag(MESSAGE_ACTION_MENU_TEST_TAG),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,

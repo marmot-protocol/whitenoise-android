@@ -119,6 +119,7 @@ internal fun ConversationBottomBar(
     onComposerPreImeBack: () -> Unit,
     /** True while system Back is closing the keyboard, so the composer collapses in the same frame. */
     composerDismissInProgress: Boolean = false,
+    preserveComposerEditingLayout: Boolean = false,
     onBottomInputChanged: () -> Unit,
     onKeyboardRestoreFromCustomInput: () -> Unit,
     onKeyboardRestoreFromCustomInputFailed: () -> Unit,
@@ -312,6 +313,7 @@ internal fun ConversationBottomBar(
                             onComposerFocusChanged = onComposerFocusChanged,
                             onComposerPreImeBack = onComposerPreImeBack,
                             composerDismissInProgress = composerDismissInProgress,
+                            preserveComposerEditingLayout = preserveComposerEditingLayout,
                             onBottomInputChanged = onBottomInputChanged,
                             onTimelineComposerMeasured = onTimelineComposerMeasured,
                             onKeyboardRestoreFromCustomInput = onKeyboardRestoreFromCustomInput,

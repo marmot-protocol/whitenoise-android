@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -64,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -242,6 +245,8 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlaySt
 import dev.ipf.whitenoise.android.ui.conversation.messages.LocalConversationSearchMarking
 import dev.ipf.whitenoise.android.ui.conversation.messages.LocalKeptMessages
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageMenuKeyboardOwner
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageMenuKeyboardPolicy
 import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardRequestHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageDetailsRecipients
@@ -548,7 +553,7 @@ private fun rememberConversationBatchSelectionUiState(
 }
 
 /** Renders one account-owned conversation and coordinates its route-stable presentation. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun ConversationScreen(
     appState: WhiteNoiseAppState,
@@ -1744,7 +1749,94 @@ internal fun ConversationScreen(
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    // Scoped to the actual controller: neither account/runtime replacement nor route exit
+    // can reuse a menu's pending keyboard restoration.
+    val menuIme = remember(controller) { MessageMenuKeyboardPolicy() }
+    var menuBackdropImeBottom by remember(controller) { mutableStateOf<Int?>(null) }
+    var menuBackdropImeReturning by remember(controller) { mutableStateOf(false) }
+    val displayedMenuImeBottom =
+        animatedMenuImeBackdrop(
+            frozenBottom = menuBackdropImeBottom,
+            returning = menuBackdropImeReturning,
+            liveBottom = { imeInsets.getBottom(density) },
+            onReleased = {
+                menuBackdropImeBottom = null
+                menuBackdropImeReturning = false
+            },
+        )
+    var menuComposerWasEditing by remember(controller) { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
+        if (openActionMenuId != null || menuIme.pendingRestore || menuBackdropImeBottom != null) {
+            menuIme.pause()
+            openActionMenuId = null
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+            menuBackdropImeBottom = null
+            menuBackdropImeReturning = false
+        }
+    }
+    val suppressMenuImeRestore = selectionMode || dragAnchorTimelineId != null
+    LaunchedEffect(openActionMenuId, routeTransitionInProgress, transcriptRoutedAway, suppressMenuImeRestore) {
+        if (routeTransitionInProgress || transcriptRoutedAway) {
+            menuIme.cancel()
+            menuBackdropImeBottom = null
+            menuBackdropImeReturning = false
+        } else if (openActionMenuId == null) {
+            val restoreOwner =
+                menuIme.close(
+                    replyTarget = controller.replyingTo?.messageIdHex,
+                    editTarget = controller.editingMessageId,
+                    selectionMode = suppressMenuImeRestore,
+                )
+            if (suppressMenuImeRestore) {
+                keyboardController?.hide()
+                menuBackdropImeBottom = null
+                menuBackdropImeReturning = false
+            } else if (restoreOwner != null) {
+                val focusTarget =
+                    when (restoreOwner) {
+                        MessageMenuKeyboardOwner.Search ->
+                            navigationState.searchFocusRequester.takeIf { navigationState.searchOpen }
+                        MessageMenuKeyboardOwner.Composer -> composerFocus.takeUnless { navigationState.searchOpen }
+                    }
+                if (
+                    focusTarget != null &&
+                    runCatching { focusTarget.requestFocus(FocusDirection.Enter) }.getOrDefault(false)
+                ) {
+                    keyboardController?.show()
+                } else {
+                    menuBackdropImeReturning = true
+                }
+                // Failed focus starts the continuous return immediately.
+            }
+        }
+    }
+    val menuImeTargetInsets = WindowInsets.imeAnimationTarget
+    LaunchedEffect(openActionMenuId, menuBackdropImeBottom != null) {
+        if (openActionMenuId == null && menuBackdropImeBottom != null && !menuBackdropImeReturning) {
+            // The return may use a shorter keyboard. Hand geometry back at its actual
+            // settled target, rather than waiting for the previous keyboard height.
+            awaitMenuImeRestore(
+                readInset = { imeInsets.getBottom(density) },
+                readTargetInset = { menuImeTargetInsets.getBottom(density) },
+                awaitFrame = { withFrameNanos { } },
+            )
+            // Settlement and timeout both enter a continuous handoff. Neither may
+            // swap a partial snapshot straight to a different live keyboard height.
+            menuBackdropImeReturning = true
+        }
+    }
     val scope = rememberCoroutineScope()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (menuIme.resumeRestoreCancelled) {
+            scope.launch {
+                // Let every resume observer consume the cancellation before a later
+                // user focus can establish the next ordinary foreground session.
+                withFrameNanos { }
+                menuIme.resumeConsumed()
+            }
+        }
+    }
     val exitConversationRoute =
         rememberConversationExitHandler(
             identity = chat.id,
@@ -3367,10 +3459,9 @@ internal fun ConversationScreen(
             timelineViewport = timelineViewport,
             bottomChromeHeightObserver = bottomChromeHeightObserver,
             composerFocused = composerFocused,
+            suppressComposerFocusRestore = { menuIme.resumeRestoreCancelled },
             searchOpen = navigationState.searchOpen,
-            hasActiveEditOrReplySession =
-                controller.editingMessageId != null ||
-                    controller.replyingTo != null,
+            hasActiveEditOrReplySession = controller.editingMessageId != null || controller.replyingTo != null,
             composerFocus = composerFocus,
             initialTimelineAnchored = initialTimelineAnchored,
             currentScrollAnchor = { currentScrollAnchor() },
@@ -4285,7 +4376,15 @@ internal fun ConversationScreen(
                     .fillMaxSize()
                     .then(transcriptRouteMotion)
                     .blur(if (openActionMenuId != null) 24.dp else 0.dp)
-                    .dismissTextSelectionOnOutsideTap(
+                    .then(
+                        if (displayedMenuImeBottom != null) {
+                            Modifier
+                                .padding(bottom = with(density) { displayedMenuImeBottom.toDp() })
+                                .consumeWindowInsets(WindowInsets.ime)
+                        } else {
+                            Modifier
+                        },
+                    ).dismissTextSelectionOnOutsideTap(
                         active = textSelectionMessageId != null,
                         selectedBoundsInWindow = textSelectionBubbleBounds,
                         onDismiss = ::clearTextSelection,
@@ -4719,6 +4818,7 @@ internal fun ConversationScreen(
                             ) &&
                                 !freezeRoutePresentation,
                         autoFocusConsumedState = composerAutoFocusConsumed,
+                        preserveComposerEditingLayout = menuBackdropImeBottom != null && menuComposerWasEditing,
                         composerFocus = composerFocus,
                         onComposerFocusChanged = { focused ->
                             if (focused) composerDismissInProgress = false
@@ -5125,10 +5225,46 @@ internal fun ConversationScreen(
                                                 onActionMenuOpenChange = { open ->
                                                     if (open) clearTextSelection()
                                                     if (open) {
+                                                        if (openActionMenuId == null &&
+                                                            menuIme.open(
+                                                                imeIsOpen,
+                                                                controller.replyingTo?.messageIdHex,
+                                                                controller.editingMessageId,
+                                                                focusOwner =
+                                                                    if (navigationState.searchOpen) {
+                                                                        MessageMenuKeyboardOwner.Search
+                                                                    } else {
+                                                                        MessageMenuKeyboardOwner.Composer
+                                                                    },
+                                                                // A previous show request can outlive its zero inset.
+                                                                restoreInFlight = menuBackdropImeBottom != null,
+                                                            )
+                                                        ) {
+                                                            menuComposerWasEditing =
+                                                                composerFocused &&
+                                                                !composerDismissInProgress
+                                                            // Freeze the visible handoff geometry.
+                                                            menuBackdropImeBottom =
+                                                                captureMenuImeBackdrop(
+                                                                    displayedMenuImeBottom,
+                                                                    imeInsets.getBottom(density),
+                                                                )
+                                                            menuBackdropImeReturning = false
+                                                            focusManager.clearFocus(force = true)
+                                                            keyboardController?.hide()
+                                                        }
                                                         openActionMenuId = item.presentationId
                                                     } else if (openActionMenuId == item.presentationId) {
                                                         openActionMenuId = null
                                                     }
+                                                },
+                                                onForwardMenuHandoff = {
+                                                    menuIme.cancel()
+                                                    menuBackdropImeBottom = null
+                                                    menuBackdropImeReturning = false
+                                                    menuComposerWasEditing = false
+                                                    focusManager.clearFocus(force = true)
+                                                    keyboardController?.hide()
                                                 },
                                                 onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                                 onReplyPreviewClick = { navigateToReplyTarget(it) },
