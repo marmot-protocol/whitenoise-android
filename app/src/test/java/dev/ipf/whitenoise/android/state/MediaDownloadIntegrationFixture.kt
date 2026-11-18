@@ -170,6 +170,14 @@ internal class MediaDownloadIntegrationFixture(
             pausedSignal.complete(Unit)
         }
 
+        internal val resumedSignal = CompletableDeferred<Unit>()
+
+        /** Lets a paused job transfer again, as MDK does once the host allows its type, without finishing it. */
+        fun resume() {
+            paused = false
+            resumedSignal.complete(Unit)
+        }
+
         /** Completes one synthetic native operation successfully. */
         fun succeed(bytes: ByteArray) {
             this.bytes = bytes
@@ -401,13 +409,15 @@ internal class MediaDownloadIntegrationFixture(
     /**
      * Emits an initial snapshot; later observation awaits native work without owning or cancelling it. Like a real
      * native feed, one opened before admission stays open until a job exists, and one that has reported READY never
-     * emits again. A paused job is reported once per subscription, then the feed waits for the job to end.
+     * emits again. A paused job is reported once per subscription, and so is its resume; then the feed waits for the
+     * job to end.
      */
     private fun subscription(key: String): AttachmentTransferSubscription {
         val initialSnapshot = AttachmentTransferSnapshotFfi(listOf(status(key)))
         return nativeStub(FixtureTransferFeed::class.java).also {
             var initial = true
             var pauseDelivered = false
+            var resumeDelivered = false
             var readyDelivered = initialSnapshot.items.single().state == AttachmentTransferStateFfi.READY
             it.nextSnapshot = {
                 if (initial) {
@@ -424,7 +434,19 @@ internal class MediaDownloadIntegrationFixture(
                                 call.result.onJoin { false }
                                 call.pausedSignal.onJoin { true }
                             }
-                    if (deliverPause) pauseDelivered = true else call.result.await()
+                    val deliverResume =
+                        !deliverPause &&
+                            pauseDelivered &&
+                            !resumeDelivered &&
+                            select {
+                                call.result.onJoin { false }
+                                call.resumedSignal.onJoin { true }
+                            }
+                    when {
+                        deliverPause -> pauseDelivered = true
+                        deliverResume -> resumeDelivered = true
+                        else -> call.result.await()
+                    }
                     AttachmentTransferSnapshotFfi(listOf(status(key))).also { snapshot ->
                         readyDelivered = snapshot.items.single().state == AttachmentTransferStateFfi.READY
                     }

@@ -1,0 +1,109 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ProfileSheetAdminActionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "fun ProfileSheetAdminActionRow(",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "ProfileSheetAdminActionRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "fun ProfileSheetAdminActionRows(",
+        "test_ids": [
+          "GRP-006",
+          "GRP-007"
+        ]
+      },
+      {
+        "surface": "ProfileSheetAdminActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "fun ProfileSheetAdminActions(",
+        "test_ids": [
+          "PRO-001"
+        ]
+      },
+      {
+        "surface": "ProfileSheetModerationConfirmDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "fun ProfileSheetModerationConfirmDialog(",
+        "test_ids": [
+          "ACC-007",
+          "GRP-034"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:group_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "R.string.group_actions",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:make_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "R.string.make_admin",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:make_admin_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "R.string.make_admin",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:remove_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "R.string.remove_admin",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:remove_admin_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "R.string.remove_admin",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:remove_from_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "R.string.remove_from_group",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:remove_member_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "R.string.remove_from_group",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_action_revoke_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
+        "anchor": "R.string.group_action_revoke_explanation",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ],
+    "source_coverage": []
+  }
+}

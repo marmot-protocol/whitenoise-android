@@ -5,12 +5,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composer
 import androidx.compose.runtime.CompositionTracer
 import androidx.compose.runtime.InternalComposeTracingApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
@@ -38,17 +42,20 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * App-wide media cache changes reach the conversation screen only where they matter: the whole-timeline selection
  * pass while a selection exists, and media-viewer forwarding where a payload is built (#3523).
  */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ConversationMediaCacheSelectionTest {
     @get:Rule
@@ -69,6 +76,7 @@ class ConversationMediaCacheSelectionTest {
     fun cacheChangesWhileReadingDoNotRecomposeTheScreen() {
         val conversation = mountScreen(ConversationSurfaceState())
         composeRule.mainClock.autoAdvance = false
+        settleCompositions(SCREEN_SOURCE)
         val neutralTraceCounts = mutableMapOf<String, Int>()
         val cacheTraceCounts = mutableMapOf<String, Int>()
         val neutralRuns =
@@ -140,8 +148,17 @@ class ConversationMediaCacheSelectionTest {
     /** Long-presses the media message and chooses Select, as a reader starts a batch selection. */
     private fun selectMediaThroughItsActions() {
         composeRule.onNodeWithTag(messageBubbleRowTestTag(MEDIA_ID)).performTouchInput { longClick() }
+        // Robolectric must render the recorded media layer before its actions become visible.
+        composeRule.onNodeWithTag(messageBubbleRowTestTag(MEDIA_ID)).captureToImage()
         val select = ApplicationProvider.getApplicationContext<Context>().getString(R.string.select)
-        composeRule.onNodeWithText(select).performClick()
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText(select).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule
+            .onNodeWithText(select)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         composeRule.waitForIdle()
     }
 
@@ -150,7 +167,12 @@ class ConversationMediaCacheSelectionTest {
     fun keptMediaCardStillObservesCacheChanges() {
         val conversation = mountScreen(ConversationSurfaceState())
         composeRule.onNodeWithTag(messageBubbleRowTestTag(MEDIA_ID)).performTouchInput { longClick() }
+        // Robolectric must render the recorded media layer before its actions become visible.
+        composeRule.onNodeWithTag(messageBubbleRowTestTag(MEDIA_ID)).captureToImage()
         val keep = ApplicationProvider.getApplicationContext<Context>().getString(R.string.floating_keep)
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText(keep).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText(keep).performClick()
         composeRule.waitForIdle()
         composeRule.mainClock.autoAdvance = false
@@ -207,11 +229,29 @@ class ConversationMediaCacheSelectionTest {
         val conversation = conversation()
         val group = conversationTimelineTestGroup()
         val members = conversationTimelineMemberSnapshot()
+        val latest = conversation.timeline.last().record
+        val projection =
+            dev.ipf.whitenoise.android.state.chatRow(group.groupIdHex).copy(
+                groupName = group.name,
+                unreadCount = 0uL,
+                hasUnread = false,
+                firstUnreadMessageIdHex = null,
+                lastReadMessageIdHex = latest.messageIdHex,
+                lastReadTimelineAt = latest.recordedAt,
+            )
         composeRule.setContent {
             WhiteNoiseTheme {
                 ConversationScreen(
                     appState = conversation.appState,
-                    chat = ChatListItem(group, null, null, 1, memberSnapshot = members),
+                    chat =
+                        ChatListItem(
+                            group,
+                            null,
+                            null,
+                            1,
+                            memberSnapshot = members,
+                            projection = projection,
+                        ),
                     controller = conversation,
                     onBack = {},
                     surfaceState = surface,
@@ -219,7 +259,34 @@ class ConversationMediaCacheSelectionTest {
             }
         }
         composeRule.waitForIdle()
+        composeRule.waitUntil(5_000) {
+            composeRule
+                .onAllNodesWithTag("performance.conversation_transcript_visible")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         return conversation
+    }
+
+    /**
+     * Advances frames until [QUIET_FRAMES] in a row recompose nothing in [source], pausing briefly in real time between
+     * them. Initial loads that mounting starts off the main thread can land well after `waitForIdle`, and one landing
+     * inside a counting window would be miscounted as a recomposition the window caused.
+     */
+    private fun settleCompositions(source: String) {
+        var quiet = 0
+        repeat(MAX_SETTLE_FRAMES) {
+            Thread.sleep(SETTLE_PAUSE_MS)
+            val runs =
+                countCompositions(source) {
+                    composeRule.runOnIdle { }
+                    composeRule.mainClock.advanceTimeByFrame()
+                    composeRule.waitForIdle()
+                }
+            quiet = if (runs == 0) quiet + 1 else 0
+            if (quiet == QUIET_FRAMES) return
+        }
+        fail("$source never stopped recomposing after the screen was mounted")
     }
 
     /** Counts runs of composable bodies and lambdas whose source location contains [source] during [block]. */
@@ -262,6 +329,9 @@ class ConversationMediaCacheSelectionTest {
 
     private companion object {
         const val SCREEN_SOURCE = "(ConversationScreen.kt:"
+        const val QUIET_FRAMES = 4
+        const val MAX_SETTLE_FRAMES = 80
+        const val SETTLE_PAUSE_MS = 25L
         const val KEPT_ATTACHMENT_SOURCE = "(KeptAttachmentPresentations.kt:"
         val MEDIA_ID = "a2".repeat(32)
         val SENDER = "cc".repeat(32)

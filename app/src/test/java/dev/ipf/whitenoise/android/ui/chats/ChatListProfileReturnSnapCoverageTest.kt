@@ -208,6 +208,7 @@ class ChatListProfileReturnSnapCoverageTest {
     fun nonListConversationOpensDoNotConsumeStaleReturnHead() {
         val mainShell = mainShellSource().readText()
         val stateHolder = mainShellStateHolderSource().readText()
+        val processState = mainShellStateHolderSource().resolveSibling("MainShellProcessState.kt").readText()
 
         val notificationCommitBlock =
             mainShell.requiredSection(
@@ -241,7 +242,7 @@ class ChatListProfileReturnSnapCoverageTest {
         )
         assertFalse(
             "process-restored conversation routes must not retain stale return-head provenance",
-            "chatListReturnHeadSnap" in stateHolder,
+            "chatListReturnHeadSnap" in stateHolder + processState,
         )
         assertTrue(
             "process-restored conversation routes must be resolved by the retained shell state holder",

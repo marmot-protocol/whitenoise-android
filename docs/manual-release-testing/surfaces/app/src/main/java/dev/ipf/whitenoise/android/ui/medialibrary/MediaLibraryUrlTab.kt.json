@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryUrlTab.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: MediaLibraryUrlTab",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryUrlTab.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "UrlLibraryRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryUrlTab.kt",
+        "anchor": "fun UrlLibraryRow(",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "UrlLibraryTab",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryUrlTab.kt",
+        "anchor": "fun UrlLibraryTab(",
+        "test_ids": [
+          "INT-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:media_couldnt_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryUrlTab.kt",
+        "anchor": "R.string.media_couldnt_open",
+        "test_ids": [
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "string:shared_media_empty_urls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryUrlTab.kt",
+        "anchor": "R.string.shared_media_empty_urls",
+        "test_ids": [
+          "INT-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

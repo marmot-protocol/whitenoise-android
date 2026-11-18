@@ -1700,7 +1700,7 @@
         {
           "case": "actions-forward-cancel",
           "selector": {
-            "text": "Forward to"
+            "text": "Sending as: Maestro Alice"
           },
           "scope": "forward request opens owning app picker; Back leaves original conversation intact."
         }
@@ -2980,7 +2980,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupAdmin.kt",
       "symbol": "ProfileSheetModerationConfirmDialog",
       "bindings": [
         {
@@ -3161,7 +3161,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
       "symbol": "EncryptedBackupResultDialog",
       "bindings": [
         {
@@ -3200,7 +3200,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
       "symbol": "ExportPasswordDialog",
       "bindings": [
         {
@@ -3221,7 +3221,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
       "symbol": "SignOutAndWipeSheet",
       "bindings": [
         {
@@ -3240,7 +3240,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
       "symbol": "SignOutProgressDialog",
       "bindings": [
         {
@@ -3257,7 +3257,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
       "symbol": "SignOutSheet",
       "bindings": [
         {
@@ -3276,7 +3276,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeProgressSheets.kt",
       "symbol": "WipeOutcomeSheet",
       "bindings": [
         {
@@ -3293,7 +3293,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeProgressSheets.kt",
       "symbol": "WipeProgressSheet",
       "bindings": [
         {
@@ -5600,7 +5600,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetGroupPickers.kt",
       "symbol": "ProfileAddToGroupsScreen",
       "bindings": [
         {
@@ -5687,7 +5687,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
       "symbol": "ProfileKeyWipeConfirmationDialog",
       "bindings": [
         {
@@ -5708,7 +5708,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
       "symbol": "ProfileKeyFeedbackDialogs",
       "bindings": [
         {
@@ -5769,7 +5769,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
       "symbol": "ProfileKeysDialogs",
       "bindings": [
         {

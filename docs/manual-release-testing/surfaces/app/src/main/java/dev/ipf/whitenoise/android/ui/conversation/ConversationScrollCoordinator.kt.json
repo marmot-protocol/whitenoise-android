@@ -4,14 +4,6 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "A flick settles only once its fling rests, so a page landing mid-fling cannot snap the transcript back",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
-        "anchor": "fun Flow<Interaction>.collectConversationDragInteractions(",
-        "test_ids": [
-          "CON-003"
-        ]
-      },
-      {
         "surface": "Far jump-to-newest lands in one snap instead of animating through history",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
         "anchor": "suspend fun animateScrollToTail(",

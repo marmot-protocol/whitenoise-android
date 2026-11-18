@@ -1,0 +1,389 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "EncryptedBackupPassphraseStrength.color",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "fun EncryptedBackupPassphraseStrength.color(",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "EncryptedBackupResultDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "fun EncryptedBackupResultDialog(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011",
+          "ACC-009"
+        ]
+      },
+      {
+        "surface": "ExportPasswordDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "fun ExportPasswordDialog(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011",
+          "SET-001",
+          "ACC-009"
+        ]
+      },
+      {
+        "surface": "ExportPasswordStrengthIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "fun ExportPasswordStrengthIndicator(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "ProfileKeysDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "fun ProfileKeysDialogs(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011",
+          "SET-001",
+          "ACC-009"
+        ]
+      },
+      {
+        "surface": "ProfileKeyFeedbackDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "fun ProfileKeyFeedbackDialogs(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011",
+          "SET-001",
+          "ACC-009"
+        ]
+      },
+      {
+        "surface": "ProfileKeyActionLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "fun ProfileKeyActionLabel(",
+        "test_ids": [
+          "ACC-009"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:choose_another_location_and_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.choose_another_location_and_try_again",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_password",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.confirm_password",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:couldnt_save_file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.couldnt_save_file",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_result_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.encrypted_backup_result_title",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_strength_fair",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.encrypted_backup_strength_fair",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_strength_strong",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.encrypted_backup_strength_strong",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_strength_too_short",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.encrypted_backup_strength_too_short",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_strength_weak",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.encrypted_backup_strength_weak",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.encrypted_private_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.export",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:export_nsec",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.export_nsec",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:export_password_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.export_password_help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:export_private_key_consequence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.export_private_key_consequence",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:hide",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.hide",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:keep_your_private_key_safe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.keep_your_private_key_safe",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:key_export_expired_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.key_export_expired_body",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:key_export_expired_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.key_export_expired_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:key_export_preview_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.key_export_preview_help",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:key_export_view_backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.key_export_view_backup",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:ok",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.ok",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:outbound_share_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.outbound_share_failed",
+        "test_ids": [
+          "ACC-010"
+        ]
+      },
+      {
+        "surface": "string:password",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.password",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:password_strength",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.password_strength",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:passwords_mismatch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.passwords_mismatch",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.share",
+        "test_ids": [
+          "ACC-010"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "button:profile_keys.view_backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "testTag(\"profile_keys.view_backup\")",
+        "test_ids": [
+          "ACC-009",
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "button:profile_keys.export_file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "testTag(\"profile_keys.export_file\")",
+        "test_ids": [
+          "ACC-009",
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: AccountKeysScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_backup_export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.explanation_organize_keys_backup_export",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_raw_file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.explanation_organize_keys_raw_file",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_raw_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.explanation_organize_keys_raw_share",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_result_copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.explanation_organize_keys_result_copy",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_result_export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.explanation_organize_keys_result_export",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_view_backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysDialogs.kt",
+        "anchor": "R.string.explanation_organize_keys_view_backup",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

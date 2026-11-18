@@ -13,7 +13,9 @@ against its new base and integration commit while keeping its source head.
 distributions and every lane that a ready PR ran before PR-side narrowing; path
 filters and draft skips apply only to `pull_request`. Checkouts use the event's
 immutable SHA. Queue concurrency keys use the workflow run ID, allowing each
-integration run to finish independently. Queue caches are read-only; all workflows
+integration run to finish independently. A queue run always runs the full matrix,
+and a failed or dropped group's run is cancelled at once (see the
+[same-content reuse](ci-request-policy.md#same-content-reuse) policy). Queue caches are read-only; all workflows
 reserve the authorization check name and restrict token writes to the existing
 explicit publishers. Repository default token permissions must be read-only with PR
 approval disabled; preview and release publishing remain separate.

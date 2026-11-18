@@ -117,6 +117,20 @@ class ConversationBackFocusTest {
     }
 
     @Test
+    fun settledReturnCanHandOffToAKeyboardShorterThanThePrevious320Pixels() =
+        kotlinx.coroutines.test.runTest {
+            var current = 0
+            val frames = ArrayDeque(listOf(40, 120, 200, 200))
+            awaitImeInsetAtTarget(
+                readInset = { current },
+                readTargetInset = { 200 },
+                awaitFrame = { current = frames.removeFirst() },
+            )
+            assertEquals(200, current)
+            assertEquals(0, frames.size)
+        }
+
+    @Test
     fun imeSettleWaitsForTheAnimationTargetThenStops() =
         kotlinx.coroutines.test.runTest {
             val insets = ArrayDeque(listOf(100, 180, 240, 240, 240))

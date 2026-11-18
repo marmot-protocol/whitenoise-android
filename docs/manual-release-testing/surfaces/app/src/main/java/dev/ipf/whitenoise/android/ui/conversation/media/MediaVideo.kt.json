@@ -32,60 +32,12 @@
         ]
       },
       {
-        "surface": "MediaVideoGridTile",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "fun MediaVideoGridTile(",
-        "test_ids": [
-          "MED-001",
-          "MED-025",
-          "MED-030"
-        ]
-      },
-      {
-        "surface": "VideoViewerPage",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "fun VideoViewerPage(",
-        "test_ids": [
-          "MED-007",
-          "MED-017",
-          "MED-033",
-          "MED-041",
-          "MED-051"
-        ]
-      },
-      {
-        "surface": "VideoViewerUnavailable",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "fun VideoViewerUnavailable(",
-        "test_ids": [
-          "MED-007",
-          "MED-017",
-          "MED-033"
-        ]
-      },
-      {
         "surface": "VideoUploadIndicator",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
         "anchor": "fun VideoUploadIndicator(",
         "test_ids": [
           "MED-001",
           "MED-030"
-        ]
-      },
-      {
-        "surface": "HoldCacheFileWhileComposed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "fun HoldCacheFileWhileComposed(",
-        "test_ids": [
-          "MED-030"
-        ]
-      },
-      {
-        "surface": "Video tap downloads in place without opening",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "fun onTileTap(",
-        "test_ids": [
-          "MED-037"
         ]
       },
       {
@@ -133,14 +85,6 @@
         "test_ids": [
           "MED-025",
           "MED-037"
-        ]
-      },
-      {
-        "surface": "Attachment video foreground and audio-route pause",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "DisposableEffect(exo, lifecycle, autoplayAllowed)",
-        "test_ids": [
-          "MED-041"
         ]
       },
       {

@@ -25,6 +25,18 @@ class AuthorizationBoundaryTest(unittest.TestCase):
         with self.assertRaises(ValueError):validate('android-pr-preview-publish.yml',{
             'permissions':{},'jobs':{'other':{'permissions':{'contents':'write'}}}})
 
+    def test_fail_fast_watcher_alone_may_write_actions(self):
+        """Only Android CI's merge-group fail-fast job may hold actions write, never statuses or checks."""
+        watcher = {'permissions': {'actions': 'write'}}
+        validate('android-ci.yml', {'permissions': {}, 'jobs': {'merge-group-fail-fast': watcher}})
+        for name, job in [('android-ci.yml', 'other'), ('normal.yml', 'merge-group-fail-fast')]:
+            with self.assertRaises(ValueError):
+                validate(name, {'permissions': {}, 'jobs': {job: watcher}})
+        for extra in ('statuses', 'checks'):
+            widened = {'permissions': {'actions': 'write', extra: 'write'}}
+            with self.assertRaises(ValueError):
+                validate('android-ci.yml', {'permissions': {}, 'jobs': {'merge-group-fail-fast': widened}})
+
     def test_reserved_or_unbounded_dynamic_job_names_are_rejected(self):
         for name in ['Android merge authorization','Android merge authorization (${{ matrix.x }})',
                      '${{ inputs.name }}','Android merge ${{ matrix.name }}','android MERGE authorization',

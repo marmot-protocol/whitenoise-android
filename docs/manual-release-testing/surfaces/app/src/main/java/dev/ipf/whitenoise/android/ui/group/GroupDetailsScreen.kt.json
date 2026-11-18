@@ -4,22 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Authored emoji prompt: GroupDetailsScreen",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "EmojiLabel(",
-        "test_ids": [
-          "MSG-037"
-        ]
-      },
-      {
-        "surface": "Custom emoji authored labels: GroupDetailsScreen",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "EmojiLabel(",
-        "test_ids": [
-          "MSG-037"
-        ]
-      },
-      {
         "surface": "DangerLeading",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun DangerLeading(",
@@ -39,14 +23,6 @@
         "surface": "developerPanels",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun developerPanels()",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "GroupDetailsHeader",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "fun GroupDetailsHeader(",
         "test_ids": [
           "GRP-001"
         ]
@@ -151,6 +127,14 @@
         "test_ids": [
           "GRP-042"
         ]
+      },
+      {
+        "surface": "Chat header Members shortcut page",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "membersAutoOpened",
+        "test_ids": [
+          "SET-058"
+        ]
       }
     ],
     "settings_controls": [
@@ -158,14 +142,6 @@
         "surface": "string:about",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.about",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:add_group_description",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.add_group_description",
         "test_ids": [
           "GRP-001"
         ]
@@ -275,14 +251,6 @@
         ]
       },
       {
-        "surface": "string:copy_public_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.copy_public_key",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:delete_chat_dialog_message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.delete_chat_dialog_message",
@@ -358,14 +326,6 @@
         "surface": "string:edit_group_info_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.edit_group_info_title",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:edit_group_name_and_description",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.edit_group_name_and_description",
         "test_ids": [
           "GRP-001"
         ]
@@ -518,22 +478,6 @@
         "surface": "string:no_share_target_available",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.no_share_target_available",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:not_copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.not_copied",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:profile_view_picture",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.profile_view_picture",
         "test_ids": [
           "GRP-001"
         ]
@@ -930,15 +874,6 @@
         ]
       },
       {
-        "surface": "R.string.copy_public_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.copy_public_key",
-        "test_ids": [
-          "GRP-001",
-          "SYS-007"
-        ]
-      },
-      {
         "surface": "R.string.disappearing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.disappearing",
@@ -995,15 +930,6 @@
         "anchor": "R.string.no_matches",
         "test_ids": [
           "GRP-001"
-        ]
-      },
-      {
-        "surface": "R.string.not_copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.not_copied",
-        "test_ids": [
-          "GRP-001",
-          "SYS-007"
         ]
       },
       {
@@ -1164,14 +1090,6 @@
         "surface": "R.string.explanation_chat_info_step_down",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.explanation_chat_info_step_down",
-        "test_ids": [
-          "GRP-042"
-        ]
-      },
-      {
-        "surface": "R.string.explanation_chat_info_copy_peer_public_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.explanation_chat_info_copy_peer_public_key",
         "test_ids": [
           "GRP-042"
         ]
