@@ -13,7 +13,7 @@ class NewMessageEntryRouteCoverageTest {
 
         assertTrue("the shared transition must open NewChatFlowHost", "if (showNewChatFlow)" in source)
         assertEquals(1, occurrences(source, "ChatsNewMessageFab(appState, openNewMessageFlow,"))
-        assertEquals(1, occurrences(source, "EmptyChats(onCreate = openNewMessageFlow)"))
+        assertEquals(1, occurrences(source, "EmptyChats(appState, onCreate = openNewMessageFlow)"))
     }
 
     private fun sourceFile(): File =

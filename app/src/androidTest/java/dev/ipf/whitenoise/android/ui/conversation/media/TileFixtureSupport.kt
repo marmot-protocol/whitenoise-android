@@ -68,6 +68,7 @@ internal object TileFixtureSupport {
         record =
             AppMessageRecordFfi(
                 messageIdHex = request.messageIdHex,
+                invalidated = false,
                 direction = if (sent) "sent" else "received",
                 groupIdHex = request.groupIdHex,
                 sender = request.accountRef,
