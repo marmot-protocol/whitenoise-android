@@ -50,7 +50,7 @@ class SourceFileSizeRatchetTest {
 
     /**
      * Line counts keyed by path below `app/src/main/java`. Flavor and debug source sets and generated
-     * sources are not counted. A final trailing newline does not add a line; blank lines before it do.
+     * sources are not counted. A final line break (LF or CRLF) does not add a line; blank lines before it do.
      */
     private fun mainSourceLineCounts(): Map<String, Int> {
         val root = appModuleFile("src/main/java")
@@ -62,6 +62,7 @@ class SourceFileSizeRatchetTest {
                     it
                         .readText()
                         .removeSuffix("\n")
+                        .removeSuffix("\r")
                         .lines()
                         .size
             }
