@@ -4105,7 +4105,8 @@ class WhiteNoiseAppState private constructor(
         }
 
     /** Adds host stage attribution after an exception has unwound without retaining its sensitive text. */
-    private fun bootstrapFailure(error: Throwable) = startupFailure(error, StartupDiagnostics.failureDetail())
+    private fun bootstrapFailure(error: Throwable): ErrorPresentation =
+        privacySafeErrorPresentation("APP_BOOTSTRAP", error, startupDetail = StartupDiagnostics.failureDetail())
 
     /** Restores only a native signed-in profile; retained signed-out identities require an explicit selection. */
     private fun startupAccount(): AccountSummaryFfi? =
@@ -5710,7 +5711,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun signOutAndWipeActiveAccountLocked(wipedRef: String): WipeOutcomeFfi? {
+    internal suspend fun signOutAndWipeActiveAccountLocked(wipedRef: String): WipeOutcomeFfi? {
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(wipedRef) {

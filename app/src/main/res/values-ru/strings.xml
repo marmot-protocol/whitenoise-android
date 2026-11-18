@@ -84,7 +84,6 @@
     <string name="white_noise_couldnt_start">Не удалось запустить White Noise</string>
     <string name="startup_taking_too_long">Запуск занимает больше времени, чем ожидалось. Повторите попытку.</string>
     <string name="error_try_again">Что-то пошло не так. Повторите попытку. Если проблема не исчезнет, скопируйте отчёт об ошибке.</string>
-    <string name="error_linked_devices_build_required">Эта учётная запись использует связанные устройства, а эта сборка не может их открыть. Ваши данные сохранены. Установите поверх неё сборку с поддержкой связанных устройств.</string>
     <string name="error_restart_app_before_retry">Локальная загрузка переписки всё ещё выполняется. Перезапустите White Noise перед повторной попыткой.</string>
     <string name="error_not_ready">White Noise ещё завершает обновление этого аккаунта. Обычно это занимает меньше минуты и повторяется автоматически.</string>
     <string name="chat_list_startup_slow">Обновление ещё завершается. Чаты появятся через мгновение; не закрывайте White Noise.</string>

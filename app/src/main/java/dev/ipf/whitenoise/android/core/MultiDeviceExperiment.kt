@@ -1,51 +1,12 @@
 package dev.ipf.whitenoise.android.core
 
-import dev.ipf.marmotkit.MarmotKitException
-
 /**
  * Compile-time switch for linked devices. It is a literal so that only a source change can alter it, never a Gradle
- * property, environment variable, intent, deep link or preference. It is on because MDK now opens every runtime
- * with device groups: a build without these screens could not answer a link request its own account receives.
+ * property, environment variable, intent, deep link or preference. MDK opens every runtime with device groups, so
+ * there is no working `false` on this library: a build without these screens could not answer a link request its
+ * own account receives. It stays only as the one name every entry point asks.
  */
 internal const val MULTI_DEVICE_EXPERIMENT = true
 
-/**
- * Whether linked-device entry points are part of this build. Every screen, row and prompt for the feature asks
- * this, so the feature is reachable exactly when the runtime opens with device groups.
- */
+/** Whether linked-device entry points are part of this build. Every screen, row and prompt asks this. */
 internal fun linkedDevicesAvailable(): Boolean = MULTI_DEVICE_EXPERIMENT
-
-/** The details MDK attaches to its runtime error when an ordinary opener meets an account that needs device groups. */
-internal const val EXPERIMENTAL_DEVICE_GROUPS_REQUIRED = "experimental_device_groups_required"
-
-/**
- * Opens the runtime through exactly one of MDK's two constructors, passing the same root, relays and options to
- * either. Device groups are on only for [experimental]; MDK requires every opener of one root to agree, so the
- * foreground runtime and the cold worker preflight both come through here.
- */
-internal fun <Options, Runtime> openMarmot(
-    experimental: Boolean,
-    rootPath: String,
-    relayUrls: List<String>,
-    options: Options,
-    ordinary: (String, List<String>, Options) -> Runtime,
-    experimentalDeviceGroups: (String, List<String>, Options) -> Runtime,
-): Runtime =
-    if (experimental) {
-        experimentalDeviceGroups(rootPath, relayUrls, options)
-    } else {
-        ordinary(rootPath, relayUrls, options)
-    }
-
-/**
- * Whether MDK refused to open an account because it holds or is joining a device group and this build opened the
- * runtime without device groups. The account's data is intact and only a build that opens with device groups can
- * use it, so callers explain that instead of offering a retry. MDK reports the refusal as its generic runtime error
- * with fixed details; this is the one place that matches them, including through a startup-stage wrapper.
- */
-internal fun Throwable.requiresExperimentalDeviceGroups(): Boolean =
-    generateSequence(this) { it.cause.takeIf { cause -> cause !== it } }
-        .take(MAX_CAUSE_DEPTH)
-        .any { it is MarmotKitException.Runtime && it.details == EXPERIMENTAL_DEVICE_GROUPS_REQUIRED }
-
-private const val MAX_CAUSE_DEPTH = 8

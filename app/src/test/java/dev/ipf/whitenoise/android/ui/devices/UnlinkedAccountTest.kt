@@ -21,7 +21,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** What a device shows once another device unlinked it, and how a newly linked device treats its own chats. */
+/** What a device shows once another device unlinked it, and the hint a newly linked device shows for its chats. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h900dp-mdpi")
 class UnlinkedAccountTest {
@@ -58,15 +58,23 @@ class UnlinkedAccountTest {
         compose.runOnIdle { assertEquals(0, removals) }
     }
 
-    /** Only a pending chat welcomed by the account itself counts as added by one of its own devices. */
+    /** Until a removal has failed the prompt offers no way to close it. */
     @Test
-    fun onlyAPendingChatWelcomedByTheAccountItselfIsItsOwn() {
-        assertTrue(addedByOwnDevice(pending = true, welcomerAccountIdHex = "AB12", ownAccountIdHex = " ab12 "))
-        assertFalse(addedByOwnDevice(pending = false, welcomerAccountIdHex = "ab12", ownAccountIdHex = "ab12"))
-        assertFalse(addedByOwnDevice(pending = true, welcomerAccountIdHex = "cd34", ownAccountIdHex = "ab12"))
-        assertFalse(addedByOwnDevice(pending = true, welcomerAccountIdHex = null, ownAccountIdHex = "ab12"))
-        assertFalse(addedByOwnDevice(pending = true, welcomerAccountIdHex = "", ownAccountIdHex = ""))
-        assertFalse(addedByOwnDevice(pending = true, welcomerAccountIdHex = "ab12", ownAccountIdHex = null))
+    fun thePromptCannotBeClosedBeforeARemovalFailed() {
+        compose.setContent { WhiteNoiseTheme { UnlinkedAccountPrompt(onRemove = {}) } }
+
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).assertDoesNotExist()
+    }
+
+    /** After a failed removal the prompt can be closed, so the device is not stuck behind it. */
+    @Test
+    fun aFailedRemovalLetsThePromptBeClosed() {
+        var closes = 0
+        compose.setContent { WhiteNoiseTheme { UnlinkedAccountPrompt(onRemove = {}, onClose = { closes++ }) } }
+
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).performClick()
+
+        compose.runOnIdle { assertEquals(1, closes) }
     }
 
     /** The arrival hint belongs to the account that linked, in any letter case, until it is ended. */
@@ -74,12 +82,14 @@ class UnlinkedAccountTest {
     fun theArrivalHintIsForTheAccountThatLinked() {
         assertFalse(ChatsArrivingHint.shown)
 
-        ChatsArrivingHint.mark("AB12")
+        ChatsArrivingHint.mark("AB12", nowMs = 1_000L, durationMs = 500L)
 
         assertTrue(ChatsArrivingHint.shown)
         assertTrue(ChatsArrivingHint.showsFor("ab12"))
         assertFalse(ChatsArrivingHint.showsFor("cd34"))
         assertFalse(ChatsArrivingHint.showsFor(null))
+        assertEquals(200L, ChatsArrivingHint.remainingMs(nowMs = 1_300L))
+        assertEquals(0L, ChatsArrivingHint.remainingMs(nowMs = 9_000L))
 
         ChatsArrivingHint.end()
 

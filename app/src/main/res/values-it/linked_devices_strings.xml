@@ -164,6 +164,6 @@
     <string name="unlinked_account_remove_detail">Un altro dei tuoi dispositivi ha scollegato questo, quindi questo account non può accedere qui. La rimozione elimina le sue chat e i suoi dati solo da questo dispositivo. Gli altri tuoi dispositivi conservano tutto. Poi accedi di nuovo per collegare questo dispositivo.</string>
     <string name="unlinked_account_remove_confirm">Rimuovi da questo dispositivo</string>
     <string name="unlinked_account_remove_failed">Impossibile rimuovere l’account da questo dispositivo. Riprova.</string>
-    <string name="chats_arriving_title">Le tue chat stanno arrivando qui</string>
-    <string name="chats_arriving_detail">Gli altri tuoi dispositivi stanno aggiungendo questo alle tue chat. Può richiedere un minuto o due.</string>
+    <string name="chats_arriving_title">Questo dispositivo è collegato</string>
+    <string name="chats_arriving_detail">Le chat che questo account ha già vengono aggiunte qui dagli altri tuoi dispositivi, di solito entro un minuto o due. Se non ne ha ancora, iniziane una.</string>
 </resources>

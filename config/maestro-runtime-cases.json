@@ -212,10 +212,9 @@
     "settings-linked-devices": {
       "suite": "settings",
       "manual_ids": [
-        "SET-059",
-        "SET-063"
+        "SET-059"
       ],
-      "assertions": "Linked devices opens from Account with this device listed and no other device; this device's page opens and its rename dialog shows its field and Save, then Back leaves each without renaming.",
+      "assertions": "Linked devices opens from Account for an account that has linked no device and says so; Back returns to Account without starting a link.",
       "postcondition": "none"
     },
     "navigation-profile-edit-cancel": {

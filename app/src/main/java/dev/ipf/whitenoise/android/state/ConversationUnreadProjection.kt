@@ -137,7 +137,7 @@ internal fun logUnreadCountDivergence(
 internal fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind == 1210uL
 
 /** Only incoming chat rows contribute to unread counts; derived edits and system events do not. */
-internal fun AppMessageRecordFfi.isUnreadEligible(): Boolean = direction == "received" && !isDerivedStateKind(kind)
+private fun AppMessageRecordFfi.isUnreadEligible(): Boolean = direction == "received" && !isDerivedStateKind(kind)
 
 /** A timeline row counts as unread only when it is incoming chat from someone else, never the account's own message. */
 internal fun TimelineMessage.isUnreadEligible(): Boolean = !fromOtherOwnDevice && record.isUnreadEligible()
@@ -164,6 +164,6 @@ internal fun unreadReceivedMentionIds(
     if (readAnchorMessageId != null && anchorIdx < 0) return emptyList()
     return timeline
         .drop(anchorIdx + 1)
-        .filter { it.record.direction == "received" && it.record.kind == 9uL && mentionsActiveAccount(it) }
+        .filter { it.isUnreadEligible() && it.record.kind == 9uL && mentionsActiveAccount(it) }
         .mapNotNull { it.record.messageIdHex.takeIf { id -> id.isNotBlank() } }
 }

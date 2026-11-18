@@ -7,7 +7,6 @@ import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
-import dev.ipf.whitenoise.android.core.requiresExperimentalDeviceGroups
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import java.time.Instant
 
@@ -76,41 +75,21 @@ private const val MAX_STARTUP_COPY_FIELDS = 7
 /**
  * The detail shown for [throwable]. An account update MDK withheld as too large for every relay's known limit (a
  * profile, relay list or KeyPackage) replaces the generic retry copy, because retrying cannot help; a caller's
- * specific detail is kept. Nothing was published, though a refused KeyPackage stays prepared locally. An account MDK
- * refused because this build opens without device groups always gets the compatible-build copy: its data is kept
- * and no retry on this build can open it. An account whose other devices unlinked this one cannot sign in here
- * again, so it is told to sign out and wipe instead of to retry.
+ * specific detail is kept. Nothing was published, though a refused KeyPackage stays prepared locally. An account
+ * whose other devices unlinked this one cannot sign in here again, so it is told to remove the account instead of
+ * to retry.
  */
 internal fun failureDetail(
     throwable: Throwable,
     detail: AppText,
 ): AppText =
     when {
-        throwable.requiresExperimentalDeviceGroups() -> AppText.Resource(R.string.error_linked_devices_build_required)
         throwable is MarmotKitException.AccountUnlinked -> AppText.Resource(R.string.error_account_unlinked)
         detail == AppText.Resource(R.string.error_try_again) &&
             throwable is MarmotKitException.EventTooLarge &&
             throwable.artifact == OversizedArtifactFfi.OTHER -> AppText.Resource(R.string.error_update_too_large)
         else -> detail
     }
-
-/**
- * The startup failure for [error]. A linked-device refusal is not retryable: the same build fails the same way, so
- * the screen names the remedy and keeps the copyable report without offering a retry that would loop.
- */
-internal fun startupFailure(
-    error: Throwable,
-    startupDetail: String?,
-): ErrorPresentation {
-    val refused = error.requiresExperimentalDeviceGroups()
-    return privacySafeErrorPresentation(
-        operationCode = "APP_BOOTSTRAP",
-        throwable = error,
-        message = failureDetail(error, AppText.Resource(R.string.error_try_again)),
-        retryable = !refused,
-        startupDetail = startupDetail,
-    )
-}
 
 fun WhiteNoiseAppState.presentFailure(
     @StringRes titleRes: Int,

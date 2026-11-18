@@ -42,6 +42,14 @@
         "test_ids": [
           "SET-065"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedAccountPrompt.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SET-065"
+        ]
       }
     ]
   },

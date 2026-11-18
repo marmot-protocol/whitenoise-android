@@ -164,6 +164,6 @@
     <string name="unlinked_account_remove_detail">Otro de tus dispositivos desvinculó este, así que esta cuenta no puede iniciar sesión aquí. Al quitarla se borran sus chats y datos solo de este dispositivo. Tus otros dispositivos lo conservan todo. Después, vuelve a iniciar sesión para vincular este dispositivo.</string>
     <string name="unlinked_account_remove_confirm">Quitar de este dispositivo</string>
     <string name="unlinked_account_remove_failed">No se pudo quitar la cuenta de este dispositivo. Inténtalo de nuevo.</string>
-    <string name="chats_arriving_title">Trayendo tus chats aquí</string>
-    <string name="chats_arriving_detail">Tus otros dispositivos están añadiendo este a tus chats. Puede tardar uno o dos minutos.</string>
+    <string name="chats_arriving_title">Este dispositivo está vinculado</string>
+    <string name="chats_arriving_detail">Tus otros dispositivos añaden aquí los chats que esta cuenta ya tiene, normalmente en uno o dos minutos. Si aún no tiene ninguno, inicia uno.</string>
 </resources>

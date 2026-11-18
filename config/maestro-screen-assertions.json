@@ -6662,21 +6662,9 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
       "symbol": "RenameDeviceDialog",
-      "bindings": [
-        {
-          "case": "settings-linked-devices",
-          "selector": {
-            "id": "device_detail.rename.field"
-          },
-          "scope": "rename dialog opened for this device and dismissed with Back; no name is saved.",
-          "entry_assertion": {
-            "id": "device_detail.rename.field"
-          },
-          "opened_by": {
-            "id": "device_detail.rename"
-          }
-        }
-      ]
+      "bindings": [],
+      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["SET-063"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
@@ -6694,7 +6682,7 @@
           "selector": {
             "id": "linked_devices.list"
           },
-          "scope": "roster destination with this device and no other device; no link is started."
+          "scope": "roster destination for an account that has linked no device, showing its empty note; no link is started."
         }
       ]
     },

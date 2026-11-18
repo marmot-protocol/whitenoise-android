@@ -64,9 +64,9 @@ sign-in notice's `client` label. None changes existing behavior.
 
 ## Upgrade
 
-The disposable hosted upgrade campaign starts from 0.17.0 at `4df811ae`.
-Account schema advances from 207 to 212 (migrations 0208 to 0212) and
-downgrade is unsupported. The campaign exercises populated upgrade, cold
-reopen, the original pending upload and both recovery relay modes. No
+The disposable hosted upgrade campaign has not run yet. It will start from
+0.17.0 at `4df811ae`. Account schema advances from 207 to 212 (migrations 0208
+to 0212) and downgrade is unsupported. The campaign is to exercise populated
+upgrade, cold reopen, the original pending upload and both recovery relay modes. No
 qualification source differs between the two runtimes, so the baseline overlay
 directory is empty. See [INT-010](manual-release-testing/cases/INT-010.md).

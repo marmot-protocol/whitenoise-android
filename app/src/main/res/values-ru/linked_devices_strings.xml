@@ -164,6 +164,6 @@
     <string name="unlinked_account_remove_detail">Другое ваше устройство отвязало это устройство, поэтому эта учётная запись не может войти здесь. Удаление стирает её чаты и данные только с этого устройства. На других ваших устройствах всё сохранится. Затем войдите снова, чтобы связать это устройство.</string>
     <string name="unlinked_account_remove_confirm">Удалить с этого устройства</string>
     <string name="unlinked_account_remove_failed">Не удалось удалить учётную запись с этого устройства. Повторите попытку.</string>
-    <string name="chats_arriving_title">Переносим ваши чаты сюда</string>
-    <string name="chats_arriving_detail">Другие ваши устройства добавляют это устройство в ваши чаты. Это может занять минуту-две.</string>
+    <string name="chats_arriving_title">Это устройство связано</string>
+    <string name="chats_arriving_detail">Чаты, которые уже есть у этой учётной записи, добавляются сюда другими вашими устройствами, обычно за минуту-две. Если их пока нет, начните новый.</string>
 </resources>

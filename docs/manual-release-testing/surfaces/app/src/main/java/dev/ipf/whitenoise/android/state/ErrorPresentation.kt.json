@@ -20,14 +20,6 @@
         ]
       },
       {
-        "surface": "Account MDK refused because this build opens without device groups: compatible-build detail, startup failure without Retry (unit-tested; reachable only with linked-device test data)",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ErrorPresentation.kt",
-        "anchor": "R.string.error_linked_devices_build_required",
-        "test_ids": [
-          "ACC-024"
-        ]
-      },
-      {
         "surface": "Linked devices: R.string.error_account_unlinked",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ErrorPresentation.kt",
         "anchor": "R.string.error_account_unlinked",

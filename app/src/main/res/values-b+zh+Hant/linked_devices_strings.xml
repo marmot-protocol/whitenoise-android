@@ -164,6 +164,6 @@
     <string name="unlinked_account_remove_detail">你的另一部裝置已取消此裝置的連結，因此該帳號無法在此登入。移除只會刪除此裝置上的聊天和資料，你的其他裝置會保留全部內容。之後請重新登入以連結此裝置。</string>
     <string name="unlinked_account_remove_confirm">從此裝置移除</string>
     <string name="unlinked_account_remove_failed">無法將該帳號從此裝置移除。請再試一次。</string>
-    <string name="chats_arriving_title">正在把你的聊天帶到這裡</string>
-    <string name="chats_arriving_detail">你的其他裝置正在把此裝置加入你的聊天。這可能需要一兩分鐘。</string>
+    <string name="chats_arriving_title">此裝置已連結</string>
+    <string name="chats_arriving_detail">此帳號已有的聊天會由你的其他裝置加入這裡，通常在一兩分鐘內。如果還沒有聊天，請發起一個。</string>
 </resources>

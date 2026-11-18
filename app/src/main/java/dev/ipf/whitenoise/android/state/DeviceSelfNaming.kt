@@ -16,7 +16,7 @@ internal fun deviceModelLabel(model: String?): String? {
 /**
  * Names this device with its model while MDK's roster lists it without a name, or under one of the [placeholders]
  * an approving device sends when its user typed none, so the account's devices can tell it apart. A name anyone
- * chose is never replaced, and each roster slot is tried once per process, so a refused rename is not repeated.
+ * chose is never replaced, and each roster slot is tried once per account session, so a refused rename is not repeated.
  */
 internal class DeviceSelfNaming(
     private val accountRef: String,

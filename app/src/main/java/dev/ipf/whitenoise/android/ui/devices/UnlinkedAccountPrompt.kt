@@ -5,6 +5,10 @@ package dev.ipf.whitenoise.android.ui.devices
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -16,25 +20,42 @@ import dev.ipf.whitenoise.android.ui.settings.launchAccountWipe
 
 internal const val UNLINKED_ACCOUNT_PROMPT_TAG = "device_link.unlinked_account"
 internal const val UNLINKED_ACCOUNT_REMOVE_TAG = "device_link.unlinked_account.remove"
+internal const val UNLINKED_ACCOUNT_CLOSE_TAG = "device_link.unlinked_account.close"
 
 /**
  * Covers the app while the profile in view is one another of the account's devices unlinked. MDK has signed it out
- * and will not sign it in again, so its chats must not stay on screen as if they worked. The one way forward is to
- * remove the account from this device, after which signing in links it anew. [blocked] holds the prompt back
- * while the app is locked or the removal is already running.
+ * and will not sign it in again, so its chats must not stay on screen as if they worked. The way forward is to
+ * remove the account from this device, after which signing in links it anew. A removal that ran and left the
+ * account here failed, so from then on the prompt can be closed to reach Settings, another account or diagnostics.
+ * [blocked] holds the prompt back while the app is locked, and it stays down while the removal is running.
  */
 @Composable
 internal fun UnlinkedAccountPromptHost(
     appState: WhiteNoiseAppState,
     blocked: Boolean,
 ) {
-    if (appState.activeAccount?.unlinked != true || blocked || appState.wipeInProgress) return
-    UnlinkedAccountPrompt(onRemove = { launchAccountWipe(appState) })
+    val account = appState.activeAccount?.takeIf { it.unlinked } ?: return
+    var attempted by remember(account.label) { mutableStateOf(false) }
+    var closed by remember(account.label) { mutableStateOf(false) }
+    if (blocked || appState.wipeInProgress || closed) return
+    UnlinkedAccountPrompt(
+        onRemove = {
+            attempted = true
+            launchAccountWipe(appState)
+        },
+        onClose = { closed = true }.takeIf { attempted },
+    )
 }
 
-/** The prompt itself. It has no dismissal: closing it would return to chats of an account that cannot be used. */
+/**
+ * The prompt itself. Back and a tap outside never close it, because that would return to chats of an account that
+ * cannot be used. [onClose] is offered only after a removal failed, so a device that cannot remove is not stuck.
+ */
 @Composable
-internal fun UnlinkedAccountPrompt(onRemove: () -> Unit) {
+internal fun UnlinkedAccountPrompt(
+    onRemove: () -> Unit,
+    onClose: (() -> Unit)? = null,
+) {
     WhiteNoiseAlertDialog(
         onDismissRequest = {},
         properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
@@ -46,5 +67,13 @@ internal fun UnlinkedAccountPrompt(onRemove: () -> Unit) {
                 Text(stringResource(R.string.unlinked_account_remove_confirm))
             }
         },
+        dismissButton =
+            onClose?.let { close ->
+                {
+                    TextButton(onClick = close, modifier = Modifier.testTag(UNLINKED_ACCOUNT_CLOSE_TAG)) {
+                        Text(stringResource(R.string.close))
+                    }
+                }
+            },
     )
 }

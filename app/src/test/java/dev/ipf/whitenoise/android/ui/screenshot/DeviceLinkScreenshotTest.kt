@@ -135,6 +135,15 @@ class DeviceLinkScreenshotTest {
             .captureRoboImage("src/test/snapshots/device_link_unlinked_prompt_dark_rtl_large_font.png")
     }
 
+    /** The prompt once a removal has failed, when it can also be closed. */
+    @Test
+    fun unlinkedPromptAfterFailedRemovalLight() {
+        show(Look()) { UnlinkedAccountPrompt(onRemove = {}, onClose = {}) }
+        compose
+            .onNode(isDialog())
+            .captureRoboImage("src/test/snapshots/device_link_unlinked_prompt_failed_removal_light.png")
+    }
+
     /** A newly linked device's empty chat list while its chats are still arriving. */
     @Test
     fun chatsArrivingLight() {

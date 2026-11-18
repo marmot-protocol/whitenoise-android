@@ -69,7 +69,6 @@
     <string name="white_noise_couldnt_start">White Noise 无法启动</string>
     <string name="startup_taking_too_long">启动时间超出预期。请重试。</string>
     <string name="error_try_again">出现问题。请重试；如果问题仍然存在，请复制错误报告。</string>
-    <string name="error_linked_devices_build_required">此账户使用了已关联设备，当前版本无法打开。你的数据已保留。请覆盖安装支持已关联设备的版本。</string>
     <string name="error_restart_app_before_retry">本地对话仍在加载中。请重启 White Noise 后再试。</string>
     <string name="error_not_ready">White Noise 仍在为此账号完成更新。通常不到一分钟，并会自动重试。</string>
     <string name="chat_list_startup_slow">正在完成更新。聊天很快就会显示，请保持 White Noise 打开。</string>

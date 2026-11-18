@@ -578,6 +578,14 @@ class ConversationUnreadTest {
 
     private val isMention: (TimelineMessage) -> Boolean = { it.record.messageIdHex.startsWith("m") }
 
+    /** The account mentioning itself from another of its devices raises no mention chip. */
+    @Test
+    fun mentions_fromTheAccountsOtherDeviceAreNotUnread() {
+        val own = received("m2").copy(fromOtherOwnDevice = true)
+
+        assertEquals(listOf("m1"), unreadReceivedMentionIds(listOf(received("m1"), own), null, isMention))
+    }
+
     @Test
     fun mentions_nullAnchor_countsAllReceivedMentions() {
         val timeline = listOf(received("m1"), received("r2"), received("m3"))

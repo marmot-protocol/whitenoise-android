@@ -1,12 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
 /**
- * Removes [label] from this device after another of the account's devices unlinked it. MDK refuses to sign such an
- * account in again, so its sign-out and wipe is the only way forward: it clears the account's local data and skips
- * leaving chats and deleting key packages, which the other devices already did. True once MDK no longer lists it.
+ * Removes a saved account that another of its devices unlinked, from the sign-in screen where no account is active.
+ * It runs the same wipe as removing the account in view, so the drafts, decrypted media, launcher shortcuts and
+ * preferences Android keeps for [label] go with MDK's data. True only once MDK reports its local cleanup complete.
  */
 internal suspend fun WhiteNoiseAppState.removeUnlinkedAccount(label: String): Boolean {
-    val wiped = runCatchingCancellable { marmotIo { signOutAndWipe(label) } }
-    runCatchingCancellable { refreshAccounts() }
-    return wiped.isSuccess && accounts.none { it.label == label }
+    // A cancelled setup child may need the account lifetime for its own cleanup before the wipe can take it.
+    accountSetup.close()
+    val outcome = withAccountLifetime { signOutAndWipeActiveAccountLocked(label) }
+    return outcome?.localCleanup?.completed == true
 }

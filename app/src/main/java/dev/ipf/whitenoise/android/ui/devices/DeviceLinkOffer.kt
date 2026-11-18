@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.devices
 
+import android.os.SystemClock
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -68,10 +69,12 @@ internal fun DeviceLinkOfferHost(
 ) {
     val offers = remember { DeviceLinkOffers.shared(appState.appContext) }
     val accountIds = appState.accounts.map { it.accountIdHex }
-    LaunchedEffect(accountIds) { offers.retainAccounts(accountIds) }
+    // A failed account read publishes an empty list that is not authoritative, so only a real read prunes offers.
+    val accountsRead = appState.accountListLoaded
+    LaunchedEffect(accountIds, accountsRead) { if (accountsRead) offers.retainAccounts(accountIds) }
     LaunchedEffect(ChatsArrivingHint.shown) {
         if (ChatsArrivingHint.shown) {
-            delay(CHATS_ARRIVING_HINT_MS)
+            delay(ChatsArrivingHint.remainingMs(SystemClock.elapsedRealtime()))
             ChatsArrivingHint.end()
         }
     }
@@ -133,7 +136,9 @@ internal fun DeviceLinkOfferSettled(
         if (state.inProgress()) sawProgress = true
         if (settled && accountIdHex != null) offers.clear(accountIdHex)
         // Only a link seen in progress here is fresh, a device linked long ago has nothing arriving.
-        if (linked && sawProgress && accountIdHex != null) ChatsArrivingHint.mark(accountIdHex)
+        if (linked && sawProgress && accountIdHex != null) {
+            ChatsArrivingHint.mark(accountIdHex, SystemClock.elapsedRealtime(), CHATS_ARRIVING_HINT_MS)
+        }
     }
 }
 

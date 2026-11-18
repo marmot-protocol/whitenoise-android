@@ -36,11 +36,10 @@ class MarmotClient(
             .apply { mkdirs() }
             .absolutePath
 
-    /** The process runtime, opened with or without device groups as [MULTI_DEVICE_EXPERIMENT] alone decides. */
+    /** The process runtime. MDK opens it with device groups, which the foreground and the cold worker share. */
     val marmot: Marmot =
         StartupDiagnostics.measure(StartupDiagnosticStage.NATIVE_CONSTRUCT) {
-            openMarmot(
-                experimental = MULTI_DEVICE_EXPERIMENT,
+            Marmot.newWithConfiguration(
                 rootPath = rootPath,
                 relayUrls = relayUrls,
                 options =
@@ -51,8 +50,6 @@ class MarmotClient(
                         attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
                         moderationReportConfig = moderationReportConfig(),
                     ),
-                ordinary = Marmot.Companion::newWithConfiguration,
-                experimentalDeviceGroups = Marmot.Companion::newWithExperimentalDeviceGroups,
             )
         }
 
