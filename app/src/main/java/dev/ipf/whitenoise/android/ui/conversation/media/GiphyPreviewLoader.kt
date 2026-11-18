@@ -22,6 +22,7 @@ private const val PREVIEW_MAX_FRAMES = 10
 private const val PREVIEW_MIN_FRAME_MS = 80L
 private const val PREVIEW_MAX_FRAME_MS = 500L
 private const val PREVIEW_CAPTURE_MS = 1_500L
+private const val PREVIEW_CACHE_MAX_BYTES = 20L * 1024 * 1024
 
 internal data class GiphyPreviewFrame(
     val image: ImageBitmap,
@@ -38,16 +39,25 @@ internal class GiphyPreview(
     }
 }
 
-/** Limits in-flight downloads and serializes brief captures on the isolated animation worker. */
-internal class GiphyPreviewLoader {
+/** Retains bounded bytes for this picker and serializes brief captures on the isolated animation worker. */
+internal class GiphyPreviewLoader(
+    private val fetch: suspend (RemoteGiphyMedia.ImageRequest) -> ByteArray? = ::fetchRemoteGiphyBytes,
+) {
     private val downloads = Semaphore(2)
     private val captures = Semaphore(1)
+    private val cache = RemoteGiphyByteCache(PREVIEW_CACHE_MAX_BYTES)
+
+    /** Revisiting a tile reuses its bounded response until this picker's LRU evicts it or the picker closes. */
+    internal suspend fun encodedBytes(request: RemoteGiphyMedia.ImageRequest): ByteArray? =
+        cache.get(request.url) ?: fetch(request)?.takeIf { it.isNotEmpty() && it.size <= GIPHY_MAX_BODY_BYTES }?.also {
+            cache.put(request.url, it)
+        }
 
     /** Captures the actual send rendition and releases the decoder before displaying the loop. */
     suspend fun load(media: RemoteGiphyMedia): GiphyPreview? =
         downloads.withPermit {
             val request = media.imageRequest() ?: return@withPermit null
-            val bytes = fetchRemoteGiphyBytes(request) ?: return@withPermit null
+            val bytes = encodedBytes(request) ?: return@withPermit null
             captures.withPermit {
                 val drawable =
                     decodeOwnedMedia(

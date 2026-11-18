@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.SafeHttpsGet
 import dev.ipf.whitenoise.android.media.ByteSizeLruCache
 import dev.ipf.whitenoise.android.media.GIPHY_MAX_MEDIA_BYTES
+import dev.ipf.whitenoise.android.media.GIPHY_USER_AGENT
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -443,6 +444,7 @@ internal suspend fun fetchRemoteGiphyBytes(request: RemoteGiphyMedia.ImageReques
                     maxBodyBytes = GIPHY_MAX_BODY_BYTES,
                     connectTimeoutMillis = GIPHY_CONNECT_TIMEOUT_MILLIS,
                     readTimeoutMillis = GIPHY_READ_TIMEOUT_MILLIS,
+                    requestHeaders = mapOf("User-Agent" to GIPHY_USER_AGENT),
                     hostAllowed = { RemoteGiphyMedia.isAllowedMediaUrl(it.toString()) },
                     contentTypeAllowed = { value ->
                         val mime = value?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)

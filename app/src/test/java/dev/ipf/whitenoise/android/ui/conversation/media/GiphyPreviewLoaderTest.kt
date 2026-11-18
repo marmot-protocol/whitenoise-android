@@ -3,11 +3,13 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
+import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.media.sandbox.AnimationSessionControl
 import dev.ipf.whitenoise.android.media.sandbox.IsolatedAnimationDrawable
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,6 +21,44 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class GiphyPreviewLoaderTest {
+    /** Scrolling back to a result reuses bytes, while closing the picker retires its private cache. */
+    @Test
+    fun revisitedTilesReuseBytesWithinThePicker() =
+        runTest {
+            var requests = 0
+            val bytes = byteArrayOf(1, 2, 3)
+            val request = RemoteGiphyMedia.ImageRequest("https://media.giphy.com/media/cat/giphy.gif", "image/gif")
+            val fetch: suspend (RemoteGiphyMedia.ImageRequest) -> ByteArray? = {
+                requests++
+                bytes
+            }
+            val loader = GiphyPreviewLoader(fetch)
+            assertSame(bytes, loader.encodedBytes(request))
+            assertSame(bytes, loader.encodedBytes(request))
+            assertEquals(1, requests)
+            assertSame(bytes, GiphyPreviewLoader(fetch).encodedBytes(request))
+            assertEquals(2, requests)
+        }
+
+    /** Retaining preview responses cannot grow past the existing byte-bounded cache budget. */
+    @Test
+    fun previewByteCacheEvictsOlderResponses() =
+        runTest {
+            var requests = 0
+            val loader =
+                GiphyPreviewLoader {
+                    requests++
+                    ByteArray(GIPHY_MAX_BODY_BYTES)
+                }
+            val media = (0..4).map { RemoteGiphyMedia.ImageRequest("https://media.giphy.com/media/cat$it/giphy.gif", "image/gif") }
+            media.forEach { assertEquals(GIPHY_MAX_BODY_BYTES, loader.encodedBytes(it)?.size) }
+            assertEquals(5, requests)
+            loader.encodedBytes(media.last())
+            assertEquals(5, requests)
+            loader.encodedBytes(media.first())
+            assertEquals(6, requests)
+        }
+
     /** A worker stream with only a first frame must never enable the send action. */
     @Test
     fun refusesAStalledAnimation() =

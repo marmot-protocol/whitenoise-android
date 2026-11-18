@@ -172,16 +172,6 @@ internal fun composerBottomClusterModifier(
 }
 
 /**
- * A focus request emits its own focus callback. Ignore that callback while a
- * pane-to-IME handoff is already running so it cannot start a second keyboard
- * request and a second transcript re-anchor.
- */
-internal fun shouldStartComposerKeyboardRestore(
-    paneOpen: Boolean,
-    keyboardRestorePending: Boolean,
-): Boolean = paneOpen && !keyboardRestorePending
-
-/**
  * Starting a reply grows the bottom input cluster by inserting the preview card.
  * Re-anchor only on the null -> non-null edge; recompositions while the same
  * reply is active must not keep stealing scroll while the user types (#1109).

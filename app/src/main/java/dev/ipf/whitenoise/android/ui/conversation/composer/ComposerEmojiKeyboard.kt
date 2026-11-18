@@ -223,3 +223,13 @@ private fun ComposerEmojiRailToggle(
         EmojiPickerTabIcon(category, ComposerEmojiRailIconSize, LocalContentColor.current)
     }
 }
+
+/**
+ * A focus request emits its own focus callback. Ignore that callback while a
+ * pane-to-IME handoff is already running so it cannot start a second keyboard
+ * request and a second transcript re-anchor.
+ */
+internal fun shouldStartComposerKeyboardRestore(
+    paneOpen: Boolean,
+    keyboardRestorePending: Boolean,
+): Boolean = paneOpen && !keyboardRestorePending

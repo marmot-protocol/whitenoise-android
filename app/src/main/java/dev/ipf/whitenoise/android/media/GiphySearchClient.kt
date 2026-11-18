@@ -19,6 +19,7 @@ private const val MAX_RESPONSE_BYTES = 1024 * 1024
 private const val GIPHY_PREFERRED_MEDIA_BYTES = 2 * 1024 * 1024
 internal const val GIPHY_MAX_MEDIA_BYTES = 5 * 1024 * 1024
 internal const val GIPHY_QUERY_MAX_LENGTH = 50
+internal const val GIPHY_USER_AGENT = "WhiteNoise/Android"
 
 /** The title and bounded GIF rendition used for both playback and sending. */
 internal data class GiphySearchResult(
@@ -45,7 +46,7 @@ internal class GiphySearchClient(
                             maxBodyBytes = MAX_RESPONSE_BYTES,
                             connectTimeoutMillis = 5_000,
                             readTimeoutMillis = 8_000,
-                            requestHeaders = mapOf("Accept" to "application/json"),
+                            requestHeaders = mapOf("Accept" to "application/json", "User-Agent" to GIPHY_USER_AGENT),
                             maxRedirectHops = 0,
                             hostAllowed = { it.host.equals(GIPHY_API_HOST, ignoreCase = true) },
                             contentTypeAllowed = { it?.substringBefore(';')?.trim().equals("application/json", true) },
@@ -135,8 +136,9 @@ private fun boundedGiphyRendition(
     rendition: JSONObject,
     originalFrames: Int?,
 ): GiphyRendition? {
-    val url = rendition.optString("url", "")
-    if (!RemoteGiphyMedia.isAllowedMediaUrl(url)) return null
+    val providerUrl = rendition.optString("url", "")
+    if (!RemoteGiphyMedia.isAllowedMediaUrl(providerUrl)) return null
+    val url = providerUrl.substringBefore('?').substringBefore('#')
     val path = URI(url).path.orEmpty().lowercase(Locale.ROOT)
     val width = rendition.optInt("width")
     val height = rendition.optInt("height")

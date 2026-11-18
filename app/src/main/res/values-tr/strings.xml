@@ -443,7 +443,7 @@
     <string name="giphy_media_preview">GIPHY üzerinden GIF</string>
     <string name="giphy_search_title">GIF ara</string>
     <string name="giphy_search_hint">GIPHY’de ara</string>
-    <string name="giphy_search_privacy">Aramanız ve IP adresiniz GIPHY’ye gönderilir. Alınan bir GIF’i açtığınızda da GIPHY ile bağlantı kurulur.</string>
+    <string name="giphy_search_privacy">GIPHY, aramanızı ve IP adresinizi alır. Alıcıların telefonları GIF’leri GIPHY’den otomatik olarak yükleyerek IP adreslerini paylaşabilir.</string>
     <string name="giphy_search_powered_by_prefix">Sağlayan</string>
     <string name="giphy_search_powered_by">GIPHY tarafından sağlanır</string>
     <string name="giphy_search_empty">GIF bulunamadı</string>

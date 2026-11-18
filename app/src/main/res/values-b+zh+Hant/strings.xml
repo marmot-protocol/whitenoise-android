@@ -430,7 +430,7 @@
     <string name="giphy_media_preview">來自 GIPHY 的 GIF</string>
     <string name="giphy_search_title">搜尋 GIF</string>
     <string name="giphy_search_hint">搜尋 GIPHY</string>
-    <string name="giphy_search_privacy">您的搜尋內容和 IP 位址會傳送給 GIPHY。開啟收到的 GIF 時也會連線至 GIPHY。</string>
+    <string name="giphy_search_privacy">GIPHY 會收到您的搜尋內容和 IP 位址。收件人的手機可能會自動從 GIPHY 載入 GIF，並分享其 IP 位址。</string>
     <string name="giphy_search_powered_by_prefix">內容提供者</string>
     <string name="giphy_search_powered_by">由 GIPHY 提供</string>
     <string name="giphy_search_empty">找不到 GIF</string>

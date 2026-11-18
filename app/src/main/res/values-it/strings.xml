@@ -445,7 +445,7 @@
     <string name="giphy_media_preview">GIF tramite GIPHY</string>
     <string name="giphy_search_title">Cerca GIF</string>
     <string name="giphy_search_hint">Cerca su GIPHY</string>
-    <string name="giphy_search_privacy">La tua ricerca e il tuo indirizzo IP vengono inviati a GIPHY. Anche l’apertura di una GIF ricevuta contatta GIPHY.</string>
+    <string name="giphy_search_privacy">GIPHY riceve la tua ricerca e il tuo indirizzo IP. I telefoni dei destinatari possono caricare automaticamente le GIF da GIPHY, condividendo il loro indirizzo IP.</string>
     <string name="giphy_search_powered_by_prefix">Fornito da</string>
     <string name="giphy_search_powered_by">Fornito da GIPHY</string>
     <string name="giphy_search_empty">Nessuna GIF trovata</string>

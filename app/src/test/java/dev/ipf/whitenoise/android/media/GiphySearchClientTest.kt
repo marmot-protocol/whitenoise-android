@@ -47,6 +47,18 @@ class GiphySearchClientTest {
         assertEquals(result.media, RemoteGiphyMedia.parse(result.media.wireText()))
     }
 
+    /** Provider tracking queries and fragments never enter preview requests or the sent message. */
+    @Test
+    fun stripsProviderTrackingFromSelectedMedia() {
+        val url = "https://media.giphy.com/media/cat/giphy.gif"
+        val tracked = "$url?cid=sender-id&rid=giphy.gif&ct=g#provider-fragment"
+        val item = JSONObject().put("images", JSONObject().put("original", rendition(tracked)))
+        val result = requireNotNull(decodeGiphySearchResults(response(item))).single()
+        assertEquals(url, result.media.url)
+        assertEquals(url, requireNotNull(result.media.imageRequest()).url)
+        assertEquals("$url\nvia GIPHY", result.media.wireText())
+    }
+
     /** A smaller GIF is both previewed and sent when the original exceeds the preferred download budget. */
     @Test
     fun prefersTheLargestRenditionUnderTwoMebibytes() {
