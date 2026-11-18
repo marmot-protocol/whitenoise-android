@@ -8,6 +8,7 @@ import android.os.Process
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -92,15 +93,14 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun policyDeniedNativeAttemptNeverGrantsMicrophoneAccess() {
+    fun policyDeniedAccessDoesNotRegisterNativeMicrophoneRecovery() {
         context.getSystemService(AudioManager::class.java).isMicrophoneMute = false
         setMode(AppOpsManager.MODE_ERRORED)
 
         val unregister = platform.requestMicrophoneUnblock {}
-        assertNotNull(unregister)
+        assertNull(unregister)
         assertEquals(0, (shadowOf(appOps) as PrivacyGatedAppOps).notes)
         assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
-        unregister?.invoke()
     }
 
     @Test

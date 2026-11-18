@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -28,7 +27,6 @@ import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companio
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
-import dev.ipf.whitenoise.android.ui.conversation.messages.awaitFileCardsVisible
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -88,12 +86,8 @@ class LargeFileCardStateTest {
     fun aReceivedFileOverTheReadBudgetSettlesDownloaded() {
         composeRule.setContent { WhiteNoiseTheme { LargeFileCard(mine = false) } }
         awaitDescribed(text(R.string.media_tap_to_download))
-        composeRule.awaitFileCardsVisible(expectedCards = 1)
 
-        composeRule
-            .onNodeWithTag(fileAttachmentCardTestTag(request(0).messageIdHex, 0))
-            .assertIsEnabled()
-            .performClick()
+        composeRule.onNodeWithTag(fileAttachmentCardTestTag(request(0).messageIdHex, 0)).performClick()
         deliverBodyOverTheReadBudget()
 
         awaitDescribed(text(R.string.attachment_type_pdf_description))

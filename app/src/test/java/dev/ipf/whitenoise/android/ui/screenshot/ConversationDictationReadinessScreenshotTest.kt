@@ -301,6 +301,48 @@ class ConversationDictationReadinessScreenshotTest {
     }
 
     @Test
+    fun microphoneOffKeepsInlineRecoveryLight() {
+        captureMicrophoneOff("dictation_microphone_off_inline_light.png")
+    }
+
+    @Test
+    fun microphoneOffKeepsInlineRecoveryDark() {
+        captureMicrophoneOff("dictation_microphone_off_inline_dark.png", darkTheme = true)
+    }
+
+    @Test
+    fun microphoneOffKeepsInlineRecoveryLargeFontRtlDark() {
+        captureMicrophoneOff(
+            "dictation_microphone_off_inline_large_font_rtl_dark.png",
+            darkTheme = true,
+            fontScale = 2f,
+            rtl = true,
+        )
+    }
+
+    private fun captureMicrophoneOff(
+        name: String,
+        darkTheme: Boolean = false,
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
+    ) {
+        val fixture = fixture(appOwned = true)
+        val initial = fixture.controller.state as ConversationDictationState.Starting
+        capture(
+            fixture,
+            name,
+            darkTheme = darkTheme,
+            fontScale = fontScale,
+            rtl = rtl,
+            state = ConversationDictationState.Failed(
+                initial.sessionId,
+                initial.target,
+                ConversationDictationFailure.MicrophoneMuted,
+            ),
+        )
+    }
+
+    @Test
     fun microphonePermissionDeniedKeepsInlineRetryLight() {
         captureMicrophoneDenial("dictation_microphone_denied_inline_light.png")
     }

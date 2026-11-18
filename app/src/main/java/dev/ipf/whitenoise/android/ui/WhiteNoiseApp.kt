@@ -155,7 +155,7 @@ internal fun TransientNoticeTimeoutEffect(
 
 /**
  * Notice layout (#3312): persistent top strips, temporary-banner slot, destination, then durable bottom controls.
- * The top slot serves destinations without their own below their bars; bottom chrome and keyboard handling stay stable.
+ * Destinations with no slot below their bars use the top slot; bottom chrome and keyboard handling stay stable.
  */
 @Composable
 @Suppress("FunctionNaming")

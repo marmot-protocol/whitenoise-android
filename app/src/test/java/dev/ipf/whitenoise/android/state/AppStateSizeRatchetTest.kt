@@ -51,8 +51,8 @@ class AppStateSizeRatchetTest {
     }
 
     private companion object {
-        private const val MAX_LINES = 8_477
+        const val MAX_LINES = 8_475
         const val CHATS_CONTROLLER_MAX_LINES = 2_152
-        const val DICTATION_CONTROLLER_MAX_LINES = 1_456
+        const val DICTATION_CONTROLLER_MAX_LINES = 1_453
     }
 }

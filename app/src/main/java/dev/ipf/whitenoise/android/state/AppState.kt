@@ -198,7 +198,10 @@ internal const val NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS = 10_000L
 private const val AUTOMATIC_ADMISSION_ATTEMPTS = 2
 internal const val INCOMING_ATTACHMENT_TAG = "DMAttachmentReceipt"
 
-/** Of [attempted] group invites, [failures] failed and [waited] were not invited because the user chose to wait. */
+/**
+ * How inviting one profile to several groups went: of [attempted] groups, [failures] failed and in [waited] the user
+ * chose to wait on a group-change question, so those groups were not invited either.
+ */
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
     val failures: Int,

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Hosted Gradle integration: strict locks and byte verification in a source archive."""
 import argparse
-from collections import deque
 from functools import partial
 import hashlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -24,26 +23,6 @@ class FixtureRepository(SimpleHTTPRequestHandler):
         if 'If-Modified-Since' in self.headers:
             del self.headers['If-Modified-Since']
         super().do_GET()
-
-    def send_response(self, code, message=None):
-        self.response_status = code
-        super().send_response(code, message)
-
-    def send_head(self):
-        """Record the actual response stream for both GET and HEAD, without changing it."""
-        stream = super().send_head()
-        size, digest = None, None
-        if stream is not None:
-            checksum = hashlib.sha256()
-            size = 0
-            for chunk in iter(lambda: stream.read(65536), b''):
-                size += len(chunk)
-                checksum.update(chunk)
-            digest = checksum.hexdigest()
-            stream.seek(0)
-        self.server.requests.append(
-            (self.command, self.path, self.response_status, size, digest))
-        return stream
 
     def send_header(self, keyword, value):
         """Omit Last-Modified: a same-size rewrite within one second otherwise looks unchanged to Gradle."""
@@ -97,8 +76,6 @@ def main():
         pom, _ = publish(repository, 'root', dependency='first')
         (project / 'android-sdk.jar').write_bytes(b'Synthetic SDK file input')
         server = ThreadingHTTPServer(('127.0.0.1', 0), partial(FixtureRepository, directory=str(repository)))
-        server.requests = deque(maxlen=80)
-        pom_digests = [hashlib.sha256(pom.read_bytes()).hexdigest()]
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
@@ -133,12 +110,7 @@ tasks.register('resolveLateSdkFixture') {
     }
 }
 tasks.register('resolveFixture') {
-    doLast {
-        def resolved = configurations.fixtureRuntime.resolve()
-        println('Fixture resolved modules: ' +
-            configurations.fixtureRuntime.incoming.resolutionResult.allComponents.collect { it.id }.sort { it.toString() })
-        assert resolved.size() == 2
-    }
+    doLast { assert configurations.fixtureRuntime.resolve().size() == 2 }
 }
 '''.replace('PORT', str(server.server_port)))
             invoke(args.gradle, project, 'resolveLateSdkFixture', '--write-locks', '--write-verification-metadata', 'sha256')
@@ -155,7 +127,6 @@ tasks.register('resolveFixture') {
             lock = project / 'gradle.lockfile'
             before = lock.read_bytes()
             publish(repository, 'root', dependency='second')
-            pom_digests.append(hashlib.sha256(pom.read_bytes()).hexdigest())
             # Review the new POM bytes, leaving the old transitive selection locked.
             metadata = project / 'gradle/verification-metadata.xml'
             tree = ET.parse(metadata)
@@ -182,17 +153,6 @@ tasks.register('resolveFixture') {
             invoke(args.gradle, project, '--dependency-verification', 'off', expect_failure=['must remain strict'])
             print('Gradle input fixture PASS: source archive, transitive drift rejected, reviewed update '
                   'accepted, substituted bytes rejected, verification bypass rejected, late SDK-file lock enforced')
-        except Exception:
-            # Failure-only, bounded synthetic evidence: do not enable Gradle's verbose logs.
-            server.shutdown()
-            print('Fixture root POM SHA-256 (original, mutated):', pom_digests, flush=True)
-            for name in ('gradle.lockfile', 'buildscript-gradle.lockfile'):
-                path = project / name
-                print('Fixture lock', name, path.read_text()[:4096] if path.exists() else '<missing>', flush=True)
-            print('Fixture HTTP responses (last 80): method path status bytes SHA-256', flush=True)
-            for request in server.requests:
-                print(*request, flush=True)
-            raise
         finally:
             server.shutdown()
             server.server_close()

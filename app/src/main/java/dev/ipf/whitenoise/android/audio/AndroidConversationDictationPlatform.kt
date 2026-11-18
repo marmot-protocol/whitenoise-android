@@ -114,11 +114,7 @@ internal class AndroidConversationDictationPlatform(
     override fun requestMicrophoneUnblock(onChanged: () -> Unit): (() -> Unit)? {
         if (
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            microphoneAccess() !in
-            setOf(
-                ConversationDictationMicrophoneAccess.MicrophoneMuted,
-                ConversationDictationMicrophoneAccess.AppOpDenied,
-            )
+            microphoneAccess() != ConversationDictationMicrophoneAccess.MicrophoneMuted
         ) {
             return null
         }
@@ -138,9 +134,9 @@ internal class AndroidConversationDictationPlatform(
             ContextCompat.RECEIVER_EXPORTED,
         )
         try {
-            // Privacy-only mute is hidden by AudioManager and can look like app policy denial.
-            // Note this explicit user-owned attempt without opening capture. AOSP shows its
-            // reminder only when sensor privacy is enabled; policy denial grants nothing.
+            // Android 12+ MODE_IGNORED is exposed as MicrophoneMuted even when AudioManager hides privacy mute.
+            // Note this explicit user-owned attempt without opening capture; AOSP shows its reminder
+            // only when sensor privacy is enabled. MODE_ERRORED app-policy denial is rejected above.
             // An allowed app-op with AudioManager-only mute must not record a privacy access.
             val appOps = context.getSystemService(AppOpsManager::class.java)
             if (

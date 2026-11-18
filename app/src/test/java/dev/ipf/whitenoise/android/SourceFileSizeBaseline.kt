@@ -10,7 +10,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
     mapOf(
         "dev/ipf/whitenoise/android/MainActivity.kt" to 910,
         "dev/ipf/whitenoise/android/amber/AmberActivityCoordinator.kt" to 857,
-        "dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt" to 696,
+        "dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt" to 692,
         "dev/ipf/whitenoise/android/audio/ConversationDictationController.kt" to 1219,
         "dev/ipf/whitenoise/android/audio/VoicePlaybackController.kt" to 788,
         "dev/ipf/whitenoise/android/audio/VoiceRecordingController.kt" to 623,
@@ -34,7 +34,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt" to 1472,
         "dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt" to 800,
         "dev/ipf/whitenoise/android/state/AppReviewDemo.kt" to 773,
-        "dev/ipf/whitenoise/android/state/AppState.kt" to 8460,
+        "dev/ipf/whitenoise/android/state/AppState.kt" to 8463,
         "dev/ipf/whitenoise/android/state/AppStateNotificationContent.kt" to 1819,
         "dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt" to 624,
         "dev/ipf/whitenoise/android/state/ChatFolderPreferences.kt" to 742,
