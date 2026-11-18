@@ -134,7 +134,7 @@ private suspend fun NotificationDeliveryController.syncPushForAccount(
             ?: return false
     if (account == activeAccountRef) localNotificationSettings = settings
     // Skip accounts with a queued sign-out disable so a stale enabled flag can't re-register them.
-    if (account in pushTokenStore.pendingDisables()) return true
+    if (account in withContext(pushWakeStorageDispatcher) { pushTokenStore.pendingDisables() }) return true
     if (!settings.nativePushEnabled) return true
     val fingerprint =
         PushFingerprint(
