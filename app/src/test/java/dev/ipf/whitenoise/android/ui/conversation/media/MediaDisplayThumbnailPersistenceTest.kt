@@ -45,7 +45,6 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
@@ -223,7 +222,12 @@ class MediaDisplayThumbnailPersistenceTest {
         }
     }
 
-    /** Re-arming an intent after availability changes cannot cancel its already-running visual producer. */
+    /**
+     * Re-arming an intent after availability changes cannot cancel its already-running visual producer.
+     *
+     * Every Compose job that reads native transfer state is recorded, not only the first — a short-lived
+     * refresh can read before the long-lived producer does and has finished, uncancelled, by the check.
+     */
     @Test
     fun durableAvailabilityDoesNotRestartAnInFlightOriginalLoad() {
         val transfer = armOriginalDownload()
@@ -242,15 +246,15 @@ class MediaDisplayThumbnailPersistenceTest {
                 metadataOwners.all { it.isCompleted }
         }
         // At zero layout size the visual effect cannot read native state. Finish metadata owners before
-        // admitting pixels, so the next Compose-owned snapshot identifies the visual producer.
-        val producer = AtomicReference<Job>()
+        // admitting pixels, so subsequent Compose-owned snapshots identify the visual producers.
+        val producers = ConcurrentHashMap.newKeySet<Job>()
         fixture.onNativeSnapshot = {
-            effectJobs.currentMainOwnerOrNull()?.let { producer.compareAndSet(null, it) }
+            effectJobs.currentMainOwnerOrNull()?.let(producers::add)
         }
         composeRule.runOnIdle { checkNotNull(state).decodeRequest.onSizeChanged(IntSize(128, 128)) }
         composeRule.waitUntil(10_000) {
             composeRule.waitForIdle()
-            fixture.calls.size == 1 && producer.get() != null
+            fixture.calls.size == 1 && producers.any { it.isActive }
         }
         composeRule.runOnIdle { fixture.state.cacheMediaPlaintext(request(0).cacheKey(), imageBytes()) }
         composeRule.waitUntil(10_000) {
@@ -258,7 +262,8 @@ class MediaDisplayThumbnailPersistenceTest {
             !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
         }
         composeRule.runOnIdle {
-            assertTrue(checkNotNull(producer.get()).isActive)
+            assertTrue("a producer was cancelled: $producers", producers.none { it.isCancelled })
+            assertTrue("no producer is still loading: $producers", producers.any { it.isActive })
             fixture.calls.single().succeed(imageBytes())
         }
         composeRule.waitUntil(10_000) {
