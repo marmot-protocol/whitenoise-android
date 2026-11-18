@@ -4166,13 +4166,13 @@ internal fun ConversationScreen(
             groupIdHex = controller.group.groupIdHex,
             currentRevision = composerDictationRevision,
         )
-    val composerDraftRevision = composerShareRevision to composerDictationRevision
-    val restoredDraftSnapshot = rememberRestoredComposerDraft(appState.draftStore, composerDraftKey, composerDraftRevision)
+    val draftRevision = composerShareRevision to composerDictationRevision
+    val restoredDraftSnapshot = rememberRestoredComposerDraft(appState.draftStore, composerDraftKey, draftRevision)
     val composerTextState =
         rememberComposerTextState(
             draftKey = composerDraftKey,
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-            externalRevision = composerDraftRevision,
+            externalRevision = draftRevision,
         )
     // Capture the baseline during composition, before either editor can receive an input event.
     val userTextEditRevisionOnEntry =
