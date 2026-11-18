@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ReplyMessageTags.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ReplyMessageTags.kt",
+        "surface": "Reply tags for polls and stickers",
+        "anchor": "internal fun replyMessageTags(",
+        "test_ids": [
+          "MSG-021",
+          "MSG-045"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ReplyMessageTags.kt",
+        "surface": "A finished poll or sticker reply clears only its own selection",
+        "anchor": "internal fun ConversationController.clearSentReply(",
+        "test_ids": [
+          "MSG-021",
+          "MSG-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

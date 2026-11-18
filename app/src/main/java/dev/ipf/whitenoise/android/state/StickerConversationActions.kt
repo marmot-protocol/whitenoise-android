@@ -92,15 +92,25 @@ private fun stickerAssetCacheFor(
     )
 }
 
-/** Sends [sticker] into this conversation through MDK; cancellation propagates, failures are shown. */
+/**
+ * Sends [sticker] into this conversation through MDK, as a reply to [reply]'s message when one is
+ * selected. Cancellation propagates; failures, including a reply with no event id yet, are shown.
+ */
 @Suppress("TooGenericExceptionCaught")
-internal suspend fun ConversationController.sendSticker(sticker: StickerFfi): Boolean {
+internal suspend fun ConversationController.sendSticker(
+    sticker: StickerFfi,
+    reply: ReplySnapshot,
+): Boolean {
     val account = boundAccountRef?.takeIf { canSendMessages } ?: return false
     return try {
+        val replyTags = reply.messageTags
         appState.withGroupCommitLock(account, group.groupIdHex) {
             check(canSendMessages)
-            appState.marmotIo { sendSticker(account, group.groupIdHex, StickerKey.from(sticker).ref) }
+            appState.marmotIo {
+                sendTaggedSticker(account, group.groupIdHex, StickerKey.from(sticker).ref, replyTags)
+            }
         }
+        clearSentReply(reply)
         true
     } catch (throwable: Throwable) {
         rethrowIfCancellation(throwable)

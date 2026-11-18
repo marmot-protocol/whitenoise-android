@@ -78,7 +78,7 @@ class PollConversationActionsTest {
             val state =
                 appState(
                     native { name, _ ->
-                        assertEquals("createPoll", name)
+                        assertEquals("createTaggedPoll", name)
                         entered.countDown()
                         summary()
                     },
@@ -91,7 +91,13 @@ class PollConversationActionsTest {
                 }
             val creation =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    controller.createPoll("Lunch?", listOf("Soup", "Salad"), PollTypeFfi.SINGLE_CHOICE, null)
+                    controller.createPoll(
+                        "Lunch?",
+                        listOf("Soup", "Salad"),
+                        PollTypeFfi.SINGLE_CHOICE,
+                        null,
+                        controller.snapshotReply(),
+                    )
                 }
             assertFalse(entered.await(150, TimeUnit.MILLISECONDS))
             release.complete(Unit)

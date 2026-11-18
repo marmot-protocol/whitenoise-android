@@ -164,11 +164,13 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
+import dev.ipf.whitenoise.android.state.replyAllowsTaggedSend
 import dev.ipf.whitenoise.android.state.resolveConversationAutoRead
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.sendSticker
 import dev.ipf.whitenoise.android.state.setUserBlocked
+import dev.ipf.whitenoise.android.state.snapshotReply
 import dev.ipf.whitenoise.android.state.tracedPagingSection
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
@@ -4739,16 +4741,17 @@ internal fun ConversationScreen(
                         onShareContact = {
                             contactPickerLauncher.launch(Unit)
                         },
+                        // A poll or sticker joins the selected reply, but a reply to a message that has
+                        // no event id yet cannot be referenced, so both stay hidden until it is accepted.
                         onCreatePoll =
-                            if (!controller.isDirectConversation) {
+                            if (!controller.isDirectConversation && controller.replyAllowsTaggedSend()) {
                                 { pollCreateOpen = true }
                             } else {
                                 null
                             },
-                        // MDK sends stickers without a reply target, so the action stays hidden
-                        // while replying or editing.
+                        // Editing changes an existing message, so a sticker cannot join it.
                         onOpenStickers =
-                            if (controller.replyingTo == null && controller.editingMessageId == null) {
+                            if (controller.editingMessageId == null && controller.replyAllowsTaggedSend()) {
                                 { stickerSheetOpen = true }
                             } else {
                                 null
@@ -5688,10 +5691,12 @@ internal fun ConversationScreen(
             PollCreateDialog(
                 onDismiss = { pollCreateOpen = false },
                 onSubmit = { question, options, type, deadlineDurationSeconds, onResult ->
+                    // The reply is captured at submit, so a later selection is neither sent nor cleared.
+                    val reply = controller.snapshotReply()
                     appState.launchMutation {
                         var created = false
                         try {
-                            created = controller.createPoll(question, options, type, deadlineDurationSeconds)
+                            created = controller.createPoll(question, options, type, deadlineDurationSeconds, reply)
                         } finally {
                             onResult(created)
                         }
@@ -5706,7 +5711,9 @@ internal fun ConversationScreen(
                 appState = appState,
                 onSend = { sticker ->
                     stickerSheetOpen = false
-                    appState.launchMutation { controller.sendSticker(sticker) }
+                    // The reply is captured at the tap, so a later selection is neither sent nor cleared.
+                    val reply = controller.snapshotReply()
+                    appState.launchMutation { controller.sendSticker(sticker, reply) }
                 },
                 onDismiss = { stickerSheetOpen = false },
             )
