@@ -279,6 +279,7 @@
     <string name="scroll_to_top">Nach oben scrollen</string>
     <string name="discard_failed_message">Fehlgeschlagene Nachricht verwerfen</string>
     <string name="message_discard_still_sending">Diese Nachricht wird noch gesendet. Versuche es gleich noch einmal.</string>
+    <string name="reply_target_not_sent">Die Nachricht, auf die du antwortest, wurde noch nicht gesendet. Warte, bis sie gesendet ist, oder tippe bei ihr auf „Erneut versuchen“, falls das Senden fehlgeschlagen ist. Sende dann deine Antwort.</string>
     <string name="message_discard_not_failed">Diese Nachricht kann nicht mehr verworfen werden.</string>
     <string name="decline">Ablehnen</string>
     <string name="accept">Annehmen</string>

@@ -696,7 +696,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
     /** A voice reply carries one exact target in its pending row and token-bound native draft admission. */
     @Test
     fun voiceReplyKeepsOriginalTargetWhenSelectionChangesDuringUpload() =
-        assertDraftlessMediaUsesTokenBoundNativeAdmission("audio/mp4", "voice.m4a", replyTarget = "poll-original")
+        assertDraftlessMediaUsesTokenBoundNativeAdmission("audio/mp4", "voice.m4a", replyTarget = POLL_MESSAGE_ID)
 }
 
 /** Covers which publish failures make a composer media Retry upload again (mdk#2891). */
@@ -1275,6 +1275,7 @@ private const val ACCOUNT_REF = "alice"
 private val ACCOUNT_ID = "a1".repeat(32)
 private val GROUP_ID = "b2".repeat(32)
 private val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
+private val POLL_MESSAGE_ID = "d1".repeat(32)
 private const val VIDEO_MEDIA_TYPE = "video/mp4"
 private val VIDEO_BYTES = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109)
 private const val PHOTO_PICK = "slot-photo"

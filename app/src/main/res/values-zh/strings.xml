@@ -266,6 +266,7 @@
     <string name="scroll_to_top">滚动到顶部</string>
     <string name="discard_failed_message">丢弃发送失败的消息</string>
     <string name="message_discard_still_sending">此消息仍在发送中。请稍后再试。</string>
+    <string name="reply_target_not_sent">你回复的消息尚未发送。请等待它发送完成；如果发送失败，请在该消息上点按“重试”，然后再发送你的回复。</string>
     <string name="message_discard_not_failed">此消息已无法丢弃。</string>
     <string name="decline">拒绝</string>
     <string name="accept">接受</string>
