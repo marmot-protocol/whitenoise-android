@@ -26,6 +26,8 @@ import java.util.Locale
  * ([originGroupIdHex]): forwarding a message back into its own conversation is
  * never the intent and would just duplicate it.
  */
+private const val ForwardMemberPreviewLimit = 6
+
 internal fun forwardTargetAvatarAccount(item: ChatListItem): String? =
     GroupProjector.avatarAccount(
         group = item.group,
@@ -44,7 +46,7 @@ internal fun forwardTargetMembersPreview(
         ?.filterNot { it.memberIdHex.equals(activeAccountIdHex, ignoreCase = true) }
         ?.map { memberTitle(it.memberIdHex) }
         ?.filter { it.isNotBlank() }
-        ?.take(6)
+        ?.take(ForwardMemberPreviewLimit)
         ?.joinToString(", ")
         ?.takeIf { it.isNotBlank() }
 }

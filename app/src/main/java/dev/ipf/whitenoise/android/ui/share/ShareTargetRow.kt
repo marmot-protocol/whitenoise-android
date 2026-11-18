@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming")
+
 package dev.ipf.whitenoise.android.ui.share
 
 import androidx.compose.runtime.Composable

@@ -61,7 +61,10 @@ class GodComposableDecompositionCoverageTest {
 
     @Test
     fun messageBubbleMediaPartitioningLivesInRememberedHolder() {
-        val bubbleBody = source("conversation/messages/MessageBubble.kt").motionOwnerSource().functionBody("MessageBubble")
+        val bubbleBody =
+            source("conversation/messages/MessageBubble.kt")
+                .motionOwnerSource()
+                .functionBody("MessageBubble")
         val mediaHolder = source("conversation/messages/BubbleMedia.kt").motionOwnerSource()
 
         assertTrue("MessageBubble must use the extracted media holder", "rememberBubbleMedia(" in bubbleBody)

@@ -88,7 +88,10 @@ class ErrorPresentationTest {
 
     @Test
     fun profileAdminPromotionScopesItsConfirmationToTheMutatedGroup() {
-        val body = mainSource("state/AppStateProfileGroups.kt").motionOwnerSource().functionBody("promoteProfileInGroup")
+        val body =
+            mainSource("state/AppStateProfileGroups.kt")
+                .motionOwnerSource()
+                .functionBody("promoteProfileInGroup")
 
         assertTrue(
             "profile-sheet admin success must use the originating account and group",

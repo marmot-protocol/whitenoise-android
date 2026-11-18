@@ -22,8 +22,9 @@ class SensitiveClipboardCoverageTest {
             root
                 .walkTopDown()
                 .filter { it.extension == "kt" }
-                .filter { file -> file.motionOwnerSource().let { "EXTRA_IS_SENSITIVE" in it && "setPrimaryClip" in it } }
-                .flatMap { file ->
+                .filter { file ->
+                    file.motionOwnerSource().let { "EXTRA_IS_SENSITIVE" in it && "setPrimaryClip" in it }
+                }.flatMap { file ->
                     val source = file.motionOwnerSource()
                     blockFunctions(source)
                         .filter { (_, body) -> "EXTRA_IS_SENSITIVE" in body && "setPrimaryClip" in body }

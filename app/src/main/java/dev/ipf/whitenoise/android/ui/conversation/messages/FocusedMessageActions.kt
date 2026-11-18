@@ -270,13 +270,7 @@ internal fun FocusedMessageActions(
         val currentInitiatingHold by rememberUpdatedState(initiatingHoldActive)
         val terminalActions =
             actions.map { action ->
-                action.copy(
-                    onClick = { popupMotion.close(action.onClick) },
-                    onClickAt =
-                        action.onClickAt?.let { activate ->
-                            { origin -> popupMotion.close { activate(origin) } }
-                        },
-                )
+                action.withTerminalCallbacks(popupMotion::close)
             }
         BoxWithConstraints(
             modifier =

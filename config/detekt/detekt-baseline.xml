@@ -54,7 +54,7 @@
     <ID>CyclomaticComplexMethod:MediaPipeline.kt:MediaPipeline$private fun parseTiffOrientation: Int?</ID>
     <ID>CyclomaticComplexMethod:MediaVideo.kt:@Composable internal fun MediaVideoBubble</ID>
     <ID>CyclomaticComplexMethod:MediaVideo.kt:@Composable internal fun MediaVideoGridTile</ID>
-    <ID>CyclomaticComplexMethod:MediaViewer.kt:@Composable internal fun ViewerPage</ID>
+    <ID>CyclomaticComplexMethod:MediaViewerPage.kt:@Composable internal fun ViewerPage</ID>
     <ID>CyclomaticComplexMethod:MediaVoice.kt:@Composable internal fun MediaVoiceBubble</ID>
     <ID>CyclomaticComplexMethod:MentionComposer.kt:MentionComposer$fun repairChipDeletion: Insertion?</ID>
     <ID>CyclomaticComplexMethod:MessageBubble.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun MessageBubble</ID>
@@ -125,12 +125,12 @@
     <ID>FunctionNaming:EmojiPicker.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun EmojiPickerSheet</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable internal fun GroupDetailsLocalDeleteControl</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun GroupMutationErrorBanner</ID>
-    <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun PushDeliveryDebugSection</ID>
-    <ID>FunctionNaming:GroupDetailsScreen.kt:@Composable private fun PushTokenDebugRows</ID>
+    <ID>FunctionNaming:GroupDetailsDiagnostics.kt:@Composable internal fun PushDeliveryDebugSection</ID>
+    <ID>FunctionNaming:GroupDetailsDiagnostics.kt:@Composable private fun PushTokenDebugRows</ID>
     <ID>FunctionNaming:GroupDetailsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupDetailsScreen</ID>
     <ID>FunctionNaming:GroupEditScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEditScreen</ID>
     <ID>FunctionNaming:GroupEmojiImagePicker.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEmojiImagePickerSheet</ID>
-    <ID>FunctionNaming:GroupImageSearch.kt:@Composable private fun GroupImageSearchTile</ID>
+    <ID>FunctionNaming:GroupImageSearchTile.kt:@Composable internal fun GroupImageSearchTile</ID>
     <ID>FunctionNaming:GroupImageSearch.kt:@Composable private fun ImageSourceButton</ID>
     <ID>FunctionNaming:GroupImageSearch.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ImageSearchSheet</ID>
     <ID>FunctionNaming:GroupMembers.kt:@Composable internal fun GroupMemberIdentityRows</ID>
@@ -178,7 +178,7 @@
     <ID>FunctionNaming:MediaVideo.kt:@Composable internal fun MediaVideoBubble</ID>
     <ID>FunctionNaming:MediaVideo.kt:@Composable internal fun MediaVideoGridTile</ID>
     <ID>FunctionNaming:MediaVideo.kt:@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class) @Composable internal fun VideoViewerPage</ID>
-    <ID>FunctionNaming:MediaViewer.kt:@Composable internal fun ViewerPage</ID>
+    <ID>FunctionNaming:MediaViewerPage.kt:@Composable internal fun ViewerPage</ID>
     <ID>FunctionNaming:MediaVoice.kt:@Composable internal fun MediaVoiceBubble</ID>
     <ID>FunctionNaming:MessageBubble.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun MessageBubble</ID>
     <ID>FunctionNaming:MessageBubbleFooter.kt:@Composable internal fun BubbleFooterLayout</ID>
@@ -255,11 +255,11 @@
     <ID>LongMethod:DisappearingMessages.kt:@Composable private fun DisappearingCustomDialog</ID>
     <ID>LongMethod:DiskByteCache.kt:DiskByteCache$fun put</ID>
     <ID>LongMethod:DiskByteCache.kt:DiskByteCache$private fun buildHydratedIndex: HydratedIndex</ID>
-    <ID>LongMethod:GroupDetailsScreen.kt:@Composable private fun PushDeliveryDebugSection</ID>
+    <ID>LongMethod:GroupDetailsDiagnostics.kt:@Composable internal fun PushDeliveryDebugSection</ID>
     <ID>LongMethod:GroupDetailsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupDetailsScreen</ID>
     <ID>LongMethod:GroupEditScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEditScreen</ID>
     <ID>LongMethod:GroupEmojiImagePicker.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun GroupEmojiImagePickerSheet</ID>
-    <ID>LongMethod:GroupImageSearch.kt:@Composable private fun GroupImageSearchTile</ID>
+    <ID>LongMethod:GroupImageSearchTile.kt:@Composable internal fun GroupImageSearchTile</ID>
     <ID>LongMethod:GroupImageSearch.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ImageSearchSheet</ID>
     <ID>LongMethod:GroupMembers.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun TransferAdminSheet</ID>
     <ID>LongMethod:GroupSystemEvents.kt:GroupSystemEvents$fun summary: String</ID>
@@ -280,7 +280,7 @@
     <ID>LongMethod:MediaVideo.kt:@Composable internal fun MediaVideoBubble</ID>
     <ID>LongMethod:MediaVideo.kt:@Composable internal fun MediaVideoGridTile</ID>
     <ID>LongMethod:MediaVideo.kt:@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class) @Composable internal fun VideoViewerPage</ID>
-    <ID>LongMethod:MediaViewer.kt:@Composable internal fun ViewerPage</ID>
+    <ID>LongMethod:MediaViewerPage.kt:@Composable internal fun ViewerPage</ID>
     <ID>LongMethod:MediaVoice.kt:@Composable internal fun MediaVoiceBubble</ID>
     <ID>LongMethod:MessageBubble.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun MessageBubble</ID>
     <ID>LongMethod:MessageDeleteDialog.kt:@Composable internal fun BatchMessageDeleteDialogContent</ID>
@@ -389,7 +389,7 @@
     <ID>MagicNumber:CopyBundles.kt:60_000L</ID>
     <ID>MagicNumber:DiagnosticsScreen.kt:1000L</ID>
     <ID>MagicNumber:DiagnosticsScreen.kt:500</ID>
-    <ID>MagicNumber:DiagnosticsScreen.kt:DiagnosticLogEntry$1000L</ID>
+    <ID>MagicNumber:DiagnosticsState.kt:DiagnosticLogEntry$1000L</ID>
     <ID>MagicNumber:DiskByteCache.kt:DiskByteCache$4</ID>
     <ID>MagicNumber:EmojiData.kt:EmojiEntry$3</ID>
     <ID>MagicNumber:EmojiData.kt:EmojiEntry$4</ID>

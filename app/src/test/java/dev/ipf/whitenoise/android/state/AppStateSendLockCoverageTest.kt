@@ -132,7 +132,9 @@ class AppStateSendLockCoverageTest {
         val hideLock = unlockBody.indexOf("screenVisible = false")
         val unlockCallback = unlockBody.indexOf("onUnlockSucceeded(dismissRetainedVisibleConversation)")
         val wiring =
-            appStateSource().motionOwnerSource().substringAfter("onUnlockSucceeded = { dismissRetainedVisibleConversation ->")
+            appStateSource()
+                .motionOwnerSource()
+                .substringAfter("onUnlockSucceeded = { dismissRetainedVisibleConversation ->")
         assertTrue(
             "successful unlock must dismiss after revealing the retained conversation",
             hideLock >= 0 &&

@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming")
+
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.material3.Icon
