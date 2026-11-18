@@ -1654,6 +1654,8 @@
         <item quantity="other">%1$d emoji</item>
     </plurals>
     <string name="emoji_sets_installed">Yüklendi</string>
+    <string name="emoji_sets_section_installed">Yüklü</string>
+    <string name="emoji_sets_section_discover">Keşfet</string>
     <string name="emoji_sets_update_available">Güncelleme var</string>
     <string name="emoji_sets_load_image">Önizleme görselini yükle</string>
     <string name="emoji_sets_image_privacy">Önizleme yüklemek veya set kurmak, IP adresinizi setin görsel sunucularıyla paylaşır.</string>

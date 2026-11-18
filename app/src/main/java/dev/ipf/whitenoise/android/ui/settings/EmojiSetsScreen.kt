@@ -207,27 +207,36 @@ private fun EmojiSetBrowser(
         if (state.sets.isEmpty() && !loading && !discoveryFailed) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
-        items(state.sets, key = { it.coordinate }) { set ->
-            SettingsGroup {
-                row("set") { context ->
-                    SettingsAction(
-                        context = context,
-                        title = set.displayTitle(),
-                        subtitle =
-                            when {
-                                set.installed?.updateAvailable == true ->
-                                    stringResource(R.string.emoji_sets_update_available)
-                                set.installed != null -> stringResource(R.string.emoji_sets_installed)
-                                else -> {
-                                    val count = set.emoji.size
-                                    pluralStringResource(R.plurals.emoji_sets_item_count, count, count)
-                                }
-                            },
-                        explanation = stringResource(R.string.explanation_organize_emoji_set),
-                        enabled = !state.busy,
-                        onClick = { onShow(set) },
-                        leading = { SettingsLeadingIcon(R.drawable.ic_category) },
-                    )
+        // Installed sets, then relay results, under the sticker browser's headings (#3882).
+        val (installed, discovered) = state.sets.partition { it.installed != null }
+        for ((heading, sets) in listOf(
+            R.string.emoji_sets_section_installed to installed,
+            R.string.emoji_sets_section_discover to discovered,
+        )) {
+            if (sets.isEmpty()) continue
+            item(key = "heading.$heading") { SettingsSection(stringResource(heading)) }
+            items(sets, key = { it.coordinate }) { set ->
+                SettingsGroup {
+                    row("set") { context ->
+                        SettingsAction(
+                            context = context,
+                            title = set.displayTitle(),
+                            subtitle =
+                                when {
+                                    set.installed?.updateAvailable == true ->
+                                        stringResource(R.string.emoji_sets_update_available)
+                                    set.installed != null -> stringResource(R.string.emoji_sets_installed)
+                                    else -> {
+                                        val count = set.emoji.size
+                                        pluralStringResource(R.plurals.emoji_sets_item_count, count, count)
+                                    }
+                                },
+                            explanation = stringResource(R.string.explanation_organize_emoji_set),
+                            enabled = !state.busy,
+                            onClick = { onShow(set) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_category) },
+                        )
+                    }
                 }
             }
         }
