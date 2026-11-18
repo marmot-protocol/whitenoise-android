@@ -5,13 +5,13 @@ import java.io.File
 
 /**
  * Lists `ConversationDictationController.kt` followed by its `ConversationDictationController<Topic>.kt`
- * extension files, so source gates keep seeing the whole controller after helper clusters moved out.
+ * extension files and merge declarations, so source gates keep seeing the whole controller.
  */
 internal fun conversationDictationControllerFiles(): List<File> {
     val audio = appModuleFile("src/main/java/dev/ipf/whitenoise/android/audio")
     val topics =
         audio
-            .listFiles { file -> file.name.matches(Regex("""ConversationDictationController\w+\.kt""")) }
+            .listFiles { file -> file.name.matches(Regex("""ConversationDictation(?:Controller\w+|Merge)\.kt""")) }
             .orEmpty()
             .sortedBy(File::getName)
     return listOf(File(audio, "ConversationDictationController.kt")) + topics
@@ -28,8 +28,12 @@ internal fun androidConversationDictationPlatformSource(): String {
     val audio = appModuleFile("src/main/java/dev/ipf/whitenoise/android/audio")
     val topics =
         audio
-            .listFiles { file -> file.name.matches(Regex("""(?:AndroidConversationDictationPlatform\w+|ConversationDictationCallerAudioProbe)\.kt""")) }
-            .orEmpty()
+            .listFiles { file ->
+                file.name.matches(
+                    Regex("""(?:AndroidConversationDictationPlatform\w+|ConversationDictationCallerAudioProbe)\.kt"""),
+                )
+            }.orEmpty()
             .sortedBy(File::getName)
-    return (listOf(File(audio, "AndroidConversationDictationPlatform.kt")) + topics).joinToString("\n") { it.readText() }
+    val files = listOf(File(audio, "AndroidConversationDictationPlatform.kt")) + topics
+    return files.joinToString("\n") { it.readText() }
 }
