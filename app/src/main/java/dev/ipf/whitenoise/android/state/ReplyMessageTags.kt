@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageProjector
 
 private const val EVENT_ID_HEX_LENGTH = 64
@@ -62,6 +63,18 @@ private fun ConversationController.confirmedReplyTarget(selected: String): Strin
         ?.messageIdHex
         ?.takeIf(::isPublishableReplyTarget)
         ?: selected
+}
+
+/**
+ * The reply target a text or media send publishes: none stays none, an event id is kept, and the client token
+ * of the user's own send resolves to that send's event id. While it has none, the user is told to try again and
+ * the result is a failure, so the caller sends nothing and the composer keeps its text, media and reply.
+ */
+internal fun ConversationController.replyTargetForSend(selected: String?): Result<String?> {
+    val target = selected?.takeIf(String::isNotBlank)?.let { confirmedReplyTarget(it) }
+    if (target == null || isPublishableReplyTarget(target)) return Result.success(target)
+    appState.present(R.string.reply_target_still_sending)
+    return Result.failure(IllegalStateException("reply target has no event id yet"))
 }
 
 /** True when the composer's reply, if any, can be carried by a poll or sticker. */

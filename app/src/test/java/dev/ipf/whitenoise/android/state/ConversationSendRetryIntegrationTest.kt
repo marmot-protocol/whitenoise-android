@@ -4224,7 +4224,7 @@ class ConversationSendRetryIntegrationTest {
         val ACCOUNT_ID = "a1".repeat(32)
         val GROUP_ID = "b2".repeat(32)
         val OTHER_GROUP_ID = "b4".repeat(32)
-        const val REPLY_MESSAGE_ID = "reply-message"
+        val REPLY_MESSAGE_ID = "d1".repeat(32)
         val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
     }
 }

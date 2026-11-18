@@ -1742,7 +1742,7 @@ class ConversationController(
      * [onTerminalFailure] distinguishes a definite failure from an ambiguous
      * delivery that remains Pending. None of the callbacks run when a guard
      * rejects the send (no account yet, blank text, unknown/non-member state,
-     * or a terminal group).
+     * a terminal group, or a reply to a message that has no event id yet).
      * The edit path also leaves [onAccepted] uncalled: the composer restores its
      * pre-edit draft via the `editingMessageId` LaunchedEffect, not by clearing.
      */
@@ -1843,11 +1843,11 @@ class ConversationController(
             }
             return
         }
+        val replyTarget = replyTargetForSend(replyingTo?.messageIdHex).getOrElse { return }
         val sendHostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEND)
         val outboundVisibleAttempt =
             appState.beginHostPerformance(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE)
 
-        val replyTarget = replyingTo?.messageIdHex?.takeIf { it.isNotBlank() }
         // WNPerf assigns an opaque process-local operation id only while the
         // user has explicitly enabled the bounded diagnostic session.
         val trace = PerformanceDiagnostics.begin(PerformanceOperation.TEXT_SEND)
@@ -2169,7 +2169,7 @@ class ConversationController(
      * temp id, retains the bytes for retry, inserts the optimistic bubble,
      * and republishes the timeline so the bubble appears immediately.
      * Returns null when the send can't proceed (no account, can't send,
-     * empty, or oversize). Caller pairs each non-null result with a
+     * empty, oversize, or a reply with no event id yet). Caller pairs each non-null result with a
      * matching [uploadQueued] call to drive the FFI work. [canQueue] rechecks a caller's
      * presentation owner after Markdown preparation, before publishing any optimistic state.
      */
@@ -2198,7 +2198,8 @@ class ConversationController(
                     )
                 }
                 ?: return null
-        if (!canQueueAttachmentBytes(attachments, replyTarget)) return null
+        val target = replyTargetForSend(replyTarget).getOrElse { return null }
+        if (!canQueueAttachmentBytes(attachments, target)) return null
         val tempId = UUID.randomUUID().toString()
         val key = "msg:$tempId"
         val outboundVisibleAttempt =
@@ -2224,7 +2225,7 @@ class ConversationController(
                         body = body,
                         attachments = attachments,
                         now = now,
-                        replyTarget = replyTarget,
+                        replyTarget = target,
                     )
                 }
             } catch (throwable: Throwable) {
@@ -2236,9 +2237,8 @@ class ConversationController(
             outboundVisibleAttempt.cancel()
             return null
         }
-        val replyRevision =
-            replyTarget?.let { prepareQueuedMediaReply(account, it, trimmedCaption, attachments) }
-        val replyStagingFailed = replyTarget != null && replyRevision == null
+        val replyRevision = target?.let { prepareQueuedMediaReply(account, it, trimmedCaption, attachments) }
+        val replyStagingFailed = target != null && replyRevision == null
         if (replyStagingFailed || !canQueueMediaForAccount(account, canQueue)) {
             outboundVisibleAttempt.cancel()
             if (replyStagingFailed) appState.present(R.string.media_reply_draft_conflict)
@@ -2248,7 +2248,7 @@ class ConversationController(
         val optimisticOrder = nextOptimisticTimelineOrder()
         retainedMediaUploads.put(
             key,
-            RetainedMediaUpload(attachments, trimmedCaption, replyTarget, replyRevision, replyVersion),
+            RetainedMediaUpload(attachments, trimmedCaption, target, replyRevision, replyVersion),
         )
         // Mark this slot as "still needed by a pending send" so the screen
         // dispose hook's `clearRetainedUploads` won't wipe bytes for slots
