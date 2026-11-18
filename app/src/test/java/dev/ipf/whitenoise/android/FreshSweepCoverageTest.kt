@@ -92,19 +92,7 @@ class FreshSweepCoverageTest {
             "forward text must be projected once per timeline change",
             "MessageProjector.forwardableText" in projection,
         )
-        assertTrue(
-            "convergence-invalidated text must remain available to bulk copy",
-            "copyableText =" in projection &&
-                "if (persistedFailure)" in projection &&
-                "MessageProjector.copyableText(record, editedText)" in projection,
-        )
-        assertTrue(
-            "convergence-invalidated text must remain unavailable to bulk forward",
-            Regex(
-                "forwardableText\\s*=\\s*if \\(invalidated\\)\\s*\\{\\s*null\\s*}\\s*else\\s*\\{\\s*" +
-                    "MessageProjector\\.forwardableText\\(\\s*record,\\s*editedText,?\\s*\\)",
-            ).containsMatchIn(projection),
-        )
+        // SelectableMessageProjectionTest checks the copy and forward results for invalidated rows.
         assertFalse("projections must not read the profile revision", "profileRevisionForCompose" in source)
     }
 
