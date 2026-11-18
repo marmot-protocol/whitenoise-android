@@ -57,8 +57,10 @@ class GiphySearchSheetScreenshotTest {
 
         composeRule.onNodeWithContentDescription("Powered by GIPHY").assertIsDisplayed()
         composeRule
-            .onNodeWithText("GIPHY receives your search and IP address. Recipients’ phones may automatically load GIFs from GIPHY, sharing their IP address.")
-            .assertIsDisplayed()
+            .onNodeWithText(
+                "GIPHY receives your search and IP address. " +
+                    "Recipients’ phones may automatically load GIFs from GIPHY, sharing their IP address.",
+            ).assertIsDisplayed()
         val second = composeRule.onNodeWithText("Sleepy cat")
         second.assertIsNotEnabled().performTouchInput { click() }
         composeRule.runOnIdle { assertNull(selected) }

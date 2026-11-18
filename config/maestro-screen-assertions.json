@@ -1262,7 +1262,7 @@
           "visible_on_entry": true
         }
       ],
-      "remaining": "MED-054 still requires the keyed composer entry, debounced provider search, playback before selection, retry, cancellation during a request, and cross-platform delivery."
+      "remaining": "MED-057 still requires the keyed composer entry, debounced provider search, playback before selection, retry, cancellation during a request, and cross-platform delivery."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",

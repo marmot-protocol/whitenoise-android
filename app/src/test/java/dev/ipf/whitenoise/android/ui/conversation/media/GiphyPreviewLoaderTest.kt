@@ -50,7 +50,10 @@ class GiphyPreviewLoaderTest {
                     requests++
                     ByteArray(GIPHY_MAX_BODY_BYTES)
                 }
-            val media = (0..4).map { RemoteGiphyMedia.ImageRequest("https://media.giphy.com/media/cat$it/giphy.gif", "image/gif") }
+            val media =
+                (0..4).map {
+                    RemoteGiphyMedia.ImageRequest("https://media.giphy.com/media/cat$it/giphy.gif", "image/gif")
+                }
             media.forEach { assertEquals(GIPHY_MAX_BODY_BYTES, loader.encodedBytes(it)?.size) }
             assertEquals(5, requests)
             loader.encodedBytes(media.last())

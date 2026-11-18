@@ -50,7 +50,7 @@
         "surface": "Search GIFs composer action",
         "anchor": "fun composerGiphyItem(",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       }
     ],
@@ -125,7 +125,7 @@
         "surface": "string:giphy_search_title",
         "anchor": "R.string.giphy_search_title",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -133,7 +133,7 @@
         "surface": "string:giphy_search_privacy",
         "anchor": "R.string.giphy_search_privacy",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       }
     ],

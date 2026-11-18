@@ -31,7 +31,10 @@ internal fun rememberConversationGiphyPicker(
                 if (open) {
                     open = false
                     controller.appState.launchMutation {
-                        if (controller.ownsRetainedForegroundPresentation && controller.canSendMessages && controller.editingMessageId == null) {
+                        if (controller.ownsRetainedForegroundPresentation &&
+                            controller.canSendMessages &&
+                            controller.editingMessageId == null
+                        ) {
                             controller.send(wireText, onAccepted = onAccepted, consumeReply = false)
                         }
                     }

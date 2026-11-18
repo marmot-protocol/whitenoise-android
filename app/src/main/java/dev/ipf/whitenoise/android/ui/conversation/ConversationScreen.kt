@@ -1913,7 +1913,6 @@ internal fun ConversationScreen(
     var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
     var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     var stickerSheetOpen by remember(chat.id) { mutableStateOf(false) }
-    val searchGifs = rememberConversationGiphyPicker(controller, attachmentOrigin, !transcriptRoutedAway && !freezeRoutePresentation, ::revealSentMessage)
     var emojiLibraryPages by remember(chat.id) { mutableStateOf(emptyList<ConversationEmojiLibraryPage>()) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
@@ -4501,7 +4500,13 @@ internal fun ConversationScreen(
                             } else {
                                 null
                             },
-                        onSearchGifs = searchGifs,
+                        onSearchGifs =
+                            rememberConversationGiphyPicker(
+                                controller,
+                                attachmentOrigin,
+                                presentationAvailable = !transcriptRoutedAway && !freezeRoutePresentation,
+                                onAccepted = ::revealSentMessage,
+                            ),
                         onOpenEmojiSettings =
                             if (draftAccountRef != null && draftAccountRef == appState.activeAccountRef) {
                                 { emojiLibraryPages = listOf(ConversationEmojiLibraryPage.Settings) }

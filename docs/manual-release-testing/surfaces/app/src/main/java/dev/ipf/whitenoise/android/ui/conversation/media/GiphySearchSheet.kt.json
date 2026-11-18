@@ -8,7 +8,7 @@
         "surface": "GiphySearchSheet",
         "anchor": "fun GiphySearchSheet(",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "surface": "GiphySearchContent",
         "anchor": "fun GiphySearchContent(",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "surface": "GiphySearchControls",
         "anchor": "fun GiphySearchControls(",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "surface": "GiphySearchStatus",
         "anchor": "fun GiphySearchStatus(",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "surface": "GiphySearchTile",
         "anchor": "fun GiphySearchTile(",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "surface": "GiphyPreviewPlaceholder",
         "anchor": "fun GiphyPreviewPlaceholder(",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "surface": "GiphyPreviewImage",
         "anchor": "fun GiphyPreviewImage(",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       }
     ],
@@ -66,7 +66,7 @@
         "surface": "string:giphy_search_title",
         "anchor": "R.string.giphy_search_title",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -74,7 +74,7 @@
         "surface": "string:giphy_search_privacy",
         "anchor": "R.string.giphy_search_privacy",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -82,7 +82,7 @@
         "surface": "string:giphy_search_powered_by",
         "anchor": "R.string.giphy_search_powered_by",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -90,7 +90,7 @@
         "surface": "string:giphy_search_powered_by_prefix",
         "anchor": "R.string.giphy_search_powered_by_prefix",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -98,7 +98,7 @@
         "surface": "string:giphy_search_hint",
         "anchor": "R.string.giphy_search_hint",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -106,7 +106,7 @@
         "surface": "string:giphy_search_failed",
         "anchor": "R.string.giphy_search_failed",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -114,7 +114,7 @@
         "surface": "string:giphy_search_empty",
         "anchor": "R.string.giphy_search_empty",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -122,7 +122,7 @@
         "surface": "string:giphy_send_result",
         "anchor": "R.string.giphy_send_result",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -130,7 +130,7 @@
         "surface": "string:gif",
         "anchor": "R.string.gif",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -138,7 +138,7 @@
         "surface": "string:retry",
         "anchor": "R.string.retry",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -146,7 +146,7 @@
         "surface": "string:giphy_preview_loading",
         "anchor": "R.string.giphy_preview_loading",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       },
       {
@@ -154,7 +154,7 @@
         "surface": "string:giphy_preview_unavailable",
         "anchor": "R.string.giphy_preview_unavailable",
         "test_ids": [
-          "MED-054"
+          "MED-057"
         ]
       }
     ]
