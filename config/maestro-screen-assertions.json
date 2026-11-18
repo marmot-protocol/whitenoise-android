@@ -2086,13 +2086,15 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
       "symbol": "ActiveProfileLinkRequest",
       "bindings": [],
-      "remaining": "This request appears only when a second installation of the same account asks to link, which the single-emulator runner cannot provide. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-060; add a direct assertion when the runner can seed a second device."
+      "remaining": "This request appears only when a second installation of the same account asks to link, which the single-emulator runner cannot provide. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-060; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["SET-060"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
       "symbol": "DeviceLinkOtherProfileDialog",
       "bindings": [],
-      "remaining": "This request appears only when a second installation of the same account asks to link, which the single-emulator runner cannot provide. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-060; add a direct assertion when the runner can seed a second device."
+      "remaining": "This request appears only when a second installation of the same account asks to link, which the single-emulator runner cannot provide. Its states, choices, duplicate-tap and close-without-answer behavior are covered by JVM tests and manual SET-060; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["SET-060"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
@@ -6654,7 +6656,8 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
       "symbol": "RemoveDeviceDialog",
       "bindings": [],
-      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device."
+      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["SET-063"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
@@ -6679,7 +6682,8 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
       "symbol": "RepairDeviceLinkDialog",
       "bindings": [],
-      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device."
+      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["SET-064"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
@@ -6698,25 +6702,29 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/SignInReviewSection.kt",
       "symbol": "SignInReviewDialog",
       "bindings": [],
-      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device."
+      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["SET-064"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
       "symbol": "GroupAccountDevicesConfirmDialog",
       "bindings": [],
-      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device."
+      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["GRP-043"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
       "symbol": "DeviceLinkOfferDialog",
       "bindings": [],
-      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device."
+      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["ACC-025"]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkOffer.kt",
       "symbol": "DeviceLinkOfferSteps",
       "bindings": [],
-      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device."
+      "remaining": "This surface opens only for an account with a second installation or linked device, which the single-emulator runner cannot provide. Its states and actions are covered by JVM tests and the linked-devices manual scenarios; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["ACC-025", "SET-060"]
     }
   ]
 }
