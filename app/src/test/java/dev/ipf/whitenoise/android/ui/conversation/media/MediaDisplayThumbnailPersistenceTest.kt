@@ -238,7 +238,8 @@ class MediaDisplayThumbnailPersistenceTest {
             state?.startDownload == true &&
                 state?.downloadActionReady == true &&
                 fixture.state.hasInteractive(transfer) &&
-                metadataOwners.isNotEmpty() && metadataOwners.all { it.isCompleted }
+                metadataOwners.isNotEmpty() &&
+                metadataOwners.all { it.isCompleted }
         }
         // At zero layout size the visual effect cannot read native state. Finish metadata owners before
         // admitting pixels, so the next Compose-owned snapshot identifies the visual producer.
