@@ -576,6 +576,8 @@ jobs:
           name: dex-method-budget-${{ matrix.phase }}
           path: app/build/reports/dex-method-budget/
           if-no-files-found: ignore
+          # A re-run of this job replaces the previous attempt's artifact.
+          overwrite: true
           retention-days: 7
 
       - name: Stage the existing APK for optional Maestro testing
@@ -620,6 +622,8 @@ jobs:
           name: android-ci-gradle-profiles-build-contracts-${{ matrix.phase }}
           path: build/reports/profile/
           if-no-files-found: ignore
+          # A re-run of this job replaces the previous attempt's artifact.
+          overwrite: true
           retention-days: 7
 
       - name: Verify dependency security resolution fixture

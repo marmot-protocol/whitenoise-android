@@ -724,6 +724,10 @@ class AndroidCiGateTest(unittest.TestCase):
                 self.assertIn("        if: endsWith(matrix.phase, 'ZapstoreRelease')\n", step)
                 self.assertNotIn('continue-on-error', step)
                 self.assertNotIn('|| true', step)
+        # Each step must measure its own phase, so the staging leg can never budget a production build.
+        for name in steps[:2]:
+            self.assertIn('          SHIPPING_VARIANT: ${{ matrix.phase }}\n',
+                          self.named_step(self.build_contracts, name))
         build = self.named_step(self.build_contracts, steps[0])
         self.assertIn("WHITENOISE_ALLOW_UNSIGNED_RELEASE: 'true'", build)
         self.assertNotIn('KEYSTORE', build)
@@ -737,6 +741,8 @@ class AndroidCiGateTest(unittest.TestCase):
                 self.assertIn(f'          {name}: {value}\n', build)
                 self.assertIn(f"printf '{name}={value.strip(chr(39))}\\n'", staging_apk)
         budget = self.named_step(self.build_contracts, steps[2])
+        self.assertIn('        run: >-\n          python3 scripts/dex_method_budget.py\n', budget)
+        self.assertIn('          DEX_BUDGET_VARIANT: ${{ matrix.phase }}\n', budget)
         self.assertIn('--apk "$DEX_BUDGET_APK_PATH"', budget)
         self.assertIn('DEX_BUDGET_APK_PATH: ${{ steps.shipping_apk.outputs.path }}', budget)
         self.assertIn('--mapping "app/build/outputs/mapping/$DEX_BUDGET_VARIANT/mapping.txt"', budget)
@@ -746,6 +752,10 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertEqual(sorted(positions), positions)
         report = self.named_step(self.build_contracts, 'Upload shipping DEX method report')
         self.assertIn("if: ${{ always() && endsWith(matrix.phase, 'ZapstoreRelease') }}", report)
+        # A retried shipping phase must replace its earlier attempt's artifacts rather than fail on the name.
+        timings = self.named_step(self.build_contracts, 'Upload Gradle timing reports')
+        for upload in (report, timings):
+            self.assertIn('          overwrite: true\n', upload)
         self.assertIn('build-contracts', self.dependencies)
 
     def test_dependency_qualification_follows_a_restored_committed_trust_root(self):
