@@ -2,17 +2,16 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.material3.Surface
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
@@ -22,12 +21,14 @@ import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.state.AccountSwitchProfileSeed
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatFolderRule
+import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.PendingForwardRequestStore
 import dev.ipf.whitenoise.android.state.SerializedPendingForwardRequestStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.forwardTargets
+import dev.ipf.whitenoise.android.state.presentedRow
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG
@@ -92,7 +93,7 @@ class ForwardMessagePickerCrossAccountUiTest {
     private val accountB = testAccount(ACCOUNT_B_REF, ACCOUNT_B_HEX)
 
     /** Builds an app state with two signing accounts and two active-account chats. */
-    private fun twoAccountAppState(): WhiteNoiseAppState =
+    private fun twoAccountAppState(completeTargets: Boolean = false): WhiteNoiseAppState =
         appStateWithDirectChats(
             GROUP_UNDER_A to PEER_A_ID,
             GROUP_UNDER_A_2 to PEER_A_2_ID,
@@ -104,6 +105,21 @@ class ForwardMessagePickerCrossAccountUiTest {
                     PEER_B_2_ID to profile("Person B2"),
                 ),
             accounts = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX), accountB),
+            chatListSubscriptions = if (completeTargets) completeTargetSubscriptions() else null,
+        )
+
+    /** Authoritative destination snapshots stay scoped to the account that requested them. */
+    private fun completeTargetSubscriptions(sourceGroupIds: List<String> = listOf(GROUP_UNDER_A, GROUP_UNDER_A_2)) =
+        ChatListLiveSubscriptions(
+            openChatListWindow = { _, _ -> error("no live window in this test") },
+            openChats = { _, _ -> error("no live stream in this test") },
+            presentedChatList = { account, _ ->
+                when (account) {
+                    ACCOUNT_REF -> sourceGroupIds.map(::presentedRow)
+                    ACCOUNT_B_REF -> listOf(presentedRow(GROUP_UNDER_B), presentedRow(GROUP_UNDER_B_2))
+                    else -> error("unexpected destination account")
+                }
+            },
         )
 
     /** Provides a controller factory pre-bound to the second account. */
@@ -321,14 +337,14 @@ class ForwardMessagePickerCrossAccountUiTest {
             }
         }
 
-        composeRule.onNodeWithText("Forward").assertIsDisplayed()
+        composeRule.onNodeWithTag("forward.confirm").assertIsDisplayed()
         composeRule.onNodeWithText("Forward to 1 chat").assertDoesNotExist()
     }
 
     /** Folder selection and horizontal scroll never transfer to another destination account. */
     @Test
     fun folderSelectionAndScrollAreClearedWhenTheDestinationAccountChanges() {
-        val appState = twoAccountAppState()
+        val appState = twoAccountAppState(completeTargets = true)
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_B_REF)
         val sourceFolders =
@@ -351,14 +367,12 @@ class ForwardMessagePickerCrossAccountUiTest {
         }
 
         composeRule.onNodeWithText("Person A").assertIsDisplayed()
-        val sourceFirst = composeRule.onNodeWithTag(forwardFolderChipTestTag(sourceFolders.first().id))
-        val initialLeadingEdge = sourceFirst.getUnclippedBoundsInRoot().left.value
-        composeRule
-            .onNodeWithTag(forwardFolderChipTestTag(sourceFolders.last().id))
-            .performScrollTo()
-            .performClick()
+        assertEquals(0f, folderScrollPosition(), 0.1f)
+        assertFolderPill(sourceFolders.last())
+        composeRule.onNodeWithTag("destination.filter.${sourceFolders.last().id}").performClick()
+        composeRule.onNodeWithTag("forward.selectAll").assertIsEnabled().performClick()
         composeRule.waitForIdle()
-        assertTrue(sourceFirst.getUnclippedBoundsInRoot().left.value < initialLeadingEdge - 100f)
+        assertTrue(folderScrollPosition() > 0f)
         assertEquals(setOf(GROUP_UNDER_A, GROUP_UNDER_A_2), selected.toSet())
         composeRule.onNodeWithText("Forward to 2 chats").assertIsDisplayed()
 
@@ -367,12 +381,13 @@ class ForwardMessagePickerCrossAccountUiTest {
         composeRule.waitForIdle()
 
         assertTrue(selected.isEmpty())
-        composeRule.onNodeWithTag(forwardFolderChipTestTag(sourceFolders.first().id)).assertDoesNotExist()
-        val destinationFirst = composeRule.onNodeWithTag(forwardFolderChipTestTag(destinationFolders.first().id))
-        destinationFirst.assertIsDisplayed()
-        assertEquals(initialLeadingEdge, destinationFirst.getUnclippedBoundsInRoot().left.value, 0.1f)
-        assertFolderChipState(destinationFolders.first(), 2, ToggleableState.Off)
+        composeRule.onNodeWithTag("destination.filter.${sourceFolders.first().id}").assertDoesNotExist()
+        val destinationFirst = composeRule.onNodeWithTag("destination.filter.${destinationFolders.first().id}")
+        assertEquals(0f, folderScrollPosition(), 0.1f)
+        composeRule.onNodeWithTag("destination.filter.all").assertIsSelected()
+        assertFolderPill(destinationFolders.first())
         destinationFirst.performClick()
+        composeRule.onNodeWithTag("forward.selectAll").assertIsEnabled().performClick()
         composeRule.waitForIdle()
         assertEquals(setOf(GROUP_UNDER_B, GROUP_UNDER_B_2), selected.toSet())
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
@@ -387,15 +402,22 @@ class ForwardMessagePickerCrossAccountUiTest {
                 GROUP_UNDER_A to PEER_A_ID,
                 GROUP_UNDER_A_2 to PEER_A_2_ID,
                 ORIGIN_GROUP to PEER_B_ID,
+                chatListSubscriptions =
+                    completeTargetSubscriptions(
+                        listOf(GROUP_UNDER_A, GROUP_UNDER_A_2, ORIGIN_GROUP),
+                    ),
             )
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
         val folder =
             seedFolder(appState, ACCOUNT_REF, "Work", STALE_GROUP, GROUP_UNDER_A_2, ORIGIN_GROUP, GROUP_UNDER_A)
         val hiddenFolder = seedFolder(appState, ACCOUNT_REF, "Only one eligible", GROUP_UNDER_A, STALE_GROUP)
         val eligibleTargets = appState.forwardTargets().filterNot { it.group.groupIdHex == ORIGIN_GROUP }
-        val rows = forwardFolderBulkRows(appState, eligibleTargets, GroupTitleCopy.Default)
-        assertEquals(listOf(folder.id), rows.map { it.first.id })
-        assertEquals(eligibleTargets.map { it.group.groupIdHex }, rows.single().second)
+        val rows = destinationFolderMembershipRows(appState, eligibleTargets, GroupTitleCopy.Default)
+        assertEquals(
+            appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).map { it.id },
+            rows.map { it.first.id },
+        )
+        assertEquals(eligibleTargets.map { it.group.groupIdHex }, rows.first { it.first.id == folder.id }.second)
         val (factory, _) = accountBControllerFactory()
         val forwards = mutableListOf<Pair<String, List<String>>>()
         var selected = emptyList<String>()
@@ -411,22 +433,23 @@ class ForwardMessagePickerCrossAccountUiTest {
             )
         }
 
-        composeRule.onNodeWithTag(forwardFolderChipTestTag(hiddenFolder.id)).assertDoesNotExist()
-        assertFolderChipState(folder, 2, ToggleableState.Off)
-        composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id)).performClick()
+        assertFolderPill(hiddenFolder)
+        assertFolderPill(folder)
+        composeRule.onNodeWithTag("destination.filter.${folder.id}").performClick()
+        composeRule.onNodeWithTag("forward.selectAll").assertIsEnabled().performClick()
         composeRule.waitForIdle()
-        assertEquals(rows.single().second, selected)
-        assertFolderChipState(folder, 2, ToggleableState.On)
+        assertEquals(rows.first { it.first.id == folder.id }.second, selected)
+        assertFolderPill(folder)
         composeRule.onNodeWithText("Forward to 2 chats").performClick()
         composeRule.waitForIdle()
-        assertEquals(listOf(ACCOUNT_REF to rows.single().second), forwards)
+        assertEquals(listOf(ACCOUNT_REF to rows.first { it.first.id == folder.id }.second), forwards)
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
     }
 
     /** Folder edits update eligibility and accessible labels without remounting the picker. */
     @Test
     fun folderPreferenceChangesRefreshTheMountedPicker() {
-        val appState = twoAccountAppState()
+        val appState = twoAccountAppState(completeTargets = true)
         val store = appState.chatFolderPreferences
         store.clearAllForAccount(ACCOUNT_REF)
         val folder = seedFolder(appState, ACCOUNT_REF, "Live folder", GROUP_UNDER_A, GROUP_UNDER_A_2)
@@ -441,19 +464,20 @@ class ForwardMessagePickerCrossAccountUiTest {
                     onPickerStateChanged = { _, groupIds, _ -> selected = groupIds },
                 )
             }
-            assertFolderChipState(folder, 2, ToggleableState.Off)
+            assertFolderPill(folder)
 
             composeRule.runOnIdle {
                 assertTrue(store.setChatInFolder(ACCOUNT_REF, folder.id, GROUP_UNDER_A_2, included = false))
             }
-            composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id)).assertDoesNotExist()
+            assertFolderPill(folder)
 
             composeRule.runOnIdle {
                 assertTrue(store.setChatInFolder(ACCOUNT_REF, folder.id, GROUP_UNDER_A_2, included = true))
                 assertTrue(store.renameFolder(ACCOUNT_REF, folder.id, "Renamed folder"))
             }
-            assertFolderChipState(folder.copy(name = "Renamed folder"), 2, ToggleableState.Off)
-            composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id)).performClick()
+            assertFolderPill(folder.copy(name = "Renamed folder"))
+            composeRule.onNodeWithTag("destination.filter.${folder.id}").performClick()
+            composeRule.onNodeWithTag("forward.selectAll").assertIsEnabled().performClick()
             composeRule.waitForIdle()
             assertEquals(expectedTargets, selected)
         } finally {
@@ -464,7 +488,7 @@ class ForwardMessagePickerCrossAccountUiTest {
     /** Profile hydration re-evaluates a keyword folder under the active search without remounting. */
     @Test
     fun profileRevisionRefreshesAFilteredKeywordFolder() {
-        val appState = twoAccountAppState()
+        val appState = twoAccountAppState(completeTargets = true)
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
         val folder = requireNotNull(appState.chatFolderPreferences.createFolder(ACCOUNT_REF, "Profile updates"))
         appState.chatFolderPreferences.setFolderRule(
@@ -473,12 +497,19 @@ class ForwardMessagePickerCrossAccountUiTest {
             rule = ChatFolderRule(keyword = "ready"),
         )
         val (factory, _) = accountBControllerFactory()
-        composeRule.setContent { Picker(appState = appState, factory = factory) }
+        var selected = emptyList<String>()
+        composeRule.setContent {
+            Picker(
+                appState = appState,
+                factory = factory,
+                onPickerStateChanged = { _, groupIds, _ -> selected = groupIds },
+            )
+        }
         composeRule
-            .onNodeWithText(context.getString(R.string.forward_search_chats))
+            .onNodeWithContentDescription(context.getString(R.string.forward_search_chats))
             .performClick()
-            .performTextInput("profile")
-        composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id)).assertDoesNotExist()
+        composeRule.onNodeWithTag("forward.searchField").performTextInput("Ready")
+        assertFolderPill(folder)
         val initialProfileRevision = appState.profileRevisionForCompose
 
         composeRule.runOnIdle {
@@ -488,9 +519,14 @@ class ForwardMessagePickerCrossAccountUiTest {
         composeRule.waitForIdle()
 
         assertTrue(initialProfileRevision != appState.profileRevisionForCompose)
-        assertFolderChipState(folder, 2, ToggleableState.Off)
-        composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id)).performClick()
-        assertFolderChipState(folder, 2, ToggleableState.On)
+        assertFolderPill(folder)
+        composeRule.onNodeWithTag("destination.filter.${folder.id}").performClick()
+        composeRule.onNodeWithText("Ready A").assertExists()
+        composeRule.onNodeWithText("Ready A2").assertExists()
+        composeRule.onNodeWithTag("forward.selectAll").assertIsEnabled().performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf(GROUP_UNDER_A, GROUP_UNDER_A_2), selected)
+        assertFolderPill(folder)
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
     }
 
@@ -499,11 +535,8 @@ class ForwardMessagePickerCrossAccountUiTest {
     fun memberRevisionRefreshesAnOrderedMixedRuleFolder() {
         val appState =
             emptyAppState(
-                profiles =
-                    mutableMapOf(
-                        PEER_A_ID to profile("Person A"),
-                        PEER_A_2_ID to profile("Person A2"),
-                    ),
+                chatListSubscriptions = completeTargetSubscriptions(),
+                profiles = mutableMapOf(PEER_A_ID to profile("Person A"), PEER_A_2_ID to profile("Person A2")),
             )
         val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
         controller.applyLocalDirectChat(GROUP_UNDER_A, ACCOUNT_HEX, PEER_A_ID)
@@ -519,30 +552,54 @@ class ForwardMessagePickerCrossAccountUiTest {
                 rule = ChatFolderRule(includeMemberPubkeys = setOf(RULE_MEMBER_ID)),
             )
             val (factory, _) = accountBControllerFactory()
-            composeRule.setContent { Picker(appState = appState, factory = factory) }
+            var selected = emptyList<String>()
+            composeRule.setContent {
+                Picker(
+                    appState = appState,
+                    factory = factory,
+                    onPickerStateChanged = { _, groupIds, _ -> selected = groupIds },
+                )
+            }
             composeRule.onNodeWithText("Person A").performClick()
-            composeRule.onNodeWithTag(forwardFolderChipTestTag(rosterFolder.id)).assertDoesNotExist()
+            assertFolderPill(rosterFolder)
             val initialMemberRevision = controller.memberSnapshotsRevision
 
             composeRule.runOnIdle {
-                controller.applyLocalGroupDetailsWithRuleMember(GROUP_UNDER_A, PEER_A_ID)
-                controller.applyLocalGroupDetailsWithRuleMember(GROUP_UNDER_A_2, PEER_A_2_ID)
+                controller.applyLocalGroupDetailsWithRuleMember(GROUP_UNDER_A, PEER_A_ID, "Person A")
+                controller.applyLocalGroupDetailsWithRuleMember(GROUP_UNDER_A_2, PEER_A_2_ID, "Person A2")
             }
             composeRule.waitForIdle()
 
             assertTrue(controller.memberSnapshotsRevision > initialMemberRevision)
-            assertFolderChipState(rosterFolder, 2, ToggleableState.Indeterminate)
-            val manualLeft =
-                composeRule.onNodeWithTag(forwardFolderChipTestTag(manualFolder.id)).getUnclippedBoundsInRoot().left
-            val rosterLeft =
-                composeRule.onNodeWithTag(forwardFolderChipTestTag(rosterFolder.id)).getUnclippedBoundsInRoot().left
-            assertTrue("newly eligible folder must retain stored order", manualLeft < rosterLeft)
+            assertFolderPill(rosterFolder)
+            val rows = destinationFolderMembershipRows(appState, appState.forwardTargets(), GroupTitleCopy.Default)
+            assertTrue(
+                "newly eligible folder must retain stored order",
+                rows.indexOfFirst { it.first.id == manualFolder.id } <
+                    rows.indexOfFirst { it.first.id == rosterFolder.id },
+            )
+            assertFolderPill(manualFolder)
+            assertFolderPill(rosterFolder)
+            composeRule.onNodeWithTag("destination.filter.${rosterFolder.id}").performClick()
+            composeRule.onNodeWithText("Person A").assertExists()
+            composeRule.onNodeWithText("Person A2").assertExists()
+            assertEquals(listOf(GROUP_UNDER_A), selected)
+            composeRule.onNodeWithTag("forward.selectAll").assertIsEnabled().performClick()
+            composeRule.waitForIdle()
+            assertEquals(listOf(GROUP_UNDER_A, GROUP_UNDER_A_2), selected)
         } finally {
             appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
             appState.attachChatsController(null)
             controller.onCleared()
         }
     }
+
+    private fun folderScrollPosition(): Float =
+        composeRule
+            .onNodeWithTag("destination.filters")
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.HorizontalScrollAxisRange]
+            .value()
 
     /** Persists real manual folder membership so tests exercise the production row projection. */
     private fun seedFolder(
@@ -557,15 +614,13 @@ class ForwardMessagePickerCrossAccountUiTest {
         return folder
     }
 
-    /** Asserts the actual accessible eligible count and tri-state, not only the visible label. */
-    private fun assertFolderChipState(
-        folder: ChatFolder,
-        count: Int,
-        state: ToggleableState,
-    ) {
-        val config = composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id)).fetchSemanticsNode().config
-        assertEquals(listOf("${folder.name}, $count chats"), config[SemanticsProperties.ContentDescription])
-        assertEquals(state, config[SemanticsProperties.ToggleableState])
+    /** Folder pills remain available as membership hydrates; bulk actions are separate. */
+    private fun assertFolderPill(folder: ChatFolder) {
+        composeRule
+            .onNodeWithTag("destination.filters")
+            .performScrollToNode(hasTestTag("destination.filter.${folder.id}"))
+        composeRule.onNodeWithTag("destination.filter.${folder.id}").assertContentDescriptionEquals(folder.name)
+        composeRule.onNodeWithText(folder.name, useUnmergedTree = true).assertExists()
     }
 
     /** Builds one cache seed that changes the rendered direct-chat title. */
@@ -579,13 +634,14 @@ class ForwardMessagePickerCrossAccountUiTest {
         avatarUrl = null,
     )
 
-    /** Replaces one direct-chat roster with an authoritative rule-matching member set. */
+    /** Replaces the roster with rule-matching members while preserving its visible title. */
     private fun ChatsController.applyLocalGroupDetailsWithRuleMember(
         groupIdHex: String,
         peerIdHex: String,
+        title: String,
     ) {
         applyLocalGroupDetails(
-            record = group(groupIdHex),
+            record = group(groupIdHex).copy(name = title),
             members =
                 listOf(
                     member(ACCOUNT_HEX, local = true),

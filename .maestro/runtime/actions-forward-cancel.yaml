@@ -8,10 +8,11 @@ name: actions-forward-cancel
 - longPressOn:
     text: "Generated fixture message"
 - tapOn: "Forward"
-- assertVisible: "Forward to"
+- assertVisible: "Forward"
 - assertVisible: "1 message"
-- assertVisible: "Maestro Alice"
+- assertVisible:
+    text: "Sending as: Maestro Alice"
 - assertVisible: "No other chats to forward to[.]"
 - back
-- assertNotVisible: "Forward to"
+- assertNotVisible: "Forward"
 - runFlow: ../fixtures/assert-fixture-conversation.yaml

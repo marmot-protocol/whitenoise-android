@@ -49,7 +49,7 @@ class ForwardMessageSheetCoverageTest {
             "the picker must use full-height scaffold layout",
             "Scaffold(" in content && ".fillMaxSize()" in content,
         )
-        assertTrue("the Forward action must remain visible", "StickyFormActionBar" in content)
+        assertTrue("the Forward action must remain visible", "BottomPanelSurface" in content)
         assertFalse("the picker must not compete with a draggable sheet", "ModalBottomSheet(" in source)
     }
 

@@ -1,0 +1,19 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnchoredDragSelection.kt",
+  "legacy_sha256": "ab6741331a01740b07287bd350bdedade66929ded4b4f42be066167ebc1ea874",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.longPressOrVerticalDrag",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnchoredDragSelection.kt",
+        "anchor": "internal fun Modifier.longPressOrVerticalDrag(",
+        "test_ids": [
+          "CHL-011",
+          "MSG-004",
+          "MSG-012"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.messages.FORWARD_CHAT_PICKER_SCREEN_TEST_TAG
-import dev.ipf.whitenoise.android.ui.conversation.messages.FORWARD_FOLDER_CHIP_ROW_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardMessagePickerContent
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
@@ -151,12 +150,9 @@ class ForwardMessagePickerScreenshotTest {
         composeRule
             .onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG)
             .captureRoboImage(snapshotPath)
-        if (folderFixture == FolderFixture.NONE) {
-            composeRule.onNodeWithTag(FORWARD_FOLDER_CHIP_ROW_TEST_TAG).assertDoesNotExist()
-        } else {
-            val region = composeRule.onNodeWithTag(FORWARD_FOLDER_CHIP_ROW_TEST_TAG).getUnclippedBoundsInRoot()
-            assertTrue("folder controls must remain one bounded row", (region.bottom - region.top).value <= 80f)
-        }
+        composeRule.onNodeWithTag("destination.filter.all").assertIsDisplayed()
+        val region = composeRule.onNodeWithTag("destination.filters").getUnclippedBoundsInRoot()
+        assertTrue("folder controls must remain one bounded row", (region.bottom - region.top).value <= 80f)
         if (folderFixture != FolderFixture.NONE) {
             val folder = appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).last()
             val filterTag = "destination.filter.${folder.id}"

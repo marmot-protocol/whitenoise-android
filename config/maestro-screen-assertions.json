@@ -1700,7 +1700,7 @@
         {
           "case": "actions-forward-cancel",
           "selector": {
-            "text": "Forward to"
+            "text": "Sending as: Maestro Alice"
           },
           "scope": "forward request opens owning app picker; Back leaves original conversation intact."
         }

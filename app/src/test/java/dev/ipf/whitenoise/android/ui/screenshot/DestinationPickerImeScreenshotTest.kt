@@ -54,6 +54,9 @@ class DestinationPickerImeScreenshotTest {
     @Test
     fun forwardPortraitLargeTextKeepsResultsAboveKeyboard() {
         render(share = false, fontScale = 1.6f)
+        composeRule
+            .onNodeWithContentDescription(composeRule.activity.getString(R.string.forward_search_chats))
+            .performClick()
         composeRule.onNode(hasSetTextAction()).performClick().performTextInput("Alice")
         dispatchIme(300)
         composeRule.onNodeWithTag("forward.destinations").performScrollToNode(hasText("Alice"))
@@ -84,6 +87,11 @@ class DestinationPickerImeScreenshotTest {
     /** Types continuously through both threshold crossings without requesting focus a second time. */
     private fun verifyResponsiveSearch(share: Boolean) {
         render(share, 1f)
+        if (!share) {
+            composeRule
+                .onNodeWithContentDescription(composeRule.activity.getString(R.string.forward_search_chats))
+                .performClick()
+        }
         composeRule.onNode(hasSetTextAction()).performClick().performTextInput("Al")
         dispatchIme(400)
         composeRule.onNode(hasSetTextAction()).assertIsFocused().performTextInput("ic")
