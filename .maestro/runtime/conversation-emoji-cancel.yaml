@@ -12,3 +12,13 @@ name: conversation-emoji-cancel
 - assertNotVisible:
     id: "emoji.picker.grid"
 - runFlow: ../fixtures/assert-fixture-conversation.yaml
+# The emoji rail opens emoji sets over the conversation; Back returns to it (#3882).
+- tapOn: "Open emoji picker"
+- tapOn:
+    id: "emoji.picker.browse_sets"
+- assertVisible:
+    id: "emoji_sets.query"
+- back
+- assertNotVisible:
+    id: "emoji_sets.query"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

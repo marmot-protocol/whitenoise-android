@@ -53,8 +53,6 @@ internal class AvatarFetchGate(
 
     suspend fun <T> withPreWarmAdmission(block: suspend () -> T): T = regular.withPermit(block)
 
-    suspend fun <T> withNotificationPermit(block: suspend () -> T): T = notification.withPermit(block)
-
     private suspend fun <T> Semaphore.withPermit(block: suspend () -> T): T {
         acquire()
         return try {

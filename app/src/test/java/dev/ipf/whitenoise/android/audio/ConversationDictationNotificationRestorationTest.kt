@@ -69,6 +69,7 @@ internal class ConversationDictationNotificationRestorationTest : ConversationDi
                 .contains("cleared"),
         )
         assertTrue(notice.contentIntent != null)
+        assertEquals(R.drawable.ic_stat_whitenoise, notice.smallIcon.resId)
     }
 
     /** Stopping connection while Android still queues the host cannot cancel microphone ownership. */
@@ -691,6 +692,7 @@ internal class ConversationDictationNotificationSuppressionTest : ConversationDi
                 assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
                 val remaining = manager.activeNotifications.single().notification
                 assertEquals(ConversationDictationForegroundService.CHANNEL_ID, remaining.channelId)
+                assertEquals(R.drawable.ic_stat_whitenoise, remaining.smallIcon.resId)
                 assertTrue(remaining.actions.isNullOrEmpty())
                 assertNull(remaining.contentView)
                 assertTrue(service.foreground.connectionServiceType != 0)

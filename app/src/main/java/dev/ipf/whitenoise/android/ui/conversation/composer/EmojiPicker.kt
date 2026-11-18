@@ -100,6 +100,8 @@ internal fun ComposerEmojiPickerPane(
     onSearchActiveChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onSearchContentHeightChange: (Dp) -> Unit = {},
+    onBrowseSets: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
 ) {
     // The panel shape clips the animated height, so content never draws past the rounded corners.
     BottomPanelSurface(
@@ -115,6 +117,8 @@ internal fun ComposerEmojiPickerPane(
             onSearchActiveChange = onSearchActiveChange,
             searchBehindIcon = true,
             onSearchContentHeightChange = { onSearchContentHeightChange(it + ComposerEmojiPaneTopInset) },
+            onBrowseSets = onBrowseSets,
+            onOpenSettings = onOpenSettings,
             modifier = Modifier.fillMaxSize().padding(top = ComposerEmojiPaneTopInset),
         )
     }

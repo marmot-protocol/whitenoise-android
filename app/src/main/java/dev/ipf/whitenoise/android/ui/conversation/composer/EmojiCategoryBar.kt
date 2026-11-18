@@ -41,6 +41,8 @@ import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
 internal const val EMOJI_PICKER_CATEGORIES_TEST_TAG = "emoji.picker.categories"
 internal const val EMOJI_PICKER_CONFIGURE_TEST_TAG = "emoji.picker.configure"
 internal const val EMOJI_PICKER_SEARCH_OPEN_TEST_TAG = "emoji.picker.search_open"
+internal const val EMOJI_PICKER_BROWSE_SETS_TEST_TAG = "emoji.picker.browse_sets"
+internal const val EMOJI_PICKER_SETTINGS_TEST_TAG = "emoji.picker.settings"
 
 /** Stable test tag for an emoji category toggle. */
 internal fun emojiPickerCategoryTestTag(category: EmojiCategory): String = "emoji.picker.category.${category.id}"

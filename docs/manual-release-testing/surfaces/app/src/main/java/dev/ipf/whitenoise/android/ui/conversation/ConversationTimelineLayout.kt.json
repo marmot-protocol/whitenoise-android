@@ -18,6 +18,15 @@
         "test_ids": [
           "CON-032"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineLayout.kt",
+        "surface": "Group-recovery card row shared by transcript emission and the structural-row count",
+        "anchor": "internal fun ConversationController.conversationGroupRecoveryRowVisible(",
+        "test_ids": [
+          "CON-032",
+          "GRP-021"
+        ]
       }
     ]
   },
