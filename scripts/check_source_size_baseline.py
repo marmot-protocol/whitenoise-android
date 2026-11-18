@@ -6,8 +6,9 @@ base revision and fails when an entry is added or a limit rises. Lowering and
 deleting entries is allowed. See docs/code-structure.md.
 
 The parser accepts only the declaration line, one literal `"path" to limit,`
-entry per line inside a single mapOf(...) block and nothing after the block. It
-fails on anything else, so another syntax cannot slip a new entry past it.
+entry per line inside a single mapOf(...) block, or an empty mapOf(), and nothing
+after the block. It fails on anything else, so another syntax cannot slip a new
+entry past it.
 """
 import argparse
 from pathlib import Path
@@ -26,19 +27,19 @@ class BaselineError(ValueError):
 
 def parse(text: str) -> dict[str, int]:
     lines = text.splitlines()
-    starts = [i for i, line in enumerate(lines) if line.rstrip().endswith('mapOf(')]
+    starts = [i for i, line in enumerate(lines) if line.strip() in ('mapOf(', 'mapOf()')]
     if len(starts) != 1 or text.count('mapOf') != 1:
         raise BaselineError('expected exactly one literal mapOf( block')
     start = starts[0]
-    if lines[start].strip() != 'mapOf(' or start == 0 or lines[start - 1].strip() != DECLARATION:
+    if start == 0 or lines[start - 1].strip() != DECLARATION:
         raise BaselineError(f'expected `{DECLARATION}` followed by `mapOf(`')
     entries: dict[str, int] = {}
+    if lines[start].strip() == 'mapOf()':
+        return _nothing_after(lines, start, entries)
     for index in range(start + 1, len(lines)):
         line = lines[index]
         if line.strip() == ')':
-            if any(rest.strip() for rest in lines[index + 1:]):
-                raise BaselineError('unexpected code after the baseline mapOf( block')
-            return entries
+            return _nothing_after(lines, index, entries)
         if not line.strip():
             continue
         match = ENTRY.fullmatch(line)
@@ -49,6 +50,12 @@ def parse(text: str) -> dict[str, int]:
             raise BaselineError(f'duplicate baseline entry: {path}')
         entries[path] = limit
     raise BaselineError('unterminated mapOf( block')
+
+
+def _nothing_after(lines: list[str], end: int, entries: dict[str, int]) -> dict[str, int]:
+    if any(rest.strip() for rest in lines[end + 1:]):
+        raise BaselineError('unexpected code after the baseline mapOf( block')
+    return entries
 
 
 def loosened(base: dict[str, int], head: dict[str, int]) -> list[str]:

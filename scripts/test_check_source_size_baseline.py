@@ -1,19 +1,36 @@
-"""Exercise the size-baseline ratchet against the real baseline file."""
+"""Exercise the size-baseline ratchet checker on a fixture and the real baseline file."""
 from pathlib import Path
 import unittest
 
-from scripts.check_source_size_baseline import BASELINE, BaselineError, loosened, parse
+from scripts.check_source_size_baseline import BASELINE, DECLARATION, BaselineError, loosened, parse
 
 ROOT = Path(__file__).resolve().parents[1]
-TEXT = (ROOT / BASELINE).read_text(encoding='utf-8')
+TEXT = f'''package dev.ipf.whitenoise.android
+
+{DECLARATION}
+    mapOf(
+        "dev/A.kt" to 700,
+        "dev/B.kt" to 650,
+    )
+'''
 ENTRIES = parse(TEXT)
-FIRST = next(iter(ENTRIES))
+FIRST = 'dev/A.kt'
 
 
 class SourceSizeBaselineCheckTest(unittest.TestCase):
     def test_real_baseline_parses(self):
-        self.assertTrue(ENTRIES)
-        self.assertEqual(loosened(ENTRIES, ENTRIES), [])
+        real = parse((ROOT / BASELINE).read_text(encoding='utf-8'))
+        self.assertEqual(loosened(real, real), [])
+
+    def test_fixture_parses(self):
+        self.assertEqual(ENTRIES, {'dev/A.kt': 700, 'dev/B.kt': 650})
+
+    def test_deleting_the_last_entry_passes(self):
+        for empty in ('    mapOf(\n    )\n', '    mapOf()\n'):
+            with self.subTest(empty=empty):
+                head = parse(TEXT[: TEXT.index('    mapOf(')] + empty)
+                self.assertEqual(head, {})
+                self.assertEqual(loosened(ENTRIES, head), [])
 
     def test_lowering_and_deleting_pass(self):
         head = {path: limit - 1 for path, limit in ENTRIES.items() if path != FIRST}
@@ -47,7 +64,7 @@ class SourceSizeBaselineCheckTest(unittest.TestCase):
             parse(TEXT.replace('Map<String, Int> =\n', 'Map<String, Int> = extra +\n'))
 
     def test_duplicate_entry_fails(self):
-        line = TEXT.splitlines()[[i for i, s in enumerate(TEXT.splitlines()) if 'mapOf(' in s][0] + 1]
+        line = '        "dev/A.kt" to 700,'
         with self.assertRaisesRegex(BaselineError, 'duplicate'):
             parse(TEXT.replace(line + '\n', line + '\n' + line + '\n', 1))
 

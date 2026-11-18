@@ -49,8 +49,8 @@ class SourceFileSizeRatchetTest {
     private fun List<String>.report(): String = joinToString("\n", prefix = "$REPORT_HEADER\n") { "- $it" }
 
     /**
-     * Line counts keyed by path below `app/src/main/java`, the only hand-written source root; generated
-     * sources live elsewhere. A trailing newline does not add a line.
+     * Line counts keyed by path below `app/src/main/java`. Flavor and debug source sets and generated
+     * sources are not counted. A final trailing newline does not add a line; blank lines before it do.
      */
     private fun mainSourceLineCounts(): Map<String, Int> {
         val root = appModuleFile("src/main/java")
@@ -61,7 +61,7 @@ class SourceFileSizeRatchetTest {
                 it.relativeTo(root).invariantSeparatorsPath to
                     it
                         .readText()
-                        .trimEnd()
+                        .removeSuffix("\n")
                         .lines()
                         .size
             }
