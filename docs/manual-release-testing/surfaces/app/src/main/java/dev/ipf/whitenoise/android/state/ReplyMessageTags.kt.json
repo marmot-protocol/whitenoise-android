@@ -34,7 +34,18 @@
         "surface": "Reply to a message that has not been sent yet",
         "anchor": "R.string.reply_target_not_sent",
         "test_ids": [
-          "CON-012"
+          "CON-012",
+          "MSG-021",
+          "MSG-045"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ReplyMessageTags.kt",
+        "surface": "Poll and sticker replies resolve their target like a text reply",
+        "anchor": "internal fun ConversationController.replyTagsForSend(",
+        "test_ids": [
+          "MSG-021",
+          "MSG-045"
         ]
       }
     ]
