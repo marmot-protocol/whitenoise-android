@@ -15,6 +15,8 @@ import dev.ipf.whitenoise.android.state.ConversationActionFixtures.appState
 import dev.ipf.whitenoise.android.state.ConversationActionFixtures.controller
 import dev.ipf.whitenoise.android.state.ConversationActionFixtures.native
 import dev.ipf.whitenoise.android.state.ConversationActionFixtures.summary
+import dev.ipf.whitenoise.android.ui.conversation.createPollAction
+import dev.ipf.whitenoise.android.ui.conversation.stickerSheetAction
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -182,6 +184,45 @@ class ReplyTaggedSendsTest {
             assertNotNull(state.toast)
         }
 
+    /** Create poll and Stickers are offered with no reply and with a reply to a message that has an event id. */
+    @Test
+    fun menuActionsAreOfferedForAPublishableReply() =
+        runTest {
+            val controller = controller(appState(SendRecorder().engine))
+
+            assertSame(OPEN, controller.createPollAction(OPEN))
+            assertSame(OPEN, controller.stickerSheetAction(OPEN))
+            controller.replyingTo = record(MESSAGE_ID)
+            assertSame(OPEN, controller.createPollAction(OPEN))
+            assertSame(OPEN, controller.stickerSheetAction(OPEN))
+        }
+
+    /** Both actions hide while the reply has only a client token, and return once that send is accepted. */
+    @Test
+    fun menuActionsWaitForTheReplyTargetToBeAccepted() =
+        runTest {
+            val controller = controller(appState(SendRecorder().engine))
+            controller.timeline = listOf(localSend(record(PENDING_ID), MessageStatus.Pending))
+            controller.replyingTo = record(PENDING_ID)
+
+            assertNull(controller.createPollAction(OPEN))
+            assertNull(controller.stickerSheetAction(OPEN))
+            controller.timeline = listOf(localSend(record(MESSAGE_ID), MessageStatus.Sent))
+            assertSame(OPEN, controller.createPollAction(OPEN))
+            assertSame(OPEN, controller.stickerSheetAction(OPEN))
+        }
+
+    /** An edit hides Stickers, since a sticker cannot join an existing message, but leaves Create poll. */
+    @Test
+    fun stickersHideDuringAnEdit() =
+        runTest {
+            val controller = controller(appState(SendRecorder().engine))
+            controller.editingMessageId = MESSAGE_ID
+
+            assertNull(controller.stickerSheetAction(OPEN))
+            assertSame(OPEN, controller.createPollAction(OPEN))
+        }
+
     /** Creates the two-option lunch poll, replying to whatever the composer has selected. */
     private suspend fun ConversationController.createLunchPoll(): Boolean =
         createPoll("Lunch?", listOf("Soup", "Salad"), PollTypeFfi.SINGLE_CHOICE, null, snapshotReply())
@@ -259,6 +300,7 @@ class ReplyTaggedSendsTest {
 
     private companion object {
         val SEND_CALLS = setOf("createTaggedPoll", "sendTaggedSticker")
+        val OPEN: () -> Unit = {}
         val OTHER_ID = "d4".repeat(32)
         const val PENDING_ID = "6f1d2a3b-0c4d-4e5f-8a9b-0c1d2e3f4a5b"
         val REPLY_TAGS = listOf(listOf("e", MESSAGE_ID), listOf("q", MESSAGE_ID))

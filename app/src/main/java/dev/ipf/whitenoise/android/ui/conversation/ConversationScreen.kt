@@ -164,7 +164,6 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
-import dev.ipf.whitenoise.android.state.replyAllowsTaggedSend
 import dev.ipf.whitenoise.android.state.resolveConversationAutoRead
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -4741,21 +4740,8 @@ internal fun ConversationScreen(
                         onShareContact = {
                             contactPickerLauncher.launch(Unit)
                         },
-                        // A poll or sticker joins the selected reply, but a reply to a message that has
-                        // no event id yet cannot be referenced, so both stay hidden until it is accepted.
-                        onCreatePoll =
-                            if (!controller.isDirectConversation && controller.replyAllowsTaggedSend()) {
-                                { pollCreateOpen = true }
-                            } else {
-                                null
-                            },
-                        // Editing changes an existing message, so a sticker cannot join it.
-                        onOpenStickers =
-                            if (controller.editingMessageId == null && controller.replyAllowsTaggedSend()) {
-                                { stickerSheetOpen = true }
-                            } else {
-                                null
-                            },
+                        onCreatePoll = controller.createPollAction { pollCreateOpen = true },
+                        onOpenStickers = controller.stickerSheetAction { stickerSheetOpen = true },
                         onPasteImageUris = { uris ->
                             imageDropImport.import(
                                 uris = uris,
