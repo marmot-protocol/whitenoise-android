@@ -95,14 +95,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
-import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearch
 import dev.ipf.whitenoise.android.core.RecentEmojiList
@@ -388,43 +386,6 @@ private fun LazyListScope.conversationLoadErrorItem(
         )
     }
 }
-
-/** Whether adjacent timeline items participate in one visible message-bubble sender run. */
-internal fun conversationBubbleRowsShareSenderRun(
-    first: TimelineMessage,
-    second: TimelineMessage,
-    streamingDebugEnabled: Boolean,
-    deletedMessageIds: Set<String>,
-): Boolean =
-    timelineItemRendersAsConversationBubble(first, streamingDebugEnabled, deletedMessageIds) &&
-        timelineItemRendersAsConversationBubble(second, streamingDebugEnabled, deletedMessageIds) &&
-        GroupProjector.messagesShareTranscriptSenderRun(
-            firstSender = first.record.sender,
-            firstRecordedAt = first.record.recordedAt,
-            secondSender = second.record.sender,
-            secondRecordedAt = second.record.recordedAt,
-            sameDay = !differentDay(first.record.recordedAt, second.record.recordedAt),
-        )
-
-/** Classifies rows that participate in adjacent sender grouping as message bubbles. */
-private fun timelineItemRendersAsConversationBubble(
-    item: TimelineMessage,
-    streamingDebugEnabled: Boolean,
-    deletedMessageIds: Set<String>,
-): Boolean =
-    when (timelineRowKind(item.record, streamingDebugEnabled)) {
-        TimelineRowKind.Bubble -> true
-        TimelineRowKind.AgentOperation ->
-            !shouldRenderDedicatedAgentOperationRow(
-                projectedDeleted = item.projected?.deleted == true,
-                optimisticallyDeleted = MessageProjector.isDeleted(item.record.messageIdHex, deletedMessageIds),
-                invalidated = item.projected?.invalidationStatus != null,
-            ) ||
-                AgentOperationProjector.project(item.record) == null
-        TimelineRowKind.GroupSystem,
-        TimelineRowKind.DebugRow,
-        -> false
-    }
 
 private data class ConversationBatchSelectionUiState(
     val selections: List<BatchMessageSelection>,
