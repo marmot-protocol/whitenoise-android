@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -73,6 +74,25 @@ class EmojiSetsScreenshotTest {
 
     /** The same preview with a mirrored layout and large text. */
     @Test fun previewRtlLarge() = preview("preview_rtl_large", rtl = true)
+
+    /** The update check waits for the opening sync, which would otherwise drop the lookup. */
+    @Test fun checkForUpdateWaitsForOpeningSync() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val set = emojiSetFixture().copy(installed = InstalledEmojiSetStateFfi("previous", 0u, 0u, 1u, 100u, false))
+        setTheme(dark = false, rtl = false) {
+            EmojiSetsContent(
+                state = EmojiSetsState(sets = listOf(set), preview = set, discovering = true),
+                onBack = {},
+                onSearch = {},
+                onShow = {},
+                onLoadArtwork = {},
+                onInstall = {},
+                onCancel = {},
+                onRemove = {},
+            )
+        }
+        composeRule.onNodeWithText(context.getString(R.string.emoji_sets_check_update)).assertIsNotEnabled()
+    }
 
     /** The composer grid with a thumbnail loaded from the installed set. */
     @Test fun pickerLight() = picker("picker_light")

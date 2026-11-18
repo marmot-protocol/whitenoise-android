@@ -428,7 +428,7 @@ private fun EmojiSetActions(
                                 stringResource(R.string.explanation_organize_emoji_check_update),
                             ),
                         ),
-                    enabled = !state.busy,
+                    enabled = !state.busy && !state.discovering,
                 ) {
                     Text(checkLabel)
                 }

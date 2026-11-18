@@ -119,7 +119,7 @@ internal data class EmojiSetsState(
     val preview: EmojiSetFfi? = null,
     val artwork: ByteArray? = null,
     val busy: Boolean = false,
-    /** The opening relay sync. Rows stay usable; only Find and Refresh wait for it. */
+    /** The opening relay sync. Rows stay usable; Find, Refresh and the update check wait for it. */
     val discovering: Boolean = false,
     val progress: EmojiSetInstallProgressFfi? = null,
     val cancelling: Boolean = false,
