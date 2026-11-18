@@ -1,11 +1,14 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.content.ContextWrapper
+import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Looper
 import android.speech.SpeechRecognizer
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationRecovery
+import dev.ipf.whitenoise.android.ui.conversation.composer.dictationFailureAction
 import dev.ipf.whitenoise.android.ui.conversation.composer.dictationFailureRecovery
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -16,11 +19,13 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
@@ -2839,6 +2844,620 @@ class ConversationDictationControllerTest {
         assertEquals(0L, fixture.controller.permissionRequestId)
         assertEquals(0, platform.recognitionAvailabilityChecks)
         assertFalse(platform.session.started)
+    }
+
+    @Test
+    fun ignoredOrPolicyDeniedNativeAttemptStaysBlockedAndCancelRejectsLaterGrant() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        assertEquals(1, platform.nativeRequests)
+        assertEquals(
+            ConversationDictationFailure.PermissionPermanentlyDenied,
+            (f.controller.state as ConversationDictationState.Failed).reason,
+        )
+        platform.nativeChanged?.invoke() // An app-op note/callback alone is never a grant.
+        assertFalse(platform.session.started)
+        assertEquals(0, platform.recognitionAvailabilityChecks)
+        val stale = platform.nativeChanged
+        f.controller.onMicrophoneHostPaused()
+        f.controller.onMicrophoneHostResumed() // Native cancel with access still blocked.
+        assertEquals(1, platform.nativeCleanup)
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        stale?.invoke()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        assertEquals(TextFieldValue("Keep"), f.drafts.getValue(key()))
+    }
+
+    @Test
+    fun nativeMicrophonePromptStartsOnceAfterRealGrantAndResumePreservingEditedDraft() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied,
+            )
+        val f = fixture(draft = TextFieldValue("Keep ", TextRange(5)), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        assertEquals(1, platform.nativeRequests)
+        assertFalse(platform.session.started)
+        f.controller.onMicrophoneHostResumed() // Observer's initial synthetic event is not cancellation.
+        assertEquals(0, platform.nativeCleanup)
+        f.controller.onMicrophoneHostPaused()
+        val edited = TextFieldValue("New draft ", TextRange(4))
+        f.edit(key(), edited)
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        platform.nativeChanged?.invoke()
+        assertFalse(platform.session.started)
+        f.controller.onMicrophoneHostResumed()
+        assertTrue(platform.session.started)
+        assertEquals(edited, f.drafts.getValue(key()))
+        val session = f.controller.state.sessionId
+        platform.nativeChanged?.invoke()
+        f.controller.onMicrophoneHostResumed()
+        assertEquals(session, f.controller.state.sessionId)
+        assertEquals(1, platform.nativeCleanup)
+        f.controller.cancel()
+    }
+
+    @Test
+    fun nullNativeRegistrationAfterGrantStartsRequestedCaptureExactlyOnce() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        platform.onNativeRegistration = {
+            platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        }
+
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+
+        assertTrue(platform.session.started)
+        assertTrue(f.controller.state is ConversationDictationState.Starting)
+        assertNull(f.controller.microphoneSettingsRecovery)
+        assertNull(platform.nativeChanged)
+        f.controller.onMicrophoneHostResumed()
+        f.controller.onAppForegrounded()
+        assertEquals(1, platform.sessions.size)
+        // Ownership begins before the access gate, then the granted retry owns a fresh session.
+        assertEquals(2, platform.captureSessionsStarted)
+        assertEquals(1, platform.session.startCalls)
+        assertEquals(TextFieldValue("Keep"), f.drafts.getValue(key()))
+        f.controller.cancel()
+    }
+
+    @Test
+    fun nullNativeRegistrationWithoutGrantDiscardsRecovery() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        platform.onNativeRegistration = {}
+
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+
+        assertEquals(
+            ConversationDictationFailure.MicrophoneMuted,
+            (f.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertNull(f.controller.microphoneSettingsRecovery)
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
+        // The blocked gesture owns a session without starting a recognizer or retry.
+        assertEquals(1, platform.captureSessionsStarted)
+        assertTrue(platform.sessions.isEmpty())
+    }
+
+    @Test
+    fun nullNativeRegistrationGrantWaitsForUnlockAndRespectsCancellationOrOriginChange() {
+        for (endRecovery in listOf("unlock", "cancel", "origin")) {
+            var locked = false
+            val platform =
+                FakePlatform(
+                    nativeUnblockSupported = true,
+                    microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+                )
+            val f = fixture(draft = TextFieldValue("Keep"), platform = platform, appLocked = { locked })
+            platform.onNativeRegistration = {
+                platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+                locked = true
+            }
+
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+
+            assertFalse(platform.session.started)
+            assertNotNull(f.controller.microphoneSettingsRecovery)
+            when (endRecovery) {
+                "cancel" -> f.controller.cancel()
+                "origin" -> f.controller.onMicrophoneOriginChanged("another-account", GROUP)
+            }
+            locked = false
+            f.controller.onAppForegrounded()
+            f.controller.onMicrophoneHostResumed()
+            assertEquals(endRecovery == "unlock", platform.session.started)
+            assertEquals(if (endRecovery == "unlock") 2 else 1, platform.captureSessionsStarted)
+            assertEquals(if (endRecovery == "unlock") 1 else 0, platform.sessions.size)
+            assertEquals(if (endRecovery == "unlock") 1 else 0, platform.sessions.sumOf { it.startCalls })
+            assertNull(f.controller.microphoneSettingsRecovery)
+            f.controller.cancel()
+        }
+    }
+
+    @Test
+    fun runtimePermissionGrantDispatchesNativeUnblockWithoutStartingCapture() {
+        val platform = FakePlatform(nativeUnblockSupported = true, hasPermission = false)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        val request = f.controller.permissionRequestId
+        assertTrue(f.controller.beginPermissionRequest(request))
+        platform.hasPermission = true
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted
+        f.controller.onPermissionResult(true)
+        assertEquals(1, platform.nativeRequests)
+        assertEquals(
+            ConversationDictationFailure.MicrophoneMuted,
+            (f.controller.state as ConversationDictationState.Failed).reason,
+        )
+        assertFalse(platform.session.started)
+        f.controller.cancel()
+        assertEquals(1, platform.nativeCleanup)
+    }
+
+    @Test
+    fun nativeDispatchWaitsForResumedHostAfterRuntimePermission() {
+        val platform = FakePlatform(nativeUnblockSupported = true, hasPermission = false)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.microphoneHostReady = { false }
+        platform.hasPermission = true
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted
+        f.controller.onPermissionResult(true)
+        assertEquals(0, platform.nativeRequests)
+        assertFalse(platform.session.started)
+        f.controller.microphoneHostReady = { true }
+        f.controller.onMicrophoneHostResumed()
+        f.controller.onMicrophoneHostResumed()
+        assertEquals(1, platform.nativeRequests)
+        f.controller.cancel()
+    }
+
+    @Test
+    fun nativeGrantCannotCaptureWhenProfileObscuresOriginOrAfterDeadline() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.microphoneHostReady = { false } // A profile covers the still-selected chat.
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        val stale = platform.nativeChanged
+        stale?.invoke()
+        assertFalse(platform.session.started)
+        f.scheduler.advanceBy(30_000L)
+        assertEquals(1, platform.nativeCleanup)
+        f.controller.microphoneHostReady = { true }
+        stale?.invoke()
+        f.controller.onMicrophoneHostResumed()
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
+    }
+
+    @Test
+    fun nativeCancelWhileLockedConsumesRecoveryBeforeUnrelatedUnmute() {
+        var locked = false
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform, appLocked = { locked })
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.onMicrophoneHostPaused()
+        locked = true
+        f.controller.onMicrophoneHostResumed()
+        assertEquals(1, platform.nativeCleanup)
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        locked = false
+        platform.nativeChanged?.invoke()
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
+    }
+
+    @Test
+    fun nativeGrantWaitsForUnlockAndCancelledRequestCannotCapture() {
+        var locked = false
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform, appLocked = { locked })
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        val stale = platform.nativeChanged
+        f.controller.onMicrophoneHostPaused()
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        locked = true
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        f.controller.cancel()
+        locked = false
+        stale?.invoke()
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
+        assertEquals(1, platform.nativeCleanup)
+    }
+
+    @Test
+    fun nativeReminderCleansUpOnBackgroundAndReplacementRejectsOldCallback() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        val stale = platform.nativeChanged
+        f.controller.onAppBackgrounded()
+        assertEquals(1, platform.nativeCleanup)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        assertEquals(2, platform.nativeRequests)
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        stale?.invoke()
+        assertFalse(platform.session.started)
+        f.controller.cancel()
+        assertEquals(2, platform.nativeCleanup)
+    }
+
+    @Test
+    fun directReplacementReleasesNativeReminderBeforeStartingNewCapture() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        val stale = platform.nativeChanged
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        assertTrue(f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key())))
+        assertEquals(1, platform.nativeCleanup)
+        assertTrue(platform.session.started)
+        val replacement = f.controller.state.sessionId
+        stale?.invoke()
+        f.controller.onMicrophoneHostResumed()
+        assertEquals(replacement, f.controller.state.sessionId)
+        f.controller.cancel()
+    }
+
+    @Test
+    fun nativeReminderCannotOutliveOriginSwitchOrTimeout() {
+        val blockedAccess =
+            listOf(
+                ConversationDictationMicrophoneAccess.MicrophoneMuted,
+                ConversationDictationMicrophoneAccess.AppOpDenied,
+            )
+        for (access in blockedAccess) {
+            for (originChanged in listOf(true, false)) {
+                val platform =
+                    FakePlatform(
+                        nativeUnblockSupported = true,
+                        microphoneAccessOverride = access,
+                    )
+                val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+                if (originChanged) {
+                    f.controller.onMicrophoneOriginChanged("another-account", GROUP)
+                } else {
+                    f.scheduler.advanceBy(30_000L)
+                }
+                assertEquals(1, platform.nativeCleanup)
+                platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+                platform.nativeChanged?.invoke()
+                f.controller.onMicrophoneHostResumed()
+                assertFalse(platform.session.started)
+            }
+        }
+    }
+
+    @Test
+    fun staleSettingsActionCannotLaunchOrArmAReplacementFailure() {
+        for (replaceDuringLaunch in listOf(false, true)) {
+            val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied)
+            val f = fixture(draft = TextFieldValue("Keep "), platform = platform)
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            val displayed = f.controller.state as ConversationDictationState.Failed
+
+            fun replaceFailure() {
+                f.controller.dismissFailure()
+                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            }
+            var launches = 0
+            val context =
+                object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+                    override fun startActivity(intent: Intent) {
+                        launches += 1
+                        if (replaceDuringLaunch) replaceFailure()
+                    }
+                }
+            val action =
+                dictationFailureAction(displayed, f.controller, dictationFailureRecovery(displayed.reason), context)
+            if (!replaceDuringLaunch) replaceFailure()
+            action()
+            assertEquals(if (replaceDuringLaunch) 1 else 0, launches)
+            val replacement = f.controller.state
+            assertTrue(replacement !== displayed)
+            f.controller.onAppBackgrounded()
+            platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+            f.controller.onAppForegrounded()
+            assertTrue(f.controller.state === replacement)
+            assertFalse(platform.session.started)
+            assertEquals("Keep ", f.drafts.getValue(key()).text)
+        }
+    }
+
+    @Test
+    fun currentSettingsActionArmsRecoveryOnlyAfterSuccessfulLaunch() {
+        for (launchSucceeds in listOf(false, true)) {
+            val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied)
+            val f = fixture(draft = TextFieldValue("Keep "), platform = platform)
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            val displayed = f.controller.state as ConversationDictationState.Failed
+            var launches = 0
+            val context =
+                object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+                    override fun startActivity(intent: Intent) {
+                        launches += 1
+                        if (!launchSucceeds) error("Settings unavailable")
+                    }
+                }
+            dictationFailureAction(displayed, f.controller, dictationFailureRecovery(displayed.reason), context)()
+            assertEquals(1, launches)
+            f.controller.onAppBackgrounded()
+            platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+            f.controller.onAppForegrounded()
+            assertEquals(launchSucceeds, platform.session.started)
+            if (!launchSucceeds) assertTrue(f.controller.state === displayed)
+            f.controller.cancel()
+        }
+    }
+
+    @Test
+    fun settingsReturnWaitsForResumedVisibleHostBeforeStartingOnce() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onMicrophoneHostPaused()
+        f.controller.microphoneHostReady = { false }
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded() // Process ON_START precedes Activity resume and notification routing.
+        assertFalse(platform.session.started)
+        f.controller.microphoneHostReady = { true }
+        f.controller.onMicrophoneHostResumed()
+        assertTrue(platform.session.started)
+        val started = f.controller.state.sessionId
+        f.controller.onMicrophoneHostResumed()
+        assertEquals(started, f.controller.state.sessionId)
+        f.controller.cancel()
+    }
+
+    @Test
+    fun settingsGrantedProfileReturnCannotCaptureAfterDismissHomeAndResume() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onMicrophoneHostPaused()
+        f.controller.onAppBackgrounded() // Outbound settings stop must retain the one return.
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.microphoneOriginValid = { false } // Profile covers the still-selected original chat.
+        f.controller.microphoneHostReady = { false }
+        f.controller.onAppForegrounded()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        assertNull(f.controller.microphoneSettingsRecovery)
+        f.controller.microphoneOriginValid = { true }
+        f.controller.microphoneHostReady = { true }
+        f.controller.onMicrophoneHostPaused()
+        f.controller.onAppBackgrounded()
+        f.scheduler.advanceBy(1_000L)
+        f.controller.onAppForegrounded()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+    }
+
+    @Test
+    fun settingsGrantedLockedReturnCannotSurviveAnotherHomeExcursion() {
+        var locked = false
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform, appLocked = { locked })
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onMicrophoneHostPaused()
+        f.controller.onAppBackgrounded()
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        locked = true
+        f.controller.onAppForegrounded()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        assertNotNull(f.controller.microphoneSettingsRecovery)
+        f.controller.onMicrophoneHostPaused()
+        f.controller.onAppBackgrounded()
+        locked = false
+        f.controller.onAppForegrounded()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        assertNull(f.controller.microphoneSettingsRecovery)
+    }
+
+    @Test
+    fun inboundRouteRevokesRecoveryBeforeComposeChangesOriginalConversation() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onMicrophoneHostPaused()
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded()
+        // MainActivity receives B synchronously; Compose still reports A as valid and visible.
+        f.controller.clearMicrophoneRecovery()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        assertNull(f.controller.microphoneSettingsRecovery)
+    }
+
+    @Test
+    fun settingsRecoveryCannotOutliveNotificationOriginSwitchOrTimeout() {
+        for (originChanged in listOf(true, false)) {
+            val platform =
+                FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+            val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.resumeAfterMicrophoneSettings()
+            f.controller.onMicrophoneHostPaused()
+            f.controller.microphoneHostReady = { false }
+            platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+            f.controller.onAppForegrounded()
+            assertFalse(platform.session.started)
+            if (originChanged) {
+                f.controller.onMicrophoneOriginChanged(ACCOUNT, "notification-chat")
+            } else {
+                f.scheduler.advanceBy(30_000L)
+            }
+            f.controller.microphoneHostReady = { true }
+            f.controller.onMicrophoneHostResumed()
+            f.controller.onAppForegrounded()
+            assertFalse(platform.session.started)
+            assertEquals(TextFieldValue("Keep"), f.drafts.getValue(key()))
+        }
+    }
+
+    /** Elapsed authorization expires even while the Handler timeout cannot run during device sleep. */
+    @Test
+    fun settingsRecoveryChecksElapsedExpiryBeforeCaptureAndAfterUnlock() {
+        for (lockedReturn in listOf(false, true)) {
+            for (elapsed in listOf(29_999L, 30_000L, 30_001L)) {
+                var locked = false
+                val platform =
+                    FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+                val draft = TextFieldValue("Keep", TextRange(2))
+                val f = fixture(draft = draft, platform = platform, appLocked = { locked })
+                f.controller.requestStart(ACCOUNT, GROUP, draft)
+                f.controller.resumeAfterMicrophoneSettings()
+                f.controller.onMicrophoneHostPaused()
+                f.controller.onAppBackgrounded()
+                platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+                if (lockedReturn) {
+                    locked = true
+                    f.controller.onAppForegrounded()
+                    f.controller.onMicrophoneHostResumed()
+                    assertFalse(platform.session.started)
+                    assertNotNull(f.controller.microphoneSettingsRecovery)
+                }
+                f.scheduler.sleepWithoutDispatch(elapsed)
+                locked = false
+                f.controller.onAppForegrounded()
+                f.controller.onMicrophoneHostResumed()
+                assertEquals(elapsed < 30_000L, platform.session.started)
+                assertNull(f.controller.microphoneSettingsRecovery)
+                assertEquals(draft, f.drafts.getValue(key()))
+            }
+        }
+    }
+
+    @Test
+    fun returningFromMicrophoneSettingsStartsOnceOnlyAfterAccessIsRestored() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep ", TextRange(5)), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onAppBackgrounded()
+        assertFalse(platform.session.started)
+        val currentDraft = TextFieldValue("Keep updated ", TextRange(13))
+        f.edit(key(), currentDraft)
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded()
+        assertTrue(platform.session.started)
+        assertEquals(currentDraft, f.drafts.getValue(key()))
+        val startedSession = f.controller.state.sessionId
+        f.controller.onAppForegrounded()
+        assertEquals(startedSession, f.controller.state.sessionId)
+        f.controller.stop()
+        platform.listener.onResult("recovered words")
+        assertEquals("Keep updated recovered words", f.drafts.getValue(key()).text)
+        assertEquals(TextRange("Keep updated recovered words".length), f.drafts.getValue(key()).selection)
+        assertEquals(1, f.writes)
+    }
+
+    @Test
+    fun returningWithMicrophoneStillBlockedNeverStartsAndConsumesRecovery() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep "), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onAppBackgrounded()
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
+        assertTrue(f.controller.state is ConversationDictationState.Failed)
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
+        assertEquals("Keep ", f.drafts.getValue(key()).text)
+    }
+
+    @Test
+    fun microphoneSettingsRecoveryWaitsForAppUnlockBeforeCapture() {
+        var locked = false
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue(""), platform = platform, appLocked = { locked })
+        f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue(""))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onAppBackgrounded()
+        locked = true
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
+        locked = false
+        f.controller.onAppForegrounded()
+        assertTrue(platform.session.started)
+        f.controller.cancel()
+    }
+
+    @Test
+    fun dismissingMicrophoneRecoveryPreventsAutomaticCaptureOnReturn() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep "), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.dismissFailure()
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
+        assertTrue(f.controller.state is ConversationDictationState.Idle)
+    }
+
+    @Test
+    fun restoringPermanentPermissionResumesTheRequestedDictation() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied)
+        val f = fixture(draft = TextFieldValue(""), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue(""))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onAppBackgrounded()
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded()
+        assertTrue(platform.session.started)
+        f.controller.cancel()
     }
 
     @Test
@@ -9314,6 +9933,7 @@ class ConversationDictationControllerTest {
         val controller =
             ConversationDictationController(
                 platform = platform,
+                microphoneRecoveryAllowed = { !appLocked() && !appUnlockEvaluationPending() },
                 readDraft = { account, group ->
                     onDraftRead()
                     ConversationDictationDraftSnapshot(
@@ -9416,6 +10036,7 @@ class ConversationDictationControllerTest {
 
     @Suppress("MaxLineLength")
     private class FakePlatform(
+        var nativeUnblockSupported: Boolean = false,
         var providerPackage: String? = null,
         var pinnedProviderPresent: Boolean = true,
         var needsProviderChoice: Boolean = false,
@@ -9435,6 +10056,26 @@ class ConversationDictationControllerTest {
             ConversationDictationCallerAudioRequirement.Supported,
         private val deferCallerAudioProbe: Boolean = false,
     ) : ConversationDictationPlatform {
+        var nativeRequests = 0
+        var nativeCleanup = 0
+        var nativeChanged: (() -> Unit)? = null
+        var onNativeRegistration: (() -> Unit)? = null
+
+        override fun requestMicrophoneUnblock(onChanged: () -> Unit): (() -> Unit)? {
+            if (!nativeUnblockSupported) return null
+            nativeRequests += 1
+            val hook = onNativeRegistration
+            return if (hook != null) {
+                onNativeRegistration = null
+                hook()
+                null
+            } else {
+                nativeChanged = onChanged
+                val unregister: () -> Unit = { nativeCleanup += 1 }
+                unregister
+            }
+        }
+
         lateinit var listener: ConversationDictationRecognitionListener
         var session = FakeSession()
         val listeners = mutableListOf<ConversationDictationRecognitionListener>()
@@ -9640,6 +10281,7 @@ class ConversationDictationControllerTest {
         private val retryAudioWithContext: () -> Boolean = { false },
     ) : ConversationDictationRecognitionSession {
         var started = false
+        var startCalls = 0
         var stopped = false
         var cancelled = false
         var destroyed = false
@@ -9660,6 +10302,7 @@ class ConversationDictationControllerTest {
 
         /** Marks this fake recognition generation started. */
         override fun start() {
+            startCalls += 1
             started = true
         }
 

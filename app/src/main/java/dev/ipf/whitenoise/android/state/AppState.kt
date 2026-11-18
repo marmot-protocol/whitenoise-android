@@ -51,7 +51,6 @@ import dev.ipf.whitenoise.android.RuntimePolicyHooks
 import dev.ipf.whitenoise.android.amber.AmberSignerController
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
-import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
@@ -486,6 +485,7 @@ class WhiteNoiseAppState private constructor(
         lazy {
             ConversationDictationController(
                 context = appContext,
+                microphoneRecoveryAllowed = { appInForeground && !appLock.screenVisible && !appLock.evaluationPending },
                 readDraft = ::conversationDictationDraftSnapshot,
                 writeDraft = ::setConversationDictationDraftIfCurrent,
                 completionWrite = ::writeCompletedDictationDraft,
@@ -533,10 +533,6 @@ class WhiteNoiseAppState private constructor(
                 onSendBlocked = { presentTransient(R.string.dictation_send_blocked) },
             )
         }
-
-    /** Settings discovery is lifecycle-local; protocol data never enters this platform snapshot. */
-    internal suspend fun discoverDictationProviders(): List<ConversationDictationProvider> =
-        discoverDictationProvidersForSettings(appContext, conversationDictationPreferences)
 
     internal val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
@@ -6704,9 +6700,10 @@ class WhiteNoiseAppState private constructor(
             }
         }
         if (foreground) {
+            // Resolve app lock before any automatic microphone recovery can start capture.
+            appLock.onAppForegrounded()
             dictationDiagnosticLifecycle.foreground { conversationDictation }
             NotificationStreamForegroundService.onAppForegrounded(initializedConversationDictation())
-            appLock.onAppForegrounded()
             if (dismissRetainedVisibleConversation) {
                 dismissVisibleConversationNotifications()
             }

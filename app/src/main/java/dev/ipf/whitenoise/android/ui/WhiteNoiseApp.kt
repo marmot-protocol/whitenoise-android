@@ -154,10 +154,8 @@ internal fun TransientNoticeTimeoutEffect(
 }
 
 /**
- * The shell's notice layout (#3312): persistent top strips first, then the shell's temporary-banner slot, then the
- * destination, with durable bottom controls last. The slot presents banners only for destinations that have no
- * slot of their own below their bars, and it sits in the top region, so bottom chrome such as a composer or a
- * form action bar keeps its own size and keyboard handling while a banner appears, clears or is dismissed.
+ * Notice layout (#3312): persistent top strips, temporary-banner slot, destination, then durable bottom controls.
+ * Destinations with no slot below their bars use the top slot; bottom chrome and keyboard handling stay stable.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -550,6 +548,7 @@ internal fun WhiteNoiseApp(
         // the UI but the biometric sheet waits for the real decision.
         if (appState.appLock.screenVisible && !appState.appLock.evaluationPending) onRequestAppUnlock()
     }
+    ConversationDictationMicrophoneEffects(appState, dictation, dictationState)
     LaunchedEffect(dictationPermissionRequestId) {
         if (dictationPermissionRequestId > 0L && dictation.state is ConversationDictationState.PermissionRequired) {
             if (dictation.beginPermissionRequest(dictationPermissionRequestId)) {

@@ -2090,7 +2090,6 @@
     <string name="dictation_disclosure_message">Установленная на этом устройстве служба распознавания речи обрабатывает сказанное и может отправлять звук своему поставщику. После сбоя распознанный текст может быть автоматически сохранён в исходном черновике. Автоматическая отправка выключена, пока вы не включите её в настройках диктовки.</string>
     <string name="dictation_continue">Продолжить</string>
     <string name="dictation_microphone_muted">Доступ к микрофону отключён</string>
-    <string name="dictation_microphone_muted_help">Включите доступ к микрофону в настройках конфиденциальности Android или на панели быстрых настроек, затем повторите диктовку.</string>
     <!-- Imported-account preflight (#2519). -->
     <string name="setup_title">Настройка аккаунта</string>
     <string name="setup_working">Проверка аккаунта…</string>

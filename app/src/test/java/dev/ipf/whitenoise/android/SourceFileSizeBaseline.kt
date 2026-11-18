@@ -8,10 +8,10 @@ package dev.ipf.whitenoise.android
  */
 internal val sourceFileSizeBaseline: Map<String, Int> =
     mapOf(
-        "dev/ipf/whitenoise/android/MainActivity.kt" to 950,
+        "dev/ipf/whitenoise/android/MainActivity.kt" to 910,
         "dev/ipf/whitenoise/android/amber/AmberActivityCoordinator.kt" to 857,
-        "dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt" to 780,
-        "dev/ipf/whitenoise/android/audio/ConversationDictationController.kt" to 1453,
+        "dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt" to 692,
+        "dev/ipf/whitenoise/android/audio/ConversationDictationController.kt" to 1219,
         "dev/ipf/whitenoise/android/audio/VoicePlaybackController.kt" to 788,
         "dev/ipf/whitenoise/android/audio/VoiceRecordingController.kt" to 623,
         "dev/ipf/whitenoise/android/audio/tts/TtsController.kt" to 1033,
@@ -34,7 +34,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt" to 1472,
         "dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt" to 800,
         "dev/ipf/whitenoise/android/state/AppReviewDemo.kt" to 773,
-        "dev/ipf/whitenoise/android/state/AppState.kt" to 8466,
+        "dev/ipf/whitenoise/android/state/AppState.kt" to 8463,
         "dev/ipf/whitenoise/android/state/AppStateNotificationContent.kt" to 1819,
         "dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt" to 624,
         "dev/ipf/whitenoise/android/state/ChatFolderPreferences.kt" to 742,
@@ -48,7 +48,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/state/NotificationNetworkRecovery.kt" to 736,
         "dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt" to 2076,
         "dev/ipf/whitenoise/android/ui/MarkdownSpeakableText.kt" to 726,
-        "dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt" to 919,
+        "dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt" to 918,
         "dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt" to 3218,
         "dev/ipf/whitenoise/android/ui/chats/GlobalSearchState.kt" to 608,
         "dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt" to 848,

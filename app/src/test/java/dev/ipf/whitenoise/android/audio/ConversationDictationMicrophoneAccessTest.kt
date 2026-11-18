@@ -7,6 +7,8 @@ import android.media.AudioManager
 import android.os.Process
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,17 +32,16 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun globalMicrophoneToggleLeavesGrantedRuntimePermissionUsableForNativeRecovery() {
+    fun globalMicrophoneToggleRequiresVisibleRecoveryBeforeCapture() {
         setMode(AppOpsManager.MODE_FOREGROUND)
         context.getSystemService(AudioManager::class.java).isMicrophoneMute = true
 
-        // Android 16's effective check includes global sensor privacy, but creating the recognizer
-        // is what gives Android the opportunity to present its native microphone-unblock prompt.
+        // Detect privacy blocking before starting a recorder that would receive only silence.
         assertEquals(
             AppOpsManager.MODE_IGNORED,
             appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
-        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
     }
 
     @Test
@@ -66,13 +67,61 @@ class ConversationDictationMicrophoneAccessTest {
             AppOpsManager.MODE_IGNORED,
             appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
-        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
     }
 
     @Test
-    fun hardAppOpDenialRemainsActionable() {
+    fun appOpDenialsRemainActionableWhenUnmuted() {
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = false
+        setMode(AppOpsManager.MODE_ERRORED)
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
+    }
+
+    @Test
+    fun privacyOnlyIgnoredAccessCanRequestNativeReminderWhenAudioManagerReportsUnmuted() {
+        // AOSP hides privacy-only mute from AudioManager but restricts the effective app-op.
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = false
+        setMode(AppOpsManager.MODE_IGNORED)
+
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
+        val unregister = platform.requestMicrophoneUnblock {}
+        assertNotNull(unregister)
+        assertEquals(1, (shadowOf(appOps) as PrivacyGatedAppOps).notes)
+        // Enqueueing the OS reminder is not a grant and must never admit capture.
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
+        unregister?.invoke()
+    }
+
+    @Test
+    fun policyDeniedAccessDoesNotRegisterNativeMicrophoneRecovery() {
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = false
         setMode(AppOpsManager.MODE_ERRORED)
 
+        val unregister = platform.requestMicrophoneUnblock {}
+        assertNull(unregister)
+        assertEquals(0, (shadowOf(appOps) as PrivacyGatedAppOps).notes)
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
+    }
+
+    @Test
+    fun audioManagerOnlyMuteDoesNotNoteAnAllowedMicrophoneAccess() {
+        val shadow = shadowOf(appOps) as PrivacyGatedAppOps
+        shadow.privacyOverlayEnabled = false
+        setMode(AppOpsManager.MODE_ALLOWED)
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = true
+
+        val unregister = platform.requestMicrophoneUnblock {}
+
+        assertNotNull(unregister)
+        assertEquals(0, shadow.notes)
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
+        unregister?.invoke()
+    }
+
+    @Test
+    @Config(sdk = [30])
+    fun ignoredAccessBeforeSensorPrivacyRemainsAppPolicyDenial() {
+        setMode(AppOpsManager.MODE_IGNORED)
         assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
     }
 
@@ -92,6 +141,21 @@ class ConversationDictationMicrophoneAccessTest {
 /** Models the effective privacy denial observed on the physical Android 17 fixture. */
 @Implements(AppOpsManager::class)
 class PrivacyGatedAppOps : ShadowAppOpsManager() {
+    var privacyOverlayEnabled = true
+    var notes = 0
+
+    @Implementation
+    public override fun noteOpNoThrow(
+        op: Int,
+        uid: Int,
+        packageName: String?,
+        attributionTag: String?,
+        message: String?,
+    ): Int {
+        notes++
+        return super.noteOpNoThrow(op, uid, packageName, attributionTag, message)
+    }
+
     @Implementation
     @Suppress("OVERRIDE_DEPRECATION")
     public override fun unsafeCheckOpNoThrow(
@@ -100,7 +164,7 @@ class PrivacyGatedAppOps : ShadowAppOpsManager() {
         packageName: String,
     ): Int {
         val context = ApplicationProvider.getApplicationContext<Application>()
-        return if (context.getSystemService(AudioManager::class.java).isMicrophoneMute) {
+        return if (privacyOverlayEnabled && context.getSystemService(AudioManager::class.java).isMicrophoneMute) {
             AppOpsManager.MODE_IGNORED
         } else {
             super.checkOpNoThrow(op, uid, packageName)
