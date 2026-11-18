@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="report_team_action">Ilmianna Kohinan tiimille</string>
-    <string name="report_team_send_toggle">Lähetä Kohinalle</string>
-    <string name="report_team_message_detail">Ilmiantosi ja lähettäjän julkinen avain lähetetään yksityisesti Kohinan tiimille. Itse viestiä ei jaeta, eikä lähettäjälle ilmoiteta.</string>
-    <string name="report_team_profile_detail">Ilmiantosi ja tämän henkilön julkinen avain lähetetään yksityisesti Kohinan tiimille. Viestejä ei jaeta, eikä tälle henkilölle ilmoiteta.</string>
-    <string name="report_team_explanation_hint">Mitä Kohinan tiimin pitäisi tietää (valinnainen)</string>
-    <string name="report_team_sent">Lähetetty Kohinan tiimille.</string>
-    <string name="report_team_queued">Tallennettu ja odottaa lähetystä Kohinan tiimille.</string>
-    <string name="report_team_pending">Tallennettu. Toimituksen vahvistusta Kohinan tiimille odotetaan.</string>
-    <string name="report_team_copy_failed">Kopiota Kohinalle ei voitu lähettää. Yritä uudelleen.</string>
-    <string name="report_team_failed">Ilmiantoa ei voitu lähettää Kohinan tiimille. Yritä uudelleen.</string>
+    <string name="report_team_action">Ilmianna White Noisen tiimille</string>
+    <string name="report_team_send_toggle">Lähetä White Noiselle</string>
+    <string name="report_team_message_detail">Ilmiantosi ja lähettäjän julkinen avain lähetetään yksityisesti White Noisen tiimille. Itse viestiä ei jaeta, eikä lähettäjälle ilmoiteta.</string>
+    <string name="report_team_profile_detail">Ilmiantosi ja tämän henkilön julkinen avain lähetetään yksityisesti White Noisen tiimille. Viestejä ei jaeta, eikä tälle henkilölle ilmoiteta.</string>
+    <string name="report_team_explanation_hint">Mitä White Noisen tiimin pitäisi tietää (valinnainen)</string>
+    <string name="report_team_sent">Lähetetty White Noisen tiimille.</string>
+    <string name="report_team_queued">Tallennettu ja odottaa lähetystä White Noisen tiimille.</string>
+    <string name="report_team_pending">Tallennettu. Toimituksen vahvistusta White Noisen tiimille odotetaan.</string>
+    <string name="report_team_copy_failed">Kopiota White Noiselle ei voitu lähettää. Yritä uudelleen.</string>
+    <string name="report_team_failed">Ilmiantoa ei voitu lähettää White Noisen tiimille. Yritä uudelleen.</string>
     <string name="report_team_rate_limited">Liikaa ilmiantoja tältä tililtä. Yritä myöhemmin uudelleen.</string>
 </resources>

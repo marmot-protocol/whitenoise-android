@@ -17,13 +17,13 @@
     <string name="translation_on">Päällä</string>
     <string name="translation_off">Pois</string>
     <string name="translation_inherit_language">Käytä yleistä kohdekieltä</string>
-    <string name="translation_privacy_warning">Offline Translator voi kirjoittaa viestien tekstiä ja käännöksiä Androidin järjestelmälokeihin. Kohina ei voi taata toisen sovelluksen käsittelemän tekstin turvallisuutta.</string>
+    <string name="translation_privacy_warning">Offline Translator voi kirjoittaa viestien tekstiä ja käännöksiä Androidin järjestelmälokeihin. White Noise ei voi taata toisen sovelluksen käsittelemän tekstin turvallisuutta.</string>
     <string name="translation_choose_language">Valitse kieli</string>
     <string name="translation_unsupported_target">Tallennettu kohdekieli ei ole saatavilla Offline Translatorissa. Valitse toinen kieli.</string>
     <string name="translation_engine_update_required">Tämä kieli vaatii uudemman Offline Translatorin. Päivitä käännösohjelma ja yritä sitten uudelleen.</string>
     <string name="translation_install_zapstore">Asenna Zapstoresta</string>
     <string name="translation_install_release">Asenna GitHubista</string>
-    <string name="translation_install_release_reason">Zapstore ei vielä tarjoa versiota, jota Kohina voi käyttää, joten tämä avaa julkaisijan version %1$s GitHubissa.</string>
+    <string name="translation_install_release_reason">Zapstore ei vielä tarjoa versiota, jota White Noise voi käyttää, joten tämä avaa julkaisijan version %1$s GitHubissa.</string>
     <string name="translation_install_open_failed">Mikään sovellus ei voinut avata Offline Translatoria tai sen lataussivua. Asenna verkkoselain ja yritä sitten uudelleen.</string>
     <string name="translation_composer_toggle">Käännä</string>
     <string name="translation_composer_will_send">Lähetetään</string>

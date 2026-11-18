@@ -13,7 +13,7 @@
     <string name="explanation_conversation_dictation_paste">Lisää tunnistetun tekstin viestikenttään lähettämättä sitä, jotta voit ensin muokata sitä.</string>
     <string name="explanation_conversation_dictation_recovery_paste">Lisää tunnistetun tekstin viestikenttään lähettämättä sitä.</string>
     <string name="explanation_conversation_dictation_recovery_retry_send">Yrittää uudelleen lähettää tunnistetun tekstin viestinä.</string>
-    <string name="explanation_conversation_dictation_recovery_app_settings">Avaa Kohinan Android-asetukset, joissa voit sallia mikrofonin käytön.</string>
+    <string name="explanation_conversation_dictation_recovery_app_settings">Avaa White Noisen Android-asetukset, joissa voit sallia mikrofonin käytön.</string>
     <string name="explanation_conversation_dictation_recovery_speech">Avaa Androidin puheentunnistusasetukset, joissa voit valita tai asentaa tunnistuspalvelun.</string>
     <string name="explanation_conversation_dictation_recovery_retry">Aloittaa kuuntelun uudelleen. Aiemmin tunnistettua tekstiä ei lisätä.</string>
     <string name="explanation_conversation_dictation_recovery_retry_retained">Yrittää tätä sanelua uudelleen jo nauhoitetulla tai tunnistetulla sisällöllä. Kuuntelua ei aloiteta uudelleen.</string>
@@ -54,9 +54,9 @@
     <string name="explanation_message_action_forward">Avaa keskustelujen valitsimen. Valitsemasi keskustelut saavat tästä viestistä uuden kopion.</string>
     <string name="explanation_message_action_keep_on_screen">Pitää tämän viestin pienenä korttina keskustelun yläosassa. Voit poistaa kortin milloin tahansa.</string>
     <string name="explanation_message_action_show_less">Tiivistää tämän pitkän viestin lyhyemmäksi esikatseluksi.</string>
-    <string name="explanation_message_action_share">Avaa Androidin jakovalikon tällä viestillä. Valitsemasi sovellus saa viestin, ja se on Kohinan ulkopuolella.</string>
+    <string name="explanation_message_action_share">Avaa Androidin jakovalikon tällä viestillä. Valitsemasi sovellus saa viestin, ja se on White Noisen ulkopuolella.</string>
     <string name="explanation_message_action_save">Tallentaa tämän viestin liitteet laitteellesi.</string>
     <string name="explanation_message_action_info">Näyttää, milloin viesti lähetettiin ja vastaanotettiin, kuka sen lähetti, sen tunnuksen ja tilan.</string>
-    <string name="explanation_message_action_report">Avaa ilmiantolomakkeen tämän ryhmän ylläpitäjille, Kohinan tiimille tai molemmille. Mitään ei lähetetä ennen kuin vahvistat.</string>
+    <string name="explanation_message_action_report">Avaa ilmiantolomakkeen tämän ryhmän ylläpitäjille, White Noisen tiimille tai molemmille. Mitään ei lähetetä ennen kuin vahvistat.</string>
     <string name="explanation_message_action_delete">Voit poistaa tämän viestin vain tältä laitteelta tai kaikilta. Kaikilta poistamista ei voi kumota. Mitään ei poisteta ennen kuin valitset.</string>
 </resources>
