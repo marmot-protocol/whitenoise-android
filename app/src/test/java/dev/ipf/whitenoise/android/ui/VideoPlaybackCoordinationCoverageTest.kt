@@ -1,19 +1,17 @@
 package dev.ipf.whitenoise.android.ui
 
-import dev.ipf.whitenoise.android.appModuleFile
 import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 /** Keeps every attachment route on the same focus, foreground and page-ownership contract. */
 class VideoPlaybackCoordinationCoverageTest {
     /** Media3 owns focus and headphones; video admission pauses the existing voice session. */
     @Test
     fun everyVideoPlayerOwnsAudioFocusAndPausesVoicePlayback() {
-        val source = mediaVideoSource().readText()
+        val source = mediaVideoSource()
         val body = source.functionBody("VideoViewerPage")
 
         assertTrue(
@@ -37,7 +35,7 @@ class VideoPlaybackCoordinationCoverageTest {
     /** Neighbour pages cannot consume a decoder or play, including after a background materialization. */
     @Test
     fun pagerVideoOnlyPreparesWhileItIsCurrent() {
-        val body = mediaVideoSource().readText().functionBody("VideoViewerPage")
+        val body = mediaVideoSource().functionBody("VideoViewerPage")
         val beforePlaybackEffect = body.substringBefore("LaunchedEffect(isCurrent, exo)")
         val playbackEffect =
             body
@@ -62,7 +60,7 @@ class VideoPlaybackCoordinationCoverageTest {
     /** STOP pauses the retained player, while foreground return has no automatic resume path. */
     @Test
     fun mountedPlayerPausesOnStopAndDetachesItsObserver() {
-        val body = mediaVideoSource().readText().functionBody("VideoViewerPage")
+        val body = mediaVideoSource().functionBody("VideoViewerPage")
         val observer =
             body
                 .substringAfter("DisposableEffect(exo, lifecycle, autoplayAllowed)")
@@ -139,12 +137,15 @@ class VideoPlaybackCoordinationCoverageTest {
         )
     }
 
-    /** Resolves the production source from module and repository test working directories. */
-    private fun mediaVideoSource(): File = appModuleFile("$MAIN_SOURCE/ui/conversation/media/MediaVideo.kt")
+    /** Reads every split attachment-video source from module and repository test working directories. */
+    private fun mediaVideoSource(): String = MEDIA_VIDEO_SOURCES.joinToString("\n") { mainSource("$MEDIA_DIR/$it") }
 
     private fun mainSource(path: String): String = appModuleSource("$MAIN_SOURCE/$path")
 
     private companion object {
         const val MAIN_SOURCE = "src/main/java/dev/ipf/whitenoise/android"
+        const val MEDIA_DIR = "ui/conversation/media"
+        val MEDIA_VIDEO_SOURCES =
+            listOf("MediaVideo.kt", "MediaVideoGridTile.kt", "MediaVideoCache.kt", "MediaVideoViewer.kt")
     }
 }

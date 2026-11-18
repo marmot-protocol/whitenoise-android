@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerSelfMembership.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "A live group update that removes only this device's copy ends this device's membership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerSelfMembership.kt",
+        "anchor": "internal fun groupStateUpdateRemovesSelf(",
+        "test_ids": [
+          "CON-039"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

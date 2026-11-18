@@ -58,6 +58,7 @@ FIXTURE_SHARED = (
     'app/src/main/java/dev/ipf/whitenoise/android/state/AutomaticAttachmentPolicy.kt',
     'app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentPermissions.kt',
     'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWork.kt',
     'app/src/main/java/dev/ipf/whitenoise/android/state/AutomaticAttachmentNetworkWaits.kt',
     'app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt',
     'app/src/main/java/dev/ipf/whitenoise/android/state/MessageForwarding.kt',

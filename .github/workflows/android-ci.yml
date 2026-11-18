@@ -12,7 +12,10 @@ name: Android CI
 # Activated queue mode uses compile/style/security PR prechecks and full
 # integration suites. Unset/unknown modes preserve prior PR validation.
 # ci:full opts into the complete two-distribution core matrix. Every merge group,
-# master, nightly and dispatch run stays full (docs/ci-request-policy.md).
+# nightly and dispatch run stays full (docs/ci-request-policy.md), and so does every
+# master push except one of a commit its merge group already validated, which reuses that
+# result; a ready-for-review run on an unchanged tree reuses its draft result
+# (docs/ci-request-policy.md#same-content-reuse).
 #
 # Each full unit suite runs as four hash-selected shards per distribution; the
 # coverage job merges the Zapstore shards' Kover reports and checks golden
@@ -56,6 +59,7 @@ permissions:
 jobs:
   changes:
     permissions:
+      actions: read
       contents: read
       issues: read
     name: Classify complete PR changes
@@ -68,6 +72,10 @@ jobs:
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
       ci_mode: ${{ steps.classify.outputs.ci_mode }}
       tooling_regressions: ${{ steps.classify.outputs.tooling_regressions }}
+      reuse: ${{ steps.reuse.outputs.reuse }}
+      reuse_run: ${{ steps.reuse.outputs.reuse_run }}
+      tree: ${{ steps.reuse.outputs.tree }}
+      lint_writer: ${{ steps.reuse.outputs.lint_writer }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -75,9 +83,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.sha }}
-
-      - name: Test conservative CI classification
-        run: python3 -m unittest scripts/test_check_ci_changes.py
 
       # The event may predate a maintainer's full-CI request. Read labels at run
       # time with read-only credentials; API errors fail closed to full CI.
@@ -96,6 +101,10 @@ jobs:
           fi
           printf 'labels=%s\n' "$labels" >> "$GITHUB_OUTPUT"
 
+      # This step and the lookup below run first and in Python's isolated mode (`-I`, which keeps
+      # the PR-controlled scripts directory off the import path), before any step that runs other
+      # PR-controlled code, so a PR cannot shadow a module or alter the environment to change
+      # the lane or the tree that name a reuse proof.
       - name: Classify complete PR diff
         id: classify
         env:
@@ -104,10 +113,47 @@ jobs:
           CI_EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha || github.sha }}
-        run: python3 scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
+          GIT_NO_REPLACE_OBJECTS: '1'
+        run: python3 -I scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
+
+      # Identical content never needs validating twice: a ready-for-review run on a tree that
+      # passed the draft lane, and a master push of the commit the queue already validated.
+      # A merge group never reuses a pull request result. Every error or uncertainty selects
+      # full validation; ANDROID_CI_REUSE=off disables reuse and shadow only reports
+      # (docs/ci-request-policy.md).
+      - name: Look for a verified result on identical content
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_REPO: ${{ github.repository }}
+          CI_EVENT: ${{ github.event_name }}
+          CI_ACTION: ${{ github.event.action }}
+          CI_MODE: ${{ steps.classify.outputs.ci_mode }}
+          CI_DOCS_ONLY: ${{ steps.classify.outputs.docs_only }}
+          CI_HEAD_SHA: ${{ github.sha }}
+          CI_BEFORE_SHA: ${{ github.event.before }}
+          ANDROID_CI_REUSE: ${{ vars.ANDROID_CI_REUSE }}
+          GIT_NO_REPLACE_OBJECTS: '1'
+        shell: bash
+        run: |
+          # The script bounds its own API time; this backstop keeps a hung call from using up the job.
+          if ! timeout 300 python3 -I scripts/ci_reuse.py --repo "$CI_REPO" --event "$CI_EVENT" --action "$CI_ACTION" \
+              --mode "$CI_MODE" --docs-only "$CI_DOCS_ONLY" --head-sha "$CI_HEAD_SHA" \
+              --before "$CI_BEFORE_SHA" --setting "$ANDROID_CI_REUSE"; then
+            echo '::warning title=Validation reuse::The lookup failed, so this run validates in full.'
+            printf 'reuse=none\nreuse_run=\ntree=\nlint_writer=false\n' >> "$GITHUB_OUTPUT"
+          fi
+
+      # Other PR-controlled code runs only now, after the classifier and the lookup have written
+      # their outputs, so it cannot alter them.
+      - name: Test conservative CI classification
+        run: python3 -m unittest scripts/test_check_ci_changes.py
 
   tooling-contracts:
     needs: changes
+    # A reused master push still runs this job, which assembles the source-bound manual
+    # testing guide that testers use for master candidates.
+    if: needs.changes.outputs.reuse != 'tree'
     name: Validate tooling and documentation contracts
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -247,7 +293,7 @@ jobs:
         run: bash .github/scripts/test-prefetch-robolectric-android-all.sh
 
       - name: Test Android CI aggregate gate
-        run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_unit_test_diagnostics.py scripts/test_verify_compose_release_apk.py scripts/test_kover_class_outputs.py
+        run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_ci_reuse.py scripts/test_unit_test_diagnostics.py scripts/test_verify_compose_release_apk.py scripts/test_kover_class_outputs.py
 
       - name: Check committed screenshot golden owners
         run: |
@@ -264,7 +310,7 @@ jobs:
 
   offline-zsp:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
     name: Verify real ZSP v2 publishing contract
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -298,7 +344,9 @@ jobs:
       contents: read
       actions: read
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    # A reused master push still runs this job: it keeps the Gradle caches fresh and stages
+    # the optional Maestro APK, neither of which a merge group result provides.
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse != 'tree'
     name: Build contracts (${{ matrix.phase }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -585,7 +633,7 @@ jobs:
   compose-compiler:
     needs: changes
     # Compiler reports run after merge (push), nightly and on demand, not on PRs or in the queue.
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.supplemental_campaigns != 'false' && needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse != 'tree' && needs.changes.outputs.supplemental_campaigns != 'false' && needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     name: Compose compiler metrics and stability reports
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -684,7 +732,7 @@ jobs:
   # which would otherwise each repeat the same 5-7 minute compilation.
   compile-tests:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none'
     name: Compile test sources (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -820,7 +868,10 @@ jobs:
           retention-days: 14
   static-analysis:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
+    # A reused master push still lints when lint inputs changed since the last push whose lint jobs
+    # completed: pushes are the only writers of the lint cache that pull requests and merge groups
+    # restore, and pushes cancel each other, so the preceding push may never have finished its lint.
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.reuse == 'none' || (needs.changes.outputs.reuse == 'push' && needs.changes.outputs.lint_writer == 'true')) && needs.changes.outputs.precheck != 'true'
     name: Android lint (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     # A full lint analysis without a cache hit runs 20 to 25 minutes, so 30 left no room for a slow runner.
@@ -932,7 +983,7 @@ jobs:
   # shard's screenshot summary and Kover binary report.
   tests:
     needs: [changes, compile-tests]
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.precheck != 'true'
     name: Unit tests and screenshots (${{ matrix.flavor }}, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -1141,7 +1192,7 @@ jobs:
   # class directories shard 0 compiled, so this job neither recompiles nor reruns tests.
   coverage:
     needs: [changes, tests]
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.precheck != 'true'
     name: Screenshot ownership and coverage
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -1277,7 +1328,7 @@ jobs:
   # so Play-only code still fails the PR. master/nightly run Play's full suite.
   secondary-variant:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true' && github.event_name == 'pull_request' && needs.changes.outputs.precheck != 'true' && needs.changes.outputs.full_matrix != 'true' && !github.event.pull_request.draft
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.reuse == 'none' && github.event_name == 'pull_request' && needs.changes.outputs.precheck != 'true' && needs.changes.outputs.full_matrix != 'true' && !github.event.pull_request.draft
     name: Compile and flavor-check Play
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -1382,12 +1433,98 @@ jobs:
           path: build/reports/dependency-security
           if-no-files-found: ignore
           retention-days: 14
+  # A merge-group run stops at its first failed job. The aggregate below waits for every
+  # job, so without this one failure would hold the PR, and every group queued behind it,
+  # until the slowest job finished. Cancelling the run cancels the jobs still running; the
+  # aggregate still runs (`always()`), sees them cancelled and fails, and the queue ejects
+  # the PR. The run also stops once the queue drops its group, for example to rebuild it
+  # after a group ahead failed: GitHub leaves that run going, holding runners the rebuilt
+  # groups need. This job has `actions: write`, runs no repository code and is deliberately
+  # not one of the aggregate's needs, since it waits for the aggregate to appear and must
+  # never fail a run whose required jobs passed.
+  merge-group-fail-fast:
+    name: Merge-group fail-fast
+    if: github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    continue-on-error: true
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+    steps:
+      - name: Cancel the run when a job fails
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          HEAD_REF: ${{ github.ref }}
+          HEAD_SHA: ${{ github.sha }}
+          REQUIRED_JOB: Compile, test, ktlint, detekt, Android lint
+        run: |
+          set -uo pipefail
+          # Stop watching before the job timeout. Each poll makes one jobs request, and a valid
+          # branch adds one matching-refs request: up to about 160 per run, or about 120 per
+          # hour, of the token's 1,000-request hourly budget shared by the repository's jobs.
+          deadline=$((SECONDS + 80 * 60))
+          # Look up the group's branch only when the event names one; otherwise watch
+          # for failed jobs alone.
+          if [[ "$HEAD_REF" != refs/heads/?* || ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            HEAD_REF=""
+          fi
+          dropped=0
+          while (( SECONDS < deadline )); do
+            # One line per job: name, status, conclusion, check URL. Retry a failed
+            # request on the next poll.
+            if jobs="$(gh api --paginate "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?per_page=100" \
+                --jq '.jobs[] | [.name, .status, .conclusion // "", .check_run_url // ""] | @tsv')"; then
+              # The aggregate starts only once every other job has finished.
+              if awk -F '\t' -v required="$REQUIRED_JOB" '$1 == required { found = 1 } END { exit !found }' <<<"$jobs"; then
+                exit 0
+              fi
+              # Merge groups accept only success, so any other conclusion already fails
+              # the aggregate (a skip is accepted only where the aggregate allows it).
+              failed="$(awk -F '\t' '$2 == "completed" && $3 != "success" && $3 != "skipped"' <<<"$jobs")"
+              if [[ -n "$failed" ]]; then
+                printf 'Cancelling the run after:\n%s\n' "$failed"
+                # A dead runner may never upload logs. Keep its server-side failure
+                # annotations from this healthy runner before cancelling.
+                while IFS=$'\t' read -r name _status _conclusion check; do
+                  if [[ -n "$check" ]]; then
+                    printf 'Failure annotations for %s:\n' "$name"
+                    gh api "$check/annotations" \
+                      --jq '.[] | select(.annotation_level == "failure") | .message' || true
+                  fi
+                done <<<"$failed"
+                gh run cancel "$RUN_ID" && exit 0
+              elif [[ -n "$HEAD_REF" ]]; then
+                # The queue deletes a dropped group's branch and may give its name to a
+                # later group on the same base. A passed group's branch is deleted only
+                # after the aggregate has run, so the check above exits first. Cancel
+                # only once two lookups in a row, a minute apart, succeed without finding
+                # this commit; a failed lookup proves nothing.
+                if sha="$(gh api "repos/$GH_REPO/git/matching-refs/${HEAD_REF#refs/}" \
+                    --jq '.[] | select(.ref == env.HEAD_REF) | .object.sha')" && [[ "$sha" != "$HEAD_SHA" ]]; then
+                  dropped=$((dropped + 1))
+                else
+                  dropped=0
+                fi
+                if (( dropped >= 2 )); then
+                  printf 'Cancelling the run: the merge queue dropped %s at %s\n' "$HEAD_REF" "$HEAD_SHA"
+                  gh run cancel "$RUN_ID" && exit 0
+                fi
+              fi
+            fi
+            sleep 60
+          done
   # Preserve the existing check name for branch protection and consumers.
   # A successful docs-only classifier permits only the named Android skips.
-  # Deliberate PR skips are derived here from the event, never from job output:
-  # secondary-variant runs only on ready PRs, compose-compiler is skipped for
-  # deferred campaigns and drafts. Missing outputs, unexpected skips, failures
-  # and cancellations remain red.
+  # Deliberate PR skips are derived here from the event: secondary-variant runs
+  # only on ready PRs, compose-compiler is skipped for deferred campaigns and
+  # drafts. The one skip taken from job output is a recorded reuse, which the
+  # classifier job reports and the rules below accept only for a ready pull
+  # request (tree) or a master push (push), never in a merge group. Missing
+  # outputs, unexpected skips, failures and cancellations remain red.
   # Drafts report under a different name. A green draft result must never be
   # the latest required check on a head that is then marked ready, because the
   # ready run creates this job only after its heavy lanes finish.
@@ -1413,6 +1550,8 @@ jobs:
             ($event == "pull_request" and $draft == "true" and ($full | not)) as $is_draft |
             (.changes.outputs.precheck == "true") as $precheck |
             ($event == "pull_request" and $draft == "false" and ($precheck | not) and ($full | not)) as $is_ready |
+            .changes.outputs.reuse as $reuse |
+            .changes.outputs.lint_writer as $lint |
             (["pull_request", "merge_group", "push", "schedule", "workflow_dispatch"] | index($event) != null) and
             ($draft == "true" or $draft == "false") and ($event == "pull_request" or $draft == "false") and
             (keys == ["build-contracts", "changes", "compile-tests", "compose-compiler", "coverage", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
@@ -1423,7 +1562,14 @@ jobs:
             (.changes.outputs.precheck == "true" or .changes.outputs.precheck == "false") and
             (($precheck | not) or ($event == "pull_request" and $mode == "merge-queue" and .changes.outputs.supplemental_campaigns == "false")) and
             (.changes.result == "success") and
-            (."tooling-contracts".result == "success") and
+            ($reuse == "none" or $reuse == "tree" or $reuse == "push") and
+            (($reuse == "none") or (.changes.outputs.docs_only == "false" and (.changes.outputs.reuse_run | test("^[0-9]+$")))) and
+            (.changes.outputs.lint_writer == "true" or .changes.outputs.lint_writer == "false") and
+            (($reuse == "push") or (.changes.outputs.lint_writer == "false")) and
+            (($reuse != "tree") or ((.changes.outputs.ci_mode == "full" or .changes.outputs.ci_mode == "precheck") and
+              ($event == "pull_request" and $draft == "false"))) and
+            (($reuse != "push") or ($event == "push" and $full)) and
+            (($reuse != "none") or (."tooling-contracts".result == "success")) and
             (.changes.outputs.docs_only == "true" or .changes.outputs.docs_only == "false") and
             (.changes.outputs.supplemental_campaigns == "true" or .changes.outputs.supplemental_campaigns == "false") and
             (.changes.outputs.supplemental_campaigns as $campaigns | if .changes.outputs.docs_only == "true" then
@@ -1431,8 +1577,41 @@ jobs:
                 if .key == "changes" or .key == "tooling-contracts" then .value.result == "success"
                 else .value.result == "skipped" end)
             else all(to_entries[];
-              if $precheck and (.key == "tests" or .key == "coverage" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
+              if $reuse == "tree" then (if .key == "changes" then .value.result == "success" else .value.result == "skipped" end)
+              elif $reuse == "push" then (
+                if .key == "changes" or .key == "tooling-contracts" or .key == "build-contracts" then .value.result == "success"
+                elif .key == "compose-compiler" then .value.result == (if $campaigns == "false" then "skipped" else "success" end)
+                elif .key == "static-analysis" then .value.result == (if $lint == "true" then "success" else "skipped" end)
+                else .value.result == "skipped" end)
+              elif $precheck and (.key == "tests" or .key == "coverage" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
               elif .key == "compose-compiler" and ($campaigns == "false" or $is_draft or $event == "pull_request" or $event == "merge_group") then .value.result == "skipped"
               elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)
           ' > /dev/null
+
+      # Real validation of a pull request tree becomes a proof for identical content: the
+      # queue and the ready-for-review run look this artifact up by its lane and tree
+      # (scripts/ci_reuse.py re-verifies the producing run before trusting it). Only this
+      # job's own success after real jobs ran records a proof, so reuse never chains from a skip.
+      # A proof only saves time later, so a failed write or upload must never turn the required check red.
+      - name: Write the validated tree proof
+        if: success() && github.event_name == 'pull_request' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        continue-on-error: true
+        env:
+          PROOF_LANE: ${{ needs.changes.outputs.ci_mode }}
+          PROOF_TREE: ${{ needs.changes.outputs.tree }}
+          PROOF_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p build/validated-tree
+          printf '{"lane":"%s","tree":"%s","head":"%s","run":"%s"}\n' \
+            "$PROOF_LANE" "$PROOF_TREE" "$PROOF_HEAD" "$GITHUB_RUN_ID" > build/validated-tree/proof.json
+
+      - name: Retain the validated tree proof
+        if: success() && github.event_name == 'pull_request' && needs.changes.outputs.reuse == 'none' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.tree != '' && (needs.changes.outputs.ci_mode == 'precheck' || needs.changes.outputs.ci_mode == 'full')
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-ci-attest-${{ needs.changes.outputs.ci_mode }}-${{ needs.changes.outputs.tree }}
+          path: build/validated-tree/
+          if-no-files-found: error
+          retention-days: 7

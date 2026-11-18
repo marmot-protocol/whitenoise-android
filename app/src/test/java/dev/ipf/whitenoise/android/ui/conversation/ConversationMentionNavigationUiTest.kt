@@ -786,7 +786,11 @@ class ConversationMentionNavigationUiTest {
         state: MentionHarnessState,
     ) {
         val action = fixture.suspendedAction ?: return
-        composeRule.waitUntil { state.awaitingLayout }
+        composeRule.runOnIdle {
+            assertTrue("Mention command must reach its controlled layout suspension", state.awaitingLayout)
+            assertEquals(0, state.completionCount)
+            assertFalse(state.layoutRelease.isCompleted)
+        }
         when (action) {
             SuspendedMentionAction.Height -> composeRule.runOnIdle { state.targetHeight = 720 }
             SuspendedMentionAction.Window ->

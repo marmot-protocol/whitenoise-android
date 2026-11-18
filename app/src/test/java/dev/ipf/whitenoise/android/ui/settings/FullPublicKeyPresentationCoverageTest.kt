@@ -25,7 +25,8 @@ class FullPublicKeyPresentationCoverageTest {
     fun accountKeysGroupsOnlyThePublicKey() {
         val keys = source(ACCOUNT_KEYS)
 
-        assertEquals(1, Regex("""fullPublicKey = true""").findAll(keys).count())
+        val parts = ACCOUNT_KEYS_PARTS.joinToString("\n") { source(it) }
+        assertEquals(1, Regex("""fullPublicKey = true""").findAll(parts).count())
         val publicRow = keys.substringAfter("""row("public_key")""").substringBefore("""row(""")
         assertTrue("the public key row lost its full display", "fullPublicKey = true" in publicRow)
     }
@@ -58,6 +59,15 @@ class FullPublicKeyPresentationCoverageTest {
 
     private companion object {
         const val ACCOUNT_KEYS = "ui/settings/AccountKeysScreen.kt"
+
+        /** The screen and the files split out of it, so the single-full-key count still covers all of them. */
+        val ACCOUNT_KEYS_PARTS =
+            listOf(
+                ACCOUNT_KEYS,
+                "ui/settings/AccountKeysDialogs.kt",
+                "ui/settings/AccountWipeAndSignOut.kt",
+                "ui/settings/AccountWipeProgressSheets.kt",
+            )
 
         /** Identity surfaces and the expression each passes as its own public key. */
         val SURFACES =
