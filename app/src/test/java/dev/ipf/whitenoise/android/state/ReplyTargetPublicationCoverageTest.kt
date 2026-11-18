@@ -34,10 +34,16 @@ class ReplyTargetPublicationCoverageTest {
     /** A text reply, plain or carrying the user's own emoji, resolves its target before its bubble is shown. */
     @Test
     fun textRepliesResolveTheirTarget() {
-        val send = appModuleSource(CONTROLLER).functionBody("send")
-        val resolved = send.indexOf("val replyTarget = replyTargetForSend(replyingTo?.messageIdHex)")
+        val controller = appModuleSource(CONTROLLER)
+        val send = controller.functionBody("send")
+        val resolution =
+            "val replyTarget = replyTargetForSend(" +
+                "replyingTo?.messageIdHex?.takeIf { consumeReply })"
+        val resolved = send.indexOf(resolution)
         assertTrue("send must resolve the reply target", resolved >= 0)
         assertTrue("the target is resolved before the bubble exists", resolved < send.indexOf("UUID.randomUUID()"))
+        assertTrue("ordinary text sends keep reply resolution enabled", "consumeReply: Boolean = true" in controller)
+        assertTrue("only a send carrying the draft's reply may clear it", "if (consumeReply) replyingTo = null" in send)
     }
 
     /** A retry republishes the target its failed bubble was built with, which the first send already resolved. */
