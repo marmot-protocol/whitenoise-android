@@ -88,6 +88,47 @@ class GiphySearchClientTest {
         assertEquals(RemoteGiphyMedia(url, creator), RemoteGiphyMedia.parse(result.media.wireText()))
     }
 
+    /** An unstable display name or username must not hide a later creator that the message parser accepts. */
+    @Test
+    fun skipsUnstableCreatorsBeforeSelectingFallbackAttribution() {
+        val url = "https://media.giphy.com/media/cat/giphy.gif"
+        val unstable = "e\u200B\u0301"
+        val users =
+            listOf(
+                JSONObject().put("display_name", "Display name").put("username", "Creator") to "Display name",
+                JSONObject().put("display_name", unstable).put("username", "Creator") to "Creator",
+                JSONObject().put("display_name", unstable).put("username", unstable) to "Fallback",
+            )
+        for ((user, expected) in users) {
+            val item =
+                JSONObject()
+                    .put("user", user)
+                    .put("username", "Fallback")
+                    .put("images", JSONObject().put("original", rendition(url)))
+            val result = requireNotNull(decodeGiphySearchResults(response(item))).single()
+            assertEquals(RemoteGiphyMedia(url, expected), result.media)
+            assertEquals(result.media, RemoteGiphyMedia.parse(result.media.wireText()))
+        }
+    }
+
+    /** The GIF remains sendable without a creator when sanitizing again would change every candidate. */
+    @Test
+    fun omitsUnstableCreatorsAndKeepsTheGif() {
+        val url = "https://media.giphy.com/media/cat/giphy.gif"
+        for (creator in listOf("e\u200B\u0301", "e\u034F\u0301", "\u1100\u200B\u1161")) {
+            val item =
+                JSONObject()
+                    .put("user", JSONObject().put("display_name", creator).put("username", creator))
+                    .put("username", creator)
+                    .put("images", JSONObject().put("original", rendition(url)))
+            val result = requireNotNull(decodeGiphySearchResults(response(item))).single()
+            assertEquals(RemoteGiphyMedia(url, null), result.media)
+            assertEquals("$url\nvia GIPHY", result.media.wireText())
+            assertEquals(result.media, RemoteGiphyMedia.parse(result.media.wireText()))
+        }
+    }
+
+    /** Supplies an admissible provider rendition without depending on the network. */
     private fun rendition(
         url: String,
         size: String = "1500",
@@ -98,6 +139,7 @@ class GiphySearchClientTest {
             .put("height", "120")
             .put("size", size)
 
+    /** Wraps provider results in the same response shape consumed by search. */
     private fun response(vararg items: JSONObject): String {
         val data = JSONArray(items.toList())
         return JSONObject().put("data", data).toString()

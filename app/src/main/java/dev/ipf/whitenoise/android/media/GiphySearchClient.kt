@@ -93,7 +93,7 @@ internal fun decodeGiphySearchResults(body: String): List<GiphySearchResult>? {
         .distinctBy { it.media.url }
 }
 
-/** Rejects a result when no rendition fits the existing GIPHY bubble's media limits. */
+/** Selects a bounded rendition and retains only creator attribution that round-trips through chat parsing. */
 private fun giphyResult(item: JSONObject): GiphySearchResult? {
     val url = item.optJSONObject("images")?.let(::selectGiphyRendition) ?: return null
     val user = item.optJSONObject("user")
@@ -102,7 +102,11 @@ private fun giphyResult(item: JSONObject): GiphySearchResult? {
             user?.opt("display_name") as? String,
             user?.opt("username") as? String,
             item.opt("username") as? String,
-        ).mapNotNull { ProfileSanitizer.displayName(it)?.trimEnd() }.firstOrNull()
+        ).mapNotNull { ProfileSanitizer.displayName(it)?.trimEnd() }
+            .firstOrNull { creator ->
+                val media = RemoteGiphyMedia(url, creator)
+                RemoteGiphyMedia.parse(media.wireText()) == media
+            }
     return GiphySearchResult(
         title = ProfileSanitizer.displayName(item.opt("title") as? String),
         media = RemoteGiphyMedia(url, attribution),
