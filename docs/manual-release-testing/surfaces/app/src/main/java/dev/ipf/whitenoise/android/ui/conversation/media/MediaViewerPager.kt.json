@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerPager.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StableMediaViewerPager",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerPager.kt",
+        "anchor": "fun StableMediaViewerPager(",
+        "test_ids": [
+          "MED-001",
+          "MED-033"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
