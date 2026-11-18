@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.updates
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.propertyInitializerCall
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -84,5 +85,5 @@ class AppUpdateAdmissionCoverageTest {
             File("src/main/java/dev/ipf/whitenoise/android", path),
             File("app/src/main/java/dev/ipf/whitenoise/android", path),
         ).first { it.isFile }
-            .readText()
+            .motionOwnerSource()
 }

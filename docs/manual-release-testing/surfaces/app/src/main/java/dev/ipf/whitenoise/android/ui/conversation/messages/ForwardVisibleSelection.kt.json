@@ -1,0 +1,36 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardVisibleSelection.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ForwardVisibleSelectionAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardVisibleSelection.kt",
+        "anchor": "fun ForwardVisibleSelectionAction(",
+        "test_ids": [
+          "FLD-001",
+          "MSG-010",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Forward visible deselect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardVisibleSelection.kt",
+        "anchor": "R.string.chat_list_deselect_all",
+        "test_ids": [
+          "MSG-010",
+          "FLD-001"
+        ]
+      },
+      {
+        "surface": "Forward visible select",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardVisibleSelection.kt",
+        "anchor": "R.string.chat_list_select_all",
+        "test_ids": [
+          "MSG-010",
+          "FLD-001"
+        ]
+      }
+    ]
+  }
+}

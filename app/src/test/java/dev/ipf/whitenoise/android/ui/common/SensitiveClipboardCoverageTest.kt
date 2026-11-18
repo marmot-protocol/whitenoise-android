@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.appModuleFile
 import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,9 +22,9 @@ class SensitiveClipboardCoverageTest {
             root
                 .walkTopDown()
                 .filter { it.extension == "kt" }
-                .filter { file -> file.readText().let { "EXTRA_IS_SENSITIVE" in it && "setPrimaryClip" in it } }
+                .filter { file -> file.motionOwnerSource().let { "EXTRA_IS_SENSITIVE" in it && "setPrimaryClip" in it } }
                 .flatMap { file ->
-                    val source = file.readText()
+                    val source = file.motionOwnerSource()
                     blockFunctions(source)
                         .filter { (_, body) -> "EXTRA_IS_SENSITIVE" in body && "setPrimaryClip" in body }
                         .map { (name, _) -> "${file.relativeTo(root).invariantSeparatorsPath}#$name" }

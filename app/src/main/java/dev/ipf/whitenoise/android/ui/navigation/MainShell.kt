@@ -72,7 +72,6 @@ import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.account.rememberRetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
-import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
@@ -88,7 +87,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHando
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.icons.filled.Settings
-import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewportEvent
@@ -100,83 +98,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming")
-@Composable
-internal fun ProfileGroupForegroundCoordinator(
-    appState: WhiteNoiseAppState,
-    conversationController: ConversationController?,
-    profileGroupForegroundState: ProfileGroupForegroundState,
-    secureWindowEnabled: Boolean?,
-    profileSecurePolicy: SecureFlagPolicy,
-    onOpenConversation: (ChatListItem, Boolean) -> Unit,
-    onGroupCreateSubmitted: () -> Long = { 0L },
-    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
-    onGroupCreateFlowSuperseded: () -> Unit = {},
-    onDismissProfile: () -> Unit,
-    onClosePicker: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    val foregroundState = profileGroupForegroundState
-    val route =
-        profileForegroundRoute(
-            pendingProfileNpub = appState.pendingProfileNpub,
-            startGroupMember = foregroundState.initialMember,
-            conversationOpen = conversationController != null,
-        )
-    when (route) {
-        is ProfileForegroundRoute.NewGroup -> {
-            secureWindowEnabled?.let { WindowSecureFlag(enabled = it) }
-            ProfileGroupOpeningPage(foregroundState.launchOrigin, route.initialMember, foregroundState.launchContour) {
-                NewGroupFlow(
-                    appState = appState,
-                    initialMembers = listOf(route.initialMember),
-                    onCreateCompletedOpen = { item, requestToken ->
-                        foregroundState.close()
-                        onGroupCreateCompletedOpen(item, requestToken)
-                    },
-                    onCreateSubmitted = onGroupCreateSubmitted,
-                    onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
-                    onClose = {
-                        onClosePicker()
-                        foregroundState.close()
-                        onGroupCreateFlowSuperseded()
-                    },
-                )
-            }
-            return
-        }
-        else -> content()
-    }
-    val profileNpub =
-        when (route) {
-            is ProfileForegroundRoute.ShellProfile -> route.npub
-            is ProfileForegroundRoute.ConversationProfile -> route.npub
-            else -> null
-        }
-    profileNpub?.let {
-        key(appState.pendingProfilePresentationId) {
-            ProfileSheet(
-                appState = appState,
-                npub = it,
-                onOpenGroup = onOpenConversation,
-                onStartGroupMeasured = { candidate, origin, contour ->
-                    appState.clearPresentedProfile()
-                    foregroundState.open(candidate, origin, contour)
-                },
-                onStartGroup = { candidate ->
-                    appState.clearPresentedProfile()
-                    foregroundState.open(candidate)
-                },
-                onDismiss = onDismissProfile,
-                adminController = conversationController,
-                securePolicy = profileSecurePolicy,
-                openGroupsInCommon = appState.pendingProfileGroupsInCommon,
-            )
-        }
-    }
-}
 
 /** Coordinates account-owned chat-list and conversation routes for the main app surface. */
 @OptIn(ExperimentalMaterial3Api::class)

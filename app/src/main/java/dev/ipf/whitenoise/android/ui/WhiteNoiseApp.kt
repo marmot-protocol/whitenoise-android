@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.ui
 
 import android.Manifest
 import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.speech.RecognizerIntent
 import android.view.ViewTreeObserver
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -911,10 +909,3 @@ private fun WarmResumeFrameSurface(
     }
     content()
 }
-
-private tailrec fun Context.findActivity(): Activity? =
-    when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
-    }

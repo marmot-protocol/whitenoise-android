@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -122,5 +123,5 @@ class TtsQuickTransportWiringCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-        ).firstOrNull(File::exists)?.readText() ?: error("Missing source file: $relativePath")
+        ).firstOrNull(File::exists)?.motionOwnerSource() ?: error("Missing source file: $relativePath")
 }

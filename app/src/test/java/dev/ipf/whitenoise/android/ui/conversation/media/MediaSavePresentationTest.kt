@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.compose.material3.SnackbarDuration
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -223,7 +224,7 @@ class MediaSavePresentationTest {
         sequenceOf(
             java.io.File(path),
             java.io.File("app/$path"),
-        ).first(java.io.File::exists).readText()
+        ).first(java.io.File::exists).motionOwnerSource()
 
     private object DiscardedDrafts : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()

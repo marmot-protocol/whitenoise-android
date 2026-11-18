@@ -69,8 +69,6 @@ import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.PushPin
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
@@ -551,18 +549,6 @@ internal fun ChatRowPreviewLine(
         overflow = TextOverflow.Ellipsis,
         fontStyle = fontStyle,
         modifier = modifier.fillMaxWidth(),
-    )
-}
-
-/** Decoration follows the engine's typed attachment kind; text remains the production projected preview. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun PinnedBadge(modifier: Modifier = Modifier) {
-    Icon(
-        imageVector = Icons.Default.PushPin,
-        contentDescription = stringResource(R.string.chat_pinned_badge),
-        modifier = modifier.size(14.dp),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 

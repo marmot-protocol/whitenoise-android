@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -9,10 +10,10 @@ import java.io.File
 class GodComposableDecompositionCoverageTest {
     @Test
     fun conversationMediaWorkLivesOutsideConversationScreenComposition() {
-        val screenSource = source("conversation/ConversationScreen.kt").readText()
+        val screenSource = source("conversation/ConversationScreen.kt").motionOwnerSource()
         val sender =
-            source("conversation/ConversationMediaSender.kt").readText() +
-                source("conversation/ConversationAttachmentReader.kt").readText()
+            source("conversation/ConversationMediaSender.kt").motionOwnerSource() +
+                source("conversation/ConversationAttachmentReader.kt").motionOwnerSource()
 
         assertTrue(
             "ConversationScreen must remember one media sender holder",
@@ -37,7 +38,7 @@ class GodComposableDecompositionCoverageTest {
 
     @Test
     fun conversationUiTreeLivesInNamedRestartScopes() {
-        val screenSource = source("conversation/ConversationScreen.kt").readText()
+        val screenSource = source("conversation/ConversationScreen.kt").motionOwnerSource()
         val screenBody = screenSource.functionBody("ConversationScreen")
 
         val componentFiles =
@@ -50,7 +51,7 @@ class GodComposableDecompositionCoverageTest {
             assertTrue("ConversationScreen must delegate to $component", "$component(" in screenBody)
             assertTrue(
                 "$component must be a named composable restart scope",
-                source(path).readText().contains("internal fun $component("),
+                source(path).motionOwnerSource().contains("internal fun $component("),
             )
         }
         assertFalse("ConversationScreen must not own TopAppBar rendering", "TopAppBar(" in screenSource)
@@ -60,8 +61,8 @@ class GodComposableDecompositionCoverageTest {
 
     @Test
     fun messageBubbleMediaPartitioningLivesInRememberedHolder() {
-        val bubbleBody = source("conversation/messages/MessageBubble.kt").readText().functionBody("MessageBubble")
-        val mediaHolder = source("conversation/messages/BubbleMedia.kt").readText()
+        val bubbleBody = source("conversation/messages/MessageBubble.kt").motionOwnerSource().functionBody("MessageBubble")
+        val mediaHolder = source("conversation/messages/BubbleMedia.kt").motionOwnerSource()
 
         assertTrue("MessageBubble must use the extracted media holder", "rememberBubbleMedia(" in bubbleBody)
         assertTrue("The extracted holder must be immutable", "@Immutable" in mediaHolder)
@@ -75,9 +76,9 @@ class GodComposableDecompositionCoverageTest {
 
     @Test
     fun messageBubbleUiBlocksLiveInNamedRestartScopes() {
-        val bubbleSource = source("conversation/messages/MessageBubble.kt").readText()
+        val bubbleSource = source("conversation/messages/MessageBubble.kt").motionOwnerSource()
         val bubbleBody = bubbleSource.functionBody("MessageBubble")
-        val componentsSource = source("conversation/messages/BubbleContentBlocks.kt").readText()
+        val componentsSource = source("conversation/messages/BubbleContentBlocks.kt").motionOwnerSource()
 
         listOf("BubbleMediaBlocks", "BubbleBodyFooterAndRetry").forEach { component ->
             assertTrue("MessageBubble must delegate to $component", "$component(" in bubbleBody)

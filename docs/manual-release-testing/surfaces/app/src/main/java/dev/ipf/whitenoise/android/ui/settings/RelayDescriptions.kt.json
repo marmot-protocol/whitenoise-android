@@ -1,0 +1,72 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayDescriptions.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Relays hold-to-explain: profile role",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayDescriptions.kt",
+        "anchor": "R.string.explanation_relays_role_profile",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Relays hold-to-explain: inbox role",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayDescriptions.kt",
+        "anchor": "R.string.explanation_relays_role_inbox",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Relays hold-to-explain: role switches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayDescriptions.kt",
+        "anchor": "internal fun AccountRelayRole.explanationRes()",
+        "test_ids": [
+          "SET-053"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:relay_onion_add_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayDescriptions.kt",
+        "anchor": "R.string.relay_onion_add_error",
+        "test_ids": [
+          "SYS-002",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_onion_needs_tor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayDescriptions.kt",
+        "anchor": "R.string.relay_onion_needs_tor",
+        "test_ids": [
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_unique_url_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayDescriptions.kt",
+        "anchor": "R.string.relay_unique_url_error",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_url_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayDescriptions.kt",
+        "anchor": "R.string.relay_url_help",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

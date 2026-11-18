@@ -20,10 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.core.content.FileProvider
-import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
@@ -52,7 +49,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorStateHolder
-import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.selectablePhotoQuality
 import kotlinx.coroutines.CoroutineScope
@@ -64,7 +60,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 internal data class PhotoEditorMessages(
@@ -807,32 +802,6 @@ internal fun rememberConversationMediaDraftState(
     return state
 }
 
-/** Materializes native draft bytes only while their composer is visible. */
-private fun materializeDraftAttachment(
-    context: Context,
-    attachment: MessageDraftAttachmentFfi,
-): Uri? =
-    runCatching {
-        val directory = File(context.cacheDir, "composer_paste/native_drafts").apply { mkdirs() }
-        val safeExtension =
-            attachment.fileName
-                .substringAfterLast('.', "")
-                .lowercase()
-                .takeIf { it.length in 1..8 && it.all(Char::isLetterOrDigit) }
-                ?.let { ".$it" }
-                .orEmpty()
-        val stableName =
-            UUID.nameUUIDFromBytes(attachment.id.toByteArray(StandardCharsets.UTF_8)).toString()
-        val file = File(directory, "$stableName$safeExtension")
-        file.writeBytes(attachment.plaintext)
-        FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file,
-            MediaPipeline.safeDisplayName(attachment.fileName),
-        )
-    }.getOrNull()
-
 private fun restorationIsCurrent(
     version: DraftRestorationVersion,
     ownerFence: DraftDocumentOwnerFence,
@@ -842,40 +811,6 @@ private fun restorationIsCurrent(
     ownerFence.isCurrent(version.owner) &&
         cleanupRevision == version.nativeRevision &&
         inputsRevision == version.inputsRevision
-
-private fun preparedPhotoPreviews(
-    backedPhotos: Map<String, DraftBackedPhoto>,
-    preparedPhotos: Map<String, DraftPreparedPhoto>,
-): Map<String, PreparedPhotoPreview> =
-    backedPhotos.mapValues { (_, photo) ->
-        PreparedPhotoPreview(
-            revision = photo.attachmentDigest,
-            bytes = photo.attachment.plaintext,
-        )
-    } +
-        preparedPhotos.mapValues { (_, photo) ->
-            PreparedPhotoPreview(
-                revision = photo.attachmentDigest,
-                bytes = photo.attachment.plaintext,
-            )
-        }
-
-private fun preparedPhotoQualities(
-    backedPhotos: Map<String, DraftBackedPhoto>,
-    renderer: PhotoEditorRenderer,
-): Map<String, PreparedPhotoQuality> =
-    backedPhotos.mapValues { (_, photo) ->
-        fun dimensions(quality: MediaQuality): String? =
-            renderer.outputPlan(photo.sourceInfo, photo.recipe, quality)?.geometry?.outputSize?.let {
-                "${it.width} × ${it.height}"
-            }
-        PreparedPhotoQuality(
-            selectedQuality = photo.quality,
-            standardDimensions =
-                dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.Standard)),
-            hdDimensions = dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.High)),
-        )
-    }
 
 /** Retains one caption acceptance generation across preview recompositions and staged-media edits. */
 @Composable

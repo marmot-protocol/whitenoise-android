@@ -7,12 +7,10 @@ import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,13 +72,11 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
-import dev.ipf.marmotkit.GroupPushTokenDebugEntryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatLink
@@ -125,7 +121,6 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
-import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
@@ -165,7 +160,6 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
-import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredContourClick
@@ -2510,41 +2504,6 @@ private fun GroupMutationErrorBanner(
     }
 }
 
-/** A developer-only fact panel: the section label over free-form diagnostic rows on the group surface. */
-@Suppress("FunctionNaming")
-@Composable
-private fun DeveloperInfoPanel(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column {
-        SettingsSection(title)
-        SettingsPanel {
-            Column(
-                Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.FormField),
-                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-                content = content,
-            )
-        }
-    }
-}
-
-/** A lifecycle row's glyph in the row's own colour, replaced by progress while its mutation runs. */
-@Suppress("FunctionNaming")
-@Composable
-private fun DangerLeading(
-    @DrawableRes icon: Int,
-    inProgress: Boolean,
-    destructive: Boolean = true,
-) {
-    val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-    if (inProgress) {
-        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-    } else {
-        SettingsLeadingIcon(icon, tint = tint)
-    }
-}
-
 private sealed class DetailsConfirm {
     data class RemoveMember(
         val member: AppGroupMemberRecordFfi,
@@ -2595,136 +2554,6 @@ private sealed class DetailsConfirm {
     data class LeaveSoleMember(
         val groupName: String,
     ) : DetailsConfirm()
-}
-
-/** Developer-mode push delivery diagnostics for the group. */
-@Composable
-private fun PushDeliveryDebugSection(
-    info: GroupPushDebugInfoFfi?,
-    loading: Boolean,
-    appState: WhiteNoiseAppState,
-) {
-    DeveloperInfoPanel(title = stringResource(R.string.push_delivery)) {
-        when {
-            loading ->
-                Text(
-                    stringResource(R.string.loading_push_debug_info),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            info == null ->
-                Text(
-                    stringResource(R.string.push_debug_info_unavailable),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            else -> {
-                val yesText = stringResource(R.string.yes)
-                val noText = stringResource(R.string.no)
-                val yesNo: (Boolean) -> String = { value -> if (value) yesText else noText }
-
-                DiagnosticRow(stringResource(R.string.push_debug_total_tokens), info.totalTokenCount.toString())
-                DiagnosticRow(stringResource(R.string.push_debug_active_tokens), info.activeTokenCount.toString())
-                DiagnosticRow(stringResource(R.string.push_debug_stale_tokens), info.staleTokenCount.toString())
-                DiagnosticRow(
-                    stringResource(R.string.push_debug_missing_relay_hints),
-                    info.missingRelayHintCount.toString(),
-                )
-                info.lastTokenListUpdatedAtMs?.let { updatedAtMs ->
-                    val updatedAtText = updatedAtMs.toString()
-                    DiagnosticRow(
-                        stringResource(R.string.push_debug_last_token_list_update),
-                        updatedAtText,
-                        copyValue = updatedAtText,
-                    )
-                }
-
-                Spacer(Modifier.heightIn(min = 4.dp))
-                Text(
-                    stringResource(R.string.push_debug_local_registration),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                val local = info.localRegistration
-                DiagnosticRow(stringResource(R.string.push_debug_registered), yesNo(local.registered))
-                DiagnosticRow(stringResource(R.string.push_debug_shareable), yesNo(local.shareable))
-                DiagnosticRow(
-                    stringResource(R.string.push_debug_local_notifications_enabled),
-                    yesNo(local.localNotificationsEnabled),
-                )
-                DiagnosticRow(stringResource(R.string.native_push), yesNo(local.nativePushEnabled))
-                local.localLeafIndex?.let { leafIndex ->
-                    DiagnosticRow(stringResource(R.string.push_debug_local_leaf_index), leafIndex.toString())
-                }
-                DiagnosticRow(stringResource(R.string.push_debug_local_token_cached), yesNo(local.localTokenCached))
-
-                if (info.tokens.isNotEmpty()) {
-                    Spacer(Modifier.heightIn(min = 4.dp))
-                    Text(
-                        stringResource(R.string.push_debug_member_tokens),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    info.tokens.forEachIndexed { index, token ->
-                        if (index > 0) {
-                            AppDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        }
-                        PushTokenDebugRows(token, appState, yesNo)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PushTokenDebugRows(
-    token: GroupPushTokenDebugEntryFfi,
-    appState: WhiteNoiseAppState,
-    yesNo: (Boolean) -> String,
-) {
-    val memberName = appState.chatMemberTitle(token.memberIdHex)
-    Text(
-        memberName,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    val identityCopy =
-        pushDebugPublicIdentityCopy(
-            memberIdHex = token.memberIdHex,
-            serverPubkeyHex = token.serverPubkeyHex,
-            npubForDisplay = appState::npubForDisplay,
-        )
-    identityCopy.memberNpub?.let { memberNpub ->
-        DiagnosticRow(
-            stringResource(R.string.push_debug_member),
-            IdentityFormatter.short(memberNpub),
-            copyValue = memberNpub,
-        )
-    }
-    DiagnosticRow(stringResource(R.string.push_debug_leaf_index), token.leafIndex.toString())
-    DiagnosticRow(stringResource(R.string.push_debug_platform), token.platform.name)
-    DiagnosticRow(
-        stringResource(R.string.push_debug_token_fingerprint),
-        IdentityFormatter.short(token.tokenFingerprint),
-        copyValue = token.tokenFingerprint,
-    )
-    identityCopy.serverNpub?.let { serverNpub ->
-        DiagnosticRow(
-            stringResource(R.string.push_debug_push_server_pubkey),
-            IdentityFormatter.short(serverNpub),
-            copyValue = serverNpub,
-        )
-    }
-    DiagnosticRow(stringResource(R.string.push_debug_relay_hint), yesNo(token.hasRelayHint))
-    DiagnosticRow(stringResource(R.string.push_debug_active_leaf), yesNo(token.activeLeaf))
-    DiagnosticRow(stringResource(R.string.push_debug_member_matches_active_leaf), yesNo(token.memberMatchesActiveLeaf))
-    DiagnosticRow(stringResource(R.string.push_debug_is_local_member), yesNo(token.isLocalMember))
-    val updatedAtText = token.updatedAtMs.toString()
-    DiagnosticRow(
-        stringResource(R.string.push_debug_updated_at),
-        updatedAtText,
-        copyValue = updatedAtText,
-    )
 }
 
 private enum class GroupMutationAction {

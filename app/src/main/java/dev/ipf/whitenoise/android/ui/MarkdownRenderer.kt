@@ -85,7 +85,6 @@ import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
-import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
@@ -1875,17 +1874,6 @@ internal fun markdownDocumentToPreviewAnnotatedString(
         },
     )
 }
-
-internal fun markdownListMarker(
-    kind: MarkdownListKindFfi,
-    index: Int,
-): String =
-    when (kind) {
-        is MarkdownListKindFfi.Bullet -> "•"
-        // Compute in Long: UInt addition wraps silently, and `start` is an
-        // FFI-supplied value we don't control.
-        is MarkdownListKindFfi.Ordered -> "${kind.start.toLong() + index}${kind.delimiter}"
-    }
 
 /**
  * Schemes handed to `ACTION_VIEW`; everything else stays inert text. `tel:` and

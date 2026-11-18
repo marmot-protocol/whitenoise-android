@@ -43,7 +43,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -775,28 +774,3 @@ private fun awaitingForwardFilterRows(
     filteredEmpty: Boolean,
     browsingFiltered: Boolean,
 ): Boolean = targetsEmpty || (browsingFiltered && filteredEmpty)
-
-/** Adds/removes only this complete visible result; selections outside it remain untouched. */
-internal fun forwardSelectionAfterVisibleToggle(
-    selected: List<String>,
-    visibleIds: List<String>,
-): List<String> = forwardSelectionAfterFolderToggle(selected, visibleIds)
-
-/** A partial result can be browsed, but cannot authorize a bulk destination selection. */
-@Composable
-internal fun ForwardVisibleSelectionAction(
-    selected: List<String>,
-    visibleIds: List<String>,
-    complete: Boolean,
-    onSelectionChange: (List<String>) -> Unit,
-) {
-    val allSelected = visibleIds.isNotEmpty() && selected.containsAll(visibleIds)
-    val label = stringResource(if (allSelected) R.string.chat_list_deselect_all else R.string.chat_list_select_all)
-    IconButton(
-        onClick = { onSelectionChange(forwardSelectionAfterVisibleToggle(selected, visibleIds)) },
-        enabled = complete && visibleIds.isNotEmpty(),
-        modifier = Modifier.testTag("forward.selectAll"),
-    ) {
-        Icon(painterResource(if (allSelected) R.drawable.ic_deselect_all else R.drawable.ic_select_all), label)
-    }
-}

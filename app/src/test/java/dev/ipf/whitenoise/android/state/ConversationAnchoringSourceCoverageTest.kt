@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -7,7 +8,7 @@ import java.io.File
 class ConversationAnchoringSourceCoverageTest {
     @Test
     fun bottomInsetHolderFollowsController() {
-        val source = conversationScreenSource().readText()
+        val source = conversationScreenSource().motionOwnerSource()
         val owner =
             source.substring(
                 source.indexOf("val bottomInsetState ="),
@@ -28,7 +29,7 @@ class ConversationAnchoringSourceCoverageTest {
 
     @Test
     fun seededTailHolderFollowsControllerAndNotificationRequest() {
-        val source = conversationScreenSource().readText()
+        val source = conversationScreenSource().motionOwnerSource()
         val owner =
             source.substring(
                 source.indexOf("val seededTailState ="),
@@ -49,7 +50,7 @@ class ConversationAnchoringSourceCoverageTest {
     /** Unread jump and follow state reset with the controller, and scroll restore uses the reconciled entry unread. */
     @Test
     fun conversationAnchoringLifecycleFollowsController() {
-        val source = conversationScreenSource().readText()
+        val source = conversationScreenSource().motionOwnerSource()
         val entrySnapshotIndex = source.indexOf("val entryUnreadSnapshot =")
         val scrollRestoreIndex = source.indexOf("val scrollRestore =")
         val unreadJumpOwner =
@@ -86,7 +87,7 @@ class ConversationAnchoringSourceCoverageTest {
 
     @Test
     fun pendingDictatedSendUsesTheAcceptedSendRevealPath() {
-        val source = conversationScreenSource().readText()
+        val source = conversationScreenSource().motionOwnerSource()
 
         assertTrue(
             "a real dictated pending row must reveal through the same measured tail transaction as typed sends",
@@ -104,7 +105,7 @@ class ConversationAnchoringSourceCoverageTest {
     /** The read anchor advances over rows that clear the composer in the reading viewport, not the raw layout. */
     @Test
     fun readAnchorFollowsTheUnobstructedViewport() {
-        val source = conversationScreenSource().parentFile.resolve("ConversationUnreadTracking.kt").readText()
+        val source = conversationScreenSource().parentFile.resolve("ConversationUnreadTracking.kt").motionOwnerSource()
         val helper = source.substring(source.indexOf("private fun ConversationReadAnchorEffect("))
 
         assertTrue(
@@ -121,7 +122,7 @@ class ConversationAnchoringSourceCoverageTest {
     /** Physical top means older history only in the reversed transcript, and endpoint reads follow layout. */
     @Test
     fun reversedDragSelectionMapsEdgesBeforeReadingThePostScrollEndpoint() {
-        val source = conversationScreenSource().readText()
+        val source = conversationScreenSource().motionOwnerSource()
         val start = source.indexOf("fun messageDragSelectionEffects()")
         val loop = source.substring(start, source.indexOf("    messageDragSelectionEffects()", start))
         val scroll = loop.indexOf("listState.scrollBy(-scrollDelta)")

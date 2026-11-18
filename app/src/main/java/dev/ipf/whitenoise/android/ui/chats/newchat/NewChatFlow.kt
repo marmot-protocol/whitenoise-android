@@ -83,20 +83,6 @@ internal enum class NewGroupCreateStage {
 
 private enum class NewChatStep { NewMessage, NewGroup }
 
-internal data class StartChatErrorUiState(
-    val npub: String,
-    val progressHex: String,
-    val detail: AppText,
-    val diagnosticReport: String? = null,
-    val recipientName: String? = null,
-    val invitation: Boolean = false,
-    val title: AppText = AppText.Resource(R.string.toast_couldnt_start_chat),
-    val retryGroupIdHex: String? = null,
-) {
-    val copyable: Boolean
-        get() = !diagnosticReport.isNullOrBlank()
-}
-
 /**
  * MDK created the canonical group but could not load its local chat row yet.
  * The id is safe to retain for a targeted read retry; creating again would

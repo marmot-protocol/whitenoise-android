@@ -74,7 +74,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatListViewFfi
@@ -3197,23 +3196,3 @@ internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG = CHAT_LIST_SEARCH_MESSA
 // Debounce before global message results read their first MDK page (#1944). Sits inside the existing
 // 250–300 ms chat-list input debounce band so a fast typist doesn't trigger a query per keystroke.
 internal const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L
-
-/** Section header above the search result groups. */
-@Composable
-@Suppress("FunctionNaming")
-internal fun ChatListSearchSectionHeader(
-    title: String,
-    testTag: String,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text = title,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .semantics { heading() }
-                .testTag(testTag)
-                .padding(16.dp),
-        style = MaterialTheme.typography.titleSmall,
-    )
-}

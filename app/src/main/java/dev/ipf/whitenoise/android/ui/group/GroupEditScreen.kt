@@ -66,9 +66,7 @@ import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
@@ -749,48 +747,6 @@ internal fun GroupEditScreen(
 }
 
 private val GroupEditAvatarSize = 120.dp
-
-/** The prototype's photo sources behind the Add / Change photo button; Remove joins once the group has an image. */
-@Composable
-@Suppress("FunctionNaming", "LongParameterList")
-private fun GroupEditPhotoMenu(
-    expanded: Boolean,
-    hasImage: Boolean,
-    onDismiss: () -> Unit,
-    onChoosePhoto: () -> Unit,
-    onChooseFile: () -> Unit,
-    onFindWebImage: () -> Unit,
-    onCreateEmoji: () -> Unit,
-    onRemove: () -> Unit,
-) {
-    WhiteNoiseDropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss,
-        items =
-            buildList {
-                add(WhiteNoiseMenuItem(stringResource(R.string.choose_photos), onChoosePhoto, R.drawable.ic_image))
-                add(WhiteNoiseMenuItem(stringResource(R.string.choose_files), onChooseFile, R.drawable.ic_description))
-                add(WhiteNoiseMenuItem(stringResource(R.string.find_web_image), onFindWebImage, R.drawable.ic_search))
-                add(
-                    WhiteNoiseMenuItem(
-                        stringResource(R.string.group_emoji_create),
-                        onCreateEmoji,
-                        R.drawable.ic_emoji_smileys,
-                    ),
-                )
-                if (hasImage) {
-                    add(
-                        WhiteNoiseMenuItem(
-                            stringResource(R.string.remove_photo),
-                            onRemove,
-                            icon = R.drawable.ic_delete,
-                            destructive = true,
-                        ),
-                    )
-                }
-            },
-    )
-}
 
 /** Settings frame shared by the native editor and its descriptive-title screenshot coverage. */
 @Composable
