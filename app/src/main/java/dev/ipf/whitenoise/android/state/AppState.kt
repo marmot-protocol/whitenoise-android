@@ -8,10 +8,12 @@ import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.text.input.TextFieldValue
@@ -184,6 +186,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
@@ -195,10 +198,7 @@ internal const val NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS = 10_000L
 private const val AUTOMATIC_ADMISSION_ATTEMPTS = 2
 internal const val INCOMING_ATTACHMENT_TAG = "DMAttachmentReceipt"
 
-/**
- * How inviting one profile to several groups went: of [attempted] groups, [failures] failed and in [waited] the user
- * chose to wait on a group-change question, so those groups were not invited either.
- */
+/** Of [attempted] group invites, [failures] failed and [waited] were not invited because the user chose to wait. */
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
     val failures: Int,

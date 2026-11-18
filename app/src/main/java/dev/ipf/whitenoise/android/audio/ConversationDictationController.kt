@@ -9,9 +9,11 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.TextFieldValue
 import kotlinx.coroutines.CoroutineScope
 import java.util.UUID
@@ -45,10 +47,8 @@ internal data class ConversationDictationKey(
 }
 
 /**
- * Process-level owner for composer dictation.
- *
- * The immutable target prevents a delayed recognizer callback from writing to
- * whichever conversation happens to be visible when recognition completes.
+ * Process-level owner for composer dictation. The immutable target prevents delayed recognizer
+ * callbacks from writing to whichever conversation happens to be visible when recognition completes.
  * Caller-audio mode keeps bounded PCM in volatile memory without persisting it.
  * MDK owns draft writes and message dispatch. Recognized text is recovered into the original
  * draft on failure; the captured Send payload remains immutable and uncertain sends never retry.

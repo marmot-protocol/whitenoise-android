@@ -26,12 +26,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -152,10 +154,8 @@ internal fun TransientNoticeTimeoutEffect(
 }
 
 /**
- * The shell's notice layout (#3312): persistent top strips first, then the shell's temporary-banner slot, then the
- * destination, with durable bottom controls last. The slot presents banners only for destinations that have no
- * slot of their own below their bars, and it sits in the top region, so bottom chrome such as a composer or a
- * form action bar keeps its own size and keyboard handling while a banner appears, clears or is dismissed.
+ * Notice layout (#3312): persistent top strips, temporary-banner slot, destination, then durable bottom controls.
+ * The top slot serves destinations without their own below their bars, preserving bottom chrome size and keyboard handling as banners appear, clear or dismiss.
  */
 @Composable
 @Suppress("FunctionNaming")
