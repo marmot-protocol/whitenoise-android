@@ -16,6 +16,22 @@ internal class EmojiSetLibrary {
     fun invalidate() {
         revision++
     }
+
+    private val discovered = mutableSetOf<Pair<String, Int>>()
+
+    /** Whether [account] completed a relay sync on runtime [generation], so opening the browser can skip it. */
+    fun hasDiscovered(
+        account: String,
+        generation: Int,
+    ): Boolean = (account to generation) in discovered
+
+    /** Records a sync every relay answered. An incomplete or failed one is retried on the next open. */
+    fun markDiscovered(
+        account: String,
+        generation: Int,
+    ) {
+        discovered += account to generation
+    }
 }
 
 /** The first installed set wins a shortcode collision. Bundled and device-local emoji keep precedence. */
