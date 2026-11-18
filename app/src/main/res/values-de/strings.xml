@@ -1665,6 +1665,8 @@
         <item quantity="other">%1$d Emoji</item>
     </plurals>
     <string name="emoji_sets_installed">Installiert</string>
+    <string name="emoji_sets_section_installed">Installiert</string>
+    <string name="emoji_sets_section_discover">Entdecken</string>
     <string name="emoji_sets_update_available">Update verfügbar</string>
     <string name="emoji_sets_load_image">Vorschaubild laden</string>
     <string name="emoji_sets_image_privacy">Beim Laden einer Vorschau oder Installieren eines Sets sehen dessen Bild-Hosts deine IP-Adresse.</string>

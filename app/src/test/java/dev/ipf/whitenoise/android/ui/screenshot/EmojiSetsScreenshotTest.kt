@@ -53,7 +53,7 @@ import org.robolectric.annotation.GraphicsMode
 class EmojiSetsScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** The available-set browser with an installed snapshot. */
+    /** The browser groups the installed snapshot and a relay result under Installed and Discover (#3882). */
     @Test fun browserLight() = preview("browser_light", showPreview = false)
 
     /** Unreachable relays show their notice instead of "no sets", with Refresh in the top bar (#3882). */
@@ -112,11 +112,13 @@ class EmojiSetsScreenshotTest {
         val set = emojiSetFixture()
         val installed = InstalledEmojiSetStateFfi("previous", 0u, 0u, 1u, 100u, true)
         val selected = if (dark) set.copy(installed = installed) else set
+        val discovered = set.copy(coordinate = "30030:${"2".repeat(64)}:ocean", identifier = "ocean", title = "Ocean waves")
+        val sets = listOf(set.copy(installed = installed)) + listOfNotNull(discovered.takeUnless { showPreview })
         setTheme(dark, rtl) {
             EmojiSetsContent(
                 state =
                     EmojiSetsState(
-                        sets = listOf(set.copy(installed = installed)),
+                        sets = sets,
                         preview = selected.takeIf { showPreview },
                     ),
                 onBack = {},
