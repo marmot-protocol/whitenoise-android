@@ -368,6 +368,14 @@
         "test_ids": [
           "SYS-013"
         ]
+      },
+      {
+        "surface": "main application shell profiling policy",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "<profileable android:shell",
+        "test_ids": [
+          "SYS-016"
+        ]
       }
     ]
   },

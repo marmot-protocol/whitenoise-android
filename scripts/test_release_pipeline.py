@@ -821,6 +821,72 @@ def check_policy(manifests):
                 raise AssertionError(f"{source_set}: unexpected memory-tagging override")
 
 
+
+def check_profiling_policy(manifests):
+    """Require shell profiling on the shipped application and nothing that makes it debuggable."""
+    application = manifests["main"].find("application")
+    profileable = [] if application is None else application.findall("profileable")
+    if len(profileable) != 1 or profileable[0].get(ANDROID + "shell") != "true":
+        raise AssertionError("main: application must declare one <profileable android:shell=\"true\">")
+    if profileable[0].get(ANDROID + "enabled") == "false":
+        raise AssertionError("main: profileable must stay enabled")
+    for source_set, manifest in manifests.items():
+        for node in manifest.iter("application"):
+            if ANDROID + "debuggable" in node.attrib:
+                raise AssertionError(f"{source_set}: debuggable belongs to the build type, not a manifest")
+        if source_set == "main":
+            continue
+        for node in manifest.iter("profileable"):
+            raise AssertionError(f"{source_set}: profiling policy belongs to the main manifest")
+
+
+
+class ShellProfilingPolicyTest(unittest.TestCase):
+    """Guard the source-level profiling policy, a device capture remains the runtime evidence."""
+    def manifests(self):
+        """Load each shipped source-set manifest for policy validation."""
+        return {
+            path.parent.name: ET.parse(path).getroot()
+            for path in (ROOT / "app/src").glob("*/AndroidManifest.xml")
+        }
+
+    def test_shipped_application_is_shell_profileable(self):
+        """The shipped manifests declare shell profiling once, on the main application."""
+        check_profiling_policy(self.manifests())
+
+    def test_missing_or_disabled_profiling_is_rejected(self):
+        """Reject a removed element, a false shell flag and a disabled profileable."""
+        for mutation in ("remove", "shell_false", "disabled"):
+            with self.subTest(mutation=mutation):
+                manifests = self.manifests()
+                application = manifests["main"].find("application")
+                profileable = application.find("profileable")
+                if mutation == "remove":
+                    application.remove(profileable)
+                elif mutation == "shell_false":
+                    profileable.set(ANDROID + "shell", "false")
+                else:
+                    profileable.set(ANDROID + "enabled", "false")
+                with self.assertRaisesRegex(AssertionError, "profileable"):
+                    check_profiling_policy(manifests)
+
+    def test_manifest_debuggable_is_rejected(self):
+        """Profiling access must never arrive through a manifest debuggable flag."""
+        manifests = self.manifests()
+        manifests["main"].find("application").set(ANDROID + "debuggable", "true")
+        with self.assertRaisesRegex(AssertionError, "debuggable"):
+            check_profiling_policy(manifests)
+
+    def test_overlay_profiling_override_is_rejected(self):
+        """A flavor or build-type overlay cannot redefine the profiling policy."""
+        manifests = self.manifests()
+        overlay = next(name for name in manifests if name != "main")
+        target = manifests[overlay].find("application")
+        ET.SubElement(target if target is not None else manifests[overlay], "profileable")
+        with self.assertRaisesRegex(AssertionError, "main manifest"):
+            check_profiling_policy(manifests)
+
+
 class MemoryTaggingPolicyTest(unittest.TestCase):
     """Guard source-level tagging policy; runtime qualification remains separate."""
     def manifests(self):

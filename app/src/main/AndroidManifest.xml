@@ -85,6 +85,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WhiteNoise"
         android:zygotePreloadName="dev.ipf.whitenoise.android.media.sandbox.MediaZygotePreload">
+        <!-- Lets a tester's own profiler (System Tracing, or adb shell perfetto/simpleperf) record this
+             app's call stacks and trace sections on user builds. The app stays non-debuggable — only
+             the device user or an authorized shell can attach, see docs/performance.md. -->
+        <profileable android:shell="true" />
+
         <!-- The document reader's WebView must not upload usage metrics about sender documents. -->
         <meta-data
             android:name="android.webkit.WebView.MetricsOptOut"

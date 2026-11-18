@@ -7,6 +7,14 @@ The Baseline Profile plugin derives two release-like variants from `release`:
   [DEX method-size budgets](#dex-method-size-budgets)); used for Macrobenchmark.
 - `devZapstoreNonMinifiedRelease`: non-minified, non-debuggable, profileable; used to collect profiles.
 
+Shipped builds are profileable from the shell (`<profileable android:shell="true">` in the main
+manifest), so System Tracing's CPU profile, `perfetto` and `simpleperf` record this app's call
+stacks and `WhiteNoise.` trace sections on a tester's own user-build device, against their real
+account. That is how a field stall is attributed without a debuggable build. Only the device user
+or an authorized `adb` shell can attach, and what they obtain is profiling data: call stacks, timing
+and allocation profiles. The app stays non-debuggable. Symbolize production stacks with the R8
+mapping from the same release build.
+
 Both use the Android debug key and the existing dev application ID
 (`dev.ipf.whitenoise.android.dev`). They cannot weaken or replace staging or
 production release signing. Direct `adb install -r` swaps preserve the dedicated
