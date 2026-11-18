@@ -8,6 +8,21 @@ import java.io.File
 
 /** Guards the selected attachment routes; remote embedded videos and debug experiments are separate. */
 class AttachmentMediaContainmentCoverageTest {
+    @Test
+    fun pdfConstructionStaysInTheIsolatedService() {
+        val constructors =
+            source(".")
+                .walkTopDown()
+                .filter {
+                    it.extension == "kt" && "PdfRenderer(" in it.readText()
+                }.toList()
+        org.junit.Assert.assertEquals(listOf("PdfPageDecoder.kt"), constructors.map { it.name })
+        val service = source("media/sandbox/MediaDecodeService.kt").readText().functionBody("imageOperation")
+        assertTrue(service.indexOf("PdfPageDecoder.execute") in 0 until service.indexOf("readDecoderInput"))
+        val viewer = source("ui/conversation/media/PdfDocumentPages.kt").readText()
+        assertTrue("transport.retireDomain(domain)" in viewer && "transport.close()" in viewer)
+    }
+
     /** Attachment Entry Points Cannot Instantiate Privileged Compressed Parsers. */
     @Test
     fun attachmentEntryPointsCannotInstantiatePrivilegedCompressedParsers() {
@@ -20,6 +35,9 @@ class AttachmentMediaContainmentCoverageTest {
                     "audio/RawVoicePlaybackPlayer.kt",
                     "audio/AttachmentPcmDecoder.kt",
                     "ui/conversation/media/MediaVideo.kt",
+                    "ui/conversation/media/MediaVideoGridTile.kt",
+                    "ui/conversation/media/MediaVideoCache.kt",
+                    "ui/conversation/media/MediaVideoViewer.kt",
                     "ui/conversation/media/DraftVideoPreview.kt",
                     "ui/conversation/media/LocalVideoSource.kt",
                 ).map(::source)
@@ -91,7 +109,7 @@ class AttachmentMediaContainmentCoverageTest {
         val video = source("ui/conversation/media/LocalVideoSource.kt").readText()
         assertTrue("Local video must select the isolated player", "IsolatedAttachmentPlayer(context, uri)" in video)
         assertTrue("Remote URLs cannot select an attachment parser", "isLocalVideoUri(uri)" in video)
-        for (path in listOf("MediaVideo.kt", "DraftVideoPreview.kt")) {
+        for (path in listOf("MediaVideoViewer.kt", "DraftVideoPreview.kt")) {
             assertTrue(
                 "Every attachment video surface must share its local player factory",
                 "localVideoPlayer(context," in source("ui/conversation/media/$path").readText(),

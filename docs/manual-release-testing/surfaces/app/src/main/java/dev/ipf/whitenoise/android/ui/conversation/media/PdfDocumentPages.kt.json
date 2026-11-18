@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PdfDocumentPages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
+        "anchor": "fun PdfDocumentPages(",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "PdfPageImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
+        "anchor": "fun PdfPageImage(",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.document_pdf_page",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
+        "anchor": "R.string.document_pdf_page",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.document_pdf_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
+        "anchor": "R.string.document_pdf_unavailable",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.document_zoom_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/PdfDocumentPages.kt",
+        "anchor": "R.string.document_zoom_reset",
+        "test_ids": [
+          "MED-056"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

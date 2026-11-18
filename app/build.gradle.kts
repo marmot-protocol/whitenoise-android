@@ -383,8 +383,8 @@ android {
         applicationId = "dev.ipf.whitenoise.android"
         minSdk = 30
         targetSdk = 36
-        versionCode = 23
-        versionName = "2026.10.27"
+        versionCode = 27
+        versionName = "2026.11.17"
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
@@ -1276,6 +1276,7 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.tracing)
     implementation(libs.okhttp)
+    implementation(libs.jsoup)
     // One profile is generated from the authenticated dev/zapstore fixture and
     // merged into main for every release consumer. Select that producer
     // configuration explicitly so staging/play/production consumers do not

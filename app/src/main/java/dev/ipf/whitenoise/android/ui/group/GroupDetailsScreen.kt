@@ -9,13 +9,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,13 +21,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -60,8 +53,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -73,14 +64,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -93,7 +82,6 @@ import dev.ipf.whitenoise.android.core.ChatLink
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
-import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
@@ -102,24 +90,26 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.authoritativeConversationMuteSettings
+import dev.ipf.whitenoise.android.state.acknowledgeDisbandFailure
+import dev.ipf.whitenoise.android.state.cancelBlockedLeave
 import dev.ipf.whitenoise.android.state.collapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.conversationNotifyMode
-import dev.ipf.whitenoise.android.state.conversationRestoreNotifyMode
 import dev.ipf.whitenoise.android.state.conversationVibrationPattern
+import dev.ipf.whitenoise.android.state.disbandGroup
+import dev.ipf.whitenoise.android.state.enableGroupDisbanding
 import dev.ipf.whitenoise.android.state.folderMemberIds
-import dev.ipf.whitenoise.android.state.groupDetailsMuteDisplay
+import dev.ipf.whitenoise.android.state.inviteMembers
 import dev.ipf.whitenoise.android.state.inviteProfileToGroups
-import dev.ipf.whitenoise.android.state.isConversationMutePending
-import dev.ipf.whitenoise.android.state.muteConversationFor
-import dev.ipf.whitenoise.android.state.muteConversationUntil
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.profileAddableGroupsState
-import dev.ipf.whitenoise.android.state.setConversationNotifyMode
+import dev.ipf.whitenoise.android.state.refreshManagementState
+import dev.ipf.whitenoise.android.state.removeMember
 import dev.ipf.whitenoise.android.state.setConversationVibrationPattern
+import dev.ipf.whitenoise.android.state.stepDownAsAdmin
+import dev.ipf.whitenoise.android.state.transferAdmin
 import dev.ipf.whitenoise.android.state.updateCollapseLongMessagesInGroup
-import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.state.updateMessageRetention
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.abandonmentAccountName
 import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
@@ -148,27 +138,22 @@ import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Archive
 import dev.ipf.whitenoise.android.ui.icons.filled.Check
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
-import dev.ipf.whitenoise.android.ui.icons.filled.Edit
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.icons.filled.Search
 import dev.ipf.whitenoise.android.ui.medialibrary.MediaLibraryRoute
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaSection
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
-import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsScreen
-import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.profile.rememberProfileAccountWideGroups
 import dev.ipf.whitenoise.android.ui.profile.rememberProfileGroupPickerState
 import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
-import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
@@ -186,7 +171,6 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -296,6 +280,9 @@ internal fun GroupDetailsScreen(
     // details screen is mounted so the initial invite path reuses later-add UI.
     autoOpenAddMember: Boolean = false,
     onAutoOpenAddMemberConsumed: () -> Unit = {},
+    // When true (header Members shortcut), open the members page directly; Back from it leaves details.
+    autoOpenMembers: Boolean = false,
+    onAutoOpenMembersConsumed: () -> Unit = {},
     // Close details and raise the conversation's message search.
     onOpenSearch: (() -> Unit)? = null,
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
@@ -309,7 +296,11 @@ internal fun GroupDetailsScreen(
         val reviewRuntime = remember(controller) { appState.runtimeGeneration }
         val detailsScrollState = key(controller) { rememberScrollState() }
         val membersScrollState = key(controller) { rememberScrollState() }
-        var membersExpanded by remember(controller) { mutableStateOf(false) }
+        // Saved together so a recreated shortcut-opened Members page reopens with its Back-to-chat origin.
+        var membersExpanded by rememberSaveable(controller.group.groupIdHex) {
+            mutableStateOf(autoOpenMembers && !controller.isDm)
+        }
+        var membersAutoOpened by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(autoOpenMembers) }
         var memberSearchOpen by remember(controller) { mutableStateOf(false) }
         var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
         var memberSearchRetry by remember(controller) { mutableIntStateOf(0) }
@@ -324,7 +315,6 @@ internal fun GroupDetailsScreen(
         var showEditGroup by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-        var showMuteDurationDialog by remember(controller) { mutableStateOf(false) }
         var showVibrationPatternDialog by remember { mutableStateOf(false) }
         var showDmAddToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var mediaLibraryCategory by remember(controller) { mutableStateOf<SharedContentCategory?>(null) }
@@ -412,7 +402,7 @@ internal fun GroupDetailsScreen(
         val isDm = controller.isDm
         val groupTerminal = controller.group.disbanding || controller.group.disbanded
         val rosterReady = controller.memberRosterState == GroupRosterLoadState.READY
-        val canEdit = !readOnlyInvite && controller.isSelfMember && controller.isSelfAdmin && !groupTerminal
+        val canEdit = controller.canEditGroupSettings
         // Presentation-only: a warm member seed plus the admin list on the group
         // record enables administration on the first frame; the invite commit
         // still requires the authoritative roster inside the controller.
@@ -431,6 +421,13 @@ internal fun GroupDetailsScreen(
                     elapsedMs = SystemClock.elapsedRealtime() - detailsOpenedAtMs,
                     rosterState = controller.memberRosterState,
                 )
+            }
+        }
+        LaunchedEffect(autoOpenMembers) {
+            if (autoOpenMembers && !isDm) {
+                membersAutoOpened = true
+                membersExpanded = true
+                onAutoOpenMembersConsumed()
             }
         }
         LaunchedEffect(autoOpenAddMember, canAdministerMembers) {
@@ -517,7 +514,9 @@ internal fun GroupDetailsScreen(
                 target = detailsDestination,
                 depth = if (detailsDestination == "details") 0 else 1,
                 ownerKey = controller to appState.runtimeGeneration,
-                suppressMotion = addMemberAutoOpened && detailsDestination == "add-members",
+                suppressMotion =
+                    (addMemberAutoOpened && detailsDestination == "add-members") ||
+                        (membersAutoOpened && detailsDestination == "members"),
                 animationsEnabled = rememberConversationMotionEnabled(),
             )
 
@@ -574,33 +573,8 @@ internal fun GroupDetailsScreen(
             remember(appState.activeAccountRef, controller.group.groupIdHex, vibrationSelections) {
                 appState.conversationVibrationPattern(controller.group.groupIdHex)
             }
-        var targetedMuteSettings by remember(appState.activeAccountRef, controller.group.groupIdHex) {
-            mutableStateOf<dev.ipf.marmotkit.ChatNotificationSettingsFfi?>(null)
-        }
-        LaunchedEffect(appState.activeAccountRef, controller.group.groupIdHex, controller.latestChatListRow) {
-            targetedMuteSettings = null
-            if (controller.latestChatListRow == null) {
-                targetedMuteSettings = appState.authoritativeConversationMuteSettings(controller.group.groupIdHex)
-            }
-        }
-        val muteDisplay =
-            appState.groupDetailsMuteDisplay(
-                controller.group.groupIdHex,
-                controller.latestChatListRow,
-                targetedMuteSettings,
-            )
-        val conversationMuted = muteDisplay.muted
-        val muteCommandPending = appState.isConversationMutePending(controller.group.groupIdHex)
-        // Android retains only the All/Only-mentions preference behind MDK's mute.
-        val conversationRestoreMode =
-            remember(
-                appState.activeAccountRef,
-                controller.group.groupIdHex,
-                notificationModes,
-            ) {
-                appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
-            }
-        val conversationMuteExpiry = muteDisplay.mutedUntilMs
+        // Shared with the optional header shortcut so both run the same mute/unmute commands.
+        val muteControl = rememberConversationMuteControl(appState, controller)
 
         suspend fun refreshMlsDetails() {
             if (!appState.developerMode) return
@@ -794,9 +768,6 @@ internal fun GroupDetailsScreen(
         var showAutoReadPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showTranslationPicker by remember(controller) { mutableStateOf(false) }
         var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-        var pendingDisappearingSecs by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
-            mutableStateOf<Long?>(null)
-        }
         var showFolderPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
 
         mediaLibraryCategory?.let { category ->
@@ -826,31 +797,7 @@ internal fun GroupDetailsScreen(
             return@PreparedGroupAvatarContent
         }
 
-        if (showMuteDurationDialog) {
-            MuteDurationDialog(
-                onDismiss = { showMuteDurationDialog = false },
-                onSelect = { target ->
-                    showMuteDurationDialog = false
-                    when (target) {
-                        is MuteTarget.After ->
-                            appState.muteConversationFor(
-                                controller.group.groupIdHex,
-                                target.durationMillis,
-                            )
-                        is MuteTarget.At ->
-                            appState.muteConversationUntil(
-                                controller.group.groupIdHex,
-                                target.expiryMillis,
-                            )
-                        MuteTarget.Always ->
-                            appState.muteConversationFor(
-                                controller.group.groupIdHex,
-                                durationMillis = 0L,
-                            )
-                    }
-                },
-            )
-        }
+        MuteDurationHost(muteControl)
 
         if (showNotificationSettings) {
             BackHandler { showNotificationSettings = false }
@@ -861,19 +808,14 @@ internal fun GroupDetailsScreen(
                     conversationTitle = conversationTitle,
                     conversationAvatarUrl = controller.avatarUrl,
                     isDm = isDm,
-                    isMuted = conversationMuted,
-                    muteCommandPending = muteCommandPending,
-                    muteExpiryMillis = conversationMuteExpiry,
-                    notifyForMode = conversationRestoreMode,
+                    isMuted = muteControl.muted,
+                    muteCommandPending = muteControl.pending,
+                    muteExpiryMillis = muteControl.mutedUntilMs,
+                    notifyForMode = muteControl.restoreMode,
                     vibrationPattern = conversationVibrationPattern,
                     onBack = { showNotificationSettings = false },
                     onToggleMute = { turnOn ->
-                        if (turnOn) {
-                            showMuteDurationDialog = true
-                        } else {
-                            // Unmute back to the All/Only-mentions preference the mute hid.
-                            appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
-                        }
+                        if (turnOn) muteControl.requestMute() else muteControl.unmute()
                     },
                     onChooseVibrationPattern = { showVibrationPatternDialog = true },
                 )
@@ -1530,7 +1472,10 @@ internal fun GroupDetailsScreen(
                                     SettingsLink(
                                         context = rowContext,
                                         title = stringResource(R.string.see_all_members),
-                                        onClick = { membersExpanded = true },
+                                        onClick = {
+                                            membersAutoOpened = false
+                                            membersExpanded = true
+                                        },
                                         leading = {
                                             SettingsLeadingIcon(R.drawable.ic_group)
                                         },
@@ -1562,10 +1507,11 @@ internal fun GroupDetailsScreen(
             }
         }
         if (membersExpanded && !isDm) {
-            BackHandler { membersExpanded = false }
+            val closeMembers = { if (membersAutoOpened) onBack() else membersExpanded = false }
+            BackHandler(onBack = closeMembers)
             detailsRoute {
                 GroupMembersScreen(
-                    onBack = { membersExpanded = false },
+                    onBack = closeMembers,
                     scrollState = membersScrollState,
                     feedback = groupFeedback,
                     content = memberContent,
@@ -1725,33 +1671,18 @@ internal fun GroupDetailsScreen(
                         )
                     }
                     QuickInfoAction(
-                        label =
-                            stringResource(if (conversationMuted) R.string.chat_row_action_unmute else R.string.mute),
-                        icon = if (conversationMuted) R.drawable.ic_volume_up else R.drawable.ic_notifications_off,
-                        enabled = !muteCommandPending,
-                        explanation =
-                            chatsExplanation(
-                                if (conversationMuted) R.string.chat_row_action_unmute else R.string.mute,
-                                if (conversationMuted) {
-                                    R.string.explanation_chat_info_unmute
-                                } else {
-                                    R.string.explanation_chat_info_mute
-                                },
-                            ),
-                        onClick = {
-                            if (conversationMuted) {
-                                appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
-                            } else {
-                                showMuteDurationDialog = true
-                            }
-                        },
+                        label = stringResource(muteControl.labelRes),
+                        icon = muteControl.iconRes,
+                        enabled = !muteControl.pending,
+                        explanation = chatsExplanation(muteControl.labelRes, muteControl.explanationRes),
+                        onClick = muteControl::toggle,
                         modifier = Modifier.weight(1f),
                     )
                     QuickInfoAction(
                         label = stringResource(R.string.disappearing),
                         icon = R.drawable.ic_timer,
                         state = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
-                        enabled = canEdit && !mutationsBlocked,
+                        enabled = disappearingTimerEditable(canEdit, mutationsBlocked),
                         explanation =
                             chatsExplanation(
                                 R.string.disappearing,
@@ -2025,51 +1956,20 @@ internal fun GroupDetailsScreen(
                     )
                 }
 
-                if (showDisappearingPicker) {
-                    DisappearingMessagesPickerDialog(
-                        currentSecs = controller.group.disappearingMessageSecs.toLong(),
-                        onDismiss = { showDisappearingPicker = false },
-                        onPick = { secs ->
-                            showDisappearingPicker = false
-                            val currentSecs = controller.group.disappearingMessageSecs.toLong()
-                            // Only turning the timer ON (from off) or SHORTENING it prunes
-                            // existing history, so confirm just those. An unchanged pick is
-                            // a no-op; turning off or relaxing (lengthening) the window
-                            // prunes nothing, so apply it directly without the destructive
-                            // warning (#674 review).
-                            val needsConfirm = secs > 0L && (currentSecs == 0L || secs < currentSecs)
-                            when {
-                                secs == currentSecs -> Unit
-                                needsConfirm -> pendingDisappearingSecs = secs
-                                else ->
-                                    runGroupMutation(
-                                        action = GroupMutationAction.DisappearingMessages,
-                                        mutation = { controller.updateMessageRetention(secs.toULong()) },
-                                    )
-                            }
-                        },
-                    )
-                }
-
-                pendingDisappearingSecs?.let { secs ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.disappearing_confirm_title),
-                        message =
-                            stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
-                        confirmLabel = stringResource(R.string.disappearing_confirm_button),
-                        onConfirm = {
-                            pendingDisappearingSecs = null
-                            runGroupMutation(
-                                action = GroupMutationAction.DisappearingMessages,
-                                mutation = { controller.updateMessageRetention(secs.toULong()) },
-                            )
-                        },
-                        onDismiss = { pendingDisappearingSecs = null },
-                        destructive = true,
-                        identity = ownIdentity,
-                        confirmEnabled = canEdit && !mutationsBlocked,
-                    )
-                }
+                DisappearingTimerEditor(
+                    open = showDisappearingPicker,
+                    currentSecs = controller.group.disappearingMessageSecs.toLong(),
+                    editable = disappearingTimerEditable(canEdit, mutationsBlocked),
+                    identity = ownIdentity,
+                    resetKeys = arrayOf(controller, appState.activeAccountRef, appState.runtimeGeneration),
+                    onDismiss = { showDisappearingPicker = false },
+                    onApply = { secs ->
+                        runGroupMutation(
+                            action = GroupMutationAction.DisappearingMessages,
+                            mutation = { controller.updateMessageRetention(secs.toULong()) },
+                        )
+                    },
+                )
 
                 // Rows shared by the DM technical group and the group lifecycle group.
 
@@ -2409,184 +2309,6 @@ internal fun GroupDetailsScreen(
     }
 }
 
-/** Adaptive conversation identity with native edit, full-picture and public-key copy actions. */
-@Composable
-// Existing adaptive header keeps its optional viewer action at the presentation boundary.
-@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
-internal fun GroupDetailsHeader(
-    title: String,
-    subtitle: String,
-    description: String,
-    seed: String,
-    pictureUrl: String?,
-    picture: ImageBitmap? = null,
-    groupAnimation: dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation? = null,
-    archived: Boolean,
-    onEdit: (() -> Unit)? = null,
-    editEnabled: Boolean = true,
-    onAddDescription: (() -> Unit)? = null,
-    descriptionCopyValue: String? = null,
-    onNameBottom: (Float) -> Unit = {},
-    readLocalBytes: (suspend () -> ByteArray?)? = null,
-    pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
-        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
-) {
-    val clipboard = LocalClipboardManager.current
-    val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
-    val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl.takeIf { picture == null }, pictureDomain)
-    val avatarImageAvailable = picture != null || remoteImageAvailable
-    var viewerOpen by remember(safePictureUrl, picture) { mutableStateOf(false) }
-    var copied by remember(descriptionCopyValue) { mutableStateOf(false) }
-    LaunchedEffect(copied) {
-        if (copied) {
-            delay(KEY_COPY_FEEDBACK_MILLIS)
-            copied = false
-        }
-    }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val avatarSize = (maxWidth * 0.32f).coerceIn(104.dp, 152.dp)
-        Column(
-            Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 12.dp).padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .testTag("chat_info.avatar")
-                        .clip(CircleShape)
-                        .clickable(
-                            enabled = avatarImageAvailable,
-                            onClickLabel = stringResource(R.string.profile_view_picture),
-                            role = Role.Button,
-                        ) { viewerOpen = true },
-            ) {
-                Avatar(
-                    title = title,
-                    seed = seed,
-                    size = avatarSize,
-                    pictureUrl = safePictureUrl?.takeIf { picture == null },
-                    picture = picture,
-                    groupAnimation = groupAnimation,
-                    pictureDomain = pictureDomain,
-                )
-            }
-            if (onEdit == null) {
-                EmojiLabel(
-                    title,
-                    modifier =
-                        Modifier.padding(top = 4.dp).testTag("chat_info.name").onGloballyPositioned {
-                            onNameBottom(it.positionInWindow().y + it.size.height)
-                        },
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else {
-                Row(
-                    modifier =
-                        Modifier
-                            .widthIn(max = 440.dp)
-                            .padding(top = 4.dp)
-                            .heightIn(min = 48.dp)
-                            .testTag("chat_info.name")
-                            .onGloballyPositioned { onNameBottom(it.positionInWindow().y + it.size.height) }
-                            .clickable(
-                                enabled = editEnabled,
-                                onClickLabel = stringResource(R.string.edit_group_name_and_description),
-                                role = Role.Button,
-                                onClick = onEdit,
-                            ),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    EmojiLabel(
-                        title,
-                        modifier = Modifier.weight(1f, fill = false),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-            if (description.isNotBlank()) {
-                val copyValue = descriptionCopyValue
-                if (copyValue == null) {
-                    EmojiLabel(
-                        description,
-                        modifier = Modifier.widthIn(max = 440.dp),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                } else {
-                    IdentifierCopyCapsule(
-                        value = copyValue,
-                        copied = copied,
-                        onCopy = {
-                            clipboard.setText(AnnotatedString(copyValue))
-                            copied = true
-                        },
-                        copyContentDescription = stringResource(R.string.copy_public_key),
-                        copiedContentDescription = stringResource(R.string.copied),
-                        notCopiedStateDescription = stringResource(R.string.not_copied),
-                        copiedStateDescription = stringResource(R.string.copied),
-                        targetTestTag = "chat_info.copy_public_key",
-                        visualTestTag = "chat_info.copy_public_key.visual",
-                        explanationRes = R.string.explanation_chat_info_copy_peer_public_key,
-                    )
-                }
-            } else if (onAddDescription != null) {
-                TextButton(onClick = onAddDescription) {
-                    Text(
-                        stringResource(R.string.add_group_description),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (subtitle.isNotBlank()) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (archived) {
-                    AssistChip(
-                        onClick = {},
-                        enabled = false,
-                        label = { Text(stringResource(R.string.archive_chat)) },
-                        leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
-                    )
-                }
-            }
-        }
-    }
-    if (viewerOpen && avatarImageAvailable) {
-        AvatarFullScreenViewer(
-            title = title,
-            seed = seed,
-            pictureUrl = safePictureUrl,
-            picture = picture,
-            onDismiss = { viewerOpen = false },
-            readLocalBytes = readLocalBytes,
-        )
-    }
-}
-
 /** Dismissible banner for the latest group mutation failure. */
 @Composable
 private fun GroupMutationErrorBanner(
@@ -2863,8 +2585,6 @@ private data class ActiveGroupMutation(
     val action: GroupMutationAction,
     val target: String? = null,
 )
-
-private const val KEY_COPY_FEEDBACK_MILLIS = 2_000L
 
 /** Visible details follow settled membership as well as metadata, without polling equal native records. */
 @Suppress("FunctionNaming") // Compose effect follows the same naming convention as other composables.

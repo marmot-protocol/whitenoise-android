@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentFallback.kt",
+  "legacy_sha256": "d569741a1cb342cf05ac8a719bfe5e5d6c418eaede0b0857da494c1545dbfac8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TextAttachmentUnavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentFallback.kt",
+        "anchor": "fun TextAttachmentUnavailable(",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.text_attachment_open_external",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentFallback.kt",
+        "anchor": "R.string.text_attachment_open_external",
+        "test_ids": [
+          "MED-001",
+          "MED-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

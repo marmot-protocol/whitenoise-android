@@ -7381,6 +7381,11 @@
             <sha256 value="edcf2e52901e22c7a1bb65dd666b873c81257c6fa77fb847640a8442800dc838" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="io.netty" name="netty-bom" version="4.2.19.Final">
+         <artifact name="netty-bom-4.2.19.Final.pom">
+            <sha256 value="78cd415dcfdcd550d781c64c9a03b73ec73dc34ca65fb9e567b6b84e4dfe41a3" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="jakarta.activation" name="jakarta.activation-api" version="1.2.1">
          <artifact name="jakarta.activation-api-1.2.1.jar">
             <sha256 value="8b0a0f52fa8b05c5431921a063ed866efaa41dadf2e3a7ee3e1961f2b0d9645b" origin="Independent official supplier audit" />
@@ -9026,6 +9031,14 @@
          </artifact>
          <artifact name="json-20260814.pom">
             <sha256 value="61937e25d261f93d16e8d9f5ccdb1b700780ec1ccb4876444654736628c62095" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="org.jsoup" name="jsoup" version="1.24.1">
+         <artifact name="jsoup-1.24.1.jar">
+            <sha256 value="fabbb4aaf7fb5340aed0613826ecd110427999d765d8e0367cedde2950d7097c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="jsoup-1.24.1.pom">
+            <sha256 value="387f01e1aae255a30fecae1b8377ec58a9e3bdc60008bfe934137101a4c95225" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="org.jspecify" name="jspecify" version="0.3.0">

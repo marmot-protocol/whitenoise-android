@@ -17,94 +17,6 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-// One isolated codec protocol owns raster, vector and AV worker lifecycle.
-@Suppress("TooManyFunctions")
-internal interface MediaDecodeTransport {
-    fun decode(
-        bytes: ByteArray,
-        edge: Int,
-        oriented: Boolean,
-        operation: Int,
-    ): Bitmap?
-
-    fun exif(bytes: ByteArray): Int? = inspect(bytes)?.orientation
-
-    fun inspect(bytes: ByteArray): ImageInspection?
-
-    fun region(
-        bytes: ByteArray,
-        region: MediaImageRegion,
-        edge: Int,
-    ): Bitmap? = null
-
-    fun svgInspect(bytes: ByteArray): ImageInspection? = null
-
-    fun svgRegion(
-        bytes: ByteArray,
-        region: ViewerSvgRegion,
-        edge: Int,
-    ): Bitmap? = null
-
-    fun animation(
-        bytes: ByteArray,
-        edge: Int,
-    ): android.graphics.drawable.Drawable? = null
-
-    fun probe(
-        file: File,
-        edge: Int,
-        poster: Boolean,
-    ): MediaProbe? = null
-
-    fun decodeUri(
-        resolver: android.content.ContentResolver,
-        uri: android.net.Uri,
-        edge: Int,
-    ): Bitmap? = null
-
-    fun probeUri(
-        resolver: android.content.ContentResolver,
-        uri: android.net.Uri,
-        edge: Int,
-    ): MediaProbe? = null
-
-    fun probeUriAt(
-        resolver: android.content.ContentResolver,
-        uri: android.net.Uri,
-        positionMs: Long,
-        edge: Int,
-    ): MediaProbe? = null
-
-    fun probeBytes(
-        bytes: ByteArray,
-        edge: Int,
-        poster: Boolean,
-    ): MediaProbe? = null
-
-    fun waveform(file: File): FloatArray? = null
-
-    /**
-     * Retires [domain]'s worker, such as a draft that was sent or emptied. A lane without domain-bound workers
-     * has nothing to retire.
-     */
-    fun retireDomain(domain: MediaTrustDomain) = Unit
-
-    /**
-     * Gives [domain] the next worker while [prioritized], such as the conversation on screen. A lane without
-     * domain-bound workers has no worker starts to order.
-     */
-    fun prioritizeDomain(
-        domain: MediaTrustDomain,
-        prioritized: Boolean,
-    ) = Unit
-}
-
-/** A lane that starts domain-bound workers on demand, and can say which inputs need none started first. */
-internal interface MediaWorkerReadiness {
-    /** The [domains] whose next input needs no worker to start first. */
-    fun servableNow(domains: List<MediaTrustDomain>): Set<MediaTrustDomain>
-}
-
 /**
  * Still-image worker generations bound to data-access domains (#3373). Each request carries the
  * [MediaTrustDomain] set by its caller through [MediaTrustScope]. Requests of one domain are serialized
@@ -264,6 +176,55 @@ internal class IsolatedMediaTransport(
             val spec = MediaDecodeRequest(edge, oriented, operation)
             request(ticket, bytes, spec, "media-pixels", capacity) { result, output ->
                 copyPixels(ticket, result, output, edge)
+            }
+        }
+
+    /** FD-only document requests share a worker only within this opening. */
+    @Suppress("ComplexCondition", "CyclomaticComplexMethod")
+    internal fun pdf(
+        file: File,
+        domain: MediaTrustDomain.DocumentSession,
+        page: Int,
+        edge: Int,
+        render: Boolean,
+    ): PdfResult? =
+        serialized(domain) { ticket ->
+            if (page !in 0 until PdfPagePolicy.MAX_PAGES || edge !in 1..PdfPagePolicy.MAX_EDGE) return@serialized null
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { input ->
+                if (input.statSize !in 1..PdfPagePolicy.MAX_INPUT || !claimWorker(ticket)) return@serialized null
+                val capacity = if (render) PdfPagePolicy.bytes(edge, edge) ?: return@serialized null else Int.SIZE_BYTES
+                withOutput("document-page", capacity) { output ->
+                    val spec =
+                        MediaDecodeRequest(
+                            edge,
+                            false,
+                            if (render) MediaDecodePolicy.PDF_RENDER_PAGE else MediaDecodePolicy.PDF_INSPECT,
+                            pdfPage = page,
+                        )
+                    val reply = exchange(ticket, input, output, spec) ?: return@withOutput null
+                    val count = reply.getInt("pdfPages")
+                    if (reply.getInt("pdfStatus") != 0 ||
+                        count !in 1..PdfPagePolicy.MAX_PAGES ||
+                        page >= count ||
+                        PdfPagePolicy.size(
+                            reply.getInt("pdfWidth").toDouble(),
+                            reply.getInt("pdfHeight").toDouble(),
+                            edge,
+                        ) == null
+                    ) {
+                        return@withOutput null
+                    }
+                    if (render &&
+                        PdfPagePolicy.bytes(
+                            reply.getInt("width"),
+                            reply.getInt("height"),
+                        ) == null
+                    ) {
+                        return@withOutput null
+                    }
+                    val bitmap = if (render) copyPixels(ticket, reply, output, edge) ?: return@withOutput null else null
+                    PdfResult(count, reply.getInt("pdfWidth"), reply.getInt("pdfHeight"), bitmap)
+                }
             }
         }
 
@@ -655,6 +616,7 @@ internal class IsolatedMediaTransport(
             putInt("version", MediaDecodePolicy.VERSION)
             putInt("operation", request.operation)
             putInt("edge", request.edge)
+            putInt("pdfPage", request.pdfPage)
             putBoolean("oriented", request.option)
             putLong("offset", request.offset)
             putLong("length", request.length ?: input.statSize)
@@ -760,15 +722,3 @@ internal class IsolatedMediaTransport(
         val requestSequence = AtomicInteger()
     }
 }
-
-@Suppress("LongParameterList") // Fixed IPC request tuple, with mutually exclusive raster/vector region shapes.
-internal data class MediaDecodeRequest(
-    val edge: Int,
-    val option: Boolean,
-    val operation: Int,
-    val offset: Long = 0L,
-    val length: Long? = null,
-    val region: MediaImageRegion? = null,
-    val positionUs: Long = 0L,
-    val svgRegion: ViewerSvgRegion? = null,
-)

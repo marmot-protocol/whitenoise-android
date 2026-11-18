@@ -88,8 +88,10 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
     withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
         coroutineScope {
             awaited
-                .map { (asset, domain) -> async { durableAvatar(asset, accountRef, acquireMissing = false, domain) } }
-                .awaitAll()
+                .map { (asset, domain) ->
+                    // A decode still queued when the budget ends is skipped unless a mounted row asks for it again.
+                    async { durableAvatar(asset, accountRef, acquireMissing = false, domain, abandonable = true) }
+                }.awaitAll()
         }
     }
     return selections.map { it.first }.mapNotNull { asset ->

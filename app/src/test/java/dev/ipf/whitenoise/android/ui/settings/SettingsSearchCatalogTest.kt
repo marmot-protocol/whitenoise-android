@@ -62,6 +62,7 @@ class SettingsSearchCatalogTest {
         }
     }
 
+    /** Every search entry has a valid id and points at a row or section that really exists. */
     @Test fun stableIdsAndActualAnchorsAreValidAndBounded() {
         assertEquals(catalog.size, catalog.map { it.id }.distinct().size)
         assertTrue(catalog.size in 50..256)
@@ -91,6 +92,7 @@ class SettingsSearchCatalogTest {
                 val generated =
                     entry.id.startsWith("Data.download.") ||
                         entry.id.startsWith("Gestures.") ||
+                        entry.id.startsWith("ChatHeader.") ||
                         SettingsHomeRow.entries.any { it.name == row }
                 assertTrue("${entry.id}: invalid row $row", literal || generated)
             }

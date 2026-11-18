@@ -1,0 +1,137 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DocumentAttachmentViewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "fun DocumentAttachmentViewer(",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "DocumentViewerFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "fun DocumentViewerFrame(",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "DocumentSource",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "fun DocumentSource(",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "DocumentLoading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "fun DocumentLoading(",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "DocumentViewerError",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "fun DocumentViewerError(",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "DocumentLinkConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "fun DocumentLinkConfirmation(",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.document_html_omitted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.document_html_omitted",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.document_html_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.document_html_unavailable",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.document_rendered",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.document_rendered",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.document_source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.document_source",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.more_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.more_options",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.share",
+        "test_ids": [
+          "MED-056"
+        ]
+      },
+      {
+        "surface": "R.string.text_attachment_open_external",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DocumentAttachmentViewer.kt",
+        "anchor": "R.string.text_attachment_open_external",
+        "test_ids": [
+          "MED-056"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

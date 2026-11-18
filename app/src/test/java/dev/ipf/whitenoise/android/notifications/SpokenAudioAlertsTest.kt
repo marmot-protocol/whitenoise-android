@@ -40,17 +40,26 @@ class SpokenAudioAlertsTest {
     @After
     fun tearDown() = clearChoice()
 
-    /** A podcast or audiobook player quiets the alert by default. */
+    /** The choice is off by default, so a podcast or audiobook player keeps the alert audible. */
     @Test
-    fun playingSpeechQuietsAlertsByDefault() {
+    fun playingSpeechKeepsAlertsAudibleByDefault() {
         playing(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_SPEECH))
-        assertTrue(SpokenAudioAlertPreferences.enabled(context))
+        assertFalse(SpokenAudioAlertPreferences.enabled(context))
+        assertFalse(quietAlertForSpokenAudio(context))
+    }
+
+    /** With the choice on, a podcast or audiobook player quiets the alert. */
+    @Test
+    fun playingSpeechQuietsAlertsWhenOn() {
+        SpokenAudioAlertPreferences.setEnabled(context, true)
+        playing(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_SPEECH))
         assertTrue(quietAlertForSpokenAudio(context))
     }
 
     /** Music is ducked by Android itself, so it keeps the alert audible. */
     @Test
     fun musicKeepsAlertsAudible() {
+        SpokenAudioAlertPreferences.setEnabled(context, true)
         playing(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_MUSIC))
         assertFalse(quietAlertForSpokenAudio(context))
     }
@@ -58,6 +67,7 @@ class SpokenAudioAlertsTest {
     /** Assistant and accessibility speech are not media, so they never quiet an alert. */
     @Test
     fun assistantAndAccessibilitySpeechKeepAlertsAudible() {
+        SpokenAudioAlertPreferences.setEnabled(context, true)
         playing(
             attributes(AudioAttributes.USAGE_ASSISTANT, AudioAttributes.CONTENT_TYPE_SPEECH),
             attributes(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY, AudioAttributes.CONTENT_TYPE_SPEECH),
@@ -68,6 +78,7 @@ class SpokenAudioAlertsTest {
     /** A speech player that is registered but not playing keeps the alert audible. */
     @Test
     fun idleSpeechPlayerKeepsAlertsAudible() {
+        SpokenAudioAlertPreferences.setEnabled(context, true)
         audio.setActivePlaybackConfigurationsFor(
             listOf(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_SPEECH)),
         )
@@ -75,14 +86,14 @@ class SpokenAudioAlertsTest {
         assertFalse(quietAlertForSpokenAudio(context))
     }
 
-    /** Turning the choice off keeps every alert audible, even over speech. */
+    /** Turning the choice on quiets alerts over speech, and turning it off again keeps them audible. */
     @Test
-    fun turningTheChoiceOffKeepsAlertsAudible() {
+    fun turningTheChoiceOnAndOffAgain() {
         playing(attributes(AudioAttributes.USAGE_MEDIA, AudioAttributes.CONTENT_TYPE_SPEECH))
-        SpokenAudioAlertPreferences.setEnabled(context, false)
-        assertFalse(quietAlertForSpokenAudio(context))
         SpokenAudioAlertPreferences.setEnabled(context, true)
         assertTrue(quietAlertForSpokenAudio(context))
+        SpokenAudioAlertPreferences.setEnabled(context, false)
+        assertFalse(quietAlertForSpokenAudio(context))
     }
 
     /** Reports [players] as registered while media is playing. */

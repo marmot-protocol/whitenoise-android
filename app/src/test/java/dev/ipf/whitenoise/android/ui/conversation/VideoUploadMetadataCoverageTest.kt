@@ -484,7 +484,7 @@ class VideoUploadMetadataCoverageTest {
     @Test
     fun fileBackedProbeRunsOnTheScrubbedSnapshot() {
         val fileBacked =
-            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt")
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationAttachmentReader.kt")
                 .functionBody("readFileBackedVideo")
         val scrub = fileBacked.indexOf("scrubVideoMetadata()")
         assertTrue(scrub in 0 until fileBacked.indexOf("readVideoFileMetadata("))

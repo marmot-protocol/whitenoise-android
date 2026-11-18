@@ -32,10 +32,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** A 320 dp visible window represents a conversation compressed by the open keyboard. */
+/** The message menu rests in the full-height frame after dismissing the keyboard. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h320dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 class FocusedMessageImeScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 

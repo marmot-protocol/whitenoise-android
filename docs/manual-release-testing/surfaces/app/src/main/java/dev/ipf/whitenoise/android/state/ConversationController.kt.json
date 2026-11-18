@@ -97,14 +97,6 @@
         ]
       },
       {
-        "surface": "R.string.toast_couldnt_cancel_leave",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_cancel_leave",
-        "test_ids": [
-          "GRP-037"
-        ]
-      },
-      {
         "surface": "R.string.toast_group_needs_admin",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_group_needs_admin",
@@ -216,34 +208,6 @@
         ]
       },
       {
-        "surface": "setting:toast_couldnt_add_members",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_add_members",
-        "test_ids": [
-          "GRP-005"
-        ]
-      },
-      {
-        "surface": "R.string.toast_admin_transferred",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_admin_transferred",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_cant_transfer_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_cant_transfer_admin",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.string.toast_chat_archived",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_chat_archived",
@@ -257,26 +221,6 @@
         "surface": "R.string.toast_chat_restored",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_chat_restored",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_couldnt_disband",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_disband",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_couldnt_enable_disbanding",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_enable_disbanding",
         "test_ids": [
           "CHL-026",
           "CHL-027",
@@ -324,39 +268,9 @@
         ]
       },
       {
-        "surface": "R.string.toast_couldnt_remove_member",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_remove_member",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_couldnt_update_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_update_admin",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.string.toast_couldnt_update_chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_couldnt_update_chat",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_couldnt_update_disappearing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_update_disappearing",
         "test_ids": [
           "CHL-026",
           "CHL-027",
@@ -374,26 +288,6 @@
         ]
       },
       {
-        "surface": "R.string.toast_disappearing_messages_updated",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_disappearing_messages_updated",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_granted_but_couldnt_step_down",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_granted_but_couldnt_step_down",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.string.toast_invite_accepted",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_invite_accepted",
@@ -404,39 +298,9 @@
         ]
       },
       {
-        "surface": "R.string.toast_keep_one_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_keep_one_admin",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.string.toast_left_named",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_left_named",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_member_removed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_member_removed",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_promote_before_removing_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_promote_before_removing_admin",
         "test_ids": [
           "CHL-026",
           "CHL-027",
@@ -457,14 +321,6 @@
         "surface": "Reviewed group action context: R.string.change_photo",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.change_photo",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.string.disappearing_messages",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.disappearing_messages",
         "test_ids": [
           "GRP-034"
         ]
@@ -494,65 +350,9 @@
         ]
       },
       {
-        "surface": "Reviewed group action context: R.string.group_disband_action",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.group_disband_action",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.string.group_disband_enable_action",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.group_disband_enable_action",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.string.make_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.make_admin",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.string.remove_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.remove_admin",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.string.remove_member",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.remove_member",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
         "surface": "Reviewed group action context: R.string.remove_photo",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.remove_photo",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.string.step_down_as_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.step_down_as_admin",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "surface": "Transfer retry keeps the combined transfer action and affected successor",
-        "anchor": "R.string.transfer_admin",
         "test_ids": [
           "GRP-034"
         ]
@@ -602,23 +402,6 @@
         "anchor": "R.string.toast_group_updated",
         "test_ids": [
           "GRP-003"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "surface": "Atomic initial admin invitation",
-        "anchor": "initialAdminInviteWriter(account",
-        "test_ids": [
-          "GRP-030"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "surface": "Coherent group details refresh",
-        "anchor": "groupSnapshotReader(account",
-        "test_ids": [
-          "GRP-001",
-          "GRP-030"
         ]
       },
       {

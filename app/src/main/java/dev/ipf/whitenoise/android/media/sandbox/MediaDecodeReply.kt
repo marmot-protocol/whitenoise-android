@@ -4,8 +4,8 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.Parcel
 
-internal const val MEDIA_REPLY_DESCRIPTOR = "dev.ipf.whitenoise.media.pixels.v2"
-private const val MIN_MEDIA_REPLY_BYTES = 72
+internal const val MEDIA_REPLY_DESCRIPTOR = "dev.ipf.whitenoise.media.pixels.v3"
+private const val MIN_MEDIA_REPLY_BYTES = 88
 
 /** Worker replies contain only explicitly read primitives, never arbitrary parcelable objects. */
 internal fun sendMediaDecodeReply(
@@ -54,6 +54,7 @@ private fun writeMediaDecodePayload(
     parcel.writeInt(result.getInt("sourceHeight"))
     parcel.writeLong(result.getLong("duration"))
     parcel.writeInt(if (result.getBoolean("pixels")) 1 else 0)
+    for (key in listOf("pdfStatus", "pdfPages", "pdfWidth", "pdfHeight")) parcel.writeInt(result.getInt(key))
     parcel.writeFloatArray(result.getFloatArray("waveform"))
 }
 
@@ -88,6 +89,23 @@ internal fun readMediaDecodeReply(parcel: Parcel): Bundle {
     require(duration in 0..MAX_MEDIA_DURATION_MS)
     result.putLong("duration", duration)
     result.putBoolean("pixels", readMediaBoolean(parcel))
+    val pdfStatus = parcel.readInt()
+    val pdfPages = parcel.readInt()
+    val pdfWidth = parcel.readInt()
+    val pdfHeight = parcel.readInt()
+    require(pdfStatus in 0..1 && pdfPages in 0..PdfPagePolicy.MAX_PAGES)
+    require(
+        (pdfWidth == 0 && pdfHeight == 0) ||
+            PdfPagePolicy.size(
+                pdfWidth.toDouble(),
+                pdfHeight.toDouble(),
+                1,
+            ) != null,
+    )
+    result.putInt("pdfStatus", pdfStatus)
+    result.putInt("pdfPages", pdfPages)
+    result.putInt("pdfWidth", pdfWidth)
+    result.putInt("pdfHeight", pdfHeight)
     val count = parcel.readInt()
     require(count == -1 || count == dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS)
     if (count == dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS) {

@@ -298,6 +298,34 @@ internal class DiskByteCache(
         }
     }
 
+    /** Visits bounded authenticated payloads without touching either in-memory or persisted LRU recency. */
+    fun forEachStoredEntry(visit: (String, ByteArray) -> Unit) {
+        ensureHydrated()
+        val (entries, generation) = synchronized(this) { index.toList() to cacheLifetime.capture() }
+        entries.forEach { (slot, entry) ->
+            val bytes = runCatching { readEncrypted(entry.file, slot) }.getOrNull() ?: return@forEach
+            if (cacheLifetime.isCurrent(generation)) visit(slot, bytes)
+        }
+    }
+
+    /** Removes a rejected logical entry only while its authenticated content is still the content read. */
+    fun discardIfMatches(
+        key: String,
+        expected: ByteArray,
+    ) = discardStoredEntryIfMatches(fileNameFor(key), expected)
+
+    /** Fences maintenance rejection against an entry replaced since its authenticated snapshot was read. */
+    fun discardStoredEntryIfMatches(
+        slot: String,
+        expected: ByteArray,
+    ) {
+        val entry = synchronized(this) { index[slot] } ?: return
+        val bytes = runCatching { readEncrypted(entry.file, slot) }.getOrNull() ?: return
+        synchronized(this) {
+            if (index[slot] === entry && bytes.contentEquals(expected)) removeStoredEntry(slot)
+        }
+    }
+
     /** Authenticates a cache entry into an owner-private temporary file. */
     @Suppress("CyclomaticComplexMethod", "ReturnCount", "ThrowsCount")
     fun materialize(
@@ -500,9 +528,11 @@ internal class DiskByteCache(
      * bytes once the engine reports it secure-deleted, so it isn't recoverable
      * from the L2 cache after expiry. No-op if absent.
      */
-    fun remove(key: String) {
+    fun remove(key: String) = removeStoredEntry(fileNameFor(key))
+
+    /** Removes an opaque slot returned by [forEachStoredEntry], preserving concurrent publication fencing. */
+    private fun removeStoredEntry(hashed: String) {
         ensureHydrated()
-        val hashed = fileNameFor(key)
         val stale =
             synchronized(this) {
                 val entry = index.remove(hashed)

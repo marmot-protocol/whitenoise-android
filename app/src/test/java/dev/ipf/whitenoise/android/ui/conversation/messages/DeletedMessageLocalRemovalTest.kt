@@ -162,13 +162,13 @@ class DeletedMessageLocalRemovalTest {
         val surface = renderLive()
         liveMessage().performTouchInput { longClick() }
         composeRule.onNodeWithText(string(R.string.forward), substring = false).performClick()
-        composeRule.onNodeWithText(string(R.string.forward_to), substring = false).assertIsDisplayed()
+        composeRule.onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG).assertIsDisplayed()
 
         surface.markDeleted()
 
         composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
             runCatching {
-                composeRule.onNodeWithText(string(R.string.forward_to), substring = false).assertDoesNotExist()
+                composeRule.onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG).assertDoesNotExist()
             }.isSuccess
         }
         placeholder().assertIsDisplayed()

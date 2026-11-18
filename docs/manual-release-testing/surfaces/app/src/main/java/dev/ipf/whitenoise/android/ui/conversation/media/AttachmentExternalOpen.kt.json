@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentExternalOpen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Explicit APK MIME still requires package archive validation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentExternalOpen.kt",
+        "anchor": "normalizedMime == ANDROID_PACKAGE_MIME ->",
+        "test_ids": [
+          "MED-018"
+        ]
+      },
+      {
+        "surface": "Active-content attachments open as inert text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentExternalOpen.kt",
+        "anchor": "isActiveContentMime(openMime) -> AttachmentOpenClassification.Ready(INERT_TEXT_MIME)",
+        "test_ids": [
+          "MED-049"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

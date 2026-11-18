@@ -1,0 +1,84 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoGridTile.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "R.string.media_tap_to_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoGridTile.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": [
+          "MED-025",
+          "MED-037"
+        ]
+      },
+      {
+        "surface": "string:reply_media_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoGridTile.kt",
+        "anchor": "R.string.reply_media_video",
+        "test_ids": [
+          "MED-025",
+          "MED-030"
+        ]
+      },
+      {
+        "surface": "MediaVideoGridTile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoGridTile.kt",
+        "anchor": "fun MediaVideoGridTile(",
+        "test_ids": [
+          "MED-001",
+          "MED-025",
+          "MED-030"
+        ]
+      },
+      {
+        "surface": "Video tap downloads in place without opening",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoGridTile.kt",
+        "anchor": "fun onTileTap(",
+        "test_ids": [
+          "MED-037"
+        ]
+      },
+      {
+        "surface": "Local video cache probe opening state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoGridTile.kt",
+        "anchor": "R.string.media_opening",
+        "test_ids": [
+          "MED-025",
+          "MED-037"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:video_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoGridTile.kt",
+        "anchor": "R.string.video_failed",
+        "test_ids": [
+          "AXY-015",
+          "MED-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Video tile unknown versus known-missing local file readiness",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoGridTile.kt",
+        "anchor": "val cacheProbeReady =",
+        "test_ids": [
+          "MED-025",
+          "MED-037"
+        ]
+      },
+      {
+        "surface": "R.string.video_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoGridTile.kt",
+        "anchor": "R.string.video_failed",
+        "test_ids": [
+          "AXY-015"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

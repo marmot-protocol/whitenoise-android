@@ -1,0 +1,65 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHeaderShortcuts.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "RowScope.ConversationHeaderShortcuts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHeaderShortcuts.kt",
+        "anchor": "fun RowScope.ConversationHeaderShortcuts(",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.header_shortcut_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHeaderShortcuts.kt",
+        "anchor": "R.string.header_shortcut_search",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.tts_auto_read_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHeaderShortcuts.kt",
+        "anchor": "R.string.tts_auto_read_title",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "HeaderActionButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHeaderShortcuts.kt",
+        "anchor": "private fun HeaderActionButton(",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_header_timer_change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHeaderShortcuts.kt",
+        "anchor": "R.string.conversation_header_timer_change",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.header_shortcut_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHeaderShortcuts.kt",
+        "anchor": "R.string.header_shortcut_members",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.add_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHeaderShortcuts.kt",
+        "anchor": "R.string.add_member",
+        "test_ids": [
+          "SET-058"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

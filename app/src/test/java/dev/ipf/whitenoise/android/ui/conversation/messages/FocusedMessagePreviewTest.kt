@@ -139,8 +139,8 @@ class FocusedMessagePreviewTest {
     /**
      * Focused stack centers on its source and clamps to the visible ime frame.
      *
-     * The frame is what the overlay may occupy, so an open keyboard shortens it and the stack
-     * settles against its bottom edge rather than sitting under the keyboard.
+     * The menu dismisses the keyboard and rests in the full-height system-bar-safe frame.
+     * An actually short window still clamps the stack without moving it out of view.
      */
     @Test fun focusedStackCentersOnItsSourceAndClampsToTheVisibleImeFrame() {
         assertEquals(80f, focusedStackRestingOffset(frameHeightPx = 780, stackHeightPx = 300, anchorCenterPx = 230), 0f)

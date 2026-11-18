@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWork.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Stopping automatic downloads cancels queued automatic work without an explicit download request",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWork.kt",
+        "anchor": "internal fun shouldCancelQueuedAutomaticWork(",
+        "test_ids": [
+          "MED-036"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

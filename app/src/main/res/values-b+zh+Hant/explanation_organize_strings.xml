@@ -70,6 +70,7 @@
     <string name="explanation_organize_hub_chat_folders">開啟你的聊天資料夾。資料夾會將你的聊天分類到各個分頁，可由你自己挑選聊天，也可依未讀或提及等規則。你可以在這裡新增、編輯、重新排序和刪除資料夾。</string>
     <string name="explanation_organize_hub_gestures">開啟滑動操作設定。你可以選擇在聊天清單中滑動聊天時會發生什麼。這些選擇適用於此裝置。</string>
     <string name="explanation_organize_hub_composer">開啟訊息框設定。你可以更改捷徑、它們的順序，以及撰寫訊息的輸入框周圍控制項的版面配置。</string>
+    <string name="explanation_organize_hub_chat_header">開啟聊天標題列快捷按鈕設定。你可以選擇最多兩個按鈕，例如搜尋或靜音，顯示在每個聊天的頂端。這些選擇適用於此裝置。</string>
     <string name="explanation_organize_hub_enter_behavior">讓你選擇撰寫訊息時 Enter 鍵的作用：傳送訊息或換行。在實體鍵盤上，Shift+Enter 一律是換行。目前的選擇顯示在右側。</string>
     <string name="explanation_organize_hub_custom_emoji">開啟你的自訂表情符號。這些是你可以新增並在訊息中使用的額外表情符號圖片，與標準表情符號組並存。</string>
     <string name="explanation_organize_hub_quick_switching">在你的頭像旁顯示其他帳號，讓你輕點一下即可切換。關閉後會隱藏它們。這只會改變切換的外觀，不會移除任何帳號。</string>

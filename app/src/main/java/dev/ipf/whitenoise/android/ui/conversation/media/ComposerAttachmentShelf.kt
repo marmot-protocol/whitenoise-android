@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeLocalPreviewAnimation
+import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.ui.common.AppDivider
@@ -134,6 +136,8 @@ internal fun ComposerAttachmentShelf(
     onRemoveDocument: (Int) -> Unit,
     enabled: Boolean = true,
     preparing: Boolean = false,
+    preparedDocuments: Map<Uri, DraftPreparedPhoto> = emptyMap(),
+    onOpenDocument: (Uri) -> Unit = {},
 ) {
     val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
     val metadata = rememberPreviewMetadata(items)
@@ -161,7 +165,16 @@ internal fun ComposerAttachmentShelf(
                     metadata = metadata[item.uri],
                     prepared = prepared,
                     enabled = enabled,
-                    onPreview = { onPreview(index) },
+                    document = preparedDocuments[item.uri],
+                    onPreview =
+                        when {
+                            item is StagedPreviewItem.Media -> ({ onPreview(index) })
+                            !preparing &&
+                                preparedDocuments[item.uri]?.attachment?.let {
+                                    attachmentReaderTarget(it.mediaType, it.fileName)
+                                } != null -> ({ onOpenDocument(item.uri) })
+                            else -> null
+                        },
                     onRemove = {
                         val media = item as? StagedPreviewItem.Media
                         if (media != null) onRemoveMedia(media.slot) else onRemoveDocument(index - mediaSlots.size)
@@ -184,8 +197,9 @@ private fun ComposerAttachmentShelfItem(
     metadata: LocalPreviewMetadata?,
     prepared: Map<String, PreparedPhotoPreview>,
     enabled: Boolean,
-    onPreview: () -> Unit,
+    onPreview: (() -> Unit)?,
     onRemove: () -> Unit,
+    document: DraftPreparedPhoto? = null,
 ) {
     val media = item as? StagedPreviewItem.Media
     val bitmap =
@@ -195,7 +209,9 @@ private fun ComposerAttachmentShelfItem(
         } else {
             null
         }
-    val label = metadata?.displayName ?: item.uri.lastPathSegment ?: stringResource(R.string.reply_media_document)
+    val label =
+        document?.attachment?.fileName ?: metadata?.displayName ?: item.uri.lastPathSegment
+            ?: stringResource(R.string.reply_media_document)
     ComposerAttachmentShelfCard(
         label = label,
         enabled = enabled,
@@ -210,7 +226,7 @@ private fun ComposerAttachmentShelfItem(
     )
 }
 
-/** Pure shelf presentation: only visual cards open the preview, and the 48dp removal target keeps its own action. */
+/** Pure shelf presentation: optional preview actions are independent of styling and the 48dp removal target. */
 @Composable
 @Suppress("LongParameterList")
 internal fun ComposerAttachmentShelfCard(
@@ -218,13 +234,14 @@ internal fun ComposerAttachmentShelfCard(
     kind: ComposerAttachmentCardKind,
     video: Boolean,
     bitmap: ImageBitmap?,
-    onPreview: () -> Unit,
+    onPreview: (() -> Unit)?,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
     animation: Drawable? = null,
     gif: Boolean = false,
     enabled: Boolean = true,
 ) {
+    val previewLabel = stringResource(R.string.composer_preview_attachment)
     val visual = kind == ComposerAttachmentCardKind.Visual
     val ratio =
         animation?.takeIf { it.intrinsicHeight > 0 }?.let { it.intrinsicWidth.toFloat() / it.intrinsicHeight }
@@ -235,8 +252,18 @@ internal fun ComposerAttachmentShelfCard(
             modifier
                 .width(cardWidth.dp)
                 .height(cardHeight.dp)
-                .then(if (visual) Modifier.clickable(enabled = enabled, onClick = onPreview) else Modifier)
-                .semantics { contentDescription = label },
+                .then(
+                    if (onPreview != null) {
+                        Modifier.clickable(
+                            enabled = enabled,
+                            role = Role.Button,
+                            onClickLabel = previewLabel,
+                            onClick = onPreview,
+                        )
+                    } else {
+                        Modifier
+                    },
+                ).semantics { contentDescription = label },
         shape = CARD_SHAPE,
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = amoledOutlineBorder(),

@@ -13,8 +13,8 @@ class AttachmentDownloadProductionWiringTest {
     @Test
     fun videoCacheEffectValidatesRetainedFilesOnIo() {
         val effect =
-            source("MediaVideo.kt")
-                .substringAfter("private fun rememberCachedVideoAttachmentFileState(")
+            source("MediaVideoCache.kt")
+                .substringAfter("internal fun rememberCachedVideoAttachmentFileState(")
                 .substringBefore("/** Keeps a resolver")
                 .normalized()
 
@@ -34,7 +34,7 @@ class AttachmentDownloadProductionWiringTest {
     /** Clearing an invalid retained file restarts the viewer resolver, while playback failure still requires Retry. */
     @Test
     fun viewerCacheInvalidationRestartsOnlyAdmittedMaterialization() {
-        val viewer = source("MediaVideo.kt").substringAfter("internal fun VideoViewerPage(").normalized()
+        val viewer = source("MediaVideoViewer.kt").substringAfter("internal fun VideoViewerPage(").normalized()
 
         assertTrue(
             "LaunchedEffect(contentKey, reference.sourceEpoch, isCurrent, reloadToken, localFile)" in viewer,
@@ -67,7 +67,7 @@ class AttachmentDownloadProductionWiringTest {
     @Test
     fun visibleMediaPromotesAnAutomaticTransferWhenTheUserTapsIt() {
         val image = source("MediaImageBubbles.kt").normalized()
-        val video = source("MediaVideo.kt").normalized()
+        val video = mediaVideoSources().normalized()
         val voice = source("MediaVoice.kt").normalized()
 
         // The image surfaces share one holder, so each wiring call appears once there and both composables call it.
@@ -107,7 +107,7 @@ class AttachmentDownloadProductionWiringTest {
     @Test
     fun visualMediaPolicyUsesAMonotonicIntentAndHandlesQueuedCancellation() {
         val image = source("MediaImageBubbles.kt").normalized()
-        val video = source("MediaVideo.kt").normalized()
+        val video = mediaVideoSources().normalized()
         val voice = source("MediaVoice.kt").normalized()
 
         assertEquals(1, occurrences(image, "rememberAttachmentMaterializationIntent("))
@@ -285,6 +285,11 @@ class AttachmentDownloadProductionWiringTest {
     ): Int = source.windowed(needle.length).count { it == needle }
 
     private fun source(fileName: String): String = projectSource("ui/conversation/media/$fileName")
+
+    /** The video surfaces span the bubble, grid tile, cache and viewer files. */
+    private fun mediaVideoSources(): String =
+        listOf("MediaVideo.kt", "MediaVideoGridTile.kt", "MediaVideoCache.kt", "MediaVideoViewer.kt")
+            .joinToString("\n") { source(it) }
 
     private fun projectSource(relativePath: String): String =
         listOf(

@@ -35,7 +35,9 @@ class PerformanceLogReleaseSafetyTest {
         val mediaFiles = source("ui/conversation/media/MediaFileAccess.kt")
         val mediaImages = source("ui/conversation/media/MediaImageBubbles.kt")
         val mediaVoice = source("ui/conversation/media/MediaVoice.kt")
-        val mediaVideo = source("ui/conversation/media/MediaVideo.kt")
+        val mediaVideo =
+            listOf("MediaVideo.kt", "MediaVideoGridTile.kt", "MediaVideoCache.kt", "MediaVideoViewer.kt")
+                .joinToString("\n") { source("ui/conversation/media/$it") }
 
         listOf(
             "detail=\${throwable.message}",

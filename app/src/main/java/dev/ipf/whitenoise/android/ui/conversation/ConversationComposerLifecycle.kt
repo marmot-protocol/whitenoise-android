@@ -22,10 +22,12 @@ internal fun ConversationComposerLifecycleEffect(
     composerFocused: Boolean,
     searchOpen: Boolean,
     hasActiveEditOrReplySession: Boolean,
+    suppressFocusRestore: () -> Boolean = { false },
     onPause: () -> Unit,
     onResume: (restoreComposerFocus: Boolean, clearFocus: Boolean) -> Unit,
     onObserverDisposed: () -> Unit = {},
 ) {
+    val currentSuppressFocusRestore by rememberUpdatedState(suppressFocusRestore)
     val currentComposerFocused by rememberUpdatedState(composerFocused)
     val currentSearchOpen by rememberUpdatedState(searchOpen)
     val currentHasActiveEditOrReplySession by rememberUpdatedState(hasActiveEditOrReplySession)
@@ -48,10 +50,11 @@ internal fun ConversationComposerLifecycleEffect(
                         }
                         Lifecycle.Event.ON_RESUME -> {
                             val restoreFocus =
-                                shouldRestoreComposerFocusOnResume(
-                                    wasComposerFocusedOnPause = wasComposerFocusedOnPause,
-                                    hasActiveEditOrReplySession = currentHasActiveEditOrReplySession,
-                                )
+                                !currentSuppressFocusRestore() &&
+                                    shouldRestoreComposerFocusOnResume(
+                                        wasComposerFocusedOnPause = wasComposerFocusedOnPause,
+                                        hasActiveEditOrReplySession = currentHasActiveEditOrReplySession,
+                                    )
                             currentOnResume(
                                 restoreFocus,
                                 shouldClearFocusOnResume(

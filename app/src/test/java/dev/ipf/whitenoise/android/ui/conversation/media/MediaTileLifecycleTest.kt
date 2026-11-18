@@ -151,7 +151,7 @@ class MediaTileLifecycleTest {
         assertEquals(0, fixture.calls.size)
     }
 
-    /** Pixels decoded before recreation are on the first committed frame of the new Activity, not reloaded later. */
+    /** Decoded memory pixels survive recreation before another rendered frame or native lookup. */
     @Test
     fun decodedPixelsAreOnTheFirstFrameAfterRecreation() {
         show()
@@ -162,6 +162,8 @@ class MediaTileLifecycleTest {
         show()
 
         composeRule.onNodeWithContentDescription(reference(0).fileName).assertIsDisplayed()
+        composeRule.mainClock.autoAdvance = true
+        awaitTilesShown()
         assertEquals(0, fixture.calls.size)
     }
 

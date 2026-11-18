@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -44,6 +45,7 @@ internal fun appStateWithDirectChats(
     profileRefresh: suspend (String) -> Unit = {},
     accounts: List<AccountSummaryFfi> = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX)),
     activeAccountRef: String = ACCOUNT_REF,
+    chatListSubscriptions: ChatListLiveSubscriptions? = null,
 ): WhiteNoiseAppState {
     val appState =
         emptyAppState(
@@ -52,6 +54,7 @@ internal fun appStateWithDirectChats(
             accounts = accounts,
             activeAccountRef = activeAccountRef,
         )
+    appState.liveSubscriptionOverrides.chatList = chatListSubscriptions
     val activeAccountHex = accounts.first { it.label == activeAccountRef }.accountIdHex
     val controller = ChatsController(appState, activeAccountRef) { _, _ -> emptyList() }
     chats.forEach { (groupId, _) -> controller.applyChatListRow(chatRow(groupId)) }
@@ -93,6 +96,7 @@ internal fun emptyAppState(
     profileDisplayName: suspend (String) -> String? = { profiles[it]?.displayName },
     accounts: List<AccountSummaryFfi> = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX)),
     activeAccountRef: String = ACCOUNT_REF,
+    chatListSubscriptions: ChatListLiveSubscriptions? = null,
     accountIdHex: suspend (String) -> String? = { null },
 ): WhiteNoiseAppState =
     WhiteNoiseAppState(
@@ -104,7 +108,7 @@ internal fun emptyAppState(
         profileReader = { profiles[it] },
         profileDisplayNameReader = profileDisplayName,
         profileRefreshRequest = profileRefresh,
-    )
+    ).also { it.liveSubscriptionOverrides.chatList = chatListSubscriptions }
 
 internal fun profile(
     displayName: String,

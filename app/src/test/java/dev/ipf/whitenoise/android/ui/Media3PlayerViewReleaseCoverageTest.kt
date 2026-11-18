@@ -10,7 +10,7 @@ class Media3PlayerViewReleaseCoverageTest {
     /** Every video view detaches its player, and disposal clears the published handle before release. */
     @Test
     fun everyVideoPlayerViewDetachesItsPlayerOnRelease() {
-        val source = mediaVideoSource().readText()
+        val source = mediaVideoSource()
         val functionName = "VideoViewerPage"
         val body = source.functionBody(functionName)
 
@@ -85,8 +85,10 @@ class Media3PlayerViewReleaseCoverageTest {
         assertTrue(!source.contains("ExoPlayer"))
     }
 
-    /** Loads the video presentation source inspected by the release/ownership regression. */
-    private fun mediaVideoSource(): File = mediaSource("MediaVideo.kt")
+    /** Loads every split video presentation source inspected by the release/ownership regression. */
+    private fun mediaVideoSource(): String =
+        listOf("MediaVideo.kt", "MediaVideoGridTile.kt", "MediaVideoCache.kt", "MediaVideoViewer.kt")
+            .joinToString("\n") { mediaSource(it).readText() }
 
     /** Loads the selected media source fixture for source-level ownership assertions. */
     private fun mediaSource(name: String): File = sourceFile("ui/conversation/media/$name")

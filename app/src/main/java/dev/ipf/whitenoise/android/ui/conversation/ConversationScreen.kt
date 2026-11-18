@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -64,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -126,11 +129,13 @@ import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
 import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
+import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.StagedAttachmentSendClaim
 import dev.ipf.whitenoise.android.state.StagedAttachmentSender
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
@@ -141,6 +146,7 @@ import dev.ipf.whitenoise.android.state.createPoll
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.dmPeerAccount
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
+import dev.ipf.whitenoise.android.state.headerShortcutPreferences
 import dev.ipf.whitenoise.android.state.hiddenMessageIdsInGroup
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.isLoadingPage
@@ -158,6 +164,7 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
+import dev.ipf.whitenoise.android.state.resolveConversationAutoRead
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.sendSticker
@@ -178,6 +185,7 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import dev.ipf.whitenoise.android.ui.chats.isBrowsingAttachments
 import dev.ipf.whitenoise.android.ui.chats.messageSearchConstraintsFor
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
@@ -237,6 +245,8 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagesOverlaySt
 import dev.ipf.whitenoise.android.ui.conversation.messages.LocalConversationSearchMarking
 import dev.ipf.whitenoise.android.ui.conversation.messages.LocalKeptMessages
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageMenuKeyboardOwner
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageMenuKeyboardPolicy
 import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardRequestHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.dismissTextSelectionOnOutsideTap
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageDetailsRecipients
@@ -260,8 +270,14 @@ import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsShari
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerSheet
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.group.DisappearingTimerEditor
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
+import dev.ipf.whitenoise.android.ui.group.MuteDurationHost
+import dev.ipf.whitenoise.android.ui.group.applyDisappearingTimer
+import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
+import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
+import dev.ipf.whitenoise.android.ui.group.rememberConversationMuteControl
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
@@ -537,7 +553,7 @@ private fun rememberConversationBatchSelectionUiState(
 }
 
 /** Renders one account-owned conversation and coordinates its route-stable presentation. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun ConversationScreen(
     appState: WhiteNoiseAppState,
@@ -685,6 +701,7 @@ internal fun ConversationScreen(
     // Empty newly-created groups should route users into the existing member
     // invite flow instead of carrying a duplicate picker in the create sheet.
     var openAddMemberOnDetails by remember(chat.id) { mutableStateOf(false) }
+    var openMembersOnDetails by remember(chat.id) { mutableStateOf(false) }
     // Re-open after back-to-list should land where the reader left off only
     // when fully read. Unread, search-hit, just-created, and notification opens
     // let their dedicated unread/newest/focus anchor own the position.
@@ -1725,7 +1742,94 @@ internal fun ConversationScreen(
     val suppressNextImeOpenReanchor = remember(chat.id) { AtomicBoolean(false) }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    // Scoped to the actual controller: neither account/runtime replacement nor route exit
+    // can reuse a menu's pending keyboard restoration.
+    val menuIme = remember(controller) { MessageMenuKeyboardPolicy() }
+    var menuBackdropImeBottom by remember(controller) { mutableStateOf<Int?>(null) }
+    var menuBackdropImeReturning by remember(controller) { mutableStateOf(false) }
+    val displayedMenuImeBottom =
+        animatedMenuImeBackdrop(
+            frozenBottom = menuBackdropImeBottom,
+            returning = menuBackdropImeReturning,
+            liveBottom = { imeInsets.getBottom(density) },
+            onReleased = {
+                menuBackdropImeBottom = null
+                menuBackdropImeReturning = false
+            },
+        )
+    var menuComposerWasEditing by remember(controller) { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
+        if (openActionMenuId != null || menuIme.pendingRestore || menuBackdropImeBottom != null) {
+            menuIme.pause()
+            openActionMenuId = null
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+            menuBackdropImeBottom = null
+            menuBackdropImeReturning = false
+        }
+    }
+    val suppressMenuImeRestore = selectionMode || dragAnchorTimelineId != null
+    LaunchedEffect(openActionMenuId, routeTransitionInProgress, transcriptRoutedAway, suppressMenuImeRestore) {
+        if (routeTransitionInProgress || transcriptRoutedAway) {
+            menuIme.cancel()
+            menuBackdropImeBottom = null
+            menuBackdropImeReturning = false
+        } else if (openActionMenuId == null) {
+            val restoreOwner =
+                menuIme.close(
+                    replyTarget = controller.replyingTo?.messageIdHex,
+                    editTarget = controller.editingMessageId,
+                    selectionMode = suppressMenuImeRestore,
+                )
+            if (suppressMenuImeRestore) {
+                keyboardController?.hide()
+                menuBackdropImeBottom = null
+                menuBackdropImeReturning = false
+            } else if (restoreOwner != null) {
+                val focusTarget =
+                    when (restoreOwner) {
+                        MessageMenuKeyboardOwner.Search ->
+                            navigationState.searchFocusRequester.takeIf { navigationState.searchOpen }
+                        MessageMenuKeyboardOwner.Composer -> composerFocus.takeUnless { navigationState.searchOpen }
+                    }
+                if (
+                    focusTarget != null &&
+                    runCatching { focusTarget.requestFocus(FocusDirection.Enter) }.getOrDefault(false)
+                ) {
+                    keyboardController?.show()
+                } else {
+                    menuBackdropImeReturning = true
+                }
+                // Failed focus starts the continuous return immediately.
+            }
+        }
+    }
+    val menuImeTargetInsets = WindowInsets.imeAnimationTarget
+    LaunchedEffect(openActionMenuId, menuBackdropImeBottom != null) {
+        if (openActionMenuId == null && menuBackdropImeBottom != null && !menuBackdropImeReturning) {
+            // The return may use a shorter keyboard. Hand geometry back at its actual
+            // settled target, rather than waiting for the previous keyboard height.
+            awaitMenuImeRestore(
+                readInset = { imeInsets.getBottom(density) },
+                readTargetInset = { menuImeTargetInsets.getBottom(density) },
+                awaitFrame = { withFrameNanos { } },
+            )
+            // Settlement and timeout both enter a continuous handoff. Neither may
+            // swap a partial snapshot straight to a different live keyboard height.
+            menuBackdropImeReturning = true
+        }
+    }
     val scope = rememberCoroutineScope()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (menuIme.resumeRestoreCancelled) {
+            scope.launch {
+                // Let every resume observer consume the cancellation before a later
+                // user focus can establish the next ordinary foreground session.
+                withFrameNanos { }
+                menuIme.resumeConsumed()
+            }
+        }
+    }
     val exitConversationRoute =
         rememberConversationExitHandler(
             identity = chat.id,
@@ -3338,10 +3442,9 @@ internal fun ConversationScreen(
             timelineViewport = timelineViewport,
             bottomChromeHeightObserver = bottomChromeHeightObserver,
             composerFocused = composerFocused,
+            suppressComposerFocusRestore = { menuIme.resumeRestoreCancelled },
             searchOpen = navigationState.searchOpen,
-            hasActiveEditOrReplySession =
-                controller.editingMessageId != null ||
-                    controller.replyingTo != null,
+            hasActiveEditOrReplySession = controller.editingMessageId != null || controller.replyingTo != null,
             composerFocus = composerFocus,
             initialTimelineAnchored = initialTimelineAnchored,
             currentScrollAnchor = { currentScrollAnchor() },
@@ -3755,8 +3858,34 @@ internal fun ConversationScreen(
 
     val pollVotesHost = remember(controller) { PollVotesHostState() }
     var mediaPreviewIndex by rememberSaveable(controller.boundAccountRef, chat.id) { mutableStateOf<Int?>(null) }
+    var stagedDocument by remember(controller, conversationAccountRef, chat.id, appState.runtimeGeneration) {
+        mutableStateOf<dev.ipf.whitenoise.android.ui.conversation.media.ComposerDocumentSelection?>(null)
+    }
     // Keyboard Send and dictation Send share this one claim, so only the first send captures the staged shelf.
     val attachmentSendClaim = remember(controller, chat.id) { StagedAttachmentSendClaim() }
+
+    stagedDocument?.let { selected ->
+        val account = conversationAccountRef
+        val runtime = appState.runtimeGeneration
+        dev.ipf.whitenoise.android.ui.conversation.media.ComposerDocumentReader(
+            selection = selected,
+            appState = appState,
+            account = account.toString(),
+            sourceIsCurrent = {
+                stagedDocument === selected &&
+                    account != null &&
+                    appState.activeAccountRef == account &&
+                    controller.boundAccountRef == account &&
+                    appState.runtimeGeneration == runtime &&
+                    selected.isCurrent(
+                        pendingDocumentUris,
+                        mediaDraftState.preparedDocuments,
+                        attachmentSendClaim.isHeld,
+                    )
+            },
+            onDismiss = { if (stagedDocument === selected) stagedDocument = null },
+        )
+    }
 
     /** Clears the media preview selection once no staged attachments remain. */
     @Composable
@@ -3798,6 +3927,8 @@ internal fun ConversationScreen(
                 withinLimit && !captionTooLong
             },
         ) { onAccepted, onRejected ->
+            // Clear synchronously: a refused send may release its claim before a snapshot observer runs.
+            stagedDocument = null
             val sendingMedia = pendingMediaSlots
             val sendingDocuments = pendingDocumentUris
             val canSettle = mediaDraftState.captureSendSettlement()
@@ -3870,6 +4001,76 @@ internal fun ConversationScreen(
         ).second
     // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
     val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
+    // The header opens chat details from its title and from the member shortcuts. The keyboard starts
+    // closing as the header unfolds into the details cards, not after the composer leaves.
+    val openDetailsFromHeader: () -> Unit = {
+        routeMorph.anchor = ConversationMorphAnchor.Details
+        keyboardController?.hide()
+        showDetails = true
+    }
+    // Chat details and the optional header shortcut open the same in-chat search.
+    val openConversationSearch: () -> Unit = {
+        showDetails = false
+        presentationState.searchState.value =
+            conversationSearchPreset(
+                conversationAccountRef,
+                appState.runtimeGeneration,
+                chat.id,
+                controller.title(groupTitleCopy),
+            )
+        navigationState.searchOpen = true
+    }
+    val headerShortcuts = appState.headerShortcutPreferences.shortcuts
+    // Mute and Read aloud write through the active account, so like chat details they stay hidden while a
+    // notification-routed open is still waiting for its account switch.
+    val headerSettingsOwner = controller.isCurrentGroupMutationOwner(appState, appState.runtimeGeneration)
+    // Read aloud mirrors the chat details auto-read choice and stays hidden without a usable speech engine.
+    val headerReadAloudOn =
+        if (headerSettingsOwner && HeaderShortcut.ReadAloud in headerShortcuts && appState.ttsHasUsableEngine) {
+            val autoRead by appState.ttsAutoReadPreferences.state.collectAsState()
+            controller.boundAccountRef?.let {
+                resolveConversationAutoRead(
+                    autoRead.globalDefaultEnabled,
+                    appState.ttsAutoReadPreferences.overrideFor(it, controller.group.groupIdHex),
+                )
+            }
+        } else {
+            null
+        }
+
+    // The account can switch between composition and the tap, so the write rechecks the owner.
+    fun toggleHeaderReadAloud(on: Boolean?) {
+        if (!controller.isCurrentGroupMutationOwner(appState, appState.runtimeGeneration)) return
+        appState.setConversationAutoReadOverride(
+            controller.group.groupIdHex,
+            if (on == true) TtsAutoReadOverride.OFF else TtsAutoReadOverride.ON,
+        )
+    }
+    // The mute state read runs only when the person put Mute/unmute in the header.
+    val headerMuteControl =
+        if (headerSettingsOwner && HeaderShortcut.MuteUnmute in headerShortcuts) {
+            rememberConversationMuteControl(appState, controller)
+        } else {
+            null
+        }
+    headerMuteControl?.let { MuteDurationHost(it) }
+    var showHeaderTimerPicker by remember(controller) { mutableStateOf(false) }
+    val headerTimerRuntime = remember(controller) { appState.runtimeGeneration }
+    val headerTimerEditable =
+        disappearingTimerEditable(
+            canEdit = controller.canEditGroupSettings,
+            mutationsBlocked =
+                controller.mutationInFlight || !controller.isCurrentGroupMutationOwner(appState, headerTimerRuntime),
+        )
+    DisappearingTimerEditor(
+        open = showHeaderTimerPicker && headerTimerEditable,
+        currentSecs = controller.group.disappearingMessageSecs.toLong(),
+        editable = headerTimerEditable,
+        identity = { GroupActingAccountIdentity(appState, controller.boundAccountRef) },
+        resetKeys = arrayOf(controller, appState.activeAccountRef, appState.runtimeGeneration),
+        onDismiss = { showHeaderTimerPicker = false },
+        onApply = { secs -> controller.applyDisappearingTimer(appState, headerTimerRuntime, secs) },
+    )
     if (transcriptRoutedAway) {
         if (showDetails) {
             /** Shows group details in place of the transcript while they are open. */
@@ -3881,6 +4082,7 @@ internal fun ConversationScreen(
                     onBack = {
                         showDetails = false
                         openAddMemberOnDetails = false
+                        openMembersOnDetails = false
                     },
                     onLeft = exitConversation,
                     onJumpToMessage = { messageId ->
@@ -3889,17 +4091,9 @@ internal fun ConversationScreen(
                     },
                     autoOpenAddMember = openAddMemberOnDetails,
                     onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
-                    onOpenSearch = {
-                        showDetails = false
-                        presentationState.searchState.value =
-                            conversationSearchPreset(
-                                conversationAccountRef,
-                                appState.runtimeGeneration,
-                                chat.id,
-                                controller.title(groupTitleCopy),
-                            )
-                        navigationState.searchOpen = true
-                    },
+                    autoOpenMembers = openMembersOnDetails,
+                    onAutoOpenMembersConsumed = { openMembersOnDetails = false },
+                    onOpenSearch = openConversationSearch,
                     onStartGroupWithPeer = onStartGroupWithPeer,
                 )
             }
@@ -4160,7 +4354,15 @@ internal fun ConversationScreen(
                     .fillMaxSize()
                     .then(transcriptRouteMotion)
                     .blur(if (openActionMenuId != null) 24.dp else 0.dp)
-                    .dismissTextSelectionOnOutsideTap(
+                    .then(
+                        if (displayedMenuImeBottom != null) {
+                            Modifier
+                                .padding(bottom = with(density) { displayedMenuImeBottom.toDp() })
+                                .consumeWindowInsets(WindowInsets.ime)
+                        } else {
+                            Modifier
+                        },
+                    ).dismissTextSelectionOnOutsideTap(
                         active = textSelectionMessageId != null,
                         selectedBoundsInWindow = textSelectionBubbleBounds,
                         onDismiss = ::clearTextSelection,
@@ -4254,15 +4456,39 @@ internal fun ConversationScreen(
                                 firstFrameAvatar = chat.firstFrameAvatar,
                                 freezeRoutePresentation = freezeRoutePresentation,
                                 openDetailsDescription = openDetailsDescription,
-                                onOpenDetails = {
-                                    // The keyboard starts closing as the header unfolds into the
-                                    // details cards, not after the composer leaves.
-                                    routeMorph.anchor = ConversationMorphAnchor.Details
-                                    keyboardController?.hide()
-                                    showDetails = true
-                                },
+                                onOpenDetails = openDetailsFromHeader,
                                 onBack = exitConversation,
                                 compactHeight = compactHeightConversation,
+                                actions = {
+                                    ConversationHeaderShortcuts(
+                                        shortcuts = headerShortcuts,
+                                        capacity = it,
+                                        muteControl = headerMuteControl,
+                                        onSearch = openConversationSearch,
+                                        readAloudOn = headerReadAloudOn,
+                                        onToggleReadAloud = { toggleHeaderReadAloud(headerReadAloudOn) },
+                                        onTimer = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
+                                        onMembers =
+                                            if (controller.isDm) {
+                                                null
+                                            } else {
+                                                {
+                                                    openMembersOnDetails = true
+                                                    openDetailsFromHeader()
+                                                }
+                                            },
+                                        onAddMembers =
+                                            if (controller.isDm || !controller.canEditGroupSettings) {
+                                                null
+                                            } else {
+                                                {
+                                                    openAddMemberOnDetails = true
+                                                    openDetailsFromHeader()
+                                                }
+                                            },
+                                    )
+                                },
+                                onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
                             )
                         }
                     },
@@ -4428,6 +4654,16 @@ internal fun ConversationScreen(
                                                 enabled = !attachmentSendClaim.isHeld,
                                                 prepared = mediaDraftState.preparedPreviews(),
                                                 preparing = mediaDraftState.isPreparing,
+                                                preparedDocuments = mediaDraftState.preparedDocuments,
+                                                onOpenDocument = { uri ->
+                                                    if (!attachmentSendClaim.isHeld && !mediaDraftState.isPreparing) {
+                                                        mediaDraftState.preparedDocuments[uri]?.let { prepared ->
+                                                            stagedDocument =
+                                                                dev.ipf.whitenoise.android.ui.conversation.media
+                                                                    .ComposerDocumentSelection(uri, prepared)
+                                                        }
+                                                    }
+                                                },
                                                 onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
                                                 onRemoveMedia = { slot ->
                                                     if (!attachmentSendClaim.isHeld) {
@@ -4444,6 +4680,9 @@ internal fun ConversationScreen(
                                                                 index,
                                                                 mediaDraftState::releasePreparedDocument,
                                                             )
+                                                        if (stagedDocument?.uri !in pendingDocumentUris) {
+                                                            stagedDocument = null
+                                                        }
                                                     }
                                                 },
                                             )
@@ -4550,6 +4789,7 @@ internal fun ConversationScreen(
                             ) &&
                                 !freezeRoutePresentation,
                         autoFocusConsumedState = composerAutoFocusConsumed,
+                        preserveComposerEditingLayout = menuBackdropImeBottom != null && menuComposerWasEditing,
                         composerFocus = composerFocus,
                         onComposerFocusChanged = { focused ->
                             if (focused) composerDismissInProgress = false
@@ -4957,10 +5197,46 @@ internal fun ConversationScreen(
                                                 onActionMenuOpenChange = { open ->
                                                     if (open) clearTextSelection()
                                                     if (open) {
+                                                        if (openActionMenuId == null &&
+                                                            menuIme.open(
+                                                                imeIsOpen,
+                                                                controller.replyingTo?.messageIdHex,
+                                                                controller.editingMessageId,
+                                                                focusOwner =
+                                                                    if (navigationState.searchOpen) {
+                                                                        MessageMenuKeyboardOwner.Search
+                                                                    } else {
+                                                                        MessageMenuKeyboardOwner.Composer
+                                                                    },
+                                                                // A previous show request can outlive its zero inset.
+                                                                restoreInFlight = menuBackdropImeBottom != null,
+                                                            )
+                                                        ) {
+                                                            menuComposerWasEditing =
+                                                                composerFocused &&
+                                                                !composerDismissInProgress
+                                                            // Freeze the visible handoff geometry.
+                                                            menuBackdropImeBottom =
+                                                                captureMenuImeBackdrop(
+                                                                    displayedMenuImeBottom,
+                                                                    imeInsets.getBottom(density),
+                                                                )
+                                                            menuBackdropImeReturning = false
+                                                            focusManager.clearFocus(force = true)
+                                                            keyboardController?.hide()
+                                                        }
                                                         openActionMenuId = item.presentationId
                                                     } else if (openActionMenuId == item.presentationId) {
                                                         openActionMenuId = null
                                                     }
+                                                },
+                                                onForwardMenuHandoff = {
+                                                    menuIme.cancel()
+                                                    menuBackdropImeBottom = null
+                                                    menuBackdropImeReturning = false
+                                                    menuComposerWasEditing = false
+                                                    focusManager.clearFocus(force = true)
+                                                    keyboardController?.hide()
                                                 },
                                                 onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                                 onReplyPreviewClick = { navigateToReplyTarget(it) },
