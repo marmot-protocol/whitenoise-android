@@ -139,6 +139,7 @@ internal class EmojiSetsController(
     private var closed = false
     private var search: String? = null
     private var reads = 0
+    private var appliedRead = 0
 
     /** The opening sync's notice, held while a preview or an operation covers the list. */
     private var heldSyncNotice: EmojiSetNotice? = null
@@ -266,11 +267,14 @@ internal class EmojiSetsController(
         }
     }
 
-    /** Rereads the list for the current search. The latest read to start wins, so an older one cannot land last. */
+    /** Rereads the list for the current search. Results apply in start order, so an older read cannot land last. */
     private suspend fun refresh() {
         val read = ++reads
         val sets = backend.sets(search)
-        if (read == reads) state = state.copy(sets = sets)
+        if (read > appliedRead) {
+            appliedRead = read
+            state = state.copy(sets = sets)
+        }
     }
 
     /** Runs one install, polling MDK's progress until it finishes, and cancels it if this coroutine is cancelled. */

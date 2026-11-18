@@ -362,6 +362,37 @@ class EmojiSetsControllerTest {
                     .installed,
             )
         }
+
+    /** A newer read that fails cannot discard the list an earlier removal reread. */
+    @Test
+    fun failedSyncReadKeepsARemovalsList() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            backend.set = backend.set.copy(installed = InstalledEmojiSetStateFfi("old", 0u, 0u, 1u, 100u, false))
+            val relays = CompletableDeferred<Boolean>()
+            backend.onDiscover = { relays.await() }
+            val controller = EmojiSetsController(backend) {}
+            val sync = launch { controller.discoverInBackground() }
+            runCurrent()
+
+            controller.show(backend.set)
+            val removalRead = CompletableDeferred<Unit>()
+            backend.beforeSets = { removalRead.await() }
+            val removal = launch { controller.remove() }
+            runCurrent()
+
+            backend.beforeSets = { error("read failure") }
+            relays.complete(true)
+            sync.join()
+            removalRead.complete(Unit)
+            removal.join()
+
+            assertNull(
+                controller.state.sets
+                    .single()
+                    .installed,
+            )
+        }
 }
 
 private class FakeEmojiSetsBackend : EmojiSetsBackend {
