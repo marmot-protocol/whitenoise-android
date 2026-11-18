@@ -334,14 +334,6 @@
         ]
       },
       {
-        "surface": "Pending sends join batch selection",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "pendingSend = item.isPendingSend,",
-        "test_ids": [
-          "MSG-010"
-        ]
-      },
-      {
         "surface": "Over-limit attachment caption refused before the shelf is sent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.toast_message_too_long",
@@ -360,7 +352,7 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "surface": "Reopened message menu suppresses an unfinished keyboard return",
-        "anchor": "restoreInFlight = menuBackdropImeBottom != null",
+        "anchor": "restoreInFlight = menuIme.backdropBottom != null",
         "test_ids": [
           "MSG-004"
         ]

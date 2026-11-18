@@ -7,7 +7,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
-import dev.ipf.whitenoise.android.state.isLoadingOlder
 
 /** The one resting interval between the final timeline row and the composer. */
 internal val CONVERSATION_TIMELINE_TAIL_GAP = 8.dp
@@ -43,27 +42,6 @@ internal fun ConversationController.conversationGroupRecoveryRowVisible(): Boole
         groupRecoveryReadFailed,
         groupConvergenceParked,
         commitRefused = groupCommitRefusal.refusedRelays.isNotEmpty(),
-    )
-
-/** Counts optional rows rendered between the permanent top spacer and the timeline. */
-internal fun conversationTimelineLeadingStructuralRowCount(
-    hasOlderHeader: Boolean,
-    hasInlineTopError: Boolean,
-    hasGroupRecovery: Boolean = false,
-): Int =
-    (if (hasGroupRecovery) 1 else 0) +
-        (if (hasOlderHeader) 1 else 0) +
-        (if (hasInlineTopError) 1 else 0)
-
-/** Counts the controller's current structural rows before its message timeline. */
-internal fun ConversationController.conversationLeadingStructuralRowCount(renderedTimelineSize: Int): Int =
-    conversationTimelineLeadingStructuralRowCount(
-        hasOlderHeader = hasMoreBefore || isLoadingOlder,
-        hasInlineTopError =
-            renderedTimelineSize > 0 &&
-                error != null &&
-                errorEdge == ConversationLoadFailureEdge.TOP,
-        hasGroupRecovery = conversationGroupRecoveryRowVisible(),
     )
 
 /**

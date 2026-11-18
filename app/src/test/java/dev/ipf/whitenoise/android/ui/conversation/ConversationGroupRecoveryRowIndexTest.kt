@@ -4,60 +4,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Regression coverage for the group-recovery card's list row (#2621).
+ * Index-mapping invariants for the reversed conversation list.
  *
- * The transcript emits that card as a lazy row above the timeline whenever the
- * conversation carries visible recovery state, but the structural-row count
- * used to omit it. Every timeline-index to list-index mapping was therefore one
- * row short while the card was on screen, which anchored scroll restores,
- * read receipts and the tail follower to the wrong message.
+ * Structural rows such as the group-recovery card (#2621) are emitted above the
+ * timeline, at the high-index end of the reversed list, so the newest row and
+ * every tail-relative timeline mapping must stay put whatever sits above them.
  */
 class ConversationGroupRecoveryRowIndexTest {
-    /** Counts the recovery row alongside the older header and the inline top error. */
-    @Test
-    fun structuralRowCountIncludesTheGroupRecoveryRow() {
-        assertEquals(
-            0,
-            conversationTimelineLeadingStructuralRowCount(
-                hasOlderHeader = false,
-                hasInlineTopError = false,
-                hasGroupRecovery = false,
-            ),
-        )
-        assertEquals(
-            1,
-            conversationTimelineLeadingStructuralRowCount(
-                hasOlderHeader = false,
-                hasInlineTopError = false,
-                hasGroupRecovery = true,
-            ),
-        )
-        assertEquals(
-            3,
-            conversationTimelineLeadingStructuralRowCount(
-                hasOlderHeader = true,
-                hasInlineTopError = true,
-                hasGroupRecovery = true,
-            ),
-        )
-    }
-
-    /** Keeps the historical count unchanged for callers that render no recovery row. */
-    @Test
-    fun structuralRowCountDefaultsToTheRecoveryFreeLayout() {
-        assertEquals(
-            conversationTimelineLeadingStructuralRowCount(
-                hasOlderHeader = true,
-                hasInlineTopError = true,
-            ),
-            conversationTimelineLeadingStructuralRowCount(
-                hasOlderHeader = true,
-                hasInlineTopError = true,
-                hasGroupRecovery = false,
-            ),
-        )
-    }
-
     /**
      * Leaves the newest row at the reversed list's origin whatever sits above it.
      *

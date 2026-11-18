@@ -94,7 +94,8 @@ baseline review remain unchanged. Drafts have the same precheck cost but retain
 the distinct draft aggregate context and require readiness before queue admission.
 
 Only master writes Gradle home cache entries. The writers are unit shard 0 per
-flavor, each build-contracts phase, each static-analysis flavor, the Compose
+flavor, the tooling and baseline build-contracts phases (the shipping phases
+never run on `master`), each static-analysis flavor, the Compose
 compiler report, the secondary variant, the Zapstore attachment fixture,
 connected shard 0 and the Maestro runtime build. `compile-tests`, the other unit
 shards, coverage, CodeQL, dependency submission, release verification, staging
@@ -106,7 +107,12 @@ generations within the repository's 10 GB cache, so PR runs still find them.
 Every merge group, master push, nightly and manual run uses the full core matrix:
 both complete unit/golden suites and comparison evidence, current coverage gates,
 both lint variants, compile/style/security/ZSP contracts and baseline
-packaging. Compose compiler reports run only on `master` pushes, nightly and manual
+packaging. Merge groups and full-matrix pull requests also build both shipping
+R8 variants, one `build-contracts` phase each, and fail on their post-R8 DEX
+method budgets ([DEX method-size budgets](performance.md#dex-method-size-budgets)).
+That is how the required check stops an over-budget method from merging;
+`master` pushes, nightly and manual runs leave the measurement to release
+runtime. Compose compiler reports run only on `master` pushes, nightly and manual
 dispatch. Merge groups do not use the PR documentation shortcut and never reuse a
 result. A master push of the commit its merge group already validated reuses that
 result (see [Same-content reuse](#same-content-reuse)). Every other master push stays
@@ -231,6 +237,9 @@ Release runtime verification and reproduction (with release lint) run on
 only when their path filters match release, signing, build or dependency inputs.
 CodeQL runs on `master` pushes, weekly and on dispatch. None of these is a
 required check. A `master` failure in any of them is fixed through an owned PR.
+The release-runtime DEX method budgets are also enforced by the required core
+check in every merge group (see above), so they block merges even though
+release runtime does not.
 
 ## Supplemental campaigns and draft PRs
 

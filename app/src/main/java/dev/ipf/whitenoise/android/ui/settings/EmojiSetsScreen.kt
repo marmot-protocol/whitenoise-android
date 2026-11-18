@@ -14,6 +14,8 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +53,9 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** The browser's Refresh action, which repeats discovery for the current query. */
+internal const val EMOJI_SETS_REFRESH_TEST_TAG = "emoji_sets.refresh"
 
 private val EmojiSetSpacing = 8.dp
 private val EmojiSetEntrySpacing = 4.dp
@@ -90,7 +96,17 @@ internal fun EmojiSetsScreen(
             }
         }
         LaunchedEffect(controller) {
-            if (initialAddress == null) controller.load() else controller.open(initialAddress)
+            if (initialAddress == null) {
+                // Show the local projection at once, then sync once per account and runtime like the sticker
+                // browser, keeping the rows usable meanwhile (#3882). Refresh forces another sync.
+                controller.load()
+                val library = appState.emojiSetLibrary
+                if (!library.hasDiscovered(account, generation) && controller.discoverInBackground()) {
+                    library.markDiscovered(account, generation)
+                }
+            } else {
+                controller.open(initialAddress)
+            }
         }
         DisposableEffect(controller) { onDispose(controller::close) }
         BackHandler(onBack = back)
@@ -135,7 +151,23 @@ internal fun EmojiSetsContent(
         } else {
             { EmojiSetsAccountTitle(title, profileName) }
         }
-    SettingsScaffold(title = title, onBack = onBack, titleContent = accountTitle) {
+    SettingsScaffold(
+        title = title,
+        onBack = onBack,
+        titleContent = accountTitle,
+        topBarActions = {
+            if (state.preview == null) {
+                // Repeats the current search; also the retry path for failed or partial discovery.
+                IconButton(
+                    onClick = { onSearch(query.text.toString().trim()) },
+                    enabled = !state.busy && !state.discovering,
+                    modifier = Modifier.testTag(EMOJI_SETS_REFRESH_TEST_TAG),
+                ) {
+                    Icon(painterResource(R.drawable.ic_refresh), contentDescription = stringResource(R.string.refresh))
+                }
+            }
+        },
+    ) {
         val set = state.preview
         if (set == null) {
             EmojiSetBrowser(state, query, onSearch, onShow)
@@ -165,61 +197,82 @@ private fun EmojiSetBrowser(
     onSearch: (String) -> Unit,
     onShow: (EmojiSetFfi) -> Unit,
 ) {
+    val loading = state.busy || state.discovering
     SettingsList {
-        item {
-            Column(
-                modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                verticalArrangement = Arrangement.spacedBy(EmojiSetSpacing),
-            ) {
-                WhiteNoiseTextField(
-                    state = field,
-                    modifier = Modifier.fillMaxWidth().testTag("emoji_sets.query"),
-                    label = { Text(stringResource(R.string.emoji_sets_query)) },
-                    lineLimits = TextFieldLineLimits.SingleLine,
-                )
-                val findLabel = stringResource(R.string.emoji_sets_find)
-                Button(
-                    onClick = { onSearch(field.text.toString().trim()) },
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                findLabel,
-                                stringResource(R.string.explanation_organize_emoji_find),
-                            ),
-                        ),
-                    enabled = !state.busy,
-                ) {
-                    Text(findLabel)
-                }
-            }
-        }
-        item { EmojiSetStatus(state) }
-        if (state.sets.isEmpty() && !state.busy) {
+        item { EmojiSetQuery(field, busy = loading, onSearch = onSearch) }
+        item { EmojiSetStatus(state, syncing = state.discovering) }
+        // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
+        val discoveryFailed =
+            state.notice == EmojiSetNotice.Error || state.notice == EmojiSetNotice.DiscoveryIncomplete
+        if (state.sets.isEmpty() && !loading && !discoveryFailed) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
-        items(state.sets, key = { it.coordinate }) { set ->
-            SettingsGroup {
-                row("set") { context ->
-                    SettingsAction(
-                        context = context,
-                        title = set.displayTitle(),
-                        subtitle =
-                            when {
-                                set.installed?.updateAvailable == true ->
-                                    stringResource(R.string.emoji_sets_update_available)
-                                set.installed != null -> stringResource(R.string.emoji_sets_installed)
-                                else -> {
-                                    val count = set.emoji.size
-                                    pluralStringResource(R.plurals.emoji_sets_item_count, count, count)
-                                }
-                            },
-                        explanation = stringResource(R.string.explanation_organize_emoji_set),
-                        enabled = !state.busy,
-                        onClick = { onShow(set) },
-                        leading = { SettingsLeadingIcon(R.drawable.ic_category) },
-                    )
+        // Installed sets, then relay results, under the sticker browser's headings (#3882).
+        val (installed, discovered) = state.sets.partition { it.installed != null }
+        for ((heading, sets) in listOf(
+            R.string.emoji_sets_section_installed to installed,
+            R.string.emoji_sets_section_discover to discovered,
+        )) {
+            if (sets.isEmpty()) continue
+            item(key = "heading.$heading") { SettingsSection(stringResource(heading)) }
+            items(sets, key = { it.coordinate }) { set ->
+                SettingsGroup {
+                    row("set") { context ->
+                        SettingsAction(
+                            context = context,
+                            title = set.displayTitle(),
+                            subtitle =
+                                when {
+                                    set.installed?.updateAvailable == true ->
+                                        stringResource(R.string.emoji_sets_update_available)
+                                    set.installed != null -> stringResource(R.string.emoji_sets_installed)
+                                    else -> {
+                                        val count = set.emoji.size
+                                        pluralStringResource(R.plurals.emoji_sets_item_count, count, count)
+                                    }
+                                },
+                            explanation = stringResource(R.string.explanation_organize_emoji_set),
+                            enabled = !state.busy,
+                            onClick = { onShow(set) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_category) },
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+/** The query field and its explicit Find action. */
+@Composable
+private fun EmojiSetQuery(
+    field: TextFieldState,
+    busy: Boolean,
+    onSearch: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        verticalArrangement = Arrangement.spacedBy(EmojiSetSpacing),
+    ) {
+        WhiteNoiseTextField(
+            state = field,
+            modifier = Modifier.fillMaxWidth().testTag("emoji_sets.query"),
+            label = { Text(stringResource(R.string.emoji_sets_query)) },
+            lineLimits = TextFieldLineLimits.SingleLine,
+        )
+        val findLabel = stringResource(R.string.emoji_sets_find)
+        Button(
+            onClick = { onSearch(field.text.toString().trim()) },
+            modifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        findLabel,
+                        stringResource(R.string.explanation_organize_emoji_find),
+                    ),
+                ),
+            enabled = !busy,
+        ) {
+            Text(findLabel)
         }
     }
 }
@@ -384,7 +437,7 @@ private fun EmojiSetActions(
                                 stringResource(R.string.explanation_organize_emoji_check_update),
                             ),
                         ),
-                    enabled = !state.busy,
+                    enabled = !state.busy && !state.discovering,
                 ) {
                     Text(checkLabel)
                 }
@@ -409,16 +462,19 @@ private fun EmojiSetActions(
     }
 }
 
-/** Renders progress and the typed result of the most recent operation. */
+/** Renders progress, including the browser's opening sync, and the typed result of the most recent operation. */
 @Composable
-private fun EmojiSetStatus(state: EmojiSetsState) {
+private fun EmojiSetStatus(
+    state: EmojiSetsState,
+    syncing: Boolean = false,
+) {
     val progress = state.progress
     if (progress != null && progress.totalEmoji > 0u) {
         LinearProgressIndicator(
             progress = { progress.completedEmoji.toFloat() / progress.totalEmoji.toFloat() },
             modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         )
-    } else if (state.busy) {
+    } else if (state.busy || syncing) {
         LinearProgressIndicator(
             modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         )

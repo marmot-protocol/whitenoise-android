@@ -13,15 +13,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.PlatformTextInputMethodRequest
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
@@ -37,7 +41,10 @@ import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerExpansionMode
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerResizeStripHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.repairComposerMentionEdit
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
@@ -120,6 +127,41 @@ class ComposerImeEditSequenceTest {
         editor.assertIsNotFocused()
         assertFalse(imeVisible())
         assertValue("first second", TextRange(12), null)
+    }
+
+    /** A blank tap in the expanded empty pill, outside its controls and editor, opens the real keyboard (#3857). */
+    @Test
+    fun emptyComposerBlankSurfaceTapShowsTheKeyboard() {
+        render("", liveIme = true, expansionMode = ComposerExpansionMode.FullScreen)
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.assertIsNotFocused()
+        assertFalse(imeVisible())
+        val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+        val stripPx = with(composeRule.density) { ComposerResizeStripHeight.toPx() }
+        val targets =
+            listOf(
+                SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick),
+                SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick),
+                hasSetTextAction(),
+            ).flatMap { matcher ->
+                composeRule
+                    .onAllNodes(matcher, useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .map { it.touchBoundsInRoot.inflate(4f) }
+            }
+        val blank =
+            generateSequence(surface.top + stripPx + 4f) { it + 4f }
+                .takeWhile { it < surface.bottom - 4f }
+                .flatMap { y ->
+                    generateSequence(surface.left + 4f) { it + 4f }
+                        .takeWhile { it < surface.right - 4f }
+                        .map { x -> Offset(x, y) }
+                }.firstOrNull { point -> targets.none { it.contains(point) } }
+        checkNotNull(blank) { "The empty pill exposes no blank surface outside its controls and editor" }
+        composeRule.onRoot().performTouchInput { click(blank) }
+        composeRule.waitUntil(10_000) { connection.get() != null }
+        composeRule.waitUntil(10_000) { imeVisible() }
+        editor.assertIsFocused()
     }
 
     /** Detects stale surrounding-text queries without giving recomposition a frame to hide the boundary. */
@@ -320,6 +362,7 @@ class ComposerImeEditSequenceTest {
     private fun render(
         text: String,
         liveIme: Boolean = false,
+        expansionMode: ComposerExpansionMode = ComposerExpansionMode.Automatic,
     ) {
         value = TextFieldValue(text)
         composeRule.setContent {
@@ -353,6 +396,7 @@ class ComposerImeEditSequenceTest {
                             attachmentSheetOpen = false,
                             onPickFromGallery = null,
                             onPickDocument = null,
+                            expansionMode = expansionMode,
                         )
                     }
                 }

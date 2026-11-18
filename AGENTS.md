@@ -64,6 +64,16 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
   Recheck discussion before marking ready. Pending checks alone do not
   justify demoting a ready PR; readiness never authorizes merging.
 
+## Code structure
+
+Follow [code structure](docs/code-structure.md) and the ownership maps for the
+[conversation controller](docs/conversation-controller-ownership.md) and
+[chat-list controller](docs/chat-list-controller-ownership.md).
+
+- New code goes in a topic file in the owning package, never at the end of a file over 600 lines.
+- Split an oversized file as a pure move first.
+- Never raise or add an entry in `SourceFileSizeBaseline.kt`.
+
 ## Task guides
 
 - [Issue/Project triage](.agents/issue-triage.md): follow live Project 7 steering before metadata writes.

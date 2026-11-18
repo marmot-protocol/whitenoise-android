@@ -22,7 +22,8 @@ internal fun buildConversationDictationNotification(
     val recovery = controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer
     return Notification
         .Builder(context, ConversationDictationForegroundService.CHANNEL_ID)
-        .setSmallIcon(R.drawable.ic_stat_whitenoise)
+        // Only the live session gets the microphone mark; recovery keeps the app mark.
+        .setSmallIcon(if (recovery) R.drawable.ic_stat_whitenoise else R.drawable.ic_stat_dictation)
         .setContentTitle(
             context.getString(
                 if (recovery) {
