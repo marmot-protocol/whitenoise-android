@@ -64,6 +64,7 @@ internal data class PreparedWindowRow(
     val record: TimelineMessageRecordFfi,
     val actionRecord: AppMessageRecordFfi,
     val projectedItemId: String,
+    val previousRecord: TimelineMessageRecordFfi?,
     val needsProjection: Boolean,
     val reconcilesOptimistic: Boolean,
 )
@@ -78,12 +79,10 @@ internal data class WindowApplyCommitPlan(
 
 /** Rechecks mutable indexes before committing an EXTEND prepared from an earlier snapshot. */
 internal fun PreparedWindowApply.planCommit(
-    snapshot: WindowApplySnapshot,
     liveRecords: Map<String, TimelineMessageRecordFfi>,
     projectedItemIds: Set<String>,
     pendingProjectionIds: Set<String>,
 ): WindowApplyCommitPlan {
-    val snapshotById = snapshot.heldRecords.associateBy(TimelineMessageRecordFfi::messageIdHex)
     // Only rows the page proved gone depart (see `departedRetainedIds`), and only while a concurrent
     // writer has not already removed them; rows the window merely slid past are retained.
     val departedIds = this.departedIds.filterTo(HashSet()) { it in liveRecords }
@@ -95,7 +94,7 @@ internal fun PreparedWindowApply.planCommit(
                 if (mode == WindowApplyMode.EXTEND && id in pendingProjectionIds) return@forEach
                 if (
                     row.needsProjection ||
-                    liveRecords[id] !== snapshotById[id] ||
+                    liveRecords[id] !== row.previousRecord ||
                     row.projectedItemId !in projectedItemIds
                 ) {
                     add(id)
@@ -215,6 +214,7 @@ internal fun prepareWindowApply(
                 record = carried,
                 actionRecord = actionRecord,
                 projectedItemId = preparedProjectedItemId(record.messageIdHex, actionRecord),
+                previousRecord = current,
                 needsProjection =
                     mode == WindowApplyMode.REPLACE ||
                         current == null ||

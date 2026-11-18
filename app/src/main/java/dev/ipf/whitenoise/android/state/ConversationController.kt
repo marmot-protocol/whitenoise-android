@@ -3726,7 +3726,6 @@ class ConversationController(
         val commitStartedAt = windowApplyNanoTime()
         val commitPlan =
             prepared.planCommit(
-                snapshot,
                 timelineRecords,
                 timelineItemsById.keys,
                 pendingProjectionsAwaitingBridge.keys,

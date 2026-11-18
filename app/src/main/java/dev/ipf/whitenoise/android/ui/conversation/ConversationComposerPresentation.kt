@@ -1,8 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.Snapshot
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.BlockListMirror
+import dev.ipf.whitenoise.android.state.ComposerDraftSnapshot
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.dmPeerAccount
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationComposerGate
@@ -70,3 +75,16 @@ internal fun ConversationSurfaceState.hasVisibleComposer(
             directPeerAccount = controller.dmPeerAccount,
             blocked = blockedDmFromMirror(controller, blockMirror),
         ) == ComposerGate.COMPOSER
+
+/** Reads the recovery draft on entry or external hydration without subscribing the screen to live editor writes. */
+@Composable
+internal fun rememberRestoredComposerDraft(
+    store: DraftStore,
+    draftKey: Pair<String?, String>,
+    externalRevision: Pair<Int, Int>,
+): ComposerDraftSnapshot? =
+    remember(store, draftKey, externalRevision) {
+        Snapshot.withoutReadObservation {
+            draftKey.first?.let { accountRef -> store.getDraft(accountRef, draftKey.second) }
+        }
+    }

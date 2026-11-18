@@ -158,6 +158,14 @@
         ]
       },
       {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Restored draft reads on entry or external hydration",
+        "anchor": "rememberRestoredComposerDraft(",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
         "surface": "Share-owned attachment discard storage recovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.share_import_storage",

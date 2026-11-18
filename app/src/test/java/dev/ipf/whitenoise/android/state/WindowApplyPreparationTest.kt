@@ -35,13 +35,30 @@ class WindowApplyPreparationTest {
 
         val plan =
             prepared.planCommit(
-                snapshot = snapshot,
                 liveRecords = mapOf(id to held),
                 projectedItemIds = emptySet(),
                 pendingProjectionIds = setOf(id),
             )
         assertTrue(plan.projectIds.isEmpty())
         assertTrue(plan.departedIds.isEmpty())
+    }
+
+    /** An equal record replaced during background preparation still invalidates the prepared row. */
+    @Test
+    fun commitRechecksEachPreviouslyHeldRecordByIdentity() {
+        val id = "aa".repeat(32)
+        val held = timelineRecord(id, 1uL, "held")
+        val prepared =
+            prepareWindowApply(
+                page = TimelinePageFfi(listOf(held), hasMoreBefore = false, hasMoreAfter = false),
+                snapshot = WindowApplySnapshot(listOf(held), emptySet(), heldOrder = mapOf(id to 0uL)),
+                replaceWindow = false,
+            )
+        val itemIds = setOf("msg:$id")
+
+        assertFalse(prepared.rows.single().needsProjection)
+        assertTrue(prepared.planCommit(mapOf(id to held), itemIds, emptySet()).projectIds.isEmpty())
+        assertEquals(setOf(id), prepared.planCommit(mapOf(id to held.copy()), itemIds, emptySet()).projectIds)
     }
 
     /** EXTEND keeps hydrated Markdown for retained rows and projects changed rows only. */

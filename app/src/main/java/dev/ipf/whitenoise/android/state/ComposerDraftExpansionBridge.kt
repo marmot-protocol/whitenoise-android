@@ -37,7 +37,7 @@ internal class ComposerDraftExpansionBridge(
         value: TextFieldValue,
         textChanged: Boolean? = null,
     ) {
-        val currentDraft = draftStore.getDraft(accountRef, groupIdHex)
+        val currentDraft = if (textChanged == true) null else draftStore.getDraft(accountRef, groupIdHex)
         // The mounted editor knows whether raw text changed, including whitespace
         // omitted by DraftStore. Other producers retain the cached-text comparison.
         val currentText = currentDraft?.textFieldValue?.text.orEmpty()

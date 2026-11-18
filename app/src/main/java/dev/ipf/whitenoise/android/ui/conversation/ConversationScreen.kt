@@ -59,6 +59,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -4118,15 +4119,8 @@ internal fun ConversationScreen(
     // per-message reader can receive the same instance.
     val draftAccountRef = controller.boundAccountRef
 
-    /** Loads the saved draft for the current account and group. */
-    @Composable
-    fun draftLoadEffect() {
-        LaunchedEffect(draftAccountRef, controller.group.groupIdHex) {
-            appState.loadDraft(draftAccountRef, controller.group.groupIdHex)
-        }
-    }
-    draftLoadEffect()
-    val restoredDraftSnapshot = appState.draftSnapshotFor(draftAccountRef, controller.group.groupIdHex)
+    val composerDraftKey = composerDraftOwnerKey(draftAccountRef, controller.group.groupIdHex)
+    LaunchedEffect(appState, composerDraftKey) { appState.loadDraft(composerDraftKey.first, composerDraftKey.second) }
     val composerShareRevision =
         rememberComposerShareRevision(
             externalRevision = appState.inboundShareRevision,
@@ -4172,15 +4166,19 @@ internal fun ConversationScreen(
             groupIdHex = controller.group.groupIdHex,
             currentRevision = composerDictationRevision,
         )
+    val composerDraftRevision = composerShareRevision to composerDictationRevision
+    val restoredDraftSnapshot = rememberRestoredComposerDraft(appState.draftStore, composerDraftKey, composerDraftRevision)
     val composerTextState =
         rememberComposerTextState(
-            draftKey = composerDraftOwnerKey(draftAccountRef, controller.group.groupIdHex),
+            draftKey = composerDraftKey,
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-            externalRevision = composerShareRevision to composerDictationRevision,
+            externalRevision = composerDraftRevision,
         )
     // Capture the baseline during composition, before either editor can receive an input event.
     val userTextEditRevisionOnEntry =
-        remember(controller, composerTextState) { composerTextState.userTextEditRevision }
+        remember(controller, composerTextState) {
+            Snapshot.withoutReadObservation { composerTextState.userTextEditRevision }
+        }
     LaunchedEffect(controller, composerTextState) {
         var observedRevision = userTextEditRevisionOnEntry
         snapshotFlow { composerTextState.userTextEditRevision }.collect { revision ->
