@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -15,7 +16,6 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -67,34 +67,61 @@ class SelectableMessageProjectionTest {
         assertNull(valid.forwardBlockedReason)
     }
 
-    /** Opens a controller on [records], then projects its rendered timeline as the screen's batch selection does. */
-    private fun project(vararg records: TimelineMessageRecordFfi): Map<String, BatchMessageSelection> =
-        runBlocking {
-            val scripted =
-                ScriptedConversationLiveSubscriptions(
-                    timelineScripts =
-                        listOf(ScriptedConversationTimelineSubscription(timelinePage(*records))),
-                    group = conversationTimelineTestGroup(),
-                )
-            val controller =
-                ConversationController(
-                    appState = conversationTimelineTestAppState(scripted.subscriptions),
-                    initialGroup = conversationTimelineTestGroup(),
-                    initialMemberSnapshot = conversationTimelineMemberSnapshot(),
-                    groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
-                    startOnConstruction = true,
-                )
-            try {
-                awaitConversationCondition { controller.timeline.size == records.size }
-                projectSelectableMessages(controller.timeline, controller, eligibilityNowSeconds = 0uL)
-            } finally {
-                controller.onCleared()
-                awaitOpenedTimelineSubscriptionsClosed(scripted)
-            }
+    /** An edit the controller holds, such as one still awaiting its echo, is the text bulk copy and forward use. */
+    @Test
+    fun bulkCopyAndForwardUseTheControllersEditedText() {
+        val edited =
+            project(
+                timelineRecord(VALID, timelineAt = 1uL, plaintext = TEXT),
+                edits = mapOf(VALID to EditState(latestText = EDITED, count = 1, versions = emptyList())),
+            ).getValue(VALID).action
+
+        assertEquals(EDITED, edited.copyableText)
+        assertEquals(EDITED, edited.forwardableText)
+        assertEquals(
+            ForwardMessagePayload.Text(
+                sourceGroupIdHex = ConversationTimelineTestIds.GROUP_ID,
+                sourceMessageIdHex = VALID,
+                text = EDITED,
+            ),
+            edited.forwardPayload,
+        )
+    }
+
+    /**
+     * Opens a controller on [records], applies [edits] as its edit state, then projects its rendered timeline as
+     * the screen's batch selection does.
+     */
+    private fun project(
+        vararg records: TimelineMessageRecordFfi,
+        edits: Map<String, EditState> = emptyMap(),
+    ): Map<String, BatchMessageSelection> {
+        val scripted =
+            ScriptedConversationLiveSubscriptions(
+                timelineScripts = listOf(ScriptedConversationTimelineSubscription(timelinePage(*records))),
+                group = conversationTimelineTestGroup(),
+            )
+        val controller =
+            ConversationController(
+                appState = conversationTimelineTestAppState(scripted.subscriptions),
+                initialGroup = conversationTimelineTestGroup(),
+                initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
+                startOnConstruction = true,
+            )
+        return try {
+            awaitConversationCondition { controller.timeline.size == records.size }
+            if (edits.isNotEmpty()) controller.editsByTarget = edits
+            projectSelectableMessages(controller.timeline, controller, eligibilityNowSeconds = 0uL)
+        } finally {
+            controller.onCleared()
+            awaitOpenedTimelineSubscriptionsClosed(scripted)
         }
+    }
 
     private companion object {
         const val TEXT = "hello"
+        const val EDITED = "hello, edited"
         const val LOSING_BRANCH = "losing-branch"
         const val PERSISTED_FAILURE = "persisted-failure"
         const val VALID = "valid"

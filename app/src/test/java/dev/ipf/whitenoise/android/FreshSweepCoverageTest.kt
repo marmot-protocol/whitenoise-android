@@ -92,7 +92,7 @@ class FreshSweepCoverageTest {
             "forward text must be projected once per timeline change",
             "MessageProjector.forwardableText" in projection,
         )
-        // SelectableMessageProjectionTest checks the copy and forward results for invalidated rows.
+        // SelectableMessageProjectionTest checks the copy and forward results for invalidated and edited rows.
         assertFalse("projections must not read the profile revision", "profileRevisionForCompose" in source)
     }
 
