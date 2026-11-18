@@ -67,13 +67,14 @@ private fun ConversationController.confirmedReplyTarget(selected: String): Strin
 
 /**
  * The reply target a text or media send publishes: none stays none, an event id is kept, and the client token
- * of the user's own send resolves to that send's event id. While it has none, the user is told to try again and
- * the result is a failure, so the caller sends nothing and the composer keeps its text, media and reply.
+ * of the user's own send resolves to that send's event id. While it has none, the user is told to wait for that
+ * message or retry it, and the result is a failure, so the caller sends nothing and the composer keeps its text,
+ * media and reply.
  */
 internal fun ConversationController.replyTargetForSend(selected: String?): Result<String?> {
     val target = selected?.takeIf(String::isNotBlank)?.let { confirmedReplyTarget(it) }
     if (target == null || isPublishableReplyTarget(target)) return Result.success(target)
-    appState.present(R.string.reply_target_still_sending)
+    appState.present(R.string.reply_target_not_sent)
     return Result.failure(IllegalStateException("reply target has no event id yet"))
 }
 

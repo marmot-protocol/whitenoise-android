@@ -48,7 +48,7 @@ class ReplyTargetForSendTest {
             assertEquals(emptyList<String>(), recorder.sendCalls())
             assertFalse(accepted)
             assertSame(pending, controller.replyingTo)
-            assertEquals(AppText.Resource(R.string.reply_target_still_sending), state.toast?.title)
+            assertEquals(AppText.Resource(R.string.reply_target_not_sent), state.toast?.title)
         }
 
     /** Once the replied-to send is accepted, the text reply MDK admits names its event id, not the client token. */
@@ -84,7 +84,7 @@ class ReplyTargetForSendTest {
 
             assertEquals(emptyList<String>(), recorder.sendCalls())
             assertSame(pending, controller.replyingTo)
-            assertEquals(AppText.Resource(R.string.reply_target_still_sending), state.toast?.title)
+            assertEquals(AppText.Resource(R.string.reply_target_not_sent), state.toast?.title)
         }
 
     /** Once the replied-to send is accepted, the media reply stages and shows its event id, not the client token. */

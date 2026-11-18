@@ -281,7 +281,7 @@
     <string name="scroll_to_top">Desplazar al inicio</string>
     <string name="discard_failed_message">Descartar mensaje fallido</string>
     <string name="message_discard_still_sending">Este mensaje aún se está enviando. Inténtalo de nuevo en un momento.</string>
-    <string name="reply_target_still_sending">El mensaje al que respondes aún se está enviando. Inténtalo de nuevo en un momento.</string>
+    <string name="reply_target_not_sent">El mensaje al que respondes aún no se ha enviado. Espera a que se envíe, o toca «Reintentar» en él si falló, y luego envía tu respuesta.</string>
     <string name="message_discard_not_failed">Este mensaje ya no se puede descartar.</string>
     <string name="decline">Rechazar</string>
     <string name="accept">Aceptar</string>

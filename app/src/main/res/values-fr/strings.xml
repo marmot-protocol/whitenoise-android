@@ -281,7 +281,7 @@
     <string name="scroll_to_top">Faire défiler vers le haut</string>
     <string name="discard_failed_message">Supprimer le message échoué</string>
     <string name="message_discard_still_sending">Ce message est encore en cours d’envoi. Réessayez dans un instant.</string>
-    <string name="reply_target_still_sending">Le message auquel vous répondez est encore en cours d’envoi. Réessayez dans un instant.</string>
+    <string name="reply_target_not_sent">Le message auquel vous répondez n’a pas encore été envoyé. Attendez son envoi, ou touchez « Réessayer » sur ce message en cas d’échec, puis envoyez votre réponse.</string>
     <string name="message_discard_not_failed">Ce message ne peut plus être supprimé.</string>
     <string name="decline">Refuser</string>
     <string name="accept">Accepter</string>

@@ -281,7 +281,7 @@
     <string name="scroll_to_top">Rolar para o topo</string>
     <string name="discard_failed_message">Descartar mensagem com falha</string>
     <string name="message_discard_still_sending">Esta mensagem ainda está sendo enviada. Tente novamente em instantes.</string>
-    <string name="reply_target_still_sending">A mensagem à qual você está respondendo ainda está sendo enviada. Tente novamente em instantes.</string>
+    <string name="reply_target_not_sent">A mensagem à qual você está respondendo ainda não foi enviada. Aguarde o envio, ou toque em «Tentar novamente» nela se o envio falhar, e depois envie sua resposta.</string>
     <string name="message_discard_not_failed">Esta mensagem não pode mais ser descartada.</string>
     <string name="decline">Recusar</string>
     <string name="accept">Aceitar</string>

@@ -281,7 +281,7 @@
     <string name="scroll_to_top">Scorri verso l\'alto</string>
     <string name="discard_failed_message">Elimina messaggio non riuscito</string>
     <string name="message_discard_still_sending">Questo messaggio è ancora in fase di invio. Riprova tra poco.</string>
-    <string name="reply_target_still_sending">Il messaggio a cui stai rispondendo è ancora in fase di invio. Riprova tra poco.</string>
+    <string name="reply_target_not_sent">Il messaggio a cui stai rispondendo non è ancora stato inviato. Attendi che venga inviato, o tocca «Riprova» sul messaggio se l’invio non è riuscito, poi invia la risposta.</string>
     <string name="message_discard_not_failed">Questo messaggio non può più essere eliminato.</string>
     <string name="decline">Rifiuta</string>
     <string name="accept">Accetta</string>
