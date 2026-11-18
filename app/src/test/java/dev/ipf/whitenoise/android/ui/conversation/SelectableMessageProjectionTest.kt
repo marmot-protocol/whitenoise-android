@@ -67,26 +67,38 @@ class SelectableMessageProjectionTest {
         assertNull(valid.forwardBlockedReason)
     }
 
-    /** An edit the controller holds, such as one still awaiting its echo, is the text bulk copy and forward use. */
+    /**
+     * An edit the controller holds, such as one still awaiting its echo, is the text bulk copy and forward use for
+     * its own message only, while an unedited row keeps its original text.
+     */
     @Test
     fun bulkCopyAndForwardUseTheControllersEditedText() {
-        val edited =
+        val selections =
             project(
                 timelineRecord(VALID, timelineAt = 1uL, plaintext = TEXT),
+                timelineRecord(UNEDITED, timelineAt = 2uL, plaintext = UNEDITED_TEXT),
                 edits = mapOf(VALID to EditState(latestText = EDITED, count = 1, versions = emptyList())),
-            ).getValue(VALID).action
+            )
+        val edited = selections.getValue(VALID).action
+        val unedited = selections.getValue(UNEDITED).action
 
         assertEquals(EDITED, edited.copyableText)
         assertEquals(EDITED, edited.forwardableText)
-        assertEquals(
-            ForwardMessagePayload.Text(
-                sourceGroupIdHex = ConversationTimelineTestIds.GROUP_ID,
-                sourceMessageIdHex = VALID,
-                text = EDITED,
-            ),
-            edited.forwardPayload,
-        )
+        assertEquals(textPayload(VALID, EDITED), edited.forwardPayload)
+        assertEquals(UNEDITED_TEXT, unedited.copyableText)
+        assertEquals(UNEDITED_TEXT, unedited.forwardableText)
+        assertEquals(textPayload(UNEDITED, UNEDITED_TEXT), unedited.forwardPayload)
     }
+
+    /** The text forward payload a message in the fixture group carries. */
+    private fun textPayload(
+        messageId: String,
+        text: String,
+    ) = ForwardMessagePayload.Text(
+        sourceGroupIdHex = ConversationTimelineTestIds.GROUP_ID,
+        sourceMessageIdHex = messageId,
+        text = text,
+    )
 
     /**
      * Opens a controller on [records], applies [edits] as its edit state, then projects its rendered timeline as
@@ -122,6 +134,8 @@ class SelectableMessageProjectionTest {
     private companion object {
         const val TEXT = "hello"
         const val EDITED = "hello, edited"
+        const val UNEDITED = "unedited"
+        const val UNEDITED_TEXT = "left as sent"
         const val LOSING_BRANCH = "losing-branch"
         const val PERSISTED_FAILURE = "persisted-failure"
         const val VALID = "valid"
