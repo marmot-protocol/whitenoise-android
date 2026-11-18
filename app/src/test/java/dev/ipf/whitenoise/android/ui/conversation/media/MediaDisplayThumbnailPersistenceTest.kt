@@ -227,12 +227,19 @@ class MediaDisplayThumbnailPersistenceTest {
     @Test
     fun durableAvailabilityDoesNotRestartAnInFlightOriginalLoad() {
         val transfer = armOriginalDownload()
+        val metadataOwners = ConcurrentHashMap.newKeySet<Job>()
+        fixture.onNativeSnapshot = {
+            effectJobs.currentMainOwnerOrNull()?.let { metadataOwners += it }
+        }
         var state: ImageLoadState? = null
         composeRule.setContent { WhiteNoiseTheme { state = ObserveLoad() } }
         composeRule.waitUntil(10_000) {
             composeRule.waitForIdle()
-            state?.startDownload == true && state?.downloadActionReady == true && fixture.state.hasInteractive(transfer)
+            state?.startDownload == true && state?.downloadActionReady == true && fixture.state.hasInteractive(transfer) &&
+                metadataOwners.isNotEmpty() && metadataOwners.all { it.isCompleted }
         }
+        // At zero layout size the visual effect cannot read native state. Finish metadata owners before
+        // admitting pixels, so the next Compose-owned snapshot identifies the visual producer.
         val producer = AtomicReference<Job>()
         fixture.onNativeSnapshot = {
             effectJobs.currentMainOwnerOrNull()?.let { producer.compareAndSet(null, it) }

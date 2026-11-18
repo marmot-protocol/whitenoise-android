@@ -2925,7 +2925,9 @@ class ConversationDictationControllerTest {
         f.controller.onMicrophoneHostResumed()
         f.controller.onAppForegrounded()
         assertEquals(1, platform.sessions.size)
-        assertEquals(1, platform.captureSessionsStarted)
+        // Ownership begins before the access gate, then the granted retry owns a fresh session.
+        assertEquals(2, platform.captureSessionsStarted)
+        assertEquals(1, platform.session.startCalls)
         assertEquals(TextFieldValue("Keep"), f.drafts.getValue(key()))
         f.controller.cancel()
     }
@@ -2950,7 +2952,9 @@ class ConversationDictationControllerTest {
         platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
         f.controller.onAppForegrounded()
         assertFalse(platform.session.started)
-        assertEquals(0, platform.captureSessionsStarted)
+        // The blocked gesture owns a session without starting a recognizer or retry.
+        assertEquals(1, platform.captureSessionsStarted)
+        assertTrue(platform.sessions.isEmpty())
     }
 
     @Test
@@ -2980,7 +2984,9 @@ class ConversationDictationControllerTest {
             f.controller.onAppForegrounded()
             f.controller.onMicrophoneHostResumed()
             assertEquals(endRecovery == "unlock", platform.session.started)
-            assertEquals(if (endRecovery == "unlock") 1 else 0, platform.captureSessionsStarted)
+            assertEquals(if (endRecovery == "unlock") 2 else 1, platform.captureSessionsStarted)
+            assertEquals(if (endRecovery == "unlock") 1 else 0, platform.sessions.size)
+            assertEquals(if (endRecovery == "unlock") 1 else 0, platform.sessions.sumOf { it.startCalls })
             assertNull(f.controller.microphoneSettingsRecovery)
             f.controller.cancel()
         }
@@ -10058,13 +10064,16 @@ class ConversationDictationControllerTest {
         override fun requestMicrophoneUnblock(onChanged: () -> Unit): (() -> Unit)? {
             if (!nativeUnblockSupported) return null
             nativeRequests += 1
-            onNativeRegistration?.let { hook ->
+            val hook = onNativeRegistration
+            return if (hook != null) {
                 onNativeRegistration = null
                 hook()
-                return null
+                null
+            } else {
+                nativeChanged = onChanged
+                val unregister: () -> Unit = { nativeCleanup += 1 }
+                unregister
             }
-            nativeChanged = onChanged
-            return { nativeCleanup += 1 }
         }
 
         lateinit var listener: ConversationDictationRecognitionListener
@@ -10272,6 +10281,7 @@ class ConversationDictationControllerTest {
         private val retryAudioWithContext: () -> Boolean = { false },
     ) : ConversationDictationRecognitionSession {
         var started = false
+        var startCalls = 0
         var stopped = false
         var cancelled = false
         var destroyed = false
@@ -10292,6 +10302,7 @@ class ConversationDictationControllerTest {
 
         /** Marks this fake recognition generation started. */
         override fun start() {
+            startCalls += 1
             started = true
         }
 
