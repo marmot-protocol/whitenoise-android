@@ -14,6 +14,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.abs
 
 /** Guards the status-bar small icons' occupied area, clearance and tint-only artwork. */
 @RunWith(RobolectricTestRunner::class)
@@ -57,6 +58,27 @@ class NotificationSmallIconScreenshotTest {
     @Test
     fun dictationIconKeepsClearance() {
         assertClearance(alphaBounds(render(R.drawable.ic_stat_dictation, MEASURE_SIZE_PX, Color.WHITE)))
+    }
+
+    /**
+     * Keeps the dictation logo the same size and position as the message mark: outside the
+     * bottom-right corner that holds the microphone and its gap, both icons must cover the same pixels.
+     * The dictation clip path can shift antialiased edges by a few alpha levels; a one-pixel move or
+     * a resize changes edge pixels by far more.
+     */
+    @Test
+    fun dictationLogoMatchesMessageMark() {
+        val message = render(R.drawable.ic_stat_whitenoise, MEASURE_SIZE_PX, Color.WHITE)
+        val dictation = render(R.drawable.ic_stat_dictation, MEASURE_SIZE_PX, Color.WHITE)
+        val micCorner = (MEASURE_SIZE_PX * MIC_CORNER_START).toInt()
+        for (y in 0 until MEASURE_SIZE_PX) {
+            for (x in 0 until MEASURE_SIZE_PX) {
+                if (x >= micCorner && y >= micCorner) continue
+                val expected = Color.alpha(message.getPixel(x, y))
+                val actual = Color.alpha(dictation.getPixel(x, y))
+                assertTrue("Pixel ($x, $y) alpha $actual, expected $expected", abs(actual - expected) <= EDGE_ALPHA_TOLERANCE)
+            }
+        }
     }
 
     /** The system tints small icons from alpha, so any visible pixel must be plain white. */
@@ -136,6 +158,10 @@ class NotificationSmallIconScreenshotTest {
         /** 24dp at xxxhdpi, where one dp is four pixels. */
         const val MEASURE_SIZE_PX = 96
         const val MIN_CLEARANCE_PX = 4
+
+        /** The microphone and its gap stay right of and below this fraction of the canvas. */
+        const val MIC_CORNER_START = 0.45f
+        const val EDGE_ALPHA_TOLERANCE = 8
 
         /** Allows unpremultiply rounding on antialiased edges. */
         const val WHITE_MIN_CHANNEL = 250

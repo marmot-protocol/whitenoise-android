@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Notification small icon for an active dictation session: the White Noise
-    mark from ic_stat_whitenoise (same geometry, scaled down and vertically
-    centred like the message icon, so both sit at the same height in the
-    status bar) with a microphone on the right, so dictation reads as White
-    Noise but differs from the message icon. The clip path cuts a gap around
-    the microphone out of the mark; its outer square and inner outline wind
-    in opposite directions so the nonzero clip excludes the outline. Must
-    stay alpha-only white: the system tints small icons itself.
+    mark with exactly the same path as ic_stat_whitenoise, so the logo has the
+    same size and position as the message icon in the status bar, plus a
+    microphone in the bottom-right corner within the same 52-unit margin. The
+    clip path cuts the gap around the microphone, and the corner of the mark
+    beside it, out of the mark; its outer square and inner outline wind in
+    opposite directions so the nonzero clip excludes the outline. Must stay
+    alpha-only white: the system tints small icons itself.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
@@ -15,13 +15,13 @@
     android:viewportWidth="1024"
     android:viewportHeight="1024">
     <group>
-        <clip-path android:pathData="M0,0V1024H1024V0ZM638.5,330.75A137.75,137.75 0 0 1 914,330.75L914,439.5L1015.5,439.5L1015.5,483A239.25,239.25 0 0 1 856,708.567L856,707.75L950.25,707.75L950.25,874.5L602.25,874.5L602.25,707.75L696.5,707.75L696.5,708.567A239.25,239.25 0 0 1 537,483L537,439.5L638.5,439.5Z" />
+        <clip-path android:pathData="M0,0V1024H1024V0ZM728.4,609.75A101.85,101.85 0 0 1 932.1,609.75L932.1,686.4L1005.6,686.4L1005.6,720L1005.6,1005.6L702.15,1005.6L702.15,880.65L770.4,880.65L770.4,884.82A175.35,175.35 0 0 1 654.9,720L654.9,686.4L728.4,686.4Z" />
         <path
             android:fillColor="@android:color/white"
             android:fillType="evenOdd"
-            android:pathData="M53.800,806L53.800,218L250.653,218L250.653,398.108L337.574,218L534.426,218L534.426,398.108L621.347,218L818.200,218L818.200,806L621.347,806L621.347,625.892L534.426,806L337.574,806L337.574,625.892L250.653,806ZM219.974,248.678L84.478,248.678L84.478,742.432L219.974,461.676ZM652.026,775.322L787.522,775.322L787.522,281.568L652.026,562.324ZM515.167,775.322L769.330,248.678L640.607,248.678L386.444,775.322ZM485.556,248.678L356.833,248.678L102.670,775.322L231.393,775.322ZM503.748,281.568L368.252,562.324L368.252,742.432L503.748,461.676Z" />
+            android:pathData="M52,865.846L52,158.154L288.924,158.154L288.924,374.924L393.538,158.154L630.462,158.154L630.462,374.924L735.076,158.154L972,158.154L972,865.846L735.076,865.846L735.076,649.076L630.462,865.846L393.538,865.846L393.538,649.076L288.924,865.846ZM252,195.077L88.923,195.077L88.923,789.338L252,451.432ZM772,828.923L935.077,828.923L935.077,234.662L772,572.568ZM607.282,828.923L913.182,195.077L758.256,195.077L452.356,828.923ZM571.644,195.077L416.718,195.077L110.818,828.923L265.744,828.923ZM593.539,234.662L430.461,572.568L430.461,789.338L593.539,451.432Z" />
     </group>
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M682,330.75A94.25,94.25 0 0 1 870.5,330.75V483A94.25,94.25 0 0 1 682,483ZM580.5,483A195.75,195.75 0 0 0 740,675.364L740,751.25L645.75,751.25L645.75,831L906.75,831L906.75,751.25L812.5,751.25L812.5,675.364A195.75,195.75 0 0 0 972,483L906.75,483A130.5,130.5 0 0 1 645.75,483Z" />
+        android:pathData="M762,609.75A68.25,68.25 0 0 1 898.5,609.75V720A68.25,68.25 0 0 1 762,720ZM688.5,720A141.75,141.75 0 0 0 804,859.298L804,914.25L735.75,914.25L735.75,972L924.75,972L924.75,914.25L856.5,914.25L856.5,859.298A141.75,141.75 0 0 0 972,720L924.75,720A94.5,94.5 0 0 1 735.75,720Z" />
 </vector>
