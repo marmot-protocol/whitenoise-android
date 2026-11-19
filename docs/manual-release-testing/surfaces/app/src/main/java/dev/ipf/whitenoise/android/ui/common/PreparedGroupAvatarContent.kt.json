@@ -36,6 +36,22 @@
           "CHL-017"
         ],
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt"
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
+        "surface": "Destinations opened from the list start from its retained group pictures",
+        "anchor": "internal val LocalRetainedGroupAvatarPixels",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
+        "surface": "Only the list's account, runtime and cache lifetime hand pictures on",
+        "anchor": "private fun retainedHandoff(",
+        "test_ids": [
+          "CHL-017"
+        ]
       }
     ]
   },

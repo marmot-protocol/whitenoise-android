@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.state.AttachmentDownloadIntentStore
 import dev.ipf.whitenoise.android.state.AttachmentInstallerHandoffRequest
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
@@ -436,15 +437,15 @@ class ReceivedApkAttachmentOpenIntegrationTest {
     @Test
     fun conversationAndMediaLibraryPassFilenameIntoTheVerifiedOpener() {
         val conversationMediaPath = "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media"
-        val bubble = projectFile("$conversationMediaPath/MediaFileBubble.kt").readText()
+        val bubble = projectFile("$conversationMediaPath/MediaFileBubble.kt").motionOwnerSource()
         val library =
             projectFile("app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt")
-                .readText()
+                .motionOwnerSource()
         val normalizedLibrary = library.replace(Regex("\\s+"), " ")
         val normalizedBubble = bubble.replace(Regex("\\s+"), " ")
         val mainShell =
             projectFile("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt")
-                .readText()
+                .motionOwnerSource()
                 .replace(Regex("\\s+"), " ")
 
         assertTrue(

@@ -34,6 +34,14 @@
         "test_ids": [
           "CON-048"
         ]
+      },
+      {
+        "surface": "ColumnScope.ExplanationContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt",
+        "anchor": "private fun ColumnScope.ExplanationContent(",
+        "test_ids": [
+          "CON-048"
+        ]
       }
     ],
     "settings_controls": [

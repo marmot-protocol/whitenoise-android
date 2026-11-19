@@ -83,14 +83,6 @@
         ]
       },
       {
-        "surface": "PinnedBadge",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
-        "anchor": "fun PinnedBadge(",
-        "test_ids": [
-          "CHL-001"
-        ]
-      },
-      {
         "surface": "Chat row resolves the membership preview subject's name",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
         "anchor": "GroupSystemPreviewNames(activeAccountIdHex)",
@@ -131,14 +123,6 @@
         "surface": "R.string.chat_muted_badge",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
         "anchor": "R.string.chat_muted_badge",
-        "test_ids": [
-          "CHL-002"
-        ]
-      },
-      {
-        "surface": "R.string.chat_pinned_badge",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
-        "anchor": "R.string.chat_pinned_badge",
         "test_ids": [
           "CHL-002"
         ]

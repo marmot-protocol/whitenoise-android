@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,7 +9,7 @@ import java.io.File
 class ComposeHotPathCoverageTest {
     @Test
     fun composerReplyProjectionAndMentionResolverAreRemembered() {
-        val source = source("conversation/composer/ComposerBar.kt").readText()
+        val source = source("conversation/composer/ComposerBar.kt").motionOwnerSource()
         val replyMarker = "if (replyingTo != null) {"
         val replyStart = source.indexOf(replyMarker)
         require(replyStart >= 0) { "Reply branch marker missing" }
@@ -44,7 +45,7 @@ class ComposeHotPathCoverageTest {
     /** Emoji search runs outside composition and off the main thread. */
     @Test
     fun emojiSearchRunsOutsideCompositionAndOffTheMainThread() {
-        val source = source("conversation/composer/EmojiPickerContent.kt").readText()
+        val source = source("conversation/composer/EmojiPickerContent.kt").motionOwnerSource()
 
         assertTrue(
             "emoji search must be produced asynchronously",
@@ -67,9 +68,9 @@ class ComposeHotPathCoverageTest {
     /** Playback ticks stay row-scoped, while native confirmation preserves the optimistic row identity. */
     @Test
     fun conversationScreenDoesNotSubscribeToTtsPlaybackState() {
-        val screenSource = source("conversation/ConversationScreen.kt").readText()
-        val timelineRowSource = source("conversation/TimelineRow.kt").readText()
-        val timelineRowTtsSource = source("conversation/TimelineRowTtsHighlight.kt").readText()
+        val screenSource = source("conversation/ConversationScreen.kt").motionOwnerSource()
+        val timelineRowSource = source("conversation/TimelineRow.kt").motionOwnerSource()
+        val timelineRowTtsSource = source("conversation/TimelineRowTtsHighlight.kt").motionOwnerSource()
 
         assertFalse(
             "ConversationScreen must not collect TTS playback state",
@@ -100,7 +101,7 @@ class ComposeHotPathCoverageTest {
     /** Chat list scroll and row search work are isolated from screen composition. */
     @Test
     fun chatListScrollAndRowSearchWorkAreIsolatedFromScreenComposition() {
-        val source = source("chats/ChatsScreen.kt").readText()
+        val source = source("chats/ChatsScreen.kt").motionOwnerSource()
         val searchProjectionRemember =
             "remember\\(\\s*scopedSourceList,\\s*normalizedSearchQuery,\\s*effectiveFolderChatIds,\\s*" +
                 "groupTitleCopy,\\s*profileRev,\\s*messageSearchConstraints,?\\s*\\)"

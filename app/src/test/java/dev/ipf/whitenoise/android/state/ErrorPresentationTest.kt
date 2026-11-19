@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.ui.profile.ProfileImageTarget
 import dev.ipf.whitenoise.android.ui.profile.profileImageFailureOperation
 import org.junit.Assert.assertEquals
@@ -87,7 +88,10 @@ class ErrorPresentationTest {
 
     @Test
     fun profileAdminPromotionScopesItsConfirmationToTheMutatedGroup() {
-        val body = mainSource("state/AppStateProfileGroups.kt").readText().functionBody("promoteProfileInGroup")
+        val body =
+            mainSource("state/AppStateProfileGroups.kt")
+                .motionOwnerSource()
+                .functionBody("promoteProfileInGroup")
 
         assertTrue(
             "profile-sheet admin success must use the originating account and group",
@@ -155,7 +159,7 @@ class ErrorPresentationTest {
         failure: Throwable,
         secret: String,
     ) {
-        val source = mainSource(path).readText()
+        val source = mainSource(path).motionOwnerSource()
         operationCodes.forEach { operationCode ->
             assertTrue("Missing migrated operation $operationCode in $path", operationCode in source)
             assertCausePreservingFailureHandler(source, path, operationCode)
@@ -177,7 +181,7 @@ class ErrorPresentationTest {
             ),
             profileOperations,
         )
-        val profileSource = mainSource("ui/profile/ProfileEditScreen.kt").readText()
+        val profileSource = mainSource("ui/profile/ProfileEditScreen.kt").motionOwnerSource()
         val profileFailureCall =
             failurePresentationCalls(profileSource).single { call ->
                 "operationCode = profileImageFailureOperation(target, prepared)" in call

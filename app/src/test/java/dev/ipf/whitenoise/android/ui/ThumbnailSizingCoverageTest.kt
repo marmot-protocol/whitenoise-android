@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -46,5 +47,5 @@ class ThumbnailSizingCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/$name"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/$name"),
-        ).firstOrNull(File::exists)?.readText() ?: error("Missing $name")
+        ).firstOrNull(File::exists)?.motionOwnerSource() ?: error("Missing $name")
 }

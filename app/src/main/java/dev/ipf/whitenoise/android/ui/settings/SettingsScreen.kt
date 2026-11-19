@@ -70,7 +70,6 @@ import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import dev.ipf.whitenoise.android.ui.updates.AppUpdateEmblem
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -326,7 +325,12 @@ private fun SettingsDetailRoute(
                 onOpenSupportChat = onOpenSupportChat,
                 onRelays = { onDetailChange(SettingsDetail.SupportRelays) },
             )
-        SettingsDetail.SupportRelays -> RelaysScreen(appState, onBack = onBack)
+        SettingsDetail.SupportRelays ->
+            RelaysScreen(
+                appState,
+                onBack = onBack,
+                destination = SettingsDetail.SupportRelays,
+            )
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = onBack)
         SettingsDetail.QuarantinedGroups -> {
             if (appState.developerMode) {
@@ -421,6 +425,8 @@ private fun SettingsHomeScreen(
     selfUpdateEnabled: Boolean,
 ) {
     var showAccountSelector by remember { mutableStateOf(false) }
+    var addIdentityOrigin by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var addIdentityContour by remember { mutableStateOf<SettingsContour?>(null) }
     var showAddIdentity by remember { mutableStateOf(false) }
     var showSignOut by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -487,6 +493,10 @@ private fun SettingsHomeScreen(
         onOpenShareConnect = { whenIdle { onOpenDetail(SettingsDetail.ShareConnect) } },
         onOpenProfilePictureActions = { whenIdle(onOpenProfilePictureActions) },
         onAddProfile = { whenIdle { showAddIdentity = true } },
+        onAddProfileMeasured = { origin, contour ->
+            addIdentityOrigin = origin
+            addIdentityContour = contour
+        },
         onSwitchProfile = { whenIdle { showAccountSelector = true } },
         onOpenDetail = { detail -> whenIdle { onOpenDetail(detail) } },
         onSignOut = { whenIdle { showSignOut = true } },
@@ -517,11 +527,18 @@ private fun SettingsHomeScreen(
                 showAccountSelector = false
                 showAddIdentity = true
             },
+            onAddAccountOrigin = { addIdentityOrigin = it },
+            onAddAccountContour = { addIdentityContour = it },
             onAccountSwitched = onBackToChats,
         )
     }
     if (showAddIdentity) {
-        AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+        AddIdentitySheet(
+            appState = appState,
+            origin = addIdentityOrigin,
+            sourceContour = addIdentityContour,
+            onDismiss = { showAddIdentity = false },
+        )
     }
     if (showSignOut) {
         SignOutSheet(
@@ -580,6 +597,7 @@ internal fun SettingsHomeContent(
     searchResultList: LazyListState = rememberLazyListState(),
     searchAnimationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
     onSearchSelection: (SettingsSearchEntry) -> Unit = {},
+    onAddProfileMeasured: (androidx.compose.ui.geometry.Rect?, SettingsContour?) -> Unit = { _, _ -> },
 ) {
     val currentOnViewportChange by rememberUpdatedState(onViewportChange)
     val listState =
@@ -628,6 +646,7 @@ internal fun SettingsHomeContent(
                                         onOpenShareConnect = onOpenShareConnect,
                                         onOpenProfilePictureActions = onOpenProfilePictureActions,
                                         onAddProfile = onAddProfile,
+                                        onAddProfileMeasured = onAddProfileMeasured,
                                         onSwitchProfile = onSwitchProfile,
                                         onOpenAccount = { onOpenDetail(SettingsHomeRow.Account.detail) },
                                     )
@@ -693,8 +712,9 @@ private fun SettingsProfileHeader(
     onAddProfile: () -> Unit,
     onSwitchProfile: () -> Unit,
     onOpenAccount: () -> Unit,
+    onAddProfileMeasured: (androidx.compose.ui.geometry.Rect?, SettingsContour?) -> Unit = { _, _ -> },
 ) {
-    Column(Modifier.padding(vertical = WhiteNoiseSpacing.Related).testTag("settings.profile_group")) {
+    Column(Modifier.padding(bottom = WhiteNoiseSpacing.Related).testTag("settings.profile_group")) {
         SettingsGroup {
             row("profile") { context ->
                 SettingsProfileRow(context, account, onOpenShareConnect, onOpenProfilePictureActions)
@@ -703,6 +723,7 @@ private fun SettingsProfileHeader(
                 SettingsLink(
                     context = context,
                     title = stringResource(SettingsHomeRow.Account.titleRes),
+                    routeKey = SettingsDetail.Account,
                     onClick = onOpenAccount,
                     explanation = stringResource(SettingsHomeRow.Account.explanationRes),
                     leading = {
@@ -715,11 +736,16 @@ private fun SettingsProfileHeader(
             }
             if (profileCount == 1) {
                 row("add_profile") { context ->
+                    val launch =
+                        rememberMeasuredContourClick { origin, contour ->
+                            onAddProfileMeasured(origin, contour)
+                            onAddProfile()
+                        }
                     SettingsAction(
                         context = context,
                         title = stringResource(R.string.settings_add_profile),
-                        onClick = onAddProfile,
-                        modifier = Modifier.testTag("settings.add_profile"),
+                        onClick = launch.second,
+                        modifier = launch.first.testTag("settings.add_profile"),
                         leading = {
                             SettingsLeadingIcon(R.drawable.ic_settings_person_add)
                         },
@@ -856,6 +882,7 @@ internal fun SettingsHubSection(
                     SettingsLink(
                         context = context,
                         title = stringResource(entry.titleRes),
+                        routeKey = entry.detail,
                         onClick = { onOpenDetail(entry.detail) },
                         explanation = stringResource(entry.explanationRes),
                         leading = {
@@ -866,58 +893,6 @@ internal fun SettingsHubSection(
             }
         }
     }
-}
-
-/** Self-managed distribution only: one row that checks for or installs the latest release. */
-@Composable
-@Suppress("FunctionNaming")
-private fun AppUpdateGroup(
-    info: AppUpdateInfo,
-    onClick: () -> Unit,
-    prominent: Boolean,
-) {
-    SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.FormField).testTag("settings.app_updates")) {
-        row("app_updates") { context ->
-            SettingsLink(
-                context = context,
-                title = stringResource(R.string.app_updates),
-                subtitle = appUpdateSubtitle(info),
-                onClick = onClick,
-                // The filled emblem announces something to do; without an update the row keeps the plain
-                // glyph every other row leads with.
-                leading =
-                    if (prominent) {
-                        { AppUpdateEmblem() }
-                    } else {
-                        { SettingsLeadingIcon(R.drawable.ic_system_update) }
-                    },
-            )
-        }
-    }
-}
-
-/** Concise prototype status uses the real release version and keeps a failed check actionable. */
-@Composable
-private fun appUpdateSubtitle(info: AppUpdateInfo): String =
-    when {
-        info.lastAttemptErrorReport != null -> stringResource(R.string.app_update_settings_check_failed)
-        info.latestVersion == null -> stringResource(R.string.app_update_row_unknown)
-        !info.isUpdateAvailable -> stringResource(R.string.app_update_row_current)
-        else -> stringResource(R.string.app_update_row_available, info.latestVersion)
-    }
-
-/** Retry failed/unknown/current checks before delegating to the existing verified update flow. */
-internal suspend fun runSettingsAppUpdateAction(
-    info: AppUpdateInfo,
-    refresh: suspend () -> AppUpdateInfo,
-    onUpdate: () -> Unit,
-) {
-    if (!info.isUpdateAvailable || info.lastAttemptErrorReport != null) {
-        val refreshed = refresh()
-        // A cached newer release must not turn another failed check into an install request.
-        if (refreshed.lastAttemptErrorReport != null) return
-    }
-    onUpdate()
 }
 
 /** Sign out as the last group: a destructive link that opens the production sign-out sheet. */

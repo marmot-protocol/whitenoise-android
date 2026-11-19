@@ -54,11 +54,13 @@ import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.CopyableFullPublicKey
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredContourClick
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
@@ -102,6 +104,7 @@ internal fun PersonProfileContent(
     error: @Composable () -> Unit = {},
     adminActions: @Composable () -> Unit = {},
     startingAs: StartingAccount? = null,
+    onStartGroupMeasured: ((androidx.compose.ui.geometry.Rect?, SettingsContour?) -> Unit)? = null,
 ) {
     SettingsScaffold(
         topBarActions = { StartingAccountIndicator(startingAs) },
@@ -145,13 +148,18 @@ internal fun PersonProfileContent(
                     }
                     SettingsGroup {
                         row("start_group") { row ->
+                            val launch =
+                                rememberMeasuredContourClick { origin, contour ->
+                                    onStartGroupMeasured?.invoke(origin, contour) ?: onStartGroup()
+                                }
                             SettingsAction(
                                 row,
                                 stringResource(R.string.person_start_group),
-                                onStartGroup,
+                                launch.second,
+                                opensRoute = true,
                                 enabled = !busy,
                                 leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
-                                modifier = Modifier.testTag("person_profile.start_group"),
+                                modifier = launch.first.testTag("person_profile.start_group"),
                             )
                         }
                         row("add_to_group") { row ->
@@ -159,6 +167,8 @@ internal fun PersonProfileContent(
                                 row,
                                 stringResource(R.string.person_add_to_group),
                                 onAddToGroup,
+                                routeKey = ProfileSheetPage.ADD_TO_GROUPS,
+                                opensRoute = true,
                                 enabled = !busy,
                                 leading = { SettingsLeadingIcon(R.drawable.ic_group) },
                                 modifier = Modifier.testTag("person_profile.add_to_group"),
@@ -170,6 +180,7 @@ internal fun PersonProfileContent(
                                     row,
                                     stringResource(R.string.person_groups_in_common),
                                     onGroupEntry,
+                                    routeKey = ProfileSheetPage.GROUPS_IN_COMMON,
                                     enabled = !busy,
                                     leading = sharedAvatars,
                                     modifier = Modifier.testTag("person_profile.groups"),
@@ -182,6 +193,7 @@ internal fun PersonProfileContent(
                                     row,
                                     stringResource(R.string.notifications),
                                     onNotifications,
+                                    routeKey = ProfileSheetPage.NOTIFICATIONS,
                                     value = notificationSummary,
                                     enabled = !busy,
                                     leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
@@ -194,6 +206,7 @@ internal fun PersonProfileContent(
                                 row,
                                 stringResource(R.string.profile_nickname_and_notes),
                                 onPrivateDetails,
+                                opensRoute = true,
                                 enabled = !busy,
                                 leading = { SettingsLeadingIcon(R.drawable.ic_edit) },
                                 modifier = Modifier.testTag("person_profile.private_details"),
@@ -205,6 +218,8 @@ internal fun PersonProfileContent(
                                     row,
                                     stringResource(R.string.person_promote_groups),
                                     onPromote,
+                                    routeKey = ProfileSheetPage.MAKE_ADMIN,
+                                    opensRoute = true,
                                     enabled = !busy,
                                     leading = { SettingsLeadingIcon(R.drawable.ic_admin_panel_settings) },
                                     modifier = Modifier.testTag("person_profile.promote_groups"),
@@ -483,10 +498,17 @@ internal fun PersonProfileBottomAction(
         if (scrolled) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLow,
         label = "PersonProfileBottomAction",
     )
+    val (originModifier, routeClick) =
+        dev.ipf.whitenoise.android.ui.settings
+            .rememberSettingsRouteClick(onClick)
     SettingsBottomAction(modifier, color, tonalElevation = 0.dp) {
         WhiteNoiseButton(
-            onClick,
-            Modifier.widthIn(max = 520.dp).fillMaxWidth().align(Alignment.CenterHorizontally),
+            routeClick,
+            Modifier
+                .widthIn(max = 520.dp)
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .then(originModifier),
             enabled = enabled,
         ) {
             if (busy) {

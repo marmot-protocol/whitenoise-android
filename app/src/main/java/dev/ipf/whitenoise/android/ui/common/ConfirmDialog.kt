@@ -30,12 +30,14 @@ internal fun ConfirmDialog(
     dismissLabel: String? = null,
     identity: (@Composable () -> Unit)? = null,
     confirmEnabled: Boolean = true,
+    ownerKey: Any? = dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph.current,
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
+        ownerKey = ownerKey,
         confirmButton = {
             TextButton(
-                onClick = onConfirm,
+                onClick = { close(onConfirm) },
                 enabled = confirmEnabled,
                 modifier = Modifier.testTag("confirmation.confirm"),
                 colors =
@@ -47,7 +49,7 @@ internal fun ConfirmDialog(
             ) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("confirmation.cancel")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag("confirmation.cancel")) {
                 Text(dismissLabel ?: stringResource(R.string.cancel))
             }
         },

@@ -59,6 +59,7 @@ class PersonProfileRouteTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val shown = mutableStateOf(true)
+    private var dismissals = 0
     private val target = "aa".repeat(32)
     private val publicKey = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
     private val profile =
@@ -293,12 +294,27 @@ class PersonProfileRouteTest {
                 .fetchSemanticsNode()
                 .config[SemanticsActions.OnClick]
                 .action!!
+        composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle {
             back()
             message()
-            assertFalse(shown.value)
+            assertTrue(shown.value)
+            assertEquals(0, dismissals)
             assertFalse(app.hasActiveChatCreateOpenTiming())
         }
+        composeRule.mainClock.advanceTimeBy(80)
+        composeRule.runOnIdle {
+            assertTrue(shown.value)
+            assertEquals(0, dismissals)
+        }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle {
+            assertFalse(shown.value)
+            assertEquals(1, dismissals)
+            assertFalse(app.hasActiveChatCreateOpenTiming())
+        }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle { assertEquals(1, dismissals) }
     }
 
     /** Start Group consumes this profile immediately; a captured private Save cannot commit in the same frame. */
@@ -381,7 +397,10 @@ class PersonProfileRouteTest {
                         publicKey,
                         { _, _ -> },
                         onStartGroup,
-                        { shown.value = false },
+                        {
+                            dismissals++
+                            shown.value = false
+                        },
                         securePolicy = SecureFlagPolicy.SecureOn,
                     )
                 }

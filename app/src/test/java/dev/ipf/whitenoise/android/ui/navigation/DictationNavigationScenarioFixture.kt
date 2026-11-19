@@ -24,6 +24,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_COMPACT_ACTIONS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
@@ -349,6 +350,27 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         )
     }
 
+    /** Checks every remaining frame and rejects captures before the shared handoff has settled. */
+    protected fun settleDictationHandoff(
+        fixture: Fixture,
+        assertFrame: () -> Unit = { assertSingleActionSet() },
+    ) {
+        // Include the placement/start frames before the shared tween begins advancing.
+        val frameBudget = (APP_MOTION_OPEN_MILLIS + 15) / 16 + 2
+        var frames = 0
+        assertFrame()
+        while (requireNotNull(fixture.handoff).active && frames < frameBudget) {
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            assertFrame()
+            frames++
+        }
+        assertFalse(
+            "Dictation handoff must settle within the shared motion budget",
+            requireNotNull(fixture.handoff).active,
+        )
+    }
+
     /** Pauses real route motion, reverses it, then checks every frame through an optional inset change. */
     protected fun verifyPersistentTrajectory(
         largeRtl: Boolean,
@@ -389,6 +411,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
             composeRule.mainClock.advanceTimeByFrame()
             assertPersistentPaintedGap(fixture)
         }
+        settleDictationHandoff(fixture) { assertPersistentPaintedGap(fixture) }
         capturePersistentFrame("chats_settled", variant)
         firstNavigationFrame { fixture.route = other }
         repeat(18) { index ->
@@ -407,6 +430,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
             assertPersistentPaintedGap(fixture)
         }
         if (moveIme) assertEquals(180, observedImeBottom)
+        settleDictationHandoff(fixture) { assertPersistentPaintedGap(fixture) }
         capturePersistentFrame("other_settled", variant)
         assertEquals(session, fixture.controller.state.sessionId)
     }
@@ -434,6 +458,14 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         assertCoupledGapFrames(fixture, variant, "other", moveIme, frames = 6)
         firstNavigationFrame { fixture.route = chats }
         assertCoupledGapFrames(fixture, variant, "reverse", moveIme = false, frames = 18)
+        // Keep the interrupted-frame captures, then bound actual terminal settlement.
+        var settlementFrames = 0
+        while (requireNotNull(fixture.handoff).active && settlementFrames < 30) {
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            assertPersistentPaintedGap(fixture)
+            settlementFrames++
+        }
         assertFalse(requireNotNull(fixture.handoff).active)
         assertPersistentPaintedGap(fixture)
         assertEquals(session, fixture.controller.state.sessionId)

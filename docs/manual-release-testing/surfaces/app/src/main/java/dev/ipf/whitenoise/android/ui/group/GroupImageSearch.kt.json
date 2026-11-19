@@ -1,0 +1,46 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt",
+  "legacy_sha256": "fdada4a75124e0125ea47c64a36f954519fcba56768b56cd22c0d5c3b0a13ce6",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ImageSearchPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt",
+        "anchor": "fun ImageSearchPreview(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "ImageSearchSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt",
+        "anchor": "fun ImageSearchSheet(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "ImageSourceButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt",
+        "anchor": "fun ImageSourceButton(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: GroupImageSearch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

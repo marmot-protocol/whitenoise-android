@@ -150,6 +150,7 @@ internal fun ChatDepartureBatchDialog(
     }
     if (!ui.confirmed) {
         ChatDepartureReview(
+            ownerKey = request,
             abandonmentTargets = request.abandonmentTargets.takeIf { request.abandon },
             targetCount = request.targets.size,
             forgetsDm = request.targets.any { it.forgetsDm },
@@ -185,7 +186,7 @@ internal fun ChatDepartureBatchDialog(
                     }
                 }
             },
-            dismissButton = { TextButton(onClick = actions.onDismiss) { Text(stringResource(R.string.close)) } },
+            dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.close)) } },
         )
     }
 }
@@ -216,6 +217,7 @@ internal fun ChatDepartureReview(
     identity: (@Composable () -> Unit)? = null,
     confirmEnabled: Boolean = true,
     forgetsDm: Boolean = false,
+    ownerKey: Any? = Unit,
 ) {
     if (abandonmentTargets != null) {
         // Never review an abandonment without its acting account and chats, captured with the request.
@@ -232,6 +234,7 @@ internal fun ChatDepartureReview(
         }
     } else {
         ConfirmDialog(
+            ownerKey = ownerKey,
             title = actionLabel,
             message =
                 stringResource(R.string.chat_departure_confirm, targetCount) +
@@ -342,6 +345,7 @@ internal fun ChatDepartureSuccessor(
     } else {
         val selectedName = appState.displayName(selected.memberIdHex).ifBlank { stringResource(R.string.member) }
         ConfirmDialog(
+            ownerKey = decision to selected.memberIdHex,
             title = stringResource(R.string.confirm_transfer_admin_title),
             message =
                 stringResource(

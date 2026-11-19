@@ -39,6 +39,13 @@ class ScrollEdgeInventoryTests(unittest.TestCase):
         Modifier.verticalScroll(state)'''
         self.assertEqual(Counter(LazyColumn=2, verticalScroll=1), calls(source))
 
+    def test_animated_menu_aliases_remain_in_the_viewport_inventory(self):
+        self.assertEqual(Counter(AnimatedDropdownMenu=2), calls("""
+        import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu as MotionMenu
+        MotionMenu(expanded = true) {}
+        dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu(expanded = true) {}
+        """))
+
     def test_declarations_comments_and_strings_are_not_viewports(self):
         source = '''fun Modifier.fadingVerticalScroll(state: ScrollState) = this
         // LazyColumn {}

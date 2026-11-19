@@ -56,7 +56,7 @@ internal fun MaestroImagePresentation(fixture: MaestroPresentationFixture) {
                 sourceInfo = PhotoEditorSourceInfo(size, size, 1, "image/png", false),
                 stateHolder = holder,
                 onCancel = { fixture.finish("dismiss") },
-                onSave = { _, _ -> fixture.finish("editor-save-handoff") },
+                onSave = { _, _, _ -> fixture.finish("editor-save-handoff") },
             )
         }
         "image-camera-close" -> MaestroCameraPresentation(fixture)

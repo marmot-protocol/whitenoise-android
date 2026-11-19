@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 /*
  * Outside batch and text selection a message row is one screen-reader stop (#3603). Android maps a
@@ -114,15 +116,15 @@ internal fun Modifier.messageRowChrome(
  * text in the row summary, and the row offers Edit history. Batch selection covers the row with its
  * own tap layer and text selection drops [onClick], so the label is never a separate action there either.
  */
+@Composable
 internal fun Modifier.editedLabelTarget(
     label: String,
-    onClick: (() -> Unit)?,
-): Modifier =
-    if (onClick == null) {
-        this
-    } else {
-        clearAndSetSemantics { text = AnnotatedString(label) }.clickable(onClick = onClick)
-    }
+    onClick: ((Rect?) -> Unit)?,
+): Modifier {
+    if (onClick == null) return this
+    val (sourceModifier, click) = rememberMeasuredControlClick(onClick)
+    return then(sourceModifier).clearAndSetSemantics { text = AnnotatedString(label) }.clickable(onClick = click)
+}
 
 /** Spoken summary of a reaction row, one entry per emoji with its count. */
 @Composable

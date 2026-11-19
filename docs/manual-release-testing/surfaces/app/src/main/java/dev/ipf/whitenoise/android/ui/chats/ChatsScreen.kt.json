@@ -38,17 +38,6 @@
         ]
       },
       {
-        "surface": "ChatListSearchSectionHeader",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "fun ChatListSearchSectionHeader(",
-        "test_ids": [
-          "FIND-002",
-          "FIND-003",
-          "FIND-012",
-          "FIND-013"
-        ]
-      },
-      {
         "surface": "ChatsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "fun ChatsScreen(",

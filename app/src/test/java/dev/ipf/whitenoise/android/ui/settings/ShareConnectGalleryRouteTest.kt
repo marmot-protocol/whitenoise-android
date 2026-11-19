@@ -134,6 +134,7 @@ class ShareConnectGalleryRouteTest {
         mount()
         openShareMenu()
         composeRule.onNodeWithTag(SAVE_ENTRY).performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithText("Save to Gallery").assertDoesNotExist()
         composeRule.waitUntil(10_000) { provider.insertCount == 1 }
         composeRule.onNodeWithTag("share_connect.share").assertIsNotEnabled()
@@ -153,6 +154,7 @@ class ShareConnectGalleryRouteTest {
         mount()
         openShareMenu()
         composeRule.onNodeWithTag(SAVE_ENTRY).performClick()
+        composeRule.waitForIdle()
         composeRule.waitUntil(10_000) { provider.insertCount == 1 }
         composeRule.onNodeWithTag("share_connect.share").performClick()
         composeRule.onNodeWithText("Save to Gallery").assertDoesNotExist()
@@ -172,6 +174,7 @@ class ShareConnectGalleryRouteTest {
             it()
             it()
         }
+        composeRule.waitForIdle()
         // waitForCompletion can read the share button before it is redrawn as disabled, so once the insert lands
         // it could return before the save finished and presented its notice.
         composeRule.waitUntil(10_000) { appState.transientNotice != null }
@@ -189,6 +192,7 @@ class ShareConnectGalleryRouteTest {
         mount()
         openShareMenu()
         composeRule.onNodeWithTag(SAVE_ENTRY).performClick()
+        composeRule.waitForIdle()
         composeRule.waitUntil(10_000) { provider.insertCount == 1 }
         composeRule.runOnIdle { screenVisible = false }
         composeRule.onNodeWithTag("share_connect.share").assertDoesNotExist()
@@ -211,6 +215,7 @@ class ShareConnectGalleryRouteTest {
     private fun saveAndWait() {
         openShareMenu()
         composeRule.onNodeWithTag(SAVE_ENTRY).performClick()
+        composeRule.waitForIdle()
         waitForCompletion()
     }
 

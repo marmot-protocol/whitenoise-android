@@ -1,12 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.content.ClipData
-import android.content.ClipDescription
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import android.os.PersistableBundle
 import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -57,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
 
@@ -124,14 +119,19 @@ internal class ProfileKeysUiState {
         privateKey = null
     }
 
-    /** Cancels a dismissed confirmation before its suspended native export can open the file picker. */
-    fun cancelExport() {
+    /** Invalidates native work immediately while the inert confirmation finishes its exit. */
+    fun cancelExportPreparation() {
         exportOperation.cancel()
         exportBusy = false
+        clearPasswords()
+    }
+
+    /** Removes the confirmation after exit, or immediately when its sensitive owner is lost. */
+    fun cancelExport() {
+        cancelExportPreparation()
         rawExportDialog = false
         passwordDialog = false
         encryptedBackup = null
-        clearPasswords()
     }
 
     /** True when no export is being prepared, picked or written. */
@@ -483,7 +483,7 @@ private fun ProfileKeysList(
         item(key = "search.AccountKeys.2") { AccountKeysIdentityHeader(identity) }
         item(key = "search.AccountKeys.3") { SettingsSection(stringResource(R.string.public_key)) }
         item(key = "search.AccountKeys.4") {
-            SettingsGroup {
+            SettingsGroup(destination = SettingsDetail.AccountKeys, surface = "account-public-key") {
                 row("public_key") { context ->
                     ProfileKeyValueRow(
                         context = context,
@@ -748,35 +748,4 @@ private fun PendingKeyExport.isExpired(): Boolean {
 private fun PendingKeyExport.remainingMillis(): Long {
     val age = SystemClock.elapsedRealtime() - createdAtMillis
     return (ProfileKeysDefaults.EXPIRY_MILLIS - age).coerceAtLeast(0L)
-}
-
-/** Restores the deliberate raw-key share transport, marking both intent and clipboard payload sensitive. */
-private fun sharePrivateKey(
-    context: Context,
-    title: String,
-    content: String,
-): Boolean =
-    runCatching {
-        val clip =
-            ClipData.newPlainText(title, content).apply {
-                description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
-            }
-        val intent =
-            Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, content)
-                putExtra(ClipDescription.EXTRA_IS_SENSITIVE, true)
-                clipData = clip
-            }
-        context.startActivity(Intent.createChooser(intent, title))
-    }.isSuccess
-
-/** Copies public [text]; secrets use [copySensitiveToClipboard], which marks them and clears them later. */
-private fun copyToClipboard(
-    context: Context,
-    label: String,
-    text: String,
-) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
 }

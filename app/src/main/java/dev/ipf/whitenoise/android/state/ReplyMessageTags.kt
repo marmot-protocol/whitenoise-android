@@ -17,13 +17,6 @@ internal data class ReplySnapshot(
     /** True when a reply is selected but its message has no event id to reference yet. */
     val unpublishable: Boolean
         get() = targetMessageIdHex != null && !isPublishableReplyTarget(targetMessageIdHex)
-
-    /**
-     * The reply tags MDK's typed text reply writes, or none without a reply. A reply whose message has no
-     * event id yet throws, so the send reports a failure instead of going out without its reply.
-     */
-    val messageTags: List<List<String>>
-        get() = targetMessageIdHex?.let(::replyMessageTags).orEmpty()
 }
 
 /** True for the lowercase 32-byte hex event id MDK projects; a local send's client token never qualifies. */
@@ -83,6 +76,14 @@ internal fun ConversationController.replyTargetForSend(selected: String?): Resul
     appState.present(R.string.reply_target_not_sent)
     return Result.failure(IllegalStateException("reply target has no event id yet"))
 }
+
+/**
+ * The reply tags a poll or sticker send carries for [reply]: none without a reply, or the `e` and `q` pair for the
+ * event id [replyTargetForSend] resolves. While its message has none, the result is a failure after that notice, so
+ * the send publishes nothing and the reply stays selected.
+ */
+internal fun ConversationController.replyTagsForSend(reply: ReplySnapshot): Result<List<List<String>>> =
+    replyTargetForSend(reply.targetMessageIdHex).map { target -> target?.let(::replyMessageTags).orEmpty() }
 
 /** True when the composer's reply, if any, can be carried by a poll or sticker. */
 internal fun ConversationController.replyAllowsTaggedSend(): Boolean = !snapshotReply().unpublishable

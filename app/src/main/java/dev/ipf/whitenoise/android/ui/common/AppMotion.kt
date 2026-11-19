@@ -13,10 +13,10 @@ import androidx.compose.animation.core.Easing
  */
 
 /** Duration for a surface arriving from its origin. */
-internal const val APP_MOTION_OPEN_MILLIS = 340
+internal const val APP_MOTION_OPEN_MILLIS = 280
 
 /** Duration for a surface returning to its origin. */
-internal const val APP_MOTION_CLOSE_MILLIS = 280
+internal const val APP_MOTION_CLOSE_MILLIS = 230
 
 /** Starts at rest, covers most of the distance early and settles softly. */
 internal val AppMotionOpenEasing: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)

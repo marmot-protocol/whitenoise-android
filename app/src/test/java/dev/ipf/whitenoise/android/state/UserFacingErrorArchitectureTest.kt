@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.kotlinBlockFrom
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,7 +20,7 @@ class UserFacingErrorArchitectureTest {
                 .walkTopDown()
                 .filter { it.isFile && it.extension == "kt" && it.name != "DiagnosticsScreen.kt" }
                 .flatMap { file ->
-                    rawThrowableUiSinkLines(file.readText()).map { line ->
+                    rawThrowableUiSinkLines(file.motionOwnerSource()).map { line ->
                         "${file.relativeTo(sourceRoot)}:$line"
                     }
                 }.toList()
@@ -39,7 +40,7 @@ class UserFacingErrorArchitectureTest {
                 .walkTopDown()
                 .filter { it.isFile && it.extension == "kt" && it.name != "DiagnosticsScreen.kt" }
                 .flatMap { file ->
-                    discardedCauseWithLegacyCopyLines(file.readText()).map { line ->
+                    discardedCauseWithLegacyCopyLines(file.motionOwnerSource()).map { line ->
                         "${file.relativeTo(sourceRoot)}:$line"
                     }
                 }.toList()

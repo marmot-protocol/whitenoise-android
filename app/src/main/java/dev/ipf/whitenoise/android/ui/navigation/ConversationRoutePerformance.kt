@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
-import androidx.compose.animation.core.Transition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -56,7 +55,7 @@ internal fun conversationControllerReleased(
 @Suppress("FunctionNaming")
 internal fun ConversationRouteSettledPerformanceMarker(
     conversationId: String?,
-    routeTransition: Transition<*>,
+    routeTransition: ConversationRouteTransition<*>,
     destinationContentReady: Boolean,
 ) {
     if (!BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return

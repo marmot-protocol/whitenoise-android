@@ -270,9 +270,11 @@ func rehearse() error {
 	// NIP-46 client, proof and catalog, before invoking the publication flags.
 	check := exec.CommandContext(ctx, binary, "--json", "check", "--channel", "main", "zapstore.yaml")
 	check.Dir, check.Env = cmd.Dir, cmd.Env
+	var checkErr bytes.Buffer
+	check.Stderr = &checkErr
 	checked, err := check.Output()
 	if err != nil {
-		return fmt.Errorf("real v2 read-only preflight failed: %w", err)
+		return fmt.Errorf("real v2 read-only preflight failed: %w; %s", err, checkErr.String())
 	}
 	var preflight struct {
 		OK         bool   `json:"ok"`

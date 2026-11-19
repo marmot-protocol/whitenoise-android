@@ -34,16 +34,6 @@
         ]
       },
       {
-        "surface": "ForwardVisibleSelectionAction",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
-        "anchor": "fun ForwardVisibleSelectionAction(",
-        "test_ids": [
-          "FLD-001",
-          "MSG-010",
-          "PRO-008"
-        ]
-      },
-      {
         "surface": "Forward folder filter pills",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
         "anchor": "DestinationFolderFilters(",
@@ -119,27 +109,9 @@
         ]
       },
       {
-        "surface": "Forward visible deselect",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
-        "anchor": "R.string.chat_list_deselect_all",
-        "test_ids": [
-          "MSG-010",
-          "FLD-001"
-        ]
-      },
-      {
         "surface": "Forward clear search",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
         "anchor": "R.string.chat_list_search_clear",
-        "test_ids": [
-          "MSG-010",
-          "FLD-001"
-        ]
-      },
-      {
-        "surface": "Forward visible select",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
-        "anchor": "R.string.chat_list_select_all",
         "test_ids": [
           "MSG-010",
           "FLD-001"

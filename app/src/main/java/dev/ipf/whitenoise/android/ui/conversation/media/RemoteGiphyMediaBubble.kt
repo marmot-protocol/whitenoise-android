@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -97,7 +98,7 @@ internal class GiphyMessageFooter(
     val showStatus: Boolean,
     val status: MessageStatus,
     val editedLabel: String?,
-    val onEditedClick: (() -> Unit)?,
+    val onEditedClick: ((Rect?) -> Unit)?,
 )
 
 /** Thread-safe, byte-bounded cache that survives conversation-row disposal within this process. */

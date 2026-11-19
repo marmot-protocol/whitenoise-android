@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,5 +39,5 @@ class MessageBatchSelectionComposerGateCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
-        ).first(File::exists).readText()
+        ).first(File::exists).motionOwnerSource()
 }

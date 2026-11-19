@@ -1,18 +1,28 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -20,6 +30,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -29,6 +40,8 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.audio.VoicePlaybackSource
 import dev.ipf.whitenoise.android.core.twoFrameGif
 import dev.ipf.whitenoise.android.media.AnimationTermination
 import dev.ipf.whitenoise.android.media.PreemptibleAnimation
@@ -42,8 +55,13 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationMotionEnabled
+import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventImagePane
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -61,6 +79,8 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
+// Real renderer, nested windows and decoder cleanup share this established fixture.
+@Suppress("LargeClass")
 class ConversationMediaViewerProductionPathTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -73,7 +93,117 @@ class ConversationMediaViewerProductionPathTest {
     fun releaseControllers() {
         fixtures.forEach { it.controller.onCleared() }
         fixtures.clear()
+        VoicePlaybackController.stop()
         IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
+    }
+
+    /** Tapping the actual viewer's playback body waits for its own motion, then the measured parent. */
+    @Config(qualifiers = "en-w360dp-h780dp-mdpi")
+    @Test
+    fun playbackSourceWaitsForActualViewerAndMeasuredParent() = assertPlaybackExit(false)
+
+    /** Privacy loss during exit removes the real renderer and drops its source-navigation continuation. */
+    @Test fun privacyLossDuringPlaybackExitNeverRoutes() = assertPlaybackExit(true)
+
+    // One real nested-window lifecycle; player flow is existing fixture input.
+    @Suppress("LongMethod", "UNCHECKED_CAST")
+    private fun assertPlaybackExit(invalidate: Boolean) {
+        val fixture = fixture(DIRECT_MESSAGE_ID, withAccount = true)
+        IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
+        val playerField = VoicePlaybackController::class.java.getDeclaredField("_state").apply { isAccessible = true }
+        val player = playerField.get(VoicePlaybackController) as MutableStateFlow<VoicePlaybackController.PlaybackState>
+        player.value =
+            VoicePlaybackController.PlaybackState(
+                key = "voice",
+                ready = true,
+                sessionId = 10,
+                source = VoicePlaybackSource(ACCOUNT_REF, GROUP_ID, DIRECT_MESSAGE_ID, "Maya"),
+            )
+        var parentVisible by mutableStateOf(true)
+        var viewerVisible by mutableStateOf(true)
+        val events = mutableListOf<String>()
+        val bytes = rendererFixturePngBytes()
+        val lifecycle = ViewerPageTestLifecycleOwner()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                // The destination route is not rendered by this component fixture.
+                Box(Modifier.fillMaxSize().background(Color.Black))
+                CompositionLocalProvider(
+                    LocalLifecycleOwner provides lifecycle,
+                    LocalSystemAnimationsEnabled provides true,
+                    LocalConversationMotionEnabled provides true,
+                    LocalShellPlaybackHost provides ShellPlaybackHost(fixture.appState) { events += "route" },
+                ) {
+                    if (parentVisible) {
+                        MeasuredPlaybackDialog(
+                            origin = null,
+                            onDismissRequest = {
+                                events += "parent"
+                                parentVisible = false
+                            },
+                        ) {
+                            if (viewerVisible) {
+                                FullScreenMediaViewer(
+                                    controller = fixture.controller,
+                                    appState = fixture.appState,
+                                    pages =
+                                        listOf(
+                                            MediaViewerPage(
+                                                DIRECT_MESSAGE_ID,
+                                                0,
+                                                reference(0, "image/png"),
+                                                false,
+                                                SENDER_ID,
+                                                1uL,
+                                            ),
+                                        ),
+                                    startIndex = 0,
+                                    onDismiss = {
+                                        events += "viewer"
+                                        viewerVisible = false
+                                    },
+                                    imageBytes = { bytes },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.awaitViewerImageWorkIdle()
+        composeRule.mainClock.autoAdvance = false
+        val captureFolder =
+            if (!invalidate && System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
+                java.io.File("build/animation-frames/viewer-playback-source/exit").apply { mkdirs() }
+            } else {
+                null
+            }
+        captureFolder?.let {
+            com.github.takahirom.roborazzi
+                .captureScreenRoboImage(java.io.File(it, "source.png").path)
+        }
+        composeRule.onAllNodes(hasText("Maya") and hasAnyAncestor(isDialog())).onLast().performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle { assertEquals(emptyList<String>(), events) }
+        composeRule.onAllNodes(isDialog()).assertCountEquals(2)
+        if (invalidate) {
+            composeRule.runOnIdle { fixture.appState.wipeInProgress = true }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).assertDoesNotExist()
+            composeRule.onAllNodes(isDialog()).assertCountEquals(1)
+        }
+        captureFolder?.let { folder ->
+            repeat(96) { frame ->
+                composeRule.mainClock.advanceTimeBy(16L)
+                composeRule.waitForIdle()
+                com.github.takahirom.roborazzi
+                    .captureScreenRoboImage(java.io.File(folder, "frame-%03d.png".format(frame)).path)
+            }
+        }
+        composeRule.mainClock.advanceTimeBy(2000)
+        composeRule.runOnIdle {
+            assertEquals(if (invalidate) listOf("viewer") else listOf("viewer", "parent", "route"), events)
+        }
     }
 
     /** An uncached foreign chat must not acquire or paint media through the live opener with equal message IDs. */
@@ -542,14 +672,22 @@ class ConversationMediaViewerProductionPathTest {
     }
 
     /** Builds the minimal production controller and timeline item for one visual bubble. */
-    private fun fixture(messageIdHex: String): Fixture {
+    private fun fixture(
+        messageIdHex: String,
+        withAccount: Boolean = false,
+    ): Fixture {
         val appState =
             WhiteNoiseAppState(
                 context = context,
                 draftStore = DraftStore(EmptyDraftPersistence),
                 accountIdHexResolver = { null },
-                accounts = emptyList(),
-                activeAccountRef = "",
+                accounts =
+                    if (withAccount) {
+                        listOf(AccountSummaryFfi(ACCOUNT_REF, "aa".repeat(32), true, false, false, true, false))
+                    } else {
+                        emptyList()
+                    },
+                activeAccountRef = if (withAccount) ACCOUNT_REF else "",
             )
         return Fixture(
             appState = appState,

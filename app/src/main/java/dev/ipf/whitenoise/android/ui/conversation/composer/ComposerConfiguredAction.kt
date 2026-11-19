@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.rememberSystemPasteGuard
 import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import kotlin.math.roundToInt
 
 private const val DISABLED_VOICE_OPACITY = 0.38f
@@ -172,19 +173,22 @@ private fun ComposerOptionalShortcutAction(
     onDictation: (() -> Unit)?,
 ) {
     val shortcutEnabled = enabled && (shortcut != ComposerShortcut.Dictation || onDictation != null)
-    IconButton(
-        onClick = {
-            if (bindings.canActivate()) {
+    val (originModifier, activate) =
+        rememberMeasuredControlClick { origin ->
+            if (shortcutEnabled && bindings.canActivate()) {
                 if (shortcut == ComposerShortcut.Dictation) {
                     onDictation?.invoke()
                 } else {
+                    bindings.onRouteOrigin(shortcut, origin)
                     bindings.attachmentActions[shortcut]?.invoke()
                 }
             }
-        },
+        }
+    IconButton(
+        onClick = activate,
         enabled = shortcutEnabled,
         modifier =
-            modifier.then(
+            modifier.then(originModifier).then(
                 if (shortcut == ComposerShortcut.Dictation) {
                     Modifier.dictationLauncherOrigin()
                 } else {

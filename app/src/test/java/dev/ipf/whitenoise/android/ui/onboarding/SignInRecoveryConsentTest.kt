@@ -151,6 +151,9 @@ class SignInRecoveryConsentTest {
         confirm.performSemanticsAction(SemanticsActions.OnClick)
         confirm.performSemanticsAction(SemanticsActions.OnClick)
 
+        assertEquals(0, engine.recoveries.size)
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
         assertEquals(1, engine.recoveries.size)
         inFlight.complete(Unit)
         composeRule.mainClock.autoAdvance = true

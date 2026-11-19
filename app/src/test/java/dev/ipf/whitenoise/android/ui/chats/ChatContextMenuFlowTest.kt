@@ -7,12 +7,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -180,8 +185,9 @@ class ChatContextMenuFlowTest {
     @Test fun newMessageFlowRetainsPlaybackControls() =
         withScreen(playback = true) { opens, _, _ ->
             composeRule.onNodeWithContentDescription(context.getString(R.string.new_message)).performClick()
-            composeRule.onNodeWithTag("chat.row.a").assertDoesNotExist()
-            returnFromPlayback(opens)
+            composeRule.onNodeWithTag("new_message.screen").assertIsDisplayed()
+            returnFromPlayback(opens, hasAnyAncestor(isDialog()))
+            composeRule.onNodeWithTag("new_message.screen").assertDoesNotExist()
         }
 
     /** Folder management replaces the list but must retain the same retained-player controls. */
@@ -224,13 +230,18 @@ class ChatContextMenuFlowTest {
         }
 
     /** Tests the visible source action, not a direct navigation callback or fabricated transport-only layout. */
-    private fun returnFromPlayback(opens: () -> Int) {
-        composeRule.onNodeWithTag("voice-transport").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.voice_message_play)).assertIsDisplayed()
+    private fun returnFromPlayback(
+        opens: () -> Int,
+        scope: SemanticsMatcher = SemanticsMatcher("any playback host") { true },
+    ) {
+        composeRule.onNode(hasTestTag("voice-transport") and scope).assertIsDisplayed()
         composeRule
-            .onNodeWithContentDescription(context.getString(R.string.tts_playback_action_stop))
+            .onNode(hasContentDescription(context.getString(R.string.voice_message_play)) and scope)
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Playback source").performClick()
+        composeRule
+            .onNode(hasContentDescription(context.getString(R.string.tts_playback_action_stop)) and scope)
+            .assertIsDisplayed()
+        composeRule.onNode(hasText("Playback source") and scope).performClick()
         composeRule.onNodeWithTag("chat.row.a").assertIsDisplayed()
         assertEquals(1, opens())
     }

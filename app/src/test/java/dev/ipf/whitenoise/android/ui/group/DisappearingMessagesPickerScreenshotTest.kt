@@ -6,7 +6,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasAnySibling
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -38,6 +40,59 @@ class DisappearingMessagesPickerScreenshotTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val nativePickers = mutableMapOf<Any?, NumberPicker>()
+
+    /** Optional frames from the actual retention picker caller; no alternate popup. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+    fun captureCustomRetentionPopupFrames() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                CompositionLocalProvider(
+                    dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled provides true,
+                ) {
+                    DisappearingMessagesPickerDialog(currentSecs = 604_800L, onDismiss = {}, onPick = {})
+                }
+            }
+        }
+        try {
+            captureCustomRetentionFrames("forward") {
+                composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+            }
+            captureCustomRetentionFrames("reverse") {
+                composeRule
+                    .onAllNodesWithText(context.getString(R.string.cancel))
+                    .filterToOne(
+                        hasClickAction() and hasAnySibling(hasText(context.getString(R.string.disappearing_set))),
+                    ).assertIsDisplayed()
+                    .performClick()
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun captureCustomRetentionFrames(
+        direction: String,
+        action: () -> Unit,
+    ) {
+        val folder = java.io.File("build/animation-frames/custom-retention-popup/$direction").apply { mkdirs() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        com.github.takahirom.roborazzi
+            .captureScreenRoboImage(java.io.File(folder, "source.png").path)
+        action()
+        composeRule.runOnIdle {
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        repeat(32) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            com.github.takahirom.roborazzi
+                .captureScreenRoboImage(java.io.File(folder, "frame-%03d.png".format(frame)).path)
+        }
+    }
 
     /** Preset ordering keeps the clearer three-month option above the shorter four-week fallback. */
     @Test

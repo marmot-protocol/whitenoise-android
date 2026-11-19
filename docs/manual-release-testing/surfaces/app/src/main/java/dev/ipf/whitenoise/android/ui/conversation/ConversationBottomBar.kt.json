@@ -34,6 +34,14 @@
         "test_ids": [
           "DIC-011"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationBottomBar.kt",
+        "surface": "Composer explanations open above the composer and keep the keyboard",
+        "anchor": "ExplainAboveComposer {",
+        "test_ids": [
+          "CON-048"
+        ]
       }
     ]
   },

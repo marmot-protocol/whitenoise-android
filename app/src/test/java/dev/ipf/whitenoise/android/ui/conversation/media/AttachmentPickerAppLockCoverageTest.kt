@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.core.app.ActivityOptionsCompat
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
 import dev.ipf.whitenoise.android.ui.navigation.rememberProtectedShellSavedState
 import org.junit.Assert.assertEquals
@@ -43,7 +44,7 @@ class AttachmentPickerAppLockCoverageTest {
             sequenceOf(
                 File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
                 File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
-            ).first(File::isFile).readText()
+            ).first(File::isFile).motionOwnerSource()
         listOf(
             "val imagePickerLauncher =",
             "val cameraPermissionLauncher =",

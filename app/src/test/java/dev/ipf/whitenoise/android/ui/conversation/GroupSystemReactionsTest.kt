@@ -283,6 +283,7 @@ class GroupSystemReactionsTest : GroupSystemReactionTestFixtures() {
 
     /** Advances the shared reaction conflator's debounce on Android Main. */
     private fun settle() {
+        composeRule.waitForIdle()
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200))
     }
 }

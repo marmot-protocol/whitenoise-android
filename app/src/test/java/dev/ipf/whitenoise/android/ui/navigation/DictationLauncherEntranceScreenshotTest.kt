@@ -10,6 +10,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_COMPACT_ACTIONS_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.ACCOUNT
@@ -25,6 +27,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 /** Records actual idle-to-start frames, rather than mounting an already running session. */
 @RunWith(RobolectricTestRunner::class)
@@ -124,7 +127,8 @@ internal class DictationLauncherEntranceScreenshotTest : DictationNavigationScen
         assertTrue("Capture uses a real middle phase", middleAlpha > 0f && middleAlpha < 1f)
         assertTrue("Midpoint rises from the launcher", middle.top < first.top)
         captureGolden("src/test/snapshots/dictation_launcher_midpoint_$variant.png")
-        composeRule.mainClock.advanceTimeBy(192)
+        // Include the measured-target preparation frames before requiring retirement.
+        composeRule.mainClock.advanceTimeBy(APP_MOTION_OPEN_MILLIS.toLong())
         val last = capsuleBounds()
         assertTrue(!requireNotNull(fixture.dictationMotion).active)
         assertTrue("The measured trajectory reaches its floating slot", last.top < middle.top)
@@ -147,4 +151,37 @@ internal class DictationLauncherEntranceScreenshotTest : DictationNavigationScen
     }
 
     private fun capsuleBounds() = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
+
+    @Test fun captureDictationEntranceFrames() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val fixture = render(dark = true, largeRtl = false, configured = true, startImmediately = false)
+        captureTransitionFrames("dictation-entry/forward") {
+            firstNavigationFrame {
+                fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+                fixture.platform.listener.onReady()
+            }
+        }
+        assertSingleActionSet()
+    }
+
+    private fun captureTransitionFrames(
+        name: String,
+        action: () -> Unit,
+    ) {
+        check(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val folder = File("build/animation-frames/$name").apply { mkdirs() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        captureScreenRoboImage(File(folder, "source.png").path)
+        action()
+        composeRule.runOnIdle {
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        repeat(32) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            captureScreenRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+        }
+    }
 }

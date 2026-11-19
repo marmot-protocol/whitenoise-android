@@ -73,12 +73,15 @@ internal class MessageBubbleSurfaceState(
     var emojiPickerOpen by mutableStateOf(false)
     var bodyExceedsCollapseLimit by mutableStateOf(false)
 
+    var infoOrigin: Rect? = null
+    var forwardOrigin: Rect? = null
     var infoSheetOpen by mutableStateOf(false)
     var forwardSheetOpen by mutableStateOf(false)
 
     /** The payload captured when the forward sheet opened, so a pending source changing state cannot rewrite it. */
     var forwardSnapshot by mutableStateOf<ForwardMessagePayload?>(null)
     var editHistoryOpen by mutableStateOf(false)
+    var editHistoryOrigin by mutableStateOf<Rect?>(null)
     var reactionSheetOpen by mutableStateOf(false)
     var customizeReactionsOpen by mutableStateOf(false)
     var configureReactionsDraft by mutableStateOf<List<String>>(emptyList())
@@ -126,9 +129,9 @@ internal class MessageBubbleSurfaceState(
         reportError = null
     }
 
-    /** Closes the report sheet once a report is complete, so the next report starts fresh. */
-    fun finishReport() {
-        closeReport()
+    /** Clears a completed report, optionally leaving the sheet mounted until its exit animation finishes. */
+    fun finishReport(closeSheet: Boolean = true) {
+        if (closeSheet) closeReport()
         reportGroupResult = null
         reportGroupRefused = false
     }

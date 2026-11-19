@@ -85,6 +85,7 @@ class KeptMessageMediaTest {
         composeRule.setContent { WhiteNoiseTheme { KeptMediaTestHost(item, onOpen = { opened = it }) } }
         composeRule.onNodeWithTag(KEPT_MESSAGE_MENU_TAG).performClick()
         composeRule.onNodeWithText("Go to Message").performClick()
+        composeRule.waitForIdle()
         assertEquals(KeptMessageKey(SWIPE_TEST_ACCOUNT_REF, SWIPE_TEST_GROUP_ID, SWIPE_TEST_MESSAGE_ID), opened)
     }
 

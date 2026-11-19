@@ -75,7 +75,7 @@ class ContentReportScreenshotTest {
             WhiteNoiseTheme(darkTheme = false) {
                 ReportMessageSheet(
                     onDismissRequest = {},
-                    onSubmit = { reason, explanation -> submitted += reason to explanation },
+                    onSubmit = { reason, explanation, _ -> submitted += reason to explanation },
                 )
             }
         }
@@ -162,7 +162,7 @@ class ContentReportScreenshotTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = 2f) {
-                ReportMessageSheet({}, { reason, explanation -> submitted += reason to explanation })
+                ReportMessageSheet({}, { reason, explanation, _ -> submitted += reason to explanation })
             }
         }
         REPORT_REASONS.forEach { reason ->
