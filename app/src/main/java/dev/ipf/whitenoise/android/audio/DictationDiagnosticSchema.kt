@@ -52,6 +52,7 @@ internal object DictationDiagnosticSchema {
             "completion_action",
             "create_recognizer",
             "failure_recovery",
+            "finish_timing",
             "foreground_notification_closed",
             "foreground_service_destroyed",
             "foreground_service_enqueue_failed",
@@ -139,6 +140,13 @@ internal object DictationDiagnosticSchema {
             "buffer_seconds",
             "version_code",
             "read",
+            "tap_to_capture_closed_ms",
+            "tap_to_last_result_ms",
+            "tap_to_delivered_ms",
+            "generations_after_tap",
+            "retries_after_tap",
+            "settle_wait_ms",
+            "audio_ms",
         )
     private val booleans =
         setOf(
@@ -309,6 +317,8 @@ internal object DictationDiagnosticSchema {
             "Done",
             "provider_microphone",
             "pcm16",
+            "paste",
+            "send",
             "10-30",
             "10-15",
         ) + ConversationDictationFailure.entries.map { it.name } +

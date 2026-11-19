@@ -8,6 +8,7 @@ internal fun ConversationDictationController.acknowledgeCaptureClosed(
     if (captureGeneration != captureClosureGeneration) return
     val releasesTerminalLease = foregroundLease.deferredReleaseCaptureGeneration == captureGeneration
     if (state.sessionId != sessionId && !releasesTerminalLease) return
+    finishTiming.captureClosed(elapsedRealtime())
     foregroundMicrophoneRequired = false
     captureClosureTimeoutHandle?.cancel()
     captureClosureTimeoutHandle = null

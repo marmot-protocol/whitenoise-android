@@ -7,6 +7,8 @@ internal class ConversationDictationRestartOwner {
     private var timeout: ConversationDictationTimeoutHandle? = null
     var lastTeardownAtElapsedMillis: Long? = null
         private set
+    var teardownSettleMillis = conversationDictationTeardownSettleMillis(providerEnded = false)
+        private set
     private var consecutiveNoSpeech = 0
     private var disconnectRetries = 0
     private var permissionRetryUsed = false
@@ -39,8 +41,12 @@ internal class ConversationDictationRestartOwner {
         restartId += 1L
     }
 
-    fun noteTeardown(now: Long) {
+    fun noteTeardown(
+        now: Long,
+        providerEnded: Boolean,
+    ) {
         lastTeardownAtElapsedMillis = now
+        teardownSettleMillis = conversationDictationTeardownSettleMillis(providerEnded)
     }
 
     fun noteNoSpeech(

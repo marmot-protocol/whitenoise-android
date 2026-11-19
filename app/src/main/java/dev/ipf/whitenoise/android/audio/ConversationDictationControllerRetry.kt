@@ -92,6 +92,7 @@ internal fun ConversationDictationController.retryRetainedCallerAudioOrFail(
     conversationDictationDiagnostic(
         "event=caller_audio_retry_scheduled failure=${failure.name} delay_ms=$delayMillis",
     )
+    finishTiming.retryScheduled()
     if (delayMillis == 0L) {
         startRecognition(sessionId, target)
     } else {

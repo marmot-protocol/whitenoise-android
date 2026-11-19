@@ -65,6 +65,7 @@ internal fun ConversationDictationController.startRecognition(
     val generationId = generation.begin()
     val generationStartedAtElapsedMillis = elapsedRealtime()
     conversationDictationDiagnostic("event=recognizer_generation_start generation=$generationId")
+    finishTiming.generationStarted()
     state = ConversationDictationState.Starting(sessionId, target)
     armGenerationTimeout(
         sessionId,
@@ -183,6 +184,7 @@ internal fun ConversationDictationController.startRecognition(
                     )
                     return
                 }
+                generation.markProviderEnded()
                 clearRecognitionGeneration(cancel = false)
                 if (settlement != null) {
                     if (!recognition.accept(settlement)) {
@@ -193,6 +195,7 @@ internal fun ConversationDictationController.startRecognition(
                 } else {
                     commitSegment(recognized)
                 }
+                finishTiming.result(elapsedRealtime(), request?.chunk?.lastSampleExclusive)
                 val targetStillAvailable = runCatching { targetAvailable(target) }.getOrDefault(false)
                 if (!targetStillAvailable) {
                     fail(
@@ -220,12 +223,17 @@ internal fun ConversationDictationController.startRecognition(
                 if (failure == ConversationDictationCallerAudioFailure.CaptureFailed) {
                     failOrRetainTranscript(sessionId, target, failure.recognitionFailure)
                 } else {
-                    onError(failure.recognitionFailure)
+                    handleError(failure.recognitionFailure, providerEnded = false)
                 }
             }
 
+            override fun onError(error: ConversationDictationFailure) = handleError(error, providerEnded = true)
+
             /** Applies retry or terminal-failure policy only to the current generation. */
-            override fun onError(error: ConversationDictationFailure) {
+            private fun handleError(
+                error: ConversationDictationFailure,
+                providerEnded: Boolean,
+            ) {
                 conversationDictationDiagnostic(
                     "event=callback_error generation=$generationId failure=${error.name} " +
                         "elapsed_ms=${elapsedRealtime() - generationStartedAtElapsedMillis}",
@@ -244,6 +252,7 @@ internal fun ConversationDictationController.startRecognition(
                 if (!owns(sessionId, generationId)) return
                 val elapsedMillis = elapsedRealtime() - generationStartedAtElapsedMillis
                 if (recycleIdleCallerAudioGeneration(sessionId, target, error, elapsedMillis)) return
+                if (providerEnded) generation.markProviderEnded()
                 unresolvedRecognitionFailure = failure
                 val currentSession = generation.session
                 if (error.isEmptyRecognition && dropSilentFinalTail(sessionId, target, currentSession, failure)) {
@@ -338,9 +347,11 @@ internal fun ConversationDictationController.deferRecognitionUntilTeardownSettle
     sessionId: Long,
     target: ConversationDictationTarget,
 ): Boolean {
-    val releasedAt = restart.lastTeardownAtElapsedMillis ?: (elapsedRealtime() - GENERATION_RESTART_DELAY_MILLIS)
-    val delayMillis = (GENERATION_RESTART_DELAY_MILLIS - (elapsedRealtime() - releasedAt)).coerceAtLeast(0L)
+    val settleMillis = restart.teardownSettleMillis
+    val releasedAt = restart.lastTeardownAtElapsedMillis ?: (elapsedRealtime() - settleMillis)
+    val delayMillis = (settleMillis - (elapsedRealtime() - releasedAt)).coerceAtLeast(0L)
     if (delayMillis == 0L) return false
+    finishTiming.settleWait(delayMillis)
     cancelPendingRestart()
     state = ConversationDictationState.Starting(sessionId, target)
     val scheduledRestartId = restart.reserve()

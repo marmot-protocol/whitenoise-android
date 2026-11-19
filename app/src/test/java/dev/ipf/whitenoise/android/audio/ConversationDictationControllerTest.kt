@@ -63,7 +63,7 @@ class ConversationDictationControllerTest {
             f.platform.useRealAudioSettlements = true
             assertTrue(f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue("")))
             f.platform.listener.onResult("turn left.")
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             assertEquals(
                 4L,
                 f.platform.session
@@ -76,7 +76,7 @@ class ConversationDictationControllerTest {
             f.controller.send()
             f.platform.listener.onResult(" ")
             assertEquals(12, buffer.bufferedBytes)
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             val replay = requireNotNull(f.platform.session.callerAudioRequest())
             assertEquals(1, replay.replayParts.size)
             assertEquals(
@@ -112,9 +112,9 @@ class ConversationDictationControllerTest {
             assertTrue(f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue("")))
             if (finishBeforeFailure) f.controller.send()
             f.platform.listener.onResult(" ")
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(if (finishBeforeFailure) 50L else 500L)
             f.platform.listener.onError(ConversationDictationFailure.NoMatch)
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(if (finishBeforeFailure) 50L else 500L)
             f.platform.listener.onResult(null)
             assertTrue("finish=$finishBeforeFailure", f.controller.state is ConversationDictationState.Failed)
             assertEquals(8, buffer.bufferedBytes)
@@ -143,7 +143,7 @@ class ConversationDictationControllerTest {
         f.platform.useRealAudioSettlements = true
         assertTrue(f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue("")))
         f.platform.listener.onResult("hello")
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         f.controller.send()
         f.platform.session.callerAudioFeedComplete = false
         f.platform.listener.onResult("world")
@@ -188,7 +188,7 @@ class ConversationDictationControllerTest {
             assertFalse(f.controller.foregroundMicrophoneRequired)
             assertEquals(pcm.size, buffer.bufferedBytes)
             assertTrue(sent.isEmpty())
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             val replayed = f.platform.claimedChunks.last()
             assertEquals(rejected.chunkId, replayed.chunkId)
             assertArrayEquals(pcm, replayed.pcm)
@@ -210,12 +210,12 @@ class ConversationDictationControllerTest {
         f.drafts[other] = TextFieldValue("")
         f.platform.pendingCallerAudio = true
         f.controller.requestStart(ACCOUNT, other.second, TextFieldValue(""))
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         f.controller.paste()
         exhaustFinalNoMatch(f)
         assertTrue(f.controller.hasParkedComposerAudio(ACCOUNT, other.second))
         f.controller.requestFreshComposerStart(ACCOUNT, GROUP, f.drafts.getValue(key()), null)
-        f.scheduler.runDelay(500L)
+        f.scheduler.advanceBy(500L)
         assertFalse(f.controller.hasParkedComposerAudio(ACCOUNT, GROUP))
         assertTrue(f.controller.hasParkedComposerAudio(ACCOUNT, other.second))
         assertEquals(1, f.platform.parkedAudioDiscards)
@@ -295,7 +295,7 @@ class ConversationDictationControllerTest {
         assertEquals("", f.drafts.getValue(key()).text)
         allowWrite = true
         f.controller.requestFreshComposerStart(ACCOUNT, GROUP, TextFieldValue(""), null)
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         assertEquals("first", f.drafts.getValue(key()).text)
         assertEquals(
             "first",
@@ -340,7 +340,7 @@ class ConversationDictationControllerTest {
                 f.platform.pendingCallerAudio = true
                 f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
                 f.platform.listener.onResult("recognized prefix")
-                f.scheduler.runDelay(500L)
+                f.scheduler.runDelay(50L)
                 if (send) f.controller.send() else f.controller.paste()
                 f.platform.session.callerAudioFinalChunk = true
                 val oldListener = f.platform.listener
@@ -362,7 +362,7 @@ class ConversationDictationControllerTest {
                     f.controller.composerAccess(ACCOUNT, other.second).phase,
                 )
                 f.controller.requestComposerStart(ACCOUNT, other.second, f.drafts.getValue(other), null)
-                f.scheduler.runDelay(500L)
+                f.scheduler.runDelay(50L)
                 val replacement = f.controller.state
                 assertEquals(other.second, replacement.target?.groupIdHex)
                 assertTrue(f.controller.hasDurableSession)
@@ -372,7 +372,7 @@ class ConversationDictationControllerTest {
                 assertEquals("Other draft", f.drafts.getValue(other).text)
                 f.controller.cancel()
                 f.controller.retryComposerAudio(retained)
-                f.scheduler.runDelay(500L)
+                f.scheduler.advanceBy(500L)
                 f.platform.pendingCallerAudio = false
                 f.platform.listener.onResult("recovered tail")
                 advanceUntilIdle()
@@ -400,7 +400,7 @@ class ConversationDictationControllerTest {
         val other = ACCOUNT to "other-chat"
         f.drafts[other] = TextFieldValue("")
         assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         val replacement = f.controller.state
         assertTrue(f.controller.foregroundMicrophoneRequired)
         close()
@@ -478,7 +478,7 @@ class ConversationDictationControllerTest {
             f.drafts[ACCOUNT to group] = TextFieldValue("")
             f.platform.pendingCallerAudio = true
             assertTrue(f.controller.requestStart(ACCOUNT, group, TextFieldValue("")))
-            if (index > 0) f.scheduler.runDelay(500L)
+            if (index > 0) f.scheduler.runDelay(50L)
             f.controller.paste()
             f.platform.session.callerAudioFinalChunk = true
             exhaustFinalNoMatch(f)
@@ -533,7 +533,7 @@ class ConversationDictationControllerTest {
             val other = ACCOUNT to "other-group"
             f.drafts[other] = TextFieldValue("")
             assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             val active = f.controller.state.sessionId
             assertFalse(f.controller.keepComposerAudioForLater(access))
             f.controller.retryComposerAudio(access)
@@ -546,7 +546,7 @@ class ConversationDictationControllerTest {
             assertEquals(ConversationDictationComposerPhase.RemainingAudio, retained.phase)
             assertTrue(f.controller.canRetryComposerAudio(retained))
             f.controller.retryComposerAudio(retained)
-            f.scheduler.runDelay(500L)
+            f.scheduler.advanceBy(500L)
             f.platform.pendingCallerAudio = false
             f.platform.listener.onResult("last half sentence")
             advanceUntilIdle()
@@ -568,12 +568,12 @@ class ConversationDictationControllerTest {
             val other = ACCOUNT to "removed-group"
             f.drafts[other] = TextFieldValue("")
             assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.controller.onTargetRemoved(ACCOUNT, other.second)
             assertTrue(f.controller.state is ConversationDictationState.Idle)
             assertTrue(f.controller.canRetryComposerAudio(kept))
             f.controller.retryComposerAudio(kept)
-            f.scheduler.runDelay(500L)
+            f.scheduler.advanceBy(500L)
             f.platform.pendingCallerAudio = false
             f.platform.listener.onResult("recovered tail")
             advanceUntilIdle()
@@ -609,7 +609,7 @@ class ConversationDictationControllerTest {
         f.drafts[other] = TextFieldValue("")
         f.platform.pendingCallerAudio = true
         assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         f.controller.paste()
         f.platform.allowAudioParking = false
         f.platform.session.callerAudioFinalChunk = true
@@ -957,7 +957,7 @@ class ConversationDictationControllerTest {
                 )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.listener.onResult("accepted")
-            f.scheduler.runDelay(500L)
+            f.scheduler.advanceBy(500L)
             f.platform.pendingCallerAudio = pendingAudio
             locked = true
             f.controller.interruptForAudioFocusLoss()
@@ -1079,7 +1079,7 @@ class ConversationDictationControllerTest {
                 )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.listener.onResult("accepted")
-            f.scheduler.runDelay(500L)
+            f.scheduler.advanceBy(500L)
             val playback = idleDictationPlaybackHandoff()
             val handoff =
                 dev.ipf.whitenoise.android.state
@@ -1220,7 +1220,7 @@ class ConversationDictationControllerTest {
             f.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other draft")
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.listener.onResult("accepted")
-            f.scheduler.runDelay(500L)
+            f.scheduler.advanceBy(500L)
             f.edit(key(), TextFieldValue("New draft", TextRange(9)))
             targetAvailable = available
             f.controller.interruptForAudioFocusLoss()
@@ -1510,7 +1510,7 @@ class ConversationDictationControllerTest {
         active.controller.requestStart(ACCOUNT, GROUP, active.drafts.getValue(key()))
         val stale = active.platform.listener
         active.platform.listener.onResult("PRIVATE_SPEECH")
-        active.scheduler.runDelay(500L)
+        active.scheduler.runDelay(50L)
         active.controller.paste()
         active.scheduler.advanceBy(90_000L)
         active.controller.retry()
@@ -2410,7 +2410,7 @@ class ConversationDictationControllerTest {
             assertEquals(listOf("pause"), events)
             assertTrue(f.controller.ownsMicrophone)
             platform.listener.onResult("first phrase")
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             platform.listener.onReady()
             assertEquals(2, platform.claimedChunks.size)
             assertTrue(
@@ -2449,7 +2449,7 @@ class ConversationDictationControllerTest {
         assertEquals(listOf("pause", "resume"), events)
 
         fixture.platform.listener.onResult("first phrase")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         assertEquals(listOf("pause", "resume", "pause"), events)
         assertTrue(fixture.controller.ownsMicrophone)
     }
@@ -2470,7 +2470,7 @@ class ConversationDictationControllerTest {
 
         assertEquals(listOf("pause", "resume"), events)
         assertFalse(fixture.controller.ownsMicrophone)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         assertEquals(listOf("pause", "resume", "pause"), events)
     }
 
@@ -3726,7 +3726,7 @@ class ConversationDictationControllerTest {
             )
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first segment")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
         fixture.controller.send()
 
@@ -3854,7 +3854,7 @@ class ConversationDictationControllerTest {
         val fixture = fixture(draft = TextFieldValue("Keep"))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first segment")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         fixture.platform.listener.onBeginningOfSpeech()
         fixture.controller.paste()
         fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
@@ -3872,7 +3872,7 @@ class ConversationDictationControllerTest {
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
             if (withText) {
                 fixture.platform.listener.onResult("first segment")
-                fixture.scheduler.runDelay(500L)
+                fixture.scheduler.advanceBy(500L)
             }
             fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
             fixture.scheduler.runDelay(500L)
@@ -4159,7 +4159,7 @@ class ConversationDictationControllerTest {
         assertEquals(0, fixture.writes)
         assertEquals(1, releases)
         assertTrue(firstSession.destroyed)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         assertEquals(2, fixture.platform.sessions.size)
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
         assertTrue(fixture.controller.ownsMicrophone)
@@ -4334,7 +4334,7 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         platform.sessionCallerAudioOwnedOverride = false
         platform.listener.onResult("first chunk")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         assertEquals(2, platform.sessions.size)
 
         platform.capturedSilenceMillis = 3_000L
@@ -4500,7 +4500,7 @@ class ConversationDictationControllerTest {
             )
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         platform.listener.onResult("first chunk")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         platform.listener.onReady()
 
         fixture.scheduler.runDelay(3_000L)
@@ -4529,15 +4529,15 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
 
         fixture.platform.listener.onResult("Hello")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         assertEquals(2, fixture.platform.sessions.size)
         fixture.platform.listener.onResult("Hello")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         assertEquals(3, fixture.platform.sessions.size)
         fixture.platform.listener.onResult(",")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         fixture.platform.listener.onResult("world")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         fixture.platform.listener.onResult("world")
         fixture.controller.stop()
 
@@ -4553,7 +4553,7 @@ class ConversationDictationControllerTest {
         val firstGeneration = fixture.platform.listener
 
         firstGeneration.onResult("Hello")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         assertEquals(2, fixture.platform.sessions.size)
         firstGeneration.onResult("Hello")
         fixture.controller.stop()
@@ -4572,7 +4572,7 @@ class ConversationDictationControllerTest {
         fixture.platform.listener.onResult("first")
 
         assertEquals(1, fixture.platform.sessions.size)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         assertEquals(2, fixture.platform.sessions.size)
         val draftText = fixture.drafts.getValue(key()).text
         assertTrue(draftText.isEmpty())
@@ -4595,7 +4595,7 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
 
         fixture.controller.stop()
         val blankSession = fixture.platform.session
@@ -4606,7 +4606,7 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
         assertEquals("", fixture.drafts.getValue(key()).text)
 
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.platform.pendingCallerAudio = false
         fixture.platform.listener.onResult("last sentence")
 
@@ -4633,7 +4633,7 @@ class ConversationDictationControllerTest {
         fixture.scheduler.advanceBy(10_000L)
         assertEquals(3, fixture.platform.sessions.size)
         fixture.controller.retry()
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         assertEquals(1L, fixture.platform.session.callerAudioChunkId())
         fixture.platform.pendingCallerAudio = false
         fixture.platform.listener.onResult("quiet final words")
@@ -4667,7 +4667,7 @@ class ConversationDictationControllerTest {
 
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
 
         assertTrue(fixture.controller.state is ConversationDictationState.Failed)
@@ -4690,7 +4690,7 @@ class ConversationDictationControllerTest {
             .providerError(ConversationDictationFailure.NoSpeech)
 
         assertEquals(1, fixture.platform.sessions.size)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         assertEquals(2, fixture.platform.sessions.size)
         assertEquals(
             1,
@@ -4725,7 +4725,7 @@ class ConversationDictationControllerTest {
             fixture.platform.pendingCallerAudio = true
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
             fixture.platform.listener.onResult("first")
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.controller.paste()
 
             repeat(2) { retry ->
@@ -4741,7 +4741,7 @@ class ConversationDictationControllerTest {
                 ) {
                     fixture.scheduler.runDelay(if (retry == 0) 500L else 1_000L)
                 } else {
-                    fixture.scheduler.runDelay(500L)
+                    fixture.scheduler.runDelay(50L)
                 }
             }
             if (failureCallback != null) {
@@ -4763,7 +4763,7 @@ class ConversationDictationControllerTest {
 
             fixture.controller.retry()
             assertTrue(fixture.controller.state is ConversationDictationState.Starting)
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.advanceBy(500L)
             fixture.platform.pendingCallerAudio = false
             fixture.platform.listener.onResult("recovered tail")
             assertEquals("first recovered tail", fixture.drafts.getValue(key()).text)
@@ -4837,7 +4837,7 @@ class ConversationDictationControllerTest {
         val fixture = fixture(draft = TextFieldValue("Keep"), platform = FakePlatform(deferCaptureCompletion = true))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first segment")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         fixture.platform.listener.onBeginningOfSpeech()
         fixture.controller.send()
         assertTrue(fixture.controller.state is ConversationDictationState.Processing)
@@ -4866,7 +4866,7 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         assertEquals(1, fixture.platform.captureSessionsStarted)
         fixture.platform.listener.onResult("first segment")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         assertEquals(1, fixture.platform.captureSessionsStarted)
         fixture.controller.cancel()
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
@@ -4880,7 +4880,7 @@ class ConversationDictationControllerTest {
         val fixture = fixture(draft = TextFieldValue("Keep"))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first segment")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         fixture.platform.listener.onBeginningOfSpeech()
         fixture.controller.send()
         assertTrue(fixture.controller.state is ConversationDictationState.Processing)
@@ -4986,7 +4986,7 @@ class ConversationDictationControllerTest {
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.tracksCallerAudioDisposal = true
             f.platform.listener.onResult("first")
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.controller.paste()
             f.platform.session.callerAudioFinalChunk = true
             exhaustFinalNoMatch(f)
@@ -4997,7 +4997,7 @@ class ConversationDictationControllerTest {
             assertEquals(tailBytes, buffer.bufferedBytes)
             assertFalse(f.controller.hasDurableSession)
             f.controller.retryComposerAudio(f.controller.composerAccess(ACCOUNT, GROUP))
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             var offset = 0
             var part = 0
             while (offset < tailBytes) {
@@ -5010,7 +5010,7 @@ class ConversationDictationControllerTest {
                 offset += retried.pcm.size
                 part += 1
                 f.platform.listener.onResult("tail$part")
-                if (offset < tailBytes) f.scheduler.runDelay(500L)
+                if (offset < tailBytes) f.scheduler.runDelay(50L)
             }
             assertEquals(tailBytes, offset)
             assertEquals(0, buffer.bufferedBytes)
@@ -5035,7 +5035,7 @@ class ConversationDictationControllerTest {
         assertEquals(ConversationDictationComposerPhase.Transcribing, f.controller.composerAccess(ACCOUNT, GROUP).phase)
         f.controller.discardComposerAudio(access)
         assertTrue(f.platform.pendingCallerAudio)
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         f.platform.pendingCallerAudio = false
         f.platform.listener.onResult("tail")
         assertEquals("Draft first tail", f.drafts.getValue(key()).text)
@@ -5085,7 +5085,7 @@ class ConversationDictationControllerTest {
         f.platform.pendingCallerAudio = true
         f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
         f.platform.listener.onResult("first")
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         f.controller.paste()
         f.platform.session.callerAudioFinalChunk = true
         exhaustFinalNoMatch(f)
@@ -5149,7 +5149,7 @@ class ConversationDictationControllerTest {
         f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
         platform.tracksCallerAudioDisposal = true
         platform.listener.onResult("first")
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         f.controller.paste()
         platform.session.callerAudioFinalChunk = true
         exhaustFinalNoMatch(f)
@@ -5624,7 +5624,7 @@ class ConversationDictationControllerTest {
             })
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("body")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         val token = requireNotNull(fixture.controller.notificationSessionToken)
         fixture.controller.send()
         fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
@@ -5657,7 +5657,7 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.session.completeCapture()
         fixture.platform.listener.onResult("body")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         fixture.platform.listener.onBeginningOfSpeech()
         fixture.controller.send()
         assertTrue(fixture.controller.state is ConversationDictationState.Processing)
@@ -5690,7 +5690,7 @@ class ConversationDictationControllerTest {
         f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
         f.platform.session.completeCapture()
         f.platform.listener.onResult("body")
-        f.scheduler.runDelay(500L)
+        f.scheduler.advanceBy(500L)
         f.platform.listener.onBeginningOfSpeech()
         f.controller.send()
         val closingCapture = f.platform.session
@@ -5824,11 +5824,11 @@ class ConversationDictationControllerTest {
             ready[0]()
             val oldToken = requireNotNull(fixture.controller.notificationSessionToken)
             fixture.platform.listener.onResult("body")
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.controller.send()
             repeat(2) {
                 fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
-                fixture.scheduler.runDelay(500L)
+                fixture.scheduler.runDelay(50L)
             }
             fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
             advanceUntilIdle()
@@ -5840,7 +5840,7 @@ class ConversationDictationControllerTest {
             val generations = fixture.platform.sessions.size
 
             fixture.controller.retry()
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             assertEquals(2, ready.size)
             assertTrue(fixture.controller.hasDurableSession)
             assertTrue(oldToken != fixture.controller.notificationSessionToken)
@@ -5923,7 +5923,7 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("body")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.controller.send()
         fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
         assertTrue(fixture.controller.hasDurableSession)
@@ -5957,7 +5957,7 @@ class ConversationDictationControllerTest {
             fixture.platform.pendingCallerAudio = true
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
             fixture.platform.listener.onResult("recognized body")
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.controller.send()
             fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
             fixture.controller.sendRecognizedText()
@@ -5981,18 +5981,18 @@ class ConversationDictationControllerTest {
             fixture.platform.pendingCallerAudio = true
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
             fixture.platform.listener.onResult("first")
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.controller.paste()
 
             fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.platform.session.callerAudioRetryAvailable = false
             if (stalledProviderCallback == null) {
                 fixture.platform.listener.onResult(null)
             } else {
                 fixture.platform.listener.onError(stalledProviderCallback)
             }
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(if (stalledProviderCallback == null) 50L else 500L)
             fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
             assertEquals("first", fixture.drafts.getValue(key()).text)
             assertEquals(4, fixture.platform.sessions.size)
@@ -6022,7 +6022,7 @@ class ConversationDictationControllerTest {
             fixture.platform.pendingCallerAudio = true
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
             fixture.platform.listener.onResult("recognized body")
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.controller.send()
 
             val disconnectedGeneration = fixture.platform.listener
@@ -6060,7 +6060,7 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("recognized body")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.controller.paste()
         fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
         assertEquals(2, fixture.platform.sessions.size)
@@ -6083,7 +6083,7 @@ class ConversationDictationControllerTest {
             fixture.platform.pendingCallerAudio = true
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
             fixture.platform.listener.onResult("recognized body")
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.controller.paste()
             fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
             assertEquals(2, fixture.platform.sessions.size)
@@ -6116,12 +6116,12 @@ class ConversationDictationControllerTest {
             fixture.platform.pendingCallerAudio = true
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
             fixture.platform.listener.onResult("first")
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.controller.send()
 
             repeat(2) {
                 fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
-                fixture.scheduler.runDelay(500L)
+                fixture.scheduler.runDelay(50L)
             }
             fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
             advanceUntilIdle()
@@ -6137,7 +6137,7 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.canRetryRetainedAudio)
 
             fixture.controller.retry()
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.platform.pendingCallerAudio = false
             fixture.platform.listener.onResult("recovered tail")
             advanceUntilIdle()
@@ -6174,7 +6174,7 @@ class ConversationDictationControllerTest {
             assertEquals("", f.drafts.getValue(key()).text)
             assertEquals(1, f.controller.pendingSendRevision(ACCOUNT, GROUP))
             f.controller.retry()
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.platform.listener.onReady()
             f.platform.listener.onEndOfSpeech()
             val recovering = f.controller.state
@@ -6335,7 +6335,7 @@ class ConversationDictationControllerTest {
                 assertTrue(f.platform.pendingCallerAudio)
                 assertEquals("first", f.drafts.getValue(key()).text)
                 f.platform.onCallerAudioStateRead = null
-                f.scheduler.runDelay(500L)
+                f.scheduler.runDelay(50L)
                 f.platform.pendingCallerAudio = false
                 f.platform.listener.onResult("tail")
                 advanceUntilIdle()
@@ -6384,7 +6384,7 @@ class ConversationDictationControllerTest {
                 f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
                 f.platform.tracksCallerAudioDisposal = true
                 f.platform.listener.onResult("first")
-                f.scheduler.runDelay(500L)
+                f.scheduler.runDelay(50L)
                 when (mode) {
                     "automatic" -> {
                         f.platform.capturedSilenceMillis = 3_000L
@@ -6410,7 +6410,7 @@ class ConversationDictationControllerTest {
                 stale.onResult("stale tail")
                 assertTrue(f.controller.state is ConversationDictationState.Failed)
                 f.controller.retry()
-                f.scheduler.runDelay(500L)
+                f.scheduler.runDelay(50L)
                 f.platform.pendingCallerAudio = false
                 f.platform.listener.onResult("recovered tail")
                 advanceUntilIdle()
@@ -6443,7 +6443,7 @@ class ConversationDictationControllerTest {
             f.platform.deferCallerAudioFinish = true
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.listener.onResult("first")
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.controller.send()
             f.platform.session.callerAudioFinalChunk = true
             exhaustFinalNoMatch(f)
@@ -6475,7 +6475,7 @@ class ConversationDictationControllerTest {
                 )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             platform.listener.onResult("first")
-            f.scheduler.runDelay(500L)
+            f.scheduler.advanceBy(500L)
             platform.listener.onBeginningOfSpeech()
             f.controller.send()
             val closing = platform.session
@@ -6511,7 +6511,7 @@ class ConversationDictationControllerTest {
                 )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             platform.listener.onResult("first")
-            f.scheduler.runDelay(500L)
+            f.scheduler.advanceBy(500L)
             platform.listener.onBeginningOfSpeech()
             f.controller.send()
             val closing = platform.session
@@ -6547,7 +6547,7 @@ class ConversationDictationControllerTest {
             f.platform.deferCallerAudioFinish = true
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.listener.onResult("first")
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.controller.send()
             f.platform.session.callerAudioFinalChunk = true
             exhaustFinalNoMatch(f)
@@ -6592,7 +6592,7 @@ class ConversationDictationControllerTest {
             readUnavailable = false
             f.edit(key(), TextFieldValue("New draft"))
             f.controller.retry()
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.platform.pendingCallerAudio = false
             f.platform.listener.onResult("tail")
             advanceUntilIdle()
@@ -6649,7 +6649,7 @@ class ConversationDictationControllerTest {
             assertTrue(f.controller.recoveryHandedToComposer)
             allowWrite = false
             f.controller.retry()
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.platform.pendingCallerAudio = false
             f.platform.listener.onResult("tail")
             advanceUntilIdle()
@@ -6686,7 +6686,7 @@ class ConversationDictationControllerTest {
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.tracksCallerAudioDisposal = true
             f.platform.listener.onResult("first")
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.controller.send()
             f.platform.session.callerAudioFinalChunk = true
             exhaustFinalNoMatch(f)
@@ -6736,7 +6736,7 @@ class ConversationDictationControllerTest {
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.tracksCallerAudioDisposal = true
             f.platform.listener.onResult("first")
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.controller.send()
             val failedGeneration = f.platform.session
             failedGeneration.callerAudioFeedComplete = false
@@ -6755,14 +6755,14 @@ class ConversationDictationControllerTest {
         f.platform.pendingCallerAudio = true
         f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
         f.platform.listener.onResult("first")
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         f.controller.send()
         f.platform.session.callerAudioFinalChunk = true
         exhaustFinalNoMatch(f)
         assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
         f.edit(key(), TextFieldValue("New draft"))
         f.controller.retry()
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         f.platform.session.callerAudioFinalChunk = true
         exhaustFinalNoMatch(f)
         val failed = f.controller.state as ConversationDictationState.Failed
@@ -6799,7 +6799,7 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Starting)
             assertEquals(1, session.retriedCallerAudioWithFollowingAudio)
             assertEquals(0, session.acknowledgedCallerAudio)
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             assertEquals(2, fixture.platform.sessions.size)
         }
     }
@@ -6823,7 +6823,7 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.controller.paste()
         val session = fixture.platform.session
         session.callerAudioFinalChunk = true
@@ -6853,7 +6853,7 @@ class ConversationDictationControllerTest {
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             if (f.platform.sessions.isEmpty()) f.scheduler.runDelay(500L)
             f.platform.listener.onResult("first")
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.controller.send()
             val tail = f.platform.session
             tail.callerAudioFinalChunk = true
@@ -6873,7 +6873,7 @@ class ConversationDictationControllerTest {
         repeat(3) {
             fixture.platform.session.callerAudioFinalChunk = true
             fixture.platform.listener.onError(ConversationDictationFailure.NoMatch)
-            if (fixture.controller.state is ConversationDictationState.Starting) fixture.scheduler.runDelay(500L)
+            if (fixture.controller.state is ConversationDictationState.Starting) fixture.scheduler.runDelay(50L)
         }
     }
 
@@ -6885,13 +6885,13 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         val created = fixture.platform.sessions.size
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-        if (fixture.platform.sessions.size == created) fixture.scheduler.runDelay(500L)
+        if (fixture.platform.sessions.size == created) fixture.scheduler.advanceBy(500L)
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         if (send) fixture.controller.send() else fixture.controller.paste()
         repeat(2) {
             fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
         }
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
         assertTrue(
@@ -6909,19 +6909,19 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.controller.paste()
 
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.platform.session.callerAudioHasSpeech = false
         fixture.platform.listener.onResult(null)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
 
         repeat(2) {
             fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
             assertTrue(fixture.controller.state is ConversationDictationState.Starting)
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
         }
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
 
@@ -6938,7 +6938,7 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
 
         fixture.controller.stop()
         val silentTailSession = fixture.platform.session
@@ -6983,7 +6983,7 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.controller.paste()
         val silentTail = fixture.platform.session
         silentTail.callerAudioHasSpeech = false
@@ -7007,7 +7007,7 @@ class ConversationDictationControllerTest {
         fixture.platform.listener.onResult("first")
 
         assertEquals(1, fixture.platform.sessions.size)
-        fixture.scheduler.advanceBy(499L)
+        fixture.scheduler.advanceBy(49L)
         assertEquals(1, fixture.platform.sessions.size)
         fixture.scheduler.advanceBy(1L)
         assertEquals(2, fixture.platform.sessions.size)
@@ -7027,7 +7027,7 @@ class ConversationDictationControllerTest {
         assertEquals(0, incomplete.acknowledgedCallerAudio)
         assertEquals(1, incomplete.retriedCallerAudio)
         assertEquals(1, fixture.platform.sessions.size)
-        fixture.scheduler.advanceBy(499L)
+        fixture.scheduler.advanceBy(49L)
         assertEquals(1, fixture.platform.sessions.size)
         fixture.scheduler.advanceBy(1L)
         assertEquals(2, fixture.platform.sessions.size)
@@ -7041,10 +7041,10 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.controller.paste()
         fixture.platform.listener.onResult("recognized body")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
         assertEquals(2, fixture.platform.sessions.size)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
         assertEquals(3, fixture.platform.sessions.size)
         fixture.scheduler.runDelay(500L)
@@ -7078,7 +7078,7 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("body")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         fixture.controller.paste()
         fixture.scheduler.advanceBy(90_000L)
         val failed = fixture.controller.state as ConversationDictationState.Failed
@@ -7129,7 +7129,7 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
 
         fixture.controller.stop()
         val failedSession = fixture.platform.session
@@ -7157,7 +7157,7 @@ class ConversationDictationControllerTest {
         fixture.controller.stop()
 
         assertEquals(1, fixture.platform.sessions.size)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         assertEquals(2, fixture.platform.sessions.size)
         fixture.platform.pendingCallerAudio = false
         fixture.platform.listener.onResult("tail")
@@ -7191,7 +7191,7 @@ class ConversationDictationControllerTest {
         assertEquals(1, releases)
         assertEquals(1, resumes)
         assertEquals("", fixture.drafts.getValue(key()).text)
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         assertEquals(2, fixture.platform.sessions.size)
 
         fixture.platform.pendingCallerAudio = false
@@ -7210,7 +7210,7 @@ class ConversationDictationControllerTest {
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
 
         fixture.controller.stop()
 
@@ -7264,7 +7264,7 @@ class ConversationDictationControllerTest {
             if (stopInRestartGap) fixture.platform.listener.onResult("first")
             fixture.controller.stop()
             if (!stopInRestartGap) fixture.platform.listener.onResult("first")
-            fixture.scheduler.runDelay(500L)
+            fixture.scheduler.runDelay(50L)
             fixture.platform.listener.onReady()
 
             fixture.scheduler.runThrough(90_000L)
@@ -7309,9 +7309,9 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
 
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
         fixture.platform.listener.onResult("second")
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
 
         assertEquals(3, acquisitions)
         assertEquals(2, releases)
@@ -7584,7 +7584,7 @@ class ConversationDictationControllerTest {
                 assertTrue(sent.isEmpty())
                 assertEquals("", f.drafts.getValue(key()).text)
                 platform.listener.onResult("first")
-                f.scheduler.runDelay(500L)
+                f.scheduler.runDelay(50L)
                 platform.listener.onReady()
                 platform.listener.onEndOfSpeech()
                 assertEquals(1, f.scheduler.scheduledTaskCount(90_000L))
@@ -7683,10 +7683,10 @@ class ConversationDictationControllerTest {
         f.controller.send()
         f.scheduler.advanceBy(30_000L)
         platform.listener.onResult("prefix")
-        f.scheduler.runDelay(500L)
+        f.scheduler.runDelay(50L)
         platform.listener.onReady()
         platform.listener.onEndOfSpeech()
-        f.scheduler.advanceBy(59_499L)
+        f.scheduler.advanceBy(59_949L)
         assertFalse(f.controller.state is ConversationDictationState.Failed)
         f.scheduler.advanceBy(1L)
         val failed = f.controller.state as ConversationDictationState.Failed
@@ -7750,7 +7750,7 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
         assertEquals(ConversationDictationDeliveryMode.SendOnFinish, fixture.controller.processingDeliveryMode)
 
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.runDelay(50L)
         platform.listener.onReady()
         assertTrue(fixture.controller.state is ConversationDictationState.Listening)
         assertEquals(ConversationDictationDeliveryMode.SendOnFinish, fixture.controller.processingDeliveryMode)
@@ -8599,7 +8599,7 @@ class ConversationDictationControllerTest {
         val starting = fixture(draft = TextFieldValue(""))
         starting.controller.requestStart(ACCOUNT, GROUP, starting.drafts.getValue(key()))
         starting.platform.listener.onResult("starting words")
-        starting.scheduler.runDelay(500L)
+        starting.scheduler.advanceBy(500L)
         starting.scheduler.runDelay(10_000L)
         assertEquals("starting words", starting.drafts.getValue(key()).text)
         assertTrue(starting.controller.state is ConversationDictationState.Idle)
@@ -8607,7 +8607,7 @@ class ConversationDictationControllerTest {
         val providerProcessing = fixture(draft = TextFieldValue(""))
         providerProcessing.controller.requestStart(ACCOUNT, GROUP, providerProcessing.drafts.getValue(key()))
         providerProcessing.platform.listener.onResult("provider words")
-        providerProcessing.scheduler.runDelay(500L)
+        providerProcessing.scheduler.advanceBy(500L)
         providerProcessing.platform.listener.onEndOfSpeech()
         providerProcessing.scheduler.runDelay(20_000L)
         assertEquals("provider words", providerProcessing.drafts.getValue(key()).text)
@@ -8616,7 +8616,7 @@ class ConversationDictationControllerTest {
         val manualStop = fixture(draft = TextFieldValue(""))
         manualStop.controller.requestStart(ACCOUNT, GROUP, manualStop.drafts.getValue(key()))
         manualStop.platform.listener.onResult("manual words")
-        manualStop.scheduler.runDelay(500L)
+        manualStop.scheduler.advanceBy(500L)
         manualStop.platform.listener.onBeginningOfSpeech()
         manualStop.controller.stop()
         manualStop.scheduler.runDelay(20_000L)
@@ -9839,7 +9839,7 @@ class ConversationDictationControllerTest {
             assertEquals("", f.drafts.getValue(key()).text)
             f.edit(key(), TextFieldValue("Draft first edited"))
             f.controller.retry()
-            f.scheduler.runDelay(500L)
+            f.scheduler.runDelay(50L)
             f.platform.pendingCallerAudio = false
             f.platform.listener.onResult("suffix")
             advanceUntilIdle()
@@ -10004,7 +10004,7 @@ class ConversationDictationControllerTest {
     }
 
     /** Builds a deterministic controller harness with injectable ownership, validation, and delivery seams. */
-    private fun fixture(
+    internal fun fixture(
         draft: TextFieldValue,
         onDraftWritten: (TextFieldValue) -> Unit = {},
         targetAvailable: () -> Boolean = { true },
@@ -10122,7 +10122,7 @@ class ConversationDictationControllerTest {
         }
     }
 
-    private data class Fixture(
+    internal data class Fixture(
         val controller: ConversationDictationController,
         val platform: FakePlatform,
         val scheduler: FakeTimeoutScheduler,
@@ -10144,7 +10144,7 @@ class ConversationDictationControllerTest {
     }
 
     @Suppress("MaxLineLength")
-    private class FakePlatform(
+    internal class FakePlatform(
         var nativeUnblockSupported: Boolean = false,
         var providerPackage: String? = null,
         var pinnedProviderPresent: Boolean = true,
@@ -10381,7 +10381,7 @@ class ConversationDictationControllerTest {
         }
     }
 
-    private class FakeSession(
+    internal class FakeSession(
         private val listener: ConversationDictationRecognitionListener? = null,
         private val completePreparationOnStop: Boolean = false,
         private val deferCaptureCompletion: Boolean = false,
@@ -10524,7 +10524,7 @@ class ConversationDictationControllerTest {
         override fun usesCallerAudioCapture(): Boolean = callerAudioOwned
     }
 
-    private class FakeTimeoutScheduler {
+    internal class FakeTimeoutScheduler {
         private val tasks = mutableListOf<Task>()
         private var currentTimeMillis = 100L
 
@@ -10606,7 +10606,7 @@ class ConversationDictationControllerTest {
         )
     }
 
-    private companion object {
+    internal companion object {
         const val ACCOUNT = "account"
         const val GROUP = "group"
         val REPLY_MESSAGE_ID = "ab".repeat(32)
