@@ -999,7 +999,7 @@ class SettingsPageMorphHostTest {
         )
     }
 
-    @Test fun unoutlinedEntryWithholdsBodyAndMarginsUntilHandoffWithoutMovingHeader() {
+    @Test fun unoutlinedEntryKeepsBodyAndMarginsVisibleWithoutMovingHeader() {
         val page = SettingsPageMorph()
         val time = mutableStateOf(1f)
         val child = mutableStateOf(false)
@@ -1029,12 +1029,38 @@ class SettingsPageMorphHostTest {
         }
         val first = rule.onRoot().captureToImage().toPixelMap()
         assertEquals("header stays native", 1f, first[100, 50].blue, 0.01f)
-        assertEquals("unoutlined body waits", 0f, first[100, 150].blue, 0.01f)
-        assertEquals("body margins also wait", 0f, first[8, 150].blue, 0.01f)
+        assertEquals("unoutlined body stays visible", 1f, first[100, 150].blue, 0.01f)
+        assertEquals("body margins stay visible", 1f, first[8, 150].blue, 0.01f)
         rule.runOnIdle { time.value = 0.9f }
         val arrived = rule.onRoot().captureToImage().toPixelMap()
         assertEquals("body arrives without a synthetic border", 1f, arrived[100, 150].blue, 0.01f)
         assertEquals("margins arrive with body", 1f, arrived[8, 150].blue, 0.01f)
+    }
+
+    @Test fun externalUnoutlinedBodyStaysVisibleThroughoutEntry() {
+        val page = SettingsPageMorph()
+        val presence = mutableStateOf(0f)
+        val viewport = Any()
+        val group = Any()
+        rule.setContent {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        val host = Rect(0f, 0f, size.width, size.height)
+                        page.reportViewport(viewport, Rect(0f, 100f, size.width, size.height))
+                        reportUnoutlinedBody(page, viewport, group, Rect(16f, 100f, 344f, 300f))
+                        with(page) { drawExternal(outlinedContour(Rect(16f, 500f, 344f, 550f), host), host, presence.value, Color.Black) }
+                    }.drawWithContent { drawRect(Color.Blue) },
+            )
+        }
+        listOf(0f, 0.1f, 0.49f, 0.5f, 0.9f).forEach { fraction ->
+            rule.runOnIdle { presence.value = fraction }
+            val pixels = rule.onRoot().captureToImage().toPixelMap()
+            assertEquals("header stays native at $fraction", 1f, pixels[100, 50].blue, 0.01f)
+            assertEquals("borderless body stays visible at $fraction", 1f, pixels[100, 150].blue, 0.01f)
+            assertEquals("body margins stay visible at $fraction", 1f, pixels[8, 150].blue, 0.01f)
+        }
     }
 
     private fun reportUnoutlinedBody(
