@@ -278,7 +278,10 @@ class WhiteNoiseAppStateReaderSpeechTest {
                 publish.invoke(appState, TtsResolutionResult(TextToSpeech.SUCCESS, emptyList(), enginePackage, handle))
             }
 
-            suspend fun startSpeech(): Boolean = appState.confirmTtsPlaybackTrust { true } && appState.speakAloud(entries, Locale.US)
+            suspend fun startSpeech(): Boolean {
+                if (!appState.confirmTtsPlaybackTrust { true }) return false
+                return appState.speakAloud(entries, Locale.US)
+            }
 
             try {
                 shadowOf(context.getSystemService(AudioManager::class.java))
