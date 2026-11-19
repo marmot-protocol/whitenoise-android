@@ -24,6 +24,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * A text or media reply to the user's own message never publishes that send's client token as its target: MDK
@@ -140,7 +141,11 @@ class ReplyTargetForSendTest {
         private vararg val answered: String,
         private val answer: (List<Any?>) -> Any? = { error("unanswered") },
     ) {
-        val calls = mutableListOf<Pair<String, List<Any?>>>()
+        /**
+         * Every call so far. Background reads land on MarmotKit's IO threads while a test reads this list, so it
+         * is copy-on-write and each read iterates a stable snapshot — a plain list throws mid-iteration.
+         */
+        val calls = CopyOnWriteArrayList<Pair<String, List<Any?>>>()
         val engine =
             native { name, args ->
                 val recorded = args.toList().filterNot { it is kotlin.coroutines.Continuation<*> }
