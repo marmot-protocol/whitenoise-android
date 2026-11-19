@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.firstUnreadReceivedIndex
+import dev.ipf.whitenoise.android.state.isUnreadEligible
 import dev.ipf.whitenoise.android.state.reconciledConversationEntryUnreadCount
 
 internal data class ConversationEntryUnreadSnapshot(
@@ -63,18 +64,30 @@ private data class ConversationEntryUnreadProjection(
 /**
  * The projected first-unread id, unless it is the read anchor or the loaded rows place it before the
  * anchor. A row folded before newer messages arrived can keep an old first-unread id after the cursor
- * moved past it; the divider then belongs on the first message after the anchor, found from the count.
+ * moved past it. Its count is just as old, so the divider goes on the first unread message after a
+ * loaded anchor; null leaves the count to find it while the anchor is not loaded.
  */
 internal fun firstUnreadAfterReadAnchor(
     firstUnreadId: String?,
     readAnchorMessageId: String?,
     timeline: List<TimelineMessage>,
 ): String? {
-    if (firstUnreadId == null || firstUnreadId == readAnchorMessageId) return null
+    if (firstUnreadId == null) return null
 
     fun indexOf(id: String?) = if (id == null) -1 else timeline.indexOfFirst { it.record.messageIdHex == id }
     val anchorIndex = indexOf(readAnchorMessageId)
-    return firstUnreadId.takeUnless { anchorIndex >= 0 && indexOf(firstUnreadId) in 0..anchorIndex }
+    val stale = firstUnreadId == readAnchorMessageId || (anchorIndex >= 0 && indexOf(firstUnreadId) in 0..anchorIndex)
+    return when {
+        !stale -> firstUnreadId
+        anchorIndex < 0 -> null
+        else ->
+            timeline
+                .drop(anchorIndex + 1)
+                .firstOrNull { it.record.isUnreadEligible() }
+                ?.record
+                ?.messageIdHex
+                ?.takeIf { it.isNotBlank() }
+    }
 }
 
 private class ConversationEntryUnreadProjectionHolder(

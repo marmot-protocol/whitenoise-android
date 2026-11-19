@@ -334,6 +334,25 @@ class ConversationEntryUnreadSnapshotTest {
             assertEquals("new-1", resolved)
         }
 
+    /** The stale row's count can be too low as well; the anchor still puts the line above new-1. */
+    @Test
+    fun staleBoundaryPagedInBeforeReadAnchorIgnoresStaleUndercount() =
+        runTest {
+            var timeline = listOf(received("new-1"), received("new-2"))
+
+            val resolved =
+                resolveConversationEntryUnreadMessageId(
+                    snapshot = ConversationEntryUnreadSnapshot(1, "old-unread", readAnchorMessageId = "read"),
+                    timeline = { timeline },
+                    loadUntilMessageAvailable = {
+                        timeline = listOf(received("old-unread"), received("read")) + timeline
+                        true
+                    },
+                )
+
+            assertEquals("new-1", resolved)
+        }
+
     @Test
     fun hiddenInitialLayoutCannotAdvanceReadAnchor() {
         assertEquals(-1, conversationReadAnchorCandidateIndex(false, 12))
