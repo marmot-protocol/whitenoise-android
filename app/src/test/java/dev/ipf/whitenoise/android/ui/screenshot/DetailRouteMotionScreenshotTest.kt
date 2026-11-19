@@ -812,19 +812,26 @@ class DetailRouteMotionScreenshotTest {
             )
         }
         if (morphs) {
-            val middle = checkNotNull(intermediate)
-            org.junit.Assert.assertFalse(
-                "$name must move beyond its source pixels",
-                middle.sameAs(transitionSources.getValue(name)),
-            )
-            org.junit.Assert.assertFalse(
-                "$name must contain intermediate motion before settling",
-                middle.sameAs(checkNotNull(settled)),
-            )
+            assertIntermediateMotion(name, checkNotNull(intermediate), checkNotNull(settled))
         }
         if (name.startsWith("composer_") && name.endsWith("_entry")) {
             assertNativeComposerHeader(name, checkNotNull(intermediate), checkNotNull(settled))
         }
+    }
+
+    private fun assertIntermediateMotion(
+        name: String,
+        middle: Bitmap,
+        settled: Bitmap,
+    ) {
+        org.junit.Assert.assertFalse(
+            "$name must move beyond its source pixels",
+            middle.sameAs(transitionSources.getValue(name)),
+        )
+        org.junit.Assert.assertFalse(
+            "$name must contain intermediate motion before settling",
+            middle.sameAs(settled),
+        )
     }
 
     private fun assertNativeBodyEdgeContinuity(

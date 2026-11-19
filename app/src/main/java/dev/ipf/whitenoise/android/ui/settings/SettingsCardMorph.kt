@@ -367,6 +367,12 @@ internal fun Modifier.settingsMorphAnchorOutline(
     }
 }
 
+@Composable
+private fun permitsContourMotion(
+    morph: SettingsCardMorph?,
+    motion: Boolean,
+): Boolean = motion && (morph?.page == null || isAmoledSurfaceTheme())
+
 /**
  * Starts [morph] whenever [target] changes and returns whether it is running, with the host modifier
  * for the route layer. A null [morph] never morphs.
@@ -381,7 +387,7 @@ internal fun <T> rememberSettingsCardMorphHost(
     captureContent: Boolean = true,
 ): Pair<Boolean, Modifier> {
     // Native control borders do not opt borderless settings themes into contour motion.
-    val animateContours = motion && (morph?.page == null || isAmoledSurfaceTheme())
+    val animateContours = permitsContourMotion(morph, motion)
     morph?.captureContent = captureContent
     DisposableEffect(morph, ownerKey) {
         val releaseChild = morph?.observeChildContours()
@@ -395,7 +401,11 @@ internal fun <T> rememberSettingsCardMorphHost(
     val morphing =
         morph != null &&
             remember(morph, ownerKey, target, animateContours) {
-                if (morph.page != null) morph.beginPage(target, forward, animateContours) else morph.begin(animateContours)
+                if (morph.page != null) {
+                    morph.beginPage(target, forward, animateContours)
+                } else {
+                    morph.begin(animateContours)
+                }
             }
     val morphProgress = remember(morph, ownerKey, target, animateContours) { Animatable(if (morphing) 0f else 1f) }
     val clock: () -> Float = remember(morphProgress) { { morphProgress.value } }
