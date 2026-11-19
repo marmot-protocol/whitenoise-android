@@ -233,7 +233,10 @@ class ComposerToolbarPreferencesTest {
         val decoded = ComposerToolbarSettings.decode(movedLeft.encode())
         assertEquals(movedLeft, decoded)
         assertEquals(ComposerShortcut.JumpBottom, decoded.onSide(ComposerShortcutSide.Left).first())
-        assertEquals(listOf(ComposerShortcut.Paste, ComposerShortcut.JumpTop), decoded.onSide(ComposerShortcutSide.Right))
+        assertEquals(
+            listOf(ComposerShortcut.Paste, ComposerShortcut.JumpTop),
+            decoded.onSide(ComposerShortcutSide.Right),
+        )
     }
 
     @Test

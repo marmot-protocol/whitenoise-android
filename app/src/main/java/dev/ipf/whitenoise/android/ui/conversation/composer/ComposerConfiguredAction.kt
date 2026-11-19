@@ -31,6 +31,16 @@ import kotlin.math.roundToInt
 
 private const val DISABLED_VOICE_OPACITY = 0.38f
 
+/** Draws the non-interactive glyph used by the arrangement preview. */
+@Composable
+private fun ComposerShortcutPreviewGlyph(shortcut: ComposerShortcut) {
+    if (shortcut == ComposerShortcut.VoiceNote) {
+        MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        Icon(painterResource(shortcut.iconRes), null, Modifier.size(ComposerShortcutIconSize))
+    }
+}
+
 /** Reuses the existing action owners, including the trusted system Paste fallback and native attachment menu. */
 @Composable
 @Suppress("LongParameterList", "LongMethod")
@@ -54,11 +64,7 @@ internal fun ComposerConfiguredAction(
     onDraftJump: (toEnd: Boolean) -> Unit = {},
 ) {
     if (preview) {
-        if (shortcut == ComposerShortcut.VoiceNote) {
-            MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
-            return
-        }
-        Icon(painterResource(shortcut.iconRes), null, Modifier.size(ComposerShortcutIconSize))
+        ComposerShortcutPreviewGlyph(shortcut)
         return
     }
     val voiceLabel = stringResource(R.string.voice_message_record)
