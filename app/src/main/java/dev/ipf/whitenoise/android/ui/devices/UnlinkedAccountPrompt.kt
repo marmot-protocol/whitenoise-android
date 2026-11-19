@@ -34,16 +34,35 @@ internal fun UnlinkedAccountPromptHost(
     appState: WhiteNoiseAppState,
     blocked: Boolean,
 ) {
-    val account = appState.activeAccount?.takeIf { it.unlinked } ?: return
-    var attempted by remember(account.label) { mutableStateOf(false) }
-    var closed by remember(account.label) { mutableStateOf(false) }
-    if (blocked || appState.wipeInProgress || closed) return
+    UnlinkedAccountPromptGate(
+        unlinkedLabel = appState.activeAccount?.takeIf { it.unlinked }?.label,
+        hidden = blocked || appState.wipeInProgress,
+        onRemove = { launchAccountWipe(appState) },
+    )
+}
+
+/**
+ * Shows the prompt for the unlinked account in view, [unlinkedLabel], unless it is [hidden] or was closed. It
+ * remembers which account a removal was attempted for, and which was closed, by label. A removal takes the account
+ * out of view while it runs and a failed one puts it back, and the attempt has to survive that gap for Close to be
+ * offered. Another account coming into view starts with neither.
+ */
+@Composable
+internal fun UnlinkedAccountPromptGate(
+    unlinkedLabel: String?,
+    hidden: Boolean,
+    onRemove: () -> Unit,
+) {
+    var attemptedFor by remember { mutableStateOf<String?>(null) }
+    var closedFor by remember { mutableStateOf<String?>(null) }
+    val label = unlinkedLabel ?: return
+    if (hidden || closedFor == label) return
     UnlinkedAccountPrompt(
         onRemove = {
-            attempted = true
-            launchAccountWipe(appState)
+            attemptedFor = label
+            onRemove()
         },
-        onClose = { closed = true }.takeIf { attempted },
+        onClose = { closedFor = label }.takeIf { attemptedFor == label },
     )
 }
 

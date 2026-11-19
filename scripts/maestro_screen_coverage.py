@@ -5,12 +5,16 @@ import functools
 import hashlib
 import json
 from pathlib import Path
+import re
 import yaml
 
 try:
     from scripts.maestro_modal_discovery import modal_owners
 except ModuleNotFoundError:
     from maestro_modal_discovery import modal_owners
+
+# A manual case's permanent ID, the only shape that may name a case file.
+MANUAL_CASE_ID = re.compile(r'[A-Z]{2,5}-\d{3}')
 
 
 def has_substitution(value):
@@ -144,6 +148,9 @@ def second_device_cases(root, row, key):
         raise ValueError(f'Second-device screen needs its manual cases: {key}')
     if row.get('bindings') or not str(row.get('remaining', '')).strip():
         raise ValueError(f'Second-device screen takes no assertions and needs its own remaining work: {key}')
+    malformed = [item for item in manual_ids if not MANUAL_CASE_ID.fullmatch(item)]
+    if malformed:
+        raise ValueError(f'Second-device screen names malformed manual cases: {key} {malformed}')
     missing = [item for item in manual_ids
                if not (root / 'docs/manual-release-testing/cases' / f'{item}.md').is_file()]
     if missing:

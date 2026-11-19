@@ -57,7 +57,7 @@ private const val CARD_SNAPSHOT_SLACK_MILLIS = 1_000L
 private const val NOTIFICATION_RECONCILIATION_RETRY_MILLIS = 1_000L
 
 /** The Marmot app-event kind of a chat message, the only kind that carries attachments. */
-private const val MARMOT_CHAT_EVENT_KIND = 9uL
+internal const val MARMOT_CHAT_EVENT_KIND = 9uL
 
 /** Converts the runtime's second timestamps for receipt lookups, which work in milliseconds. */
 private const val MILLIS_PER_SECOND_LONG = 1_000L
@@ -1292,7 +1292,7 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                         val received = (event as? MarmotEventFfi.MessageReceived)?.received
                         // Only the cheap kind and sender check runs here; the suppression reads run with the
                         // lookup, as a child of this loop, so they never delay the next event.
-                        if (received != null && received.isChatFromOthers()) {
+                        if (received != null && received.mayCarryIncomingAttachments()) {
                             // A supervised child whose failure is logged, so one receipt can never cancel the
                             // loop or, through it, the notification listener.
                             launch(notificationDispatcher) {
@@ -1354,9 +1354,9 @@ private suspend fun WhiteNoiseAppState.reconcileConversationNotificationCards(
     if (cards.isNotEmpty()) reconcileConversationCards(accountRef, groupIdHex, cards, marmot)
 }
 
-/** Whether [this] is a chat message from someone else, the only received messages that carry attachments. */
-private fun RuntimeMessageReceivedFfi.isChatFromOthers(): Boolean =
-    message.kind == MARMOT_CHAT_EVENT_KIND && !message.sender.equals(accountIdHex, ignoreCase = true)
+/** Whether [this] is a chat message whose attachments this device may still have to fetch. */
+private fun RuntimeMessageReceivedFfi.mayCarryIncomingAttachments(): Boolean =
+    receivedChatMayCarryAttachments(message.kind, message.sender.equals(accountIdHex, true), linkedDevicesAvailable())
 
 /**
  * Schedules one received chat message's media from the runtime event stream, whatever its notification did. The

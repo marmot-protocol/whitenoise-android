@@ -71,13 +71,15 @@ private fun LinkedDevicesPages(
     var deviceSlot by rememberSaveable(key) { mutableStateOf<String?>(null) }
     var reviewingSlot by rememberSaveable(key) { mutableStateOf<String?>(null) }
     var repairing by rememberSaveable(key) { mutableStateOf(false) }
+    // Read before the notice below clears the failure, so the step itself also says a link action failed.
+    val linkStepFailed = rememberDeviceLinkFailed(controller)
     DeviceLinkFailureEffect(appState, controller)
     DeviceLinkOfferSettled(appState, controller)
     DeviceManagementFailureEffect(appState, management)
     val openDevice = deviceSlot?.let { controller.roster.roster?.device(it) }
     val firstRead = linkedDevicesFirstRead(controller, management)
     when {
-        linking -> LinkThisDeviceRoute(controller, onClose = { linking = false })
+        linking -> LinkThisDeviceRoute(controller, onClose = { linking = false }, failed = linkStepFailed)
         openDevice != null -> LinkedDeviceDetailRoute(openDevice, management, scope, onClose = { deviceSlot = null })
         !firstRead -> LinkedDevicesContent(LinkedDeviceRosterState(), onBack, showLoading = false)
         else ->

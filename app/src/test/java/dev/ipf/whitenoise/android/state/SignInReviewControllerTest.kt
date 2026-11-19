@@ -7,6 +7,10 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SignInResponseFfi
 import dev.ipf.marmotkit.UnrecognizedSignInFfi
 import dev.ipf.marmotkit.UnrecognizedSignInStateFfi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -62,6 +66,28 @@ class SignInReviewControllerTest {
             act()
         }
     }
+
+    /** A local read begun before a relay check finished is older than the check, so it does not replace its list. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun aRefreshBegunBeforeACheckDoesNotReplaceTheCheckedList() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val native = Native()
+            native.listed = {
+                gate.await()
+                listOf(signIn("a"))
+            }
+            val controller = SignInReviewController(ACCOUNT, native)
+            val refresh = launch { controller.refresh() }
+            runCurrent()
+
+            controller.check()
+            gate.complete(Unit)
+            refresh.join()
+
+            assertEquals(listOf("a", "b"), controller.list.signIns.map { it.slotIdHex })
+        }
 
     /** A refresh publishes the list, the warning and the started-fresh flag. */
     @Test

@@ -108,6 +108,9 @@ internal class DeviceLinkRequestWatcher(
     var queue by mutableStateOf(DeviceLinkRequestQueue())
         private set
 
+    /** How many command results each profile has had published, so a read begun before one can tell it is stale. */
+    private var accepted = emptyMap<String, Long>()
+
     // Serializes read-and-publish so an older read can never replace a newer one.
     private val reads = Mutex()
 
@@ -130,9 +133,12 @@ internal class DeviceLinkRequestWatcher(
         blocked: Boolean,
     ) {
         reads.withLock {
+            val before = accepted
             val read = accounts.mapNotNull { account -> read(account)?.let { account to it } }.toMap()
             if (!owns()) return
-            publish(snapshots.filterKeys { it in accounts } + read, blocked)
+            // A command result published meanwhile is newer than these reads, so it stays.
+            val fresh = read.filterKeys { accepted[it] == before[it] }
+            publish(snapshots.filterKeys { it in accounts } + fresh, blocked)
         }
     }
 
@@ -144,18 +150,26 @@ internal class DeviceLinkRequestWatcher(
     ) {
         val account = (event as? MarmotEventFfi.DeviceLinkChanged)?.accountLabel?.takeIf { it in accounts } ?: return
         reads.withLock {
+            val before = accepted[account]
             val snapshot = read(account)
-            if (snapshot != null && owns()) publish(snapshots + (account to snapshot), blocked)
+            if (snapshot != null && owns() && accepted[account] == before) {
+                publish(snapshots + (account to snapshot), blocked)
+            }
         }
     }
 
-    /** Applies a snapshot a command on [accountRef] returned, so the prompt updates without waiting for an event. */
+    /**
+     * Applies a snapshot a command on [accountRef] returned, so the prompt updates without waiting for an event. A
+     * read of that profile still in flight began before the command finished, so its result is dropped.
+     */
     fun accept(
         accountRef: String,
         snapshot: DeviceLinkSnapshotFfi,
         blocked: Boolean,
     ) {
-        if (owns()) publish(snapshots + (accountRef to snapshot), blocked)
+        if (!owns()) return
+        accepted = accepted + (accountRef to (accepted[accountRef] ?: 0L) + 1L)
+        publish(snapshots + (accountRef to snapshot), blocked)
     }
 
     /** Re-evaluates what to present after the shell became blocked or unblocked. */

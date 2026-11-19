@@ -196,7 +196,8 @@ internal class DeviceLinkController(
     /**
      * Runs one link command and publishes the snapshot MDK returns. A command started while another runs is dropped,
      * which makes a double tap harmless. A result or failure that arrives after retirement or an account change is
-     * dropped too.
+     * dropped too. The command holds the link-read lock from its native call to its publication, so a read can
+     * neither publish between the two nor be overtaken by the command's older snapshot.
      */
     @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure is shown to the user once.
     suspend fun command(
@@ -206,9 +207,10 @@ internal class DeviceLinkController(
         if (!current || !commands.tryLock()) return
         try {
             running = kind
-            val snapshot = native.run(accountRef)
-            if (current) {
-                linkReads.withLock {
+            linkReads.withLock {
+                if (!current) return
+                val snapshot = native.run(accountRef)
+                if (current) {
                     link = snapshot
                     linkReadFailed = false
                 }

@@ -1067,14 +1067,14 @@ class ConversationController(
             copy = copy,
             conversationKind = latestConversationKind,
             soleSelfMember = GroupProjector.isSelfSoleMember(members, conversationAccountIdHex),
+            selfAccountIdHex = conversationAccountIdHex,
         )
     }
 
     val inviteAccount: String?
         get() {
             val me = conversationAccountIdHex
-            val other = GroupProjector.otherMemberAccount(members, me)
-            return GroupProjector.inviteAccount(group, other, me)
+            return GroupProjector.inviteAccount(group, GroupProjector.otherMemberAccount(members, me), me)
         }
 
     /**

@@ -146,8 +146,8 @@
     <string name="device_move_failed">Le déplacement ne s’est pas terminé. Cet appareil fait toujours confiance à ses appareils précédents.</string>
     <string name="device_move_title">Déplacer cet appareil</string>
     <string name="device_move_detail">Associez cet appareil à un autre ensemble d’appareils de ce compte. Il quitte l’ensemble actuel et ses discussions sont conservées.</string>
-    <string name="device_move_old_sibling">%1$s est toujours dans votre ensemble précédent. Pour l’y amener, associez-le depuis cet appareil-là.</string>
-    <string name="device_move_old_sibling_unnamed">Un appareil est toujours dans votre ensemble précédent. Pour l’y amener, associez-le depuis cet appareil-là.</string>
+    <string name="device_move_old_sibling">%1$s est toujours dans votre ensemble précédent. Pour l’amener dans le nouvel ensemble, associez-le depuis cet appareil-là.</string>
+    <string name="device_move_old_sibling_unnamed">Un appareil est toujours dans votre ensemble précédent. Pour l’amener dans le nouvel ensemble, associez-le depuis cet appareil-là.</string>
     <string name="device_move_dismiss">Ignorer le rappel</string>
     <string name="device_move_dismiss_detail">Masque ce rappel. Cela n’associe ni ne supprime l’appareil.</string>
     <string name="device_move_overridden">Certains appareils que vous aviez refusés y étaient déjà associés ; ils le restent.</string>

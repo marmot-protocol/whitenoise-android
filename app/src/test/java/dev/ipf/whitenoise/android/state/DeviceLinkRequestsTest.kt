@@ -239,6 +239,27 @@ class DeviceLinkRequestsTest {
             assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
         }
 
+    /** A read that began before a command's result was published is older than it, so it does not replace it. */
+    @Test
+    fun aReadBegunBeforeACommandsResultDoesNotReplaceIt() =
+        runTest {
+            lateinit var watcher: DeviceLinkRequestWatcher
+            val linking = snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking))
+            watcher =
+                DeviceLinkRequestWatcher(
+                    readSnapshot = {
+                        watcher.accept("a", linking, blocked = false)
+                        snapshot(prompt("p1", 10u))
+                    },
+                )
+
+            watcher.refresh(listOf("a"), blocked = false)
+            assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
+
+            watcher.onEvent(MarmotEventFfi.DeviceLinkChanged("id", "a"), listOf("a"), blocked = false)
+            assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
+        }
+
     /** Closing the prompt hides it and answers nothing; unblocking later does not bring it back. */
     @Test
     fun hidingThePresentedRequestAnswersNothing() =

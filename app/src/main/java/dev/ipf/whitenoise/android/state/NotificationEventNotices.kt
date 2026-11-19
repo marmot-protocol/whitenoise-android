@@ -38,3 +38,14 @@ internal fun needsIncomingAttachmentDownload(
     update: NotificationUpdateFfi,
     linkedDevices: Boolean,
 ): Boolean = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && (!update.isFromSelf || linkedDevices)
+
+/**
+ * Whether a received message of [kind] may carry attachments this device still has to fetch, by the same rule as
+ * [needsIncomingAttachmentDownload]: a chat message from someone else always may, and with linked devices so may the
+ * account's own message, because it can have been sent from another of its devices.
+ */
+internal fun receivedChatMayCarryAttachments(
+    kind: ULong,
+    fromSelf: Boolean,
+    linkedDevices: Boolean,
+): Boolean = kind == MARMOT_CHAT_EVENT_KIND && (!fromSelf || linkedDevices)

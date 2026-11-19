@@ -112,6 +112,7 @@ class ScreenProofTest(unittest.TestCase):
             (root / '.maestro/main.yaml').write_text('appId: test\n---\n- assertVisible: Real screen\n')
             (root / 'docs/manual-release-testing/cases').mkdir(parents=True)
             (root / 'docs/manual-release-testing/cases/SET-060.md').write_text('case')
+            (root / 'docs/outside.md').write_text('not a case')
             (root / 'screen.kt').write_text('fun Screen() = Unit')
             screen = {'source': 'screen.kt', 'symbol': 'Screen'}
             cases = {'case': {'flow': '.maestro/main.yaml'}}
@@ -125,7 +126,7 @@ class ScreenProofTest(unittest.TestCase):
             bound = [{'case': 'case', 'selector': {'text': 'Real screen'}, 'scope': 'Chrome'}]
             for row in ({**excused, 'second_device': []}, {**excused, 'second_device': 'SET-060'},
                         {**excused, 'second_device': ['SET-060', 'SET-060']}, {**excused, 'second_device': ['SET-999']},
-                        {**excused, 'bindings': bound}):
+                        {**excused, 'second_device': ['../../outside']}, {**excused, 'bindings': bound}):
                 with self.subTest(row=row), self.assertRaisesRegex(ValueError, 'Second-device screen'):
                     audit(row)
 

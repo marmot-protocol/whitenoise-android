@@ -95,6 +95,9 @@ internal class SignInReviewController(
     private val actions = Mutex()
     private val reads = Mutex()
 
+    /** How many relay checks have published a list, so a local read begun before one can tell it is stale. */
+    private var checks = 0L
+
     @Volatile
     private var retired = false
 
@@ -111,14 +114,18 @@ internal class SignInReviewController(
         failure = null
     }
 
-    /** Re-reads the list, the warning and the started-fresh flag locally; a failed read keeps what is shown. */
+    /**
+     * Re-reads the list, the warning and the started-fresh flag locally; a failed read keeps what is shown. A list
+     * read before a relay check finished is older than the check's result, so it is not published over it.
+     */
     suspend fun refresh() {
         reads.withLock {
+            val checksBefore = checks
             val signIns = read { native.unrecognizedSignIns(accountRef) }
             val items = read { native.compromiseWarning(accountRef) }
             val fresh = read { native.startedFresh(accountRef) }
             if (!current) return
-            if (signIns != null) list = list.copy(signIns = signIns, loaded = true)
+            if (signIns != null && checks == checksBefore) list = list.copy(signIns = signIns, loaded = true)
             if (items != null) warning = items
             if (fresh != null) startedFresh = fresh
         }
@@ -159,6 +166,7 @@ internal class SignInReviewController(
                 if (checked == null) {
                     list.copy(checking = false, checkFailed = true)
                 } else {
+                    checks++
                     SignInListState(signIns = checked, loaded = true)
                 }
         } finally {

@@ -443,6 +443,31 @@ class DeviceLinkControllerTest {
             )
         }
 
+    /** A read waits for a running command, so it can never publish between the command's call and its result. */
+    @Test
+    fun aLinkReadWaitsForARunningCommand() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val order = mutableListOf<String>()
+            val native = Native(snapshot = { linkSnapshot(stalled = true).also { order += "read" } })
+            native.commandResult = {
+                gate.await()
+                linkSnapshot().also { order += "command" }
+            }
+            val controller = DeviceLinkController(ACCOUNT, native)
+            val command = launch { controller.confirmMatch() }
+            runCurrent()
+            val read = launch { controller.refreshLink() }
+            runCurrent()
+
+            gate.complete(Unit)
+            command.join()
+            read.join()
+
+            assertEquals(listOf("command", "read"), order)
+            assertEquals(true, controller.link?.deviceGroupStalled)
+        }
+
     /** A second tap while a command runs submits nothing. */
     @Test
     fun aCommandStartedWhileAnotherRunsIsDropped() =

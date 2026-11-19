@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.devices
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -75,6 +78,38 @@ class UnlinkedAccountTest {
         compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).performClick()
 
         compose.runOnIdle { assertEquals(1, closes) }
+    }
+
+    /** A removal that left the account here offers Close, even though the account left view while it ran. */
+    @Test
+    fun closeIsOfferedAfterARemovalThatLeftTheAccountHere() {
+        var label by mutableStateOf<String?>("a")
+        var hidden by mutableStateOf(false)
+        compose.setContent { WhiteNoiseTheme { UnlinkedAccountPromptGate(label, hidden) { hidden = true } } }
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).assertDoesNotExist()
+
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_REMOVE_TAG).performClick()
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_PROMPT_TAG).assertDoesNotExist()
+        label = null
+        compose.waitForIdle()
+        label = "a"
+        hidden = false
+
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).performClick()
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_PROMPT_TAG).assertDoesNotExist()
+    }
+
+    /** Another unlinked account coming into view starts with no attempt, so it offers no Close. */
+    @Test
+    fun anotherAccountStartsWithoutClose() {
+        var label by mutableStateOf<String?>("a")
+        compose.setContent { WhiteNoiseTheme { UnlinkedAccountPromptGate(label, hidden = false) {} } }
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_REMOVE_TAG).performClick()
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).assertExists()
+
+        label = "b"
+
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).assertDoesNotExist()
     }
 
     /** The arrival hint belongs to the account that linked, in any letter case, until it is ended. */

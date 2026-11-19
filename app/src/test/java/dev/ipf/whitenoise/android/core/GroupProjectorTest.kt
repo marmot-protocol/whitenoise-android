@@ -703,6 +703,26 @@ class GroupProjectorTest {
         assertEquals("ME", GroupProjector.inviteAccount(forwarded, otherMemberAccount = "bob"))
     }
 
+    /** A roster holding only the account's own devices offers the account as the other member, which is not named. */
+    @Test
+    fun inviteAccountNeverFallsBackToTheAccountItself() {
+        val forwarded = group(name = "", pending = true, welcomer = "me")
+
+        assertNull(GroupProjector.inviteAccount(forwarded, otherMemberAccount = "ME", selfAccountIdHex = "me"))
+    }
+
+    /** An unnamed pending chat passed on by the account's own device is titled after the other member. */
+    @Test
+    fun aForwardedInvitationIsTitledAfterTheOtherMember() {
+        val forwarded = group(name = "", pending = true, welcomer = "me")
+        val title = { self: String? ->
+            GroupProjector.displayTitle(forwarded, "bob", 2, memberTitle = { "name:$it" }, selfAccountIdHex = self)
+        }
+
+        assertTrue(title("me").contains("name:bob"))
+        assertTrue(title(null).contains("name:me"))
+    }
+
     @Test
     fun verifiedTwoMemberGroupUsesDirectTranscriptChromeWithoutChangingConversationKind() {
         val namedTwoMemberGroupIsDm =

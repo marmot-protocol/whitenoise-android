@@ -26,8 +26,9 @@ private const val EVENT_STREAM_RETRY_MS = 2_000L
 /**
  * Runs [follow] against MDK's event stream for as long as [lifecycle] is started, and again after each time the
  * stream ends, so a closed stream or a failed subscription never leaves a screen without updates. [follow] receives
- * the stream's next-event read, or null when the stream could not be opened and it should read once instead. The
- * subscription is always released, off the main thread, even when the caller is cancelled.
+ * the stream's next-event read, or null when the stream could not be opened and it should read once instead. A read
+ * that throws ends that round like a closed stream, so it is retried too. The subscription is always released, off
+ * the main thread, even when the caller is cancelled.
  */
 internal suspend fun WhiteNoiseAppState.followEventsWhileStarted(
     lifecycle: Lifecycle,
@@ -38,7 +39,9 @@ internal suspend fun WhiteNoiseAppState.followEventsWhileStarted(
         while (true) {
             val subscription = runCatchingCancellable { marmotIo { subscribeEvents() } }.getOrNull()
             try {
-                follow(subscription?.let { stream -> { withContext(Dispatchers.IO) { stream.next() } } })
+                runCatchingCancellable {
+                    follow(subscription?.let { stream -> { withContext(Dispatchers.IO) { stream.next() } } })
+                }
             } finally {
                 subscription?.let { withContext(NonCancellable + Dispatchers.IO) { runCatching { it.destroy() } } }
             }
