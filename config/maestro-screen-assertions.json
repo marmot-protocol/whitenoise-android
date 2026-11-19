@@ -1182,23 +1182,6 @@
       "remaining": "Exact-source campaign execution, keyboard continuity and owner-switch lifecycle remain separate qualification."
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-      "symbol": "ConversationDictationMicrophoneDialog",
-      "bindings": [
-        {
-          "case": "presentation-dictation-microphone-settings",
-          "selector": {
-            "text": "Microphone access is off"
-          },
-          "scope": "microphone-denial dialog and Settings handoff callback, without microphone capture.",
-          "entry_assertion": {
-            "text": "Microphone access is off"
-          },
-          "visible_on_entry": true
-        }
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
       "symbol": "ComposerEmojiPickerPane",
       "bindings": [

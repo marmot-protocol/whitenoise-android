@@ -31,28 +31,34 @@ internal object ConversationActionFixtures {
     val GROUP_ID = "b2".repeat(32)
     val MESSAGE_ID = "c3".repeat(32)
 
-    /** Opens the pinned group conversation and confirms it can send before the test acts. */
-    suspend fun controller(state: WhiteNoiseAppState) =
-        ConversationController(
-            state,
-            group(),
-            initialMemberSnapshot = memberSnapshot(),
-            accountRefOverride = TARGET_REF,
-            groupRosterReader = { _, _ ->
-                GroupRosterFfi(
-                    GROUP_ID,
-                    listOf(GroupMemberDetailsFfi(TARGET_ID, TARGET_REF, true, true, true, "npub-$TARGET_ID", null)),
-                    1uL,
-                    1uL,
-                    SelfMembershipFfi.MEMBER,
-                    1u,
-                    GroupLifecycleStateFfi.STABLE,
-                )
-            },
-        ).also {
-            it.retryMembers()
-            assertTrue(it.canSendMessages)
-        }
+    /**
+     * Opens the pinned group conversation and confirms it can send before the test acts. A text send looks up the
+     * user's own emoji through [customEmojiReader] when one is given, instead of reading them from MDK.
+     */
+    suspend fun controller(
+        state: WhiteNoiseAppState,
+        customEmojiReader: (suspend (String) -> List<LocalEmojiArtwork>)? = null,
+    ) = ConversationController(
+        state,
+        group(),
+        initialMemberSnapshot = memberSnapshot(),
+        accountRefOverride = TARGET_REF,
+        customEmojiReader = customEmojiReader,
+        groupRosterReader = { _, _ ->
+            GroupRosterFfi(
+                GROUP_ID,
+                listOf(GroupMemberDetailsFfi(TARGET_ID, TARGET_REF, true, true, true, "npub-$TARGET_ID", null)),
+                1uL,
+                1uL,
+                SelfMembershipFfi.MEMBER,
+                1u,
+                GroupLifecycleStateFfi.STABLE,
+            )
+        },
+    ).also {
+        it.retryMembers()
+        assertTrue(it.canSendMessages)
+    }
 
     /** Routes every native call except object identity to [call], with mangled inline-class names trimmed. */
     fun native(call: (String, Array<out Any?>) -> Any?): MarmotInterface =
@@ -72,36 +78,38 @@ internal object ConversationActionFixtures {
     fun summary(disposition: SendAcceptDispositionFfi = SendAcceptDispositionFfi.PUBLISHED) =
         SendSummaryFfi(1u, listOf(MESSAGE_ID), disposition, SendMaintenanceDispositionFfi.READY)
 
-    /** Builds an app state on the given native interface with the previous account active. */
-    fun appState(native: MarmotInterface) =
-        WhiteNoiseAppState(
-            context = ApplicationProvider.getApplicationContext(),
-            draftStore = DraftStore(NoopDraftPersistence()),
-            accountIdHexResolver = { PREVIOUS_ID },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = PREVIOUS_REF,
-                        accountIdHex = PREVIOUS_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                        unlinked = false,
-                    ),
-                    AccountSummaryFfi(
-                        label = TARGET_REF,
-                        accountIdHex = TARGET_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                        unlinked = false,
-                    ),
+    /** Builds an app state on [native] with [activeAccountRef] active, by default the previous account. */
+    fun appState(
+        native: MarmotInterface,
+        activeAccountRef: String = PREVIOUS_REF,
+    ) = WhiteNoiseAppState(
+        context = ApplicationProvider.getApplicationContext(),
+        draftStore = DraftStore(NoopDraftPersistence()),
+        accountIdHexResolver = { PREVIOUS_ID },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = PREVIOUS_REF,
+                    accountIdHex = PREVIOUS_ID,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                    unlinked = false,
                 ),
-            activeAccountRef = PREVIOUS_REF,
-            initialMarmotRuntime = AppMarmotRuntime("test", native),
-        )
+                AccountSummaryFfi(
+                    label = TARGET_REF,
+                    accountIdHex = TARGET_ID,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                    unlinked = false,
+                ),
+            ),
+        activeAccountRef = activeAccountRef,
+        initialMarmotRuntime = AppMarmotRuntime("test", native),
+    )
 
     /** The bound account as the group's only local member. */
     private fun memberSnapshot() =

@@ -8,15 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
         "anchor": "override fun microphoneAccess(): ConversationDictationMicrophoneAccess",
         "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "Dictation caller-audio capability probe",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
-        "anchor": "private class ConversationDictationCallerAudioProbe(",
-        "test_ids": [
-          "DIC-003"
+          "DIC-002",
+          "DIC-015"
         ]
       },
       {
@@ -41,6 +34,14 @@
         "anchor": "private fun openCallerAudioStream(",
         "test_ids": [
           "DIC-014"
+        ]
+      },
+      {
+        "surface": "Dictation native microphone unblock attempt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
+        "anchor": "override fun requestMicrophoneUnblock(onChanged: () -> Unit)",
+        "test_ids": [
+          "DIC-015"
         ]
       }
     ]

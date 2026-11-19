@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationProviderCapability
 import dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.discoverDictationProviders
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn

@@ -281,6 +281,7 @@
     <string name="scroll_to_top">Scorri verso l\'alto</string>
     <string name="discard_failed_message">Elimina messaggio non riuscito</string>
     <string name="message_discard_still_sending">Questo messaggio è ancora in fase di invio. Riprova tra poco.</string>
+    <string name="reply_target_not_sent">Il messaggio a cui stai rispondendo non è ancora stato inviato. Attendi che venga inviato, o tocca «Riprova» sul messaggio se l’invio non è riuscito, poi invia la risposta.</string>
     <string name="message_discard_not_failed">Questo messaggio non può più essere eliminato.</string>
     <string name="decline">Rifiuta</string>
     <string name="accept">Accetta</string>
@@ -2020,7 +2021,6 @@
     <string name="dictation_disclosure_message">Il servizio vocale installato su questo dispositivo elabora ciò che dici e può inviare l’audio al proprio fornitore. Dopo un errore, il testo riconosciuto può essere salvato automaticamente nella bozza originale. L’invio automatico è disattivato, a meno che tu non lo attivi nelle impostazioni di Dettatura.</string>
     <string name="dictation_continue">Continua</string>
     <string name="dictation_microphone_muted">L’accesso al microfono è disattivato</string>
-    <string name="dictation_microphone_muted_help">Attiva l’accesso al microfono nelle impostazioni sulla privacy di Android o nelle Impostazioni rapide, poi riprova la dettatura.</string>
     <!-- Imported-account preflight (#2519). -->
     <string name="setup_title">Configura account</string>
     <string name="setup_working">Verifica del tuo account…</string>

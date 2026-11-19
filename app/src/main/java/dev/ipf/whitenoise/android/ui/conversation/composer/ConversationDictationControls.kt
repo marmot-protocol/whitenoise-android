@@ -2,8 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import android.content.Intent
-import android.provider.Settings
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -23,7 +21,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -34,7 +31,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -55,7 +51,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
-import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
@@ -209,40 +204,6 @@ internal fun ConversationDictationCompactActions(
             }
         }
     }
-    if (state is ConversationDictationState.Failed && state.reason == ConversationDictationFailure.MicrophoneMuted) {
-        val context = LocalContext.current
-        ConversationDictationMicrophoneDialog(
-            onDismiss = controller::dismissFailure,
-            onOpenSettings = {
-                controller.dismissFailure()
-                runCatching {
-                    context.startActivity(
-                        Intent(Settings.ACTION_PRIVACY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }
-            },
-        )
-    }
-}
-
-/** Explains system microphone blocking before any silent recognition session starts. */
-@Composable
-internal fun ConversationDictationMicrophoneDialog(
-    onDismiss: () -> Unit,
-    onOpenSettings: () -> Unit,
-) {
-    AnimatedAlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.testTag("dictation-microphone-dialog"),
-        title = { Text(stringResource(R.string.dictation_microphone_muted)) },
-        text = { Text(stringResource(R.string.dictation_microphone_muted_help)) },
-        confirmButton = {
-            TextButton(onClick = { close(onOpenSettings) }) { Text(stringResource(R.string.open_settings)) }
-        },
-        dismissButton = {
-            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
 }
 
 private val ConversationDictationState.hasActiveRecognitionActions: Boolean

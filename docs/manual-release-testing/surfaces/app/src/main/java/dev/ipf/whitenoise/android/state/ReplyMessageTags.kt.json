@@ -20,6 +20,22 @@
           "MSG-021",
           "MSG-045"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ReplyMessageTags.kt",
+        "surface": "Text and media replies resolve an unsent own message to its event id or wait",
+        "anchor": "internal fun ConversationController.replyTargetForSend(",
+        "test_ids": [
+          "CON-012"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ReplyMessageTags.kt",
+        "surface": "Reply to a message that has not been sent yet",
+        "anchor": "R.string.reply_target_not_sent",
+        "test_ids": [
+          "CON-012"
+        ]
       }
     ]
   },

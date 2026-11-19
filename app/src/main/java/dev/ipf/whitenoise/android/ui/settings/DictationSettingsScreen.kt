@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.audio.conversationDictationRecognitionServiceC
 import dev.ipf.whitenoise.android.audio.resolveConversationDictationProvider
 import dev.ipf.whitenoise.android.state.ConversationDictationPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.discoverDictationProviders
 import dev.ipf.whitenoise.android.ui.common.SpeechChoice
 import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail

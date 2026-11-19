@@ -18,6 +18,14 @@
         "test_ids": [
           "SEC-017"
         ]
+      },
+      {
+        "surface": "Push state reads reuse one Keystore open between writes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PushTokenStore.kt",
+        "anchor": "cacheReads = true",
+        "test_ids": [
+          "SEC-017"
+        ]
       }
     ]
   },

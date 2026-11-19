@@ -353,6 +353,7 @@
     <string name="scroll_to_top">Scroll to top</string>
     <string name="discard_failed_message">Discard failed message</string>
     <string name="message_discard_still_sending">This message is still sending. Try again in a moment.</string>
+    <string name="reply_target_not_sent">The message you\'re replying to hasn\'t been sent yet. Wait for it to send, or tap Retry on it if it failed, then send your reply.</string>
     <string name="message_discard_not_failed">This message can no longer be discarded.</string>
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
@@ -1724,7 +1725,6 @@
     <string name="dictation_open_speech_service">Open the speech service</string>
     <string name="dictation_permission_denied_permanently">Allow microphone access in Settings</string>
     <string name="dictation_microphone_muted">Microphone access is off</string>
-    <string name="dictation_microphone_muted_help">Turn on microphone access in Android privacy settings or Quick Settings, then try dictation again.</string>
     <string name="dictation_microphone_in_use">The microphone is already in use</string>
     <string name="dictation_interrupted">Dictation interrupted. Review recovered text and any remaining audio before sending.</string>
     <string name="dictation_audio_focus_unavailable">Could not pause other audio. Try again or turn off Pause other audio in Dictation settings.</string>

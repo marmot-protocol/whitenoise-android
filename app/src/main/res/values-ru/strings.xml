@@ -305,6 +305,7 @@
     <string name="scroll_to_top">Прокрутить вверх</string>
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
     <string name="message_discard_still_sending">Это сообщение ещё отправляется. Повторите попытку чуть позже.</string>
+    <string name="reply_target_not_sent">Сообщение, на которое вы отвечаете, ещё не отправлено. Дождитесь отправки или нажмите на нём «Повторить», если отправить не удалось, а затем отправьте ответ.</string>
     <string name="message_discard_not_failed">Это сообщение больше нельзя удалить.</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
@@ -2089,7 +2090,6 @@
     <string name="dictation_disclosure_message">Установленная на этом устройстве служба распознавания речи обрабатывает сказанное и может отправлять звук своему поставщику. После сбоя распознанный текст может быть автоматически сохранён в исходном черновике. Автоматическая отправка выключена, пока вы не включите её в настройках диктовки.</string>
     <string name="dictation_continue">Продолжить</string>
     <string name="dictation_microphone_muted">Доступ к микрофону отключён</string>
-    <string name="dictation_microphone_muted_help">Включите доступ к микрофону в настройках конфиденциальности Android или на панели быстрых настроек, затем повторите диктовку.</string>
     <!-- Imported-account preflight (#2519). -->
     <string name="setup_title">Настройка аккаунта</string>
     <string name="setup_working">Проверка аккаунта…</string>

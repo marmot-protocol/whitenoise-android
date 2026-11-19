@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageProjector
 
 private const val EVENT_ID_HEX_LENGTH = 64
@@ -50,8 +51,10 @@ internal fun ConversationController.snapshotReply(): ReplySnapshot =
 /**
  * A reply picked on the user's own message while it was still sending keeps that send's client token. Once
  * the accepted row is in the timeline, under the same row identity or carrying the token, its event id is
- * the target; until then the token is returned unchanged and stays unpublishable. Only the loaded window is
- * searched, so if the accepted row has paged out the actions stay hidden; the token is never published.
+ * the target. A text MDK accepted before its row was projected keeps the token on that row, so its event id
+ * comes from the acceptance map instead. Until then the token is returned unchanged and stays unpublishable.
+ * Only the loaded window is searched, so if the accepted row has paged out the actions stay hidden; the token
+ * is never published.
  */
 private fun ConversationController.confirmedReplyTarget(selected: String): String {
     if (isPublishableReplyTarget(selected)) return selected
@@ -61,7 +64,24 @@ private fun ConversationController.confirmedReplyTarget(selected: String): Strin
         ?.record
         ?.messageIdHex
         ?.takeIf(::isPublishableReplyTarget)
+        ?: acceptedPendingTextOptimisticIds.entries
+            .firstOrNull { it.value == selected }
+            ?.key
+            ?.takeIf(::isPublishableReplyTarget)
         ?: selected
+}
+
+/**
+ * The reply target a text or media send publishes: none stays none, an event id is kept, and the client token
+ * of the user's own send resolves to that send's event id. While it has none, the user is told to wait for that
+ * message or retry it, and the result is a failure, so the caller sends nothing and the composer keeps its text,
+ * media and reply.
+ */
+internal fun ConversationController.replyTargetForSend(selected: String?): Result<String?> {
+    val target = selected?.takeIf(String::isNotBlank)?.let { confirmedReplyTarget(it) }
+    if (target == null || isPublishableReplyTarget(target)) return Result.success(target)
+    appState.present(R.string.reply_target_not_sent)
+    return Result.failure(IllegalStateException("reply target has no event id yet"))
 }
 
 /** True when the composer's reply, if any, can be carried by a poll or sticker. */

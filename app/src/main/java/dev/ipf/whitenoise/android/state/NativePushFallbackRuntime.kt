@@ -177,7 +177,7 @@ internal data class NativePushFallbackBindings(
     val readSettings: suspend (NativePushFallbackOwner, String) -> NotificationSettingsFfi,
     val publishActiveSettings: (NotificationSettingsFfi) -> Unit,
     val publishPersistentConnectionEnabled: () -> Unit,
-    val publishComplete: () -> Unit,
+    val publishComplete: suspend () -> Unit,
     val removeFingerprint: (NativePushFallbackOwner) -> Unit,
     val setNativePushDisabled: suspend (NativePushFallbackOwner) -> NotificationSettingsFfi,
     val clearRegistration: suspend (NativePushFallbackOwner) -> Unit,

@@ -266,6 +266,7 @@
     <string name="scroll_to_top">捲動到頂部</string>
     <string name="discard_failed_message">捨棄發送失敗的訊息</string>
     <string name="message_discard_still_sending">此訊息仍在傳送中。請稍後再試一次。</string>
+    <string name="reply_target_not_sent">你回覆的訊息尚未傳送。請等待它傳送完成；如果傳送失敗，請在該訊息上輕觸「重試」，然後再傳送你的回覆。</string>
     <string name="message_discard_not_failed">此訊息已無法捨棄。</string>
     <string name="decline">拒絕</string>
     <string name="accept">接受</string>
@@ -1981,7 +1982,6 @@
     <string name="dictation_disclosure_message">此裝置上安裝的語音服務會處理你說的內容，並可能將音訊傳送給其供應商。發生錯誤後，辨識的文字可能會自動儲存到原始草稿中。除非你在「聽寫」設定中開啟，否則不會自動傳送。</string>
     <string name="dictation_continue">繼續</string>
     <string name="dictation_microphone_muted">麥克風存取已關閉</string>
-    <string name="dictation_microphone_muted_help">請在 Android 隱私權設定或快速設定中開啟麥克風存取，然後重試聽寫。</string>
     <!-- Imported-account preflight (#2519). -->
     <string name="setup_title">帳號設定</string>
     <string name="setup_working">正在檢查你的帳號…</string>

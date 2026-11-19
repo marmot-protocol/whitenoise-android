@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
  * because [nativePushEnabled] is already false on the runtime side.
  */
 internal suspend fun NotificationDeliveryController.drainPendingPushClears() {
-    for (account in pushTokenStore.pendingClears()) {
+    for (account in withContext(pushWakeStorageDispatcher) { pushTokenStore.pendingClears() }) {
         val cleared =
             runCatchingCancellable { host.marmotIo { clearPushRegistration(account) } }
                 .onSuccess { outcome ->
@@ -24,16 +24,16 @@ internal suspend fun NotificationDeliveryController.drainPendingPushClears() {
                     appStateDebug { "pending clearPushRegistration retry failed: ${it.readableMessage()}" }
                 }.isSuccess
         if (cleared) {
-            pushTokenStore.clearPending(account)
+            withContext(pushWakeStorageDispatcher) { pushTokenStore.clearPending(account) }
             appStateDebug { "pending clearPushRegistration drained account=${account.take(8)}" }
         }
     }
 }
 
-// Retry sign-out push-disables that failed; on success the account leaves the pending set.
+/** Retries sign-out push-disables that failed. On success the account leaves the pending set. */
 internal suspend fun NotificationDeliveryController.drainPendingPushDisables() {
     val runtime = marmotRuntime ?: return
-    for (account in pushTokenStore.pendingDisables()) {
+    for (account in withContext(pushWakeStorageDispatcher) { pushTokenStore.pendingDisables() }) {
         val settings =
             runCatchingCancellable {
                 withContext(marmotIoDispatcher) { runtime.marmot.setNativePushEnabled(account, false) }
@@ -44,7 +44,7 @@ internal suspend fun NotificationDeliveryController.drainPendingPushDisables() {
         if (settings?.nativePushEnabled == false) {
             perAccountSyncedFingerprints.remove(account)
             if (account == activeAccountRef) localNotificationSettings = settings
-            pushTokenStore.clearPendingDisable(account)
+            withContext(pushWakeStorageDispatcher) { pushTokenStore.clearPendingDisable(account) }
             appStateDebug { "pending native-push disable drained account=${account.take(8)}" }
         }
     }
@@ -112,6 +112,7 @@ private suspend fun NotificationDeliveryController.clearPushRegistrationForAccou
     }
 }
 
+/** Clears [account]'s push registration, queueing the clear for retry when the runtime call fails. */
 internal suspend fun NotificationDeliveryController.clearPushRegistrationForAccountLocked(account: String) {
     perAccountSyncedFingerprints.remove(account)
     val result = runCatchingCancellable { host.marmotIo { clearPushRegistration(account) } }
@@ -120,7 +121,7 @@ internal suspend fun NotificationDeliveryController.clearPushRegistrationForAcco
         // retry group sharing; it is a successful local clear, not a
         // reason to restore or roll back the registration.
         logPushRegistrationShareOutcome("clear", account, outcome)
-        pushTokenStore.clearPending(account)
+        withContext(pushWakeStorageDispatcher) { pushTokenStore.clearPending(account) }
     }
     result.exceptionOrNull()?.let { failure ->
         val queued = withContext(Dispatchers.IO) { pushTokenStore.recordPendingClear(account) }

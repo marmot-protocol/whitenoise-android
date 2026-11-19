@@ -74,15 +74,6 @@
         ]
       },
       {
-        "surface": "ConversationDictationMicrophoneDialog",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "fun ConversationDictationMicrophoneDialog(",
-        "test_ids": [
-          "DIC-001",
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "ConversationDictationPasteAction",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationPasteAction(",
@@ -207,24 +198,6 @@
         "surface": "string:dictation_microphone_muted",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "R.string.dictation_microphone_muted",
-        "test_ids": [
-          "DIC-001",
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_microphone_muted_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "R.string.dictation_microphone_muted_help",
-        "test_ids": [
-          "DIC-001",
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:open_settings",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "R.string.open_settings",
         "test_ids": [
           "DIC-001",
           "DIC-002"

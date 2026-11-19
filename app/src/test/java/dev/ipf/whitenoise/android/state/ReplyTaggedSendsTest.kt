@@ -92,18 +92,17 @@ class ReplyTaggedSendsTest {
             assertNull(controller.replyingTo)
         }
 
-    /** A reply picked while an earlier send was running stays selected, and the send keeps its own target. */
+    /** A reply picked while MDK is still sending stays selected, and the send keeps its own target. */
     @Test
     fun aReplyPickedDuringTheSendIsKept() =
         runTest {
             val recorder = SendRecorder()
             val controller = controller(appState(recorder.engine))
             controller.replyingTo = record(MESSAGE_ID)
-            val captured = controller.snapshotReply()
             val newer = record(OTHER_ID)
-            controller.replyingTo = newer
+            recorder.onSend = { controller.replyingTo = newer }
 
-            assertTrue(controller.sendSticker(STICKER, captured))
+            assertTrue(controller.sendSticker(STICKER, controller.snapshotReply()))
 
             assertEquals(REPLY_TAGS, recorder.onlyTags())
             assertSame(newer, controller.replyingTo)
@@ -286,10 +285,14 @@ class ReplyTaggedSendsTest {
         private val failure: Throwable? = null,
     ) {
         val sends = mutableListOf<Pair<String, List<Any?>>>()
+
+        /** Runs inside the native send, before it returns, as a user acting while MDK is still sending would. */
+        var onSend: () -> Unit = {}
         val engine =
             native { name, args ->
                 if (name !in SEND_CALLS) throw UnsupportedOperationException("Unused native test call: $name")
                 sends += name to args.dropLast(1)
+                onSend()
                 failure?.let { throw it }
                 summary()
             }
