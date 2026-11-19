@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Testing-only MarmotKit November 18 nightly from 0ad3c610 over the official 0.17.0 baseline. Verify account migrations 0208\u20130212, retained data, the original pending upload, cold restart, both recovery relay modes, linked devices, the relay repair warning and removal action in account setup, and group sends with no usable relay.",
+        "surface": "Testing-only MarmotKit November 19 nightly from e4421e86 over the official 0.17.0 baseline. Verify account migrations 0208\u20130214, retained data, the original pending upload, cold restart, both recovery relay modes, linked devices, the relay repair warning and removal action in account setup, and group sends with no usable relay.",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
-        "anchor": "artifact-id=0.18.0-nightly.20261118",
+        "anchor": "artifact-id=0.18.0-nightly.20261119",
         "test_ids": [
           "INT-010",
           "INT-003",
