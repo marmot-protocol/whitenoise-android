@@ -7,6 +7,7 @@ import org.junit.Test
 import java.io.File
 
 class KeyboardPreservingBottomSheetCoverageTest {
+    /** The sheet reuses KeyboardSafePopup's overlay and Back handling, ending above the keyboard or a given y. */
     @Test
     fun bottomSheetDelegatesOverlayPlumbingToKeyboardSafePopup() {
         val source = appSheetsSource().readText()
@@ -15,7 +16,11 @@ class KeyboardPreservingBottomSheetCoverageTest {
         assertTrue("sheet must use the shared non-focusable overlay", "KeyboardSafePopup(" in body)
         assertTrue(
             "sheet must anchor above the visible-window bottom, including an open IME",
-            "popupPositionProvider = BottomAnchoredPopupPositionProvider" in body,
+            "BottomAnchoredPopupPositionProvider" in body && "popupPositionProvider = placement" in body,
+        )
+        assertTrue(
+            "a sheet given a window y must keep its bottom there and fit the space above it",
+            "AboveWindowYPopupPositionProvider" in body && ".then(heightBound ?: Modifier)" in body,
         )
         assertFalse("sheet wrapper must not duplicate Popup plumbing", Regex("""\bPopup\(""").containsMatchIn(body))
         assertFalse("sheet wrapper must not duplicate Back handling", "BackHandler(" in body || "OnBackInvoked" in body)
@@ -44,6 +49,37 @@ class KeyboardPreservingBottomSheetCoverageTest {
             "BottomSheetDefaults.SheetMaxWidth" in body &&
                 "BottomSheetDefaults.ExpandedShape" in body &&
                 ".navigationBarsPadding()" in body,
+        )
+    }
+
+    /**
+     * A held composer control's explanation keeps the keyboard: the composer marks its visible surface as the edge,
+     * the hold reads that edge, and an explanation with an edge opens this sheet, not the focusable modal one.
+     */
+    @Test
+    fun composerExplanationsUseTheKeyboardPreservingSheet() {
+        val explanation = source("ui/common/LongPressExplanation.kt").readText()
+        val sheet = explanation.functionBody("ExplanationSheet")
+        assertTrue(
+            "an explanation with a bottom edge must open the keyboard-preserving sheet at that edge",
+            "KeyboardPreservingBottomSheet(" in sheet && "bottomWindowY = bottomWindowY" in sheet,
+        )
+        assertTrue(
+            "holding a control must pass the composer's edge to the host",
+            "explanations.show(current, latestBottomEdge?.invoke())" in explanation.functionBody("explainOnLongPress"),
+        )
+        assertTrue(
+            "the editor's Back must close a composer explanation before it hides the keyboard",
+            "val closeComposerPopup = closeSendingIdentity ?: composerExplanationClose()" in
+                source("ui/conversation/composer/ComposerBar.kt").readText(),
+        )
+        assertTrue(
+            "the conversation must explain its composer's controls above the composer",
+            "ExplainAboveComposer {\n" in source("ui/conversation/ConversationBottomBar.kt").readText(),
+        )
+        assertTrue(
+            "the composer must mark the box around its visible surface as the edge, not its taller root",
+            ".composerExplanationEdge()" in source("ui/conversation/composer/ComposerBar.kt").readText(),
         )
     }
 

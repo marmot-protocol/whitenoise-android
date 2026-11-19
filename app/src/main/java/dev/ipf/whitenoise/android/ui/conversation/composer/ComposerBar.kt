@@ -1153,8 +1153,7 @@ internal fun ComposerBar(
     }
     BoxWithConstraints(modifier.fillMaxWidth().onSizeChanged { lastMeasuredHeight = it.height }) {
         val statusBarTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
-        val appliesImePadding =
-            composerBottomClusterAppliesImePadding(showEmojiPane = showEmojiPane)
+        val appliesImePadding = composerBottomClusterAppliesImePadding(showEmojiPane = showEmojiPane)
         val bottomInset =
             with(density) {
                 val navigationBottom = navigationInsets.getBottom(this)
@@ -1747,13 +1746,14 @@ internal fun ComposerBar(
                         Modifier
                             .fillMaxWidth()
                             .onGloballyPositioned { toolbarParentBounds = it.boundsInWindow() }
+                            .composerExplanationEdge()
                             .onSizeChanged { toolbarParentSize = it },
                 ) {
                     // Keep the field composed and focusable throughout dictation. The
                     // app-owned controls replace only the waveform slot, so an open IME
                     // stays open and a closed IME is never raised implicitly.
-                    val openComposerOverlay =
-                        composerEmojiPickerOpen || attachmentSheetState.isOpen
+                    val openComposerOverlay = composerEmojiPickerOpen || attachmentSheetState.isOpen
+                    val closeComposerPopup = closeSendingIdentity ?: composerExplanationClose()
                     ComposerPill(
                         sendingIdentity =
                             if (appState != null && composerSendingAccount(appState, draftAccountRef) != null) {
@@ -1898,18 +1898,18 @@ internal fun ComposerBar(
                                         ?.let(::guardedAttachmentAction),
                             )
                         },
-                        // Android13+ gives the identity confirmation its single overlay-priority Back owner.
-                        // Earlier versions need this pre-IME catch to close it without hiding the keyboard.
+                        // Android13+ gives the identity confirmation and a composer explanation one overlay Back owner.
+                        // Earlier versions need this pre-IME catch to close them without hiding the keyboard.
                         preImeBackEnabled =
                             !openComposerOverlay &&
                                 (
-                                    closeSendingIdentity == null ||
+                                    closeComposerPopup == null ||
                                         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                                 ),
                         onPreImeBack = {
-                            val closeConfirmation = closeSendingIdentity
-                            if (closeConfirmation != null) {
-                                closeConfirmation()
+                            val closePopup = closeComposerPopup
+                            if (closePopup != null) {
+                                closePopup()
                             } else if (onComposerPreImeBack != null) {
                                 onComposerPreImeBack()
                             } else {

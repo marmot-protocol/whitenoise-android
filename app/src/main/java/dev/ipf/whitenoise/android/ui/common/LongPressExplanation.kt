@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,6 +32,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** What a held control does, in the words of its visible [title]. */
@@ -39,15 +43,33 @@ internal data class Explanation(
 )
 
 /** Shows one explanation at a time; `null` outside an [ExplanationHost], which disables holding to explain. */
-internal val LocalExplanationHost = staticCompositionLocalOf<((Explanation) -> Unit)?> { null }
+internal val LocalExplanationHost = staticCompositionLocalOf<ExplanationHostState?> { null }
 
-/** The one explanation on screen; [show] is what [LocalExplanationHost] provides. */
+/**
+ * The window y, in pixels, that an explanation's sheet keeps its bottom edge at, read when a held control is
+ * explained. The composer provides its top edge, so the sheet opens above it without taking focus from the editor
+ * and the keyboard stays open. `null` opens the modal sheet at the bottom of the window.
+ */
+internal val LocalExplanationBottomEdge = staticCompositionLocalOf<(() -> Int)?> { null }
+
+/** The one explanation on screen, and the window y its sheet stays above, if any. */
 @Stable
 internal class ExplanationHostState {
     var shown by mutableStateOf<Explanation?>(null)
         private set
 
-    val show: (Explanation) -> Unit = { shown = it }
+    /** The window y the shown explanation's sheet keeps its bottom edge at, or `null` for the modal sheet. */
+    var bottomWindowY by mutableStateOf<Int?>(null)
+        private set
+
+    /** Shows [explanation], replacing any other, above [bottomWindowY] when given. */
+    fun show(
+        explanation: Explanation,
+        bottomWindowY: Int? = null,
+    ) {
+        this.bottomWindowY = bottomWindowY
+        shown = explanation
+    }
 
     fun dismiss() {
         shown = null
@@ -68,7 +90,7 @@ internal fun ExplanationSheetHost(
         LaunchedEffect(state) { state.dismiss() }
         return
     }
-    state.shown?.let { explanation -> ExplanationSheet(explanation, onDismiss = state::dismiss) }
+    state.shown?.let { explanation -> ExplanationSheet(explanation, state.bottomWindowY, onDismiss = state::dismiss) }
 }
 
 /** Provides holding to explain for [content] with its own sheet, for surfaces outside the app root. */
@@ -76,30 +98,59 @@ internal fun ExplanationSheetHost(
 @Composable
 internal fun ExplanationHost(content: @Composable () -> Unit) {
     val state = rememberExplanationHostState()
-    CompositionLocalProvider(LocalExplanationHost provides state.show, content = content)
+    CompositionLocalProvider(LocalExplanationHost provides state, content = content)
     ExplanationSheetHost(state)
 }
 
+/**
+ * The modal sheet at the window's bottom, or, with [bottomWindowY], a keyboard-preserving sheet whose bottom stays
+ * at that window y. The modal sheet's focusable window would take focus from a focused editor and close the keyboard.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable
 private fun ExplanationSheet(
     explanation: Explanation,
+    bottomWindowY: Int?,
     onDismiss: () -> Unit,
 ) {
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.testTag("explanation.sheet")) {
-        WhiteNoiseSheetHeader(explanation.title, onClose = onDismiss)
-        Text(
-            explanation.body,
-            modifier =
-                Modifier
-                    .padding(horizontal = WhiteNoiseSpacing.Section)
-                    .padding(bottom = WhiteNoiseSpacing.Section)
-                    .testTag("explanation.body"),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    val sheet = Modifier.testTag("explanation.sheet")
+    if (bottomWindowY == null) {
+        WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss, modifier = sheet) {
+            ExplanationContent(explanation, onDismiss)
+        }
+    } else {
+        KeyboardPreservingBottomSheet(
+            paneTitle = explanation.title,
+            onDismissRequest = onDismiss,
+            modifier = sheet,
+            bottomWindowY = bottomWindowY,
+        ) {
+            ExplanationContent(explanation, onDismiss)
+        }
     }
+}
+
+/** The explanation's title with a close button over its body, which scrolls when the sheet's height is bounded. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ColumnScope.ExplanationContent(
+    explanation: Explanation,
+    onDismiss: () -> Unit,
+) {
+    WhiteNoiseSheetHeader(explanation.title, onClose = onDismiss)
+    Text(
+        explanation.body,
+        modifier =
+            Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = WhiteNoiseSpacing.Section)
+                .padding(bottom = WhiteNoiseSpacing.Section)
+                .testTag("explanation.body"),
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /**
@@ -119,16 +170,18 @@ internal fun Modifier.explainOnLongPress(
     additionalActions: List<CustomAccessibilityAction> = emptyList(),
 ): Modifier {
     val host = LocalExplanationHost.current
+    val bottomEdge = LocalExplanationBottomEdge.current
     val haptics = LocalHapticFeedback.current
     val explainLabel = stringResource(R.string.explanation_action_explain)
     val latestExplanation by rememberUpdatedState(explanation)
     val latestBeforeShow by rememberUpdatedState(beforeShow)
     val latestHost by rememberUpdatedState(host)
+    val latestBottomEdge by rememberUpdatedState(bottomEdge)
     val show: () -> Unit = {
         latestExplanation?.let { current ->
-            latestHost?.let { showExplanation ->
+            latestHost?.let { explanations ->
                 latestBeforeShow()
-                showExplanation(current)
+                explanations.show(current, latestBottomEdge?.invoke())
             }
         }
     }

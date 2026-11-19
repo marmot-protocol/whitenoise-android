@@ -90,6 +90,27 @@ internal object BottomAnchoredPopupPositionProvider : PopupPositionProvider {
 }
 
 /**
+ * Bottom-anchors popup content at [bottomY], a host-window y such as the composer's top edge, centered like
+ * [BottomAnchoredPopupPositionProvider]. A [bottomY] below the visible frame, as when the keyboard has just covered
+ * it, falls back to the frame's bottom. Callers bound the content's height, so its top is never pushed off screen.
+ */
+internal class AboveWindowYPopupPositionProvider(
+    private val bottomY: Int,
+) : PopupPositionProvider {
+    /** Centers the content and ends it at [bottomY], or at the visible frame's bottom if that is higher. */
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val x = (windowSize.width - popupContentSize.width) / 2
+        val y = minOf(bottomY, windowSize.height) - popupContentSize.height
+        return IntOffset(x, y)
+    }
+}
+
+/**
  * Registers [callback] at [priority] and returns its unregistration, letting a host route the overlay's
  * Back callback through its own seam instead of the view's [OnBackInvokedDispatcher].
  */
