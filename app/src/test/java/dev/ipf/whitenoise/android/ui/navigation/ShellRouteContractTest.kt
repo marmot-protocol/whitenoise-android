@@ -63,6 +63,49 @@ class ShellRouteContractTest {
         }
     }
 
+    /**
+     * A signed-out moment, as a wipe passes through, closes the open conversation at once, and the same account
+     * coming back does not reopen it.
+     */
+    @Test
+    fun aSignedOutMomentClosesTheConversationForGood() {
+        withMountedShell(mutableStateOf(COMPACT_WIDTH)) { fixture, holder ->
+            openTarget(fixture, holder)
+
+            composeRule.runOnIdle { fixture.appState.replaceActiveAccount(null) }
+            awaitCondition { holder.selectedChat.value == null }
+            assertEquals(ConversationOpenContext(), holder.selectedChatOpenContext.value)
+            assertEquals(emptyList<ConversationController>(), fixture.appState.attachedConversationControllers())
+
+            composeRule.runOnIdle { fixture.appState.replaceActiveAccount(ConversationTimelineTestIds.ACCOUNT_REF) }
+            settle()
+            assertNull(holder.selectedChat.value)
+            assertEquals(MainSection.Chats.name, holder.sectionState.sectionName)
+        }
+    }
+
+    /** An open Settings screen returns to Chats in the signed-out moment and stays there on the next account. */
+    @Test
+    fun aSignedOutMomentLeavesSettingsForChatsOnTheNextAccount() {
+        withMountedShell(mutableStateOf(COMPACT_WIDTH)) { fixture, holder ->
+            composeRule.runOnIdle {
+                holder.sectionState.sectionName = MainSection.Settings.name
+                holder.sectionState.settingsDetailName = SettingsDetail.Appearance.name
+            }
+            settle()
+            assertEquals(SettingsDetail.Appearance.name, holder.sectionState.settingsDetailName)
+
+            composeRule.runOnIdle { fixture.appState.replaceActiveAccount(null) }
+            awaitCondition { holder.sectionState.sectionName == MainSection.Chats.name }
+            assertNull(holder.sectionState.settingsDetailName)
+
+            composeRule.runOnIdle { fixture.appState.replaceActiveAccount(OTHER_ACCOUNT_REF) }
+            settle()
+            assertEquals(MainSection.Chats.name, holder.sectionState.sectionName)
+            assertNull(holder.sectionState.settingsDetailName)
+        }
+    }
+
     /** Folding and unfolding keeps the one attached conversation controller, not a rebuilt copy. */
     @Test
     fun crossingTheExpandedWidthKeepsTheSameConversationController() {
