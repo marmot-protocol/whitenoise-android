@@ -128,6 +128,14 @@
         "test_ids": [
           "SYS-005"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "surface": "The conversation route receives the list's retained group pictures",
+        "anchor": "LocalRetainedGroupAvatarPixels provides retainedAvatarPreparation,",
+        "test_ids": [
+          "CHL-017"
+        ]
       }
     ]
   },

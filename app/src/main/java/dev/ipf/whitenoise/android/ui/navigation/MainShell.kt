@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.LocalRetainedGroupAvatarPixels
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
@@ -443,8 +444,7 @@ internal fun MainShell(
                 .ShellPlaybackHost(appState) { currentSourceOpen() }
         }
     val guardedPlaybackSourceOpen: () -> Unit = { shellPlaybackHost.requestOpenSource() }
-    val profileGroupForegroundState =
-        remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
+    val profileGroupForegroundState = remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
     // Process-owned, so unmounting the shell for a frame cannot release the route's priority window (#586).
     val notificationFirstFrameGate = shellStateHolder.notificationFirstFrame.gate
 
@@ -1624,8 +1624,7 @@ internal fun MainShell(
     val twoPaneRetainedContent =
         accountOwnedExitingConversationContent.takeIf { twoPane && accountOwnedPendingConversationOpen != null }
     // The open or closing conversation beside the list owns the one player bar.
-    val conversationBesideList =
-        twoPane && (selectedChat != null || accountOwnedExitingConversationContent != null)
+    val conversationBesideList = twoPane && (selectedChat != null || accountOwnedExitingConversationContent != null)
     // The rendered Chats slot keeps its player during preparation and while AnimatedContent exits it.
     // Promoting a pending tap to the shell would move the player above the account picker for one frame.
     val playbackInChatList = section == MainSection.Chats
@@ -2071,6 +2070,7 @@ internal fun MainShell(
                             CompositionLocalProvider(
                                 LocalTopNoticeScope provides
                                     ConversationNoticeDestination(content.accountRef, chat.group.groupIdHex),
+                                LocalRetainedGroupAvatarPixels provides retainedAvatarPreparation,
                             ) {
                                 ConversationScreen(
                                     appState = appState,
