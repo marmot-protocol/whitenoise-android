@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -62,6 +63,8 @@ class ShellEarlyOpenDetailsContractTest {
         )
     private val holder = MainShellStateHolder(appState, SavedStateHandle())
     private val routed = NotificationRouteHarness.routedTarget(TARGET_ACCOUNT)
+    private val inbound = mutableStateOf<NotificationTarget?>(routed.notificationTarget)
+    private val inboundRequestId = mutableLongStateOf(routed.notificationRequestId)
 
     /** Frees every held engine read and the shell's process-scoped work so nothing outlives the case. */
     @After
@@ -140,6 +143,44 @@ class ShellEarlyOpenDetailsContractTest {
         assertSame(earlyController, appState.attachedConversationControllers().single())
     }
 
+    /**
+     * A second tap for the same account and chat arrives while the first tap's switch is still held. The newer
+     * request takes the route over: the open conversation carries its request, on a rebuilt controller, and when
+     * the account lands the conversation is still open. The older request does not turn the landing into a reset.
+     */
+    @Test
+    fun aRepeatTapWhileTheSwitchIsHeldTakesOverAndStillLandsOpen() {
+        mountShellWithTheTap()
+        awaitCondition("the conversation never opened ahead of the switch") { openedAheadOfTheSwitch() }
+        val earlyController = appState.attachedConversationControllers().single()
+        assertEquals(routed.notificationRequestId, holder.selectedChatOpenContext.value.notificationRouteTraceRequestId)
+
+        composeRule.runOnIdle {
+            inboundRequestId.longValue = REPEAT_REQUEST_ID
+            inbound.value = routed.notificationTarget
+        }
+        awaitCondition("the repeat tap never took the route over") { routeCarries(REPEAT_REQUEST_ID) }
+        assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
+        assertEquals(SHARED_GROUP, holder.selectedChat.value?.id)
+        assertEquals(TARGET_ACCOUNT, holder.selectedChatOpenContext.value.pinnedAccountRef)
+        assertNotSame(earlyController, appState.attachedConversationControllers().single())
+
+        activationHold.releaseAll()
+        awaitCondition("the switch never landed") { appState.activeAccountRef == TARGET_ACCOUNT && transcriptShown() }
+        repeat(SETTLE_PUMPS) { pump() }
+
+        assertTrue(transcriptShown())
+        assertEquals(SHARED_GROUP, holder.selectedChat.value?.id)
+        assertTrue(routeCarries(REPEAT_REQUEST_ID))
+        assertEquals(TARGET_ACCOUNT, appState.attachedConversationControllers().single().boundAccountRef)
+    }
+
+    /** True once the open conversation was committed by notification request [requestId]. */
+    private fun routeCarries(requestId: Long): Boolean {
+        val committedBy = holder.selectedChatOpenContext.value.notificationRouteTraceRequestId
+        return committedBy == requestId
+    }
+
     /** How many composed nodes satisfy [matcher], counted in the unmerged tree so no parent can hide one. */
     private fun composed(matcher: SemanticsMatcher): Int {
         val matching = composeRule.onAllNodes(matcher, useUnmergedTree = true)
@@ -157,14 +198,13 @@ class ShellEarlyOpenDetailsContractTest {
         gate.releaseActivation.countDown()
         appState.liveSubscriptionOverrides.conversation = conversations()
         appState.setAppInForeground(true)
-        val inbound = mutableStateOf<NotificationTarget?>(routed.notificationTarget)
         composeRule.setContent {
             WhiteNoiseTheme {
                 MainShell(
                     appState = appState,
                     stateHolder = holder,
                     inboundNotificationTarget = inbound.value,
-                    inboundNotificationRequestId = routed.notificationRequestId,
+                    inboundNotificationRequestId = inboundRequestId.longValue,
                     onNotificationTargetHandled = { _, _ -> inbound.value = null },
                 )
             }
@@ -234,6 +274,9 @@ class ShellEarlyOpenDetailsContractTest {
         const val DETAILS_TAG = "chat_info.list"
         const val TARGET_ACCOUNT_MESSAGE = "target account only message"
         const val POLL_MILLIS = 20L
+
+        /** Any request id other than the first tap's. */
+        const val REPEAT_REQUEST_ID = 1_001L
 
         /** About a second of held switch, long enough for a late draw of details to show. */
         const val HELD_PUMPS = 25
