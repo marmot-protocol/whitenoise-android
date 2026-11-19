@@ -13,6 +13,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -23,6 +25,13 @@ import dev.ipf.whitenoise.android.state.isRenderable
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal val LocalPreparedGroupAvatarPixels = compositionLocalOf<PreparedGroupAvatarPixels?> { null }
+
+/**
+ * The chat list's retained window, provided to the destinations opened from it. A destination's own preparation
+ * draws a selected picture from it on its first frame when the shared decoded cache has evicted that picture, as
+ * long as the account, runtime, cache lifetime and exact revision still match.
+ */
+internal val LocalRetainedGroupAvatarPixels = staticCompositionLocalOf<RetainedGroupAvatarPreparation?> { null }
 
 /** Scroll offsets are observed in this scope; unchanged row windows do not invalidate list content. */
 @Composable
@@ -261,17 +270,20 @@ private fun rememberAvatarPixelPreparation(
     surfaceIdentity: Any?,
 ): AvatarPixelPreparation {
     val identities = selected.map { it.cacheKey(accountRef.orEmpty()) }
+    val source = LocalRetainedGroupAvatarPixels.current
     return key(appState, appState.runtimeGeneration, accountRef, lifetime, surfaceIdentity, identities) {
+        val handoff = retainedHandoff(source, accountRef, appState.runtimeGeneration, lifetime)
         val cached =
             selected
                 .mapNotNull { asset ->
                     val imageKey = accountRef?.let(asset::cacheKey) ?: return@mapNotNull null
-                    AvatarImageLoader.cachedImage(imageKey)?.let {
+                    (AvatarImageLoader.cachedImage(imageKey) ?: handoff?.images?.get(imageKey))?.let {
                         imageKey to
                             PreparedAvatarImage(
                                 asset.copy(),
                                 it,
-                                AvatarImageLoader.cachedAnimationClassification(imageKey),
+                                AvatarImageLoader.cachedAnimationClassification(imageKey)
+                                    ?: handoff?.animationClassificationFor(asset),
                             )
                     }
                 }.toMap()
@@ -299,6 +311,26 @@ private fun rememberAvatarPixelPreparation(
         }.value
     }
 }
+
+/**
+ * The chat list's retained pixels a destination may start from: only the list's own account, runtime and cache
+ * lifetime qualify, and its exact-revision images are keyed like the destination's. Read without observing the
+ * window, so later list scrolling does not recompose the destination.
+ */
+private fun retainedHandoff(
+    source: RetainedGroupAvatarPreparation?,
+    accountRef: String?,
+    runtimeGeneration: Int,
+    lifetime: Long,
+): PreparedGroupAvatarPixels? =
+    Snapshot
+        .withoutReadObservation { source?.pixels }
+        ?.takeIf {
+            accountRef != null &&
+                it.accountRef == accountRef &&
+                it.runtimeGeneration == runtimeGeneration &&
+                it.lifetime == lifetime
+        }
 
 private data class AvatarPixelPreparation(
     val frames: Map<String, PreparedAvatarImage>,
