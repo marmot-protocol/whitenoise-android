@@ -14,7 +14,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,6 +44,9 @@ class ShellAccountBoundaryFrameContractTest {
         shell.withMountedShell(mutableStateOf(COMPACT_WIDTH), fixture) { _, holder ->
             shell.openTarget(fixture, holder)
             shell.awaitCondition { composed(PREVIOUS_ACCOUNT_MESSAGE) == 1 }
+            // Both markers are composed before the switch, so their later absence means something.
+            assertEquals(1, composerCount())
+            assertEquals(fixture.target.groupIdHex, holder.selectedChat.value?.id)
 
             composeRule.mainClock.autoAdvance = false
             composeRule.runOnUiThread {
@@ -53,16 +55,19 @@ class ShellAccountBoundaryFrameContractTest {
                 // must deliver it, or the first frame would be composed from state that never saw the switch.
                 Snapshot.sendApplyNotifications()
             }
+            val selectedAtFrame = mutableListOf<String?>()
             val leaked =
                 (1..FRAMES_WATCHED).filter {
                     composeRule.mainClock.advanceTimeByFrame()
                     shadowOf(Looper.getMainLooper()).idle()
+                    selectedAtFrame += holder.selectedChat.value?.id
                     composed(PREVIOUS_ACCOUNT_MESSAGE) > 0 || composerCount() > 0
                 }
             composeRule.mainClock.autoAdvance = true
 
             assertEquals("frames that still composed the previous account's conversation", emptyList<Int>(), leaked)
-            assertNull(holder.selectedChat.value)
+            val stillSelected = selectedAtFrame.filterNotNull()
+            assertEquals("the selection is clear from the first frame on", emptyList<String>(), stillSelected)
         }
     }
 
