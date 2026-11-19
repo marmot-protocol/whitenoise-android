@@ -20,7 +20,9 @@ internal fun WhiteNoiseAppState.chatListDictationActivity(
     accountRef: String?,
     item: ChatListItem,
 ): ConversationDictationActivity? =
-    accountRef?.let { initializedConversationDictation()?.chatListActivity(it, item.group.groupIdHex) }
+    accountRef?.let {
+        initializedConversationDictation()?.chatListActivity(it, item.group.groupIdHex)
+    }
 
 /** Live dictation marker: red mic while speech is captured, accent transcript glyph while it becomes text. */
 @Suppress("FunctionNaming")
