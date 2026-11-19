@@ -6641,8 +6641,20 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt",
       "symbol": "ConversationCameraScreen",
-      "bindings": [],
-      "remaining": "In-app camera opened by the composer's Camera action. Photo and Video modes, recording, the microphone prompt and Close need a Maestro fixture with a camera-backed emulator; until then ConversationCameraContentTest, ConversationCameraCaptureKindTest and a manual emulator run cover them."
+      "bindings": [
+        {
+          "case": "presentation-image-camera-close",
+          "selector": {
+            "id": "camera.shutter"
+          },
+          "scope": "Production camera screen opens in Photo mode with shutter, mode and lens controls; Close dispatch checked, with no capture, recording or preview claim.",
+          "entry_assertion": {
+            "id": "camera.shutter"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Video mode, recording, the microphone prompt and a real capture need a camera-backed emulator; ConversationCameraContentTest, ConversationCameraCaptureKindTest and a manual emulator run cover them."
     }
   ]
 }
