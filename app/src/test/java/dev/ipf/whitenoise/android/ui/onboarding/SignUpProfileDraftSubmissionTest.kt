@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.ExplanationHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -267,13 +268,21 @@ class SignUpProfileDraftSubmissionTest {
             val scope = rememberCoroutineScope()
             controller = remember { idleSignUpController(scope) }
             WhiteNoiseTheme {
-                SignUpScreen(controller, { true }, { excluding -> "Quiet Otter".also { requests += excluding } }, {})
+                ExplanationHost {
+                    SignUpScreen(
+                        controller,
+                        { true },
+                        { excluding -> "Quiet Otter".also { requests += excluding } },
+                        {},
+                    )
+                }
             }
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
         val hint = context.getString(R.string.signup_generated_name_hint)
-        composeRule.onNodeWithText(hint).assertDoesNotExist()
+        composeRule.onNodeWithTag("explanation.sheet").assertDoesNotExist()
         composeRule.onNodeWithTag("onboarding.sign_up.suggest_name").performTouchInput { longClick() }
+        composeRule.onNodeWithTag("explanation.sheet").assertExists()
         composeRule.onNodeWithText(hint).assertExists()
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
         composeRule.runOnIdle {

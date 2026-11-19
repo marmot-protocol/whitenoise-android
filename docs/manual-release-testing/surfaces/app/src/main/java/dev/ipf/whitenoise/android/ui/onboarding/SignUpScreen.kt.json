@@ -124,6 +124,14 @@
         ]
       },
       {
+        "surface": "R.string.profile_suggest_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.profile_suggest_name",
+        "test_ids": [
+          "ONB-025"
+        ]
+      },
+      {
         "surface": "R.string.retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
         "anchor": "R.string.retry",

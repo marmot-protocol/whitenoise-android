@@ -9,19 +9,17 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
-import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.ExplanationHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -97,36 +95,37 @@ class SignUpScreenshotTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
-                    SignUpContent(
-                        TextFieldState(initialName),
-                        TextFieldState("A local profile description"),
-                        null,
-                        stage,
-                        editable = stage == SignUpStage.Editing,
-                        preparingPhoto = false,
-                        offline = offline,
-                        onSuggestName = {},
-                        onSubmit = {},
-                        onContinueWithoutProfile = {},
-                        onBack = {},
-                        photoControls = {
-                            FilledTonalButton(
-                                onClick = {},
-                                enabled = !stage.busy,
-                                border =
-                                    dev.ipf.whitenoise.android.ui.theme
-                                        .amoledOutlineBorder(!stage.busy),
-                            ) { Text("Add Photo") }
-                        },
-                    )
+                    ExplanationHost {
+                        SignUpContent(
+                            TextFieldState(initialName),
+                            TextFieldState("A local profile description"),
+                            null,
+                            stage,
+                            editable = stage == SignUpStage.Editing,
+                            preparingPhoto = false,
+                            offline = offline,
+                            onSuggestName = {},
+                            onSubmit = {},
+                            onContinueWithoutProfile = {},
+                            onBack = {},
+                            photoControls = {
+                                FilledTonalButton(
+                                    onClick = {},
+                                    enabled = !stage.busy,
+                                    border =
+                                        dev.ipf.whitenoise.android.ui.theme
+                                            .amoledOutlineBorder(!stage.busy),
+                                ) { Text("Add Photo") }
+                            },
+                        )
+                    }
                 }
             }
         }
         composeRule.mainClock.advanceTimeBy(160)
         if (showNameHelp) {
             composeRule.onNodeWithTag("onboarding.sign_up.suggest_name").performTouchInput { longClick() }
-            val hint = RuntimeEnvironment.getApplication().getString(R.string.signup_generated_name_hint)
-            composeRule.onNodeWithText(hint).assertIsDisplayed()
+            composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
             captureScreenRoboImage("src/test/snapshots/$name.png")
         } else {
             composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")

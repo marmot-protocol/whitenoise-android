@@ -22,15 +22,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,12 +48,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
@@ -175,7 +171,6 @@ internal fun SignUpScreen(
 
 /** Prototype 120 dp avatar, compact photo action, 24 dp sections, 16 dp field gaps and IME-aware 520 dp form. */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SignUpContent(
     name: TextFieldState,
@@ -273,20 +268,19 @@ internal fun SignUpContent(
                         enabled = editable,
                         label = { Text(stringResource(R.string.name)) },
                         trailingIcon = {
-                            TooltipBox(
-                                positionProvider =
-                                    TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                                tooltip = {
-                                    PlainTooltip { Text(stringResource(R.string.signup_generated_name_hint)) }
-                                },
-                                state = rememberTooltipState(),
-                            ) {
-                                RandomProfileNameButton(
-                                    enabled = editable,
-                                    onClick = onSuggestName,
-                                    modifier = Modifier.testTag("onboarding.sign_up.suggest_name"),
+                            val nameExplanation =
+                                Explanation(
+                                    title = stringResource(R.string.profile_suggest_name),
+                                    body = stringResource(R.string.signup_generated_name_hint),
                                 )
-                            }
+                            RandomProfileNameButton(
+                                enabled = editable,
+                                onClick = onSuggestName,
+                                modifier =
+                                    Modifier
+                                        .testTag("onboarding.sign_up.suggest_name")
+                                        .explainOnLongPress(nameExplanation, enabled = editable),
+                            )
                         },
                         lineLimits = TextFieldLineLimits.SingleLine,
                         keyboardOptions =
