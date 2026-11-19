@@ -7,7 +7,10 @@ import dev.ipf.whitenoise.android.core.MarmotClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Publishes whichever relay lists the account is missing, seeded from MarmotKit's defaults. */
+/**
+ * Publishes whichever relay lists the account is missing, seeded from the projection's `defaultRelays`. MarmotKit
+ * fills that field with the account's own NIP-65 posting relays, not White Noise's defaults.
+ */
 internal suspend fun WhiteNoiseAppState.publishMissingRelayLists(account: String?): AccountRelayListsFfi? {
     val current = account?.let { loadAccountRelayLists(it) }
     return when {
@@ -24,7 +27,10 @@ internal suspend fun WhiteNoiseAppState.publishMissingRelayLists(account: String
     }
 }
 
-/** Replaces both relay lists with MarmotKit's defaults through the same validation an edit passes. */
+/**
+ * Replaces both relay lists with White Noise's defaults through the same validation an edit passes. The projection
+ * must be readable, as for any other relay edit, though its `defaultRelays` are the account's own and go unused.
+ */
 internal suspend fun WhiteNoiseAppState.restoreDefaultAccountRelays(account: String?): AccountRelayListsFfi? {
     val current = account?.let { loadAccountRelayLists(it) }
     return when {
@@ -36,11 +42,7 @@ internal suspend fun WhiteNoiseAppState.restoreDefaultAccountRelays(account: Str
             present(R.string.toast_relay_update_failed, R.string.no_relay_projection)
             null
         }
-        else -> {
-            val plan = RelayListEditPlan(normalizeRelayUrls(current.defaultRelays))
-            publishAccountRelays(account, RelayListKind.Nip65, plan)
-                ?.let { publishAccountRelays(account, RelayListKind.Inbox, plan) }
-        }
+        else -> restoreDefaultRelayKinds { kind, plan -> publishAccountRelays(account, kind, plan) }
     }
 }
 
