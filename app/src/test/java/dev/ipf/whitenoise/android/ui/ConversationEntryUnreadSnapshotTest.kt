@@ -75,7 +75,7 @@ class ConversationEntryUnreadSnapshotTest {
             timeline.value = listOf(received("older"), received("read"), received("unread"))
         }
         composeRule.waitForIdle()
-        assertEquals(ConversationEntryUnreadSnapshot(count = 1, firstUnreadMessageId = "unread"), snapshot[0])
+        assertEquals(ConversationEntryUnreadSnapshot(1, "unread", readAnchorMessageId = "read"), snapshot[0])
         assertEquals(before, snapshot[0])
     }
 
@@ -94,7 +94,7 @@ class ConversationEntryUnreadSnapshotTest {
                 )
         }
         composeRule.waitForIdle()
-        assertEquals(ConversationEntryUnreadSnapshot(count = 2, firstUnreadMessageId = "new-1"), snapshot[0])
+        assertEquals(ConversationEntryUnreadSnapshot(2, "new-1", readAnchorMessageId = "read"), snapshot[0])
     }
 
     /** A projected first-unread after the anchor is still trusted as-is. */
@@ -107,12 +107,12 @@ class ConversationEntryUnreadSnapshotTest {
                     controllerIdentity = this,
                     projectionUnread = 2,
                     projectionFirstUnreadMessageId = "new-1",
-                    timeline = listOf(received("read"), received("new-1"), received("new-2")),
+                    timeline = listOf(received("read"), received("new-1"), received("new-2"), received("new-3")),
                     readAnchorMessageId = "read",
                 )
         }
         composeRule.waitForIdle()
-        assertEquals(ConversationEntryUnreadSnapshot(count = 2, firstUnreadMessageId = "new-1"), snapshot[0])
+        assertEquals(ConversationEntryUnreadSnapshot(2, "new-1", readAnchorMessageId = "read"), snapshot[0])
     }
 
     @Test
@@ -133,7 +133,7 @@ class ConversationEntryUnreadSnapshotTest {
                 )
         }
         composeRule.waitForIdle()
-        assertEquals(ConversationEntryUnreadSnapshot(count = 0, firstUnreadMessageId = null), snapshot[0])
+        assertEquals(ConversationEntryUnreadSnapshot(0, null, readAnchorMessageId = "a2"), snapshot[0])
 
         composeRule.runOnUiThread {
             controllerIdentity.value = Any()
@@ -164,7 +164,7 @@ class ConversationEntryUnreadSnapshotTest {
         }
         composeRule.waitForIdle()
         assertEquals(
-            ConversationEntryUnreadSnapshot(count = 75, firstUnreadMessageId = "oldest-unread"),
+            ConversationEntryUnreadSnapshot(75, "oldest-unread", readAnchorMessageId = "last-read"),
             snapshot[0],
         )
 
@@ -176,7 +176,7 @@ class ConversationEntryUnreadSnapshotTest {
         composeRule.waitForIdle()
 
         assertEquals(
-            ConversationEntryUnreadSnapshot(count = 75, firstUnreadMessageId = "oldest-unread"),
+            ConversationEntryUnreadSnapshot(75, "oldest-unread", readAnchorMessageId = "last-read"),
             snapshot[0],
         )
     }
@@ -313,6 +313,25 @@ class ConversationEntryUnreadSnapshotTest {
                 )
 
             assertEquals("fallback", resolved)
+        }
+
+    /** A stale boundary paged in from before the read anchor is rejected for the first row after it. */
+    @Test
+    fun staleBoundaryPagedInBeforeReadAnchorFallsBackToUnreadCount() =
+        runTest {
+            var timeline = listOf(received("new-1"), received("new-2"))
+
+            val resolved =
+                resolveConversationEntryUnreadMessageId(
+                    snapshot = ConversationEntryUnreadSnapshot(2, "old-unread", readAnchorMessageId = "read"),
+                    timeline = { timeline },
+                    loadUntilMessageAvailable = {
+                        timeline = listOf(received("old-unread"), received("read")) + timeline
+                        true
+                    },
+                )
+
+            assertEquals("new-1", resolved)
         }
 
     @Test

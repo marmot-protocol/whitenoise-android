@@ -10,6 +10,7 @@ internal data class ConversationEntryUnreadSnapshot(
     val count: Int,
     val firstUnreadMessageId: String?,
     val projectionCaptured: Boolean = true,
+    val readAnchorMessageId: String? = null,
 )
 
 /** Keep the entry marker fixed for the lifetime of this conversation open. */
@@ -60,17 +61,20 @@ private data class ConversationEntryUnreadProjection(
 )
 
 /**
- * The projected first-unread id, unless the loaded rows place it at or before the read anchor. A row
- * folded before newer messages arrived can keep an old first-unread id after the cursor moved past
- * it; the divider then belongs on the first message after the anchor, found from the count.
+ * The projected first-unread id, unless it is the read anchor or the loaded rows place it before the
+ * anchor. A row folded before newer messages arrived can keep an old first-unread id after the cursor
+ * moved past it; the divider then belongs on the first message after the anchor, found from the count.
  */
-private fun ConversationEntryUnreadProjection.firstUnreadAfterReadAnchor(timeline: List<TimelineMessage>): String? {
-    val firstUnreadId = firstUnreadMessageId ?: return null
+internal fun firstUnreadAfterReadAnchor(
+    firstUnreadId: String?,
+    readAnchorMessageId: String?,
+    timeline: List<TimelineMessage>,
+): String? {
+    if (firstUnreadId == null || firstUnreadId == readAnchorMessageId) return null
 
     fun indexOf(id: String?) = if (id == null) -1 else timeline.indexOfFirst { it.record.messageIdHex == id }
     val anchorIndex = indexOf(readAnchorMessageId)
-    val firstUnreadIndex = indexOf(firstUnreadId)
-    return firstUnreadId.takeUnless { anchorIndex >= 0 && firstUnreadIndex in 0..anchorIndex }
+    return firstUnreadId.takeUnless { anchorIndex >= 0 && indexOf(firstUnreadId) in 0..anchorIndex }
 }
 
 private class ConversationEntryUnreadProjectionHolder(
@@ -130,11 +134,16 @@ internal fun rememberConversationEntryUnreadSnapshot(
         ConversationEntryUnreadSnapshot(
             count = count,
             projectionCaptured = projectionCaptured,
+            readAnchorMessageId = entryProjection.readAnchorMessageId,
             firstUnreadMessageId =
                 if (count <= 0) {
                     null
                 } else {
-                    entryProjection.firstUnreadAfterReadAnchor(timeline)
+                    firstUnreadAfterReadAnchor(
+                        entryProjection.firstUnreadMessageId,
+                        entryProjection.readAnchorMessageId,
+                        timeline,
+                    )
                         ?: timeline
                             .getOrNull(firstUnreadIndex)
                             ?.record
@@ -167,7 +176,8 @@ internal suspend fun resolveConversationEntryUnreadMessageId(
                 loadedMessageId(target)
                     ?: if (loadUntilMessageAvailable(target)) loadedMessageId(target) else null
             }
-        loadedAuthoritativeId
+        // Paging back to an older stale id also loads the newer read anchor, so check the order again.
+        loadedAuthoritativeId?.let { firstUnreadAfterReadAnchor(it, snapshot.readAnchorMessageId, timeline()) }
             ?: run {
                 val currentTimeline = timeline()
                 currentTimeline
