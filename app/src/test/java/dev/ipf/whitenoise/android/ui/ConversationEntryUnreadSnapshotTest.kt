@@ -386,7 +386,7 @@ class ConversationEntryUnreadSnapshotTest {
 
     /** A stale boundary and count paged in from before the read anchor give way to the first row after it. */
     @Test
-    fun staleBoundaryPagedInBeforeReadAnchorFallsBackToUnreadCount() =
+    fun staleBoundaryPagedInBeforeReadAnchorResolvesAfterAnchor() =
         runTest {
             var timeline = listOf(received("new-1"), received("new-2"))
 
@@ -401,6 +401,45 @@ class ConversationEntryUnreadSnapshotTest {
                 )
 
             assertEquals("new-1", resolved)
+        }
+
+    /** A first-unread id equal to an unloaded anchor stays the paging target when more than a page is unread. */
+    @Test
+    fun firstUnreadEqualToUnloadedAnchorPagesToTheAnchor() =
+        runTest {
+            val page = (1..50).map { received("new-$it") }
+            val composed = mutableStateOf(page)
+            val entry = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+            composeRule.setContent {
+                entry[0] =
+                    rememberConversationEntryUnreadSnapshot(
+                        controllerIdentity = this,
+                        projectionUnread = 60,
+                        projectionFirstUnreadMessageId = "read",
+                        timeline = composed.value,
+                        readAnchorMessageId = "read",
+                    )
+            }
+            composeRule.waitForIdle()
+            assertEquals(ConversationEntryUnreadSnapshot(60, "read", readAnchorMessageId = "read"), entry[0])
+
+            var timeline = page
+            val resolved =
+                resolveConversationEntryUnreadMessageId(
+                    snapshot = entry[0]!!,
+                    timeline = { timeline },
+                    loadUntilMessageAvailable = {
+                        timeline = listOf(received("older"), received("read")) + timeline
+                        true
+                    },
+                )
+
+            assertEquals("new-1", resolved)
+
+            // The rendered line follows once the paged anchor reaches composition.
+            composeRule.runOnUiThread { composed.value = timeline }
+            composeRule.waitForIdle()
+            assertEquals(ConversationEntryUnreadSnapshot(60, "new-1", readAnchorMessageId = "read"), entry[0])
         }
 
     /** The stale row's count can be too low as well; the anchor still puts the line above new-1. */

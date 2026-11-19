@@ -65,7 +65,7 @@ private data class ConversationEntryUnreadProjection(
  * The projected first-unread id, unless it is the read anchor or the loaded rows place it before the
  * anchor. A row folded before newer messages arrived can keep an old first-unread id after the cursor
  * moved past it. Its count is just as old, so the divider goes on the first unread message after a
- * loaded anchor; null leaves the count to find it while the anchor is not loaded.
+ * loaded anchor. An id equal to an unloaded anchor is kept so paging can load the anchor and move it.
  */
 internal fun firstUnreadAfterReadAnchor(
     firstUnreadId: String?,
@@ -79,7 +79,7 @@ internal fun firstUnreadAfterReadAnchor(
     val stale = firstUnreadId == readAnchorMessageId || (anchorIndex >= 0 && indexOf(firstUnreadId) in 0..anchorIndex)
     return when {
         !stale -> firstUnreadId
-        anchorIndex < 0 -> null
+        anchorIndex < 0 -> firstUnreadId
         else ->
             timeline
                 .drop(anchorIndex + 1)
