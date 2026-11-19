@@ -120,4 +120,22 @@ class ConversationDictationTeardownSettleTest {
         assertEquals(1L, timing["retries_after_tap"])
         assertEquals(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS, timing["settle_wait_ms"])
     }
+
+    /** Confirmed silence with live capture and no queued chunk restarts after the short settle, not 500 ms. */
+    @Test
+    fun confirmedSilenceWithoutQueuedChunkRestartsAfterShortSettle() {
+        val fixture = callerAudioFixture()
+        val silent = fixture.platform.sessions.single()
+        silent.callerAudioHasSpeech = false
+        fixture.platform.pendingCallerAudio = false
+        silent.providerError(ConversationDictationFailure.NoSpeech)
+
+        assertEquals(1, silent.acknowledgedCallerAudio)
+        assertEquals(0, fixture.scheduler.liveTaskCount(ConversationDictationController.GENERATION_RESTART_DELAY_MILLIS))
+        fixture.platform.pendingCallerAudio = true
+        fixture.scheduler.advanceBy(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS - 1L)
+        assertEquals(1, fixture.platform.sessions.size)
+        fixture.scheduler.advanceBy(1L)
+        assertEquals(2, fixture.platform.sessions.size)
+    }
 }

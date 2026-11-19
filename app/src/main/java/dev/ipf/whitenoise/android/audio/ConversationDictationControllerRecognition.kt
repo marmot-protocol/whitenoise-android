@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.audio
 
-import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.GENERATION_RESTART_DELAY_MILLIS
 import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.MAX_RETAINED_CALLER_AUDIO_RETRIES
 import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.MAX_SESSION_MILLIS
 import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.PROCESSING_TIMEOUT_MILLIS
@@ -390,7 +389,7 @@ internal fun ConversationDictationController.advancePastConfirmedSilentCallerAud
         runCatching(platform::callerAudioHasPending).getOrDefault(false) ->
             startRecognition(sessionId, target)
         finishRequested -> finalizeAccumulatedTranscript(sessionId, target)
-        else -> scheduleRestart(sessionId, target, GENERATION_RESTART_DELAY_MILLIS, "no_speech_advanced")
+        else -> scheduleRestart(sessionId, target, restart.teardownSettleMillis, "no_speech_advanced")
     }
 }
 
