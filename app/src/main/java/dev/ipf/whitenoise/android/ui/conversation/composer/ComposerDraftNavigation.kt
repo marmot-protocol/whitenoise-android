@@ -10,10 +10,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -43,26 +50,64 @@ internal fun ComposerToolbarBindings.withDraftJumps(admitted: Boolean): Composer
     if (admitted) this else copy(shortcuts = shortcuts - composerDraftJumpShortcuts)
 
 /**
+ * The draft scroll both jump slots follow. A jump that had keyboard focus leaves the row once the draft
+ * reaches its edge, so it hands focus to the opposite jump, which that same scroll has just revealed.
+ */
+@Stable
+internal class ComposerDraftJumps(
+    val scrollState: ScrollState,
+) {
+    private val top = FocusRequester()
+    private val bottom = FocusRequester()
+
+    /** The jump that should take focus as soon as it is composed, if any. */
+    var focusHandoff by mutableStateOf<ComposerShortcut?>(null)
+
+    /** The requester attached to [shortcut]'s button. */
+    fun focusRequester(shortcut: ComposerShortcut): FocusRequester =
+        when (shortcut) {
+            ComposerShortcut.JumpBottom -> bottom
+            else -> top
+        }
+}
+
+/**
  * An admitted jump keeps its slot so the row never shifts while reading, and shows its button only
  * while the draft is scrolled away from that edge. The slot modifier supplies hold-to-explain.
  */
 @Composable
 internal fun ComposerDraftEdgeAction(
     shortcut: ComposerShortcut,
-    scrollState: ScrollState,
+    jumps: ComposerDraftJumps,
     enabled: Boolean,
     modifier: Modifier,
     onJump: (toEnd: Boolean) -> Unit,
 ) {
     val toEnd = shortcut == ComposerShortcut.JumpBottom
+    val scrollState = jumps.scrollState
     val awayFromEdge by remember(scrollState, toEnd) {
         derivedStateOf { if (toEnd) scrollState.value < scrollState.maxValue else scrollState.value > 0 }
     }
     if (!awayFromEdge) return
+    var focused by remember { mutableStateOf(false) }
+    val handoff = jumps.focusHandoff
+    LaunchedEffect(handoff) {
+        if (handoff == shortcut) {
+            jumps.focusHandoff = null
+            jumps.focusRequester(shortcut).requestFocus()
+        }
+    }
     IconButton(
-        onClick = { onJump(toEnd) },
+        onClick = {
+            if (focused) jumps.focusHandoff = if (toEnd) ComposerShortcut.JumpTop else ComposerShortcut.JumpBottom
+            onJump(toEnd)
+        },
         enabled = enabled,
-        modifier = modifier.testTag(if (toEnd) COMPOSER_DRAFT_BOTTOM_TAG else COMPOSER_DRAFT_TOP_TAG),
+        modifier =
+            modifier
+                .focusRequester(jumps.focusRequester(shortcut))
+                .onFocusChanged { focused = it.hasFocus }
+                .testTag(if (toEnd) COMPOSER_DRAFT_BOTTOM_TAG else COMPOSER_DRAFT_TOP_TAG),
     ) {
         Icon(
             painterResource(shortcut.iconRes),

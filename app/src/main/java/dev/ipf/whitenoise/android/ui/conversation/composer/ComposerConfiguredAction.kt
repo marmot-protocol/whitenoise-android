@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -60,7 +59,7 @@ internal fun ComposerConfiguredAction(
     onEmoji: () -> Unit,
     onDictation: (() -> Unit)?,
     sendingIdentity: (@Composable (Modifier) -> Unit)?,
-    draftScroll: ScrollState? = null,
+    draftJumps: ComposerDraftJumps? = null,
     onDraftJump: (toEnd: Boolean) -> Unit = {},
 ) {
     if (preview) {
@@ -142,7 +141,7 @@ internal fun ComposerConfiguredAction(
         }
         ComposerShortcut.Translate -> ComposerTranslateAction(modifier, bindings, enabled)
         ComposerShortcut.JumpTop, ComposerShortcut.JumpBottom ->
-            draftScroll?.let { ComposerDraftEdgeAction(shortcut, it, enabled, modifier, onDraftJump) }
+            draftJumps?.let { ComposerDraftEdgeAction(shortcut, it, enabled, modifier, onDraftJump) }
         else -> ComposerOptionalShortcutAction(shortcut, modifier, bindings, enabled, onDictation)
     }
 }

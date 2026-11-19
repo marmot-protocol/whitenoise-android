@@ -73,6 +73,15 @@ internal fun composerToolbarCompactWidth(
 }
 
 /**
+ * Whether [actionCount] actions all keep a visible full-pitch target in a compact row's [room] for actions.
+ * Draft jumps are admitted to a compact row only then, so they never take a core tool's slot.
+ */
+internal fun composerCompactRowFits(
+    room: Float,
+    actionCount: Int,
+): Boolean = room >= actionCount * COMPOSER_SHORTCUT_TARGET_DP + COMPOSER_TOOLBAR_GUTTER_DP
+
+/**
  * Splits the expanded toolbar row between the start and end groups. The end group sits beside Send, so it
  * receives whole target columns sized to its actions and never more; the start group absorbs the spare width.
  * Returns the end group's width; the start group's width is `room - result` when it has actions.

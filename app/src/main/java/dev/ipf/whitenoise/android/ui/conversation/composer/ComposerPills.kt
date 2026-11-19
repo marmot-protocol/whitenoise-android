@@ -693,8 +693,13 @@ internal fun ComposerPill(
         } else {
             primaryTrailingWidth
         }
+    val sendAccessoryWidth = if (sendAccessoryContent != null) 66.dp else 0.dp
+    val compactProtectedWidth = toolbarGeometryPrimaryWidth + minimumDictationWidth + sendAccessoryWidth + 4.dp
     var draftJumpsAdmitted by remember(scrollOwnerKey) { mutableStateOf(false) }
-    val admittedToolbar = toolbar?.withDraftJumps(draftJumpsAdmitted)
+    val compactToolRoom = (navigationSurfaceWidth - compactProtectedWidth - compactMinimumTextWidth).value
+    val draftJumpsFit =
+        !multilineControlsSuppressed || composerCompactRowFits(compactToolRoom, toolbar?.shortcuts?.size ?: 0)
+    val admittedToolbar = toolbar?.withDraftJumps(toolbarPreview || draftJumpsAdmitted && draftJumpsFit)
     val toolbarSeparateRow =
         admittedToolbar?.let {
             composerToolbarRequiresSeparateRow(
@@ -753,10 +758,7 @@ internal fun ComposerPill(
                     composerToolbarCompactWidth(
                         navigationSurfaceWidth.value,
                         leadingCount,
-                        (
-                            toolbarGeometryPrimaryWidth + minimumDictationWidth + rightConfiguredWidth +
-                                if (sendAccessoryContent != null) 66.dp else 0.dp
-                        ).value + 4f,
+                        (compactProtectedWidth + rightConfiguredWidth).value,
                         compactMinimumTextWidth.value,
                     ).dp + ComposerToolbarGutter
                 else -> ComposerShortcutPitch * leadingCount + ComposerToolbarGutter
@@ -768,7 +770,7 @@ internal fun ComposerPill(
         leadingControlsWidth
     val navigationRoom =
         navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth - toolbarGeometryPrimaryWidth -
-            minimumDictationWidth - (if (sendAccessoryContent != null) 66.dp else 0.dp)
+            minimumDictationWidth - sendAccessoryWidth
     // Navigation uses only leftover room after the dictation minimum; reserving it cannot reduce
     // the capped dictation width. Keep this measurement independent of navigation admission.
     val availableDictationWidth =
@@ -1269,6 +1271,7 @@ internal fun ComposerPill(
         editorScrollJob =
             editorScrollScope.launch { composerScrollState.scrollTo(if (toEnd) composerScrollState.maxValue else 0) }
     }
+    val draftJumps = remember(composerScrollState) { ComposerDraftJumps(composerScrollState) }
     val draftTopAction: @Composable () -> Unit = { ComposerLegacyDraftTop(draftTopWidth) { jumpDraft(false) } }
 
     /** Applies the one-line/three-line hysteresis to the measured editor line count. */
@@ -1817,7 +1820,7 @@ internal fun ComposerPill(
                                                     toolbar.enabled &&
                                                     (!toolbar.transactionActive || shortcut == ComposerShortcut.Paste),
                                             preview = toolbarPreview,
-                                            draftScroll = composerScrollState,
+                                            draftJumps = draftJumps,
                                             onDraftJump = jumpDraft,
                                             pasteKey =
                                                 listOf(
@@ -1983,7 +1986,7 @@ internal fun ComposerPill(
                                                         shortcut == ComposerShortcut.Paste
                                                 ),
                                         preview = toolbarPreview,
-                                        draftScroll = composerScrollState,
+                                        draftJumps = draftJumps,
                                         onDraftJump = jumpDraft,
                                         pasteKey =
                                             listOf(

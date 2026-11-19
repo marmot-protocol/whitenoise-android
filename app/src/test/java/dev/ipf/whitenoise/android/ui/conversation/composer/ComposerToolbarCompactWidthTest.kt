@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,5 +43,14 @@ class ComposerToolbarCompactWidthTest {
         assertEquals(108f, width, 0f)
         assertEquals(0f, width % 36f, 0f)
         assertEquals(36f, composerExpandedTrailingWidth(40f, 1, 3), 0f)
+    }
+
+    /** Draft jumps join a compact row only when every configured action keeps a full-pitch target. */
+    @Test
+    fun compactRowAdmitsActionsOnlyAtFullPitch() {
+        assertTrue(composerCompactRowFits(4 * 36f + 8f, 4))
+        assertFalse(composerCompactRowFits(4 * 36f + 7f, 4))
+        assertTrue(composerCompactRowFits(8f, 0))
+        assertFalse(composerCompactRowFits(-1f, 0))
     }
 }
