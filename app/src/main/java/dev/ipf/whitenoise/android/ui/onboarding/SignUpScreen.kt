@@ -265,6 +265,7 @@ internal fun SignUpContent(
                         modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_up.name"),
                         enabled = editable,
                         label = { Text(stringResource(R.string.name)) },
+                        supportingText = { Text(stringResource(R.string.signup_generated_name_hint)) },
                         trailingIcon = {
                             RandomProfileNameButton(
                                 enabled = editable,

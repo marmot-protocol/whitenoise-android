@@ -2421,6 +2421,7 @@
     <string name="onboarding_signing_in">Signing in…</string>
     <string name="onboarding_choose_profile">Choose profile</string>
     <string name="onboarding_enter_private_key">Enter private key</string>
+    <string name="signup_generated_name_hint">Sign Up starts with a random name. Roll the dice for another or type your own.</string>
     <string name="signup_about_prompt">Tell people about yourself</string>
     <string name="signup_preparing_photo">Preparing photo…</string>
     <string name="signup_publishing_profile">Publishing profile…</string>

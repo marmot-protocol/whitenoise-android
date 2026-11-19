@@ -269,6 +269,7 @@ class SignUpProfileDraftSubmissionTest {
             }
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
+        composeRule.onNodeWithText(context.getString(R.string.signup_generated_name_hint)).assertExists()
         composeRule.runOnIdle {
             assertEquals(listOf<String?>(null), requests)
             assertEquals("Quiet Otter", controller.draft?.name)

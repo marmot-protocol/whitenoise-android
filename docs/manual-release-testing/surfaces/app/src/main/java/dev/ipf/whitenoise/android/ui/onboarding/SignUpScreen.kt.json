@@ -160,6 +160,14 @@
         ]
       },
       {
+        "surface": "R.string.signup_generated_name_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "R.string.signup_generated_name_hint",
+        "test_ids": [
+          "ONB-025"
+        ]
+      },
+      {
         "surface": "R.string.signup_leave_profile_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
         "anchor": "R.string.signup_leave_profile_detail",
