@@ -45,14 +45,6 @@
         ]
       },
       {
-        "surface": "RemovedMemberComposerNotice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "fun RemovedMemberComposerNotice(",
-        "test_ids": [
-          "CON-001"
-        ]
-      },
-      {
         "surface": "Compact toolbar target spacing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
         "anchor": "val primaryTrailingActionWidth =",
@@ -67,6 +59,14 @@
         "anchor": "R.string.explanation_conversation_voice_delete",
         "test_ids": [
           "CON-049"
+        ]
+      },
+      {
+        "surface": "Dictation hold-to-send gesture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "dictationHoldGesture(",
+        "test_ids": [
+          "DIC-016"
         ]
       }
     ],
@@ -214,23 +214,6 @@
         "anchor": "R.string.voice_message_cancel",
         "test_ids": [
           "CON-030"
-        ]
-      },
-      {
-        "surface": "Device-removed composer notice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "R.string.device_removed_from_group_composer",
-        "test_ids": [
-          "CON-039"
-        ]
-      },
-      {
-        "surface": "Removed-member composer notice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "R.string.you_are_no_longer_a_member",
-        "test_ids": [
-          "GRP-006",
-          "CON-039"
         ]
       }
     ]

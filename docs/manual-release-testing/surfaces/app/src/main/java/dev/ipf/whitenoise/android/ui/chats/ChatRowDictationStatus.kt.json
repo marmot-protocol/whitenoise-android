@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowDictationStatus.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatRowDictationStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowDictationStatus.kt",
+        "anchor": "fun ChatRowDictationStatus(",
+        "test_ids": [
+          "CHL-038"
+        ]
+      },
+      {
+        "surface": "Chat row dictation listening status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowDictationStatus.kt",
+        "anchor": "R.string.dictation_listening",
+        "test_ids": [
+          "CHL-038"
+        ]
+      },
+      {
+        "surface": "Chat row dictation transcribing status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowDictationStatus.kt",
+        "anchor": "R.string.dictation_processing",
+        "test_ids": [
+          "CHL-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
