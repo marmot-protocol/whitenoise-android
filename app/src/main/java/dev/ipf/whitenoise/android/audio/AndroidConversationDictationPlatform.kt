@@ -569,13 +569,13 @@ private class AndroidConversationDictationRecognitionSession(
             callerAudioCompletionBarrier.deliverImmediately(delivery)
             return
         }
-        val source = callerAudio
-        if (source == null) {
-            // Defensive only: callerAudioCapturing can become true only when this immutable stream starts.
-            callerAudioCompletionBarrier.deliverImmediately(delivery)
-            return
-        }
-        callerAudioCompletionBarrier.deliver({ source.endFeedAfterProviderTerminal { mainHandler.post(it) } }, source::onCaptureClosed, delivery)
+        // Defensive only: callerAudioCapturing can become true only when this immutable stream starts.
+        val source = callerAudio ?: return callerAudioCompletionBarrier.deliverImmediately(delivery)
+        callerAudioCompletionBarrier.deliver(
+            { continuation -> source.endFeedAfterProviderTerminal { mainHandler.post(continuation) } },
+            source::onCaptureClosed,
+            delivery,
+        )
     }
 
     /** Serializes terminal callback decisions with UI actions on Android's main thread. */

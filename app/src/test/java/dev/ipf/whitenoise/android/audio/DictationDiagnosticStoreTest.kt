@@ -50,7 +50,9 @@ class DictationDiagnosticStoreTest {
         assertEquals("paste", event("event=finish_timing action=paste")["action"])
         val dropped =
             requireNotNull(
-                DictationDiagnosticSchema.parse("event=finish_timing action=PRIVATE tap_to_delivered_ms=x transcript=hi"),
+                DictationDiagnosticSchema.parse(
+                    "event=finish_timing action=PRIVATE tap_to_delivered_ms=x transcript=hi",
+                ),
             )
         assertEquals(mapOf("event" to "finish_timing"), dropped.fields)
         assertEquals(3L, dropped.filteredFields)

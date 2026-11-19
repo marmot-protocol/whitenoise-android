@@ -131,7 +131,10 @@ class ConversationDictationTeardownSettleTest {
         silent.providerError(ConversationDictationFailure.NoSpeech)
 
         assertEquals(1, silent.acknowledgedCallerAudio)
-        assertEquals(0, fixture.scheduler.liveTaskCount(ConversationDictationController.GENERATION_RESTART_DELAY_MILLIS))
+        assertEquals(
+            0,
+            fixture.scheduler.liveTaskCount(ConversationDictationController.GENERATION_RESTART_DELAY_MILLIS),
+        )
         fixture.platform.pendingCallerAudio = true
         fixture.scheduler.advanceBy(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS - 1L)
         assertEquals(1, fixture.platform.sessions.size)
