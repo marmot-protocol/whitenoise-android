@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.design
 import dev.ipf.whitenoise.android.appModuleFile
 import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -22,8 +23,24 @@ class PlatformBackCallbackGateCoverageTest {
 
         assertTrue("no platform Back handler call was found", calls.isNotEmpty())
         calls.forEach { (file, gate) ->
-            assertTrue("$file gates a platform Back handler on `$gate`", android14Gates.any { it in gate })
+            assertTrue("$file gates a platform Back handler on `$gate`", isAndroid14Gate(gate))
         }
+    }
+
+    /** Only a positive Android 14 check counts: a negated, lower-version or OR-ed condition does not. */
+    @Test
+    fun onlyPositiveAndroid14ChecksCountAsTheGate() {
+        listOf(
+            "(platformBackCallbacksEnabled())",
+            "(overlayBack && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)",
+        ).forEach { assertTrue(it, isAndroid14Gate(it)) }
+        listOf(
+            "(!platformBackCallbacksEnabled())",
+            "(Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE)",
+            "(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)",
+            "(platformBackCallbacksEnabled() || legacyBack)",
+            "no if",
+        ).forEach { assertFalse(it, isAndroid14Gate(it)) }
     }
 
     /** A direct platform registration lives only inside one of the gated handlers, so no new one can skip the gate. */
@@ -47,8 +64,22 @@ class PlatformBackCallbackGateCoverageTest {
                 "ShareChatPickerOverlayBackHandler",
             )
 
-        /** Checks that are true only from Android 14, where MainActivity's opt-in takes effect. */
-        val android14Gates = listOf("platformBackCallbacksEnabled()", "VERSION_CODES.UPSIDE_DOWN_CAKE")
+        /** Clauses that are true only from Android 14, where MainActivity's opt-in takes effect. */
+        val android14Clauses =
+            listOf(
+                Regex("""platformBackCallbacksEnabled\(\)"""),
+                Regex("""(Build\.VERSION\.)?SDK_INT\s*>=\s*(Build\.VERSION_CODES\.)?UPSIDE_DOWN_CAKE"""),
+            )
+
+        /**
+         * Whether the `if` [condition] holds only from Android 14: one of its `&&` clauses is exactly a positive
+         * Android 14 check, and no `||` can let a lower version through.
+         */
+        fun isAndroid14Gate(condition: String): Boolean {
+            val body = condition.trim().removePrefix("(").removeSuffix(")")
+            return "||" !in body &&
+                body.split("&&").map { it.trim() }.any { clause -> android14Clauses.any { it.matches(clause) } }
+        }
 
         val functionDeclaration = Regex("""\bfun\s+(?:[\w.<>?, ]+\.)?(\w+)\s*\(""")
 
