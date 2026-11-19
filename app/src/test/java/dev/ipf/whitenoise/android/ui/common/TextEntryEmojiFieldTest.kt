@@ -57,6 +57,7 @@ class TextEntryEmojiFieldTest {
         composeRule.onNodeWithTag("field").performTextInputSelection(TextRange(1, 3))
         openPicker()
         pickGrin()
+        composeRule.waitForIdle()
         assertEquals("A😀D", text)
     }
 

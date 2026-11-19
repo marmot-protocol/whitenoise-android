@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+  "legacy_sha256": "e84fd35fd3b330b1460bdbdd1946b5fcecb34bba2265a4b59cc5f546a91ca340",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupEmojiImagePickerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "fun GroupEmojiImagePickerSheet(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Emoji image action label remains measured during progress and dismissal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+        "anchor": "R.string.group_image_emoji_use",
+        "test_ids": [
+          "GRP-001",
+          "NAV-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

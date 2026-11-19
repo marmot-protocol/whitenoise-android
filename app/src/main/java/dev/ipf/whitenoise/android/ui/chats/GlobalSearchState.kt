@@ -13,10 +13,8 @@ import dev.ipf.whitenoise.android.search.projectGlobalSearchRequest
 import java.time.ZoneId
 import java.util.Base64
 
-/**
- * In-session global chat-list search state owned by [dev.ipf.whitenoise.android.ui.navigation.MainShell].
- * The prototype's six filter categories live here: folders and chat types scope the chat list, named
- * chats narrow it further, and senders, date and content constrain the message search.
+/** In-session search owned by [dev.ipf.whitenoise.android.ui.navigation.MainShell]. Folders, chat types and named
+ * chats scope the list; sender, date and content filters constrain messages.
  */
 internal data class GlobalSearchState(
     val isOpen: Boolean = false,

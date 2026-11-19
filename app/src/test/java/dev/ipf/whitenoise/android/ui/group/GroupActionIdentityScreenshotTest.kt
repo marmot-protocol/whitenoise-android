@@ -138,6 +138,7 @@ class GroupActionIdentityScreenshotTest {
         rule.onNodeWithTag("confirmation.cancel").assertIsDisplayed()
         rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_action_identity_$name.png")
         rule.onNodeWithTag("confirmation.confirm").performClick()
+        rule.waitForIdle()
         assertEquals(1, submitted)
     }
 }

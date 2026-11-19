@@ -5,7 +5,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -43,7 +48,7 @@ class FocusedMessageOutsideDismissTest {
 
         composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { click() }
 
-        assertEquals("the lifted message must dismiss", 1, dismissals)
+        composeRule.runOnIdle { assertEquals("the lifted message must dismiss", 1, dismissals) }
     }
 
     /**
@@ -59,7 +64,7 @@ class FocusedMessageOutsideDismissTest {
 
         composeRule.onNodeWithTag(PREVIEW_TAG).assertHasClickAction().performClick()
 
-        assertEquals("the accessible dismissal must dismiss", 1, dismissals)
+        composeRule.runOnIdle { assertEquals("the accessible dismissal must dismiss", 1, dismissals) }
     }
 
     /** An action still acts instead of dismissing: the menu consumes its own taps first. */
@@ -71,7 +76,7 @@ class FocusedMessageOutsideDismissTest {
 
         composeRule.onNodeWithText(ACTION_LABEL).performClick()
 
-        assertEquals("the action must run", 1, acted)
+        composeRule.runOnIdle { assertEquals("the action must run", 1, acted) }
         assertEquals("the action must not also dismiss", 0, dismissals)
     }
 
@@ -89,42 +94,75 @@ class FocusedMessageOutsideDismissTest {
         assertEquals("the reaction must not also dismiss", 0, dismissals)
     }
 
+    /** Quick reaction handoff starts immediately and rejects captured same-frame replay. */
+    @Test
+    fun capturedReactionStartsOnceBeforeTheExitClockAdvances() {
+        var reactions = 0
+        render(onReact = { reactions++ })
+        val click =
+            checkNotNull(
+                composeRule
+                    .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$QUICK_REACTION")
+                    .fetchSemanticsNode()
+                    .config[SemanticsActions.OnClick]
+                    .action,
+            )
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle {
+            click()
+            click()
+            assertEquals("the source-to-badge handoff cannot await the popup exit", 1, reactions)
+        }
+        composeRule.runOnUiThread { Snapshot.sendApplyNotifications() }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(PREVIEW_TAG).assertDoesNotExist()
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle { assertEquals("exit completion cannot replay the reaction", 1, reactions) }
+    }
+
     private fun render(
         onDismiss: () -> Unit = {},
         onAction: () -> Unit = {},
         onReact: (String) -> Unit = {},
     ) {
+        var showing by mutableStateOf(true)
         composeRule.setContent {
             WhiteNoiseTheme {
-                FocusedMessageActions(
-                    sourceBounds = IntRect(0, 200, 360, 280),
-                    touchY = 240f,
-                    mine = true,
-                    actions =
-                        listOf(
-                            FocusedMessageAction(
-                                label = ACTION_LABEL,
-                                supportingLabel = null,
-                                enabled = true,
-                                destructive = false,
-                                icon = {},
-                                onClick = onAction,
+                if (showing) {
+                    FocusedMessageActions(
+                        sourceBounds = IntRect(0, 200, 360, 280),
+                        touchY = 240f,
+                        mine = true,
+                        actions =
+                            listOf(
+                                FocusedMessageAction(
+                                    label = ACTION_LABEL,
+                                    supportingLabel = null,
+                                    enabled = true,
+                                    destructive = false,
+                                    icon = {},
+                                    onClick = onAction,
+                                ),
                             ),
-                        ),
-                    quickReactions = listOf(QUICK_REACTION),
-                    canReact = true,
-                    selectedReactions = emptySet(),
-                    previewDescription = "Lifted message",
-                    previewReady = true,
-                    preview = {
-                        Box(Modifier.size(200.dp, 60.dp).background(MaterialTheme.colorScheme.surface)) {
-                            Text(PREVIEW_TEXT)
-                        }
-                    },
-                    onReact = onReact,
-                    onMoreReactions = {},
-                    onDismiss = onDismiss,
-                )
+                        quickReactions = listOf(QUICK_REACTION),
+                        canReact = true,
+                        selectedReactions = emptySet(),
+                        previewDescription = "Lifted message",
+                        previewReady = true,
+                        preview = {
+                            Box(Modifier.size(200.dp, 60.dp).background(MaterialTheme.colorScheme.surface)) {
+                                Text(PREVIEW_TEXT)
+                            }
+                        },
+                        onReact = { emoji ->
+                            showing = false
+                            onReact(emoji)
+                        },
+                        onMoreReactions = {},
+                        onDismiss = onDismiss,
+                    )
+                }
             }
         }
         composeRule.waitForIdle()

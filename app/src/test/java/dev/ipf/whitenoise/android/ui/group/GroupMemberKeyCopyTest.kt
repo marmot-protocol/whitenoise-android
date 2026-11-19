@@ -49,6 +49,7 @@ class GroupMemberKeyCopyTest {
         assertEquals(PEER_NPUB, clipText())
         assertEquals(emptyList<String>(), picked)
         composeRule.onNode(hasText(PEER_NAME), useUnmergedTree = true).performClick()
+        composeRule.waitForIdle()
         assertEquals(listOf(PEER), picked)
     }
 
@@ -71,6 +72,7 @@ class GroupMemberKeyCopyTest {
                 hasClickAction() and hasAnyDescendant(hasTestTag("transfer_admin.key.$PEER")),
                 useUnmergedTree = true,
             ).performTouchInput { click(centerLeft + Offset(1f, 0f)) }
+        composeRule.waitForIdle()
         assertEquals(listOf(PEER), picked)
     }
 

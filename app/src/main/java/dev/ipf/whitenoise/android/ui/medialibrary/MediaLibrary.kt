@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -95,8 +95,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresent
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentExternally
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
+import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
@@ -109,69 +112,6 @@ import java.time.format.FormatStyle
 import java.util.Calendar
 import java.util.Locale
 import androidx.compose.foundation.lazy.grid.items as gridItems
-
-// A renderable image/video tile resolved from the conversation timeline. Unlike
-// MediaInventory's MediaEntry (which is transport-free and carries only the
-// reference), this also carries the protocol-level attachmentIndex and the
-// receive-side `mine` flag the existing decrypt/download pipeline needs to
-// materialize the thumbnail through the same path the bubbles use.
-internal data class SharedMediaTile(
-    val messageIdHex: String,
-    val attachmentIndex: Int,
-    val reference: MediaAttachmentReferenceFfi,
-    val mine: Boolean,
-    val recordedAt: ULong,
-    val sender: String,
-    val isVideo: Boolean,
-)
-
-// An attachment row for the Voice/Files vertical lists. Like SharedMediaTile it
-// carries the protocol-level attachmentIndex and `mine` flag the decrypt path
-// needs, plus the sender hex so the row can resolve a display name + avatar.
-internal data class SharedMediaRow(
-    val messageIdHex: String,
-    val attachmentIndex: Int,
-    val reference: MediaAttachmentReferenceFfi,
-    val mine: Boolean,
-    val recordedAt: ULong,
-    val sender: String,
-)
-
-internal data class MediaMonthSection<T>(
-    val monthKey: Int,
-    val items: List<T>,
-    val sectionKey: String = monthKey.toString(),
-)
-
-internal data class SharedMediaTiles(
-    val visuals: List<SharedMediaTile>,
-    val images: List<SharedMediaTile>,
-    val videos: List<SharedMediaTile>,
-    val voice: List<SharedMediaRow>,
-    val files: List<SharedMediaRow>,
-    val urls: List<MediaInventory.UrlEntry>,
-    val imageSections: List<MediaMonthSection<SharedMediaTile>>,
-    val videoSections: List<MediaMonthSection<SharedMediaTile>>,
-    val voiceSections: List<MediaMonthSection<SharedMediaRow>>,
-    val fileSections: List<MediaMonthSection<SharedMediaRow>>,
-    val urlSections: List<MediaMonthSection<IndexedValue<MediaInventory.UrlEntry>>>,
-    // True when the conversation carries media beyond the rendered image/video
-    // grids — voice, files, urls, or bare image-URL links that aren't gridded.
-    // Carried so the section can decide between the strip, the single
-    // "View shared media" row, and hiding entirely without re-deriving.
-    val hasOther: Boolean,
-    val visualSections: List<MediaMonthSection<SharedMediaTile>> = emptyList(),
-    val isLoading: Boolean = false,
-) {
-    val isEmpty: Boolean
-        get() =
-            images.isEmpty() &&
-                videos.isEmpty() &&
-                voice.isEmpty() &&
-                files.isEmpty() &&
-                urls.isEmpty() &&
-                !hasOther
-}
 
 // Walk the loaded timeline once and project image/video tiles, newest first.
 // Projected rows provide typed media carrying the real source epoch; only
@@ -655,7 +595,7 @@ private fun MediaTileGrid(
                 )
             }
             gridItems(section.items, key = { "${it.messageIdHex}#${it.attachmentIndex}" }) { tile ->
-                Box(Modifier.aspectRatio(1f), contentAlignment = Alignment.BottomStart) {
+                Box(Modifier.aspectRatio(1f).settingsCardMorph(), contentAlignment = Alignment.BottomStart) {
                     if (tile.isVideo) {
                         MediaVideoGridTile(
                             messageIdHex = tile.messageIdHex,
@@ -748,27 +688,29 @@ internal fun <T> MonthSectionedColumn(
         EmptyPlaceholder(emptyLabel)
         return
     }
-    WhiteNoiseLazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(bottom = 24.dp),
-        modifier = Modifier.fillMaxSize().trackWhiteNoiseHeader(listState),
-    ) {
-        sections.forEach { section ->
-            item(key = "header-${section.sectionKey}") {
-                Text(
-                    monthLabel(section.monthKey),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(16.dp).semantics { heading() },
-                )
-            }
-            items(section.items, key = { keyOf(it) }) { item ->
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    row(item)
-                    TextButton(
-                        onClick = { onJumpToMessage(messageIdOf(item)) },
-                        modifier = Modifier.testTag("shared.message.${keyOf(item)}"),
-                    ) {
-                        Text(stringResource(R.string.shared_content_go_to_message))
+    dev.ipf.whitenoise.android.ui.settings.SettingsNativeViewport { viewport ->
+        WhiteNoiseLazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(bottom = 24.dp),
+            modifier = Modifier.fillMaxSize().then(viewport).trackWhiteNoiseHeader(listState),
+        ) {
+            sections.forEach { section ->
+                item(key = "header-${section.sectionKey}") {
+                    Text(
+                        monthLabel(section.monthKey),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(16.dp).semantics { heading() },
+                    )
+                }
+                items(section.items, key = { keyOf(it) }) { item ->
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        row(item)
+                        TextButton(
+                            onClick = { onJumpToMessage(messageIdOf(item)) },
+                            modifier = Modifier.testTag("shared.message.${keyOf(item)}"),
+                        ) {
+                            Text(stringResource(R.string.shared_content_go_to_message))
+                        }
                     }
                 }
             }
@@ -895,6 +837,16 @@ internal fun FileLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(
+                    rememberSettingsNativeSurface(
+                        destination = null,
+                        fill = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = MaterialTheme.shapes.large,
+                        strokeColor =
+                            amoledSurfaceBorderStroke()?.let { MaterialTheme.colorScheme.outlineVariant }
+                                ?: Color.Unspecified,
+                    ).first,
+                ).settingsCardMorph()
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)
@@ -979,71 +931,75 @@ internal fun FileLibraryRow(
                     )
                 }
                 val menuScrollState = rememberScrollState()
-                DropdownMenu(
+                AnimatedDropdownMenu(
                     scrollState = menuScrollState,
                     modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                     shape = MenuDefaults.shape,
                     border = amoledSurfaceBorderStroke(),
-                ) {
+                ) { surface ->
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.shared_media_save)) },
                         onClick = {
-                            menuOpen = false
-                            scope.launch {
-                                val outcome =
-                                    runCatchingCancellable {
-                                        val file = fetchFile()
-                                        val saved =
-                                            saveDocumentWithFallback(
-                                                context = context,
-                                                source = file,
-                                                fileName = row.reference.fileName,
-                                                mediaType = row.reference.mediaType,
-                                                fallback = documentSaveFallback,
-                                            )
-                                        check(saved) { "MediaStore save returned false" }
-                                    }
-                                appState.presentMediaSaveOutcome(
-                                    outcome = outcome,
-                                    successTitleRes = R.string.shared_media_saved,
-                                    failureTitleRes = R.string.shared_media_save_failed,
-                                    operationCode = "MEDIA_LIBRARY_FILE_SAVE",
-                                )
+                            surface.close {
+                                menuOpen = false
+                                scope.launch {
+                                    val outcome =
+                                        runCatchingCancellable {
+                                            val file = fetchFile()
+                                            val saved =
+                                                saveDocumentWithFallback(
+                                                    context = context,
+                                                    source = file,
+                                                    fileName = row.reference.fileName,
+                                                    mediaType = row.reference.mediaType,
+                                                    fallback = documentSaveFallback,
+                                                )
+                                            check(saved) { "MediaStore save returned false" }
+                                        }
+                                    appState.presentMediaSaveOutcome(
+                                        outcome = outcome,
+                                        successTitleRes = R.string.shared_media_saved,
+                                        failureTitleRes = R.string.shared_media_save_failed,
+                                        operationCode = "MEDIA_LIBRARY_FILE_SAVE",
+                                    )
+                                }
                             }
                         },
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.shared_media_share)) },
                         onClick = {
-                            menuOpen = false
-                            scope.launch {
-                                val sharedRow = row
-                                runCatchingCancellable {
-                                    // Streams the whole verified file to the share sheet, whatever its size, as
-                                    // Open and Save do. Leaving the screen cancels this scope, and a row rebound
-                                    // to another attachment opens no share sheet.
-                                    shareLibraryFile(
-                                        context = context,
-                                        row = sharedRow,
-                                        chooserTitle = shareChooserTitle,
-                                        currentRow = { currentRow },
-                                    ) {
-                                        attachmentSource(
-                                            controller,
-                                            sharedRow.messageIdHex,
-                                            sharedRow.attachmentIndex,
-                                            sharedRow.reference,
-                                            sharedRow.mine,
+                            surface.close {
+                                menuOpen = false
+                                scope.launch {
+                                    val sharedRow = row
+                                    runCatchingCancellable {
+                                        // Streams the whole verified file to the share sheet, whatever its size, as
+                                        // Open and Save do. Leaving the screen cancels this scope, and a row rebound
+                                        // to another attachment opens no share sheet.
+                                        shareLibraryFile(
+                                            context = context,
+                                            row = sharedRow,
+                                            chooserTitle = shareChooserTitle,
+                                            currentRow = { currentRow },
+                                        ) {
+                                            attachmentSource(
+                                                controller,
+                                                sharedRow.messageIdHex,
+                                                sharedRow.attachmentIndex,
+                                                sharedRow.reference,
+                                                sharedRow.mine,
+                                            )
+                                        }
+                                    }.onFailure { error ->
+                                        appState.presentMediaLaunchFailure(
+                                            R.string.media_couldnt_open,
+                                            "MEDIA_LIBRARY_FILE_SHARE",
+                                            error,
                                         )
                                     }
-                                }.onFailure { error ->
-                                    appState.presentMediaLaunchFailure(
-                                        R.string.media_couldnt_open,
-                                        "MEDIA_LIBRARY_FILE_SHARE",
-                                        error,
-                                    )
                                 }
                             }
                         },

@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SelectableDates
@@ -29,6 +27,8 @@ import dev.ipf.whitenoise.android.search.GlobalSearchCustomRangeValidation
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.search.civilDateFromPickerUtcMillis
 import dev.ipf.whitenoise.android.search.pickerUtcMillisForCivilDate
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.AnimatedDatePickerDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -159,7 +159,7 @@ private fun GlobalSearchDatePresetDialog(
     zoneId: () -> ZoneId,
 ) {
     var stagedSelection by remember(selection) { mutableStateOf(selection) }
-    AlertDialog(
+    AnimatedAlertDialog(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG).exposePerformanceTestTags(),
         onDismissRequest = onDismiss,
@@ -197,11 +197,14 @@ private fun GlobalSearchDatePresetDialog(
         confirmButton = {
             TextButton(
                 modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_APPLY_TAG),
-                onClick = { onApply(stagedSelection) },
+                onClick = {
+                    val accepted = stagedSelection
+                    close { onApply(accepted) }
+                },
             ) { Text(stringResource(R.string.ok)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -221,7 +224,7 @@ private fun GlobalSearchCustomRangeReviewDialog(
             zoneId = stage.snapshottedZoneId,
         )
     val validation = customSelection.validateCustomRange()
-    AlertDialog(
+    AnimatedAlertDialog(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG).exposePerformanceTestTags(),
         onDismissRequest = onDismiss,
@@ -246,11 +249,11 @@ private fun GlobalSearchCustomRangeReviewDialog(
             TextButton(
                 enabled = validation.canApply,
                 modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_APPLY_TAG),
-                onClick = { onApply(customSelection) },
+                onClick = { close { onApply(customSelection) } },
             ) { Text(stringResource(R.string.ok)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -289,21 +292,22 @@ private fun GlobalSearchCivilDatePickerDialog(
                     override fun isSelectableDate(utcTimeMillis: Long): Boolean = true
                 },
         )
-    DatePickerDialog(
+    AnimatedDatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
-                enabled = dateState.selectedDateMillis != null,
+                enabled = dateState.selectedDateMillis != null && acceptsInput,
                 modifier = Modifier.testTag(confirmTag),
                 onClick = {
                     dateState.selectedDateMillis?.let { selectedDateMillis ->
-                        onConfirm(civilDateFromPickerUtcMillis(selectedDateMillis))
+                        val selected = civilDateFromPickerUtcMillis(selectedDateMillis)
+                        close { onConfirm(selected) }
                     }
                 },
             ) { Text(stringResource(R.string.next)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     ) {
         Column {

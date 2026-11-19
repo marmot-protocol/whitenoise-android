@@ -29,7 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
-import java.util.Collections
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Leaving as one of several admins steps down first, and MDK may hold that step back (#3289). A departure cancelled
@@ -40,7 +40,8 @@ import java.util.Collections
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class GroupDepartureQuestionTest {
-    private val calls = Collections.synchronizedList(mutableListOf<String>())
+    // Native timing callbacks may append while assertions inspect the recorded call sequence.
+    private val calls = CopyOnWriteArrayList<String>()
 
     /** Cancelling the leave while its question is open withdraws the question; no demotion or leave follows. */
     @Test

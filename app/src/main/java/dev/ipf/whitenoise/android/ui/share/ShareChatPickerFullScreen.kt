@@ -54,9 +54,7 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.requestForwardTargetMembers
-import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
-import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
@@ -64,12 +62,10 @@ import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
-import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAccount
-import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersPreview
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -134,6 +130,8 @@ internal fun ShareChatPickerFullScreenContent(
 
 /** Builds the edge-to-edge modal surface and exports its first-frame benchmark selector. */
 @Composable
+// Keep modal Back ownership, scaffold slots, and terminal completion together.
+@Suppress("LongMethod")
 private fun ShareChatPickerScaffold(
     pickerState: ShareChatPickerState,
     presentedTargets: List<ShareChatPickerTargetPresentation>,
@@ -175,7 +173,8 @@ private fun ShareChatPickerScaffold(
                         actions = {
                             val selected = pickerState.selectedAccountRef
                             if (onOpenEmojiSet != null && selected != null) {
-                                TextButton(onClick = { onOpenEmojiSet(selected) }) {
+                                val (origin, open) = rememberSettingsRouteClick { onOpenEmojiSet(selected) }
+                                TextButton(onClick = open, modifier = origin) {
                                     Text(stringResource(R.string.emoji_sets_open))
                                 }
                             }
@@ -716,55 +715,4 @@ private fun rememberShareChatPickerState(
             accountSelectorOpenState = selectionState.accountSelectorOpenState,
         )
     }
-}
-
-/** One share destination; a DM's stored peer picture animates like any other profile picture. */
-@Composable
-internal fun ShareTargetRow(
-    item: ChatListItem,
-    title: String,
-    selected: Boolean,
-    selectedAccountIdHex: String?,
-    ownerAccountRef: String?,
-    appState: WhiteNoiseAppState,
-    onToggle: (String) -> Unit,
-) {
-    val groupId = item.group.groupIdHex
-    val avatarAccount = forwardTargetAvatarAccount(item)
-    val avatar =
-        rememberChatListGroupAvatar(
-            appState,
-            item,
-            ownerAccountRef,
-            avatarAccount?.let { appState.contactAvatarSource(it, ownerAccountRef) },
-        )
-    val memberIds =
-        remember(item, selectedAccountIdHex) {
-            item.memberSnapshot
-                ?.members
-                .orEmpty()
-                .map { it.memberIdHex }
-                .filter { it.isNotBlank() && it != selectedAccountIdHex }
-                .distinct()
-        }
-    val memberRevisions = memberIds.map(appState::profileAccountRevisionForCompose)
-    val membersPreview =
-        remember(item, ownerAccountRef, memberRevisions) {
-            forwardTargetMembersPreview(item, selectedAccountIdHex) { memberIdHex ->
-                appState.contactDisplayNameCached(ownerAccountRef, memberIdHex)
-            }
-        }
-    ContactRow(
-        title = title,
-        subtitle = membersPreview,
-        avatarSeed = avatarAccount ?: item.group.groupIdHex,
-        avatarUrl = avatar.pictureUrl,
-        avatarImage = avatar.image,
-        avatarAnimationKey = avatar.animationKey,
-        groupAnimation = avatar.groupAnimation,
-        avatarDomain = avatar.pictureDomain,
-        modifier = Modifier.semantics { this.selected = selected },
-        onClick = { onToggle(groupId) },
-        trailing = { SelectionIndicator(selected = selected) },
-    )
 }

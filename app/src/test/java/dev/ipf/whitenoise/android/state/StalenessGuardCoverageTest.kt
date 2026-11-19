@@ -412,12 +412,12 @@ class StalenessGuardCoverageTest {
                         "runtimeGeneration",
                         "profileRevision",
                         "contactNicknameRevision",
-                        "profileAccountRevisionEpoch",
-                        "profileAccountRevisionSequence",
                         "attachmentDownloadPolicyRevision",
                         "draftHydrationRevision",
                         "notificationDrainSequence",
                     ),
+                "ProfilePresentationNames.kt" to
+                    listOf("profileAccountRevisionEpoch", "profileAccountRevisionSequence"),
                 "ChatsController.kt" to
                     listOf(
                         "retryGeneration",

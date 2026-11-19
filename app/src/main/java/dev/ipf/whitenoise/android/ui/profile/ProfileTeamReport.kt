@@ -48,19 +48,20 @@ internal fun ProfileTeamReportSheet(
 ) {
     ReportMessageSheet(
         onDismissRequest = state::close,
-        onSubmit = submit@{ reason, explanation ->
+        onSubmit = submit@{ reason, explanation, finishExit ->
             if (state.sending) return@submit
             state.sending = true
             state.error = null
             appState.launchMutation {
                 try {
                     val outcome = appState.reportToTeam(accountRef, targetHex, reason, explanation)
-                    if (canAct()) presentProfileReportOutcome(appState, state, outcome, onFeedback)
+                    if (canAct()) presentProfileReportOutcome(appState, state, outcome, onFeedback, finishExit)
                 } finally {
                     state.sending = false
                 }
             }
         },
+        ownerKey = Triple(accountRef, targetHex, appState.runtimeGeneration),
         audience = ReportAudience.TeamProfile,
         form = ReportFormState(state.sending, error = state.error),
     )
@@ -72,6 +73,7 @@ private fun presentProfileReportOutcome(
     state: ProfileTeamReportState,
     outcome: TeamReportOutcome,
     onFeedback: (ToastMessage?) -> Unit,
+    finishExit: () -> Unit,
 ) {
     val message =
         when (outcome) {
@@ -81,7 +83,7 @@ private fun presentProfileReportOutcome(
     if (outcome is TeamReportOutcome.Failed && state.open) {
         state.error = message
     } else {
-        state.close()
+        finishExit()
         appState.present(message)
         onFeedback(appState.toast)
     }

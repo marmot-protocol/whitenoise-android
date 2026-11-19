@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorAccountState
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorState
 import dev.ipf.whitenoise.android.ui.account.ProfileSwitcherSheet
@@ -621,7 +622,7 @@ class PublicKeyCopyPresentationCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$path"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$path"),
-        ).firstOrNull(File::exists)?.readText() ?: error("Missing $path")
+        ).firstOrNull(File::exists)?.motionOwnerSource() ?: error("Missing $path")
 
     private companion object {
         const val FOCUS_SETTLE_MILLIS = 500L

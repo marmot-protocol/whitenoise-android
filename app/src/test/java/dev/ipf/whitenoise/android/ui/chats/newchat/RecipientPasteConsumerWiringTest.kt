@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,5 +44,5 @@ class RecipientPasteConsumerWiringTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-        ).first(File::isFile).readText()
+        ).first(File::isFile).motionOwnerSource()
 }

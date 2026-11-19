@@ -26,6 +26,7 @@ internal data class ContactPictureEditorState(
     val hasPicture: Boolean = false,
     val preview: ImageBitmap? = null,
     val crop: IdentityImageCropSource? = null,
+    val cropPresentation: Int = 0,
     val busy: Boolean = false,
     val failed: Boolean = false,
 )
@@ -85,7 +86,10 @@ internal class ContactPictureEditorController(
 
     /** Crop confirmation replaces only the editor draft; Save remains the sole persistence action. */
     fun confirm(crop: IdentityImageCrop) =
-        edit {
+        edit(onFailure = {
+            val state = mutableState.value
+            if (state.crop != null) mutableState.value = state.copy(cropPresentation = state.cropPresentation + 1)
+        }) {
             val source = checkNotNull(mutableState.value.crop)
             val normalized = preparePrivateContactPicture(source.bytes, crop)
             val single = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
@@ -120,13 +124,19 @@ internal class ContactPictureEditorController(
     }
 
     /** Show a stable localized failure without exposing picker URIs, paths, or decoder exceptions. */
-    private fun edit(operation: suspend () -> Unit) {
+    private fun edit(
+        onFailure: () -> Unit = {},
+        operation: suspend () -> Unit,
+    ) {
         if (!isCurrent() || mutableState.value.busy) return
         mutableState.value = mutableState.value.copy(busy = true, failed = false)
         scope.launch {
             try {
                 runCatchingCancellable { operation() }.onFailure {
-                    if (isCurrent()) mutableState.value = mutableState.value.copy(failed = true)
+                    if (isCurrent()) {
+                        mutableState.value = mutableState.value.copy(failed = true)
+                        onFailure()
+                    }
                 }
             } finally {
                 if (isCurrent()) mutableState.value = mutableState.value.copy(busy = false)

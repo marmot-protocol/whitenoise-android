@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StorageUsage
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -123,7 +124,11 @@ internal fun StorageUsagePanel(
             total ?: stringResource(R.string.storage_calculating),
             parts,
         )
-    SettingsPanel(modifier.testTag("storage.usage").clearAndSetSemantics { contentDescription = described }) {
+    SettingsPanel(
+        modifier = modifier.testTag("storage.usage").clearAndSetSemantics { contentDescription = described },
+        destination = SettingsDetail.ManageStorage,
+        surface = "storage-usage",
+    ) {
         Column(
             Modifier.padding(WhiteNoiseSpacing.FormField),
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),

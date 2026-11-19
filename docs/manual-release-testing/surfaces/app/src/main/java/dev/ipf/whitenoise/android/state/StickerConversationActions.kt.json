@@ -66,6 +66,14 @@
         "test_ids": [
           "MSG-045"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/StickerConversationActions.kt",
+        "surface": "A sticker reply to a message that has not been sent yet says so instead of failing",
+        "anchor": "replyTagsForSend(reply)",
+        "test_ids": [
+          "MSG-045"
+        ]
       }
     ]
   },

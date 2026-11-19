@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -44,6 +45,7 @@ class IdentityImageCropDialogTest {
 
         composeRule.onNodeWithTag("identity_crop.canvas").performTouchInput { swipeRight() }
         composeRule.onNodeWithTag("identity_crop.confirm").performClick()
+        composeRule.waitForIdle()
 
         val crop = requireNotNull(confirmed.value) { "the surface must confirm a crop" }
         // A whole-width drag must carry the crop to its left bound. Asserting merely that it moved
@@ -61,6 +63,7 @@ class IdentityImageCropDialogTest {
 
         composeRule.onNodeWithTag("identity_crop.rotate").performClick()
         composeRule.onNodeWithTag("identity_crop.confirm").performClick()
+        composeRule.waitForIdle()
 
         assertEquals(1, requireNotNull(confirmed.value).quarterTurnsClockwise)
     }
@@ -73,7 +76,40 @@ class IdentityImageCropDialogTest {
         composeRule.onNodeWithTag("identity_crop.canvas").performTouchInput { swipeRight() }
         composeRule.onNodeWithTag("identity_crop.cancel").performClick()
 
+        composeRule.waitForIdle()
+        assertTrue("the close must complete", confirmed.dismissed)
         assertNull("a cancelled crop must not publish", confirmed.value)
+    }
+
+    /** Retrying a failed save reopens the same crop instead of leaving a consumed invisible window. */
+    @Test
+    fun retryRevisionReopensTheSurfaceAndRetainsTheEditedCrop() {
+        val bitmap = source()
+        val preview = bitmap.asImageBitmap()
+        val revision = mutableStateOf(0)
+        val confirmed = mutableListOf<IdentityImageCrop>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                IdentityImageCropDialog(
+                    preview = preview,
+                    sourceSize = EditorPixelSize(bitmap.width, bitmap.height),
+                    shape = IdentityImageCropShape.Circle,
+                    ownerKey = bitmap to revision.value,
+                    onDismiss = {},
+                    onConfirm = { confirmed += it },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("identity_crop.rotate").performClick()
+        composeRule.onNodeWithTag("identity_crop.confirm").performClick()
+        composeRule.runOnIdle { assertEquals(1, confirmed.single().quarterTurnsClockwise) }
+        composeRule.onNodeWithTag("identity_crop.confirm").assertDoesNotExist()
+        composeRule.runOnIdle { revision.value++ }
+        composeRule.onNodeWithTag("identity_crop.confirm").performClick()
+        composeRule.runOnIdle {
+            assertEquals(2, confirmed.size)
+            assertEquals(confirmed.first(), confirmed.last())
+        }
     }
 
     /** Renders the surface over a fixed landscape source and captures what it confirms. */

@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.defaultDisappearingMessagesSeconds
+import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
 
 /** Member references and setup UI belong to one active account/runtime, independent of the parent route. */
 @Composable
@@ -42,7 +43,8 @@ internal fun NewGroupCreationFlow(
 
 /** A temporary setup Back retains the authored draft and selection; permanent departure consumes callbacks. */
 @Composable
-@Suppress("FunctionNaming") // Compose naming follows the framework convention.
+@Suppress("FunctionNaming", "CyclomaticComplexMethod", "LongMethod") // Compose naming follows the framework convention.
+// The account fence and both setup/picker callbacks share one draft and selection lifetime.
 private fun NewGroupAccountFlow(
     appState: WhiteNoiseAppState,
     onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
@@ -73,45 +75,52 @@ private fun NewGroupAccountFlow(
             initialRetentionSeconds = appState.defaultDisappearingMessagesSeconds(account),
         )
     var setupOpen by rememberSaveable { mutableStateOf(false) }
-    if (setupOpen) {
-        NewGroupSetupScreen(
-            appState = appState,
-            members = selected,
-            draft = draft,
-            onRemoveMember = { accountId ->
-                removeUnacceptedGroupMember(current(), draft.retryGroupIdHex, selected, accountId)
-            },
-            onBack = {
-                if (current()) {
-                    onCreateFlowSuperseded()
-                    if (draft.retryGroupIdHex != null) {
+    SettingsRouteMotion(
+        target = setupOpen,
+        depth = if (setupOpen) 1 else 0,
+        ownerKey = account to runtime,
+        cardMorph = true,
+    ) { visibleSetup ->
+        if (visibleSetup) {
+            NewGroupSetupScreen(
+                appState = appState,
+                members = selected,
+                draft = draft,
+                onRemoveMember = { accountId ->
+                    removeUnacceptedGroupMember(current(), draft.retryGroupIdHex, selected, accountId)
+                },
+                onBack = {
+                    if (current()) {
+                        onCreateFlowSuperseded()
+                        if (draft.retryGroupIdHex != null) {
+                            active = false
+                            onClose()
+                        } else {
+                            setupOpen = false
+                        }
+                    }
+                },
+                onCreateCompletedOpen = { item, token ->
+                    if (current()) {
+                        active = false
+                        onCreateCompletedOpen(item, token)
+                    }
+                },
+                onCreateSubmitted = onCreateSubmitted,
+            )
+        } else {
+            NewGroupRecipientPickerScreen(
+                appState = appState,
+                selected = selected,
+                onBack = {
+                    if (current()) {
                         active = false
                         onClose()
-                    } else {
-                        setupOpen = false
                     }
-                }
-            },
-            onCreateCompletedOpen = { item, token ->
-                if (current()) {
-                    active = false
-                    onCreateCompletedOpen(item, token)
-                }
-            },
-            onCreateSubmitted = onCreateSubmitted,
-        )
-    } else {
-        NewGroupRecipientPickerScreen(
-            appState = appState,
-            selected = selected,
-            onBack = {
-                if (current()) {
-                    active = false
-                    onClose()
-                }
-            },
-            onConfirm = { if (current()) setupOpen = true },
-        )
+                },
+                onConfirm = { if (current()) setupOpen = true },
+            )
+        }
     }
 }
 

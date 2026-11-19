@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.state.WipeReport
 import dev.ipf.whitenoise.android.state.WipeStage
 import dev.ipf.whitenoise.android.state.WipeStageReport
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
@@ -107,10 +108,12 @@ internal fun WipeOutcomeSheet(
     report: WipeReport,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     ModalBottomSheet(
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { terminal.close(onDismiss) },
+        sheetState = sheetState,
     ) {
         Column(
             Modifier.fillMaxWidth().padding(24.dp),
@@ -121,7 +124,7 @@ internal fun WipeOutcomeSheet(
                 style = MaterialTheme.typography.titleLarge,
             )
             report.stages.forEach { stage -> WipeOutcomeStageRow(stage) }
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { terminal.close(onDismiss) }, modifier = Modifier.fillMaxWidth()) {
                 ProfileKeyActionLabel(stringResource(R.string.close), R.drawable.ic_close)
             }
         }

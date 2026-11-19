@@ -264,6 +264,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
             val item = render()
             openMenu(item.record.messageIdHex)
             composeRule.onNodeWithText("Reply").performClick()
+            composeRule.waitForIdle()
             pollController.send("I prefer soup")
             val call = recordedCalls().first { it.first == "replyToMessageWithClientToken" }.second
             assertEquals(
@@ -275,6 +276,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
 
     /** App mutations use Android Main, whose delayed reaction admission needs its paused looper advanced. */
     private fun advanceReactionQuietPeriod() {
+        composeRule.waitForIdle()
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200L))
     }
 

@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
@@ -61,6 +62,8 @@ internal fun DisappearingTimerEditor(
     onApply: (Long) -> Unit,
 ) {
     var pendingSecs by remember(*resetKeys) { mutableStateOf<Long?>(null) }
+    val currentEditable by rememberUpdatedState(editable)
+    val currentOnApply by rememberUpdatedState(onApply)
     if (open) {
         DisappearingMessagesPickerDialog(
             currentSecs = currentSecs,
@@ -76,15 +79,19 @@ internal fun DisappearingTimerEditor(
         )
     }
     pendingSecs?.let { secs ->
+        val request = remember(secs) { Any() }
         ConfirmDialog(
+            ownerKey = resetKeys.toList() to request,
             title = stringResource(R.string.disappearing_confirm_title),
             message = stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
             confirmLabel = stringResource(R.string.disappearing_confirm_button),
             onConfirm = {
-                pendingSecs = null
-                onApply(secs)
+                if (pendingSecs == secs) {
+                    pendingSecs = null
+                    if (currentEditable) currentOnApply(secs)
+                }
             },
-            onDismiss = { pendingSecs = null },
+            onDismiss = { if (pendingSecs == secs) pendingSecs = null },
             destructive = true,
             identity = identity,
             confirmEnabled = editable,

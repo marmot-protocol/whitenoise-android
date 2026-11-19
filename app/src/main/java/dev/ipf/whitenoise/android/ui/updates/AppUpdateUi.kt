@@ -46,10 +46,14 @@ internal fun AppUpdateIconButton(
         stringResource(
             if (info.isFarBehind) R.string.app_update_persistent_title else R.string.app_update_available_title,
         )
+    val (settingsOrigin, openSettings) =
+        dev.ipf.whitenoise.android.ui.settings
+            .rememberSettingsRouteClick(onOpenSettings)
     IconButton(
-        onClick = onOpenSettings,
+        onClick = openSettings,
         modifier =
             modifier
+                .then(settingsOrigin)
                 .testTag("appUpdate.openSettings")
                 .semantics { stateDescription = availability }
                 .explainOnLongPress(chatsExplanation(R.string.app_updates, R.string.explanation_app_update_icon)),

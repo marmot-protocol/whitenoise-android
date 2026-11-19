@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android
 
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.ui.common.relativeTimeRefreshDelayMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -381,7 +382,7 @@ class FreshSweepCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-        ).firstOrNull(File::exists)?.readText()
+        ).firstOrNull(File::exists)?.motionOwnerSource()
             ?: error("Missing source file: $relativePath")
 
     /** Reads the attachment-video sources split across the bubble, grid tile, cache and viewer files. */

@@ -35,9 +35,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.DialogWindowMotion
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val DISAPPEARING_CUSTOM_VALUE_PICKER_TAG = "disappearing_custom_value_picker"
@@ -75,10 +77,13 @@ internal fun DisappearingMessagesPickerDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onPick(selected) }) { Text(stringResource(R.string.save)) }
+            TextButton(onClick = {
+                val duration = selected
+                close { onPick(duration) }
+            }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
     if (showCustom) {
@@ -168,6 +173,9 @@ private fun DisappearingCustomDialog(
     hostInDialog: Boolean = true,
     onPickerCreated: ((NumberPicker) -> Unit)? = null,
 ) {
+    val surface = rememberPopupSurfaceMotion(true, onDismiss, animate = hostInDialog)
+    if (hostInDialog && !surface.visible) return
+    val dismiss = if (hostInDialog) surface.dismiss else onDismiss
     val units = disappearingCustomUnits
     val initialState = remember(initialSecs) { disappearingCustomPickerStateForSeconds(initialSecs) }
     val unitLabels = units.map { stringResource(it.labelRes) }.toTypedArray()
@@ -181,7 +189,9 @@ private fun DisappearingCustomDialog(
     val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
     val content: @Composable () -> Unit = {
         Surface(
-            modifier = Modifier.width(300.dp),
+            modifier =
+                (if (hostInDialog) surface.modifier().then(surface.inputModifier()) else Modifier)
+                    .width(300.dp),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
@@ -243,11 +253,12 @@ private fun DisappearingCustomDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+                    TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
                     Spacer(Modifier.width(8.dp))
                     TextButton(
                         onClick = {
-                            onConfirm(disappearingCustomSeconds(displayValue, unitIndex))
+                            val seconds = disappearingCustomSeconds(displayValue, unitIndex)
+                            if (hostInDialog) surface.close { onConfirm(seconds) } else onConfirm(seconds)
                         },
                     ) {
                         Text(stringResource(R.string.disappearing_set))
@@ -258,9 +269,10 @@ private fun DisappearingCustomDialog(
     }
     if (hostInDialog) {
         Dialog(
-            onDismissRequest = onDismiss,
+            onDismissRequest = surface.dismiss,
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
+            DialogWindowMotion(surface.presence)
             content()
         }
     } else {

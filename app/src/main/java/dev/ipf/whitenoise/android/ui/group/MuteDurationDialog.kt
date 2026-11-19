@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SelectableDates
@@ -25,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.AnimatedDatePickerDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -151,9 +151,13 @@ internal fun MuteDurationDialog(
                     val expiryMillis = customMuteExpiryMillis(customDate, pickedTime, zoneId())
                     if (expiryMillis <= nowMillis()) {
                         customValidationError = true
+                        null
                     } else {
-                        customStage = null
-                        onSelect(MuteTarget.At(expiryMillis))
+                        val commit: () -> Unit = {
+                            customStage = null
+                            onSelect(MuteTarget.At(expiryMillis))
+                        }
+                        commit
                     }
                 },
             )
@@ -184,7 +188,7 @@ private fun MuteDurationChoiceDialog(
         confirmButton = {},
         modifier = Modifier.testTag(MUTE_DURATION_DIALOG_TAG),
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
         title = { Text(stringResource(R.string.mute_for)) },
         text = {
@@ -195,10 +199,10 @@ private fun MuteDurationChoiceDialog(
                     .selectableGroup(),
             ) {
                 mutePresets.forEach { preset ->
-                    MuteDurationChoice(preset.labelId) { onSelect(preset.target) }
+                    MuteDurationChoice(preset.labelId) { close { onSelect(preset.target) } }
                 }
                 if (customTimeAvailable) {
-                    MuteDurationChoice(R.string.mute_duration_custom, onClick = onCustom)
+                    MuteDurationChoice(R.string.mute_duration_custom, onClick = { close(onCustom) })
                 }
             }
         },
@@ -243,14 +247,16 @@ private fun CustomMuteDateDialog(
             initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
             selectableDates = selectableDates,
         )
-    DatePickerDialog(
+    AnimatedDatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
                 modifier = Modifier.testTag(MUTE_CUSTOM_DATE_CONFIRM_TAG),
+                enabled = dateState.selectedDateMillis != null && acceptsInput,
                 onClick = {
                     dateState.selectedDateMillis?.let { selectedDateMillis ->
-                        onConfirm(Instant.ofEpochMilli(selectedDateMillis).atZone(ZoneOffset.UTC).toLocalDate())
+                        val selected = Instant.ofEpochMilli(selectedDateMillis).atZone(ZoneOffset.UTC).toLocalDate()
+                        close { onConfirm(selected) }
                     }
                 },
             ) { Text(stringResource(R.string.next)) }
@@ -258,7 +264,7 @@ private fun CustomMuteDateDialog(
         dismissButton = {
             TextButton(
                 modifier = Modifier.testTag(MUTE_CUSTOM_DATE_CANCEL_TAG),
-                onClick = onDismiss,
+                onClick = dismiss,
             ) { Text(stringResource(R.string.cancel)) }
         },
     ) {
@@ -274,7 +280,7 @@ private fun CustomMuteTimeDialog(
     initialTime: LocalTime,
     showValidationError: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (LocalTime) -> Unit,
+    onConfirm: (LocalTime) -> (() -> Unit)?,
 ) {
     val timeState = rememberTimePickerState(initialHour = initialTime.hour, initialMinute = initialTime.minute)
     WhiteNoiseAlertDialog(
@@ -282,11 +288,14 @@ private fun CustomMuteTimeDialog(
         confirmButton = {
             TextButton(
                 modifier = Modifier.testTag(MUTE_CUSTOM_TIME_CONFIRM_TAG),
-                onClick = { onConfirm(LocalTime.of(timeState.hour, timeState.minute)) },
+                onClick = {
+                    val time = LocalTime.of(timeState.hour, timeState.minute)
+                    onConfirm(time)?.let { accepted -> close(accepted) }
+                },
             ) { Text(stringResource(R.string.mute)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
         title = { Text(stringResource(R.string.mute_custom_time_title)) },
         text = {

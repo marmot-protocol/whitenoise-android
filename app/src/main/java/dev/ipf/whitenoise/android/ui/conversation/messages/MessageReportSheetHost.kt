@@ -49,7 +49,7 @@ internal fun MessageReportSheetHost(
     val effectiveAudience = surfaces.effectiveReportAudience(audience)
     ReportMessageSheet(
         onDismissRequest = surfaces::closeReport,
-        onSubmit = submit@{ reason, explanation ->
+        onSubmit = submit@{ reason, explanation, finishExit ->
             if (surfaces.reportInFlight) return@submit
             val team = ReportTeamChoice(effectiveAudience, surfaces.reportToTeam)
             val generation = appState.runtimeGeneration
@@ -69,12 +69,16 @@ internal fun MessageReportSheetHost(
             surfaces.reportError = null
             appState.launchMutation {
                 try {
-                    surfaces.sendReport(team, sends)
+                    surfaces.sendReport(team, sends) {
+                        surfaces.finishReport(closeSheet = false)
+                        finishExit()
+                    }
                 } finally {
                     surfaces.reportInFlight = false
                 }
             }
         },
+        ownerKey = Triple(controller, record.messageIdHex, appState.activeAccountRef to appState.runtimeGeneration),
         audience = effectiveAudience,
         sendToTeam = surfaces.reportToTeam,
         onSendToTeamChange = { surfaces.reportToTeam = it },
@@ -118,20 +122,21 @@ internal class MessageReportSends(
 internal suspend fun MessageBubbleSurfaceState.sendReport(
     team: ReportTeamChoice,
     sends: MessageReportSends,
+    onFinished: () -> Unit = { finishReport() },
 ) {
     val recorded = reportGroupResult
     val sheetGeneration = reportSheetGeneration
     val answer = if (team.reachesGroup && recorded == null) sends.group() else null
     val groupResult = if (team.reachesGroup) recorded ?: answer?.notice?.takeIf { answer.took } else null
     if (!team.reachesTeam) {
-        finishReport()
+        onFinished()
         answer?.takeUnless { it.alreadyShown }?.let { sends.present(it.notice, null) }
         return
     }
     if (groupResult != null) reportGroupResult = groupResult
     when (val outcome = sends.team()) {
         is TeamReportOutcome.Accepted -> {
-            finishReport()
+            onFinished()
             // One notice for both, which replaces a group failure the controller showed but still names it.
             sends.present(answer?.notice ?: groupResult, outcome.message)
         }

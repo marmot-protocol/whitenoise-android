@@ -168,7 +168,7 @@ class ChatListProfileReturnSnapCoverageTest {
             mainShell.requiredSection(
                 start = "ProfileGroupForegroundCoordinator(",
                 end = "val routeForwardDirection =",
-                occurrence = 1,
+                occurrence = 0,
             )
 
         val onDismissBlock =

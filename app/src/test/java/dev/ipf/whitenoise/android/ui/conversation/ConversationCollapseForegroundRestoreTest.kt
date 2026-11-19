@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -81,7 +82,7 @@ class ConversationCollapseForegroundRestoreTest {
             listOf(
                 File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
                 File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
-            ).first { it.exists() }.readText()
+            ).first { it.exists() }.motionOwnerSource()
         val start = source.indexOf("onBeforeBodyCollapse = {")
         assertTrue("The actual message collapse callback must exist", start >= 0)
         val callback = source.substring(start).substringBefore("collapseLongMessages =")

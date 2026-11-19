@@ -33,6 +33,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsSentenceProjectionSegment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -373,7 +374,7 @@ class TtsReadableViewportCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-        ).firstOrNull(File::exists)?.readText() ?: error("Missing source file: $relativePath")
+        ).firstOrNull(File::exists)?.motionOwnerSource() ?: error("Missing source file: $relativePath")
 
     private companion object {
         const val FRAME = "tts-readable-viewport-frame"

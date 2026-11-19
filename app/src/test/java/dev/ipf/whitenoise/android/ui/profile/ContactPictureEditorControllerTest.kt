@@ -2,9 +2,11 @@ package dev.ipf.whitenoise.android.ui.profile
 
 import android.content.Context
 import android.graphics.Color
+import dev.ipf.whitenoise.android.media.IdentityImageCrop
 import dev.ipf.whitenoise.android.state.ContactPictureChange
 import dev.ipf.whitenoise.android.state.ContactPictureStore
 import dev.ipf.whitenoise.android.state.contactPicturePng
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -30,6 +32,29 @@ class ContactPictureEditorControllerTest {
             context.getSharedPreferences("editor", Context.MODE_PRIVATE),
             File(context.noBackupFilesDir, "editor"),
         )
+
+    /** A failed preparation reissues the same editable crop; a later successful retry retires it. */
+    @Test fun failedCropPreparationReissuesItsPresentationAndCanRetry() =
+        runTest {
+            store.save("a", "contact", "", "", ContactPictureChange.Replace(contactPicturePng(Color.RED))) { true }
+            val controller = ContactPictureEditorController(store, store.reference("a", "contact"), this) { true }
+            controller.reposition()
+            controller.state.first { !it.busy }
+            val source = requireNotNull(controller.state.value.crop)
+            val original = source.bytes.copyOf()
+            source.bytes.fill(0)
+            controller.confirm(IdentityImageCrop.Centered)
+            controller.state.first { !it.busy }
+            assertTrue(controller.state.value.failed)
+            assertEquals(source, controller.state.value.crop)
+            assertEquals(1, controller.state.value.cropPresentation)
+            original.copyInto(source.bytes)
+            controller.confirm(IdentityImageCrop.Centered)
+            controller.state.first { !it.busy }
+            assertFalse(controller.state.value.failed)
+            assertEquals(null, controller.state.value.crop)
+            assertTrue(controller.state.value.hasPicture)
+        }
 
     /** Clear remains an editor draft until Save; cancellation cannot modify the stored selection. */
     @Test fun clearDoesNotTouchStorageUntilSaveAndCancellationDropsTheDraft() =

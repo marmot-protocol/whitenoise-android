@@ -108,7 +108,7 @@ internal fun PhotoEditorCoordinatesDialog(
             ) { Text(stringResource(R.string.photo_editor_apply)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

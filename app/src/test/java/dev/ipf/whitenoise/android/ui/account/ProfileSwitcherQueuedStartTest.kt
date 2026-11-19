@@ -36,9 +36,19 @@ class ProfileSwitcherQueuedStartTest {
     /** Teardown before mutation dispatch never enters native recovery. */
     @Test fun teardownBeforeMutationDispatchNeverEntersNativeRecovery() = queuedStart(close = false)
 
+    /** A cancelled Material exit may accept another row, but cannot revive the old queued activation. */
+    @Test fun cancelledExitRetiresPendingActivationAndLeavesSelectionRetryable() =
+        queuedStart(
+            close = true,
+            retry = true,
+        )
+
     /** Awaits real process-scope mutation jobs through IO so late native calls cannot evade assertions. */
     @Suppress("LongMethod")
-    private fun queuedStart(close: Boolean) {
+    private fun queuedStart(
+        close: Boolean,
+        retry: Boolean = false,
+    ) {
         val dispatcher = StandardTestDispatcher()
         Dispatchers.setMain(dispatcher)
         var app: WhiteNoiseAppState? = null
@@ -78,7 +88,22 @@ class ProfileSwitcherQueuedStartTest {
             val queued = checkNotNull(state.mutationsScope.coroutineContext[Job]).children.toList()
             assertTrue(queued.isNotEmpty())
             assertTrue(calls.isEmpty())
-            if (close) selection.close() else state.wipeInProgress = true
+            if (retry) {
+                selection.cancelPending()
+                assertEquals(null, selection.pendingLabel)
+                runTest(dispatcher) { queued.joinAll() }
+                assertTrue(calls.isEmpty())
+                assertEquals("a", state.activeAccountRef)
+                selection.select(state, "retained") { completed++ }
+                assertEquals("retained", selection.pendingLabel)
+                selection.close()
+                val retried = checkNotNull(state.mutationsScope.coroutineContext[Job]).children.toList()
+                runTest(dispatcher) { retried.joinAll() }
+            } else if (close) {
+                selection.close()
+            } else {
+                state.wipeInProgress = true
+            }
             runTest(dispatcher) { queued.joinAll() }
             assertTrue(calls.isEmpty())
             assertEquals("a", state.activeAccountRef)

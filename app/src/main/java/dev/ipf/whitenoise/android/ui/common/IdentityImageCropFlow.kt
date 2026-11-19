@@ -54,6 +54,7 @@ internal fun IdentityImageCropFlow(
             preview = ready.preview.asImageBitmap(),
             sourceSize = ready.orientedSize,
             shape = shape,
+            ownerKey = uri to ready,
             onDismiss = onDismiss,
             onConfirm = { crop -> onCropped(ready.bytes, crop) },
         )

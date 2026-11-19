@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.conversationControllerSource
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.notificationDeliveryControllerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -35,13 +36,13 @@ class AppStateSendLockCoverageTest {
             "marmotIo(MarmotTraceSection.TEXT_SEND)" in controllerFunctionBody("send") ||
                 "marmotIo(MarmotTraceSection.TEXT_SEND)" in conversationControllerSource() ||
                 "marmotIo(MarmotTraceSection.TEXT_SEND)" in
-                controllersSource().resolveSibling("DurableLocalSends.kt").readText(),
+                controllersSource().resolveSibling("DurableLocalSends.kt").motionOwnerSource(),
         )
     }
 
     @Test
     fun forwardTextsLocksEachTargetsOrderedMessageBatch() {
-        val body = functionBodyIn(forwardingSource().readText(), "forwardTexts")
+        val body = functionBodyIn(forwardingSource().motionOwnerSource(), "forwardTexts")
 
         assertTrue(
             "forwardTexts must serialize each target's ordered message batch through the per-group commit lock",
@@ -69,7 +70,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun singleMessageForwardKeepsSingleMessageResultCopy() {
-        val body = functionBodyIn(forwardingSource().readText(), "forwardText")
+        val body = functionBodyIn(forwardingSource().motionOwnerSource(), "forwardText")
 
         assertTrue(
             "forwardText must keep its single-message target breakdown instead of using batch result copy",
@@ -125,13 +126,15 @@ class AppStateSendLockCoverageTest {
             foregroundLockGate >= 0 && foregroundDismissal > foregroundLockGate,
         )
 
-        val controllerSource = appStateSource().resolveSibling("AppLockController.kt").readText()
+        val controllerSource = appStateSource().resolveSibling("AppLockController.kt").motionOwnerSource()
         val unlockStart = controllerSource.indexOf("fun markUnlockSucceeded(")
         val unlockBody = controllerSource.substring(unlockStart, controllerSource.indexOf("\n    }\n", unlockStart))
         val hideLock = unlockBody.indexOf("screenVisible = false")
         val unlockCallback = unlockBody.indexOf("onUnlockSucceeded(dismissRetainedVisibleConversation)")
         val wiring =
-            appStateSource().readText().substringAfter("onUnlockSucceeded = { dismissRetainedVisibleConversation ->")
+            appStateSource()
+                .motionOwnerSource()
+                .substringAfter("onUnlockSucceeded = { dismissRetainedVisibleConversation ->")
         assertTrue(
             "successful unlock must dismiss after revealing the retained conversation",
             hideLock >= 0 &&
@@ -418,7 +421,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun appStateRuntimeReferenceIsVolatile() {
-        val source = appStateSource().readText()
+        val source = appStateSource().motionOwnerSource()
 
         assertTrue(
             "Marmot runtime is written on IO and read off-mutex, so visibility must be explicit",
@@ -430,8 +433,8 @@ class AppStateSendLockCoverageTest {
     @Test
     fun conversationReadAnchorUsesHoistedRenderedTimelineAndCandidateIdentity() {
         val screen = conversationScreenSource()
-        val source = screen.readText()
-        val tracking = screen.parentFile.resolve("ConversationUnreadTracking.kt").readText()
+        val source = screen.motionOwnerSource()
+        val tracking = screen.parentFile.resolve("ConversationUnreadTracking.kt").motionOwnerSource()
         val renderedTimelineIndex = source.indexOf("val renderedTimeline =")
         val readAnchorHelper = tracking.substring(tracking.indexOf("private fun ConversationReadAnchorEffect("))
         val readAnchorCallIndex = source.indexOf("ConversationUnreadTracking(", renderedTimelineIndex)
@@ -456,16 +459,16 @@ class AppStateSendLockCoverageTest {
     @Test
     fun conversationHistoryReanchorIgnoresSameRowHydration() {
         val screenFile = conversationScreenSource()
-        val source = screenFile.readText().replace(Regex("\\s+"), " ")
+        val source = screenFile.motionOwnerSource().replace(Regex("\\s+"), " ")
         val owner =
             screenFile.parentFile
                 .resolve("ConversationViewportRestorationOwner.kt")
-                .readText()
+                .motionOwnerSource()
                 .replace(Regex("\\s+"), " ")
         val effects =
             screenFile.parentFile
                 .resolve("ConversationViewportRestorationEffects.kt")
-                .readText()
+                .motionOwnerSource()
                 .replace(Regex("\\s+"), " ")
 
         assertTrue(
@@ -488,7 +491,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun voiceAutoChainSkipsDerivedEditRows() {
-        val source = conversationScreenSource().readText()
+        val source = conversationScreenSource().motionOwnerSource()
         val autoChain =
             source.substring(
                 source.indexOf("Auto-chain voice playback"),
@@ -504,7 +507,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun loadOlderPageRoutesPaginateThroughActiveSubscriptionGuard() {
-        val pagingSource = pagingSource().readText()
+        val pagingSource = pagingSource().motionOwnerSource()
         val loadOlder = functionBodyIn(pagingSource, "loadOlderPageInternal")
         val guard = functionBodyIn(pagingSource, "pageOlderIfActive")
         val retains = functionBodyIn(pagingSource, "retainsSubscription")
@@ -524,9 +527,9 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun closeTimelineSubscriptionWaitsNonCancellablyForActiveCallMutex() {
-        val session = controllersSource().resolveSibling("ConversationTimelineSession.kt").readText()
+        val session = controllersSource().resolveSibling("ConversationTimelineSession.kt").motionOwnerSource()
         val close = functionBodyIn(session, "closeTimeline")
-        val paging = pagingSource().readText()
+        val paging = pagingSource().motionOwnerSource()
         val controllers = conversationControllerSource()
         val olderPage = functionBodyIn(paging, "pageOlderIfActive", includeDeclaration = true)
         val newerPage = functionBodyIn(paging, "pageNewerIfActive", includeDeclaration = true)
@@ -639,7 +642,7 @@ class AppStateSendLockCoverageTest {
         functionName: String,
         sourceFile: File = appStateSource(),
     ): String {
-        val source = sourceFile.readText()
+        val source = sourceFile.motionOwnerSource()
         val start =
             Regex("""\bfun\s+(?:WhiteNoiseAppState\.)?${Regex.escape(functionName)}\s*\(""")
                 .find(source)
@@ -720,7 +723,7 @@ class AppStateSendLockCoverageTest {
             when (controllerFileName) {
                 "ConversationController.kt" -> conversationControllerSource()
                 "NotificationDeliveryController.kt" -> notificationDeliveryControllerSource()
-                else -> controllersSource().resolveSibling(controllerFileName).readText()
+                else -> controllersSource().resolveSibling(controllerFileName).motionOwnerSource()
             }
         val start =
             // Extensions declare a receiver between `fun` and the name.

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
@@ -82,25 +83,32 @@ class GroupAbandonmentDialogScreenshotTest {
     fun soleAdminCancelDismissesAndAbandonOpensTheReview() {
         var abandons = 0
         var dismissals = 0
+        val lifetime = mutableStateOf(0)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
-                GroupSoleAdminLeaveDialog(
-                    groupName = "Alice",
-                    isDm = true,
-                    onAbandon = { abandons++ },
-                    onDismiss = { dismissals++ },
-                )
+                key(lifetime.value) {
+                    GroupSoleAdminLeaveDialog(
+                        groupName = "Alice",
+                        isDm = true,
+                        onAbandon = { abandons++ },
+                        onDismiss = { dismissals++ },
+                    )
+                }
             }
         }
         composeRule.onNodeWithText(app.getString(R.string.sole_admin_abandon_hint_dm)).assertIsDisplayed()
         composeRule.onNodeWithTag("chat_info.sole_admin_leave.cancel").performClick()
+        composeRule.waitForIdle()
         assertEquals(0, abandons)
         assertEquals(1, dismissals)
+        composeRule.runOnIdle { lifetime.value++ }
         composeRule
             .onNodeWithTag("chat_info.sole_admin_leave.abandon")
             .assertTextEquals(app.getString(R.string.delete_from_device))
             .performClick()
+        composeRule.waitForIdle()
         assertEquals(1, abandons)
+        assertEquals(1, dismissals)
     }
 
     /** The chat list's bulk review names every selected chat and the account, with both kinds' consequences. */
@@ -127,6 +135,7 @@ class GroupAbandonmentDialogScreenshotTest {
             app.getString(R.string.abandon_identity_account, DM.accountName),
         ).forEach { composeRule.onNodeWithText(it).assertExists() }
         composeRule.onNodeWithTag("group.abandon.confirm").performClick()
+        composeRule.waitForIdle()
         assertEquals(1, confirms)
     }
 
@@ -163,6 +172,7 @@ class GroupAbandonmentDialogScreenshotTest {
             .onNodeWithTag("group.abandon.confirm")
             .assertTextEquals(app.getString(R.string.delete_group_confirm))
         composeRule.onNodeWithTag("group.abandon.cancel").performClick()
+        composeRule.waitForIdle()
         assertEquals(0, confirms)
         assertEquals(1, dismissals)
     }
@@ -181,6 +191,7 @@ class GroupAbandonmentDialogScreenshotTest {
         status.value = GroupAbandonmentStatus.Failed
         composeRule.onNodeWithTag("group.abandon.error").assertIsDisplayed()
         composeRule.onNodeWithTag("group.abandon.confirm").assertIsEnabled().performClick()
+        composeRule.waitForIdle()
         assertEquals(1, confirms)
     }
 

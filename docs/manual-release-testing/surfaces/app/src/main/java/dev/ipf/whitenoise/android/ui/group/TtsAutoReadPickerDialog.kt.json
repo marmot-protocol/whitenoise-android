@@ -1,0 +1,36 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadPickerDialog.kt",
+  "legacy_sha256": "704f359255bc4a3c468fd9cb4be12cf08c68bfa1ea153b9048d768e00d558832",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TtsAutoReadPickerDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadPickerDialog.kt",
+        "anchor": "fun TtsAutoReadPickerDialog(",
+        "test_ids": [
+          "GRP-001",
+          "NAV-011"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadPickerDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:tts_auto_read_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadPickerDialog.kt",
+        "anchor": "R.string.tts_auto_read_title",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

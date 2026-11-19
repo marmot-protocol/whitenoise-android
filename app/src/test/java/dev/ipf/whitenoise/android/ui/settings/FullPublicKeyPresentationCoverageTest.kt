@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,7 +37,7 @@ class FullPublicKeyPresentationCoverageTest {
     fun groupingStaysDisplayOnly() {
         val grouping =
             mainSources()
-                .filter { "publicKeyDisplayGroups(" in it.readText() }
+                .filter { "publicKeyDisplayGroups(" in it.motionOwnerSource() }
                 .map { it.name }
 
         assertEquals(listOf("FullPublicKey.kt"), grouping)
@@ -47,7 +48,7 @@ class FullPublicKeyPresentationCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$path"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$path"),
-        ).firstOrNull(File::exists)?.readText() ?: error("Missing $path")
+        ).firstOrNull(File::exists)?.motionOwnerSource() ?: error("Missing $path")
 
     /** Every Kotlin main source file. */
     private fun mainSources(): List<File> =

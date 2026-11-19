@@ -189,7 +189,7 @@ class RelaysContentTest {
                     busy = false,
                     rejectedUrl = null,
                     onDismiss = {},
-                    onAdd = { _, _ -> },
+                    onAdd = { _, _, _ -> },
                 )
             }
         }
@@ -259,7 +259,7 @@ class RelaysContentTest {
                     busy = busy.value,
                     rejectedUrl = null,
                     onDismiss = {},
-                    onAdd = { url, _ ->
+                    onAdd = { url, _, _ ->
                         submittedUrl = url
                         busy.value = true
                     },

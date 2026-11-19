@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -59,10 +60,17 @@ class NewGroupPresentationTest {
     @Test fun nativePersonTapAndLongPressRemainDistinct() {
         var selections = 0
         var profiles = 0
-        picker(listOf(person), emptyList(), toggle = { selections++ }, profile = { profiles++ })
+        var profileBounds: Rect? = null
+        picker(listOf(person), emptyList(), toggle = { selections++ }, profile = { profiles++ }, profileOrigin = {
+            profileBounds =
+                it
+        })
         val row = composeRule.onNodeWithTag("new_group.person.${person.candidate.accountIdHex}")
         row.performTouchInput { longClick() }
         assertEquals(1, profiles)
+        val activated = row.fetchSemanticsNode().boundsInRoot
+        assertEquals(activated.size, profileBounds?.size)
+        assertTrue(profileBounds?.isEmpty == false)
         assertEquals(0, selections)
         row.performClick()
         assertEquals(1, selections)
@@ -263,8 +271,10 @@ class NewGroupPresentationTest {
         ).forEach { (label, expected) ->
             composeRule.runOnIdle { expanded.value = true }
             composeRule.onNodeWithText(context.getString(label)).performClick()
-            assertEquals(expected, actions.last())
-            assertFalse(expanded.value)
+            composeRule.runOnIdle {
+                assertEquals(expected, actions.last())
+                assertFalse(expanded.value)
+            }
         }
     }
 
@@ -279,6 +289,7 @@ class NewGroupPresentationTest {
         toggle: (RecipientSearch.Candidate) -> Unit = {},
         profile: (RecipientSearch.Candidate) -> Unit = {},
         addressFailed: Boolean = false,
+        profileOrigin: (Rect?) -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -289,7 +300,10 @@ class NewGroupPresentationTest {
                     false,
                     false,
                     incomplete,
-                    NewGroupRecipientActions({}, confirm, review, {}, {}, retry, toggle, profile),
+                    NewGroupRecipientActions({}, confirm, review, {}, {}, retry, toggle, { candidate, origin ->
+                        profile(candidate)
+                        profileOrigin(origin)
+                    }),
                     isValidNpub = { true },
                     addressLookupFailed = addressFailed,
                 )

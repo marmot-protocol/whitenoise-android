@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -99,38 +100,9 @@ import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
-
-internal fun ttsBodyIsCollapsed(
-    collapseEnabled: Boolean,
-    measuredBodyHeightPx: Int?,
-    maxBodyHeightPx: Int,
-): Boolean = collapseEnabled && (measuredBodyHeightPx == null || measuredBodyHeightPx > maxBodyHeightPx)
-
-/**
- * Selects the final file card as the message footer owner when no visual tile already owns it and
- * the message has no caption; a caption is the message's last line and carries the footer itself.
- * Confirmed and optimistic file renderers apply the returned ownership only to their last card.
- */
-internal fun fileCardOwnsFooter(
-    deleted: Boolean,
-    fileCount: Int,
-    visualOwnsFooter: Boolean,
-    hasCaption: Boolean = false,
-): Boolean = !deleted && fileCount > 0 && !visualOwnsFooter && !hasCaption
-
-/**
- * Selects an uncaptioned visual-only group for overlay metadata.
- * A file attachment always takes precedence so mixed groups keep one stable trailing footer.
- */
-internal fun visualMediaOwnsFooter(
-    deleted: Boolean,
-    hasInvalidationWarning: Boolean,
-    visualCount: Int,
-    fileCount: Int,
-    hasCaption: Boolean,
-): Boolean = !deleted && !hasInvalidationWarning && visualCount > 0 && fileCount == 0 && !hasCaption
 
 /** Footer frame for visual media: time and status at the trailing edge. */
 @Composable
@@ -175,7 +147,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     sharedUser: SharedUser?,
     remoteGiphyMedia: RemoteGiphyMedia?,
     giphyEditedLabel: String?,
-    onGiphyEditedClick: (() -> Unit)?,
+    onGiphyEditedClick: ((Rect?) -> Unit)?,
     deleted: Boolean,
     mine: Boolean,
     showStatus: Boolean,
@@ -556,13 +528,14 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     timestampColor: Color,
     showStatus: Boolean,
     editedLabel: String?,
-    onEditedClick: (() -> Unit)?,
+    onEditedClick: ((Rect?) -> Unit)?,
     footerOnVisualMedia: Boolean,
     footerOnPendingVisual: Boolean,
     showTimestamp: Boolean = true,
     invalidationWarning: String?,
     mine: Boolean,
     onExpand: () -> Unit,
+    onExpandAt: ((Rect?) -> Unit)? = null,
     statusContainerColor: Color? = null,
 ) {
     val showOuterMetadata = bodyText != null || (!footerOnVisualMedia && !footerOnPendingVisual)
@@ -873,16 +846,20 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             }
         }
         val readMoreFooter: @Composable () -> Unit = {
+            val (originModifier, expand) =
+                rememberMeasuredControlClick { origin ->
+                    onExpandAt?.invoke(origin) ?: onExpand()
+                }
             Text(
                 readMoreLabel,
                 style = MaterialTheme.typography.bodyLarge,
                 color = readMoreStyle.color,
                 fontWeight = readMoreStyle.fontWeight,
                 modifier =
-                    Modifier.clickable(
+                    Modifier.then(originModifier).clickable(
                         onClickLabel = readMoreLabel,
                         role = Role.Button,
-                        onClick = onExpand,
+                        onClick = expand,
                     ),
             )
         }

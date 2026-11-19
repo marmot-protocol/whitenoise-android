@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -38,7 +39,10 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailure
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Language
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
+import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
+import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.net.URI
 
 /** Links tab of the library. */
@@ -107,6 +111,7 @@ private fun UrlLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(rememberMediaLibraryRowSurface())
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)
@@ -161,3 +166,15 @@ private fun UrlLibraryRow(
 // when it can't be parsed (the inventory already guarantees an http(s) prefix).
 @Suppress("MaxLineLength")
 private fun hostOf(url: String): String = runCatching { URI(url).host }.getOrNull()?.removePrefix("www.")?.takeIf { it.isNotBlank() } ?: url
+
+/** Registers the same measured outline for link and voice rows. */
+@Composable
+internal fun rememberMediaLibraryRowSurface(): Modifier =
+    rememberSettingsNativeSurface(
+        destination = null,
+        fill = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.large,
+        strokeColor =
+            amoledSurfaceBorderStroke()?.let { MaterialTheme.colorScheme.outlineVariant }
+                ?: Color.Unspecified,
+    ).first.settingsCardMorph()

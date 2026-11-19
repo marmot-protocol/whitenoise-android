@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddIdentitySheet.kt",
+  "legacy_sha256": "d12541d835b9398e01278b0d32e9702f9a261ba9d3964166c58f61983de82c20",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AddIdentitySheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddIdentitySheet.kt",
+        "anchor": "fun AddIdentitySheet(",
+        "test_ids": [
+          "PRO-001",
+          "NAV-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

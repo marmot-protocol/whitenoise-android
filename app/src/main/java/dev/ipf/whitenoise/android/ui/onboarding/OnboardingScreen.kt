@@ -149,10 +149,12 @@ internal fun OnboardingScreen(
         // reused from the field rather than stashed anywhere new — it leaves
         // memory with the rest of the onboarding state.
         onRecoveryConsentConfirm = {
-            recoveryConsentVisible = false
-            val value = privateKeyState.text.toString().trim()
-            recoveryConsentedFor = value
-            runStep { recoveryStepFor(appState.recoverIncompleteIdentitySetup(value)) }
+            val value = identity.trim()
+            if (recoveryConsentVisible && privateKeyState.text.toString().trim() == value) {
+                recoveryConsentVisible = false
+                recoveryConsentedFor = value
+                runStep { recoveryStepFor(appState.recoverIncompleteIdentitySetup(value)) }
+            }
         },
         // Declining reaches no engine call at all: only the prompt closes, and
         // the entered key and sign-in button stay exactly as they were.

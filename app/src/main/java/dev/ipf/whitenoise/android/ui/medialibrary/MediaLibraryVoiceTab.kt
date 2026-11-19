@@ -197,6 +197,7 @@ internal fun VoiceLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(rememberMediaLibraryRowSurface())
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)

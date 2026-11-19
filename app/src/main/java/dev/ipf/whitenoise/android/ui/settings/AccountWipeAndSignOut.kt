@@ -56,6 +56,7 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -290,12 +291,14 @@ internal fun SignOutSheet(
     onConfirm: (deleteKeyPackages: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     var deleteKeyPackages by remember { mutableStateOf(true) }
     ModalBottomSheet(
         modifier = Modifier.exposePerformanceTestTags(),
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { terminal.close(onDismiss) },
+        sheetState = sheetState,
     ) {
         Column(
             Modifier.fillMaxWidth().padding(24.dp),
@@ -349,7 +352,7 @@ internal fun SignOutSheet(
                 }
                 Switch(checked = deleteKeyPackages, onCheckedChange = null)
             }
-            Button(onClick = { onConfirm(deleteKeyPackages) }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { terminal.close(deleteKeyPackages, onConfirm) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(painterResource(R.drawable.ic_logout), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_out))
@@ -371,10 +374,12 @@ private fun SignOutAndWipeSheet(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     ModalBottomSheet(
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { terminal.close(onDismiss) },
+        sheetState = sheetState,
     ) {
         Column(
             Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(24.dp),
@@ -400,7 +405,7 @@ private fun SignOutAndWipeSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedButton(
-                onClick = onConfirm,
+                onClick = { terminal.close(onConfirm) },
                 modifier = Modifier.fillMaxWidth(),
                 colors =
                     ButtonDefaults.outlinedButtonColors(

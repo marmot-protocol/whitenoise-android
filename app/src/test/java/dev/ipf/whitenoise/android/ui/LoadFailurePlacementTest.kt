@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.chatsControllerSource
 import dev.ipf.whitenoise.android.conversationControllerSource
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationSearchPageDirection
 import dev.ipf.whitenoise.android.state.conversationLoadFailureEdge
@@ -59,7 +60,7 @@ class LoadFailurePlacementTest {
             )
         val sourceRoot = sourceCandidates.first(File::isDirectory)
         val controllers = chatsControllerSource() + "\n" + conversationControllerSource()
-        val shell = File(sourceRoot, "ui/navigation/MainShell.kt").readText()
+        val shell = File(sourceRoot, "ui/navigation/MainShell.kt").motionOwnerSource()
 
         assertTrue(controllers.countOccurrences("terminalLoadFailure = true") >= 2)
         assertTrue(controllers.countOccurrences("retryGeneration += 1L") >= 2)
@@ -78,7 +79,7 @@ class LoadFailurePlacementTest {
             )
         val sourceRoot = sourceCandidates.first(File::isDirectory)
         val controllers = conversationControllerSource()
-        val screen = File(sourceRoot, "ui/conversation/ConversationScreen.kt").readText()
+        val screen = File(sourceRoot, "ui/conversation/ConversationScreen.kt").motionOwnerSource()
         val failureResolutionStart = "private fun ConversationController.discardInitialTimelineSeedForFailure"
         val failureResolutionEnd = "private fun ConversationController.publishAuthoritativeEmptyInitialTimeline"
         val seededReconciliationStart = "val seededTailAlignmentReady ="

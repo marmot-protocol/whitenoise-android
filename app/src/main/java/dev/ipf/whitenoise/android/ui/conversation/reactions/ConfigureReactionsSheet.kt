@@ -22,6 +22,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,7 @@ import dev.ipf.whitenoise.android.core.RecentEmojiList
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -63,14 +65,20 @@ internal const val CONFIGURE_REACTIONS_ADD_SLOT_TAG = "configure-reactions-add-s
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// One draft, selection handoff and terminal exit stay in the same sheet composition.
+@Suppress("LongMethod", "FunctionNaming")
 internal fun ConfigureReactionsSheet(
     current: List<String>,
     onDismiss: () -> Unit,
     onApply: (List<String>) -> Unit,
     onPickSlot: (Int, List<String>) -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState()
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     var draft by remember(current) { mutableStateOf(RecentEmojiList.normalizeQuickChoices(current)) }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = amoledSheetContainerColor()) {
+    ModalBottomSheet(sheetState = sheetState, onDismissRequest = {
+        terminal.close(onDismiss)
+    }, containerColor = amoledSheetContainerColor()) {
         WhiteNoiseSheetHeader(stringResource(R.string.configure_reactions))
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Column(
@@ -94,18 +102,36 @@ internal fun ConfigureReactionsSheet(
                 ) {
                     draft.forEachIndexed { index, emoji ->
                         if (index < RecentEmojiList.QuickLimit) {
-                            ReactionSlot(index = index, emoji = emoji, onClick = { onPickSlot(index, draft) })
+                            ReactionSlot(
+                                index = index,
+                                emoji = emoji,
+                                onClick = {
+                                    terminal.close(
+                                        index to draft,
+                                    ) { (slot, choices) -> onPickSlot(slot, choices) }
+                                },
+                            )
                         } else {
                             OptionalReactionSlot(
                                 index = index,
                                 emoji = emoji,
-                                onReplace = { onPickSlot(index, draft) },
+                                onReplace = {
+                                    terminal.close(
+                                        index to draft,
+                                    ) { (slot, choices) -> onPickSlot(slot, choices) }
+                                },
                                 onRemove = { draft = RecentEmojiList.withoutQuickChoiceAt(draft, index) },
                             )
                         }
                     }
                     if (draft.size < RecentEmojiList.QuickMaximum) {
-                        AddReactionSlot(onClick = { onPickSlot(draft.size, draft) })
+                        AddReactionSlot(
+                            onClick = {
+                                terminal.close(
+                                    draft.size to draft,
+                                ) { (slot, choices) -> onPickSlot(slot, choices) }
+                            },
+                        )
                     }
                 }
                 Row(
@@ -118,7 +144,7 @@ internal fun ConfigureReactionsSheet(
                     ) {
                         Text(stringResource(R.string.reset))
                     }
-                    WhiteNoiseButton(onClick = { onApply(draft) }, modifier = Modifier.weight(1f)) {
+                    WhiteNoiseButton(onClick = { terminal.close(draft, onApply) }, modifier = Modifier.weight(1f)) {
                         Text(stringResource(R.string.done))
                     }
                 }

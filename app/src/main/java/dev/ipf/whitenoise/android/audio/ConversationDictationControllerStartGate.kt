@@ -92,3 +92,19 @@ internal fun ConversationDictationController.completedTargetValidation(
     } catch (_: RuntimeException) {
         ConversationDictationTargetValidation.Indeterminate
     }
+
+/** Accept only the disclosure still owned by the current gesture. */
+internal fun ConversationDictationController.acceptPendingDisclosure(
+    expected: ConversationDictationState.DisclosureRequired?,
+    markDisclosureAccepted: () -> Unit,
+    markOfflineDisclosureAccepted: () -> Unit,
+) {
+    val pending = expected ?: return
+    if (state !== pending) return
+    if (pending.usesOfflineSpeechToText) {
+        markOfflineDisclosureAccepted()
+    } else {
+        markDisclosureAccepted()
+    }
+    startTarget(pending.sessionId, pending.target)
+}

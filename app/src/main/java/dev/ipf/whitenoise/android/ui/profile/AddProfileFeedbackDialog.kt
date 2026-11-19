@@ -29,7 +29,7 @@ internal fun AddProfileFeedbackDialog(
         title = { Text(feedback.title.resolve(context)) },
         text = { feedback.detail?.let { SelectionContainer { Text(it.resolve(context)) } } },
         confirmButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("add-profile-feedback-dismiss")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag("add-profile-feedback-dismiss")) {
                 Text(stringResource(R.string.ok))
             }
         },
