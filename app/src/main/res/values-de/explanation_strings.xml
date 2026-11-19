@@ -11,7 +11,7 @@
     <string name="explanation_composer_dictation">Tippt, was du sagst, mithilfe der Android-Spracherkennung. White Noise fordert Offline-Erkennung an, aber dein Gerät nutzt möglicherweise trotzdem einen Online-Dienst.</string>
     <string name="explanation_composer_translate">Schaltet den Übersetzungsmodus ein oder aus. Solange er an ist, sendet Senden die Übersetzung aus der Zeile Wird gesendet, und es wird nichts gesendet, bis eine Übersetzung bereit ist.</string>
     <string name="explanation_composer_voice_note">Gedrückt halten, um eine Sprachnachricht aufzunehmen.</string>
-    <string name="explanation_composer_camera">Öffnet die Kamera, damit du ein neues Foto anhängen kannst. Android fragt beim ersten Mal nach dem Kamerazugriff.</string>
+    <string name="explanation_composer_camera">Öffnet die Kamera, damit du ein Foto aufnehmen oder ein Video aufzeichnen und anhängen kannst. Android fragt beim ersten Mal nach dem Kamerazugriff und bei der ersten Aufnahme nach dem Mikrofonzugriff.</string>
     <string name="explanation_composer_gallery">Öffnet die Android-Fotoauswahl. White Noise erhält nur die Fotos und Videos, die du auswählst.</string>
     <string name="explanation_composer_files">Öffnet die Android-Dateiauswahl, um eine beliebige Datei anzuhängen.</string>
     <string name="explanation_composer_location">Sendet deinen aktuellen Standort einmalig als Kartenlink. Dein Standort wird nicht weiter geteilt.</string>

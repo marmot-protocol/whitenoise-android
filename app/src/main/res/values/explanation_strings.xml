@@ -11,7 +11,7 @@
     <string name="explanation_composer_dictation">Types what you say using Android speech recognition. White Noise asks for offline recognition, but your device may still use an online service.</string>
     <string name="explanation_composer_translate">Turns translate mode on or off. While it is on, Send delivers the translation shown on the Will send line, and nothing is sent until a translation is ready.</string>
     <string name="explanation_composer_voice_note">Hold to record a voice message.</string>
-    <string name="explanation_composer_camera">Opens the camera so you can attach a new photo. Android asks for camera access the first time.</string>
+    <string name="explanation_composer_camera">Opens the camera to take a photo or record a video to attach. Android asks for camera access the first time, and for microphone access the first time you record.</string>
     <string name="explanation_composer_gallery">Opens the Android photo picker. White Noise only receives the photos and videos you choose.</string>
     <string name="explanation_composer_files">Opens the Android file picker to attach any file.</string>
     <string name="explanation_composer_location">Sends your current location once, as a map link. It does not keep sharing your location.</string>
