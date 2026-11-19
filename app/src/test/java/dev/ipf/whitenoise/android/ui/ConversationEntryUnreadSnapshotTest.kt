@@ -116,8 +116,13 @@ class ConversationEntryUnreadSnapshotTest {
         composeRule.waitForIdle()
         assertEquals(ConversationEntryUnreadSnapshot(1, "old-unread", readAnchorMessageId = "read"), snapshot[0])
 
+        // The anchor arrives a page before the stale id; only loading both can prove it stale.
+        composeRule.runOnUiThread { timeline.value = listOf(received("read")) + timeline.value }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(1, "old-unread", readAnchorMessageId = "read"), snapshot[0])
+
         composeRule.runOnUiThread {
-            timeline.value = listOf(received("old-unread"), received("read")) + timeline.value
+            timeline.value = listOf(received("old-unread"), received("read-earlier")) + timeline.value
         }
         composeRule.waitForIdle()
         assertEquals(ConversationEntryUnreadSnapshot(1, "new-1", readAnchorMessageId = "read"), snapshot[0])

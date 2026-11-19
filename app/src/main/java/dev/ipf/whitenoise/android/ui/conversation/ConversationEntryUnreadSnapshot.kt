@@ -166,14 +166,15 @@ internal fun rememberConversationEntryUnreadSnapshot(
                     },
             )
         }
-    // Paging the anchor in can prove the frozen id stale. Move the line once and keep it there.
+    // Paging can load both the anchor and the frozen id, proving it stale. Move the line once and keep it there.
     val anchorCheck = remember(snapshot) { ConversationEntryAnchorCheck() }
     val anchorId = snapshot.readAnchorMessageId
-    val anchorLoaded = anchorId != null && timeline.any { it.record.messageIdHex == anchorId }
-    if (!anchorCheck.done && snapshot.firstUnreadMessageId != null && anchorLoaded) {
+    val firstUnreadId = snapshot.firstUnreadMessageId
+
+    fun loaded(id: String?) = id != null && timeline.any { it.record.messageIdHex == id }
+    if (!anchorCheck.done && loaded(anchorId) && (firstUnreadId == anchorId || loaded(firstUnreadId))) {
         anchorCheck.done = true
-        anchorCheck.firstUnreadMessageId =
-            firstUnreadAfterReadAnchor(snapshot.firstUnreadMessageId, anchorId, timeline)
+        anchorCheck.firstUnreadMessageId = firstUnreadAfterReadAnchor(firstUnreadId, anchorId, timeline)
     }
     return if (anchorCheck.done) snapshot.copy(firstUnreadMessageId = anchorCheck.firstUnreadMessageId) else snapshot
 }
