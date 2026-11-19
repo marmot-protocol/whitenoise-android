@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerRefFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationActionFixtures.GROUP_ID
 import dev.ipf.whitenoise.android.state.ConversationActionFixtures.MESSAGE_ID
 import dev.ipf.whitenoise.android.state.ConversationActionFixtures.TARGET_REF
@@ -108,23 +109,49 @@ class ReplyTaggedSendsTest {
             assertSame(newer, controller.replyingTo)
         }
 
-    /** A reply to a message still being sent has only a client token, so both sends fail visibly instead. */
+    /**
+     * A reply to a message still being sent has only a client token, so a sticker or poll sends nothing and says,
+     * as a text reply does, that the message hasn't been sent yet. The reply stays selected.
+     */
     @Test
     fun replyToAnUnsentMessageIsNeverPublished() =
         runTest {
-            val recorder = SendRecorder()
-            val state = appState(recorder.engine)
-            val controller = controller(state)
-            controller.timeline = listOf(localSend(record(PENDING_ID), MessageStatus.Pending))
-            val pending = record(PENDING_ID)
-            controller.replyingTo = pending
+            val attempts =
+                listOf<suspend ConversationController.() -> Boolean>(
+                    { sendSticker(STICKER, snapshotReply()) },
+                    { createLunchPoll() },
+                )
+            attempts.forEach { attempt ->
+                val recorder = SendRecorder()
+                val state = appState(recorder.engine)
+                val controller = controller(state)
+                controller.timeline = listOf(localSend(record(PENDING_ID), MessageStatus.Pending))
+                val pending = record(PENDING_ID)
+                controller.replyingTo = pending
 
-            assertFalse(controller.replyAllowsTaggedSend())
-            assertFalse(controller.sendSticker(STICKER, controller.snapshotReply()))
-            assertNotNull(state.toast)
-            assertFalse(controller.createLunchPoll())
-            assertEquals(emptyList<Pair<String, List<Any?>>>(), recorder.sends)
-            assertSame(pending, controller.replyingTo)
+                assertFalse(controller.replyAllowsTaggedSend())
+                assertFalse(attempt(controller))
+                assertEquals(AppText.Resource(R.string.reply_target_not_sent), state.toast?.title)
+                assertEquals(emptyList<Pair<String, List<Any?>>>(), recorder.sends)
+                assertSame(pending, controller.replyingTo)
+            }
+        }
+
+    /** A reply captured while its message was still sending goes out with the event id that message has by then. */
+    @Test
+    fun aReplyCapturedBeforeItsTargetWasAcceptedUsesTheEventId() =
+        runTest {
+            val recorder = SendRecorder()
+            val controller = controller(appState(recorder.engine))
+            controller.timeline = listOf(localSend(record(PENDING_ID), MessageStatus.Pending))
+            controller.replyingTo = record(PENDING_ID)
+            val reply = controller.snapshotReply()
+            controller.timeline = listOf(localSend(record(MESSAGE_ID), MessageStatus.Sent))
+
+            assertTrue(controller.sendSticker(STICKER, reply))
+
+            assertEquals(REPLY_TAGS, recorder.onlyTags())
+            assertNull(controller.replyingTo)
         }
 
     /** Once the replied-to send is accepted, its row's event id replaces the client token the reply kept. */

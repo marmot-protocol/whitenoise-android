@@ -59,11 +59,13 @@ class ReplyTargetPublicationCoverageTest {
         assertFalse("the unresolved target is never read after resolution", "replyTarget" in afterResolution)
     }
 
-    /** Polls and stickers carry the tags of the reply snapshot the resolver captured, never the raw selection. */
+    /** Polls and stickers resolve the reply captured at submit through the same resolver, never the live selection. */
     @Test
-    fun pollAndStickerRepliesUseTheResolvedSnapshot() {
-        assertTrue("reply.messageTags" in appModuleSource(POLL).functionBody("createPoll"))
-        assertTrue("reply.messageTags" in appModuleSource(STICKER).functionBody("sendSticker"))
+    fun pollAndStickerRepliesResolveTheirTarget() {
+        mapOf(POLL to "createPoll", STICKER to "sendSticker").forEach { (file, function) ->
+            val body = appModuleSource(file).functionBody(function)
+            assertTrue("$function must resolve the reply", "replyTagsForSend(reply).getOrNull()" in body)
+        }
     }
 
     /** The only detached text send carries no reply, since no mounted composer is left to resolve one. */

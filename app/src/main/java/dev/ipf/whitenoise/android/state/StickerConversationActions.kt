@@ -94,7 +94,8 @@ private fun stickerAssetCacheFor(
 
 /**
  * Sends [sticker] into this conversation through MDK, as a reply to [reply]'s message when one is
- * selected. Cancellation propagates; failures, including a reply with no event id yet, are shown.
+ * selected. A reply to a message that hasn't been sent yet gets the same notice as a text reply.
+ * Cancellation propagates; other failures are shown.
  */
 @Suppress("TooGenericExceptionCaught")
 internal suspend fun ConversationController.sendSticker(
@@ -102,25 +103,29 @@ internal suspend fun ConversationController.sendSticker(
     reply: ReplySnapshot,
 ): Boolean {
     val account = boundAccountRef?.takeIf { canSendMessages } ?: return false
-    return try {
-        val replyTags = reply.messageTags
-        appState.withGroupCommitLock(account, group.groupIdHex) {
-            check(canSendMessages)
-            appState.marmotIo {
-                sendTaggedSticker(account, group.groupIdHex, StickerKey.from(sticker).ref, replyTags)
-            }
-        }
-        clearSentReply(reply)
-        true
-    } catch (throwable: Throwable) {
-        rethrowIfCancellation(throwable)
-        appState.presentFailure(
-            R.string.sticker_send_failed,
-            "STICKER_SEND",
-            throwable,
-            stickerFailureDetail(throwable),
-        )
+    val replyTags = replyTagsForSend(reply).getOrNull()
+    return if (replyTags == null) {
         false
+    } else {
+        try {
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                check(canSendMessages)
+                appState.marmotIo {
+                    sendTaggedSticker(account, group.groupIdHex, StickerKey.from(sticker).ref, replyTags)
+                }
+            }
+            clearSentReply(reply)
+            true
+        } catch (throwable: Throwable) {
+            rethrowIfCancellation(throwable)
+            appState.presentFailure(
+                R.string.sticker_send_failed,
+                "STICKER_SEND",
+                throwable,
+                stickerFailureDetail(throwable),
+            )
+            false
+        }
     }
 }
 
