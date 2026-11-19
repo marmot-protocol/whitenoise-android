@@ -16,6 +16,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -206,14 +207,34 @@ class WhiteNoiseAppStateReaderSpeechTest {
             appState.ttsController.attachEngine(engine)
             val entries = listOf(TtsSpeakableEntry("s", "Sender", "Private speech."))
             val handle = TtsEngineHandle(TextToSpeech(context, {}), "test.external.reader", EngineTrust.Unknown)
-            val consent = TtsPlaybackTrustConsent(appState) { handle }
+            var attachedHandle: TtsEngineHandle? = handle
+            val consent = TtsPlaybackTrustConsent(appState) { attachedHandle }
             try {
                 suspend fun startSpeech() = consent.confirm { true } && appState.speakAloud(entries, Locale.US)
 
-                val cancelled = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
+                val dismissed = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
                 assertTrue(engine.spoken.isEmpty())
                 requireNotNull(consent.pending).respond(false)
+                assertFalse(dismissed.await())
+                assertTrue(consent.needsAcknowledgment())
+                assertTrue(engine.spoken.isEmpty())
+
+                val cancelled = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
+                val cancelledRequest = requireNotNull(consent.pending)
+                consent.cancel()
+                cancelledRequest.respond(true)
                 assertFalse(cancelled.await())
+                assertNull(consent.pending)
+                assertTrue(consent.needsAcknowledgment())
+                assertTrue(engine.spoken.isEmpty())
+
+                val detached = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
+                val detachedRequest = requireNotNull(consent.pending)
+                attachedHandle = null
+                detachedRequest.respond(true)
+                assertFalse(detached.await())
+                assertNull(consent.pending)
+                attachedHandle = handle
                 assertTrue(consent.needsAcknowledgment())
                 assertTrue(engine.spoken.isEmpty())
 

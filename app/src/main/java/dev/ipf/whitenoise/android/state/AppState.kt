@@ -1043,8 +1043,7 @@ class WhiteNoiseAppState private constructor(
     private var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
     private val ttsAutoReadContinuation by lazy { createTtsAutoReadContinuation(this) }
 
-    // Manual speech deliberately has no auto-read session key, but it still
-    // owns decrypted text that must stop when its account is removed.
+    // Manual speech has no auto-read key. Its decrypted text must stop when its account is removed.
     private var ttsSpeechAccountRef: String? = null
     internal val attachmentSpeechDestination =
         MutableStateFlow<dev.ipf.whitenoise.android.audio.AttachmentSpeechDestination?>(null)
@@ -1057,6 +1056,7 @@ class WhiteNoiseAppState private constructor(
         return key == ttsAutoReadKey(activeAccountRef, groupIdHex)
     }
 
+    /** Starts read-aloud for one or more speakable messages after any required approval. */
     fun speakAloud(
         entries: List<TtsSpeakableEntry>,
         locale: java.util.Locale,
@@ -1064,14 +1064,14 @@ class WhiteNoiseAppState private constructor(
     ): Boolean {
         if (ttsEngineNeedsAcknowledgment() || !ttsController.speak(entries, locale, startSentenceIndex)) return false
 
-        // Only successful speech replaces the previous source ownership.
+        // A controller rejection leaves the prior queue playing with its current owner.
+        // Only a successful start replaces auto-read ownership.
         ttsSpeechAccountRef = activeAccountRef
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
         attachmentSpeechDestination.value = null
 
-        // A rejected foreground-service start must not leave private
-        // read-aloud running without its user-visible stop surface.
+        // Stop private speech if its foreground service fails to provide a visible stop control.
         val foregroundStarted = TtsPlaybackForegroundService.start(appContext)
         if (!foregroundStarted) stopSpeaking()
         return foregroundStarted

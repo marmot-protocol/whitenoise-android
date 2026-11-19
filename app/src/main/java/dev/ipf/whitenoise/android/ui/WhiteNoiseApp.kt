@@ -844,7 +844,7 @@ internal fun WhiteNoiseApp(
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
     }
     TtsPlaybackTrustWarningHost(appState)
-    // Keep a refused group change visible after its screen closes while its account and runtime are current.
+    // Keep refused changes visible off-screen. Withdraw stale requests as Wait before another account sees them.
     val groupChangeQuestion = appState.groupChangeConfirmations.pending
     val groupChangeQuestionOwned = groupChangeQuestion?.let { appState.ownsGroupChange(it.target) } == true
     LaunchedEffect(groupChangeQuestion, groupChangeQuestionOwned) {
