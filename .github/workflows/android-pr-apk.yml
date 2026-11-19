@@ -13,6 +13,14 @@ on:
         description: Open internal PR whose current head needs test APKs
         required: true
         type: string
+      expected_head:
+        description: Reviewed full commit SHA of the PR head for a pinned request
+        required: false
+        type: string
+      expected_workflow_sha:
+        description: Reviewed full commit SHA of the builder workflow for a pinned request
+        required: false
+        type: string
       include_isolated:
         description: Also build the unsigned isolated channel for opt-in qualification runs; never signed or linked
         required: false
@@ -54,6 +62,8 @@ jobs:
           EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           EVENT_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           REQUESTED_PR_NUMBER: ${{ inputs.pr_number }}
+          EXPECTED_HEAD: ${{ inputs.expected_head }}
+          EXPECTED_WORKFLOW_SHA: ${{ inputs.expected_workflow_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -63,12 +73,20 @@ jobs:
             head_repository=$EVENT_HEAD_REPOSITORY
           else
             [[ "$REQUESTED_PR_NUMBER" =~ ^[1-9][0-9]*$ ]]
+            if [[ -n "$EXPECTED_HEAD" || -n "$EXPECTED_WORKFLOW_SHA" ]]; then
+              [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+              [[ "$EXPECTED_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+              [[ "$GITHUB_SHA" == "$EXPECTED_WORKFLOW_SHA" ]]
+            fi
             pr_number=$REQUESTED_PR_NUMBER
             read -r state head_sha head_repository < <(
               gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" \
                 --jq '[.state, .head.sha, .head.repo.full_name] | @tsv'
             )
             [[ "$state" == open ]]
+            if [[ -n "$EXPECTED_HEAD" ]]; then
+              [[ "$head_sha" == "$EXPECTED_HEAD" ]]
+            fi
           fi
           [[ "$head_repository" == "$GITHUB_REPOSITORY" ]]
           [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]]
