@@ -89,14 +89,18 @@ class PlatformBackCallbackGateCoverageTest {
         assertEquals(emptyList<String>(), outside.map { (file, text, offset) -> "$file:${text.lineAt(offset)}" })
     }
 
-    /** Only a registration inside a handler's body counts, not one in code that merely follows a handler. */
+    /** Only a registration inside a handler's own body counts, not one in code that merely follows a handler. */
     @Test
     fun onlyRegistrationsInsideAHandlersBodyCount() {
-        val handler = "fun ${platformBackHandlers.first()}(enabled: Boolean) {\n"
+        val name = platformBackHandlers.first()
+        val handler = "fun $name(enabled: Boolean) {\n"
+        val strayInit = "class Other {\n    init {\n        dispatcher.$REGISTRATION (0, callback)\n    }\n}"
         mapOf(
             "${handler}DisposableEffect(enabled) {\n    dispatcher.$REGISTRATION(0, callback)\n}\n}" to true,
-            "$handler}\nclass Other {\n    init {\n        dispatcher.$REGISTRATION (0, callback)\n    }\n}" to false,
+            "$handler}\n$strayInit" to false,
             "$handler}\nfun other() {\n    dispatcher.$REGISTRATION(0, callback)\n}" to false,
+            "fun $name() = Unit\n$strayInit" to false,
+            "fun $name(): Unit {\n    dispatcher.$REGISTRATION(0, callback)\n}" to true,
         ).forEach { (source, inside) ->
             assertEquals(source, inside, source.isInsideHandler(source.callSites(REGISTRATION).single()))
         }
@@ -123,6 +127,7 @@ class PlatformBackCallbackGateCoverageTest {
         val ifStatement = Regex("""\bif\s*\(""")
         val functionDeclaration = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w.<>?, ]+\.)?(\w+)\s*\(""")
         val declarationPrefix = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w.<>?, ]+\.)?$""")
+        val returnType = Regex("""\s*(?::\s*[\w.<>?, ]+)?\s*""")
 
         /**
          * Whether the `if` [condition] holds only from Android 14: one of its `&&` clauses is exactly a positive
@@ -158,15 +163,18 @@ class PlatformBackCallbackGateCoverageTest {
                 isAndroid14Gate(condition) && getOrNull(branch) == '{' && offset in blockAt(branch)
             }
 
-        /** Whether [offset] lies inside the braced body of one of the [platformBackHandlers]. */
+        /**
+         * Whether [offset] lies inside the braced body of one of the [platformBackHandlers]. The body's `{` must follow
+         * the parameters and an optional return type, so an expression-bodied handler never borrows a later block.
+         */
         fun String.isInsideHandler(offset: Int): Boolean =
             functionDeclaration
                 .findAll(substring(0, offset))
                 .filter { it.groupValues[1] in platformBackHandlers }
                 .any { match ->
-                    val parameters = kotlinBlockFrom(match.range.last, "parameters", '(', ')')
-                    val body = indexOf('{', match.range.last + parameters.length)
-                    body in 0 until offset && offset in blockAt(body)
+                    val header = match.range.last + kotlinBlockFrom(match.range.last, "parameters", '(', ')').length
+                    val body = indexOf('{', header)
+                    body in 0 until offset && returnType.matches(substring(header, body)) && offset in blockAt(body)
                 }
 
         /** The offsets of the balanced `{}` block that opens at [start]. */
