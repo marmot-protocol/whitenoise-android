@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.conversation.ConversationEntryUnreadSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.conversationReadAnchorCandidateIndex
+import dev.ipf.whitenoise.android.ui.conversation.firstUnreadAfterReadAnchor
 import dev.ipf.whitenoise.android.ui.conversation.hasSentMessageAfterUnreadBoundary
 import dev.ipf.whitenoise.android.ui.conversation.loadConversationTimelineToNewest
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationEntryUnreadSnapshot
@@ -95,6 +96,38 @@ class ConversationEntryUnreadSnapshotTest {
         }
         composeRule.waitForIdle()
         assertEquals(ConversationEntryUnreadSnapshot(2, "new-1", readAnchorMessageId = "read"), snapshot[0])
+    }
+
+    /** The rendered line moves too once paging loads the anchor behind a stale first-unread id. */
+    @Test
+    fun staleFirstUnreadMovesWhenPagingLoadsReadAnchor() {
+        val timeline = mutableStateOf(listOf(received("new-1"), received("new-2")))
+        val snapshot = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+        composeRule.setContent {
+            snapshot[0] =
+                rememberConversationEntryUnreadSnapshot(
+                    controllerIdentity = this,
+                    projectionUnread = 1,
+                    projectionFirstUnreadMessageId = "old-unread",
+                    timeline = timeline.value,
+                    readAnchorMessageId = "read",
+                )
+        }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(1, "old-unread", readAnchorMessageId = "read"), snapshot[0])
+
+        composeRule.runOnUiThread {
+            timeline.value = listOf(received("old-unread"), received("read")) + timeline.value
+        }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(1, "new-1", readAnchorMessageId = "read"), snapshot[0])
+    }
+
+    @Test
+    fun staleFirstUnreadBeforeLoadedAnchorMovesToNextReceivedMessage() {
+        val timeline = listOf(received("old-unread"), received("read"), received("new-1"), received("new-2"))
+        assertEquals("new-1", firstUnreadAfterReadAnchor("old-unread", "read", timeline))
+        assertEquals(null, firstUnreadAfterReadAnchor("old-unread", "read", timeline.take(2) + sent("reply")))
     }
 
     /** A projected first-unread after the anchor is still trusted as-is. */

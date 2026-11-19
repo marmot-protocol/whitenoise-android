@@ -132,7 +132,13 @@ internal fun rememberConversationEntryUnreadSnapshot(
     }
     val projectionCaptured = projectionHolder.frozen != null
     val entryProjection = projectionHolder.frozen ?: currentProjection
-    return remember(controllerIdentity, entryProjection, timeline.isNotEmpty(), projectionCaptured) {
+    // Paging the anchor in can prove a frozen first-unread id stale, so check the boundary again then.
+    val readAnchorLoaded =
+        remember(timeline, entryProjection.readAnchorMessageId) {
+            val anchorId = entryProjection.readAnchorMessageId
+            anchorId != null && timeline.any { it.record.messageIdHex == anchorId }
+        }
+    return remember(controllerIdentity, entryProjection, timeline.isNotEmpty(), projectionCaptured, readAnchorLoaded) {
         val count =
             if (timeline.isEmpty()) {
                 entryProjection.count
