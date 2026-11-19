@@ -6,6 +6,7 @@ import android.Manifest
 import android.app.Activity
 import android.graphics.Color
 import android.os.Bundle
+import android.view.OrientationEventListener
 import android.view.Surface
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -21,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
@@ -95,6 +98,7 @@ internal fun ConversationCameraScreen(
     var microphoneAllowed by remember { mutableStateOf(hasMicrophoneAccess(context)) }
     var microphoneAsked by rememberSaveable { mutableStateOf(false) }
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+    val heldRotation = rememberHeldRotation()
     val microphone =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { microphoneAllowed = it }
     DisposableEffect(controller) { onDispose { controller.release() } }
@@ -104,6 +108,7 @@ internal fun ConversationCameraScreen(
         }
     }
     BackHandler(onBack = onClose)
+    KeepScreenOnWhile(session.recording)
     ConversationCameraContent(
         state = session.uiState(videoWithoutSound = microphoneAsked && !microphoneAllowed),
         onClose = onClose,
@@ -115,13 +120,62 @@ internal fun ConversationCameraScreen(
             }
         },
         onShutter = {
-            val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
+            val rotation = heldRotation.value ?: previewView.display?.rotation ?: Surface.ROTATION_0
             controller.pressShutter(session, rotation, onCaptured, onCaptureFailed)
         },
         onSwitchCamera = { session.front = !session.front },
         preview = { AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize()) },
     )
 }
+
+/**
+ * How the phone is held, as the rotation a capture should carry, whatever the screen's own rotation. With auto-rotate
+ * off the screen stays portrait while the phone is sideways. Null until the orientation sensor first reports.
+ */
+@Composable
+private fun rememberHeldRotation(): State<Int?> {
+    val context = LocalContext.current
+    val rotation = remember { mutableStateOf<Int?>(null) }
+    DisposableEffect(context) {
+        val listener =
+            object : OrientationEventListener(context) {
+                override fun onOrientationChanged(orientation: Int) {
+                    captureRotationFor(orientation)?.let { rotation.value = it }
+                }
+            }
+        listener.enable()
+        onDispose { listener.disable() }
+    }
+    return rotation
+}
+
+/** Keeps the screen on while [active], so the screen timing out never stops a recording. */
+@Composable
+internal fun KeepScreenOnWhile(active: Boolean) {
+    val view = LocalView.current
+    DisposableEffect(view, active) {
+        view.keepScreenOn = active
+        onDispose { view.keepScreenOn = false }
+    }
+}
+
+private const val DEGREES_PER_QUARTER_TURN = 90
+
+/** Capture rotations for a phone turned 0, 90, 180 and 270 degrees clockwise from its natural orientation. */
+private val captureRotationsByQuarterTurn =
+    intArrayOf(Surface.ROTATION_0, Surface.ROTATION_270, Surface.ROTATION_180, Surface.ROTATION_90)
+
+/**
+ * The capture rotation for a phone turned [degrees] clockwise from its natural orientation, to the nearest quarter
+ * turn, or null when the angle is unknown, as when the phone lies flat.
+ */
+internal fun captureRotationFor(degrees: Int): Int? =
+    if (degrees == OrientationEventListener.ORIENTATION_UNKNOWN) {
+        null
+    } else {
+        val quarterTurns = (degrees + DEGREES_PER_QUARTER_TURN / 2) / DEGREES_PER_QUARTER_TURN
+        captureRotationsByQuarterTurn[quarterTurns % captureRotationsByQuarterTurn.size]
+    }
 
 /** The camera screen's own state: the chosen mode and lens, and a photo or recording in progress. */
 @Stable

@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "KeepScreenOnWhile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt",
+        "anchor": "fun KeepScreenOnWhile(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
         "surface": "string:camera_unavailable",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt",
         "anchor": "R.string.camera_unavailable",

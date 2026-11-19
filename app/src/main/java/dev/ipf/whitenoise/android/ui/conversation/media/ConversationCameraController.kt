@@ -9,7 +9,9 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCase
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileDescriptorOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -32,7 +34,7 @@ internal enum class CameraMode {
 /**
  * Binds CameraX for one camera screen and writes each capture into the private output [outputs] reserved for it.
  * Each mode binds only the use cases it needs, so every device that can preview can also capture. Main-thread only;
- * [release] unbinds, and discards a recording in progress.
+ * [release] unbinds this screen's use cases, never another camera screen's, and discards a recording in progress.
  */
 internal class ConversationCameraController(
     private val context: Context,
@@ -40,6 +42,7 @@ internal class ConversationCameraController(
 ) {
     private val mainExecutor = ContextCompat.getMainExecutor(context)
     private var provider: ProcessCameraProvider? = null
+    private var bound: Array<UseCase> = emptyArray()
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
@@ -72,7 +75,7 @@ internal class ConversationCameraController(
         )
     }
 
-    /** Unbinds everything, then binds the preview with the one capture use case [mode] needs. */
+    /** Unbinds this screen's earlier use cases, then binds the preview with the one capture use case [mode] needs. */
     private fun bindUseCases(
         cameraProvider: ProcessCameraProvider,
         owner: LifecycleOwner,
@@ -93,14 +96,15 @@ internal class ConversationCameraController(
                         .also { imageCapture = it }
                 CameraMode.Video ->
                     VideoCapture
-                        .withOutput(
-                            Recorder.Builder().setQualitySelector(QualitySelector.from(Quality.HD)).build(),
-                        ).also { videoCapture = it }
+                        .withOutput(Recorder.Builder().setQualitySelector(videoQuality).build())
+                        .also { videoCapture = it }
             }
         val selector = if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
         runCatching {
-            cameraProvider.unbindAll()
+            cameraProvider.unbind(*bound)
+            bound = emptyArray()
             cameraProvider.bindToLifecycle(owner, selector, preview, capture)
+            bound = arrayOf(preview, capture)
         }.onFailure {
             imageCapture = null
             videoCapture = null
@@ -159,7 +163,8 @@ internal class ConversationCameraController(
         capture.targetRotation = rotation
         discardRecording = false
         recordingOutput = output
-        val pending = capture.output.prepareRecording(context, FileDescriptorOutputOptions.Builder(output).build())
+        val options = FileDescriptorOutputOptions.Builder(output).setFileSizeLimit(MAX_RECORDING_BYTES).build()
+        val pending = capture.output.prepareRecording(context, options)
         if (hasMicrophoneAccess(context)) pending.withAudioEnabled()
         recording =
             pending.start(mainExecutor) { event ->
@@ -181,12 +186,7 @@ internal class ConversationCameraController(
         recording = null
         recordingOutput?.closeQuietly()
         recordingOutput = null
-        // A recording that reached a size or length limit still holds everything recorded until then.
-        val usable =
-            !event.hasError() ||
-                event.error == VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED ||
-                event.error == VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED
-        if (!discardRecording && !released) onFinished(usable)
+        if (!discardRecording && !released) onFinished(finalizedRecordingIsUsable(event.error))
     }
 
     /** Stops the recording in progress; its result arrives through [startRecording]'s `onFinished`. */
@@ -199,12 +199,30 @@ internal class ConversationCameraController(
         released = true
         discardRecording = true
         recording?.stop()
-        runCatching { provider?.unbindAll() }
+        runCatching { provider?.unbind(*bound) }
+        bound = emptyArray()
         provider = null
         imageCapture = null
         videoCapture = null
     }
 }
+
+/** The largest file a conversation can send. A recording stops there, and what it recorded is still usable. */
+private const val MAX_RECORDING_BYTES = FILE_BACKED_ATTACHMENT_MAX_BYTES
+
+/** HD video, or the nearest quality the camera has when it has no HD, so a lens without 720p still records. */
+private val videoQuality = QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.HD))
+
+/**
+ * Whether a recording finalized with [error] left a video worth sending. One that reached the size or length limit,
+ * or whose camera closed underneath it, as when the app leaves the screen, still holds everything recorded until
+ * then. A recording the user closed is discarded before this is asked.
+ */
+internal fun finalizedRecordingIsUsable(error: Int): Boolean =
+    error == VideoRecordEvent.Finalize.ERROR_NONE ||
+        error == VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED ||
+        error == VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED ||
+        error == VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE
 
 /** Whether the app may record sound with a video. */
 internal fun hasMicrophoneAccess(context: Context): Boolean =
