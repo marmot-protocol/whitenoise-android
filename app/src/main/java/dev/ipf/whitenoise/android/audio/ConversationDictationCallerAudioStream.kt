@@ -72,7 +72,8 @@ internal class ConversationDictationCallerAudioStream(
      * Ends an unfinished feed as soon as the provider reports a terminal callback, instead of
      * writing into a dead request until the pipe stalls. The feeder stops at its next poll; a claimed
      * chunk is requeued with its exact bytes and failure identity and reported as a pipe failure before
-     * the callback runs, so the bounded retry replays it. A fully fed stream is left untouched.
+     * the callback runs, so the bounded retry replays it. A caller that queues failures to a thread must
+     * queue the callback behind them too. A fully fed stream is left untouched.
      */
     fun endFeedAfterProviderTerminal(callback: () -> Unit) {
         providerEnded.set(true)

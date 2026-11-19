@@ -575,7 +575,12 @@ private class AndroidConversationDictationRecognitionSession(
             callerAudioCompletionBarrier.deliverImmediately(delivery)
             return
         }
-        callerAudioCompletionBarrier.deliver(source::endFeedAfterProviderTerminal, source::onCaptureClosed, delivery)
+        // Always queue: a pipe failure the feeder posted before closing must reach main before this callback.
+        callerAudioCompletionBarrier.deliver(
+            { onClosed -> source.endFeedAfterProviderTerminal { mainHandler.post(onClosed) } },
+            source::onCaptureClosed,
+            delivery,
+        )
     }
 
     /** Serializes terminal callback decisions with UI actions on Android's main thread. */
