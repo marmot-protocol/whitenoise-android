@@ -303,6 +303,7 @@
     <string name="chat_row_draft_prefix">Черновик: </string>
     <string name="jump_to_newest">К новым</string>
     <string name="scroll_to_top">Прокрутить вверх</string>
+    <string name="scroll_to_bottom">Прокрутить вниз</string>
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
     <string name="message_discard_still_sending">Это сообщение ещё отправляется. Повторите попытку чуть позже.</string>
     <string name="reply_target_not_sent">Сообщение, на которое вы отвечаете, ещё не отправлено. Дождитесь отправки или нажмите на нём «Повторить», если отправить не удалось, а затем отправьте ответ.</string>

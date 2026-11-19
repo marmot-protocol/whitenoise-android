@@ -277,6 +277,7 @@
     <string name="chat_row_draft_prefix">Taslak: </string>
     <string name="jump_to_newest">En yeniye atla</string>
     <string name="scroll_to_top">Başa kaydır</string>
+    <string name="scroll_to_bottom">Sona kaydır</string>
     <string name="discard_failed_message">Başarısız mesajı sil</string>
     <string name="message_discard_still_sending">Bu mesaj hâlâ gönderiliyor. Birazdan tekrar deneyin.</string>
     <string name="reply_target_not_sent">Yanıtladığınız mesaj henüz gönderilmedi. Gönderilmesini bekleyin veya gönderilemediyse mesajda Tekrar dene’ye dokunun, ardından yanıtınızı gönderin.</string>

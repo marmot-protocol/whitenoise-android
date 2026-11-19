@@ -279,6 +279,7 @@
     <string name="chat_row_draft_prefix">Borrador: </string>
     <string name="jump_to_newest">Saltar al más reciente</string>
     <string name="scroll_to_top">Desplazar al inicio</string>
+    <string name="scroll_to_bottom">Desplazar al final</string>
     <string name="discard_failed_message">Descartar mensaje fallido</string>
     <string name="message_discard_still_sending">Este mensaje aún se está enviando. Inténtalo de nuevo en un momento.</string>
     <string name="reply_target_not_sent">El mensaje al que respondes aún no se ha enviado. Espera a que se envíe, o toca «Reintentar» en él si falló, y luego envía tu respuesta.</string>

@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Opens this chat\'s details, such as its members and settings.</string>
     <string name="explanation_conversation_jump_to_mention">Scrolls to the next unread message that mentions you.</string>
     <string name="explanation_composer_draft_top">Scrolls the draft back to its first line. It does not change the text.</string>
+    <string name="explanation_composer_draft_bottom">Scrolls the draft to its last line. It does not change the text.</string>
     <string name="explanation_emoji_search">Searches the emoji list by name.</string>
     <string name="explanation_emoji_configure">Opens the settings where you choose your quick reaction emoji.</string>
 

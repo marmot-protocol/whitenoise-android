@@ -163,7 +163,7 @@ internal fun ComposerConfiguredToolbar(
     content: @Composable (ComposerShortcut, Modifier) -> Unit,
 ) {
     val scroll = rememberScrollState()
-    val focusTarget = bindings.shortcuts.firstOrNull { it != ComposerShortcut.VoiceNote }
+    val focusTarget = bindings.shortcuts.firstOrNull { it.takesDefaultFocus }
     val latestVoiceBounds by rememberUpdatedState(bindings.onVoiceBounds)
     DisposableEffect(Unit) { onDispose { latestVoiceBounds(null) } }
     val slots: @Composable () -> Unit = {

@@ -1473,7 +1473,7 @@ internal fun ComposerBar(
                 val settings = toolbarPreference?.value ?: ComposerToolbarSettings()
                 val available =
                     attachmentActions.keys +
-                        setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.More) +
+                        composerAlwaysAvailableShortcuts +
                         (
                             if (appState != null &&
                                 composerSendingAccount(appState, draftAccountRef) != null
