@@ -166,17 +166,32 @@ internal fun rememberConversationEntryUnreadSnapshot(
                     },
             )
         }
-    // Paging can load both the anchor and the frozen id, proving it stale. Move the line once and keep it there.
-    val anchorCheck = remember(snapshot) { ConversationEntryAnchorCheck() }
-    val anchorId = snapshot.readAnchorMessageId
-    val firstUnreadId = snapshot.firstUnreadMessageId
+    return rememberAnchorCheckedSnapshot(snapshot, timeline)
+}
 
-    fun loaded(id: String?) = id != null && timeline.any { it.record.messageIdHex == id }
-    if (!anchorCheck.done && loaded(anchorId) && (firstUnreadId == anchorId || loaded(firstUnreadId))) {
+/** Paging can load both the anchor and the frozen id, proving it stale. Move the line once and keep it there. */
+@Composable
+private fun rememberAnchorCheckedSnapshot(
+    snapshot: ConversationEntryUnreadSnapshot,
+    timeline: List<TimelineMessage>,
+): ConversationEntryUnreadSnapshot {
+    val anchorCheck = remember(snapshot) { ConversationEntryAnchorCheck() }
+    if (!anchorCheck.done && canCheckAgainstReadAnchor(snapshot, timeline)) {
         anchorCheck.done = true
-        anchorCheck.firstUnreadMessageId = firstUnreadAfterReadAnchor(firstUnreadId, anchorId, timeline)
+        anchorCheck.firstUnreadMessageId =
+            firstUnreadAfterReadAnchor(snapshot.firstUnreadMessageId, snapshot.readAnchorMessageId, timeline)
     }
     return if (anchorCheck.done) snapshot.copy(firstUnreadMessageId = anchorCheck.firstUnreadMessageId) else snapshot
+}
+
+private fun canCheckAgainstReadAnchor(
+    snapshot: ConversationEntryUnreadSnapshot,
+    timeline: List<TimelineMessage>,
+): Boolean {
+    fun loaded(id: String?) = id != null && timeline.any { it.record.messageIdHex == id }
+    val anchorId = snapshot.readAnchorMessageId
+    val firstUnreadId = snapshot.firstUnreadMessageId
+    return loaded(anchorId) && (firstUnreadId == anchorId || loaded(firstUnreadId))
 }
 
 private class ConversationEntryAnchorCheck(
