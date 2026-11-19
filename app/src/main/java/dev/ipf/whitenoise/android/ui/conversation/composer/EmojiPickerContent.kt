@@ -38,7 +38,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
@@ -432,7 +434,7 @@ internal fun EmojiGlyph(
         }
     if (art != null) {
         // Artwork takes the Unicode glyph's em box, so every emoji in a row reads at one size.
-        val artSize = with(LocalDensity.current) { fontSize.toDp() }.coerceAtMost(size)
+        val artSize = with(LocalDensity.current) { emojiGlyphArtworkSize(fontSize, size) }
         Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
             EmojiArtImage(art, contentDescription = emojiPlainLabel(emoji), modifier = Modifier.size(artSize))
         }
@@ -449,3 +451,9 @@ internal fun EmojiGlyph(
         )
     }
 }
+
+/** Side of the square EmojiGlyph artwork draws in: the Unicode glyph's em box, capped by its cell. */
+internal fun Density.emojiGlyphArtworkSize(
+    fontSize: TextUnit,
+    cell: Dp,
+): Dp = fontSize.toDp().coerceAtMost(cell)
