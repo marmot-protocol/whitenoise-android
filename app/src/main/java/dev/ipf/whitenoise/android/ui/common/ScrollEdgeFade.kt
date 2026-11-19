@@ -54,9 +54,12 @@ internal fun Modifier.scrollEdgeFade(
 }
 
 /** Decorative bands can outlive a keyed folder subtree without owning its scroll or input state. */
-internal class ScrollEdgeFadeMotion {
-    val top = Animatable(0.dp, Dp.VectorConverter)
-    val bottom = Animatable(0.dp, Dp.VectorConverter)
+internal class ScrollEdgeFadeMotion(
+    initialTop: Dp = 0.dp,
+    initialBottom: Dp = 0.dp,
+) {
+    val top = Animatable(initialTop, Dp.VectorConverter)
+    val bottom = Animatable(initialBottom, Dp.VectorConverter)
 }
 
 /** Retire decorative state with the viewport owner, rather than with its selected folder. */
@@ -69,7 +72,7 @@ internal fun Modifier.scrollEdgeFade(
     state: LazyListState,
     reverseLayout: Boolean = false,
     fadeHeight: Dp = SCROLL_EDGE_FADE_HEIGHT,
-    motion: ScrollEdgeFadeMotion = rememberScrollEdgeFadeMotion(state),
+    motion: ScrollEdgeFadeMotion? = null,
 ): Modifier {
     val source = remember(state) { ScrollEdgeSource(state, { state.canScrollBackward }, { state.canScrollForward }) }
     return scrollEdgeFade(source, reverseLayout, true, fadeHeight, motion = motion)
@@ -103,16 +106,26 @@ private fun Modifier.scrollEdgeFade(
     fadeEnabled: Boolean,
     fadeHeight: Dp,
     stableRenderTarget: Boolean = false,
-    motion: ScrollEdgeFadeMotion = rememberScrollEdgeFadeMotion(source.owner),
+    motion: ScrollEdgeFadeMotion? = null,
 ): Modifier {
     // Keyboard forms keep ordinary painting and their caller-owned scroll state.
     // Clear the mask immediately, and hiding the IME restores the same viewport's cues.
     // The layer itself stays mounted — removing its outsets from under a clipping parent leaves that parent
     // clipping the outset width off the left edge, which cut every chat-list avatar under the search keyboard.
     val masking = fadeEnabled && !WindowInsets.isImeVisible
-    val top = motion.top
-    val bottom = motion.bottom
-    LaunchedEffect(motion, source.owner, reverseScrolling, fadeEnabled, fadeHeight) {
+    // Returning viewports already know their scroll range: paint their resting bands on the first draw.
+    // Explicitly retained bands keep their current animation across folder/content changes.
+    val localMotion =
+        motion ?: remember(source.owner) {
+            val edges = scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling)
+            ScrollEdgeFadeMotion(
+                initialTop = if (edges.top && fadeEnabled) fadeHeight else 0.dp,
+                initialBottom = if (edges.bottom && fadeEnabled) fadeHeight else 0.dp,
+            )
+        }
+    val top = localMotion.top
+    val bottom = localMotion.bottom
+    LaunchedEffect(localMotion, source.owner, reverseScrolling, fadeEnabled, fadeHeight) {
         snapshotFlow { scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling) }
             .collectLatest { edges ->
                 coroutineScope {

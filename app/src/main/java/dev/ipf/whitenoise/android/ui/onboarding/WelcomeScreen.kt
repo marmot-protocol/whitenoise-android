@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -26,6 +27,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -39,8 +42,12 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
+import dev.ipf.whitenoise.android.ui.settings.SettingsNativeViewport
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /** Selects Welcome or Sign In while the existing owner retains creation, import, signer and recovery state. */
 @Suppress("FunctionNaming", "LongParameterList")
@@ -146,7 +153,11 @@ internal fun WelcomeScreen(
         },
     ) { contentPadding ->
         Column(
-            Modifier.fillMaxSize().padding(contentPadding).consumeWindowInsets(contentPadding),
+            Modifier
+                .fillMaxSize()
+                .nativePageBody(contentPadding)
+                .padding(contentPadding)
+                .consumeWindowInsets(contentPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -165,45 +176,63 @@ internal fun WelcomeScreen(
                             .testTag("onboarding.welcome.mark"),
                 )
             }
-            Column(
-                modifier =
-                    Modifier
-                        .then(
-                            if (savedAccounts.isNotEmpty() || offlineErrorVisible) {
-                                Modifier.weight(1f, fill = false)
-                            } else {
-                                Modifier
-                            },
-                        ).whiteNoiseVerticalScroll(rememberScrollState())
-                        .widthIn(max = OnboardingMaxContentWidth)
-                        .fillMaxWidth()
-                        .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
-                        .padding(bottom = WhiteNoiseSpacing.PinnedActionInset),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-            ) {
-                OnboardingSavedAccountActions(
-                    savedAccounts,
-                    reactivatingAccountLabel,
-                    !busy,
-                    onContinueWithSavedAccount,
-                    onRecoverSavedAccount,
-                )
-                if (offlineErrorVisible) OnboardingOfflineNotice(onOfflineRetry)
-                WhiteNoiseOutlinedButton(
-                    onClick = onSignIn,
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().testTag("onboarding.welcome.sign_in"),
+            SettingsNativeViewport { viewport ->
+                // Match the shared buttons' native default shape and actual enabled/loading borders.
+                val signInBorder = ButtonDefaults.outlinedButtonBorder(!busy)
+                val signInContour =
+                    rememberSettingsNativeSurface(
+                        destination = "welcome-sign-in",
+                        shape = ButtonDefaults.shape,
+                        strokeColor = (signInBorder.brush as? SolidColor)?.value ?: Color.Unspecified,
+                    ).first
+                val signUpBorder = amoledOutlineBorder(!busy || creatingIdentity)
+                val signUpContour =
+                    rememberSettingsNativeSurface(
+                        destination = "welcome-sign-up",
+                        shape = ButtonDefaults.shape,
+                        strokeColor = (signUpBorder?.brush as? SolidColor)?.value ?: Color.Unspecified,
+                    ).first
+                Column(
+                    modifier =
+                        Modifier
+                            .then(
+                                if (savedAccounts.isNotEmpty() || offlineErrorVisible) {
+                                    Modifier.weight(1f, fill = false)
+                                } else {
+                                    Modifier
+                                },
+                            ).then(viewport)
+                            .whiteNoiseVerticalScroll(rememberScrollState())
+                            .widthIn(max = OnboardingMaxContentWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                            .padding(bottom = WhiteNoiseSpacing.PinnedActionInset),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
                 ) {
-                    Text(stringResource(R.string.onboarding_login))
+                    OnboardingSavedAccountActions(
+                        savedAccounts,
+                        reactivatingAccountLabel,
+                        !busy,
+                        onContinueWithSavedAccount,
+                        onRecoverSavedAccount,
+                    )
+                    if (offlineErrorVisible) OnboardingOfflineNotice(onOfflineRetry)
+                    WhiteNoiseOutlinedButton(
+                        onClick = onSignIn,
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().then(signInContour).testTag("onboarding.welcome.sign_in"),
+                    ) {
+                        Text(stringResource(R.string.onboarding_login))
+                    }
+                    WhiteNoiseButton(
+                        onClick = onSignUp,
+                        enabled = !busy,
+                        loading = creatingIdentity,
+                        loadingLabel = stringResource(R.string.creating_identity_title),
+                        modifier = Modifier.fillMaxWidth().then(signUpContour).testTag("onboarding.welcome.sign_up"),
+                    ) { Text(stringResource(R.string.onboarding_sign_up)) }
                 }
-                WhiteNoiseButton(
-                    onClick = onSignUp,
-                    enabled = !busy,
-                    loading = creatingIdentity,
-                    loadingLabel = stringResource(R.string.creating_identity_title),
-                    modifier = Modifier.fillMaxWidth().testTag("onboarding.welcome.sign_up"),
-                ) { Text(stringResource(R.string.onboarding_sign_up)) }
             }
         }
     }

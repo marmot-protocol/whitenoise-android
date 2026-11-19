@@ -37,6 +37,7 @@ class AuditLogExportConsentDialogTest {
         composeRule.onNodeWithText(string(R.string.export_audit_logs_confirm_title)).assertIsDisplayed()
         assertEquals(0, confirms)
         composeRule.onNodeWithText(string(R.string.export_audit_logs_confirm_action)).performClick()
+        composeRule.waitForIdle()
         assertEquals(1, confirms)
         assertEquals(0, dismisses)
     }
@@ -62,6 +63,7 @@ class AuditLogExportConsentDialogTest {
         composeRule.onNodeWithText(string(R.string.export_audit_logs_share)).assertIsDisplayed()
 
         composeRule.onNodeWithText(string(R.string.export_audit_logs_save)).performClick()
+        composeRule.waitForIdle()
         assertEquals(1, saves)
         assertEquals(0, shares)
         assertEquals(0, dismisses)
@@ -83,6 +85,7 @@ class AuditLogExportConsentDialogTest {
         }
 
         composeRule.onNodeWithText(string(R.string.export_audit_logs_share)).performClick()
+        composeRule.waitForIdle()
         assertEquals(1, shares)
         assertEquals(0, saves)
     }

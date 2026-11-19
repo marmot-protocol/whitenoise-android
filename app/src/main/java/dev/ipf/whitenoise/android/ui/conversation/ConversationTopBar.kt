@@ -70,7 +70,6 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
-import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
@@ -263,8 +262,6 @@ internal fun ConversationTopBar(
                                     Modifier
                                         .fillMaxWidth()
                                         .heightIn(min = 48.dp)
-                                        // Details unfold from this header and fold back into it.
-                                        .settingsCardMorph(anchor = ConversationMorphAnchor.Details)
                                         .clip(RoundedCornerShape(12.dp))
                                         // The reader speaks the chat name and member line, then offers Details.
                                         .explainOnLongPress(

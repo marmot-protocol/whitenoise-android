@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
 
@@ -224,11 +225,11 @@ internal fun ChatFolderDeleteDialog(
         confirmButton = {
             TextButton(
                 modifier = Modifier.testTag("folder.delete_confirm"),
-                onClick = onConfirm,
+                onClick = { close(onConfirm) },
             ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -314,7 +315,10 @@ private fun ChatFolderRestoreDefaults(
     defaultsMissing: Boolean,
     onRestoreDefaults: () -> Unit,
 ) {
-    SettingsGroup {
+    SettingsGroup(
+        destination = SettingsDetail.ChatFolders,
+        surface = "folder-management-actions",
+    ) {
         row("restore") { context ->
             SettingsAction(
                 context = context,

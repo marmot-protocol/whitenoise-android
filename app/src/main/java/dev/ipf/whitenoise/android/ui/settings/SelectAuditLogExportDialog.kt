@@ -21,6 +21,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -40,6 +41,7 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.stageSelectedAuditLogs
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
 import java.io.File
@@ -54,27 +56,36 @@ internal fun SelectAuditLogExportDialog(
     onStaged: (File) -> Unit,
 ) {
     val generation = appState.runtimeGeneration
-    val scope = rememberCoroutineScope()
-    var result by remember(generation) { mutableStateOf<Result<List<AuditLogFileFfi>>?>(null) }
-    var attempt by remember { mutableStateOf(0) }
-    var exporting by remember { mutableStateOf(false) }
-    LaunchedEffect(generation, attempt) {
+    val owner = Triple(appState, appState.activeAccountRef, generation)
+    val scope = key(owner) { rememberCoroutineScope() }
+    var result by remember(owner) { mutableStateOf<Result<List<AuditLogFileFfi>>?>(null) }
+    var attempt by remember(owner) { mutableStateOf(0) }
+    var exporting by remember(owner) { mutableStateOf(false) }
+    LaunchedEffect(owner, attempt) {
         result = runCatchingCancellable { appState.listAuditLogExportCandidates() }
     }
     AuditLogPickerDialog(
         result = result,
         exporting = exporting,
         onDismiss = onDismiss,
+        ownerKey = owner,
         onExport = { selectedPaths ->
             if (!exporting) {
                 exporting = true
                 scope.launch {
                     try {
                         val staged = runCatchingCancellable { appState.stageSelectedAuditLogs(selectedPaths) }
-                        if (generation == appState.runtimeGeneration) {
+                        if (owner == Triple(appState, appState.activeAccountRef, appState.runtimeGeneration)) {
                             staged
-                                .onSuccess(onStaged)
-                                .onFailure { result = Result.failure(it) }
+                                .onSuccess { file ->
+                                    close {
+                                        if (owner ==
+                                            Triple(appState, appState.activeAccountRef, appState.runtimeGeneration)
+                                        ) {
+                                            onStaged(file)
+                                        }
+                                    }
+                                }.onFailure { result = Result.failure(it) }
                         }
                     } finally {
                         exporting = false
@@ -96,13 +107,16 @@ internal fun AuditLogPickerDialog(
     result: Result<List<AuditLogFileFfi>>?,
     exporting: Boolean,
     onDismiss: () -> Unit,
-    onExport: (Set<String>) -> Unit,
+    onExport: PopupSurfaceMotion.(Set<String>) -> Unit,
     onRetry: () -> Unit,
+    ownerKey: Any? = LocalSettingsCardMorph.current,
 ) {
     val files = result?.getOrNull().orEmpty()
     var selected by remember(result) { mutableStateOf(emptySet<String>()) }
     WhiteNoiseAlertDialog(
-        onDismissRequest = { if (!exporting) onDismiss() },
+        onDismissRequest = onDismiss,
+        ownerKey = ownerKey,
+        dismissEnabled = { !exporting },
         title = { Text(stringResource(R.string.choose_audit_files)) },
         text = {
             when {
@@ -112,7 +126,11 @@ internal fun AuditLogPickerDialog(
                 else ->
                     WhiteNoiseLazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = AuditLogPickerMaxHeight)) {
                         items(files, key = { it.path }) { file ->
-                            AuditLogPickerRow(file, file.path in selected, enabled = !exporting) { checked ->
+                            AuditLogPickerRow(
+                                file,
+                                file.path in selected,
+                                enabled = !exporting && acceptsInput,
+                            ) { checked ->
                                 selected = if (checked) selected + file.path else selected - file.path
                             }
                         }
@@ -121,9 +139,16 @@ internal fun AuditLogPickerDialog(
         },
         confirmButton = {
             if (result?.isFailure == true) {
-                TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                TextButton(
+                    onClick = onRetry,
+                    enabled = acceptsInput && !exporting,
+                ) { Text(stringResource(R.string.retry)) }
             } else {
-                TextButton(onClick = { onExport(selected) }, enabled = selected.isNotEmpty() && !exporting) {
+                TextButton(
+                    onClick = { onExport.invoke(this, selected) },
+                    enabled =
+                        selected.isNotEmpty() && !exporting && acceptsInput,
+                ) {
                     if (exporting) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(AuditLogPickerProgressSize),
@@ -136,7 +161,9 @@ internal fun AuditLogPickerDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !exporting) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = {
+                close(onDismiss)
+            }, enabled = !exporting && acceptsInput) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -295,7 +296,7 @@ class AttachmentDownloadProductionWiringTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-        ).firstOrNull(File::isFile)?.readText() ?: error("Missing $relativePath source file")
+        ).firstOrNull(File::isFile)?.motionOwnerSource() ?: error("Missing $relativePath source file")
 
     private fun String.normalized(): String = replace(Regex("\\s+"), " ")
 }

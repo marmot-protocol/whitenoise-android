@@ -23,6 +23,7 @@ class ComposeConstraintSafetyCoverageTest {
         assertTrue("Intrinsic sizing must use the bounded policy: $offenders", offenders.isEmpty())
         val owners =
             mapOf(
+                "design/AnimatedDropdownMenu.kt" to "boundedIntrinsicWidth",
                 "conversation/messages/MessageBubble.kt" to "boundedIntrinsicWidth",
                 "conversation/composer/ComposerAttachmentMenu.kt" to "boundedIntrinsicWidth",
                 "conversation/composer/VoiceReviewComposer.kt" to "boundedIntrinsicWidth",

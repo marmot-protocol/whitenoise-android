@@ -143,7 +143,7 @@ class NewGroupScreenshotTest {
                         false,
                         false,
                         partial,
-                        NewGroupRecipientActions({}, {}, {}, {}, {}, {}, {}, {}),
+                        NewGroupRecipientActions({}, {}, {}, {}, {}, {}, {}, { _, _ -> }),
                         isValidNpub = { true },
                         startingAs = StartingAccount("a".repeat(64), "Carol", null, "npub1carol"),
                         addressLookupFailed = addressFailed,

@@ -100,8 +100,8 @@ export PREFETCH_PIDS="$FIXTURE/pids"
 assert_transport_stopped() {
   while read -r pid; do
     if kill -0 "$pid" 2>/dev/null; then
-      state="$(ps -o stat= -p "$pid")"
-      [[ "$state" == Z* ]] || fail 'timed transport or its descendant is still running'
+      state="$(ps -o stat= -p "$pid" || true)"
+      [[ -z "$state" || "$state" == Z* ]] || fail 'timed transport or its descendant is still running'
     fi
   done <"$PREFETCH_PIDS"
 }

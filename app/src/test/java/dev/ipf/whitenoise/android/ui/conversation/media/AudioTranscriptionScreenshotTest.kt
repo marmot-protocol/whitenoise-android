@@ -5,9 +5,11 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -28,12 +30,17 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.audio.AttachmentSpeechFailure
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.translation.MessageSideDiscSpacing
 import dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth
+import dev.ipf.whitenoise.android.ui.conversation.messages.MediaCaptionFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleBottomAlignmentLine
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderAvatarSlot
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -46,6 +53,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 /**
  * A received voice message keeps its transcribe disc in the side gutter, like translation, and shows the
@@ -54,7 +62,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h640dp-mdpi")
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, ExperimentalRoborazziApi::class)
 class AudioTranscriptionScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule(effectContext = UnconfinedTestDispatcher())
@@ -126,6 +134,62 @@ class AudioTranscriptionScreenshotTest {
         composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG).assertIsDisplayed().assertIsOff()
     }
 
+    /** Records three actual inline transcript toggles without adding fixture-only motion. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun captureTranscriptFrames() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val output = File("build/animation-frames/transcript")
+        check(!output.exists()) { "Archive the previous transcript output first" }
+        check(output.mkdirs())
+        val shown = mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    IncomingVoiceMessage(
+                        state = if (shown.value) completed() else null,
+                        inlineMedia = true,
+                        onToggle = { shown.value = it },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        repeat(3) { cycle ->
+            captureTranscriptTransition(File(output, "cycle_$cycle/forward"), shown = true)
+            captureTranscriptTransition(File(output, "cycle_$cycle/reverse"), shown = false)
+        }
+    }
+
+    private fun captureTranscriptTransition(
+        folder: File,
+        shown: Boolean,
+    ) {
+        check(folder.mkdirs())
+        val disc = composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG)
+        if (shown) disc.assertIsOff() else disc.assertIsOn()
+        captureScreenRoboImage(File(folder, "source.png").path)
+        disc.performClick()
+        composeRule.runOnIdle {
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        repeat(33) { frame ->
+            composeRule.mainClock.advanceTimeBy(16)
+            composeRule.waitForIdle()
+            captureScreenRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+        }
+        if (shown) {
+            disc.assertIsOn()
+            composeRule.onNodeWithTag(AUDIO_TRANSCRIPT_TEST_TAG).assertIsDisplayed()
+        } else {
+            disc.assertIsOff()
+            composeRule.onNodeWithTag(AUDIO_TRANSCRIPT_TEST_TAG).assertDoesNotExist()
+        }
+        composeRule.onNode(isDialog()).assertDoesNotExist()
+    }
+
     private fun capture(
         name: String,
         state: AudioTranscriptUi?,
@@ -154,7 +218,11 @@ class AudioTranscriptionScreenshotTest {
 
     /** The production order: avatar, bubble with the voice row and transcript, then the side disc column. */
     @Composable
-    private fun IncomingVoiceMessage(state: AudioTranscriptUi?) {
+    private fun IncomingVoiceMessage(
+        state: AudioTranscriptUi?,
+        inlineMedia: Boolean = false,
+        onToggle: (Boolean) -> Unit = {},
+    ) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             MessageSenderAvatarSlot(
                 showSenderAvatar = true,
@@ -166,29 +234,36 @@ class AudioTranscriptionScreenshotTest {
                 onClick = {},
             )
             Column(modifier = Modifier.weight(1f, fill = false).alignBy(MessageBubbleBottomAlignmentLine)) {
-                MessageBubbleFrame(
-                    presentation = messageBubblePresentation(deleted = false, mine = false),
-                    highlighted = false,
-                    mine = false,
-                    mentionedSelf = false,
-                    mentionedYouLabel = "Mentioned you",
-                ) {
-                    VoiceAttachmentContent(
-                        loading = false,
-                        failed = false,
-                        startDownload = false,
-                        localFileAvailable = true,
-                        isPlaying = false,
-                        isPaused = false,
-                        activePositionMs = 0,
-                        activeDurationMs = 0,
-                        totalDurationMs = 14_000,
-                        progressFraction = 0f,
-                        outgoing = false,
-                        onLongPress = {},
-                        onActionClick = {},
+                if (inlineMedia) {
+                    MediaCaptionFrame(
+                        presentation = messageBubblePresentation(deleted = false, mine = false),
+                        highlighted = false,
+                        mine = false,
+                        mentionedSelf = false,
+                        mentionedYouLabel = "Mentioned you",
+                        alignEnd = false,
+                        media = { VoiceAndTranscript(state) },
+                        caption = {
+                            MessageInlineFooter(
+                                timeText = "10:24",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                showStatus = false,
+                                status = MessageStatus.Received,
+                                editedLabel = null,
+                                onEditedClick = null,
+                            )
+                        },
                     )
-                    AudioTranscriptBody(state = state, onRetry = {}, onGetProvider = {})
+                } else {
+                    MessageBubbleFrame(
+                        presentation = messageBubblePresentation(deleted = false, mine = false),
+                        highlighted = false,
+                        mine = false,
+                        mentionedSelf = false,
+                        mentionedYouLabel = "Mentioned you",
+                    ) {
+                        VoiceAndTranscript(state)
+                    }
                 }
             }
             Column(
@@ -199,11 +274,31 @@ class AudioTranscriptionScreenshotTest {
                     on = state != null,
                     working = state?.phase == AudioTranscriptPhase.WORKING,
                     enabled = true,
-                    onToggle = {},
+                    onToggle = onToggle,
                     modifier = Modifier.width(MessageTranslationToggleSlotWidth),
                 )
             }
         }
+    }
+
+    @Composable
+    private fun VoiceAndTranscript(state: AudioTranscriptUi?) {
+        VoiceAttachmentContent(
+            loading = false,
+            failed = false,
+            startDownload = false,
+            localFileAvailable = true,
+            isPlaying = false,
+            isPaused = false,
+            activePositionMs = 0,
+            activeDurationMs = 0,
+            totalDurationMs = 14_000,
+            progressFraction = 0f,
+            outgoing = false,
+            onLongPress = {},
+            onActionClick = {},
+        )
+        AudioTranscriptBody(state = state, onRetry = {}, onGetProvider = {})
     }
 
     private fun completed(): AudioTranscriptUi =

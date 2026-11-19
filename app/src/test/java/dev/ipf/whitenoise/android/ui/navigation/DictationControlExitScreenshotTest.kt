@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.origin
@@ -21,6 +22,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 /** An ended floating session shrinks into its corner instead of vanishing between frames. */
 @RunWith(RobolectricTestRunner::class)
@@ -58,6 +60,23 @@ internal class DictationControlExitScreenshotTest : DictationNavigationScenarioF
         } finally {
             Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, old)
         }
+    }
+
+    /** Export the real floating-control exit independently of its conversation entrance. */
+    @Test
+    fun captureFloatingDictationExitFrames() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val fixture = showFloatingCapsule(dark = true, largeRtl = false)
+        val folder = File("build/animation-frames/dictation-floating-exit/exit").apply { mkdirs() }
+        composeRule.mainClock.autoAdvance = false
+        captureScreenRoboImage(File(folder, "source.png").path)
+        endWith(fixture, "Cancel")
+        repeat(32) { frame ->
+            captureScreenRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+            composeRule.mainClock.advanceTimeBy(16)
+            composeRule.waitForIdle()
+        }
+        composeRule.onAllNodes(hasTestTag(APP_DICTATION_CONTROL_TAG)).assertCountEquals(0)
     }
 
     private fun captureExit(

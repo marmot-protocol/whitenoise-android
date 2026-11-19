@@ -12,6 +12,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -39,6 +40,7 @@ fun WhiteNoiseModalBottomSheet(
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     containerColor: Color? = null,
     contentWindowInsets: @Composable () -> WindowInsets = { WindowInsets.safeDrawing },
+    interactionEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -47,6 +49,12 @@ fun WhiteNoiseModalBottomSheet(
             onDismissRequest = onDismissRequest,
             modifier = modifier.exposePerformanceTestTags().testTag("sheet.surface"),
             sheetState = sheetState,
+            sheetGesturesEnabled = interactionEnabled,
+            properties =
+                ModalBottomSheetProperties(
+                    shouldDismissOnBackPress = interactionEnabled,
+                    shouldDismissOnClickOutside = interactionEnabled,
+                ),
             containerColor = containerColor ?: scheme.surfaceContainerLow,
             contentColor = scheme.onSurface,
             contentWindowInsets = contentWindowInsets,

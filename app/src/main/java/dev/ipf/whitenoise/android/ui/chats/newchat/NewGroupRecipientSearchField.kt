@@ -40,7 +40,9 @@ import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ContentPaste
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 /** Prototype compact search geometry with the unchanged recipient paste policy and native selection/IME state. */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -77,6 +79,12 @@ internal fun NewGroupRecipientSearchField(
         }
     val interactions = remember { MutableInteractionSource() }
     val shape = MaterialTheme.shapes.extraLarge
+    val native =
+        rememberSettingsNativeSurface(
+            destination = "new-group-search",
+            shape = shape,
+            strokeColor = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outlineVariant else Color.Unspecified,
+        ).first
     val colors =
         TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -91,6 +99,7 @@ internal fun NewGroupRecipientSearchField(
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
                 .contentReceiver(receiver)
+                .then(native)
                 .amoledSurfaceBorder(shape),
         lineLimits = TextFieldLineLimits.SingleLine,
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),

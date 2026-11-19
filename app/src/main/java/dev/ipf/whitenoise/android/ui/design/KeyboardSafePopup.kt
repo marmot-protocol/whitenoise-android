@@ -13,8 +13,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -108,42 +111,63 @@ internal fun KeyboardSafePopup(
     modifier: Modifier = Modifier,
     scrimModifier: Modifier = Modifier,
     backRegistration: KeyboardSafePopupBackRegistration? = null,
-    content: @Composable () -> Unit,
+    animateWindowContent: Boolean = true,
+    content: @Composable PopupSurfaceMotion.() -> Unit,
 ) {
-    val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
+    val surface = rememberPopupSurfaceMotion(expanded = expanded, onDismiss = onDismissRequest)
+    val requestDismiss = surface.dismiss
+    val currentRequestDismiss by rememberUpdatedState(requestDismiss)
     Box(modifier) {
-        if (!expanded) return@Box
+        // Keep both nonfocusable windows and the scrim until the exit is drawn.
+        if (!surface.visible) return@Box
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             KeyboardSafePopupPlatformBackHandler(
                 priority = OnBackInvokedDispatcher.PRIORITY_OVERLAY,
                 backRegistration = backRegistration,
-                onBack = { currentOnDismissRequest() },
+                onBack = requestDismiss,
             )
         } else {
-            BackHandler(enabled = true) { currentOnDismissRequest() }
+            BackHandler(enabled = true) { requestDismiss() }
         }
         // Scrim popup: composed before the content popup so content renders on top.
         // Fills the window and swallows any tap as a pure dismissal.
         Popup(
             properties = keyboardSafePopupProperties,
-            onDismissRequest = currentOnDismissRequest,
+            onDismissRequest = requestDismiss,
         ) {
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .then(scrimModifier)
+                        .graphicsLayer { alpha = surface.presence.value }
+                        .semantics {
+                            onClick {
+                                requestDismiss()
+                                true
+                            }
+                        }.then(scrimModifier)
                         .pointerInput(Unit) {
-                            detectTapGestures { currentOnDismissRequest() }
+                            detectTapGestures { currentRequestDismiss() }
                         },
             )
         }
         Popup(
             popupPositionProvider = popupPositionProvider,
-            onDismissRequest = currentOnDismissRequest,
+            onDismissRequest = requestDismiss,
             properties = keyboardSafePopupProperties,
-            content = content,
-        )
+        ) {
+            Box(
+                (
+                    if (animateWindowContent) {
+                        surface.modifier(
+                            popupPositionProvider === BottomAnchoredPopupPositionProvider,
+                        )
+                    } else {
+                        Modifier
+                    }
+                ).then(surface.inputModifier()),
+            ) { content(surface) }
+        }
     }
 }
 
@@ -151,7 +175,7 @@ internal fun KeyboardSafePopup(
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 @Suppress("FunctionNaming")
-private fun KeyboardSafePopupPlatformBackHandler(
+internal fun KeyboardSafePopupPlatformBackHandler(
     priority: Int,
     backRegistration: KeyboardSafePopupBackRegistration?,
     onBack: () -> Unit,

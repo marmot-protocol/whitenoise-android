@@ -99,6 +99,7 @@ class GroupDetailsNotificationControlsTest {
         composeRule.onNodeWithTag(messagesTag).assertIsOff()
         composeRule.onNodeWithTag(reactionsTag).assertIsOff()
         composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
+        composeRule.waitForIdle()
         visualErrors.checkSucceeds {
             composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions$suffix.png")
         }

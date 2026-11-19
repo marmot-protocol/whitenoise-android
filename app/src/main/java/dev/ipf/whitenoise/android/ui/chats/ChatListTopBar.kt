@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -75,6 +76,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -128,6 +130,8 @@ internal fun ChatListTopBar(
 ) {
     var showSelector by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
+    var addIdentityContour by remember(appState.runtimeGeneration) { mutableStateOf<SettingsContour?>(null) }
+    var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
     val switchNotice = rememberQuickAccountSwitchNotice()
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
@@ -235,6 +239,9 @@ internal fun ChatListTopBar(
                             }
                         else -> {
                             val active = appState.activeAccount
+                            val (settingsOrigin, openSettings) =
+                                dev.ipf.whitenoise.android.ui.settings
+                                    .rememberSettingsRouteClick(onOpenSettings)
                             val avatarExplanation =
                                 if (appState.chatsAvatarOpensSelector()) {
                                     chatsExplanation(
@@ -272,7 +279,7 @@ internal fun ChatListTopBar(
                                             if (appState.chatsAvatarOpensSelector()) {
                                                 openSelector()
                                             } else {
-                                                onOpenSettings()
+                                                openSettings()
                                             }
                                         }
                                     },
@@ -280,6 +287,7 @@ internal fun ChatListTopBar(
                                         Modifier
                                             .padding(start = 8.dp)
                                             .testTag("chats.switchProfile")
+                                            .then(settingsOrigin)
                                             .explainOnLongPress(avatarExplanation),
                                     // Per-account dot: light only when the active account
                                     // itself has unread, same shared decision the other
@@ -349,6 +357,8 @@ internal fun ChatListTopBar(
         AccountSelectorSheet(
             appState = appState,
             onDismiss = { showSelector = false },
+            onAddAccountOrigin = { addIdentityOrigin = it },
+            onAddAccountContour = { addIdentityContour = it },
             onAddAccount = {
                 showSelector = false
                 showAddIdentity = true
@@ -361,7 +371,12 @@ internal fun ChatListTopBar(
         )
     }
     if (showAddIdentity) {
-        AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+        AddIdentitySheet(
+            appState = appState,
+            origin = addIdentityOrigin,
+            sourceContour = addIdentityContour,
+            onDismiss = { showAddIdentity = false },
+        )
     }
 }
 

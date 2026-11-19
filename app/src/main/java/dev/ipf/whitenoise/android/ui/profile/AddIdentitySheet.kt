@@ -8,23 +8,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
 import dev.ipf.whitenoise.android.ui.onboarding.SignInStep
 import dev.ipf.whitenoise.android.ui.onboarding.importIdentityErrorRes
 import dev.ipf.whitenoise.android.ui.onboarding.signInStepFor
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 
 /** Full-screen Add Profile entry; shared Sign Up and the existing import/Amber owners perform native work. */
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 internal fun AddIdentitySheet(
     appState: WhiteNoiseAppState,
+    origin: Rect? = null,
+    sourceContour: SettingsContour? = null,
     onDismiss: () -> Unit,
 ) {
     WindowSecureFlag()
@@ -101,8 +105,12 @@ internal fun AddIdentitySheet(
             }
         }
     }
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
+        sourceContour = sourceContour,
+        ownerKey = session,
         onDismissRequest = session::dismiss,
+        onSourceDismiss = session::dismiss,
         properties =
             DialogProperties(
                 securePolicy = SecureFlagPolicy.SecureOn,
@@ -132,7 +140,7 @@ internal fun AddIdentitySheet(
             onImport = ::startImport,
             privateKeyState = session.key,
             amberSignInStage = appState.amberSignInStage,
-            onBack = session::dismiss,
+            onBack = this.dismiss,
         )
         session.feedback?.let { AddProfileFeedbackDialog(it, session::dismissFeedback) }
     }

@@ -4,12 +4,13 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -31,11 +32,88 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** What TalkBack hears on Manage Storage: the usage sentence, row selection, select-all and list retry. */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class ManageStorageSemanticsTest {
+    /** A request accepted on one profile cannot clear caches for its replacement. */
+    @Test fun replacingStorageOwnerCancelsAcceptedClear() {
+        var owner by mutableStateOf<Any>(Any())
+        lateinit var dialogs: StorageDialogs
+        val actions = mutableListOf<dev.ipf.whitenoise.android.state.StorageAction>()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                dialogs = rememberStorageDialogs(owner)
+                StorageOverviewDialogs(ManageStorageUiState(), dialogs, { actions.add(it) })
+            }
+        }
+        composeRule.runOnIdle { dialogs.clearCache.value = true }
+        advanceTimeBy(400)
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        composeRule.runOnIdle { owner = Any() }
+        advanceTimeBy(800)
+        composeRule.runOnIdle {
+            assertEquals(emptyList<dev.ipf.whitenoise.android.state.StorageAction>(), actions)
+            assertEquals(false, dialogs.clearCache.value)
+        }
+    }
+
+    /** An accepted removal cannot silently switch to another attachment selection during its exit. */
+    @Test fun replacingSelectionCancelsAcceptedRemovalAndNewRequestStillWorks() {
+        val rows = listOf(attachment("a", 9_000_000), attachment("b", 4_000_000))
+        var list by mutableStateOf(
+            StoredAttachmentsUiState(items = rows, complete = true, selected = setOf(rows[0].key)),
+        )
+        val appState = appState()
+        val actions = mutableListOf<dev.ipf.whitenoise.android.state.StorageAction>()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                StoredAttachmentsContent(
+                    appState = appState,
+                    storage = ManageStorageUiState(),
+                    list = list,
+                    groupIdHex = null,
+                    onBack = {},
+                    actions = StoredAttachmentsActions({}, {}, {}, {}, { actions.add(it) }),
+                )
+            }
+        }
+        advanceTimeBy(400)
+        composeRule.onNodeWithTag("storage.selection.remove").performClick()
+        advanceTimeBy(400)
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        composeRule.runOnIdle { list = list.copy(selected = setOf(rows[1].key)) }
+        advanceTimeBy(800)
+        composeRule.runOnIdle { assertEquals(0, actions.size) }
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        advanceTimeBy(16)
+        composeRule.onNodeWithTag("confirmation.confirm").assertDoesNotExist()
+        advanceTimeBy(400)
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf(
+                    dev.ipf.whitenoise.android.state.StorageAction
+                        .RemoveAttachments(listOf(rows[1])),
+                ),
+                actions,
+            )
+        }
+    }
+
+    /** Publish paused-clock state writes before the frame that consumes them. */
+    private fun advanceTimeBy(millis: Long) {
+        composeRule.runOnUiThread { Snapshot.sendApplyNotifications() }
+        repeat(((millis + 15L) / 16L).toInt()) {
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+        }
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 

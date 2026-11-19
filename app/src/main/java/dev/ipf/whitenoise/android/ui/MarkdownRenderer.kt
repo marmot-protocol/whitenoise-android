@@ -35,6 +35,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -84,7 +85,6 @@ import dev.ipf.marmotkit.MarkdownAutolinkKindFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
-import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
@@ -170,7 +170,7 @@ internal fun MarkdownMessageBody(
     val inAppLinks = LocalInAppLinkHandler.current
     // A tapped spoofable `[label](url)` link parks its destination here until
     // the user confirms it in the dialog below (#273).
-    var pendingLinkUrl by remember { mutableStateOf<String?>(null) }
+    var pendingLinkUrl by remember(document, context) { mutableStateOf<String?>(null) }
     // One listener for every link in the document; the tapped destination rides
     // in on the annotation. Autolink URL annotations open directly because their
     // visible text is the supplied destination; confirm-link Clickable annotations
@@ -235,13 +235,16 @@ internal fun MarkdownMessageBody(
             blankLinesBefore = document.blankLinesBefore,
         )
     }
+    val currentOnWebLinkActivated by rememberUpdatedState(onWebLinkActivated)
     pendingLinkUrl?.let { url ->
         WebLinkConfirmation(
             url = url,
             onDismiss = { pendingLinkUrl = null },
             onConfirm = {
-                pendingLinkUrl = null
-                openMarkdownLink(context, url, onWebLinkActivated)
+                if (pendingLinkUrl == url) {
+                    pendingLinkUrl = null
+                    openMarkdownLink(context, url, currentOnWebLinkActivated)
+                }
             },
         )
     }
@@ -1871,17 +1874,6 @@ internal fun markdownDocumentToPreviewAnnotatedString(
         },
     )
 }
-
-internal fun markdownListMarker(
-    kind: MarkdownListKindFfi,
-    index: Int,
-): String =
-    when (kind) {
-        is MarkdownListKindFfi.Bullet -> "•"
-        // Compute in Long: UInt addition wraps silently, and `start` is an
-        // FFI-supplied value we don't control.
-        is MarkdownListKindFfi.Ordered -> "${kind.start.toLong() + index}${kind.delimiter}"
-    }
 
 /**
  * Schemes handed to `ACTION_VIEW`; everything else stays inert text. `tel:` and

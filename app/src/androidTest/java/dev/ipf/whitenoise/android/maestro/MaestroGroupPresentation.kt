@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.maestro
 
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import dev.ipf.whitenoise.android.media.ImageSearchClient
 import dev.ipf.whitenoise.android.media.ImageSearchException
@@ -123,6 +124,7 @@ private fun EntityPresentation(fixture: MaestroPresentationFixture) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupImagePresentation(fixture: MaestroPresentationFixture) {

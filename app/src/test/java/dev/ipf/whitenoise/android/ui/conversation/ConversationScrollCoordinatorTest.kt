@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -1914,7 +1915,7 @@ class ConversationScrollCoordinatorTest {
 
     @Test
     fun conversationScreenStartsReplyHighlightBeforeLoadingAndScrolling() {
-        val screen = sourceFile("ConversationScreen.kt").readText()
+        val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
         val replyNavigation =
             screen
                 .substringAfter("fun navigateToReplyTarget(item: TimelineMessage)")
@@ -1930,7 +1931,7 @@ class ConversationScrollCoordinatorTest {
 
     @Test
     fun conversationScreenRejectsSupersededReplyAndSearchNavigationAtPagingBoundaries() {
-        val screen = sourceFile("ConversationScreen.kt").readText()
+        val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
         val replyNavigation =
             screen
                 .substringAfter("fun navigateToReplyTarget(item: TimelineMessage)")
@@ -1969,7 +1970,7 @@ class ConversationScrollCoordinatorTest {
     @Test
     fun messageExpansionCancelsPendingTargetNavigation() {
         val expansion =
-            sourceFile("ConversationScreen.kt").readText().functionBody("preserveReadingPositionOnExpansion")
+            sourceFile("ConversationScreen.kt").motionOwnerSource().functionBody("preserveReadingPositionOnExpansion")
         val cancel = expansion.indexOf("navigationState.targetNavigation.cancel()")
         assertTrue("expansion must cancel pending reply and search navigation", cancel >= 0)
         assertTrue(
@@ -1980,7 +1981,7 @@ class ConversationScrollCoordinatorTest {
 
     @Test
     fun conversationScreenHighlightsOnlyCompletedCenteringCommands() {
-        val screen = sourceFile("ConversationScreen.kt").readText()
+        val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
 
         assertEquals(1, Regex("if \\(!centered \\|\\| !navigationRequest.isCurrent\\(\\)\\)").findAll(screen).count())
         assertEquals(1, Regex("if \\(centered && navigationRequest.isCurrent\\(\\)\\)").findAll(screen).count())
@@ -1999,7 +2000,7 @@ class ConversationScrollCoordinatorTest {
     /** Failed speech targets restart through the localized Retry; search landings: ConversationHistorySearchTest. */
     @Test
     fun failedFocusTargetSharesExistingLocalizedRetryActions() {
-        val screen = sourceFile("ConversationScreen.kt").readText()
+        val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
         val focus =
             screen
                 .substringAfter("// Lands a global-search result")
@@ -2018,7 +2019,7 @@ class ConversationScrollCoordinatorTest {
 
     @Test
     fun conversationScreenReResolvesMessageBackedTargetsBeforeTheFinalAnimation() {
-        val screen = sourceFile("ConversationScreen.kt").readText()
+        val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
 
         assertTrue(
             screen.contains(
@@ -2034,12 +2035,12 @@ class ConversationScrollCoordinatorTest {
         // The pause/resume machinery lives in ConversationForegroundRestoreEffects.kt,
         // hoisted out of the screen body so the debug dex stays within what ART's
         // bytecode verifier accepts.
-        val screen = sourceFile("ConversationScreen.kt").readText()
-        val effects = sourceFile("ConversationForegroundRestoreEffects.kt").readText()
-        val owner = sourceFile("ConversationViewportRestorationOwner.kt").readText()
-        val presentation = sourceFile("ConversationForegroundPresentation.kt").readText()
+        val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
+        val effects = sourceFile("ConversationForegroundRestoreEffects.kt").motionOwnerSource()
+        val owner = sourceFile("ConversationViewportRestorationOwner.kt").motionOwnerSource()
+        val presentation = sourceFile("ConversationForegroundPresentation.kt").motionOwnerSource()
 
-        val binding = sourceFile("ConversationForegroundRestoreBinding.kt").readText()
+        val binding = sourceFile("ConversationForegroundRestoreBinding.kt").motionOwnerSource()
         assertTrue(effects.contains("ConversationForegroundRestoreBinding.begin("))
         assertTrue(effects.contains("pausedRestore?.resume(scrollCoordinator)"))
         assertTrue(binding.contains("owner.beginForegroundRestore(snapshot)"))
@@ -2062,10 +2063,10 @@ class ConversationScrollCoordinatorTest {
 
     @Test
     fun conversationScreenRoutesEveryLazyListWriteThroughTheCoordinator() {
-        val screen = sourceFile("ConversationScreen.kt").readText()
+        val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
         val coordinator =
-            sourceFile("ConversationScrollCoordinator.kt").readText() +
-                sourceFile("ConversationScrollWriter.kt").readText()
+            sourceFile("ConversationScrollCoordinator.kt").motionOwnerSource() +
+                sourceFile("ConversationScrollWriter.kt").motionOwnerSource()
 
         assertFalse(
             "ConversationScreen must not mutate LazyListState directly",

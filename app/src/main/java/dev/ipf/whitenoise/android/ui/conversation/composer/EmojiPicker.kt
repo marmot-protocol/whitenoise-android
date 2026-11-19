@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 internal enum class EmojiPickerPurpose {
@@ -55,20 +56,22 @@ internal fun EmojiPickerSheet(
     recentEmojis: List<String> = emptyList(),
     onEmojiUsed: (String) -> Unit = {},
     onConfigure: (() -> Unit)? = null,
+    closeOnPick: Boolean = true,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = { terminal.close(onDismissRequest) },
         sheetState = sheetState,
         containerColor = amoledSheetContainerColor(),
     ) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             EmojiPickerContent(
-                onEmojiPicked = onEmojiPicked,
+                onEmojiPicked = { if (closeOnPick) terminal.close(it, onEmojiPicked) else onEmojiPicked(it) },
                 purpose = purpose,
                 recentEmojis = recentEmojis,
                 onEmojiUsed = onEmojiUsed,
-                onConfigure = onConfigure,
+                onConfigure = onConfigure?.let { configure -> { terminal.close(configure) } },
                 modifier =
                     Modifier
                         .fillMaxWidth()

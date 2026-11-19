@@ -30,7 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -50,12 +49,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -87,11 +89,13 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.media.editor.PhotoStrokeMode
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
@@ -103,11 +107,16 @@ internal fun PhotoEditorDialog(
     sourceInfo: PhotoEditorSourceInfo,
     stateHolder: PhotoEditorStateHolder,
     onCancel: () -> Unit,
-    onSave: (PhotoEditRecipe, MediaQuality) -> Unit,
+    onSave: (PhotoEditRecipe, MediaQuality, () -> Unit) -> Unit,
+    origin: Rect? = null,
+    ownerKey: Any = stateHolder,
     frameIndex: Int = 0,
     frameCount: Int = 1,
 ) {
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
+        ownerKey = ownerKey,
+        dismissEnabled = { false },
         // Back is handled by [PhotoEditorScreen] so a dirty recipe always goes
         // through the discard confirmation instead of bypassing it here.
         onDismissRequest = {},
@@ -118,8 +127,9 @@ internal fun PhotoEditorDialog(
             previewBitmap = previewBitmap,
             sourceInfo = sourceInfo,
             stateHolder = stateHolder,
-            onCancel = onCancel,
-            onSave = onSave,
+            onCancel = { close(onCancel) },
+            onSave = { recipe, quality -> onSave(recipe, quality) { close(onCancel) } },
+            inputEnabled = { acceptsInput },
             frameIndex = frameIndex,
             frameCount = frameCount,
         )
@@ -129,7 +139,7 @@ internal fun PhotoEditorDialog(
 /** Photo editor: canvas, tools and the save flow for a staged photo. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongMethod", "LongParameterList") // Screen-level orchestration keeps save/back semantics together.
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod") // Screen-level orchestration keeps save/back semantics together.
 internal fun PhotoEditorScreen(
     previewBitmap: Bitmap,
     sourceInfo: PhotoEditorSourceInfo,
@@ -137,11 +147,12 @@ internal fun PhotoEditorScreen(
     onCancel: () -> Unit,
     onSave: (PhotoEditRecipe, MediaQuality) -> Unit,
     modifier: Modifier = Modifier,
+    inputEnabled: () -> Boolean = { true },
     frameIndex: Int = 0,
     frameCount: Int = 1,
 ) {
     val state = stateHolder.state
-    var showDiscardDialog by remember { mutableStateOf(false) }
+    var showDiscardDialog by remember(stateHolder) { mutableStateOf(false) }
     var showCoordinates by remember { mutableStateOf(false) }
     var showQuality by remember { mutableStateOf(false) }
     var showHelp by remember { mutableStateOf(false) }
@@ -149,7 +160,7 @@ internal fun PhotoEditorScreen(
     val originalEdited = state.quality == MediaQuality.Original && state.recipe != stateHolder.initialRecipe
 
     fun requestCancel() {
-        if (state.isSaving) return
+        if (state.isSaving || !inputEnabled()) return
         if (stateHolder.hasUnsavedChanges) showDiscardDialog = true else onCancel()
     }
 
@@ -177,7 +188,7 @@ internal fun PhotoEditorScreen(
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().nativePageBody(padding).padding(padding)) {
             if (state.isSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val wide = maxWidth >= 600.dp || maxHeight < 360.dp
@@ -228,8 +239,10 @@ internal fun PhotoEditorScreen(
             EditorStatus(state)
         }
     }
+    val currentOnCancel by rememberUpdatedState(onCancel)
+    val discardEnabled by rememberUpdatedState(!state.isSaving && inputEnabled())
     if (showHelp) {
-        AlertDialog(
+        AnimatedAlertDialog(
             onDismissRequest = { showHelp = false },
             title = { Text(stringResource(R.string.help)) },
             text = {
@@ -239,28 +252,34 @@ internal fun PhotoEditorScreen(
                     Text(stringResource(R.string.photo_editor_original_edited))
                 }
             },
-            confirmButton = { TextButton(onClick = { showHelp = false }) { Text(stringResource(R.string.done)) } },
+            confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.done)) } },
         )
     }
     if (showDiscardDialog) {
-        AlertDialog(
-            onDismissRequest = { showDiscardDialog = false },
-            title = { Text(stringResource(R.string.photo_editor_discard_title)) },
-            text = { Text(stringResource(R.string.photo_editor_discard_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDiscardDialog = false
-                        onCancel()
-                    },
-                ) { Text(stringResource(R.string.photo_editor_discard)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDiscardDialog = false }) {
-                    Text(stringResource(R.string.photo_editor_keep_editing))
-                }
-            },
-        )
+        key(stateHolder, discardEnabled) {
+            AnimatedAlertDialog(
+                onDismissRequest = { showDiscardDialog = false },
+                title = { Text(stringResource(R.string.photo_editor_discard_title)) },
+                text = { Text(stringResource(R.string.photo_editor_discard_message)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            close {
+                                if (discardEnabled) {
+                                    showDiscardDialog = false
+                                    currentOnCancel()
+                                }
+                            }
+                        },
+                    ) { Text(stringResource(R.string.photo_editor_discard)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = dismiss) {
+                        Text(stringResource(R.string.photo_editor_keep_editing))
+                    }
+                },
+            )
+        }
     }
     if (showCoordinates) {
         PhotoEditorCoordinatesDialog(
@@ -824,32 +843,6 @@ private fun PhotoEditorCanvas(
             )
         }
     }
-}
-
-private data class EditorColor(
-    val argb: Int,
-    val name: String,
-    val selectedDescription: String,
-)
-
-/** The drawing colours the editor offers. */
-@Composable
-private fun editorColors(): List<EditorColor> {
-    @Composable
-    fun color(
-        argb: Int,
-        nameResource: Int,
-    ): EditorColor {
-        val name = stringResource(nameResource)
-        return EditorColor(argb, name, stringResource(R.string.photo_editor_color_selected, name))
-    }
-    return listOf(
-        color(0xFFFF3B30.toInt(), R.string.photo_editor_color_red),
-        color(0xFFFFCC00.toInt(), R.string.photo_editor_color_yellow),
-        color(0xFF34C759.toInt(), R.string.photo_editor_color_green),
-        color(0xFF007AFF.toInt(), R.string.photo_editor_color_blue),
-        color(0xFFFFFFFF.toInt(), R.string.photo_editor_color_white),
-    )
 }
 
 @Composable

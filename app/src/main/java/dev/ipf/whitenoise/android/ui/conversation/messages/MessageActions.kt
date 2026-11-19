@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,9 +26,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -43,12 +42,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
-import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
-import dev.ipf.whitenoise.android.core.chatFolderChatIds
-import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
-import dev.ipf.whitenoise.android.state.ChatFolder
-import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ForwardFailureStage
 import dev.ipf.whitenoise.android.state.ForwardOperationPhase
@@ -58,7 +51,6 @@ import dev.ipf.whitenoise.android.state.ForwardTargetProgress
 import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
-import dev.ipf.whitenoise.android.state.nativeFolderMembership
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -68,7 +60,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.icons.filled.Schedule
 import dev.ipf.whitenoise.android.ui.theme.Dimens
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import java.util.Locale
 import java.util.UUID
@@ -124,6 +115,8 @@ internal fun MessageActionMenu(
     selectedReactionEmojis: Set<String> = emptySet(),
     previewDescription: String = "",
     previewReady: Boolean = true,
+    onInfoAt: ((Rect?) -> Unit)? = null,
+    onForwardAt: ((Rect?) -> Unit)? = null,
     preview: (@Composable () -> Unit)? = null,
 ) {
     if (!expanded) return
@@ -182,6 +175,14 @@ internal fun MessageActionMenu(
                         null
                     },
                 enabled = kind != MessageActionKind.Forward || canForward,
+                onClickAt =
+                    when (kind) {
+                        MessageActionKind.Info -> onInfoAt
+                        MessageActionKind.Forward -> onForwardAt
+                        else -> null
+                    },
+                // Forward transfers ownership to a picker above the still-open menu.
+                dismissBeforeActivation = kind != MessageActionKind.Forward,
                 destructive = kind == null,
                 icon = { MessageActionIcon(kind) },
                 explanation = Explanation(label, stringResource(messageActionExplanationRes(kind))),
@@ -230,32 +231,6 @@ internal fun MessageActionMenu(
     )
 }
 
-/** The plain-language body held on a menu row; the row's own label is its title. A null [kind] is Delete. */
-@Suppress("CyclomaticComplexMethod") // One flat branch per action kind.
-@StringRes
-private fun messageActionExplanationRes(kind: MessageActionKind?): Int =
-    when (kind) {
-        MessageActionKind.Reply -> R.string.explanation_message_action_reply
-        MessageActionKind.Edit -> R.string.explanation_message_action_edit
-        MessageActionKind.Select -> R.string.explanation_message_action_select
-        MessageActionKind.SelectText -> R.string.explanation_message_action_select_text
-        MessageActionKind.CopyText -> R.string.explanation_message_action_copy
-        MessageActionKind.Translate -> R.string.explanation_message_action_translate
-        MessageActionKind.Speak -> R.string.explanation_message_action_read_aloud
-        MessageActionKind.SpeakCodeLiterally -> R.string.explanation_message_action_read_code_literally
-        MessageActionKind.Forward -> R.string.explanation_message_action_forward
-        MessageActionKind.KeepOnScreen -> R.string.explanation_message_action_keep_on_screen
-        MessageActionKind.ShowLess -> R.string.explanation_message_action_show_less
-        MessageActionKind.Share -> R.string.explanation_message_action_share
-        MessageActionKind.Save -> R.string.explanation_message_action_save
-        MessageActionKind.Info -> R.string.explanation_message_action_info
-        MessageActionKind.Report -> R.string.explanation_message_action_report
-        null -> R.string.explanation_message_action_delete
-    }
-
-/** Leading-glyph size shared by every message action row. */
-private val messageActionIconSize = 24.dp
-
 /** Label explaining why forwarding is blocked. */
 @Composable
 internal fun forwardBlockedReasonLabel(reason: ForwardBlockedReason): String =
@@ -268,121 +243,6 @@ internal fun forwardBlockedReasonLabel(reason: ForwardBlockedReason): String =
         ForwardBlockedReason.RestrictedAttachment -> stringResource(R.string.forward_blocked_restricted)
         ForwardBlockedReason.Unsupported -> stringResource(R.string.forward_blocked_unsupported)
         ForwardBlockedReason.TooLong -> stringResource(R.string.forward_blocked_too_long)
-    }
-
-/**
- * Glyph for a message action row. A null [kind] is the destructive Delete row,
- * which the menu tints with the error colour on its own.
- */
-@Composable
-@Suppress("FunctionNaming")
-private fun MessageActionIcon(kind: MessageActionKind?) {
-    Icon(
-        painter = painterResource(kind?.let(::messageActionIconRes) ?: R.drawable.ic_delete),
-        contentDescription = null,
-        modifier = Modifier.size(messageActionIconSize),
-    )
-}
-
-/**
- * Chat-picker sheet for forwarding a message into one or more other chats
- * (issue #390). Multi-select, searchable, recent-first. Confirming fans the
- * message out to every selected chat as an independent fresh send (see
- * [WhiteNoiseAppState.startForwardMessages]) — each target is re-encrypted under its own
- * group state, with no source-group key reuse and no original-sender / source
- * attribution carried across the boundary.
- *
- * The picker deliberately omits the chat the message came from
- * ([originGroupIdHex]): forwarding a message back into its own conversation is
- * never the intent and would just duplicate it.
- */
-internal fun forwardTargetAvatarAccount(item: ChatListItem): String? =
-    GroupProjector.avatarAccount(
-        group = item.group,
-        otherMemberAccount = item.presentationOtherMemberAccount,
-        memberCount = item.presentationMemberCount,
-    )
-
-internal fun forwardTargetMembersPreview(
-    item: ChatListItem,
-    activeAccountIdHex: String?,
-    memberTitle: (String) -> String,
-): String? {
-    if (forwardTargetAvatarAccount(item) != null) return null
-    return item.memberSnapshot
-        ?.members
-        ?.filterNot { it.memberIdHex.equals(activeAccountIdHex, ignoreCase = true) }
-        ?.map { memberTitle(it.memberIdHex) }
-        ?.filter { it.isNotBlank() }
-        ?.take(6)
-        ?.joinToString(", ")
-        ?.takeIf { it.isNotBlank() }
-}
-
-/** Resolves all saved folders against the same bounded, eligible account-owned destinations. */
-internal fun destinationFolderMembershipRows(
-    appState: WhiteNoiseAppState,
-    targets: List<ChatListItem>,
-    groupTitleCopy: GroupTitleCopy,
-    ownerAccountRef: String? = appState.activeAccountRef,
-    ownerAccountIdHex: String? = appState.activeAccount?.accountIdHex,
-): List<Pair<ChatFolder, List<String>>> {
-    val accountRef = ownerAccountRef ?: return emptyList()
-    val store = appState.chatFolderPreferences
-    val eligibleIds =
-        targets
-            .map {
-                it.group.groupIdHex
-                    .trim()
-                    .lowercase(Locale.ROOT)
-            }.filter { it.isNotEmpty() }
-            .distinct()
-    val mutedGroupIds = targets.filter(ChatListItem::engineMuted).mapTo(hashSetOf()) { it.group.groupIdHex }
-    return store
-        .foldersFor(accountRef)
-        .map { folder ->
-            val native = appState.nativeFolderMembership(accountRef, folder.id)?.idSet
-            val memberIds =
-                native ?: chatFolderChatIds(
-                    items = targets,
-                    manualChatIds = store.membershipFor(accountRef, folder.id),
-                    excludedChatIds = store.excludedChats(accountRef, folder.id),
-                    rule = store.folderRule(accountRef, folder.id),
-                    activeAccountIdHex = ownerAccountIdHex,
-                    isMuted = { groupIdHex ->
-                        groupIdHex in mutedGroupIds
-                    },
-                    displayTitle = { forwardTargetDisplayTitle(it, appState, accountRef, groupTitleCopy) },
-                ).mapTo(hashSetOf()) { it.trim().lowercase(Locale.ROOT) }
-            folder to eligibleIds.filter(memberIds::contains)
-        }
-}
-
-/**
- * Chat title resolved against the account that owns the chat list, so a
- * non-active destination account's rows never borrow the active account's
- * contact-name caches.
- */
-internal fun forwardTargetDisplayTitle(
-    item: ChatListItem,
-    appState: WhiteNoiseAppState,
-    ownerAccountRef: String?,
-    copy: GroupTitleCopy,
-): String =
-    when {
-        ownerAccountRef == null || ownerAccountRef == appState.activeAccountRef ->
-            chatListItemDisplayTitle(item, appState, copy)
-        item.sanitizedNamedTitle != null -> item.sanitizedNamedTitle.orEmpty()
-        else ->
-            GroupProjector.displayTitle(
-                group = item.group,
-                otherMemberAccount = item.presentationOtherMemberAccount,
-                memberCount = item.presentationMemberCount,
-                memberTitle = { appState.contactDisplayNameCached(ownerAccountRef, it) },
-                copy = copy,
-                conversationKind = item.projection?.conversationKind,
-                soleSelfMember = item.presentationActiveAccountIsSoleMember,
-            )
     }
 
 /** Forward details: the operation summary, slow-aware preparation progress and one row per destination. */
@@ -596,6 +456,7 @@ internal fun ForwardMessageSheet(
     originGroupIdHex: String,
     onDismiss: () -> Unit,
     restoredRequest: PendingForwardRequest? = null,
+    origin: Rect? = null,
 ) {
     // Plain remember on purpose: the encrypted store owns recreation, and the
     // saved-state Bundle must not carry forward-request identifiers.
@@ -609,6 +470,7 @@ internal fun ForwardMessageSheet(
         onDismiss()
     }
     ForwardMessagePickerFullScreen(
+        origin = origin,
         appState = appState,
         messageCount = payloads.size,
         attachmentCount =

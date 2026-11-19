@@ -16,6 +16,53 @@ import org.junit.Test
 
 /** Endpoint admission prevents previously hidden controls from reviving a stale decorative origin. */
 class MeasuredControlHandoffTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun returningToPenUsesCloseClockAndCurveWhileComposerEntryKeepsOpenClock() =
+        runTest {
+            for (returning in listOf(false, true)) {
+                val source = if (returning) "composer" else "pen"
+                val target = if (returning) "pen" else "composer"
+                val state = MeasuredControlHandoff(source, morphSurface = true, closeDestination = "pen")
+                val from = Rect(10f, 100f, 110f, 150f)
+                val to = Rect(20f, 200f, 220f, 250f)
+                state.report(source, Any(), from)
+                val request = state.prepare(target, true)
+                state.report(target, Any(), to)
+                val frames = BroadcastFrameClock()
+                val animation = launch(frames) { state.animatePrepared(request) }
+                runCurrent()
+                frames.sendFrame(0L) // Native endpoint admission.
+                runCurrent()
+                frames.sendFrame(16_000_000L) // Animatable frame zero.
+                runCurrent()
+                frames.sendFrame(112_000_000L)
+                runCurrent()
+                val fraction =
+                    if (returning) {
+                        AppMotionCloseEasing.transform(96f / 230f)
+                    } else {
+                        AppMotionOpenEasing.transform(
+                            96f / 280f,
+                        )
+                    }
+                assertEquals(
+                    androidx.compose.ui.geometry
+                        .lerp(from, to, fraction),
+                    state.renderedBounds,
+                )
+                frames.sendFrame(246_000_000L) // Exactly 230 ms after animation frame zero.
+                runCurrent()
+                assertEquals(!returning, state.active)
+                if (!returning) {
+                    frames.sendFrame(296_000_000L)
+                    runCurrent()
+                    assertFalse(state.active)
+                }
+                animation.join()
+            }
+        }
+
     /** A newly created session can emerge from its measured launcher using the existing morph clock. */
     @Test
     fun firstPreparationAcceptsFiniteLauncherOriginOnlyOnce() {

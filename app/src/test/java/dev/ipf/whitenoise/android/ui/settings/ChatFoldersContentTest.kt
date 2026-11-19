@@ -176,12 +176,15 @@ class ChatFoldersContentTest {
         val menu = app.getString(R.string.actions_for, "Work")
         composeRule.onNodeWithContentDescription(menu).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_edit)).performClick()
+        composeRule.waitForIdle()
         assertEquals("work", editedId)
         composeRule.onNodeWithContentDescription(menu).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_move_up)).performClick()
+        composeRule.waitForIdle()
         assertEquals("work" to -1, moved)
         composeRule.onNodeWithContentDescription(menu).performClick()
         composeRule.onNodeWithText(app.getString(R.string.delete)).performClick()
+        composeRule.waitForIdle()
         assertEquals("work", deletedId)
     }
 
@@ -198,9 +201,11 @@ class ChatFoldersContentTest {
         val menu = app.getString(R.string.actions_for, app.getString(R.string.chat_list_filter_unread))
         composeRule.onNodeWithContentDescription(menu).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_edit)).performClick()
+        composeRule.waitForIdle()
         assertEquals("unread", editedId)
         composeRule.onNodeWithContentDescription(menu).performClick()
         composeRule.onNodeWithText(app.getString(R.string.delete)).performClick()
+        composeRule.waitForIdle()
         assertEquals("unread", deletedId)
     }
 
@@ -258,6 +263,7 @@ class ChatFoldersContentTest {
         composeRule.onNodeWithTag("folder.row.work").performTouchInput { longClick() }
         assertEquals(null, edited)
         composeRule.onNodeWithText(app.getString(R.string.folder_move_down)).performClick()
+        composeRule.waitForIdle()
         assertEquals("work" to 1, moved)
         composeRule.onNodeWithTag("folder.menu.work").assertDoesNotExist()
     }

@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 /** Keeps a reactor-sheet filter while its emoji remains present in the live participant list. */
@@ -249,7 +250,8 @@ private fun ReactionFilterChips(
 /** Native Android reactor row with the original own-reaction removal and profile actions. */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
+// Keep the identity row and its own-reaction actions together as one Compose item.
 private fun ReactionParticipantRow(
     participant: ReactionParticipant,
     appState: WhiteNoiseAppState,
@@ -303,9 +305,13 @@ private fun ReactionParticipantRow(
             content = headline,
         )
     } else {
+        val (profileModifier, profileClick) =
+            rememberMeasuredControlClick { origin ->
+                appState.presentProfile(appState.npub(participant.sender), origin = origin)
+            }
         ListItem(
-            onClick = { appState.presentProfile(appState.npub(participant.sender)) },
-            modifier = Modifier.fillMaxWidth(),
+            onClick = profileClick,
+            modifier = Modifier.fillMaxWidth().then(profileModifier),
             shapes = WhiteNoiseListItemDefaults.shapes(),
             colors = colors,
             leadingContent = leading,

@@ -187,7 +187,7 @@ internal fun SignInKeyField(
             onDismissRequest = { scanError = null },
             title = { Text(stringResource(R.string.scan_qr_code)) },
             text = { Text(stringResource(message)) },
-            confirmButton = { TextButton(onClick = { scanError = null }) { Text(stringResource(R.string.ok)) } },
+            confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.ok)) } },
         )
     }
 }

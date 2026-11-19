@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -123,7 +124,7 @@ class ConversationExitCoordinatorTest {
 
     @Test
     fun conversationScreenRoutesEveryListExitThroughTheCoordinator() {
-        val screen = sourceFile("ConversationScreen.kt").readText()
+        val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
 
         assertTrue(screen.contains("val exitConversation ="))
         assertTrue(screen.contains("rememberConversationExitHandler("))

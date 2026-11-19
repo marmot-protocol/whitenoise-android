@@ -249,6 +249,7 @@ class TtsTransportBarTest {
         TtsRatePreferences.PRESET_RATES.forEach { rate ->
             control.performClick()
             composeRule.onNode(hasText(ttsRateLabel(rate, Locale.US)) and isSelectable()).performClick()
+            composeRule.waitForIdle()
         }
 
         assertEquals(listOf<Float?>(null) + TtsRatePreferences.PRESET_RATES, selections)
@@ -266,6 +267,7 @@ class TtsTransportBarTest {
             openCustomRateEditor()
             composeRule.onNode(hasSetTextAction()).performTextReplacement(input)
             composeRule.onNodeWithText(label(R.string.tts_rate_apply)).performClick()
+            composeRule.waitForIdle()
             assertEquals(expected, selections.last())
         }
     }

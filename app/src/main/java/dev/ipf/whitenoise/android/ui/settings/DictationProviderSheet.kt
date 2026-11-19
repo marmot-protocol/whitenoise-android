@@ -9,6 +9,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
 /** Re-enumerates on entry and return from provider setup. This list belongs only to this UI. */
@@ -81,7 +83,11 @@ internal fun DictationProviderSheet(
     onSelect: (ConversationDictationProviderChoice?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.exposePerformanceTestTags()) {
+    val sheetState = rememberModalBottomSheetState()
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
+    ModalBottomSheet(sheetState = sheetState, onDismissRequest = {
+        terminal.close(onDismiss)
+    }, modifier = Modifier.exposePerformanceTestTags()) {
         WhiteNoiseLazyColumn(Modifier.selectableGroup().testTag("dictation_provider_choices").padding(bottom = 24.dp)) {
             item {
                 Column(Modifier.padding(16.dp)) {
@@ -94,7 +100,7 @@ internal fun DictationProviderSheet(
                     title = stringResource(R.string.dictation_provider_automatic),
                     subtitle = stringResource(R.string.dictation_provider_precedence),
                     selected = selected == null,
-                    onClick = { onSelect(null) },
+                    onClick = { terminal.close(null, onSelect) },
                     modifier =
                         Modifier.explainOnLongPress(
                             Explanation(
@@ -140,7 +146,7 @@ internal fun DictationProviderSheet(
                                 subtitle = capability,
                                 accessibilityLabel = "${provider.appName}, $engine, $capability",
                                 selected = selected?.sameInstallation(choice) == true,
-                                onClick = { onSelect(choice) },
+                                onClick = { terminal.close(choice, onSelect) },
                                 modifier =
                                     Modifier.explainOnLongPress(
                                         Explanation(

@@ -83,7 +83,8 @@ class KeptMediaCardDeviceTest {
         composeRule.onNodeWithTag(KEPT_MESSAGE_CARD_TAG).performTouchInput { longClick() }
         composeRule.onNodeWithTag(KEPT_MESSAGE_MENU_TAG).performClick()
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.go_to_message)).performClick()
-        assertEquals(key, opened)
+        // Menu actions run after the exit animation has completed.
+        composeRule.runOnIdle { assertEquals(key, opened) }
         composeRule.runOnIdle { controller.remove(key) }
         composeRule.onNodeWithTag(KEPT_MESSAGE_CARD_TAG).assertDoesNotExist()
     }

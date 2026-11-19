@@ -174,7 +174,7 @@ internal fun AppSelfUpdateContent(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = onCancel, modifier = Modifier.testTag("appUpdate.cancel")) {
+                    TextButton(onClick = dismiss, modifier = Modifier.testTag("appUpdate.cancel")) {
                         Text(stringResource(R.string.cancel))
                     }
                 },
@@ -191,7 +191,7 @@ internal fun AppSelfUpdateContent(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = onCancel, modifier = Modifier.testTag("appUpdate.cancel")) {
+                    TextButton(onClick = dismiss, modifier = Modifier.testTag("appUpdate.cancel")) {
                         Text(stringResource(R.string.cancel))
                     }
                 },

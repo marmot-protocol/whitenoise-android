@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.ui
 
 import android.Manifest
 import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.speech.RecognizerIntent
 import android.view.ViewTreeObserver
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -858,8 +856,9 @@ internal fun WhiteNoiseApp(
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(
             offlineSpeechToText = dictationState.usesOfflineSpeechToText,
-            onConfirm = dictation::acceptDisclosure,
-            onDismiss = dictation::cancel,
+            ownerKey = dictationState,
+            onConfirm = { dictation.acceptDisclosure(dictationState) },
+            onDismiss = { if (dictation.state === dictationState) dictation.cancel() },
         )
     }
 }
@@ -909,10 +908,3 @@ private fun WarmResumeFrameSurface(
     }
     content()
 }
-
-private tailrec fun Context.findActivity(): Activity? =
-    when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
-    }

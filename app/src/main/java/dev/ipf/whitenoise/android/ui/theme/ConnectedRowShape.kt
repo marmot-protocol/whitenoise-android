@@ -58,6 +58,8 @@ internal fun Modifier.connectedRowBorder(
     shape: ConnectedRowShape,
     color: Color,
     seamColor: Color = color,
+    suppressChrome: () -> Boolean = { false },
+    suppressSeam: () -> Boolean = suppressChrome,
 ): Modifier =
     drawWithCache {
         val corners =
@@ -72,56 +74,70 @@ internal fun Modifier.connectedRowBorder(
         val inset = strokeWidth / 2
         val left = inset
         val right = size.width - inset
-        val top = inset
-        val bottom = size.height - inset
-        val topLeft = (corners.topLeftCornerRadius.x - inset).coerceAtLeast(0f)
-        val topRight = (corners.topRightCornerRadius.x - inset).coerceAtLeast(0f)
-        val bottomRight = (corners.bottomRightCornerRadius.x - inset).coerceAtLeast(0f)
-        val bottomLeft = (corners.bottomLeftCornerRadius.x - inset).coerceAtLeast(0f)
-        val path =
-            Path().apply {
-                if (shape.first) {
-                    moveTo(left, top + topLeft)
-                    cornerArc(
-                        Rect(left, top, left + 2 * topLeft, top + 2 * topLeft),
-                        ConnectedRowBorderDefaults.TopLeftStartDegrees,
-                    )
-                    lineTo(right - topRight, top)
-                    cornerArc(
-                        Rect(right - 2 * topRight, top, right, top + 2 * topRight),
-                        ConnectedRowBorderDefaults.TopRightStartDegrees,
-                    )
-                } else {
-                    moveTo(right, 0f)
-                }
-                if (shape.last) {
-                    lineTo(right, bottom - bottomRight)
-                    cornerArc(
-                        Rect(right - 2 * bottomRight, bottom - 2 * bottomRight, right, bottom),
-                        ConnectedRowBorderDefaults.BottomRightStartDegrees,
-                    )
-                    lineTo(left + bottomLeft, bottom)
-                    cornerArc(
-                        Rect(left, bottom - 2 * bottomLeft, left + 2 * bottomLeft, bottom),
-                        ConnectedRowBorderDefaults.BottomLeftStartDegrees,
-                    )
-                } else {
-                    lineTo(right, size.height)
-                    moveTo(left, size.height)
-                }
-                lineTo(left, if (shape.first) top + topLeft else 0f)
-                if (shape.first && shape.last) close()
-            }
+        val path = connectedRowBorderPath(Rect(Offset.Zero, size), corners, shape.first, shape.last, strokeWidth)
         val seamWidth = ConnectedRowBorderDefaults.SeamWidthPx
         val seamCenterY = size.height - seamWidth / 2
         onDrawWithContent {
             drawContent()
-            if (!shape.last) {
+            if (!shape.last && !suppressSeam()) {
                 drawLine(seamColor, Offset(left, seamCenterY), Offset(right, seamCenterY), strokeWidth = seamWidth)
             }
-            drawPath(path, color, style = Stroke(width = strokeWidth))
+            if (!suppressChrome()) drawPath(path, color, style = Stroke(width = strokeWidth))
         }
     }
+
+/** Shared native path: preserve continuous corner/side joins and the original arc rasterization. */
+@Suppress("LongMethod")
+internal fun connectedRowBorderPath(
+    bounds: Rect,
+    corners: RoundRect,
+    first: Boolean,
+    last: Boolean,
+    strokeWidth: Float,
+): Path {
+    val inset = strokeWidth / 2
+    val left = bounds.left + inset
+    val right = bounds.right - inset
+    val top = bounds.top + inset
+    val bottom = bounds.bottom - inset
+    val topLeft = (corners.topLeftCornerRadius.x - inset).coerceAtLeast(0f)
+    val topRight = (corners.topRightCornerRadius.x - inset).coerceAtLeast(0f)
+    val bottomRight = (corners.bottomRightCornerRadius.x - inset).coerceAtLeast(0f)
+    val bottomLeft = (corners.bottomLeftCornerRadius.x - inset).coerceAtLeast(0f)
+    return Path().apply {
+        if (first) {
+            moveTo(left, top + topLeft)
+            cornerArc(
+                Rect(left, top, left + 2 * topLeft, top + 2 * topLeft),
+                ConnectedRowBorderDefaults.TopLeftStartDegrees,
+            )
+            lineTo(right - topRight, top)
+            cornerArc(
+                Rect(right - 2 * topRight, top, right, top + 2 * topRight),
+                ConnectedRowBorderDefaults.TopRightStartDegrees,
+            )
+        } else {
+            moveTo(right, bounds.top)
+        }
+        if (last) {
+            lineTo(right, bottom - bottomRight)
+            cornerArc(
+                Rect(right - 2 * bottomRight, bottom - 2 * bottomRight, right, bottom),
+                ConnectedRowBorderDefaults.BottomRightStartDegrees,
+            )
+            lineTo(left + bottomLeft, bottom)
+            cornerArc(
+                Rect(left, bottom - 2 * bottomLeft, left + 2 * bottomLeft, bottom),
+                ConnectedRowBorderDefaults.BottomLeftStartDegrees,
+            )
+        } else {
+            lineTo(right, bounds.bottom)
+            moveTo(left, bounds.bottom)
+        }
+        lineTo(left, if (first) top + topLeft else bounds.top)
+        if (first && last) close()
+    }
+}
 
 /** Append one quarter-turn corner; a zero radius corner is a plain vertex and draws nothing. */
 private fun Path.cornerArc(

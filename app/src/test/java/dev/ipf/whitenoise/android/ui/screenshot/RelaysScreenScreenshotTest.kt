@@ -65,7 +65,7 @@ class RelaysScreenScreenshotTest {
                     busy = busy.value,
                     rejectedUrl = null,
                     onDismiss = {},
-                    onAdd = { _, _ -> },
+                    onAdd = { _, _, _ -> },
                 )
             }
         }

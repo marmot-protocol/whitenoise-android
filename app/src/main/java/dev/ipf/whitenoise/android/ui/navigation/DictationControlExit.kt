@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.runtime.Composable
@@ -20,10 +19,14 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
+import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
+import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.conversation.composer.DictationControlFacts
 import kotlin.math.roundToInt
 
-internal const val DICTATION_CONTROL_EXIT_MILLIS = 280
+internal const val DICTATION_CONTROL_EXIT_MILLIS = APP_MOTION_CLOSE_MILLIS
 
 /** The capsule stays fully opaque while it starts shrinking, then fades over the remaining travel. */
 private const val DICTATION_CONTROL_EXIT_FADE_START = 0.4f
@@ -100,7 +103,7 @@ internal fun DictationControlExit(
         if (entering) {
             try {
                 entrance.snapTo(1f)
-                entrance.animateTo(0f, tween(DICTATION_CONTROL_EXIT_MILLIS, easing = FastOutSlowInEasing))
+                entrance.animateTo(0f, tween(APP_MOTION_OPEN_MILLIS, easing = AppMotionOpenEasing))
             } finally {
                 entering = false
             }
@@ -109,7 +112,7 @@ internal fun DictationControlExit(
     LaunchedEffect(exiting) {
         if (exiting != null) {
             progress.snapTo(0f)
-            progress.animateTo(1f, tween(DICTATION_CONTROL_EXIT_MILLIS, easing = FastOutSlowInEasing))
+            progress.animateTo(1f, tween(DICTATION_CONTROL_EXIT_MILLIS, easing = AppMotionCloseEasing))
             exiting = null
         }
     }

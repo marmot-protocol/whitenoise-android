@@ -151,7 +151,7 @@ class LargeGroupInviteWarningUiTest {
                 ContactPickerScreen(
                     appState = reviewState,
                     title = "Add member",
-                    selected = mutableStateListOf(alice, bob),
+                    selected = androidx.compose.runtime.remember { mutableStateListOf(alice, bob) },
                     onBack = {},
                     onConfirm = { submits++ },
                     confirmLabel = "Add members",
@@ -202,12 +202,13 @@ class LargeGroupInviteWarningUiTest {
     fun reviewSubmitsAdminSetEditedInsideIt() {
         var submitted = emptySet<String>()
         val admins = mutableStateListOf<String>()
+        val selected = mutableStateListOf(alice)
         composeRule.setContent {
             WhiteNoiseTheme {
                 ContactPickerScreen(
                     appState = reviewState,
                     title = "Add member",
-                    selected = mutableStateListOf(alice),
+                    selected = selected,
                     onBack = {},
                     onConfirm = { submitted = admins.toSet() },
                     confirmLabel = "Add member",
@@ -232,12 +233,13 @@ class LargeGroupInviteWarningUiTest {
     fun warningDisappearsWhenThresholdIsNoLongerReachedAndConfirmStillSends() {
         var submits = 0
         var description by mutableStateOf<String?>(LARGE_GROUP_WARNING)
+        val selected = mutableStateListOf(alice)
         composeRule.setContent {
             WhiteNoiseTheme {
                 ContactPickerScreen(
                     appState = reviewState,
                     title = "Add member",
-                    selected = mutableStateListOf(alice),
+                    selected = selected,
                     onBack = {},
                     onConfirm = { submits++ },
                     confirmLabel = "Add member",

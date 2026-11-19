@@ -3,22 +3,12 @@
 package dev.ipf.whitenoise.android.ui.profile
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,20 +22,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -100,13 +84,13 @@ import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
-import dev.ipf.whitenoise.android.ui.theme.Dimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 
@@ -290,6 +274,13 @@ internal fun ProfileSheet(
     adminController: ConversationController? = null,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
     openGroupsInCommon: Boolean = false,
+    onStartGroupMeasured: (
+        (
+            RecipientSearch.Candidate,
+            androidx.compose.ui.geometry.Rect?,
+            SettingsContour?,
+        ) -> Unit
+    )? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -315,9 +306,9 @@ internal fun ProfileSheet(
         appState.wipeInProgress,
         appState.retainedAccountReactivationRef,
     ) {
-        if (!owner.canAct()) currentDismiss()
+        if (!owner.canPresent()) currentDismiss()
     }
-    if (!owner.canAct() || appState.appLock.screenVisible) return
+    if (!owner.canPresent() || appState.appLock.screenVisible) return
     // Seed the identity synchronously so the first composed frame already has
     // the content it will settle on. ModalBottomSheet animates toward its
     // measured height, so rows that resolve a frame later — about, NIP-05,
@@ -632,7 +623,7 @@ internal fun ProfileSheet(
         remember(accountAtOpen, hex, notificationRevision) {
             appState.profileNotificationOverrides.get(accountAtOpen, hex)
         }
-    val profileContent: @Composable () -> Unit = {
+    val profileContent: @Composable (() -> Unit) -> Unit = { dismissProfile ->
         PersonProfileContent(
             startingAs =
                 if (hex != null && !targetIsSelf) {
@@ -670,7 +661,7 @@ internal fun ProfileSheet(
                     ),
             showSharedGroups = hex != null && !targetIsSelf,
             copied = copied,
-            onBack = { if (!creatingChat) owner.leave { currentDismiss() } },
+            onBack = { if (!creatingChat) dismissProfile() },
             onMessage = { openOrCreateProfileChat() },
             notificationSummary =
                 if (accountAtOpen != null && hex != null && !targetIsSelf) {
@@ -776,6 +767,16 @@ internal fun ProfileSheet(
                     }
                 }
             },
+            onStartGroupMeasured = { origin, contour ->
+                if (owner.canAct()) {
+                    hex?.let { target ->
+                        owner.leave {
+                            val candidate = RecipientSearch.Candidate(target, displayTitle, npub)
+                            onStartGroupMeasured?.invoke(candidate, origin, contour) ?: onStartGroup(candidate)
+                        }
+                    }
+                }
+            },
             onGroupEntry = {
                 if (owner.canAct()) {
                     pickerParent = ProfileSheetPage.PROFILE
@@ -842,14 +843,17 @@ internal fun ProfileSheet(
         )
     }
 
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = appState.pendingProfileOrigin,
+        sourceContour = appState.pendingProfileContour,
+        ownerKey = owner to appState.pendingProfilePresentationId,
+        dismissEnabled = { !creatingChat && !addingToGroups && !promotingAdmin },
+        onDismissStart = owner::dispose,
         onSourceDismiss =
-            ({ owner.leave { currentDismiss() } }).takeUnless {
+            ({ currentDismiss() }).takeUnless {
                 creatingChat || addingToGroups || promotingAdmin
             },
-        onDismissRequest = {
-            if (!creatingChat && !addingToGroups && !promotingAdmin) owner.leave { currentDismiss() }
-        },
+        onDismissRequest = { currentDismiss() },
         properties =
             DialogProperties(
                 securePolicy = securePolicy,
@@ -857,12 +861,17 @@ internal fun ProfileSheet(
                 decorFitsSystemWindows = false,
             ),
     ) {
+        val returnFromGroups: () -> Unit = {
+            if (openGroupsInCommon) dismiss() else page = ProfileSheetPage.PROFILE
+        }
         // Register against the modal dialog's dispatcher, not the activity's;
         // otherwise the dialog consumes Back before this nested route sees it.
         BackHandler {
             if (!creatingChat && !addingToGroups && !promotingAdmin) {
-                if (page == ProfileSheetPage.PROFILE) {
-                    owner.leave { currentDismiss() }
+                if (page == ProfileSheetPage.GROUPS_IN_COMMON) {
+                    returnFromGroups()
+                } else if (page == ProfileSheetPage.PROFILE) {
+                    dismiss()
                 } else {
                     page = if (page == ProfileSheetPage.ADD_TO_GROUPS) pickerParent else ProfileSheetPage.PROFILE
                 }
@@ -874,8 +883,9 @@ internal fun ProfileSheet(
                 target = motionPage,
                 depth = profileSheetPageDepth(motionPage, pickerParent),
                 ownerKey = owner,
-                contentVisible = owner.canAct() && !appState.appLock.screenVisible,
+                contentVisible = owner.canPresent() && !appState.appLock.screenVisible,
                 animationsEnabled = rememberConversationMotionEnabled(),
+                cardMorph = true,
             ) { targetPage ->
                 when (targetPage) {
                     ProfileSheetPage.ADD_TO_GROUPS -> {
@@ -935,7 +945,7 @@ internal fun ProfileSheet(
                                 },
                                 rows = sharedRows,
                                 unresolved = shared.incomplete,
-                                onBack = { page = ProfileSheetPage.PROFILE },
+                                onBack = returnFromGroups,
                                 onOpen = { id ->
                                     if (owner.canAct()) {
                                         appState
@@ -982,7 +992,7 @@ internal fun ProfileSheet(
                             }
                         }
                     }
-                    ProfileSheetPage.PROFILE -> profileContent()
+                    ProfileSheetPage.PROFILE -> profileContent(dismiss)
                 }
             }
         }
@@ -1022,94 +1032,6 @@ internal fun ProfileSheet(
     }
 }
 
-/**
- * [AvatarImageLoader.load] answers null both while it is working and when the
- * fetch failed, so completion has to be tracked separately: a banner that will
- * never arrive is dropped instead of spinning forever.
- */
-internal data class ProfileBannerLoadState(
-    val image: ImageBitmap?,
-    val settled: Boolean,
-) {
-    /** False once a load has failed, so callers collapse as if there were no banner. */
-    val visible: Boolean get() = image != null || !settled
-}
-
-/**
- * Banner load state for a surface [targetWidthPx] physical pixels wide.
- *
- * The width selects the loader's bounded banner decode, so the image is resolved for the box it
- * actually fills instead of being upscaled from the avatar cap (#2762).
- */
-@Composable
-internal fun rememberProfileBannerLoadState(
-    bannerUrl: String,
-    targetWidthPx: Int,
-    peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
-    load: suspend (String, Int) -> ImageBitmap? = { url, width ->
-        // A kind-0 banner is published, so it decodes in the public profiles.
-        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
-    },
-): ProfileBannerLoadState {
-    var image by remember(bannerUrl, targetWidthPx) { mutableStateOf(peek(bannerUrl, targetWidthPx)) }
-    var settled by remember(bannerUrl, targetWidthPx) { mutableStateOf(image != null) }
-    LaunchedEffect(bannerUrl, targetWidthPx) {
-        if (image == null) {
-            image = load(bannerUrl, targetWidthPx)
-            settled = true
-        }
-    }
-    return ProfileBannerLoadState(image = image, settled = settled)
-}
-
-@Composable
-@Suppress("FunctionNaming")
-internal fun ProfileBannerImage(
-    bannerUrl: String,
-    peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
-    load: suspend (String, Int) -> ImageBitmap? = { url, width ->
-        // A kind-0 banner is published, so it decodes in the public profiles.
-        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
-    },
-) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val targetWidthPx = profileBannerTargetWidthPx(maxWidth)
-        ProfileBannerImage(rememberProfileBannerLoadState(bannerUrl, targetWidthPx, peek, load))
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-@Suppress("FunctionNaming")
-internal fun ProfileBannerImage(state: ProfileBannerLoadState) {
-    val bitmap = state.image
-    if (!state.visible) return
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimens.spaceLg)
-                .aspectRatio(2f)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .testTag(PROFILE_BANNER_TAG),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            LoadingIndicator(modifier = Modifier.size(20.dp).testTag(PROFILE_BANNER_LOADING_TAG))
-        }
-    }
-}
-
-internal const val PROFILE_BANNER_TAG = "profile-banner"
-internal const val PROFILE_BANNER_LOADING_TAG = "profile-banner-loading"
 internal const val PROFILE_FOLLOW_ACTION_TAG = "profile-follow-action"
 internal const val PROFILE_MESSAGE_ACTION_TAG = "profile-message-action"
 internal const val PROFILE_QUICK_ACTIONS_TAG = "profile-quick-actions"
@@ -1135,6 +1057,7 @@ internal fun ContactPrivateDetailsDialog(
     onRepositionPicture: () -> Unit = {},
     onClearPicture: () -> Unit = {},
     viewportInsets: WindowInsets? = null,
+    popupMotion: dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion? = null,
 ) {
     val nickname =
         remember(initialNickname) {
@@ -1154,9 +1077,11 @@ internal fun ContactPrivateDetailsDialog(
             securePolicy = securePolicy,
             viewportInsets = viewportInsets,
             onDismiss = onDismiss,
+            popupMotion = popupMotion,
+            dismissEnabled = { pictureState?.busy != true },
             actions = {
                 TextButton(
-                    onDismiss,
+                    dismiss,
                     Modifier.testTag("person_profile.private_cancel"),
                     enabled = pictureState?.busy != true,
                 ) { Text(stringResource(R.string.cancel)) }

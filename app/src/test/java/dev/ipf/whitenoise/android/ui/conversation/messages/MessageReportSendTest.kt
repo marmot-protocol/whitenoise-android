@@ -30,6 +30,32 @@ class MessageReportSendTest {
             present = { group, team -> presented += group to team },
         )
 
+    /** A completed copy stays mounted for the caller's exit; a failed copy never starts that exit. */
+    @Test
+    fun onlyACompletedReportRequestsAnimatedExit() =
+        runBlocking {
+            teamAnswers += listOf(FAILED, ACCEPTED)
+            var exits = 0
+            val finish = {
+                surfaces.finishReport(closeSheet = false)
+                exits++
+                Unit
+            }
+
+            surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), sends, finish)
+            assertEquals(0, exits)
+            assertTrue(surfaces.reportCopyPending)
+            surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), sends, finish)
+
+            assertEquals(1, exits)
+            assertEquals(1, groupSends)
+            assertTrue(surfaces.reportSheetOpen)
+            assertNull(surfaces.reportGroupResult)
+            surfaces.closeReport()
+            assertFalse(surfaces.reportSheetOpen)
+            assertFalse(surfaces.reportCopyPending)
+        }
+
     /** A locked retry after a failed team copy sends only the copy, and the report then finishes. */
     @Test
     fun aLockedRetrySendsOnlyTheTeamCopy() =

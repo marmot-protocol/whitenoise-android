@@ -6,14 +6,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,7 +19,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -46,7 +47,9 @@ import dev.ipf.whitenoise.android.media.GroupEmojiImageException
 import dev.ipf.whitenoise.android.media.GroupEmojiImageRenderer
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.addGroupEmojiSelection
+import dev.ipf.whitenoise.android.ui.common.SheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -92,6 +95,8 @@ internal fun GroupEmojiImagePickerSheet(
     onEmojiUsed: (String) -> Unit,
     onApply: (ImageUploadDraft) -> Unit,
     onDismiss: () -> Unit,
+    suppliedSheetState: SheetState? = null,
+    suppliedTerminal: SheetTerminalMotion? = null,
     renderer: (List<String>) -> ImageUploadDraft = { GroupEmojiImageRenderer.render(it) },
 ) {
     var selectedEmojis by remember { mutableStateOf(emptyList<String>()) }
@@ -132,15 +137,22 @@ internal fun GroupEmojiImagePickerSheet(
     val previewEmojiLabel = readyState?.emojis.orEmpty().joinToString(separator = " ")
     val currentApplyInFlight by rememberUpdatedState(applyInFlight)
 
+    val sheetState =
+        suppliedSheetState ?: rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange = { value -> value != SheetValue.Hidden || !currentApplyInFlight },
+        )
+    val terminal = suppliedTerminal ?: rememberSheetTerminalMotion(sheetState)
+    val inputBlocked = applyInFlight || !terminal.acceptsInput
     ModalBottomSheet(
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = { if (!applyInFlight) onDismiss() },
-        sheetState =
-            rememberModalBottomSheetState(
-                skipPartiallyExpanded = true,
-                confirmValueChange = { value ->
-                    value != SheetValue.Hidden || !currentApplyInFlight
-                },
+        onDismissRequest = { if (!inputBlocked) terminal.close(onDismiss) },
+        sheetState = sheetState,
+        sheetGesturesEnabled = !inputBlocked,
+        properties =
+            ModalBottomSheetProperties(
+                shouldDismissOnBackPress = !inputBlocked,
+                shouldDismissOnClickOutside = !inputBlocked,
             ),
     ) {
         Column(
@@ -216,7 +228,7 @@ internal fun GroupEmojiImagePickerSheet(
                                         selectedEmojis = selectedEmojis.toMutableList().also { it.removeAt(index) }
                                         limitReached = false
                                     },
-                                    enabled = !applyInFlight,
+                                    enabled = !inputBlocked,
                                 ) {
                                     Text(
                                         text = "$emoji ×",
@@ -263,7 +275,7 @@ internal fun GroupEmojiImagePickerSheet(
                 },
                 purpose = EmojiPickerPurpose.GROUP_IMAGE,
                 recentEmojis = recentEmojis,
-                selectionEnabled = !applyInFlight,
+                selectionEnabled = !inputBlocked,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
             Row(
@@ -271,26 +283,31 @@ internal fun GroupEmojiImagePickerSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 TextButton(
-                    onClick = onDismiss,
-                    enabled = !applyInFlight,
+                    onClick = { terminal.close(onDismiss) },
+                    enabled = !inputBlocked,
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.cancel))
                 }
                 Button(
                     onClick = { readyDraft?.let(onApply) },
-                    enabled = readyDraft != null && !applyInFlight,
+                    enabled = readyDraft != null && !inputBlocked,
                     modifier = Modifier.weight(1f),
                 ) {
-                    if (applyInFlight) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                    // Keep the label's footprint while applying; closing alone is not work.
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            stringResource(R.string.group_image_emoji_use),
+                            modifier = Modifier.alpha(if (applyInFlight) 0f else 1f),
                         )
-                        Spacer(Modifier.width(8.dp))
+                        if (applyInFlight) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
                     }
-                    Text(stringResource(R.string.group_image_emoji_use))
                 }
             }
         }

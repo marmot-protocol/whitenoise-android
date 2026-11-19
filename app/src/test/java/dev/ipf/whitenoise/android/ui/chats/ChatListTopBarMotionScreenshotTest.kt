@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -12,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -23,6 +27,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -38,6 +45,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 /** Temporal counterparts to ChatListTopBarScreenshotTest, using the real toolbar's measured decoration. */
 @RunWith(RobolectricTestRunner::class)
@@ -85,11 +93,20 @@ class ChatListTopBarMotionScreenshotTest {
     @Config(sdk = [36], qualifiers = "en-w280dp-h360dp-mdpi")
     fun searchRoundTripLargeRtlAmoled() = captureRoundTrip("large_rtl_amoled", dark = true, largeRtl = true)
 
+    /** Normal-scale source-render component export; not a populated Chats route. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+    fun captureSearchFrames() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        captureRoundTrip("video_amoled", dark = true, exportFrames = true)
+    }
+
     /** No click ripple or cursor blink can masquerade as the production outline's changing pixels. */
     private fun captureRoundTrip(
         variant: String,
         dark: Boolean,
         largeRtl: Boolean = false,
+        exportFrames: Boolean = false,
     ) {
         val appState = ChatRowPortFixtures.state(context)
         val focusRequester = FocusRequester()
@@ -98,7 +115,12 @@ class ChatListTopBarMotionScreenshotTest {
                 LocalCursorBlinkEnabled provides false,
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = largeRtl, fontScale = if (largeRtl) 2f else 1f) {
+                WhiteNoiseTheme(
+                    darkTheme = dark,
+                    amoled = largeRtl || exportFrames,
+                    fontScale = if (largeRtl) 2f else 1f,
+                ) {
+                    if (exportFrames) Box(Modifier.fillMaxSize().background(Color.Black))
                     Surface(Modifier.fillMaxWidth().testTag(TAG)) {
                         val composedOpen = open
                         SideEffect { committedOpen = composedOpen }
@@ -121,6 +143,11 @@ class ChatListTopBarMotionScreenshotTest {
         }
         rule.waitForIdle()
         rule.mainClock.autoAdvance = false
+        if (exportFrames) {
+            exportTransition(opening = true)
+            exportTransition(opening = false)
+            return
+        }
         captureTransition(variant, opening = true)
         captureTransition(variant, opening = false)
     }
@@ -149,13 +176,33 @@ class ChatListTopBarMotionScreenshotTest {
         assertEditor(opening)
         val middle = pixels()
         capture("${direction}_mid_$variant")
-        rule.mainClock.advanceTimeBy(144)
+        val duration = if (opening) APP_MOTION_OPEN_MILLIS else APP_MOTION_CLOSE_MILLIS
+        val settledAt = ((duration + 15L) / 16L) * 16L + 32L
+        rule.mainClock.advanceTimeBy(settledAt - 96L)
         rule.waitForIdle()
-        assertEquals(start + 240L, rule.mainClock.currentTime)
+        assertEquals(start + settledAt, rule.mainClock.currentTime)
         assertEditor(opening)
         val settled = pixels()
         capture("${direction}_settled_$variant")
         assertFalse("The measured outline must change actual pixels before retiring", middle.contentEquals(settled))
+        assertEquals("Retained query", query)
+    }
+
+    private fun exportTransition(opening: Boolean) {
+        val direction = if (opening) "forward" else "reverse"
+        val folder = File("build/animation-frames/chat-search-component/$direction").apply { mkdirs() }
+        captureScreenRoboImage(File(folder, "source.png").path)
+        rule.runOnIdle {
+            open = opening
+            Snapshot.sendApplyNotifications()
+        }
+        scheduler.runCurrent()
+        repeat(32) { frame ->
+            rule.mainClock.advanceTimeBy(16)
+            rule.waitForIdle()
+            assertEditor(opening)
+            captureScreenRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+        }
         assertEquals("Retained query", query)
     }
 

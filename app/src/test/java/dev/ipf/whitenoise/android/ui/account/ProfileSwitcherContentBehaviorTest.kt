@@ -11,8 +11,12 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -56,6 +60,35 @@ class ProfileSwitcherContentBehaviorTest {
         assertEquals(1, settings)
     }
 
+    @Test fun outlinedAddProfileTransfersItsActualGroupAndUnoutlinedEntryTransfersNone() {
+        var captured: SettingsContour? = null
+        render(amoled = true, onContour = { captured = it })
+        composeRule.onNodeWithTag("profile_switcher.add_profile").performClick()
+        assertNotNull("The source sheet must collect its own native outline", captured)
+        assertEquals(2, captured!!.rows.size)
+        assertEquals(1f, captured!!.color.alpha, 0f)
+        assertTrue(
+            captured!!.bounds.contains(
+                captured!!
+                    .rows
+                    .first()
+                    .bounds.center,
+            ),
+        )
+    }
+
+    @Test fun unoutlinedAddProfileDoesNotBorrowAnotherProfilesOutline() {
+        var captured: SettingsContour? = null
+        var delivered = false
+        render(onSettings = null, onContour = {
+            captured = it
+            delivered = true
+        })
+        composeRule.onNodeWithTag("profile_switcher.add_profile").performClick()
+        assertTrue(delivered)
+        assertNull(captured)
+    }
+
     /** A profile's short key copies its whole key and does not switch, while the row itself still switches. */
     @Test fun shortKeyCopiesWithoutSwitchingProfiles() {
         val selected = mutableListOf<String>()
@@ -84,7 +117,9 @@ class ProfileSwitcherContentBehaviorTest {
     private fun render(
         onSelect: (String) -> Unit = {},
         onAdd: () -> Unit = {},
-        onSettings: () -> Unit = {},
+        onSettings: (() -> Unit)? = {},
+        onContour: (SettingsContour?) -> Unit = {},
+        amoled: Boolean = false,
         npub: (String) -> String = { "" },
     ) {
         val accounts =
@@ -92,7 +127,7 @@ class ProfileSwitcherContentBehaviorTest {
                 AccountSummaryFfi(it, it.repeat(64), true, false, false, true, false)
             }
         composeRule.setContent {
-            WhiteNoiseTheme {
+            WhiteNoiseTheme(darkTheme = amoled, amoled = amoled) {
                 Surface {
                     ProfileSwitcherSheet(
                         accountSelectorState(accounts, "a", false),
@@ -111,6 +146,7 @@ class ProfileSwitcherContentBehaviorTest {
                         onSelectProfile = onSelect,
                         onAddProfile = onAdd,
                         onSettings = onSettings,
+                        onAddProfileContour = onContour,
                         npub = npub,
                     )
                 }

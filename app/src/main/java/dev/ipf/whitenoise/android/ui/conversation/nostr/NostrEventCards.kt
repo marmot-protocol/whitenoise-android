@@ -33,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
@@ -50,6 +51,7 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import kotlinx.coroutines.launch
 
 /** Renders bounded event cards and their lifecycle-bound fullscreen viewers. */
@@ -65,7 +67,7 @@ internal fun NostrEventCards(
     modifier: Modifier = Modifier,
 ) {
     if (references.isEmpty()) return
-    var videoSelection by remember(resolver) { mutableStateOf<NostrEventCardModel?>(null) }
+    var videoSelection by remember(resolver) { mutableStateOf<Pair<NostrEventCardModel, Rect?>?>(null) }
     var readerSelection by remember(resolver) { mutableStateOf<NostrEventReaderSelection?>(null) }
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -80,9 +82,9 @@ internal fun NostrEventCards(
                     contentColor = contentColor,
                     mentionDisplayName = mentionDisplayName,
                     parseMarkdown = parseMarkdown,
-                    onPlayVideo = { card -> videoSelection = card },
-                    onReadEvent = { card, authoredReference ->
-                        readerSelection = NostrEventReaderSelection(card, authoredReference)
+                    onPlayVideo = { card, origin -> videoSelection = card to origin },
+                    onReadEvent = { card, authoredReference, origin ->
+                        readerSelection = NostrEventReaderSelection(card, authoredReference, origin)
                     },
                 )
             }
@@ -91,6 +93,7 @@ internal fun NostrEventCards(
     readerSelection?.let { selection ->
         NostrEventReaderDialog(
             card = selection.card,
+            origin = selection.origin,
             authoredReference = selection.authoredReference,
             authorDisplayName = authorDisplayName,
             mentionDisplayName = mentionDisplayName,
@@ -99,9 +102,9 @@ internal fun NostrEventCards(
             onDismiss = { readerSelection = null },
         )
     }
-    videoSelection?.let { card ->
+    videoSelection?.let { (card, origin) ->
         card.mediaUrl?.let { url ->
-            NostrVideoPlayerDialog(url, card.mediaMimeType, onDismiss = { videoSelection = null })
+            NostrVideoPlayerDialog(url, card.mediaMimeType, origin = origin, onDismiss = { videoSelection = null })
         }
     }
 }
@@ -109,6 +112,7 @@ internal fun NostrEventCards(
 private data class NostrEventReaderSelection(
     val card: NostrEventCardModel,
     val authoredReference: String?,
+    val origin: Rect?,
 )
 
 /** Connects one resolved card to its independent retry, copy, external-open, and reader actions. */
@@ -120,9 +124,10 @@ private fun ResolvedNostrEventCard(
     contentColor: Color,
     mentionDisplayName: (String) -> String?,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
-    onReadEvent: (NostrEventCardModel, String?) -> Unit,
-    onPlayVideo: (NostrEventCardModel) -> Unit,
+    onReadEvent: (NostrEventCardModel, String?, Rect?) -> Unit,
+    onPlayVideo: (NostrEventCardModel, Rect?) -> Unit,
 ) {
+    var launchOrigin: Rect? = null
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
@@ -146,11 +151,12 @@ private fun ResolvedNostrEventCard(
                 )
             }
         },
-        onReadNote = { card -> onReadEvent(card, authoredReference) },
-        onPlayVideo = onPlayVideo,
+        onReadNote = { card -> onReadEvent(card, authoredReference, launchOrigin) },
+        onPlayVideo = { card -> onPlayVideo(card, launchOrigin) },
+        onLaunchOrigin = { launchOrigin = it },
         onOpen = { card ->
             when {
-                card != null -> onReadEvent(card, authoredReference)
+                card != null -> onReadEvent(card, authoredReference, launchOrigin)
                 else ->
                     runCatching {
                         context.startActivity(
@@ -175,6 +181,7 @@ internal fun NostrEventCard(
     onReadNote: (NostrEventCardModel) -> Unit = {},
     referenceLabel: String? = null,
     onPlayVideo: (NostrEventCardModel) -> Unit = {},
+    onLaunchOrigin: (Rect?) -> Unit = {},
 ) {
     val openDescription = stringResource(R.string.nostr_event_open)
     val copyDescription = stringResource(R.string.nostr_event_copy)
@@ -187,9 +194,11 @@ internal fun NostrEventCard(
     ) {
         NostrEventCardLayout(
             maximumHeight = nostrEventPreviewMaximumHeight(),
+            onLaunchOrigin = onLaunchOrigin,
             onExpand = { onOpen((state as? NostrEventCardState.Loaded)?.card) },
         ) {
             EventCardBody(
+                onLaunchOrigin = onLaunchOrigin,
                 onPlayVideo = onPlayVideo,
                 state = state,
                 authorDisplayName = authorDisplayName,
@@ -220,6 +229,7 @@ private fun EventCardBody(
     onOpen: (NostrEventCardModel?) -> Unit,
     onReadNote: (NostrEventCardModel) -> Unit,
     onPlayVideo: (NostrEventCardModel) -> Unit,
+    onLaunchOrigin: (Rect?) -> Unit,
 ) {
     when (state) {
         NostrEventCardState.Loading ->
@@ -276,6 +286,7 @@ private fun EventCardBody(
                 onOpen = { onOpen(state.card) },
                 onReadNote = { onReadNote(state.card) },
                 onPlayVideo = { onPlayVideo(state.card) },
+                onLaunchOrigin = onLaunchOrigin,
             )
     }
 }
@@ -294,6 +305,7 @@ private fun LoadedEventCard(
     onOpen: () -> Unit,
     onReadNote: () -> Unit,
     onPlayVideo: () -> Unit,
+    onLaunchOrigin: (Rect?) -> Unit,
 ) {
     val primaryAction = card.primaryAction()
     Column(Modifier.padding(start = 10.dp, top = 6.dp, end = 4.dp, bottom = 7.dp)) {
@@ -304,6 +316,7 @@ private fun LoadedEventCard(
             copyDescription = copyDescription,
             openDescription = primaryAction.description,
             openIcon = primaryAction.icon,
+            onLaunchOrigin = onLaunchOrigin,
             onCopy = onCopy,
             onOpen = onOpen,
         )
@@ -322,13 +335,23 @@ private fun LoadedEventCard(
             card = card,
             contentColor = contentColor,
             onReadNote = onReadNote,
+            onLaunchOrigin = onLaunchOrigin,
         )
         LoadedEventMetadata(card.metadata, contentColor)
         card.imageUrls.firstOrNull()?.let { url ->
             NostrEventImagePane(url = url, compact = true)
         }
         if (card.mediaUrl != null) {
-            TextButton(onClick = onPlayVideo, colors = ButtonDefaults.textButtonColors(contentColor = contentColor)) {
+            val (playModifier, play) =
+                rememberMeasuredControlClick {
+                    onLaunchOrigin(it)
+                    onPlayVideo()
+                }
+            TextButton(
+                onClick = play,
+                modifier = playModifier,
+                colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
+            ) {
                 Text(stringResource(R.string.nostr_event_play_video))
             }
         }
@@ -346,6 +369,7 @@ private fun LoadedEventHeader(
     openIcon: ImageVector,
     onCopy: () -> Unit,
     onOpen: () -> Unit,
+    onLaunchOrigin: (Rect?) -> Unit,
 ) {
     val author = eventAuthorLabel(card, authorDisplayName)
     val kindAndDate =
@@ -397,6 +421,7 @@ private fun LoadedEventHeader(
             onCopy = onCopy,
             onOpen = onOpen,
             openIcon = openIcon,
+            onLaunchOrigin = onLaunchOrigin,
         )
     }
 }
@@ -407,12 +432,18 @@ private fun LoadedEventSummary(
     card: NostrEventCardModel,
     contentColor: Color,
     onReadNote: () -> Unit,
+    onLaunchOrigin: (Rect?) -> Unit,
 ) {
     card.summary?.takeIf(String::isNotBlank)?.let { summary ->
         Spacer(Modifier.height(4.dp))
+        val (readModifier, read) =
+            rememberMeasuredControlClick {
+                onLaunchOrigin(it)
+                onReadNote()
+            }
         val modifier =
             if (!card.readerBody.isNullOrBlank()) {
-                Modifier
+                readModifier
                     .fillMaxWidth()
                     .clickable(
                         onClickLabel =
@@ -424,7 +455,7 @@ private fun LoadedEventSummary(
                                 },
                             ),
                         role = Role.Button,
-                        onClick = onReadNote,
+                        onClick = read,
                     ).minimumInteractiveComponentSize()
                     .testTag(NOSTR_NOTE_PREVIEW_ACTION_TAG)
             } else {

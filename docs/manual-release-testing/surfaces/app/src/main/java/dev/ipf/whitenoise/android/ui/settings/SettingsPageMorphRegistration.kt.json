@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorphRegistration.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "rememberSettingsRouteClick",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorphRegistration.kt",
+        "anchor": "fun rememberSettingsRouteClick(",
+        "test_ids": [
+          "SET-039",
+          "CON-037"
+        ]
+      },
+      {
+        "surface": "rememberSettingsNativeSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorphRegistration.kt",
+        "anchor": "fun rememberSettingsNativeSurface(",
+        "test_ids": [
+          "SET-039",
+          "CON-037"
+        ],
+        "behavior": "Measured semantic-anchor and nearest noncrossing one-to-one correspondence is reused during motion. Surplus outlines exit rigidly or contract vertically into exclusive gaps without fading. Opaque body ink stays at native coordinates under moving interior clips with one geometry midpoint handoff. Native headers, borderless themes, interrupted geometry and protected-content capture rules remain independent."
+      },
+      {
+        "surface": "rememberSettingsNativeRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorphRegistration.kt",
+        "anchor": "fun rememberSettingsNativeRow(",
+        "test_ids": [
+          "SET-039",
+          "CON-037"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

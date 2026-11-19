@@ -6,6 +6,8 @@ import android.os.Looper
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
@@ -190,12 +192,79 @@ class ChatListAvatarReloadScreenshotTest {
                 }
             visible.forEach { (tag, color) ->
                 val contrast = if (tag.startsWith("chat.row.")) FIRST_ROW_CONTRAST else 0.4f
-                if (!containsAvatar(tag, color, exact = false, minContrast = contrast)) missing += tag
+                if (!containsAvatar(tag, color, exact = false, minContrast = contrast)) {
+                    missing += "$tag ${firstFrameDiagnostic(tag, color, contrast)}"
+                }
                 pending.remove(tag)
             }
             if (pending.isEmpty()) return missing
         }
         error("Return never drew the avatar targets ${pending.keys}")
+    }
+
+    /**
+     * Failure-only evidence from this exact clock frame. Isolated captures and final root pixels
+     * distinguish missing hue from common compositing attenuation without changing the first-frame gate.
+     * Ancestor cyan is contextual evidence; only row preview cyan is a known sibling paint marker.
+     */
+    private fun firstFrameDiagnostic(
+        tag: String,
+        color: Int,
+        threshold: Float,
+    ): String {
+        val target = rule.onNodeWithTag(tag, useUnmergedTree = true)
+        val node = target.fetchSemanticsNode()
+        val root = rule.onRoot().captureToImage().toPixelMap()
+        val isolated = target.captureToImage().toPixelMap()
+        val ancestorBounds = node.parent?.boundsInRoot ?: node.boundsInRoot
+        val preview =
+            if (tag.startsWith("chat.row.")) {
+                val marker =
+                    rule
+                        .onNode(
+                            hasText("No messages yet") and hasAnyAncestor(hasTestTag(tag)),
+                            useUnmergedTree = true,
+                        ).captureToImage()
+                        .toPixelMap()
+                pixelEvidence(marker, Color.CYAN)
+            } else {
+                "no dedicated sibling marker"
+            }
+        return "frameMs=${rule.mainClock.currentTime} threshold=$threshold " +
+            "bounds=${node.boundsInRoot} isolated=${pixelEvidence(isolated, color)} " +
+            "rootTarget=${pixelEvidence(root, color, node.boundsInRoot)} " +
+            "ancestorCyan=${pixelEvidence(root, Color.CYAN, ancestorBounds)} preview=[$preview]"
+    }
+
+    /** Maximum expected-hue contrast plus neutral/alpha evidence; synthetic fixture colors only. */
+    private fun pixelEvidence(
+        pixels: PixelMap,
+        color: Int,
+        bounds: Rect = Rect(0f, 0f, pixels.width.toFloat(), pixels.height.toFloat()),
+    ): String {
+        var matchingPixels = 0
+        var maxHueContrast = 0f
+        var maxChannelSpan = 0f
+        var maxAlpha = 0f
+        val expected = listOf(Color.red(color), Color.green(color), Color.blue(color))
+        for (y in bounds.top.toInt().coerceAtLeast(0) until bounds.bottom.toInt().coerceAtMost(pixels.height)) {
+            for (x in bounds.left.toInt().coerceAtLeast(0) until bounds.right.toInt().coerceAtMost(pixels.width)) {
+                val pixel = pixels[x, y]
+                maxAlpha = maxOf(maxAlpha, pixel.alpha)
+                val channels = listOf(pixel.red, pixel.green, pixel.blue)
+                val span = channels.max() - channels.min()
+                maxChannelSpan = maxOf(maxChannelSpan, span)
+                val middle = (channels.min() + channels.max()) / 2f
+                val sameHue =
+                    channels.zip(expected).all { (actual, channel) -> (actual > middle) == (channel == 255) }
+                if (pixel.alpha > 0f && sameHue) {
+                    matchingPixels++
+                    maxHueContrast = maxOf(maxHueContrast, span)
+                }
+            }
+        }
+        return "huePixels=$matchingPixels maxHueContrast=$maxHueContrast " +
+            "maxChannelSpan=$maxChannelSpan maxAlpha=$maxAlpha"
     }
 
     /** Finds cyan ink from the fixture's preview even when the returning route is faint. */
