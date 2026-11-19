@@ -105,12 +105,13 @@ class NotificationSmallIconScreenshotTest {
     }
 
     private fun assertClearance(bounds: PixelBounds) {
-        val edges = listOf(
-            bounds.left,
-            bounds.top,
-            MEASURE_SIZE_PX - 1 - bounds.right,
-            MEASURE_SIZE_PX - 1 - bounds.bottom,
-        )
+        val edges =
+            listOf(
+                bounds.left,
+                bounds.top,
+                MEASURE_SIZE_PX - 1 - bounds.right,
+                MEASURE_SIZE_PX - 1 - bounds.bottom,
+            )
         assertTrue("Edge clearance $edges px is under $MIN_CLEARANCE_PX px", edges.all { it >= MIN_CLEARANCE_PX })
     }
 
