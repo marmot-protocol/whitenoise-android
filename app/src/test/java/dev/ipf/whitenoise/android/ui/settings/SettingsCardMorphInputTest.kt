@@ -53,7 +53,7 @@ class SettingsCardMorphInputTest {
         var beginActive = false
         var measuredTarget: String? = null
         rule.setContent {
-            androidx.compose.material3.MaterialTheme {
+            dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 CompositionLocalProvider(LocalSettingsCardMorph provides morph) {
                     val view = LocalView.current
                     val (admitted, host) =

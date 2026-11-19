@@ -516,10 +516,9 @@ class DetailRouteMotionScreenshotTest {
         action.performClick()
         rule.mainClock.advanceTimeByFrame()
         val protectedDestination = rule.onNodeWithText(destinationTitle, useUnmergedTree = profile)
-        // Profile content is composed immediately but its presentation hides merged semantics.
-        // The unmerged query verifies its removal on lock. Conversation morphs
-        // may still hide their child here; lock removal below must hold for either phase.
-        if (profile) protectedDestination.assertExists() else protectedDestination.assertDoesNotExist()
+        // Borderless destinations are immediately visible; AMOLED contour entry holds its child.
+        // Lock removal below must hold for either presentation phase.
+        if (profile || !amoled) protectedDestination.assertExists() else protectedDestination.assertDoesNotExist()
         // Real observable lock state removes the protected route immediately, even mid-flight.
         rule.runOnIdle {
             state.appLock.javaClass
@@ -764,22 +763,22 @@ class DetailRouteMotionScreenshotTest {
         var intermediate: Bitmap? = null
         var settled: Bitmap? = null
         // Only AMOLED cards draw outlines, so only there do details cards visibly fold into the composer.
-        val borderlessComposer = name.startsWith("composer_light") || name.startsWith("composer_dark")
+        val borderlessPage = "_light" in name || "_dark" in name
         val morphs =
-            !borderlessComposer &&
+            !borderlessPage &&
                 (
                     (profile && "_light" !in name && "_dark" !in name) ||
                         name.startsWith("composer_") ||
                         name.endsWith("_entry") ||
                         (name.endsWith("_entry_back") && "_light" !in name && "_dark" !in name)
                 )
-        val capturesSettledBody = morphs || profile || borderlessComposer
+        val capturesSettledBody = morphs || profile || borderlessPage
         // Ordinary checks retain their timing; private exports include settled frames after preparation.
         for (frame in 0..(if (captureFrames) 31 else 22)) {
             if (captureFrames || frame in listOf(0, 6, 20)) {
                 val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
                 val bitmap = node.captureToImage().asAndroidBitmap()
-                if ((morphs || borderlessComposer) && frame == 6) {
+                if ((morphs || borderlessPage) && frame == 6) {
                     intermediate = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
                 if (capturesSettledBody && frame == 20) {
@@ -787,7 +786,7 @@ class DetailRouteMotionScreenshotTest {
                 }
                 exportTransitionFrame(frames, name, frame, bitmap)
                 if (frame == 0) {
-                    if (borderlessComposer && name.endsWith("_entry")) {
+                    if (borderlessPage) {
                         firstNativeBody = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                     } else {
                         assertFirstFrameBackplate(name, bitmap)
@@ -804,7 +803,7 @@ class DetailRouteMotionScreenshotTest {
         firstNativeBody?.let { first ->
             assertNativeBodyEdgeContinuity(name, first, checkNotNull(settled))
         }
-        if (profile || borderlessComposer) {
+        if (profile || borderlessPage) {
             // Borderless themes hand off their body once; no synthetic contour or dissolve is required.
             org.junit.Assert.assertFalse(
                 "$name must replace its source body at the destination",

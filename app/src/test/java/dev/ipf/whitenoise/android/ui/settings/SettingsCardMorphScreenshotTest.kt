@@ -18,6 +18,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -35,6 +36,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -99,6 +101,26 @@ class SettingsCardMorphScreenshotTest {
             to = 0,
         )
 
+    @Test fun forwardMorphsCardsInOrderAmoled() =
+        navigate(
+            "forward_amoled",
+            dark = true,
+            largeRtl = false,
+            from = 0,
+            to = 1,
+            amoled = true,
+        )
+
+    @Test fun backMorphsCardsInOrderLargeRtlAmoled() =
+        navigate(
+            "back_large_rtl_amoled",
+            dark = true,
+            largeRtl = true,
+            from = 1,
+            to = 0,
+            amoled = true,
+        )
+
     @Test fun reducedMotionSwitchesAtOnce() {
         render(dark = false, largeRtl = false, start = 0)
         update { animations.value = false }
@@ -115,8 +137,9 @@ class SettingsCardMorphScreenshotTest {
         largeRtl: Boolean,
         from: Int,
         to: Int,
+        amoled: Boolean = false,
     ) {
-        render(dark, largeRtl, start = 0)
+        render(dark, largeRtl, start = 0, amoled = amoled)
         composeRule.onRoot().captureToImage()
         if (from == 1) {
             composeRule.onNodeWithText("Appearance", useUnmergedTree = true).performClick()
@@ -136,21 +159,29 @@ class SettingsCardMorphScreenshotTest {
             composeRule.onRoot().captureToImage()
         }
         advanceFrames(SETTINGS_CARD_MORPH_MILLIS / 6L)
-        val early = captureActiveFrame("settings_card_morph_early_$variant")
+        val early = captureTransitionFrame("settings_card_morph_early_$variant", amoled)
         advanceFrames(SETTINGS_CARD_MORPH_MILLIS / 4L)
-        val mid = captureActiveFrame("settings_card_morph_mid_$variant")
+        val mid = captureTransitionFrame("settings_card_morph_mid_$variant", amoled)
         advanceFrames(SETTINGS_CARD_MORPH_MILLIS.toLong())
         assertFalse(requireNotNull(morph?.page).active)
         capture("settings_card_morph_settled_$variant")
         val settled = composeRule.onRoot().captureToImage()
         assertNativeHeader(settled, early)
         assertNativeHeader(settled, mid)
+        if (!amoled) {
+            assertTrue(
+                "Borderless entry must render its native body immediately",
+                early.asAndroidBitmap().sameAs(settled.asAndroidBitmap()),
+            )
+            assertTrue("Borderless body must stay settled", mid.asAndroidBitmap().sameAs(settled.asAndroidBitmap()))
+        }
     }
 
     private fun render(
         dark: Boolean,
         largeRtl: Boolean,
         start: Int,
+        amoled: Boolean = false,
     ) {
         route.value = start
         composeRule.mainClock.autoAdvance = false
@@ -160,7 +191,7 @@ class SettingsCardMorphScreenshotTest {
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 LocalDensity provides Density(density.density, if (largeRtl) 1.6f else 1f),
             ) {
-                WhiteNoiseTheme(darkTheme = dark) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
                     Surface(Modifier.fillMaxSize()) {
                         SettingsRouteMotion(
                             target = route.value,
@@ -199,11 +230,21 @@ class SettingsCardMorphScreenshotTest {
         }
     }
 
-    private fun captureActiveFrame(name: String): ImageBitmap {
+    private fun captureTransitionFrame(
+        name: String,
+        animated: Boolean,
+    ): ImageBitmap {
         val image = composeRule.onRoot().captureToImage()
         val owner = requireNotNull(morph)
-        assertTrue("Native page must be active at $name", requireNotNull(owner.page).active)
-        assertTrue("Native page clock must advance at $name: ${owner.time()}", owner.time() > 0f && owner.time() < 1f)
+        assertEquals("Only AMOLED admits contour motion at $name", animated, requireNotNull(owner.page).active)
+        if (animated) {
+            assertTrue(
+                "Native page clock must advance at $name: ${owner.time()}",
+                owner.time() > 0f && owner.time() < 1f,
+            )
+        } else {
+            assertEquals("Borderless page must release its clock immediately", 1f, owner.time(), 0f)
+        }
         capture(name)
         return image
     }
