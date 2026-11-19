@@ -230,7 +230,7 @@ private fun composerVoiceBoundsModifier(
         Modifier
     }
 
-/** Holding a configured slot explains it; voice note keeps hold-to-record but TalkBack can still explain it. */
+/** Holding a slot explains it; voice note and dictation keep their hold gestures, TalkBack still explains them. */
 @Composable
 private fun Modifier.explainComposerShortcut(
     shortcut: ComposerShortcut,
@@ -240,7 +240,7 @@ private fun Modifier.explainComposerShortcut(
     return explainOnLongPress(
         explanation = shortcut.explanation(),
         enabled = customizable,
-        holdToExplain = shortcut != ComposerShortcut.VoiceNote,
+        holdToExplain = shortcut != ComposerShortcut.VoiceNote && shortcut != ComposerShortcut.Dictation,
         additionalActions =
             if (customizable) composerCustomizeAccessibilityActions(bindings.onCustomize) else emptyList(),
     )
