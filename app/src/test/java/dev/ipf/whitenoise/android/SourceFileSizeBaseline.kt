@@ -60,7 +60,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt" to 777,
         "dev/ipf/whitenoise/android/ui/conversation/ConversationTtsFollow.kt" to 715,
         "dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt" to 2246,
-        "dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt" to 2206,
+        "dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt" to 2205,
         "dev/ipf/whitenoise/android/ui/conversation/media/MediaFileBubble.kt" to 694,
         "dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt" to 1109,
         "dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt" to 641,

@@ -1,15 +1,18 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import dev.ipf.whitenoise.android.ui.common.LocalExplanationBottomEdge
 import dev.ipf.whitenoise.android.ui.common.LocalExplanationHost
+import dev.ipf.whitenoise.android.ui.design.platformBackCallbacksEnabled
 import kotlin.math.roundToInt
 
 /** The composer's top edge while [ExplainAboveComposer] is active, or `null` outside it. */
@@ -50,14 +53,15 @@ internal fun Modifier.composerExplanationEdge(): Modifier {
 @Composable
 internal fun composerExplanationClose(): (() -> Unit)? {
     val explanations = LocalExplanationHost.current ?: return null
-    return if (explanations.shown != null && explanations.bottomWindowY != null) explanations::dismiss else null
+    return if (explanations.shown != null && explanations.bottomEdge != null) explanations::dismiss else null
 }
 
 /**
- * Whether the editor's pre-IME Back is on. An open explanation always closes there: before Android 16 the app's
- * overlay-priority Back callback runs only after the keyboard has taken Back, so Back would hide the keyboard instead.
- * The sending-identity popup keeps its overlay-priority Back owner on Android 13 and later, and needs this catch only
- * before 13. With no popup open, the catch hides the keyboard or leaves the conversation as before.
+ * Whether the editor's pre-IME Back is on. An open explanation always closes there: on Android 14 and 15 a Back key
+ * reaches the keyboard before the app's overlay-priority callback, and Android 13 drops that callback altogether, so
+ * Back would hide the keyboard instead. The sending-identity popup keeps its overlay-priority Back owner where
+ * [platformBackCallbacksEnabled], and needs this catch only below that. With no popup open, the catch hides the
+ * keyboard or leaves the conversation as before.
  */
 internal fun preImeHandlesBack(
     closeSendingIdentity: (() -> Unit)?,
@@ -65,9 +69,9 @@ internal fun preImeHandlesBack(
 ): Boolean =
     closeExplanation != null ||
         closeSendingIdentity == null ||
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+        !platformBackCallbacksEnabled()
 
-/** The composer's last laid-out top edge in window pixels, read only when a held control is explained. */
+/** The composer's laid-out top edge in window pixels, observed by an open explanation's sheet so it follows along. */
 private class ComposerTopEdge {
-    var windowY = 0
+    var windowY by mutableIntStateOf(0)
 }

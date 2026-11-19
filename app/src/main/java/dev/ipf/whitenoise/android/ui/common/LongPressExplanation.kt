@@ -45,9 +45,10 @@ internal data class Explanation(
 internal val LocalExplanationHost = staticCompositionLocalOf<ExplanationHostState?> { null }
 
 /**
- * The window y, in pixels, that an explanation's sheet keeps its bottom edge at, read when a held control is
- * explained. The composer provides its top edge, so the sheet opens above it without taking focus from the editor
- * and the keyboard stays open. `null` opens the modal sheet at the bottom of the window.
+ * The window y, in pixels, that an explanation's sheet keeps its bottom edge at, read for as long as the explanation
+ * shows. The composer provides its top edge, so the sheet opens above it without taking focus from the editor, the
+ * keyboard stays open, and the sheet follows the composer when the keyboard or the window changes. `null` opens the
+ * modal sheet at the bottom of the window.
  */
 internal val LocalExplanationBottomEdge = staticCompositionLocalOf<(() -> Int)?> { null }
 
@@ -57,16 +58,20 @@ internal class ExplanationHostState {
     var shown by mutableStateOf<Explanation?>(null)
         private set
 
-    /** The window y the shown explanation's sheet keeps its bottom edge at, or `null` for the modal sheet. */
-    var bottomWindowY by mutableStateOf<Int?>(null)
+    /** Reads the window y the shown explanation's sheet keeps its bottom edge at, or `null` for the modal sheet. */
+    var bottomEdge by mutableStateOf<(() -> Int)?>(null)
         private set
 
-    /** Shows [explanation], replacing any other, above [bottomWindowY] when given. */
+    /** The shown explanation's sheet's bottom edge now, observed through [bottomEdge] by whoever reads it. */
+    val bottomWindowY: Int?
+        get() = bottomEdge?.invoke()
+
+    /** Shows [explanation], replacing any other, above the window y [bottomEdge] reads when given. */
     fun show(
         explanation: Explanation,
-        bottomWindowY: Int? = null,
+        bottomEdge: (() -> Int)? = null,
     ) {
-        this.bottomWindowY = bottomWindowY
+        this.bottomEdge = bottomEdge
         shown = explanation
     }
 
@@ -180,7 +185,7 @@ internal fun Modifier.explainOnLongPress(
         latestExplanation?.let { current ->
             latestHost?.let { explanations ->
                 latestBeforeShow()
-                explanations.show(current, latestBottomEdge?.invoke())
+                explanations.show(current, latestBottomEdge)
             }
         }
     }

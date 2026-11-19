@@ -151,6 +151,7 @@ import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
+import dev.ipf.whitenoise.android.ui.design.platformBackCallbacksEnabled
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Key
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
@@ -470,11 +471,9 @@ internal fun ComposerPill(
             showKeyboardAfterTouchTap = false
         }
     }
-    // Gesture/predictive Back reaches the IME before the activity's ordinary
-    // BackHandler. While this field owns focus, register ahead of the IME so an
-    // explicit Back clears focus; IME-only geometry changes (including a
-    // keyboard-to-voice handoff) never invoke this callback.
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    // While this field owns focus, register ahead of the IME where platform callbacks run, so an explicit Back
+    // clears focus. IME-only geometry changes, a keyboard-to-voice handoff included, never invoke this callback.
+    if (platformBackCallbacksEnabled()) {
         ComposerPlatformPreImeBackHandler(
             enabled = preImeBackEnabled && composerFocused,
             onBack = { latestOnPreImeBack() },
