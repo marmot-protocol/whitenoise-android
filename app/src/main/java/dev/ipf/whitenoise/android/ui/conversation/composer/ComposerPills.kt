@@ -1232,7 +1232,12 @@ internal fun ComposerPill(
         }
     }
     val draftJumpLayoutSettled = draftTopGeometrySettled && textHeightGeometrySettled && !geometryTransitionActive
-    LaunchedEffect(textFieldValue.text.isEmpty(), draftJumpLayoutSettled, composerScrollState.maxValue > 0) {
+    LaunchedEffect(
+        scrollOwnerKey,
+        textFieldValue.text.isEmpty(),
+        draftJumpLayoutSettled,
+        composerScrollState.maxValue > 0,
+    ) {
         if (textFieldValue.text.isEmpty()) {
             draftJumpsAdmitted = false
         } else if (draftJumpLayoutSettled) {
