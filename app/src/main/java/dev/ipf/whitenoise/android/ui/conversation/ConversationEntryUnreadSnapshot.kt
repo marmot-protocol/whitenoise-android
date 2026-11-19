@@ -132,46 +132,56 @@ internal fun rememberConversationEntryUnreadSnapshot(
     }
     val projectionCaptured = projectionHolder.frozen != null
     val entryProjection = projectionHolder.frozen ?: currentProjection
-    // Paging the anchor in can prove a frozen first-unread id stale, so check the boundary again then.
-    val readAnchorLoaded =
-        remember(timeline, entryProjection.readAnchorMessageId) {
-            val anchorId = entryProjection.readAnchorMessageId
-            anchorId != null && timeline.any { it.record.messageIdHex == anchorId }
-        }
-    return remember(controllerIdentity, entryProjection, timeline.isNotEmpty(), projectionCaptured, readAnchorLoaded) {
-        val count =
-            if (timeline.isEmpty()) {
-                entryProjection.count
-            } else {
-                reconciledConversationEntryUnreadCount(
-                    projectionUnread = entryProjection.count,
-                    timeline = timeline,
-                    readAnchorMessageId = entryProjection.readAnchorMessageId,
-                )
-            }
-        val firstUnreadIndex = firstUnreadReceivedIndex(timeline, count)
-        ConversationEntryUnreadSnapshot(
-            count = count,
-            projectionCaptured = projectionCaptured,
-            readAnchorMessageId = entryProjection.readAnchorMessageId,
-            firstUnreadMessageId =
-                if (count <= 0) {
-                    null
+    val snapshot =
+        remember(controllerIdentity, entryProjection, timeline.isNotEmpty(), projectionCaptured) {
+            val count =
+                if (timeline.isEmpty()) {
+                    entryProjection.count
                 } else {
-                    firstUnreadAfterReadAnchor(
-                        entryProjection.firstUnreadMessageId,
-                        entryProjection.readAnchorMessageId,
-                        timeline,
+                    reconciledConversationEntryUnreadCount(
+                        projectionUnread = entryProjection.count,
+                        timeline = timeline,
+                        readAnchorMessageId = entryProjection.readAnchorMessageId,
                     )
-                        ?: timeline
-                            .getOrNull(firstUnreadIndex)
-                            ?.record
-                            ?.messageIdHex
-                            ?.takeIf { it.isNotBlank() }
-                },
-        )
+                }
+            val firstUnreadIndex = firstUnreadReceivedIndex(timeline, count)
+            ConversationEntryUnreadSnapshot(
+                count = count,
+                projectionCaptured = projectionCaptured,
+                readAnchorMessageId = entryProjection.readAnchorMessageId,
+                firstUnreadMessageId =
+                    if (count <= 0) {
+                        null
+                    } else {
+                        firstUnreadAfterReadAnchor(
+                            entryProjection.firstUnreadMessageId,
+                            entryProjection.readAnchorMessageId,
+                            timeline,
+                        )
+                            ?: timeline
+                                .getOrNull(firstUnreadIndex)
+                                ?.record
+                                ?.messageIdHex
+                                ?.takeIf { it.isNotBlank() }
+                    },
+            )
+        }
+    // Paging the anchor in can prove the frozen id stale. Move the line once and keep it there.
+    val anchorCheck = remember(snapshot) { ConversationEntryAnchorCheck() }
+    val anchorId = snapshot.readAnchorMessageId
+    val anchorLoaded = anchorId != null && timeline.any { it.record.messageIdHex == anchorId }
+    if (!anchorCheck.done && snapshot.firstUnreadMessageId != null && anchorLoaded) {
+        anchorCheck.done = true
+        anchorCheck.firstUnreadMessageId =
+            firstUnreadAfterReadAnchor(snapshot.firstUnreadMessageId, anchorId, timeline)
     }
+    return if (anchorCheck.done) snapshot.copy(firstUnreadMessageId = anchorCheck.firstUnreadMessageId) else snapshot
 }
+
+private class ConversationEntryAnchorCheck(
+    var done: Boolean = false,
+    var firstUnreadMessageId: String? = null,
+)
 
 /** Resolve and, when necessary, page in the frozen first-unread row. */
 internal suspend fun resolveConversationEntryUnreadMessageId(

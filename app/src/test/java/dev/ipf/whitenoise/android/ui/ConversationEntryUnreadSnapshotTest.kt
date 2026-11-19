@@ -121,6 +121,37 @@ class ConversationEntryUnreadSnapshotTest {
         }
         composeRule.waitForIdle()
         assertEquals(ConversationEntryUnreadSnapshot(1, "new-1", readAnchorMessageId = "read"), snapshot[0])
+
+        // The line stays put when the window later drops the anchor again.
+        composeRule.runOnUiThread { timeline.value = listOf(received("new-1"), received("new-2")) }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(1, "new-1", readAnchorMessageId = "read"), snapshot[0])
+    }
+
+    /** Without a projected id, a later anchor page cannot push the count-based line onto live arrivals. */
+    @Test
+    fun countBasedLineIgnoresMessagesArrivingBeforeAnchorPagesIn() {
+        val timeline = mutableStateOf(listOf(received("new-1"), received("new-2")))
+        val snapshot = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+        composeRule.setContent {
+            snapshot[0] =
+                rememberConversationEntryUnreadSnapshot(
+                    controllerIdentity = this,
+                    projectionUnread = 2,
+                    projectionFirstUnreadMessageId = null,
+                    timeline = timeline.value,
+                    readAnchorMessageId = "read",
+                )
+        }
+        composeRule.waitForIdle()
+        val entry = snapshot[0]
+        assertEquals(ConversationEntryUnreadSnapshot(2, "new-1", readAnchorMessageId = "read"), entry)
+
+        composeRule.runOnUiThread { timeline.value = timeline.value + received("live") }
+        composeRule.waitForIdle()
+        composeRule.runOnUiThread { timeline.value = listOf(received("read")) + timeline.value }
+        composeRule.waitForIdle()
+        assertEquals(entry, snapshot[0])
     }
 
     @Test
