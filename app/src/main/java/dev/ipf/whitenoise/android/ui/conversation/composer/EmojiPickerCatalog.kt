@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiSection
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.InstalledEmojiSetTab
+import dev.ipf.whitenoise.android.ui.hides
 
 /** Persistent reaction slots use device-wide artwork while ordinary sends can use account and chat sources. */
 internal fun emojiPickerShortcodes(
@@ -58,4 +59,24 @@ internal fun emojiPickerSets(
     val inSets = (builtin + installed).flatMapTo(mutableSetOf()) { it.emoji }
     val custom = available.filterNot { it in inSets || it in EmojiShortcodes.builtins }
     return EmojiPickerSets(custom, builtin + installed)
+}
+
+/** Recents this picker can still offer: artwork must be available here and outside hidden sets. */
+internal fun pickerRecents(
+    recentEmojis: List<String>,
+    purpose: EmojiPickerPurpose,
+    customEmoji: CustomEmojiSet,
+    hidden: Set<BuiltinEmojiSet>,
+): List<String> {
+    val available =
+        if (purpose == EmojiPickerPurpose.GROUP_IMAGE) {
+            emptySet()
+        } else {
+            (emojiPickerShortcodes(customEmoji, purpose) + EmojiShortcodes.builtins)
+                .filterNot { hidden.hides(it) }
+                .toSet()
+        }
+    return recentEmojis
+        .filter { it.isNotBlank() && (!EmojiShortcodes.isShortcode(it) || it in available) }
+        .distinct()
 }

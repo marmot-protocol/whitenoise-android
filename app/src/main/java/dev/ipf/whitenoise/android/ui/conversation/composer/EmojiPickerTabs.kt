@@ -33,6 +33,7 @@ internal fun EmojiPickerTabIcon(
     tint: Color,
 ) {
     val title = emojiPickerTabTitle(tab)
+    val setLabel = Modifier.clearAndSetSemantics { contentDescription = title }
     when (tab) {
         is EmojiCategory ->
             Icon(
@@ -41,7 +42,7 @@ internal fun EmojiPickerTabIcon(
                 modifier = Modifier.size(size),
                 tint = tint,
             )
-        is BuiltinEmojiSet -> EmojiGlyph(tab.iconEmoji, Modifier.clearAndSetSemantics { contentDescription = title }, size)
-        is InstalledEmojiSetTab -> EmojiGlyph(tab.iconEmoji, Modifier.clearAndSetSemantics { contentDescription = title }, size)
+        is BuiltinEmojiSet -> EmojiGlyph(tab.iconEmoji, setLabel, size)
+        is InstalledEmojiSetTab -> EmojiGlyph(tab.iconEmoji, setLabel, size)
     }
 }

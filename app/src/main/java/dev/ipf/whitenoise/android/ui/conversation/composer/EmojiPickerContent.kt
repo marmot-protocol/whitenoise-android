@@ -41,8 +41,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.BuiltinEmojiSet
-import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiEntry
@@ -135,7 +133,9 @@ private fun rememberEmojiPickerModel(
     val pickerSets = remember(customEmoji, purpose, hidden) { emojiPickerSets(customEmoji, purpose, hidden) }
     val custom = pickerSets.custom
     val recents =
-        remember(recentEmojis, purpose, customEmoji, hidden) { pickerRecents(recentEmojis, purpose, customEmoji, hidden) }
+        remember(recentEmojis, purpose, customEmoji, hidden) {
+            pickerRecents(recentEmojis, purpose, customEmoji, hidden)
+        }
     val browseSections =
         remember(entries, recents, pickerSets) { emojiBrowseSections(entries, recents, custom, pickerSets.sets) }
     var searchSections by remember { mutableStateOf<List<EmojiSection>>(emptyList()) }
@@ -448,24 +448,4 @@ internal fun EmojiGlyph(
             softWrap = false,
         )
     }
-}
-
-/** Recents this picker can still offer: artwork must be available here and outside hidden sets. */
-private fun pickerRecents(
-    recentEmojis: List<String>,
-    purpose: EmojiPickerPurpose,
-    customEmoji: CustomEmojiSet,
-    hidden: Set<BuiltinEmojiSet>,
-): List<String> {
-    val available =
-        if (purpose == EmojiPickerPurpose.GROUP_IMAGE) {
-            emptySet()
-        } else {
-            (emojiPickerShortcodes(customEmoji, purpose) + EmojiShortcodes.builtins)
-                .filterNot { hidden.hides(it) }
-                .toSet()
-        }
-    return recentEmojis
-        .filter { it.isNotBlank() && (!EmojiShortcodes.isShortcode(it) || it in available) }
-        .distinct()
 }
