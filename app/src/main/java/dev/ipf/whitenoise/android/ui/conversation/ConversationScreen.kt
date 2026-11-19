@@ -534,7 +534,8 @@ internal fun ConversationScreen(
             controller to notificationOpenRequestId
         }
     // The controller row is seeded from the live chat-list row; the open item can predate newer messages.
-    val entryRow = rememberConversationEntryRow(entryUnreadSessionIdentity) { controller.latestChatListRow ?: chat.projection }
+    val entryRow =
+        rememberConversationEntryRow(entryUnreadSessionIdentity) { controller.latestChatListRow ?: chat.projection }
     val entryProjectionAvailable = entryRow != null
     val projectedUnreadCount = (entryRow?.unreadCount ?: 0uL).coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     val entryUnreadSnapshot =

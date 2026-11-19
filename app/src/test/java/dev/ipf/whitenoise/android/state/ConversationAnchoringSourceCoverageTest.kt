@@ -130,7 +130,8 @@ class ConversationAnchoringSourceCoverageTest {
         assertTrue(
             "the unread line must start from the controller's live row and seed it from the backing row",
             screen.contains(
-                "rememberConversationEntryRow(entryUnreadSessionIdentity) { controller.latestChatListRow ?: chat.projection }",
+                "rememberConversationEntryRow(entryUnreadSessionIdentity) " +
+                    "{ controller.latestChatListRow ?: chat.projection }",
             ) &&
                 mainShell.contains(
                     "initialChatListRow = conversationEntryChatListRow(openChat, chatsController, accountRef)",
