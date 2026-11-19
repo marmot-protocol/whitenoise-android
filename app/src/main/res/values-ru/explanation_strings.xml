@@ -11,7 +11,7 @@
     <string name="explanation_composer_dictation">Вводит текст по вашей речи с помощью распознавания речи Android. White Noise запрашивает автономное распознавание, но устройство всё равно может использовать онлайн-сервис.</string>
     <string name="explanation_composer_translate">Включает или выключает режим перевода. Пока он включён, «Отправить» отправляет перевод из строки «Будет отправлено», и ничего не отправляется, пока перевод не готов.</string>
     <string name="explanation_composer_voice_note">Удерживайте, чтобы записать голосовое сообщение.</string>
-    <string name="explanation_composer_camera">Открывает камеру, чтобы вы могли прикрепить новое фото. Android запрашивает доступ к камере при первом использовании.</string>
+    <string name="explanation_composer_camera">Открывает камеру, чтобы вы могли сделать фото или записать видео и прикрепить его. Android запрашивает доступ к камере при первом использовании и к микрофону при первой записи.</string>
     <string name="explanation_composer_gallery">Открывает выбор фото Android. White Noise получает только те фото и видео, которые вы выберете.</string>
     <string name="explanation_composer_files">Открывает выбор файлов Android, чтобы прикрепить любой файл.</string>
     <string name="explanation_composer_location">Один раз отправляет ваше текущее местоположение в виде ссылки на карту. Не продолжает делиться местоположением.</string>
