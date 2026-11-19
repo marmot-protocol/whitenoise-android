@@ -29,13 +29,25 @@ internal class TtsPlaybackTrustConsent(
     private val appState: WhiteNoiseAppState,
     private val attachedHandle: () -> TtsEngineHandle?,
 ) {
+    private var approvedUnverifiedHandle: TtsEngineHandle? = null
+
     var pending by mutableStateOf<TtsPlaybackTrustRequest?>(null)
         private set
 
     fun needsAcknowledgment(): Boolean = attachedHandle()?.let(::needsAcknowledgment) == true
 
     private fun needsAcknowledgment(handle: TtsEngineHandle): Boolean =
-        requiresTtsTrustWarning(handle.enginePackage, handle.trust, appState.ttsWarningPreferences)
+        if (handle.connectedPackageVerified) {
+            requiresTtsTrustWarning(handle.enginePackage, handle.trust, appState.ttsWarningPreferences)
+        } else {
+            approvedUnverifiedHandle !== handle
+        }
+
+    /** A replacement connection cannot inherit consent from an inferred package. */
+    fun onHandleReplaced() {
+        approvedUnverifiedHandle = null
+        cancel()
+    }
 
     fun cancel() {
         pending?.respond(false)
@@ -67,7 +79,11 @@ internal class TtsPlaybackTrustConsent(
             if (!question.awaitApproval()) {
                 false
             } else {
-                appState.acknowledgeTtsTrustWarning(handle.enginePackage)
+                if (handle.connectedPackageVerified) {
+                    appState.acknowledgeTtsTrustWarning(handle.enginePackage)
+                } else {
+                    approvedUnverifiedHandle = handle
+                }
                 true
             }
         } finally {

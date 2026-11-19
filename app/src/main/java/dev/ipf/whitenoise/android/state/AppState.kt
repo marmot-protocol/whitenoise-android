@@ -1333,7 +1333,7 @@ class WhiteNoiseAppState private constructor(
         // in-flight speech. It must also preserve the utterance-locale voice
         // resolution most recently published by the attached adapter.
         if (handle === attachedTtsHandle) return
-        ttsPlaybackTrust.cancel()
+        ttsPlaybackTrust.onHandleReplaced()
         clearTtsPlaybackOwnership()
         ttsVoiceResolution = handle?.voiceResolution ?: TtsVoiceResolution.Empty
         attachedTtsHandle = handle

@@ -42,6 +42,7 @@ data class TtsEngineHandle(
     val enginePackage: String,
     val trust: EngineTrust,
     val voiceResolution: TtsVoiceResolution = TtsVoiceResolution.Empty,
+    val connectedPackageVerified: Boolean = false,
 ) {
     /** Shuts down the framework engine when this resolved handle is replaced. */
     fun release() {
@@ -308,6 +309,7 @@ class TtsEngineResolver(
                     enginePackage = activePackage,
                     trust = trust,
                     voiceResolution = voiceResolution,
+                    connectedPackageVerified = verifiedPackage != null,
                 ),
         )
     }

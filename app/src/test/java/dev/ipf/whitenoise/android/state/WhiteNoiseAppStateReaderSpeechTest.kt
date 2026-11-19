@@ -1,12 +1,15 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.media.AudioManager
+import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
+import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
@@ -22,6 +25,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.Locale
 
@@ -249,6 +253,95 @@ class WhiteNoiseAppStateReaderSpeechTest {
                 handle.release()
             }
         }
+
+    /** Stored package approval cannot authorize an unverified Android connection or its replacement. */
+    @Test
+    fun unverifiedReplacementRequiresConsentDespiteSavedPackageApproval() =
+        runBlocking {
+            val appState = testAppState()
+            val packageName = "test.external.reader"
+            val entries = listOf(TtsSpeakableEntry("s", "Sender", "Private speech."))
+            val original = ConsentRecordingTts(context)
+            val replacement = ConsentRecordingTts(context)
+            val publish =
+                WhiteNoiseAppState::class.java
+                    .getDeclaredMethod("publishTtsResolution", TtsResolutionResult::class.java)
+                    .apply { isAccessible = true }
+
+            fun attach(
+                tts: TextToSpeech,
+                trust: EngineTrust = EngineTrust.Unknown,
+                verified: Boolean = false,
+                enginePackage: String = packageName,
+            ) {
+                val handle = TtsEngineHandle(tts, enginePackage, trust, connectedPackageVerified = verified)
+                publish.invoke(appState, TtsResolutionResult(TextToSpeech.SUCCESS, emptyList(), enginePackage, handle))
+            }
+
+            suspend fun startSpeech() =
+                appState.confirmTtsPlaybackTrust { true } && appState.speakAloud(entries, Locale.US)
+
+            try {
+                shadowOf(context.getSystemService(AudioManager::class.java))
+                    .setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+                appState.acknowledgeTtsTrustWarning(packageName)
+                attach(original)
+                val accepted = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
+                assertEquals(0, original.utterances)
+                val originalRequest = requireNotNull(appState.ttsPlaybackTrust.pending)
+                originalRequest.respond(true)
+                assertTrue(accepted.await())
+                assertTrue(original.utterances > 0)
+                assertTrue(appState.confirmTtsPlaybackTrust { true })
+                assertNull(appState.ttsPlaybackTrust.pending)
+
+                val previousStops = original.stops
+                attach(replacement)
+                assertTrue(original.stops > previousStops)
+                assertTrue(appState.ttsController.queuedMessagesSnapshot().isEmpty())
+                originalRequest.respond(true)
+                val pending = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
+                assertEquals(0, replacement.utterances)
+                requireNotNull(appState.ttsPlaybackTrust.pending).respond(false)
+                assertFalse(pending.await())
+                assertEquals(0, replacement.utterances)
+
+                attach(replacement, verified = true)
+                assertTrue(appState.confirmTtsPlaybackTrust { true })
+                attach(replacement, trust = EngineTrust.Local, verified = true, enginePackage = "test.local.reader")
+                assertTrue(appState.confirmTtsPlaybackTrust { true })
+            } finally {
+                publish.invoke(appState, null)
+                original.shutdown()
+                replacement.shutdown()
+            }
+        }
+
+    private class ConsentRecordingTts(
+        context: Context,
+    ) : TextToSpeech(context, {}) {
+        var utterances = 0
+            private set
+        var stops = 0
+            private set
+
+        override fun speak(
+            text: CharSequence?,
+            queueMode: Int,
+            params: Bundle?,
+            utteranceId: String?,
+        ): Int {
+            utterances++
+            return SUCCESS
+        }
+
+        override fun stop(): Int {
+            stops++
+            return SUCCESS
+        }
+
+        override fun setLanguage(locale: Locale?): Int = LANG_COUNTRY_AVAILABLE
+    }
 
     /** An unmappable conversation start neither guesses the top nor acquires an auto-read session. */
     @Test

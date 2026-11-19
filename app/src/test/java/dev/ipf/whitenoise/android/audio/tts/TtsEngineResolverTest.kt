@@ -422,6 +422,7 @@ class TtsEngineResolverTest {
             assertNotNull(result.handle)
             assertEquals(EngineTrust.Unknown, result.handle?.trust)
             assertEquals("com.google.android.tts", result.handle?.enginePackage)
+            assertEquals(true, result.handle?.connectedPackageVerified)
             result.handle?.release()
             Unit
         }
@@ -453,6 +454,7 @@ class TtsEngineResolverTest {
 
             assertNotNull(result.handle)
             assertEquals(EngineTrust.Local, result.handle?.trust)
+            assertEquals(true, result.handle?.connectedPackageVerified)
             assertEquals("app.grapheneos.speechservices", result.handle?.enginePackage)
             result.handle?.release()
             Unit
