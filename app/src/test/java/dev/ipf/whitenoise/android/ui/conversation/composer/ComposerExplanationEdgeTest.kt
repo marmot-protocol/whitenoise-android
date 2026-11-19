@@ -32,7 +32,9 @@ import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.design.AboveWindowYPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -88,6 +90,27 @@ class ComposerExplanationEdgeTest {
         composeRule.runOnIdle { host.show(EXPLANATION, bottomWindowY = 600) }
         composeRule.runOnIdle { checkNotNull(close).invoke() }
         composeRule.runOnIdle { assertNull(host.shown) }
+    }
+
+    /**
+     * On Android 16 the editor's pre-IME Back closes an explanation, and otherwise stays off while only the
+     * sending-identity popup is open, which owns Back through its overlay callback there.
+     */
+    @Test
+    fun preImeBackClosesExplanationsOnEveryVersion() {
+        val close = {}
+
+        assertTrue(preImeHandlesBack(closeSendingIdentity = null, closeExplanation = close))
+        assertTrue(preImeHandlesBack(closeSendingIdentity = close, closeExplanation = close))
+        assertFalse(preImeHandlesBack(closeSendingIdentity = close, closeExplanation = null))
+        assertTrue(preImeHandlesBack(closeSendingIdentity = null, closeExplanation = null))
+    }
+
+    /** Before Android 13 the editor's pre-IME Back also closes the sending-identity popup. */
+    @Test
+    @Config(sdk = [30])
+    fun preImeBackClosesTheIdentityPopupBeforeAndroid13() {
+        assertTrue(preImeHandlesBack(closeSendingIdentity = {}, closeExplanation = null))
     }
 
     /**

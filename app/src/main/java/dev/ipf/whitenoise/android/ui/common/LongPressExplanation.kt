@@ -5,7 +5,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -131,7 +130,7 @@ private fun ExplanationSheet(
     }
 }
 
-/** The explanation's title with a close button over its body, which scrolls when the sheet's height is bounded. */
+/** The explanation's title with a close button over its body, which scrolls, edge-faded, when its height is bounded. */
 @Suppress("FunctionNaming")
 @Composable
 private fun ColumnScope.ExplanationContent(
@@ -144,7 +143,7 @@ private fun ColumnScope.ExplanationContent(
         modifier =
             Modifier
                 .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState())
+                .fadingVerticalScroll(rememberScrollState())
                 .padding(horizontal = WhiteNoiseSpacing.Section)
                 .padding(bottom = WhiteNoiseSpacing.Section)
                 .testTag("explanation.body"),

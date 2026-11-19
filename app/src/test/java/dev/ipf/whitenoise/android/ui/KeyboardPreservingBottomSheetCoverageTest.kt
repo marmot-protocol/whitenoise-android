@@ -70,7 +70,7 @@ class KeyboardPreservingBottomSheetCoverageTest {
         )
         assertTrue(
             "the editor's Back must close a composer explanation before it hides the keyboard",
-            "val closeComposerPopup = closeSendingIdentity ?: composerExplanationClose()" in
+            "val closeExplanation = composerExplanationClose()" in
                 source("ui/conversation/composer/ComposerBar.kt").readText(),
         )
         assertTrue(

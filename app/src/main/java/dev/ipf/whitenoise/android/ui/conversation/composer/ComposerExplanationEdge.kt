@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -51,6 +52,20 @@ internal fun composerExplanationClose(): (() -> Unit)? {
     val explanations = LocalExplanationHost.current ?: return null
     return if (explanations.shown != null && explanations.bottomWindowY != null) explanations::dismiss else null
 }
+
+/**
+ * Whether the editor's pre-IME Back is on. An open explanation always closes there: before Android 16 the app's
+ * overlay-priority Back callback runs only after the keyboard has taken Back, so Back would hide the keyboard instead.
+ * The sending-identity popup keeps its overlay-priority Back owner on Android 13 and later, and needs this catch only
+ * before 13. With no popup open, the catch hides the keyboard or leaves the conversation as before.
+ */
+internal fun preImeHandlesBack(
+    closeSendingIdentity: (() -> Unit)?,
+    closeExplanation: (() -> Unit)?,
+): Boolean =
+    closeExplanation != null ||
+        closeSendingIdentity == null ||
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
 
 /** The composer's last laid-out top edge in window pixels, read only when a held control is explained. */
 private class ComposerTopEdge {
