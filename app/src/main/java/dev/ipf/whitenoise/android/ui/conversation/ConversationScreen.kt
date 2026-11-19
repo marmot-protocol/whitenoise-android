@@ -1877,9 +1877,8 @@ internal fun ConversationScreen(
             onRejected = { appState.presentAttachmentAdmission(context, acceptedCount = 0, offeredCount = 1) },
         )
 
-    // TakePicture needs no permission of its own, but because CAMERA is declared
-    // in the manifest (for the QR scanner) some OEMs require the runtime grant
-    // before launching the capture intent — request it first if missing.
+    // The in-app camera opens the device camera itself through CameraX, so it
+    // needs the CAMERA runtime grant — request it first if missing.
     val cameraPermissionLauncher =
         rememberOriginGuardedResultLauncher(
             ActivityResultContracts.RequestPermission(),

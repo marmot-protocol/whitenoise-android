@@ -11,7 +11,8 @@ import org.junit.Test
 
 /**
  * Relay lists are seeded from White Noise's own defaults, never from what the account's projection already holds.
- * Restore must also drop the account's read and write roles, which the per-list setters preserve.
+ * Restore must also drop the account's read and write roles, which the per-list setters preserve, and every path
+ * that gives an account its first lists reads the same defaults.
  */
 class RelayDefaultsRestoreCoverageTest {
     /** Restore publishes both White Noise lists in one role-free call, never through a role-preserving setter. */
@@ -51,6 +52,22 @@ class RelayDefaultsRestoreCoverageTest {
                 }.toList()
 
         assertEquals(listOf("AppStateRelayLists.kt:publishMissingAccountRelayKinds"), seeded)
+    }
+
+    /**
+     * Only `whiteNoiseDefaultRelays` reads the NIP-65 constant, so sign-up, sign-in, recovery, onboarding and Restore
+     * all publish the same split, and changing it happens in one place.
+     */
+    @Test
+    fun onlyTheDefaultsReadTheNip65Constant() {
+        val readers =
+            appModuleFile("src/main/java")
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" && "MarmotClient.accountRelays" in it.readText() }
+                .map { it.name }
+                .toList()
+
+        assertEquals(listOf("WhiteNoiseDefaultRelays.kt"), readers)
     }
 
     private companion object {

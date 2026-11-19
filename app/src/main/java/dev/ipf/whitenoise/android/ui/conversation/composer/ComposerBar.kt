@@ -1246,7 +1246,8 @@ internal fun ComposerBar(
                                 size.height,
                                 automaticComposerHeightPx.toInt().coerceAtLeast(0),
                             )
-                        }.padding(horizontal = 16.dp, vertical = ComposerOuterVerticalPadding),
+                        }.padding(horizontal = 16.dp, vertical = ComposerOuterVerticalPadding)
+                        .composerExplanationEdge(),
                 fillEditorHeight = composerExpansion.mode != ComposerExpansionMode.Automatic,
                 minimumEditorHeight = with(density) { minimumManualComposerHeightPx.toDp() } - 12.dp,
             ) {
@@ -1659,7 +1660,6 @@ internal fun ComposerBar(
                         Modifier
                             .fillMaxWidth()
                             .onGloballyPositioned { toolbarParentBounds = it.boundsInWindow() }
-                            .composerExplanationEdge()
                             .onSizeChanged { toolbarParentSize = it },
                 ) {
                     // Keep the field composed and focusable throughout dictation. The

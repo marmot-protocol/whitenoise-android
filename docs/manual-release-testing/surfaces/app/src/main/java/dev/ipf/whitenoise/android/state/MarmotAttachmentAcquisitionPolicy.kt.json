@@ -14,7 +14,7 @@
       {
         "surface": "Generated identity relay-list split",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
-        "anchor": "createIdentity(MarmotClient.accountRelays, relays, relays)",
+        "anchor": "createIdentity(whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)",
         "test_ids": [
           "ONB-003",
           "ONB-026"
@@ -23,7 +23,7 @@
       {
         "surface": "Sign Up name and About as the first public profile",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
-        "anchor": "createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)",
+        "anchor": "createIdentityWithInitialProfile(profile, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)",
         "test_ids": [
           "ONB-003",
           "ONB-026"
