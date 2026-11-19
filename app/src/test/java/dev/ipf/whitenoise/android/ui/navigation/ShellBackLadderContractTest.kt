@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,7 +22,8 @@ import org.robolectric.annotation.Config
 
 /**
  * Where system Back leads from each level of the production shell. One press leaves exactly one level, in the
- * order a reader went in, and the last press from a route lands on the chat list.
+ * order a reader went in, and the last press from a route lands on the chat list. Activity recreation keeps the
+ * ladder as it was.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w1280dp-h800dp-mdpi")
@@ -80,6 +83,30 @@ class ShellBackLadderContractTest {
             shell.awaitCondition { holder.sectionState.sectionName == MainSection.Chats.name }
             assertNull(holder.sectionState.settingsDetailName)
             assertFalse("Back to Chats must not leave the app", composeRule.activity.isFinishing)
+        }
+    }
+
+    /**
+     * Recreating the Activity keeps chat details open over the same conversation controller, and Back still
+     * returns to that conversation first.
+     */
+    @Test
+    fun recreationKeepsChatDetailsOpenOnTheSameController() {
+        shell.withMountedShell(mutableStateOf(COMPACT_WIDTH)) { fixture, holder ->
+            shell.openTarget(fixture, holder)
+            composeRule.onNode(conversationHeader()).performClick()
+            shell.awaitCondition { detailsShown() }
+            val opened = fixture.appState.attachedConversationControllers().single()
+
+            shell.recreate()
+
+            assertTrue("chat details must survive recreation", detailsShown())
+            assertSame(opened, fixture.appState.attachedConversationControllers().single())
+            assertEquals(fixture.target.groupIdHex, holder.selectedChat.value?.id)
+
+            pressBack()
+            shell.awaitCondition { !detailsShown() }
+            assertEquals(fixture.target.groupIdHex, holder.selectedChat.value?.id)
         }
     }
 

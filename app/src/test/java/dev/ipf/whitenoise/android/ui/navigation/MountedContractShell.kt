@@ -7,6 +7,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Dp
@@ -25,6 +26,14 @@ import org.robolectric.Shadows.shadowOf
 internal class MountedContractShell(
     private val composeRule: AndroidComposeTestRule<ActivityScenarioRule<ComponentActivity>, ComponentActivity>,
 ) {
+    private val restoration = StateRestorationTester(composeRule)
+
+    /** Recreates the shell's composition from its saved instance state, as Activity recreation does. */
+    fun recreate() {
+        restoration.emulateSavedInstanceStateRestore()
+        settle()
+    }
+
     /** Mounts the production shell under a test-controlled window width and always releases its jobs. */
     fun withMountedShell(
         width: MutableState<Dp>,
@@ -36,7 +45,7 @@ internal class MountedContractShell(
         val controller =
             holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
         fixture.appState.setAppInForeground(true)
-        composeRule.setContent {
+        restoration.setContent {
             if (mounted.value) {
                 CompositionLocalProvider(
                     LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, SHELL_HEIGHT)),
