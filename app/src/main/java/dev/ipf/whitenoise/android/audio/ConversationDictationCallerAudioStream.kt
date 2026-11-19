@@ -159,7 +159,7 @@ internal class ConversationDictationCallerAudioStream(
     private fun feed() {
         try {
             var owned: ConversationDictationAudioRequest? = null
-            while (!cancelled.get() && !settled.get() && !providerEnded.get() && owned == null) {
+            while (feedOpen() && owned == null) {
                 owned = buffer.requests.pollRequest()
                 if (owned == null) Thread.sleep(PIPE_RETRY_MILLIS)
             }
@@ -210,7 +210,7 @@ internal class ConversationDictationCallerAudioStream(
         var stalledAt: Long? = null
         for (part in owned.pcmParts) {
             var offset = 0
-            while (!cancelled.get() && !settled.get() && !providerEnded.get() && offset < part.pcm.size) {
+            while (feedOpen() && offset < part.pcm.size) {
                 val written =
                     try {
                         pipeWriter.write(sink, part.pcm, offset, part.pcm.size - offset)
@@ -243,12 +243,7 @@ internal class ConversationDictationCallerAudioStream(
                 "new_bytes=${owned.chunk.pcm.size} bytes=$totalWritten",
         )
         // A terminal that lands during the final write still wins: its result cannot cover this feed.
-        val complete =
-            totalWritten == owned.pcmParts.sumOf { it.pcm.size } &&
-                !cancelled.get() &&
-                !settled.get() &&
-                !providerEnded.get()
-        if (complete) {
+        if (totalWritten == owned.pcmParts.sumOf { it.pcm.size } && feedOpen()) {
             fullyFed.set(true)
         } else if (providerEnded.get() && !cancelled.get()) {
             conversationDictationDiagnostic("event=caller_audio_feed_ended reason=provider_result claimed=true")
@@ -256,6 +251,9 @@ internal class ConversationDictationCallerAudioStream(
             settle(requeue = true)
         }
     }
+
+    /** True while no cancellation, settlement or provider terminal has ended this feed. */
+    private fun feedOpen() = !cancelled.get() && !settled.get() && !providerEnded.get()
 
     /** Releases the active-stream lease exactly once, even before a chunk has been acquired. */
     private fun settle(
