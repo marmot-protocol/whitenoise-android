@@ -105,7 +105,12 @@ class NotificationSmallIconScreenshotTest {
     }
 
     private fun assertClearance(bounds: PixelBounds) {
-        val edges = listOf(bounds.left, bounds.top, MEASURE_SIZE_PX - 1 - bounds.right, MEASURE_SIZE_PX - 1 - bounds.bottom)
+        val edges = listOf(
+            bounds.left,
+            bounds.top,
+            MEASURE_SIZE_PX - 1 - bounds.right,
+            MEASURE_SIZE_PX - 1 - bounds.bottom,
+        )
         assertTrue("Edge clearance $edges px is under $MIN_CLEARANCE_PX px", edges.all { it >= MIN_CLEARANCE_PX })
     }
 
@@ -120,7 +125,10 @@ class NotificationSmallIconScreenshotTest {
     }
 
     private companion object {
-        /** The status bar draws small icons at about 17dp: pixel sizes at 1.5x, 2x and a current Pixel's 2.625x density. */
+        /**
+         * The status bar draws small icons at about 17dp: pixel sizes at 1.5x, 2x and a current Pixel's
+         * 2.625x density.
+         */
         val SNAPSHOT_SIZES = listOf(26, 34, 45)
         const val SNAPSHOT_PADDING_PX = 8
 
