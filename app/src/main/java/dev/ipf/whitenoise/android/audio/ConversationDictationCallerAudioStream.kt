@@ -242,7 +242,12 @@ internal class ConversationDictationCallerAudioStream(
                 "replay_bytes=${owned.replayParts.sumOf { it.pcm.size }} " +
                 "new_bytes=${owned.chunk.pcm.size} bytes=$totalWritten",
         )
-        val complete = totalWritten == owned.pcmParts.sumOf { it.pcm.size } && !cancelled.get() && !settled.get()
+        // A terminal that lands during the final write still wins: its result cannot cover this feed.
+        val complete =
+            totalWritten == owned.pcmParts.sumOf { it.pcm.size } &&
+                !cancelled.get() &&
+                !settled.get() &&
+                !providerEnded.get()
         if (complete) {
             fullyFed.set(true)
         } else if (providerEnded.get() && !cancelled.get()) {
