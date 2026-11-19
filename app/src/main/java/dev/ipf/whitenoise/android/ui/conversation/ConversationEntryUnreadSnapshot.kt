@@ -1,7 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.firstUnreadReceivedIndex
 import dev.ipf.whitenoise.android.state.isUnreadEligible
@@ -88,6 +92,22 @@ internal fun firstUnreadAfterReadAnchor(
                 ?.messageIdHex
                 ?.takeIf { it.isNotBlank() }
     }
+}
+
+/**
+ * The first available chat-list row of one open. Only that row sets the entry boundary, so later
+ * row updates (counts, sort keys) are not read and do not recompose the screen.
+ */
+@Composable
+internal fun rememberConversationEntryRow(
+    sessionIdentity: Any,
+    row: () -> ChatListRowFfi?,
+): ChatListRowFfi? {
+    val currentRow by rememberUpdatedState(row)
+    return remember(sessionIdentity) {
+        var captured: ChatListRowFfi? = null
+        derivedStateOf { captured ?: currentRow().also { captured = it } }
+    }.value
 }
 
 private class ConversationEntryUnreadProjectionHolder(
