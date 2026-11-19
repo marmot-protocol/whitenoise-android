@@ -5,11 +5,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import dev.ipf.whitenoise.android.notifications.NotificationScenario
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -105,6 +107,51 @@ class ShellEarlyOpenDetailsContractTest {
         assertEquals(TARGET_ACCOUNT, landed.boundAccountRef)
     }
 
+    /**
+     * What is composed while the switch is still held. The early conversation composes the target account's message
+     * under the source account, and with details open no node carries text, a description or an input, for as long
+     * as the switch stays pending. Back returns to that conversation on the same controller.
+     */
+    @Test
+    fun whileTheSwitchIsHeldDetailsComposeNothingReadable() {
+        mountShellWithTheTap()
+        awaitCondition("the conversation never opened ahead of the switch") { openedAheadOfTheSwitch() }
+        val earlyController = appState.attachedConversationControllers().single()
+        assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
+        assertEquals(1, composed(hasText(TARGET_ACCOUNT_MESSAGE, substring = true)))
+        assertTrue(composed(readable()) > 0)
+
+        composeRule.onNode(conversationHeader()).performClick()
+        awaitCondition("details never replaced the transcript") { !transcriptShown() }
+        val readableWhileHeld =
+            List(HELD_PUMPS) {
+                pump()
+                composed(readable())
+            }
+
+        assertEquals("readable nodes at each held sample", List(HELD_PUMPS) { 0 }, readableWhileHeld)
+        assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
+        assertEquals(SHARED_GROUP, holder.selectedChat.value?.id)
+
+        Espresso.pressBack()
+        awaitCondition("Back never returned to the held conversation") { transcriptShown() }
+        assertEquals(1, composed(hasText(TARGET_ACCOUNT_MESSAGE, substring = true)))
+        assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
+        assertSame(earlyController, appState.attachedConversationControllers().single())
+    }
+
+    /** How many composed nodes satisfy [matcher], counted in the unmerged tree so no parent can hide one. */
+    private fun composed(matcher: SemanticsMatcher): Int {
+        val matching = composeRule.onAllNodes(matcher, useUnmergedTree = true)
+        return matching.fetchSemanticsNodes().size
+    }
+
+    /** Any node a reader or a screen reader could take content from: text, a description or a text input. */
+    private fun readable(): SemanticsMatcher =
+        SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) or
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription) or
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText)
+
     /** Mounts the production shell with the other account's tap pending and its broad chat-list bind unheld. */
     private fun mountShellWithTheTap() {
         gate.releaseActivation.countDown()
@@ -142,7 +189,9 @@ class ShellEarlyOpenDetailsContractTest {
     /** One short scripted timeline for the shared group, so the transcript can reveal. */
     private fun conversations(): ConversationLiveSubscriptions {
         val group = conversationTimelineTestGroup().copy(groupIdHex = SHARED_GROUP)
-        val record = timelineRecord(NotificationScenario.NOTIFIED_ID, 1uL).copy(groupIdHex = SHARED_GROUP)
+        val record =
+            timelineRecord(NotificationScenario.NOTIFIED_ID, 1uL)
+                .copy(groupIdHex = SHARED_GROUP, plaintext = TARGET_ACCOUNT_MESSAGE)
         return ConversationLiveSubscriptions(
             openTimeline = { _, _, _ -> ScriptedConversationTimelineSubscription(timelinePage(record)) },
             openGroupState = { _, _ -> ScriptedConversationGroupStateSubscription(group) },
@@ -183,7 +232,11 @@ class ShellEarlyOpenDetailsContractTest {
         const val TARGET_ACCOUNT = NotificationRouteHarness.TARGET_ACCOUNT
         val SHARED_GROUP = NotificationRouteHarness.SHARED_GROUP
         const val DETAILS_TAG = "chat_info.list"
+        const val TARGET_ACCOUNT_MESSAGE = "target account only message"
         const val POLL_MILLIS = 20L
+
+        /** About a second of held switch, long enough for a late draw of details to show. */
+        const val HELD_PUMPS = 25
 
         /** Long enough for a late reopen of details to show after the switch lands. */
         const val SETTLE_PUMPS = 50
