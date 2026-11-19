@@ -61,11 +61,24 @@ class SignUpScreenshotTest {
     /** Native upload stage blocks editing and names actual work. */
     @Test fun uploadingPhoto() = render("signup_uploading", stage = SignUpStage.UploadingPhoto)
 
-    @Test fun generatedNameHelp() = render("signup_generated_name_help", initialName = "Quiet Otter", showNameHelp = true)
+    @Test
+    fun generatedNameHelp() =
+        render(
+            "signup_generated_name_help",
+            initialName = "Quiet Otter",
+            showNameHelp = true,
+        )
 
     @Test
     fun generatedNameHelpRtlLargeText() =
-        render("signup_generated_name_help_rtl_200", dark = true, rtl = true, scale = 2f, initialName = "Quiet Otter", showNameHelp = true)
+        render(
+            "signup_generated_name_help_rtl_200",
+            dark = true,
+            rtl = true,
+            scale = 2f,
+            initialName = "Quiet Otter",
+            showNameHelp = true,
+        )
 
     private fun render(
         name: String,
