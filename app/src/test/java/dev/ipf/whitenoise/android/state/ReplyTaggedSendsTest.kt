@@ -30,6 +30,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.CopyOnWriteArrayList
 
 /** Polls and stickers sent while replying carry MDK's reply tags and clear only the reply they carried. */
 @RunWith(RobolectricTestRunner::class)
@@ -311,7 +312,11 @@ class ReplyTaggedSendsTest {
     private class SendRecorder(
         private val failure: Throwable? = null,
     ) {
-        val sends = mutableListOf<Pair<String, List<Any?>>>()
+        /**
+         * The sends so far, recorded on the native call's thread and read on the test thread, so it is
+         * copy-on-write and each read iterates a stable snapshot.
+         */
+        val sends = CopyOnWriteArrayList<Pair<String, List<Any?>>>()
 
         /** Runs inside the native send, before it returns, as a user acting while MDK is still sending would. */
         var onSend: () -> Unit = {}
