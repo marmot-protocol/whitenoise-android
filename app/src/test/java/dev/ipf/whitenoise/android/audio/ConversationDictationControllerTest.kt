@@ -9439,10 +9439,11 @@ class ConversationDictationControllerTest {
     /** A provider idling out before any chunk was claimed recycles without spending retry or silence budgets. */
     @Test
     fun repeatedChunklessEmptyEndsWhileListeningNeitherFailNorConsumeRetries() {
-        val platform = FakePlatform().apply {
-            pendingCallerAudio = true
-            unclaimedCallerAudio = true
-        }
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                unclaimedCallerAudio = true
+            }
         val fixture = fixture(draft = TextFieldValue("Draft"), platform = platform)
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         repeat(4) { attempt ->
@@ -9464,10 +9465,11 @@ class ConversationDictationControllerTest {
     /** After Paste, a chunkless idle end drains straight into the next generation and delivers exactly once. */
     @Test
     fun chunklessEmptyEndAfterPasteDrainsAndDeliversOnce() {
-        val platform = FakePlatform().apply {
-            pendingCallerAudio = true
-            unclaimedCallerAudio = true
-        }
+        val platform =
+            FakePlatform().apply {
+                pendingCallerAudio = true
+                unclaimedCallerAudio = true
+            }
         val fixture = fixture(draft = TextFieldValue("Draft", TextRange(5)), platform = platform)
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         platform.listener.onReady()

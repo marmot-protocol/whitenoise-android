@@ -29,8 +29,8 @@ internal class ConversationDictationCallerAudioStream(
     private val feedClosed = AtomicBoolean(false)
     private val fullyFed = AtomicBoolean(false)
 
-    /** Decides once whether the feeder completed or a provider terminal callback ended the feed. */
-    private val feedResolved = AtomicBoolean(false)
+    /** Set by a provider terminal callback; only the feeder thread acts on it, so claims cannot race it. */
+    private val providerEnded = AtomicBoolean(false)
     private val feedClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
     private val cancelled = AtomicBoolean(false)
     private val captureFailureReported = AtomicBoolean(false)
@@ -70,18 +70,12 @@ internal class ConversationDictationCallerAudioStream(
 
     /**
      * Ends an unfinished feed as soon as the provider reports a terminal callback, instead of
-     * writing into a dead request until the pipe stalls. A claimed chunk is requeued with its exact
-     * bytes and keeps its failure identity; a fully fed stream is left untouched.
+     * writing into a dead request until the pipe stalls. The feeder stops at its next poll; a claimed
+     * chunk is requeued with its exact bytes and keeps its failure identity, and a fully fed stream
+     * is left untouched. The callback runs once the feeder has closed.
      */
     fun endFeedAfterProviderTerminal(callback: () -> Unit) {
-        if (!feedClosed.get() && feedResolved.compareAndSet(false, true)) {
-            val owned = request.get()
-            owned?.let { failureIdentity.set(FailureIdentity(it.chunk.chunkId, it.version)) }
-            conversationDictationDiagnostic(
-                "event=caller_audio_feed_ended reason=provider_result claimed=${owned != null}",
-            )
-            cancel(requeue = true)
-        }
+        providerEnded.set(true)
         onFeedClosed(callback)
     }
 
@@ -165,11 +159,18 @@ internal class ConversationDictationCallerAudioStream(
     private fun feed() {
         try {
             var owned: ConversationDictationAudioRequest? = null
-            while (!cancelled.get() && !settled.get() && owned == null) {
+            while (!cancelled.get() && !settled.get() && !providerEnded.get() && owned == null) {
                 owned = buffer.requests.pollRequest()
                 if (owned == null) Thread.sleep(PIPE_RETRY_MILLIS)
             }
-            if (owned == null) return
+            if (owned == null) {
+                if (providerEnded.get()) {
+                    conversationDictationDiagnostic(
+                        "event=caller_audio_feed_ended reason=provider_result claimed=false",
+                    )
+                }
+                return
+            }
             request.set(owned)
             chunk.set(owned.chunk)
             if (cancelled.get() || settled.get()) {
@@ -209,7 +210,7 @@ internal class ConversationDictationCallerAudioStream(
         var stalledAt: Long? = null
         for (part in owned.pcmParts) {
             var offset = 0
-            while (!cancelled.get() && !settled.get() && offset < part.pcm.size) {
+            while (!cancelled.get() && !settled.get() && !providerEnded.get() && offset < part.pcm.size) {
                 val written =
                     try {
                         pipeWriter.write(sink, part.pcm, offset, part.pcm.size - offset)
@@ -242,7 +243,13 @@ internal class ConversationDictationCallerAudioStream(
                 "new_bytes=${owned.chunk.pcm.size} bytes=$totalWritten",
         )
         val complete = totalWritten == owned.pcmParts.sumOf { it.pcm.size } && !cancelled.get() && !settled.get()
-        if (complete && feedResolved.compareAndSet(false, true)) fullyFed.set(true)
+        if (complete) {
+            fullyFed.set(true)
+        } else if (providerEnded.get() && !cancelled.get()) {
+            conversationDictationDiagnostic("event=caller_audio_feed_ended reason=provider_result claimed=true")
+            failureIdentity.set(FailureIdentity(owned.chunk.chunkId, owned.version))
+            settle(requeue = true)
+        }
     }
 
     /** Releases the active-stream lease exactly once, even before a chunk has been acquired. */

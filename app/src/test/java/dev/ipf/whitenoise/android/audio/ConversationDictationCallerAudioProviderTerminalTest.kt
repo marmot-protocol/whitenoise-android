@@ -52,9 +52,9 @@ class ConversationDictationCallerAudioProviderTerminalTest {
         val stream = checkNotNull(capture.openProviderStream(failures::add))
         try {
             assertTrue(stream.start())
-            val closed = AtomicInteger(0)
-            stream.endFeedAfterProviderTerminal { closed.incrementAndGet() }
-            assertEquals(1, closed.get())
+            val closed = CountDownLatch(1)
+            stream.endFeedAfterProviderTerminal(closed::countDown)
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
             assertTrue(failures.isEmpty())
             assertNull(stream.chunkId())
             assertNull(stream.requestVersion())
@@ -98,9 +98,9 @@ class ConversationDictationCallerAudioProviderTerminalTest {
         try {
             assertTrue(stream.start())
             assertTrue(stalled.await(2, TimeUnit.SECONDS))
-            val closed = AtomicInteger(0)
-            stream.endFeedAfterProviderTerminal { closed.incrementAndGet() }
-            assertEquals(1, closed.get())
+            val closed = CountDownLatch(1)
+            stream.endFeedAfterProviderTerminal(closed::countDown)
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
             val feeder = checkNotNull(worker.get())
             feeder.join(2_000L)
             assertFalse(feeder.isAlive)
@@ -131,9 +131,9 @@ class ConversationDictationCallerAudioProviderTerminalTest {
             assertTrue(fed.await(2, TimeUnit.SECONDS))
             assertTrue(stream.fullyFed())
 
-            val closed = AtomicInteger(0)
-            stream.endFeedAfterProviderTerminal { closed.incrementAndGet() }
-            assertEquals(1, closed.get())
+            val closed = CountDownLatch(1)
+            stream.endFeedAfterProviderTerminal(closed::countDown)
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
             assertTrue(stream.fullyFed())
             assertNotNull(stream.request())
             assertEquals(1L, stream.chunkId())
@@ -144,6 +144,32 @@ class ConversationDictationCallerAudioProviderTerminalTest {
             stream.cancel()
             stream.closeProviderEnd()
             capture.discard {}
+        }
+    }
+
+    /** A terminal callback racing the feeder's claim never closes the feed while the chunk is unaccounted for. */
+    @Test
+    fun terminalRacingAClaimLeavesTheChunkQueuedOrIdentified() {
+        repeat(RACE_ATTEMPTS) {
+            val buffer = pcmBuffer()
+            val capture = sealedCapture(buffer, ConversationDictationAudioPipeWriter { _, _, _, _ -> 0 })
+            val stream = checkNotNull(capture.openProviderStream {})
+            try {
+                assertTrue(stream.start())
+                val accounted = AtomicReference<Boolean>()
+                val closed = CountDownLatch(1)
+                stream.endFeedAfterProviderTerminal {
+                    accounted.set(buffer.hasPending || stream.chunkId() != null)
+                    closed.countDown()
+                }
+                assertTrue(closed.await(2, TimeUnit.SECONDS))
+                assertEquals(true, accounted.get())
+                assertArrayEquals(PCM, checkNotNull(buffer.poll()).pcm)
+            } finally {
+                stream.cancel()
+                stream.closeProviderEnd()
+                capture.discard {}
+            }
         }
     }
 
@@ -181,5 +207,7 @@ class ConversationDictationCallerAudioProviderTerminalTest {
 
         /** Several 10 ms feeder polls: long enough for a still-running feeder to claim queued audio. */
         const val FEEDER_POLLS_MILLIS = 100L
+
+        const val RACE_ATTEMPTS = 200
     }
 }
