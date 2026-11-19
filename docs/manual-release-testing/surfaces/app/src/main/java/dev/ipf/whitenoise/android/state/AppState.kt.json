@@ -47,7 +47,7 @@
       {
         "surface": "Read-aloud external engine consent and dismissal",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "private suspend fun requestTtsPlaybackTrust(",
+        "anchor": "internal suspend fun confirmTtsPlaybackTrust(",
         "test_ids": [
           "TTS-003"
         ]

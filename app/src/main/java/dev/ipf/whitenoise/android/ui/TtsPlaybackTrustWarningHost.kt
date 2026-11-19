@@ -6,15 +6,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
 @Composable
 @Suppress("FunctionNaming")
 internal fun TtsPlaybackTrustWarningHost(appState: WhiteNoiseAppState) {
-    val request = appState.pendingTtsTrustWarning ?: return
+    val request = appState.ttsPlaybackTrust.pending ?: return
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val eligible = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && request.isCurrent()
+    val eligible = lifecycle.currentStateAsState().value.isAtLeast(Lifecycle.State.RESUMED) && request.isCurrent()
     LaunchedEffect(request, eligible) {
         if (!eligible) request.respond(false)
     }

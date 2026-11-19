@@ -1059,19 +1059,8 @@ internal fun MessageBubble(
         expectedPress: TtsLongPressStart? = null,
     ) {
         if (deleted) return
-        val owner =
-            expectedPress ?: captureTtsLongPressStart(
-                startRenderedHit,
-                ttsSpeakableSource?.text,
-                controller,
-                appState,
-            )
-        val accountIsCurrent = appState.captureTtsAccountOwner(owner.accountRef)
-        val canCommit = {
-            accountIsCurrent() &&
-                controller.acceptsConversationActionOwner(owner.accountRef, owner.groupIdHex) &&
-                isTtsLongPressStartCurrent(owner, record, controller, appState)
-        }
+        val owner = expectedPress ?: captureTtsLongPressStart(startRenderedHit, ttsSpeakableSource?.text, controller, appState)
+        val canCommit = captureTtsLongPressGuard(owner, record, controller, appState)
         if (!canCommit()) return
         val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
         val locale = java.util.Locale.getDefault()

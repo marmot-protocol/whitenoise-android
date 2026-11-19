@@ -15,3 +15,14 @@ fun resolveConversationAutoRead(
     globalDefaultEnabled: Boolean,
     override: TtsAutoReadOverride?,
 ): Boolean = override?.let { it == TtsAutoReadOverride.ON } ?: globalDefaultEnabled
+
+internal fun WhiteNoiseAppState.captureTtsAutoReadPolicy(groupIdHex: String): () -> Boolean {
+    val policy = ttsAutoReadPreferences.state.value
+    // Turning auto-read off and back on publishes a new snapshot and revokes old projections.
+    return { ttsAutoReadPreferences.state.value === policy && isConversationAutoRead(groupIdHex) }
+}
+
+internal fun ttsAutoReadKey(
+    account: String?,
+    group: String,
+): String? = account?.let { "$it|${group.lowercase()}" }

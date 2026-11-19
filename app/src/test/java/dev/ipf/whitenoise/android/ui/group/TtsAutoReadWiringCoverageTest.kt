@@ -164,13 +164,15 @@ class TtsAutoReadWiringCoverageTest {
         }
         val message = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
         val reader = source("ui/conversation/media/TextAttachmentSpeech.kt")
-        assertTrue(message.indexOf("confirmTtsPlaybackTrust(canCommit)") in 0 until message.indexOf("speakAloudAutoRead("))
+        val messageConsent = message.indexOf("confirmTtsPlaybackTrust(canCommit)")
+        assertTrue(messageConsent in 0 until message.indexOf("speakAloudAutoRead("))
         assertTrue(reader.indexOf("confirmTtsPlaybackTrust(") in 0 until reader.indexOf("speakAloudPrepared("))
         assertTrue("!appState.ttsEngineNeedsAcknowledgment()" in source("state/TtsAutoReadContinuation.kt"))
         val appState = source("state/AppState.kt")
         val replaceEngine = appState.functionBody("publishTtsResolution")
         val ownership = appState.functionBody("clearTtsPlaybackOwnership")
-        assertTrue(replaceEngine.indexOf("clearTtsPlaybackOwnership()") in 0 until replaceEngine.indexOf("ttsController.attachEngine("))
+        val released = replaceEngine.indexOf("clearTtsPlaybackOwnership()")
+        assertTrue(released in 0 until replaceEngine.indexOf("ttsController.attachEngine("))
         assertTrue("ttsAutoReadSessionKey = null" in ownership)
     }
 

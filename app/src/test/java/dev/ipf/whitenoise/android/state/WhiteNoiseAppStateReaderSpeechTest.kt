@@ -236,6 +236,61 @@ class WhiteNoiseAppStateReaderSpeechTest {
             assertTrue(appState.ttsController.state.value is TtsState.Idle)
         }
 
+    @Test
+    fun staleProjectionCannotStartAfterAutoReadIsTurnedOffAndBackOn() {
+        val appState = testAppState()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        appState.setConversationAutoReadOverride("group-a", TtsAutoReadOverride.ON)
+        val policyIsCurrent = appState.captureTtsAutoReadPolicy("group-a")
+        assertTrue(policyIsCurrent())
+
+        appState.setConversationAutoReadOverride("group-a", TtsAutoReadOverride.OFF)
+        assertFalse(policyIsCurrent())
+        appState.setConversationAutoReadOverride("group-a", TtsAutoReadOverride.ON)
+        assertFalse(policyIsCurrent())
+        assertTrue(appState.captureTtsAutoReadPolicy("group-a")())
+        assertFalse(
+            runBlocking {
+                appState.speakAloudAutoRead(
+                    "group-a",
+                    listOf(TtsSpeakableEntry("old", "Sender", "Stale projection.")),
+                    Locale.US,
+                    backgroundPreparation = true,
+                    canCommit = policyIsCurrent,
+                )
+            },
+        )
+        assertFalse(appState.ownsTtsAutoReadSession("group-a"))
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
+    @Test
+    fun staleProjectionCannotStartAfterSwitchingAwayAndBack() {
+        val appState = testAppState(twoAccounts = true)
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        val accountIsCurrent = appState.captureTtsAccountOwner("account-a")
+        assertTrue(accountIsCurrent())
+
+        runBlocking {
+            appState.setActiveAccount("account-b")
+            assertFalse(accountIsCurrent())
+            appState.setActiveAccount("account-a")
+            assertFalse(accountIsCurrent())
+            assertTrue(appState.captureTtsAccountOwner("account-a")())
+            assertFalse(
+                appState.speakAloudAutoRead(
+                    "group-a",
+                    listOf(TtsSpeakableEntry("old", "Sender", "Stale projection.")),
+                    Locale.US,
+                    backgroundPreparation = true,
+                    canCommit = accountIsCurrent,
+                ),
+            )
+        }
+        assertFalse(appState.ownsTtsAutoReadSession("group-a"))
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
     /** Creates account labels without a network/runtime or persistent protocol/draft cache. */
     private fun testAppState(twoAccounts: Boolean = false): WhiteNoiseAppState {
         val accounts =

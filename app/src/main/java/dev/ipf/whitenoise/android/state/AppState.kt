@@ -69,7 +69,6 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -1010,63 +1009,11 @@ class WhiteNoiseAppState private constructor(
     internal val chatMuteOwner = ChatMuteOwner()
     internal val chatFolderPreferences = ChatFolderPreferences(appContext)
     internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
-    internal var pendingTtsTrustWarning by mutableStateOf<TtsPlaybackTrustRequest?>(null)
-        private set
+    internal val ttsPlaybackTrust = TtsPlaybackTrustConsent(this) { attachedTtsHandle }
 
-    internal fun ttsEngineNeedsAcknowledgment(): Boolean =
-        attachedTtsHandle?.let { handle ->
-            requiresTtsTrustWarning(
-                handle.enginePackage,
-                handle.trust,
-                ttsWarningPreferences,
-            )
-        } == true
+    internal fun ttsEngineNeedsAcknowledgment(): Boolean = ttsPlaybackTrust.needsAcknowledgment()
 
-    /** Captures a conversation's account before any suspending speech projection. */
-    internal fun captureTtsAccountOwner(account: String?): () -> Boolean {
-        val generation = accountSwitchHandoff.capture()
-        return {
-            account != null && account == activeAccountRef && accountSwitchHandoff.isCurrent(generation)
-        }
-    }
-
-    internal suspend fun confirmTtsPlaybackTrust(isCurrent: () -> Boolean): Boolean {
-        if (!isCurrent()) return false
-        val handle = attachedTtsHandle
-        return if (handle == null || !ttsEngineNeedsAcknowledgment()) {
-            true
-        } else {
-            requestTtsPlaybackTrust(handle, isCurrent)
-        }
-    }
-
-    private suspend fun requestTtsPlaybackTrust(
-        handle: TtsEngineHandle,
-        isCurrent: () -> Boolean,
-    ): Boolean {
-        val accountIsCurrent = captureTtsAccountOwner(activeAccountRef)
-        val playbackIsCurrent = ttsController.speechStartProjectionGuard()
-        val question =
-            TtsPlaybackTrustRequest {
-                attachedTtsHandle === handle &&
-                    accountIsCurrent() &&
-                    !appLock.screenVisible &&
-                    playbackIsCurrent() &&
-                    isCurrent()
-            }
-        if (pendingTtsTrustWarning != null || !question.isCurrent()) return false
-        pendingTtsTrustWarning = question
-        return try {
-            if (!question.awaitApproval()) {
-                false
-            } else {
-                acknowledgeTtsTrustWarning(handle.enginePackage)
-                true
-            }
-        } finally {
-            if (pendingTtsTrustWarning === question) pendingTtsTrustWarning = null
-        }
-    }
+    internal suspend fun confirmTtsPlaybackTrust(isCurrent: () -> Boolean): Boolean = ttsPlaybackTrust.confirm(isCurrent)
 
     internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
     internal val ttsVoicePreferences = TtsVoicePreferences(appContext)
@@ -1110,37 +1057,24 @@ class WhiteNoiseAppState private constructor(
         return key == ttsAutoReadKey(activeAccountRef, groupIdHex)
     }
 
-    private fun ttsAutoReadKey(
-        account: String?,
-        group: String,
-    ): String? = account?.let { "$it|${group.lowercase()}" }
-
-    /** Starts read-aloud for one or more speakable messages. */
     fun speakAloud(
         entries: List<TtsSpeakableEntry>,
         locale: java.util.Locale,
         startSentenceIndex: Int = 0,
     ): Boolean {
-        if (ttsEngineNeedsAcknowledgment()) return false
-        val started = ttsController.speak(entries, locale, startSentenceIndex)
-        if (started) {
-            // Only successful speech replaces prior auto-read ownership; a failed start
-            // (blank text or no engine) leaves the old queue playing and still owned.
-            ttsSpeechAccountRef = activeAccountRef
-            ttsAutoReadSessionKey = null
-            ttsHistorySession.onSessionCleared()
-            attachmentSpeechDestination.value = null
-            // The session now exists, so the mediaPlayback service must too:
-            // it mirrors the controller, keeps playback alive across app
-            // switches, and stops itself when the controller goes terminal.
-            if (!TtsPlaybackForegroundService.start(appContext)) {
-                // A rejected foreground-service start must not leave private
-                // read-aloud running without its user-visible stop surface.
-                stopSpeaking()
-                return false
-            }
-        }
-        return started
+        if (ttsEngineNeedsAcknowledgment() || !ttsController.speak(entries, locale, startSentenceIndex)) return false
+
+        // Only successful speech replaces the previous source ownership.
+        ttsSpeechAccountRef = activeAccountRef
+        ttsAutoReadSessionKey = null
+        ttsHistorySession.onSessionCleared()
+        attachmentSpeechDestination.value = null
+
+        // A rejected foreground-service start must not leave private
+        // read-aloud running without its user-visible stop surface.
+        val foregroundStarted = TtsPlaybackForegroundService.start(appContext)
+        if (!foregroundStarted) stopSpeaking()
+        return foregroundStarted
     }
 
     /** [speakAloud] for an auto-read backlog, marking the owning conversation. */
@@ -1209,10 +1143,7 @@ class WhiteNoiseAppState private constructor(
                     state.sessionId == preparingSessionId &&
                     ttsSpeechAccountRef == ownerAccount
                 ) {
-                    ttsSpeechAccountRef = null
-                    ttsAutoReadSessionKey = null
-                    ttsHistorySession.onSessionCleared()
-                    attachmentSpeechDestination.value = null
+                    clearTtsPlaybackOwnership()
                 }
             }
         }
@@ -1300,15 +1231,6 @@ class WhiteNoiseAppState private constructor(
 
     internal val ttsAutoReadPreferences = TtsAutoReadPreferences(appContext)
 
-    internal fun captureTtsAutoReadPolicy(groupIdHex: String): () -> Boolean {
-        val policy = ttsAutoReadPreferences.state.value
-        // Even an off/on round trip publishes a new snapshot. A request prepared
-        // before the policy changed cannot be revived by re-enabling auto-read.
-        return {
-            ttsAutoReadPreferences.state.value === policy && isConversationAutoRead(groupIdHex)
-        }
-    }
-
     fun isConversationAutoRead(groupIdHex: String): Boolean {
         val accountRef = activeAccountRef ?: return false
         return conversationAutoReadFor(accountRef, groupIdHex)
@@ -1383,7 +1305,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Stops the active speech queue and immediately revokes every transient source-navigation credential. */
     fun stopSpeaking() {
-        pendingTtsTrustWarning?.respond(false)
+        ttsPlaybackTrust.cancel()
         ttsController.stop()
         clearTtsPlaybackOwnership()
     }
@@ -1411,7 +1333,7 @@ class WhiteNoiseAppState private constructor(
         // in-flight speech. It must also preserve the utterance-locale voice
         // resolution most recently published by the attached adapter.
         if (handle === attachedTtsHandle) return
-        pendingTtsTrustWarning?.respond(false)
+        ttsPlaybackTrust.cancel()
         clearTtsPlaybackOwnership()
         ttsVoiceResolution = handle?.voiceResolution ?: TtsVoiceResolution.Empty
         attachedTtsHandle = handle

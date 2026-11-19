@@ -477,61 +477,6 @@ class WhiteNoiseAppStateTtsAutoReadTest {
     }
 
     @Test
-    fun staleProjectionCannotStartAfterAutoReadIsTurnedOffAndBackOn() {
-        val appState = testAppState()
-        appState.ttsController.attachEngine(FakeSessionEngine())
-        appState.setConversationAutoReadOverride(groupA, TtsAutoReadOverride.ON)
-        val policyIsCurrent = appState.captureTtsAutoReadPolicy(groupA)
-        assertTrue(policyIsCurrent())
-
-        appState.setConversationAutoReadOverride(groupA, TtsAutoReadOverride.OFF)
-        assertFalse(policyIsCurrent())
-        appState.setConversationAutoReadOverride(groupA, TtsAutoReadOverride.ON)
-        assertFalse(policyIsCurrent())
-        assertTrue(appState.captureTtsAutoReadPolicy(groupA)())
-        assertFalse(
-            runBlocking {
-                appState.speakAloudAutoRead(
-                    groupA,
-                    listOf(TtsSpeakableEntry("old", "Sender", "Stale projection.")),
-                    Locale.US,
-                    backgroundPreparation = true,
-                    canCommit = policyIsCurrent,
-                )
-            },
-        )
-        assertFalse(appState.ownsTtsAutoReadSession(groupA))
-        assertTrue(appState.ttsController.state.value is TtsState.Idle)
-    }
-
-    @Test
-    fun staleProjectionCannotStartAfterSwitchingAwayAndBack() {
-        val appState = testAppStateWithTwoAccounts(activeAccountRef = accountRef)
-        appState.ttsController.attachEngine(FakeSessionEngine())
-        val accountIsCurrent = appState.captureTtsAccountOwner(accountRef)
-        assertTrue(accountIsCurrent())
-
-        runBlocking {
-            appState.setActiveAccount("account-b")
-            assertFalse(accountIsCurrent())
-            appState.setActiveAccount(accountRef)
-            assertFalse(accountIsCurrent())
-            assertTrue(appState.captureTtsAccountOwner(accountRef)())
-            assertFalse(
-                appState.speakAloudAutoRead(
-                    groupA,
-                    listOf(TtsSpeakableEntry("old", "Sender", "Stale projection.")),
-                    Locale.US,
-                    backgroundPreparation = true,
-                    canCommit = accountIsCurrent,
-                ),
-            )
-        }
-        assertFalse(appState.ownsTtsAutoReadSession(groupA))
-        assertTrue(appState.ttsController.state.value is TtsState.Idle)
-    }
-
-    @Test
     fun switchedAccountDoesNotOwnPreviousAccountsAutoReadSession() {
         val appState = testAppStateWithTwoAccounts(activeAccountRef = accountRef)
         val engine = FakeSessionEngine()

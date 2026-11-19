@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.captureTtsAccountOwner
 
 /** Frozen UI intent; it contains no independently persisted message or sentence state. */
 internal data class TtsLongPressStart(
@@ -37,6 +38,20 @@ internal fun captureTtsLongPressStart(
         controller.group.groupIdHex,
         appState.runtimeGeneration,
     )
+
+internal fun captureTtsLongPressGuard(
+    owner: TtsLongPressStart,
+    record: AppMessageRecordFfi,
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+): () -> Boolean {
+    val accountIsCurrent = appState.captureTtsAccountOwner(owner.accountRef)
+    return {
+        accountIsCurrent() &&
+            controller.acceptsConversationActionOwner(owner.accountRef, owner.groupIdHex) &&
+            isTtsLongPressStartCurrent(owner, record, controller, appState)
+    }
+}
 
 /** Re-read the existing timeline/edit projection without introducing another source store. */
 internal fun isTtsLongPressStartCurrent(
