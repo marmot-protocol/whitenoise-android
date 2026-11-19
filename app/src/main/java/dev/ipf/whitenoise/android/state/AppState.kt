@@ -474,12 +474,12 @@ class WhiteNoiseAppState private constructor(
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
+    private var initializedDictation by mutableStateOf<ConversationDictationController?>(null)
     internal val conversationDictation: ConversationDictationController
         get() = conversationDictationOwner.value
 
-    /** Connection lifecycle checks must not create a speech controller in an idle process. */
-    internal fun initializedConversationDictation(): ConversationDictationController? =
-        if (conversationDictationOwner.isInitialized()) conversationDictationOwner.value else null
+    /** Lifecycle checks and the chat list observe dictation without creating a controller in an idle process. */
+    internal fun initializedConversationDictation(): ConversationDictationController? = initializedDictation
 
     private val conversationDictationOwner =
         lazy {
@@ -531,7 +531,7 @@ class WhiteNoiseAppState private constructor(
                 },
                 sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
                 onSendBlocked = { presentTransient(R.string.dictation_send_blocked) },
-            )
+            ).also { initializedDictation = it }
         }
 
     internal val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }

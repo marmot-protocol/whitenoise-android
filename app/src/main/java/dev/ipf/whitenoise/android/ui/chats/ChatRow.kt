@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.em
 import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationActivity
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
@@ -161,6 +162,7 @@ internal fun ChatRow(
     accountRef: String? = appState.activeAccountRef,
     ownerAccountIdHex: String? = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex,
     titleOverride: String? = null,
+    dictationActivity: ConversationDictationActivity? = appState.chatListDictationActivity(accountRef, item),
     onClick: () -> Unit,
     onOpenProfile: (String) -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -294,6 +296,7 @@ internal fun ChatRow(
         interactionsEnabled = interactionsEnabled,
         consumeSelectionLongPress = selectionMode && !rangeDragActive,
         titleMetadata = {
+            dictationActivity?.let { ChatRowDictationStatus(it) }
             if (isMuted) {
                 ChatRowTitleStatus(R.drawable.ic_notifications_off, stringResource(R.string.chat_muted_badge))
             }
