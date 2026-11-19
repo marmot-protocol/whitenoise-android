@@ -533,18 +533,21 @@ internal fun ConversationScreen(
         remember(controller, notificationOpenRequestId) {
             controller to notificationOpenRequestId
         }
-    val projectedUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
-    val entryProjectionAvailable = chat.projection != null
+    // The controller row is seeded from the live chat-list row; the open item can predate newer messages.
+    val entryRow =
+        rememberConversationEntryRow(entryUnreadSessionIdentity) { controller.latestChatListRow ?: chat.projection }
+    val entryProjectionAvailable = entryRow != null
+    val projectedUnreadCount = (entryRow?.unreadCount ?: 0uL).coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     val entryUnreadSnapshot =
         rememberConversationEntryUnreadSnapshot(
             controllerIdentity = entryUnreadSessionIdentity,
             projectionUnread = projectedUnreadCount,
-            projectionFirstUnreadMessageId = chat.projection?.firstUnreadMessageIdHex,
+            projectionFirstUnreadMessageId = entryRow?.firstUnreadMessageIdHex,
             projectionAvailable = entryProjectionAvailable,
             // A one-row chat-list seed cannot establish the authoritative unread
             // boundary. Freeze only after MDK's first real page replaces it.
             timeline = if (controller.initialTimelineSeedActive) emptyList() else controller.timeline,
-            readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+            readAnchorMessageId = entryRow?.lastReadMessageIdHex,
         )
     val entryUnreadCount = entryUnreadSnapshot.count
     val entryFirstUnreadMessageId = entryUnreadSnapshot.firstUnreadMessageId
@@ -3133,7 +3136,7 @@ internal fun ConversationScreen(
             unreadCountDivergenceReport(
                 projectionUnread = projectedUnreadCount,
                 timeline = controller.timeline,
-                readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+                readAnchorMessageId = entryRow?.lastReadMessageIdHex,
             )?.let { report ->
                 logUnreadCountDivergence("DMConversation", report)
             }
