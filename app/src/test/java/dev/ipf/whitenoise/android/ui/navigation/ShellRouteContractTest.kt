@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.os.Looper
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -14,18 +13,12 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.SavedStateHandle
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emptyTimelinePage
-import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
-import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
-import dev.ipf.whitenoise.android.ui.common.WindowLayout
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -47,6 +40,8 @@ import org.robolectric.annotation.Config
 class ShellRouteContractTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    private val shell = MountedContractShell(composeRule)
 
     /** A switch to another account closes the open conversation and leaves no open context behind. */
     @Test
@@ -174,69 +169,28 @@ class ShellRouteContractTest {
         return composeRule.onNode(hasSetTextAction() and outsideTheListPane)
     }
 
-    /** Mounts the production shell under a test-controlled window width and always releases its jobs. */
+    /** Mounts the production shell at [width] for [exercise]. */
     private fun withMountedShell(
         width: MutableState<Dp>,
         fixture: ReturnFixture = ReturnFixture(),
         exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
-    ) {
-        val mounted = mutableStateOf(true)
-        val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
-        val controller =
-            holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
-        fixture.appState.setAppInForeground(true)
-        composeRule.setContent {
-            if (mounted.value) {
-                CompositionLocalProvider(
-                    LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, HEIGHT)),
-                ) {
-                    WhiteNoiseTheme { MainShell(appState = fixture.appState, stateHolder = holder) }
-                }
-            }
-        }
-        try {
-            awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
-            composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
-            composeRule.waitForIdle()
-            exercise(fixture, holder)
-        } finally {
-            composeRule.runOnIdle {
-                mounted.value = false
-                holder.release()
-            }
-            composeRule.waitForIdle()
-        }
-    }
+    ) = shell.withMountedShell(width, fixture, exercise)
 
-    /** Opens the fixture's target chat from its list row and waits for the route to settle. */
+    /** Opens the fixture's target chat from its list row. */
     private fun openTarget(
         fixture: ReturnFixture,
         holder: MainShellStateHolder,
-    ) {
-        composeRule.onNodeWithTag("chat.row.${fixture.target.groupIdHex}").assertIsDisplayed().performClick()
-        awaitCondition { holder.selectedChat.value?.id == fixture.target.groupIdHex }
-        settle()
-    }
+    ) = shell.openTarget(fixture, holder)
 
-    /** Lets route transitions and their one-frame retention finish. */
-    private fun settle() {
-        composeRule.mainClock.advanceTimeBy(1_000)
-        composeRule.waitForIdle()
-    }
+    /** Lets route transitions finish. */
+    private fun settle() = shell.settle()
 
-    /** Polls only for observable asynchronous shell/controller settlement. */
-    private fun awaitCondition(condition: () -> Boolean) {
-        composeRule.waitUntil(10_000) {
-            shadowOf(Looper.getMainLooper()).idle()
-            condition()
-        }
-        composeRule.waitForIdle()
-    }
+    /** Waits for asynchronous shell settlement. */
+    private fun awaitCondition(condition: () -> Boolean) = shell.awaitCondition(condition)
 
     private companion object {
         val EXPANDED_WIDTH = 840.dp
         val COMPACT_WIDTH = 839.dp
-        val HEIGHT = 800.dp
         const val OTHER_ACCOUNT_REF = "other-contract-account"
 
         /** Well inside the 300 ms pending-open bound, so the tapped chat is still being prepared. */
