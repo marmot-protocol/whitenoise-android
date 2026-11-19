@@ -296,7 +296,8 @@ class TtsEngineResolver(
                 handle = null,
             )
         }
-        val trust = resolveHandleTrust(requestedEnginePackage, verifiedPackage, activePackage)
+        // A requested or default package alone is not evidence of a successful bind.
+        val trust = verifiedPackage?.let(::classify) ?: EngineTrust.Unknown
         return TtsResolutionResult(
             status = status,
             engines = engines,
@@ -310,18 +311,6 @@ class TtsEngineResolver(
                 ),
         )
     }
-
-    /** Trusts only a framework-verified default; explicit selections remain unknown. */
-    private fun resolveHandleTrust(
-        requestedEnginePackage: String?,
-        verifiedPackage: String?,
-        activePackage: String,
-    ): EngineTrust =
-        when {
-            requestedEnginePackage != null -> EngineTrust.Unknown
-            verifiedPackage != null -> classify(verifiedPackage)
-            else -> EngineTrust.Unknown
-        }
 
     /** Applies a valid saved voice or the deterministic installed offline fallback. */
     private fun configureResolvedEngine(

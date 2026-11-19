@@ -845,6 +845,7 @@ internal fun WhiteNoiseApp(
     }
     // A refused group change waits for the user's answer wherever it was started, even after its screen closed, but
     // only while its account and runtime are current: after a switch it is withdrawn as Wait, never shown to another.
+    TtsPlaybackTrustWarningHost(appState)
     val groupChangeQuestion = appState.groupChangeConfirmations.pending
     val groupChangeQuestionOwned = groupChangeQuestion?.let { appState.ownsGroupChange(it.target) } == true
     LaunchedEffect(groupChangeQuestion, groupChangeQuestionOwned) {

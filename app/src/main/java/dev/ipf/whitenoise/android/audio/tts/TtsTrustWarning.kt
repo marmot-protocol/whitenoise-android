@@ -15,10 +15,7 @@ fun requiresTtsTrustWarning(
         enginePackage.isNotBlank() &&
         !preferences.hasAcknowledged(enginePackage)
 
-/**
- * Reusable first-use trust warning for Unknown TTS engines (#1479). #1481 will
- * gate Speak on this before handing off to #1480.
- */
+/** First-use warning shared by engine selection and private read-aloud. */
 @Composable
 fun TtsTrustWarningDialog(
     onProceed: () -> Unit,

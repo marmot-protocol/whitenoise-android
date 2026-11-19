@@ -1066,7 +1066,12 @@ internal fun MessageBubble(
                 controller,
                 appState,
             )
-        val canCommit = { isTtsLongPressStartCurrent(owner, record, controller, appState) }
+        val accountIsCurrent = appState.captureTtsAccountOwner(owner.accountRef)
+        val canCommit = {
+            accountIsCurrent() &&
+                controller.acceptsConversationActionOwner(owner.accountRef, owner.groupIdHex) &&
+                isTtsLongPressStartCurrent(owner, record, controller, appState)
+        }
         if (!canCommit()) return
         val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
         val locale = java.util.Locale.getDefault()
@@ -1090,6 +1095,7 @@ internal fun MessageBubble(
                         locale = locale,
                     )
                 }
+            if (!appState.confirmTtsPlaybackTrust(canCommit)) return@launchMutation
             val started =
                 appState.speakAloudAutoRead(
                     controller.group.groupIdHex,

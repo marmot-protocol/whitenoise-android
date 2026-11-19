@@ -144,6 +144,37 @@ class TtsAutoReadWiringCoverageTest {
     }
 
     @Test
+    fun projectedSpeechRequiresCurrentOwnershipAndExternalEngineConsent() {
+        val effects = source("ui/conversation/ConversationTtsEffects.kt")
+        val open =
+            effects
+                .substringAfter("LaunchedEffect(controller, chatId, transcriptReadyToReveal)")
+                .substringBefore("// The process-owned continuation")
+        val resume =
+            effects
+                .substringAfter("LaunchedEffect(controller, chatId, autoReadResumeGeneration")
+                .substringBefore("internal fun ConversationTtsFollowEffects")
+        for ((effect, projection) in listOf(open to "autoReadBacklogEntries()", resume to "withTimeoutOrNull(")) {
+            val capture = effect.indexOf("val canCommit = captureAutoReadOwner()")
+            val projected = effect.indexOf(projection)
+            val consent = effect.indexOf("confirmTtsPlaybackTrust(canCommit)")
+            val start = effect.indexOf("speakAloudAutoRead(")
+            assertTrue(capture >= 0 && capture < projected && projected < consent && consent < start)
+            assertTrue("canCommit = canCommit" in effect)
+        }
+        val message = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
+        val reader = source("ui/conversation/media/TextAttachmentSpeech.kt")
+        assertTrue(message.indexOf("confirmTtsPlaybackTrust(canCommit)") in 0 until message.indexOf("speakAloudAutoRead("))
+        assertTrue(reader.indexOf("confirmTtsPlaybackTrust(") in 0 until reader.indexOf("speakAloudPrepared("))
+        assertTrue("!appState.ttsEngineNeedsAcknowledgment()" in source("state/TtsAutoReadContinuation.kt"))
+        val appState = source("state/AppState.kt")
+        val replaceEngine = appState.functionBody("publishTtsResolution")
+        val ownership = appState.functionBody("clearTtsPlaybackOwnership")
+        assertTrue(replaceEngine.indexOf("clearTtsPlaybackOwnership()") in 0 until replaceEngine.indexOf("ttsController.attachEngine("))
+        assertTrue("ttsAutoReadSessionKey = null" in ownership)
+    }
+
+    @Test
     fun conversationScreenDelegatesTtsOrchestrationOutOfItsGeneratedMethod() {
         val body = source("ui/conversation/ConversationScreen.kt")
 

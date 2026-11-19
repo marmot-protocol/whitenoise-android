@@ -427,7 +427,7 @@ class TtsEngineResolverTest {
         }
 
     @Test
-    fun explicitLocalEngineRequestUsesUnverifiedHandleTrustEvenWhenConnectedMatches() =
+    fun explicitLocalEngineRequestUsesLocalTrustWhenConnectedMatches() =
         runBlocking {
             val factory = ControllableTtsFactory()
             val resolver =
@@ -436,24 +436,24 @@ class TtsEngineResolverTest {
                     ttsFactory = factory,
                     engineCatalog =
                         FakeTtsEngineCatalog(
-                            engines = listOf(engineInfo("com.github.olga_yakovleva.rhvoice.android", "RHVoice")),
-                            defaultEngine = "com.github.olga_yakovleva.rhvoice.android",
+                            engines = listOf(engineInfo("app.grapheneos.speechservices", "GrapheneOS")),
+                            defaultEngine = "app.grapheneos.speechservices",
                             connectedEngineForRequest = { requested ->
-                                requested ?: "com.github.olga_yakovleva.rhvoice.android"
+                                requested ?: "app.grapheneos.speechservices"
                             },
                         ),
                 )
 
             val deferred =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    resolver.resolve("com.github.olga_yakovleva.rhvoice.android")
+                    resolver.resolve("app.grapheneos.speechservices")
                 }
             factory.completeInit(TextToSpeech.SUCCESS)
             val result = deferred.await()
 
             assertNotNull(result.handle)
-            assertEquals(EngineTrust.Unknown, result.handle?.trust)
-            assertEquals("com.github.olga_yakovleva.rhvoice.android", result.handle?.enginePackage)
+            assertEquals(EngineTrust.Local, result.handle?.trust)
+            assertEquals("app.grapheneos.speechservices", result.handle?.enginePackage)
             result.handle?.release()
             Unit
         }
