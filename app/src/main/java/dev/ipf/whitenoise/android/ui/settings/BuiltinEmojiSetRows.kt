@@ -50,7 +50,7 @@ internal fun LazyListScope.builtinEmojiSetRows(
                             stringResource(R.string.emoji_sets_builtin_hidden)
                         },
                     explanation = stringResource(R.string.explanation_organize_emoji_builtin_set),
-                    enabled = enabled,
+                    enabled = enabled && choices.loaded,
                     leading = { BuiltinEmojiSetIcon(set) },
                 )
             }
@@ -58,6 +58,7 @@ internal fun LazyListScope.builtinEmojiSetRows(
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun BuiltinEmojiSetIcon(set: BuiltinEmojiSet) {
     val drawable = EmojiShortcodes.builtinDrawable(set.iconEmoji) ?: return

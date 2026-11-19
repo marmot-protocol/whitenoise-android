@@ -7,8 +7,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import dev.ipf.whitenoise.android.ui.BuiltinEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiCategory
@@ -25,6 +25,7 @@ internal fun emojiPickerTabTitle(tab: EmojiPickerTab): String =
     }
 
 /** A category's glyph, or an emoji set's own first emoji, on its picker tab. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun EmojiPickerTabIcon(
     tab: EmojiPickerTab,
@@ -40,7 +41,7 @@ internal fun EmojiPickerTabIcon(
                 modifier = Modifier.size(size),
                 tint = tint,
             )
-        is BuiltinEmojiSet -> EmojiGlyph(tab.iconEmoji, Modifier.semantics { contentDescription = title }, size)
-        is InstalledEmojiSetTab -> EmojiGlyph(tab.iconEmoji, Modifier.semantics { contentDescription = title }, size)
+        is BuiltinEmojiSet -> EmojiGlyph(tab.iconEmoji, Modifier.clearAndSetSemantics { contentDescription = title }, size)
+        is InstalledEmojiSetTab -> EmojiGlyph(tab.iconEmoji, Modifier.clearAndSetSemantics { contentDescription = title }, size)
     }
 }

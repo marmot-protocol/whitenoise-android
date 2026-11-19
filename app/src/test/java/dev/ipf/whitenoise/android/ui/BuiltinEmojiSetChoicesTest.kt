@@ -18,7 +18,9 @@ class BuiltinEmojiSetChoicesTest {
 
     @Test
     fun hiddenSetsPersistAcrossProcesses() {
-        BuiltinEmojiSetChoices(context).setHidden(BuiltinEmojiSet.Marmot, hide = true)
+        val first = BuiltinEmojiSetChoices(context)
+        runBlocking { first.load() }
+        first.setHidden(BuiltinEmojiSet.Marmot, hide = true)
 
         val restarted = BuiltinEmojiSetChoices(context)
         runBlocking { restarted.load() }
@@ -28,5 +30,17 @@ class BuiltinEmojiSetChoicesTest {
         val restored = BuiltinEmojiSetChoices(context)
         runBlocking { restored.load() }
         assertTrue(restored.hidden.isEmpty())
+    }
+
+    @Test
+    fun changeBeforeLoadKeepsStoredChoice() {
+        val first = BuiltinEmojiSetChoices(context)
+        runBlocking { first.load() }
+        first.setHidden(BuiltinEmojiSet.Marmot, hide = true)
+
+        val restarted = BuiltinEmojiSetChoices(context)
+        restarted.setHidden(BuiltinEmojiSet.WhiteNoise, hide = true)
+        runBlocking { restarted.load() }
+        assertEquals(setOf(BuiltinEmojiSet.Marmot), restarted.hidden)
     }
 }

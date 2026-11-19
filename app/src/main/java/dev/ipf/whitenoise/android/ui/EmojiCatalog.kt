@@ -110,6 +110,16 @@ internal fun installedSetSearchSections(
     query: String,
 ): List<EmojiSection> = sets.filter { it.category is InstalledEmojiSetTab }.mapNotNull { shortcodeMatches(it, query) }
 
+/** Search uses the browse order: the user's own emoji, pre-installed sets, installed sets, then categories. */
+internal fun emojiSearchLayout(
+    custom: EmojiSection?,
+    results: List<EmojiSection>,
+    installed: List<EmojiSection>,
+): List<EmojiSection> {
+    val (builtin, categories) = results.partition { it.category is BuiltinEmojiSet }
+    return listOfNotNull(custom) + builtin + installed + categories
+}
+
 private fun shortcodeMatches(
     section: EmojiSection,
     query: String,

@@ -119,11 +119,18 @@ class EmojiSetPickerScreenshotTest {
 
     private fun waitForHeader(tab: EmojiPickerTab) {
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag(emojiPickerHeaderTestTag(tab), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            composeRule
+                .onAllNodesWithTag(emojiPickerHeaderTestTag(tab), useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
     }
 
-    private fun headerTop(tab: EmojiPickerTab) = composeRule.onNodeWithTag(emojiPickerHeaderTestTag(tab), useUnmergedTree = true).getBoundsInRoot().top
+    private fun headerTop(tab: EmojiPickerTab) =
+        composeRule
+            .onNodeWithTag(emojiPickerHeaderTestTag(tab), useUnmergedTree = true)
+            .getBoundsInRoot()
+            .top
 
     private companion object {
         const val PANE_TAG = "emoji-set-picker-pane"

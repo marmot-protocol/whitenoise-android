@@ -4,11 +4,13 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
@@ -90,7 +92,6 @@ internal fun EmojiSetsScreen(
                 )
             }
         val scope = rememberCoroutineScope()
-        val builtinChoices = rememberBuiltinEmojiSetChoices()
         val back = {
             when {
                 controller.state.progress != null -> controller.cancelInstall()
@@ -129,7 +130,7 @@ internal fun EmojiSetsScreen(
             onRemove = { appState.launchMutation { controller.remove() } },
             profileName = selected?.let { appState.accountDisplayNameCached(it.accountIdHex) },
             // Pre-installed sets are a device choice, so the share flow's per-profile browser leaves them out.
-            builtinSets = if (targetAccount == null) builtinChoices else null,
+            builtinSets = rememberBuiltinEmojiSetChoices().takeIf { targetAccount == null },
         )
     }
 }
@@ -209,45 +210,53 @@ private fun EmojiSetBrowser(
         item { EmojiSetQuery(field, busy = loading, onSearch = onSearch) }
         item { EmojiSetStatus(state, syncing = state.discovering) }
         // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
-        val discoveryFailed =
-            state.notice == EmojiSetNotice.Error || state.notice == EmojiSetNotice.DiscoveryIncomplete
-        if (state.sets.isEmpty() && builtinSets == null && !loading && !discoveryFailed) {
+        if (!loading && state.showsNoSets(builtinsListed = builtinSets != null)) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
         // Installed sets, then relay results, under the sticker browser's headings (#3882).
         val (installed, discovered) = state.sets.partition { it.installed != null }
-        for ((heading, sets) in listOf(
-            R.string.emoji_sets_section_installed to installed,
-            R.string.emoji_sets_section_discover to discovered,
-        )) {
-            val builtins = builtinSets.takeIf { heading == R.string.emoji_sets_section_installed }
-            if (sets.isEmpty() && builtins == null) continue
-            item(key = "heading.$heading") { SettingsSection(stringResource(heading)) }
-            // The shipped White Noise and Marmot sets sit with the installed sets and can be hidden like them.
-            if (builtins != null) builtinEmojiSetRows(builtins, enabled = !state.busy)
-            items(sets, key = { it.coordinate }) { set ->
-                SettingsGroup {
-                    row("set") { context ->
-                        SettingsAction(
-                            context = context,
-                            title = set.displayTitle(),
-                            subtitle =
-                                when {
-                                    set.installed?.updateAvailable == true ->
-                                        stringResource(R.string.emoji_sets_update_available)
-                                    set.installed != null -> stringResource(R.string.emoji_sets_installed)
-                                    else -> {
-                                        val count = set.emoji.size
-                                        pluralStringResource(R.plurals.emoji_sets_item_count, count, count)
-                                    }
-                                },
-                            explanation = stringResource(R.string.explanation_organize_emoji_set),
-                            enabled = !state.busy,
-                            onClick = { onShow(set) },
-                            leading = { SettingsLeadingIcon(R.drawable.ic_category) },
-                        )
-                    }
-                }
+        emojiSetSection(R.string.emoji_sets_section_installed, installed, state.busy, onShow, builtinSets)
+        emojiSetSection(R.string.emoji_sets_section_discover, discovered, state.busy, onShow)
+    }
+}
+
+private fun EmojiSetsState.showsNoSets(builtinsListed: Boolean): Boolean {
+    val discoveryFailed = notice == EmojiSetNotice.Error || notice == EmojiSetNotice.DiscoveryIncomplete
+    return sets.isEmpty() && !builtinsListed && !discoveryFailed
+}
+
+private fun LazyListScope.emojiSetSection(
+    @StringRes heading: Int,
+    sets: List<EmojiSetFfi>,
+    busy: Boolean,
+    onShow: (EmojiSetFfi) -> Unit,
+    builtins: BuiltinEmojiSetChoices? = null,
+) {
+    if (sets.isEmpty() && builtins == null) return
+    item(key = "heading.$heading") { SettingsSection(stringResource(heading)) }
+    // The shipped White Noise and Marmot sets sit with the installed sets and can be hidden like them.
+    if (builtins != null) builtinEmojiSetRows(builtins, enabled = !busy)
+    items(sets, key = { it.coordinate }) { set ->
+        SettingsGroup {
+            row("set") { context ->
+                SettingsAction(
+                    context = context,
+                    title = set.displayTitle(),
+                    subtitle =
+                        when {
+                            set.installed?.updateAvailable == true ->
+                                stringResource(R.string.emoji_sets_update_available)
+                            set.installed != null -> stringResource(R.string.emoji_sets_installed)
+                            else -> {
+                                val count = set.emoji.size
+                                pluralStringResource(R.plurals.emoji_sets_item_count, count, count)
+                            }
+                        },
+                    explanation = stringResource(R.string.explanation_organize_emoji_set),
+                    enabled = !busy,
+                    onClick = { onShow(set) },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_category) },
+                )
             }
         }
     }

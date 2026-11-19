@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.settings.EMOJI_SETS_REFRESH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.settings.EmojiSetsContent
 import dev.ipf.whitenoise.android.ui.settings.builtinEmojiSetRowTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -154,6 +155,7 @@ class EmojiSetsScreenshotTest {
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val choices = BuiltinEmojiSetChoices(context)
+        runBlocking { choices.load() }
         choices.setHidden(BuiltinEmojiSet.Marmot, hide)
         val installed = InstalledEmojiSetStateFfi("previous", 0u, 0u, 1u, 100u, false)
         setTheme(dark, rtl) {

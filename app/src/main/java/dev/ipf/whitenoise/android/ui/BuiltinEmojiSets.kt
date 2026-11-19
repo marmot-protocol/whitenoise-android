@@ -47,7 +47,9 @@ internal fun Set<BuiltinEmojiSet>.hides(emoji: String): Boolean = any { emoji in
 internal class BuiltinEmojiSetChoices(
     private val context: Context,
 ) {
-    private var loaded = false
+    /** False until the stored choice is read; changes made before then would overwrite it. */
+    var loaded by mutableStateOf(false)
+        private set
 
     var hidden: Set<BuiltinEmojiSet> by mutableStateOf(emptySet())
         private set
@@ -64,13 +66,15 @@ internal class BuiltinEmojiSetChoices(
         }
     }
 
-    /** Removes [set] from the picker, or restores it. */
+    /** Removes [set] from the picker, or restores it. Ignored until [load] has read the stored choice. */
     fun setHidden(
         set: BuiltinEmojiSet,
         hide: Boolean,
     ) {
+        if (!loaded) {
+            return
+        }
         hidden = if (hide) hidden + set else hidden - set
-        loaded = true
         context
             .preferences()
             .edit()

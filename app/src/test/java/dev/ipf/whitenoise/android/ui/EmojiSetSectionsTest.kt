@@ -42,6 +42,26 @@ class EmojiSetSectionsTest {
         )
     }
 
+    /** Search keeps the browse order, so installed sets follow the pre-installed ones. */
+    @Test
+    fun searchKeepsBrowseSetOrder() {
+        val mine = EmojiSection(EmojiCategory.Custom, listOf(":mine:"))
+        val installed = listOf(EmojiSection(forest, listOf(":fox:")))
+
+        val sections = emojiSearchLayout(mine, emojiSearchSections(listOf(grin, marmot, wn)), installed)
+
+        assertEquals(
+            listOf(
+                EmojiCategory.Custom,
+                BuiltinEmojiSet.WhiteNoise,
+                BuiltinEmojiSet.Marmot,
+                forest,
+                EmojiCategory.SmileysAndPeople,
+            ),
+            sections.map { it.category },
+        )
+    }
+
     /** Installed sets keep their own section in search, holding only matching shortcodes. */
     @Test
     fun installedSetSearchMatchesShortcodes() {
