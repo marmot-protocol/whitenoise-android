@@ -1240,7 +1240,7 @@ class SettingsPageMorphHostTest {
         }
     }
 
-    @Test fun closingIntoComposerMasksOnlyItsNativeStrokeUntilHandoff() {
+    @Test fun openingFromComposerDelaysFreeBodyUntilHandoff() {
         val page = SettingsPageMorph()
         val host = Rect(0f, 0f, 360f, 780f)
         val composer = Rect(20f, 650f, 340f, 730f)
@@ -1288,6 +1288,37 @@ class SettingsPageMorphHostTest {
                 .blue,
             0.01f,
         )
+    }
+
+    @Test fun closingIntoComposerMasksOnlyItsNativeStrokeUntilHandoff() {
+        val page = SettingsPageMorph()
+        val host = Rect(0f, 0f, 360f, 780f)
+        val composer = Rect(20f, 650f, 340f, 730f)
+        val details = Rect(40f, 150f, 320f, 350f)
+        val closing = mutableStateOf(false)
+        val time = mutableStateOf(1f)
+        val token = Any()
+        val contour = outlinedContour(composer, host)
+        page.anchorContour = { contour }
+        page.closingAnchorContour = { contour }
+        page.begin("chat", true, false, host)
+        page.pendingOrigin = composer
+        assertTrue(page.begin("details", true, true, host))
+        rule.setContent {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        if (!closing.value) {
+                            page.reportOutlinedDestination(token, details)
+                        }
+                        with(page) { draw(host, time.value, true, Color.Black) }
+                    }.drawWithContent {
+                        drawComposerReturnNative(closing.value, if (closing.value) composer else details)
+                    },
+            )
+        }
+        rule.onRoot().captureToImage()
         rule.runOnIdle {
             assertTrue(page.begin("chat", false, true, host))
             closing.value = true

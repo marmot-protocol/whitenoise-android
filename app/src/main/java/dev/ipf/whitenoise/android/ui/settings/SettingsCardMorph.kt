@@ -380,6 +380,8 @@ internal fun <T> rememberSettingsCardMorphHost(
     forward: Boolean = true,
     captureContent: Boolean = true,
 ): Pair<Boolean, Modifier> {
+    // Native control borders do not opt borderless settings themes into contour motion.
+    val animateContours = motion && (morph?.page == null || isAmoledSurfaceTheme())
     morph?.captureContent = captureContent
     DisposableEffect(morph, ownerKey) {
         val releaseChild = morph?.observeChildContours()
@@ -392,10 +394,10 @@ internal fun <T> rememberSettingsCardMorphHost(
     // Runs while the new route composes, before the old route's cards have reported their removal.
     val morphing =
         morph != null &&
-            remember(morph, ownerKey, target, motion) {
-                if (morph.page != null) morph.beginPage(target, forward, motion) else morph.begin(motion)
+            remember(morph, ownerKey, target, animateContours) {
+                if (morph.page != null) morph.beginPage(target, forward, animateContours) else morph.begin(animateContours)
             }
-    val morphProgress = remember(morph, ownerKey, target, motion) { Animatable(if (morphing) 0f else 1f) }
+    val morphProgress = remember(morph, ownerKey, target, animateContours) { Animatable(if (morphing) 0f else 1f) }
     val clock: () -> Float = remember(morphProgress) { { morphProgress.value } }
     morph?.time = clock
     LaunchedEffect(morphProgress) {

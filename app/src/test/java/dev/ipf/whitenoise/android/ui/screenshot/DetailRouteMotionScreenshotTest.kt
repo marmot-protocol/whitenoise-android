@@ -183,6 +183,9 @@ class DetailRouteMotionScreenshotTest {
     /** The composer settings card morph on the light theme. */
     @Test fun composerLight() = captureComposer("composer_light")
 
+    /** Native dark composer controls remain live without synthetic settings contours. */
+    @Test fun composerDark() = captureComposer("composer_dark", dark = true)
+
     /** The conversation title, which offers Details as its click label. */
     private fun opensDetails() =
         SemanticsMatcher("opens details") {
@@ -757,10 +760,11 @@ class DetailRouteMotionScreenshotTest {
         profile: Boolean,
     ) {
         val frames = if (captureFrames) File("build/detail-route-motion/$name").apply { mkdirs() } else null
+        var firstNativeBody: Bitmap? = null
         var intermediate: Bitmap? = null
         var settled: Bitmap? = null
         // Only AMOLED cards draw outlines, so only there do details cards visibly fold into the composer.
-        val borderlessComposer = name.startsWith("composer_light")
+        val borderlessComposer = name.startsWith("composer_light") || name.startsWith("composer_dark")
         val morphs =
             !borderlessComposer &&
                 (
@@ -783,7 +787,11 @@ class DetailRouteMotionScreenshotTest {
                 }
                 exportTransitionFrame(frames, name, frame, bitmap)
                 if (frame == 0) {
-                    assertFirstFrameBackplate(name, bitmap)
+                    if (borderlessComposer && name.endsWith("_entry")) {
+                        firstNativeBody = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                    } else {
+                        assertFirstFrameBackplate(name, bitmap)
+                    }
                 }
                 if (!captureFrames && frame in listOf(0, 6, 20)) {
                     bitmap.captureRoboImage(
@@ -792,6 +800,9 @@ class DetailRouteMotionScreenshotTest {
                 }
             }
             rule.mainClock.advanceTimeBy(16)
+        }
+        firstNativeBody?.let { first ->
+            assertNativeBodyEdgeContinuity(name, first, checkNotNull(settled))
         }
         if (profile || borderlessComposer) {
             // Borderless themes hand off their body once; no synthetic contour or dissolve is required.
@@ -813,6 +824,20 @@ class DetailRouteMotionScreenshotTest {
         }
         if (name.startsWith("composer_") && name.endsWith("_entry")) {
             assertNativeComposerHeader(name, checkNotNull(intermediate), checkNotNull(settled))
+        }
+    }
+
+    private fun assertNativeBodyEdgeContinuity(
+        name: String,
+        first: Bitmap,
+        settled: Bitmap,
+    ) {
+        for (y in listOf(first.height / 4, first.height / 2, first.height * 3 / 4)) {
+            assertEquals(
+                "$name must preserve each native surface at entry",
+                settled.getPixel(1, y),
+                first.getPixel(1, y),
+            )
         }
     }
 
@@ -864,7 +889,7 @@ class DetailRouteMotionScreenshotTest {
             // real source pixels, rather than a theme-color guess, define continuity.
             // Returning to the conversation keeps its native margin visible outside the morphing cards.
             val expected =
-                if (name.endsWith("_entry_back") || (name.startsWith("composer_light") && name.endsWith("_entry"))) {
+                if (name.endsWith("_entry_back")) {
                     checkNotNull(routeBackground)
                 } else {
                     source?.getPixel(edge, y) ?: checkNotNull(morphBackplate)
