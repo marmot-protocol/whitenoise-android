@@ -327,6 +327,7 @@ class ReplyTaggedSendsTest {
         fun record(id: String) =
             AppMessageRecordFfi(
                 messageIdHex = id,
+                invalidated = false,
                 direction = "received",
                 groupIdHex = GROUP_ID,
                 sender = "f6".repeat(32),
