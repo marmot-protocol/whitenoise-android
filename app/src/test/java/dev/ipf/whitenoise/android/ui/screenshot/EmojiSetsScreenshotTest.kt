@@ -32,11 +32,14 @@ import dev.ipf.whitenoise.android.state.EmojiSetNotice
 import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.state.emojiSetFixture
 import dev.ipf.whitenoise.android.state.installedEmojiFixture
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSet
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.settings.EMOJI_SETS_REFRESH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.settings.EmojiSetsContent
+import dev.ipf.whitenoise.android.ui.settings.builtinEmojiSetRowTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -55,6 +58,15 @@ class EmojiSetsScreenshotTest {
 
     /** The browser groups the installed snapshot and a relay result under Installed and Discover (#3882). */
     @Test fun browserLight() = preview("browser_light", showPreview = false)
+
+    /** The pre-installed sets list above installed sets, each with its own picker switch. */
+    @Test fun browserBuiltinLight() = builtinBrowser("browser_builtin_light")
+
+    /** A removed pre-installed set says it still renders in messages. */
+    @Test fun browserBuiltinHiddenDark() = builtinBrowser("browser_builtin_hidden_dark", dark = true, hide = true)
+
+    /** The pre-installed rows mirrored with large text. */
+    @Test fun browserBuiltinRtlLarge() = builtinBrowser("browser_builtin_rtl_large", rtl = true)
 
     /** Unreachable relays show their notice instead of "no sets", with Refresh in the top bar (#3882). */
     @Test fun browserDiscoveryIncompleteDark() {
@@ -132,6 +144,35 @@ class EmojiSetsScreenshotTest {
             )
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/emoji_sets_$name.png")
+    }
+
+    private fun builtinBrowser(
+        name: String,
+        dark: Boolean = false,
+        rtl: Boolean = false,
+        hide: Boolean = false,
+    ) {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val choices = BuiltinEmojiSetChoices(context)
+        choices.setHidden(BuiltinEmojiSet.Marmot, hide)
+        val installed = InstalledEmojiSetStateFfi("previous", 0u, 0u, 1u, 100u, false)
+        setTheme(dark, rtl) {
+            EmojiSetsContent(
+                state = EmojiSetsState(sets = listOf(emojiSetFixture().copy(installed = installed))),
+                onBack = {},
+                onSearch = {},
+                onShow = {},
+                onLoadArtwork = {},
+                onInstall = {},
+                onCancel = {},
+                onRemove = {},
+                builtinSets = choices,
+            )
+        }
+        composeRule.onNodeWithTag(builtinEmojiSetRowTestTag(BuiltinEmojiSet.Marmot)).assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/emoji_sets_$name.png")
+        composeRule.onNodeWithTag(builtinEmojiSetRowTestTag(BuiltinEmojiSet.Marmot)).performClick()
+        assertEquals("The switch flips the stored choice", !hide, BuiltinEmojiSet.Marmot in choices.hidden)
     }
 
     /** Golden: an empty browser showing [notice] in place of the empty-library message. */

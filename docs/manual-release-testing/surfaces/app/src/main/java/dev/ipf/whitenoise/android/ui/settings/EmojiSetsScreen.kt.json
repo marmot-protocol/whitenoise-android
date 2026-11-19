@@ -358,6 +358,14 @@
         "test_ids": [
           "SET-057"
         ]
+      },
+      {
+        "surface": "Pre-installed sets in the emoji set browser",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "builtinSets",
+        "test_ids": [
+          "SET-059"
+        ]
       }
     ]
   },

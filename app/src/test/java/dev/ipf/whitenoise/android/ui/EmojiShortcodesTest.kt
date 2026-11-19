@@ -27,7 +27,7 @@ class EmojiShortcodesTest {
         assertEquals(emptyList<String>(), EmojiShortcodes.presentationShortcodes("```\n:wn:\n```"))
     }
 
-    /** Only the padded Marmot canvas is cropped, and only built-ins have a product name for text-only surfaces. */
+    /** Padded Marmot canvases are cropped, the full-bleed mark is not, and only built-ins have a product name. */
     @Test
     fun builtinArtworkRegionsAndNames() {
         val marmot = checkNotNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_marmot_classic))
@@ -36,7 +36,9 @@ class EmojiShortcodesTest {
         assertEquals(51, marmot.width)
         assertEquals(51, marmot.height)
         assertNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_wn))
-        assertNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_marmot))
+        val pixelMarmot = checkNotNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_marmot))
+        assertEquals(104, pixelMarmot.width)
+        assertEquals(104, pixelMarmot.height)
         assertEquals(R.string.emoji_name_marmot, EmojiShortcodes.builtinName(":marmot:"))
         assertEquals(R.string.white_noise, EmojiShortcodes.builtinName(":wn:"))
         assertNull(EmojiShortcodes.builtinName(":party:"))

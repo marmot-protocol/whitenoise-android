@@ -43,12 +43,14 @@ import dev.ipf.whitenoise.android.state.EmojiSetsController
 import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emojiSetsBackend
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.decodeEmojiImage
+import dev.ipf.whitenoise.android.ui.rememberBuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -88,6 +90,7 @@ internal fun EmojiSetsScreen(
                 )
             }
         val scope = rememberCoroutineScope()
+        val builtinChoices = rememberBuiltinEmojiSetChoices()
         val back = {
             when {
                 controller.state.progress != null -> controller.cancelInstall()
@@ -125,6 +128,8 @@ internal fun EmojiSetsScreen(
             onCancel = controller::cancelInstall,
             onRemove = { appState.launchMutation { controller.remove() } },
             profileName = selected?.let { appState.accountDisplayNameCached(it.accountIdHex) },
+            // Pre-installed sets are a device choice, so the share flow's per-profile browser leaves them out.
+            builtinSets = if (targetAccount == null) builtinChoices else null,
         )
     }
 }
@@ -142,6 +147,7 @@ internal fun EmojiSetsContent(
     onCancel: () -> Unit,
     onRemove: () -> Unit,
     profileName: String? = null,
+    builtinSets: BuiltinEmojiSetChoices? = null,
 ) {
     val title = stringResource(R.string.emoji_sets_title)
     val query = rememberTextFieldState()
@@ -170,7 +176,7 @@ internal fun EmojiSetsContent(
     ) {
         val set = state.preview
         if (set == null) {
-            EmojiSetBrowser(state, query, onSearch, onShow)
+            EmojiSetBrowser(state, query, onSearch, onShow, builtinSets)
         } else {
             EmojiSetPreview(state, set, onLoadArtwork, onInstall, onCancel, onRemove) { onSearch(set.coordinate) }
         }
@@ -196,6 +202,7 @@ private fun EmojiSetBrowser(
     field: TextFieldState,
     onSearch: (String) -> Unit,
     onShow: (EmojiSetFfi) -> Unit,
+    builtinSets: BuiltinEmojiSetChoices?,
 ) {
     val loading = state.busy || state.discovering
     SettingsList {
@@ -204,7 +211,7 @@ private fun EmojiSetBrowser(
         // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
         val discoveryFailed =
             state.notice == EmojiSetNotice.Error || state.notice == EmojiSetNotice.DiscoveryIncomplete
-        if (state.sets.isEmpty() && !loading && !discoveryFailed) {
+        if (state.sets.isEmpty() && builtinSets == null && !loading && !discoveryFailed) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
         // Installed sets, then relay results, under the sticker browser's headings (#3882).
@@ -213,8 +220,11 @@ private fun EmojiSetBrowser(
             R.string.emoji_sets_section_installed to installed,
             R.string.emoji_sets_section_discover to discovered,
         )) {
-            if (sets.isEmpty()) continue
+            val builtins = builtinSets.takeIf { heading == R.string.emoji_sets_section_installed }
+            if (sets.isEmpty() && builtins == null) continue
             item(key = "heading.$heading") { SettingsSection(stringResource(heading)) }
+            // The shipped White Noise and Marmot sets sit with the installed sets and can be hidden like them.
+            if (builtins != null) builtinEmojiSetRows(builtins, enabled = !state.busy)
             items(sets, key = { it.coordinate }) { set ->
                 SettingsGroup {
                     row("set") { context ->

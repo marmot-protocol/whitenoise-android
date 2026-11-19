@@ -585,7 +585,6 @@ internal fun WhiteNoiseApp(
         }
     }
 
-    val customEmojiStore = rememberCustomEmojiStore(context)
     val explanationHost = rememberExplanationHostState()
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
     // whole app UI so every descendant text field requests incognito mode from
@@ -594,7 +593,8 @@ internal fun WhiteNoiseApp(
         CompositionLocalProvider(
             LocalPendingCameraCaptureFiles provides mainShellStateHolder.pendingCameraCaptureFiles,
             LocalTopNoticeHost provides topNoticeHost,
-            LocalCustomEmoji provides customEmojiStore.emoji,
+            LocalCustomEmoji provides rememberCustomEmojiStore(context).emoji,
+            LocalHiddenBuiltinEmojiSets provides rememberBuiltinEmojiSetChoices(context).hidden,
             LocalInAppLinkHandler provides inAppLinkHandler,
             LocalExplanationHost provides explanationHost,
         ) {

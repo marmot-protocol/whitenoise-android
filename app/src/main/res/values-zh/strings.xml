@@ -1640,6 +1640,8 @@
     <string name="emoji_sets_installed">已安装</string>
     <string name="emoji_sets_section_installed">已安装</string>
     <string name="emoji_sets_section_discover">发现</string>
+    <string name="emoji_sets_builtin_shown">预装 · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">已从选择器中隐藏。消息中仍会显示。</string>
     <string name="emoji_sets_update_available">有可用更新</string>
     <string name="emoji_sets_load_image">加载预览图片</string>
     <string name="emoji_sets_image_privacy">加载预览或安装表情包会向其图片服务器暴露你的 IP 地址。</string>

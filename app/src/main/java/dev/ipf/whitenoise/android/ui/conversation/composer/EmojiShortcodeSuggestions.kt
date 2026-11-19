@@ -24,6 +24,8 @@ import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
+import dev.ipf.whitenoise.android.ui.LocalHiddenBuiltinEmojiSets
+import dev.ipf.whitenoise.android.ui.hides
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +67,7 @@ internal fun EmojiShortcodeSuggestions(
         }
     val context = LocalContext.current
     val custom = LocalCustomEmoji.current
+    val hiddenSets = LocalHiddenBuiltinEmojiSets.current
     val suggestions by produceState(emptyList<String>(), active?.query, custom) {
         val query = active?.query
         if (query == null) {
@@ -79,7 +82,9 @@ internal fun EmojiShortcodeSuggestions(
     }
     val visibleSuggestions =
         suggestions.filter {
-            !EmojiShortcodes.isShortcode(it) || it in custom.composerShortcodes || it in EmojiShortcodes.builtins
+            !EmojiShortcodes.isShortcode(it) ||
+                it in custom.composerShortcodes ||
+                (it in EmojiShortcodes.builtins && !hiddenSets.hides(it))
         }
     if (active == null || visibleSuggestions.isEmpty()) {
         return
@@ -105,7 +110,6 @@ internal fun EmojiShortcodeSuggestions(
                     },
                     modifier = Modifier.testTag(emojiSuggestionTestTag(index)),
                     glyphSize = EmojiSuggestionGlyphSize,
-                    fitPickerArtwork = false,
                 )
             }
         }

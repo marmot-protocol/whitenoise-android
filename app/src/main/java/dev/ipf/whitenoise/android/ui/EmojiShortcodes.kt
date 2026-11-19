@@ -114,17 +114,40 @@ internal object EmojiShortcodes {
     fun builtinDrawable(shortcode: String): Int? = definitions[shortcode]?.drawable
 
     /**
-     * The part of a bundled image's canvas that holds its artwork, or null when the artwork fills it.
-     * Every renderer crops through this, so the Marmot is the same size in the app and in notifications.
+     * The square part of a bundled image's canvas that holds its artwork, or null when the artwork fills it.
+     * Every renderer crops through this, so built-ins match Unicode and custom emoji in the app and in
+     * notifications. Each square is the artwork's tight bounding box, centred and padded on its short side.
      */
     fun builtinArtworkRegion(
         @DrawableRes drawable: Int,
-    ): IntRect? =
-        // The classic Marmot's 72px canvas includes padding around its 51px artwork.
-        if (drawable == R.drawable.builtin_emoji_marmot_classic) {
-            IntRect(IntOffset(x = 11, y = 10), IntSize(width = 51, height = 51))
-        } else {
-            null
+    ): IntRect? = artworkRegions[drawable]
+
+    @Suppress("MagicNumber")
+    private val artworkRegions: Map<Int, IntRect> =
+        buildMap {
+            fun square(
+                x: Int,
+                y: Int,
+                side: Int,
+            ) = IntRect(IntOffset(x, y), IntSize(side, side))
+            // 128px pixel-art canvases with transparent margins around each pose.
+            for (drawable in listOf(
+                R.drawable.builtin_emoji_marmot,
+                R.drawable.builtin_emoji_marmot_angry,
+                R.drawable.builtin_emoji_marmot_cry,
+                R.drawable.builtin_emoji_marmot_fire,
+                R.drawable.builtin_emoji_marmot_laugh,
+                R.drawable.builtin_emoji_marmot_smirk,
+                R.drawable.builtin_emoji_marmot_wow,
+            )) {
+                put(drawable, square(12, 10, 104))
+            }
+            put(R.drawable.builtin_emoji_marmot_love, square(12, 18, 104))
+            put(R.drawable.builtin_emoji_marmot_party, square(8, 0, 112))
+            put(R.drawable.builtin_emoji_marmot_wave, square(4, 8, 112))
+            put(R.drawable.builtin_emoji_marmot_yes, square(8, 12, 108))
+            // The classic Marmot's 72px canvas includes padding around its 51px artwork.
+            put(R.drawable.builtin_emoji_marmot_classic, square(11, 10, 51))
         }
 
     /** Localized spoken names, with product names kept untranslated. */
