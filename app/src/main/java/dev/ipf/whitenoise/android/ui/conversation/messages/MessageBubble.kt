@@ -1056,10 +1056,10 @@ internal fun MessageBubble(
         fallbackVisibleText: String? = null,
         fallbackVisibleOffset: Int? = null,
         literalCode: Boolean = false,
-        expectedPress: TtsLongPressStart? = null,
+        press: TtsLongPressStart? = null,
     ) {
         if (deleted) return
-        val owner = expectedPress ?: captureTtsLongPressStart(startRenderedHit, ttsSpeakableSource?.text, controller, appState)
+        val owner = press ?: captureTtsLongPressStart(startRenderedHit, ttsSpeakableSource?.text, controller, appState)
         val canCommit = captureTtsLongPressGuard(owner, record, controller, appState)
         if (!canCommit()) return
         val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
@@ -1107,7 +1107,7 @@ internal fun MessageBubble(
         val layouts = textLayouts.selectableTextLayouts.snapshot()
         val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
         if (!selectionActive) {
-            startSpeakAloud(pressState.longPressTtsStart?.renderedHit, expectedPress = pressState.longPressTtsStart)
+            startSpeakAloud(pressState.longPressTtsStart?.renderedHit, press = pressState.longPressTtsStart)
             return
         }
         val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }

@@ -1013,7 +1013,7 @@ class WhiteNoiseAppState private constructor(
 
     internal fun ttsEngineNeedsAcknowledgment(): Boolean = ttsPlaybackTrust.needsAcknowledgment()
 
-    internal suspend fun confirmTtsPlaybackTrust(isCurrent: () -> Boolean): Boolean = ttsPlaybackTrust.confirm(isCurrent)
+    internal suspend fun confirmTtsPlaybackTrust(current: () -> Boolean): Boolean = ttsPlaybackTrust.confirm(current)
 
     internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
     internal val ttsVoicePreferences = TtsVoicePreferences(appContext)

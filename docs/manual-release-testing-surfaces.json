@@ -27080,14 +27080,6 @@
         ]
       },
       {
-        "surface": "Read-aloud external engine consent and dismissal",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "private suspend fun requestTtsPlaybackTrust(",
-        "test_ids": [
-          "TTS-003"
-        ]
-      },
-      {
         "surface": "Android 11 notification reply history re-post",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/RemoteInputHistoryCompat.kt",
         "anchor": "internal fun Notification.withoutApi30RemoteInputHistoryItems(",

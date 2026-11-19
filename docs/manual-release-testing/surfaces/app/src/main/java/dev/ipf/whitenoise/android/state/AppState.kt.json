@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-  "legacy_sha256": "2c2b96c6da0237e2f5a19aff93276a6ce8e468fa8b31ad68c69f057eab98ac67",
+  "legacy_sha256": "bfe8bf9aa29af4258ea84fed752b02fb817c0d36b9b2729ce06ada3a1ed78b42",
   "categories": {
     "composable_surfaces": [
       {

@@ -1,13 +1,18 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.speech.tts.TextToSpeech
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
+import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -191,6 +196,37 @@ class WhiteNoiseAppStateReaderSpeechTest {
             assertTrue(appState.ttsController.state.value is TtsState.Idle)
             assertFalse(appState.ownsCurrentAccountSpeech())
             assertTrue(engine.spoken.isEmpty())
+        }
+
+    @Test
+    fun unacknowledgedEngineRequiresConsentBeforePlayback() =
+        runBlocking {
+            val appState = testAppState()
+            val engine = FakeSessionEngine()
+            appState.ttsController.attachEngine(engine)
+            val entries = listOf(TtsSpeakableEntry("s", "Sender", "Private speech."))
+            val handle = TtsEngineHandle(TextToSpeech(context, {}), "test.external.reader", EngineTrust.Unknown)
+            val consent = TtsPlaybackTrustConsent(appState) { handle }
+            try {
+                suspend fun startSpeech() = consent.confirm { true } && appState.speakAloud(entries, Locale.US)
+
+                val cancelled = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
+                assertTrue(engine.spoken.isEmpty())
+                requireNotNull(consent.pending).respond(false)
+                assertFalse(cancelled.await())
+                assertTrue(consent.needsAcknowledgment())
+                assertTrue(engine.spoken.isEmpty())
+
+                val accepted = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
+                assertTrue(engine.spoken.isEmpty())
+                requireNotNull(consent.pending).respond(true)
+                assertTrue(accepted.await())
+                assertFalse(consent.needsAcknowledgment())
+                assertEquals(1, engine.spoken.size)
+                appState.stopSpeaking()
+            } finally {
+                handle.release()
+            }
         }
 
     /** An unmappable conversation start neither guesses the top nor acquires an auto-read session. */
