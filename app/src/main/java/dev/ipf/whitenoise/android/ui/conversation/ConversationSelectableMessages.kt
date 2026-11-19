@@ -52,15 +52,35 @@ private fun selectableMessageProjection(
     ) {
         return null
     }
-    if (item.projected?.deleted == true) {
-        return BatchMessageSelection(
-            action = BatchMessageActionItem(messageId, record.sender, record.sender, null, null, canDeleteForEveryone = false),
+    return if (item.projected?.deleted == true) {
+        BatchMessageSelection(
+            action =
+                BatchMessageActionItem(
+                    messageId,
+                    record.sender,
+                    record.sender,
+                    null,
+                    null,
+                    canDeleteForEveryone = false,
+                ),
             record = record,
             status = item.status,
             timelineOrder = item.timelineOrder,
             confirmedDeleted = true,
         ).asPlaceholder()
+    } else {
+        val live = liveSelectableMessage(item, controller, eligibilityNowSeconds)
+        if (deleted) live.asPlaceholder(live.action) else live
     }
+}
+
+private fun liveSelectableMessage(
+    item: TimelineMessage,
+    controller: ConversationController,
+    eligibilityNowSeconds: ULong,
+): BatchMessageSelection {
+    val record = item.record
+    val messageId = record.messageIdHex
     val invalidated = item.projected?.invalidationStatus != null
     val persistedFailure = item.projected?.let(::usesPersistedFailurePresentation) == true
     val editedText =
@@ -74,39 +94,38 @@ private fun selectableMessageProjection(
         } else {
             batchForwardEligibility(item, controller, mediaReferences, editedText, eligibilityNowSeconds)
         }
-    val live =
-        BatchMessageSelection(
-            action =
-                BatchMessageActionItem(
-                    messageId = messageId,
-                    senderId = record.sender,
-                    senderDisplayName = record.sender,
-                    copyableText =
-                        if (persistedFailure) {
-                            null
-                        } else {
-                            MessageProjector.copyableText(record, editedText)
-                        },
-                    forwardableText =
-                        if (invalidated) {
-                            null
-                        } else {
-                            MessageProjector.forwardableText(record, editedText)
-                        },
-                    // Same authoritative accessor the single-message
-                    // surface and the mutation guard use, so bulk
-                    // routing never diverges from per-message policy.
-                    canDeleteForEveryone = controller.deleteCapabilityFor(record, alreadyDeleted = false).canDeleteForEveryone,
-                    hasSaveableMedia = mediaReferences.isNotEmpty(),
-                    forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload,
-                    forwardBlockedReason = (forwardEligibility as? ForwardEligibility.Blocked)?.reason,
-                    pendingSend = item.isPendingSend,
-                ),
-            record = record,
-            status = item.status,
-            timelineOrder = item.timelineOrder,
-        )
-    return if (deleted) live.asPlaceholder(live.action) else live
+    return BatchMessageSelection(
+        action =
+            BatchMessageActionItem(
+                messageId = messageId,
+                senderId = record.sender,
+                senderDisplayName = record.sender,
+                copyableText =
+                    if (persistedFailure) {
+                        null
+                    } else {
+                        MessageProjector.copyableText(record, editedText)
+                    },
+                forwardableText =
+                    if (invalidated) {
+                        null
+                    } else {
+                        MessageProjector.forwardableText(record, editedText)
+                    },
+                // Same authoritative accessor the single-message
+                // surface and the mutation guard use, so bulk
+                // routing never diverges from per-message policy.
+                canDeleteForEveryone =
+                    controller.deleteCapabilityFor(record, alreadyDeleted = false).canDeleteForEveryone,
+                hasSaveableMedia = mediaReferences.isNotEmpty(),
+                forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload,
+                forwardBlockedReason = (forwardEligibility as? ForwardEligibility.Blocked)?.reason,
+                pendingSend = item.isPendingSend,
+            ),
+        record = record,
+        status = item.status,
+        timelineOrder = item.timelineOrder,
+    )
 }
 
 /**

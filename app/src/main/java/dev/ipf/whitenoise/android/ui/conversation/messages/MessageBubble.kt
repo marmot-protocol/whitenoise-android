@@ -2933,7 +2933,10 @@ internal fun MessageBubble(
                         collapseOverride = true
                     },
                     canTranslate =
-                        !deleted && translationSource != null && translationSession != null && translationPreferences != null,
+                        !deleted &&
+                            translationSource != null &&
+                            translationSession != null &&
+                            translationPreferences != null,
                     onTranslate = {
                         onActionMenuOpenChange(false)
                         if (translationPreferences?.providerNoticeAccepted() == true) {
@@ -2991,7 +2994,7 @@ internal fun MessageBubble(
                     onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,
                     onSelect = {
-                        if (!deleted && !actionsReadOnly) {
+                        if (batchSelectable && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             onToggleSelection()
                         }

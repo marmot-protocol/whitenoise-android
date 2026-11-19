@@ -233,7 +233,8 @@ private val NOSTR_EVENT_URI =
 private val BARE_NOSTR_EVENT =
     Regex(
         "(?<![A-Za-z0-9_/@])(?<!nostr:)" +
-            "(?:note1[$NIP19_BODY_CHARS]{6,1019}|nevent1[$NIP19_BODY_CHARS]{6,1017}|naddr1[$NIP19_BODY_CHARS]{6,1018})" +
+            "(?:note1[$NIP19_BODY_CHARS]{6,1019}|" +
+            "nevent1[$NIP19_BODY_CHARS]{6,1017}|naddr1[$NIP19_BODY_CHARS]{6,1018})" +
             "(?![A-Za-z0-9_/])",
     )
 

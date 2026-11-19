@@ -165,11 +165,11 @@ class DeletedMessageLocalRemovalTest {
     }
 
     @Test
-    fun readOnlyPlaceholderStillOffersLocalRemovalWithoutSelection() {
+    fun readOnlyPlaceholderOffersNeitherSelectionNorRemoval() {
         render(failCommits = false, readOnly = true)
         placeholder().performTouchInput { longClick() }
         composeRule.onNodeWithText(string(R.string.select), substring = false).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.delete_for_me), substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.delete_for_me), substring = false).assertDoesNotExist()
     }
 
     @Test

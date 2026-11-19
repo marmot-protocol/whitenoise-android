@@ -88,7 +88,12 @@ class NostrEventCardRendererTest {
                         listOf("subject", "Fix parser"),
                         listOf("a", "30617:$id:parser"),
                         listOf("branch-name", "fix-parser"),
-                        listOf("clone", "https://example.org/parser.git", "nostr://bob@example.org/parser", "javascript:hello"),
+                        listOf(
+                            "clone",
+                            "https://example.org/parser.git",
+                            "nostr://bob@example.org/parser",
+                            "javascript:hello",
+                        ),
                     ),
                 content = "# Full description",
             ).toCardModel()

@@ -123,7 +123,7 @@ private const val KIND_HORIZONTAL_VIDEO = 34_236
 
 /** Keeps the complete verified content available outside the three-line card preview. */
 private fun NostrEvent.fullReaderBody(cardKind: NostrEventCardKind): String? {
-    if (cardKind == NostrEventCardKind.Git && (kind == 1617 || kind == 1111)) {
+    if (cardKind == NostrEventCardKind.Git && (kind == KIND_GIT_PATCH || kind == KIND_GIT_COMMENT)) {
         return content.safeReaderBody(preserveWhitespace = true).takeIf(String::isNotBlank)
     }
     val body =
