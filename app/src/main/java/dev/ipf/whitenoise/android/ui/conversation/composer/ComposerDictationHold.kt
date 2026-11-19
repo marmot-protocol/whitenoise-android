@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.Lock
@@ -130,6 +131,7 @@ internal fun dictationHoldGesture(
 ): Modifier {
     val latestStart by rememberUpdatedState(startCapture)
     val haptics by rememberUpdatedState(LocalHapticFeedback.current)
+    val finishMorph by rememberUpdatedState(LocalFinishControlMorph.current)
     val launcher by rememberUpdatedState(LocalDictationLauncherOrigin.current)
     val rtl by rememberUpdatedState(LocalLayoutDirection.current == LayoutDirection.Rtl)
     return Modifier
@@ -184,11 +186,17 @@ internal fun dictationHoldGesture(
                             }
                             DictationHoldAction.Send -> {
                                 // The controller rejects Send outside live recognition, keeping the bubble.
-                                if (controller.state.sessionId == session) controller.send()
+                                if (controller.state.sessionId == session) {
+                                    finishMorph()
+                                    controller.send()
+                                }
                                 break
                             }
                             DictationHoldAction.Cancel -> {
-                                if (controller.state.sessionId == session) controller.cancel()
+                                if (controller.state.sessionId == session) {
+                                    finishMorph()
+                                    controller.cancel()
+                                }
                                 break
                             }
                         }

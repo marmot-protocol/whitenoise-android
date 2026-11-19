@@ -22,8 +22,8 @@ internal fun ConversationDictationController.chatListActivity(
             } else {
                 ConversationDictationActivity.Transcribing
             }
-        // Provider checks and pending launches have not opened capture yet.
         is ConversationDictationState.ProviderActivityActive -> ConversationDictationActivity.Listening
+        // Provider checks and pending launches have not opened capture yet.
         else -> null
     }
 }

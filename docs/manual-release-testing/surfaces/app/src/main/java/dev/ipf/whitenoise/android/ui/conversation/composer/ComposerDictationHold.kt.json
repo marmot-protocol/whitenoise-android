@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerDictationHold.kt",
         "anchor": "fun DictationHoldHint(",
         "test_ids": [
-          "DIC-016"
+          "DIC-017"
         ]
       }
     ]
