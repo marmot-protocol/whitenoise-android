@@ -10,7 +10,7 @@ class TtsPlaybackTrustRequestTest {
     fun currentRequestCanProceed() {
         val request = TtsPlaybackTrustRequest { true }
         request.respond(true)
-        assertTrue(runBlocking { request.answer.await() })
+        assertTrue(runBlocking { request.awaitApproval() })
     }
 
     @Test
@@ -19,7 +19,7 @@ class TtsPlaybackTrustRequestTest {
         val request = TtsPlaybackTrustRequest { current }
         current = false
         request.respond(true)
-        assertFalse(runBlocking { request.answer.await() })
+        assertFalse(runBlocking { request.awaitApproval() })
     }
 
     @Test
@@ -27,6 +27,14 @@ class TtsPlaybackTrustRequestTest {
         val request = TtsPlaybackTrustRequest { true }
         request.respond(false)
         request.respond(true)
-        assertFalse(runBlocking { request.answer.await() })
+        assertFalse(runBlocking { request.awaitApproval() })
+    }
+
+    @Test
+    fun dismissalRevokesConfirmationBeforePlaybackConsumesIt() {
+        val request = TtsPlaybackTrustRequest { true }
+        request.respond(true)
+        request.respond(false)
+        assertFalse(runBlocking { request.awaitApproval() })
     }
 }

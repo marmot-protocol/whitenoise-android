@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-  "legacy_sha256": "bfe8bf9aa29af4258ea84fed752b02fb817c0d36b9b2729ce06ada3a1ed78b42",
+  "legacy_sha256": "2c2b96c6da0237e2f5a19aff93276a6ce8e468fa8b31ad68c69f057eab98ac67",
   "categories": {
     "composable_surfaces": [
       {
@@ -42,6 +42,14 @@
         "anchor": "private suspend fun signOutAndWipeActiveAccountLocked(",
         "test_ids": [
           "ACC-014"
+        ]
+      },
+      {
+        "surface": "Read-aloud external engine consent and dismissal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun requestTtsPlaybackTrust(",
+        "test_ids": [
+          "TTS-003"
         ]
       }
     ],

@@ -1057,7 +1057,7 @@ class WhiteNoiseAppState private constructor(
         if (pendingTtsTrustWarning != null || !question.isCurrent()) return false
         pendingTtsTrustWarning = question
         return try {
-            if (!question.answer.await() || !question.isCurrent()) {
+            if (!question.awaitApproval()) {
                 false
             } else {
                 acknowledgeTtsTrustWarning(handle.enginePackage)
