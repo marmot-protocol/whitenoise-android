@@ -306,6 +306,14 @@
           "SYS-003",
           "SYS-014"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "surface": "Restore Default Relays is disabled only at White Noise's defaults",
+        "anchor": "internal fun AccountRelayListsFfi.usesDefaultRelays(",
+        "test_ids": [
+          "SYS-003"
+        ]
       }
     ]
   },

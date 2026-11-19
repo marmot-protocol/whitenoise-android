@@ -116,7 +116,7 @@ class ChatRelayFeedbackTest {
     }
 
     /**
-     * Sync native methods use their actual return types; validation succeeds locally and only the native setter fails.
+     * Sync native methods use their actual return types, and Restore's one native relay-list publish fails.
      */
     private fun nativeFailureApp(writes: AtomicInteger): WhiteNoiseAppState {
         val native =
@@ -134,9 +134,9 @@ class ChatRelayFeedbackTest {
                             val endpoint = raw as String
                             RelayEndpointClassificationFfi(endpoint, endpoint, RelayEndpointPolicyFfi.ALLOWED)
                         }
-                    "setAccountNip65Relays" -> {
+                    "publishRelayLists" -> {
                         writes.incrementAndGet()
-                        error("Controlled relay setter failure")
+                        error("Controlled relay list publish failure")
                     }
                     "toString" -> "ChatRelayFeedbackNativeFixture"
                     "hashCode" -> System.identityHashCode(proxy)

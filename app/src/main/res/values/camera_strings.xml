@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In-app camera opened by the composer's Camera action. -->
+    <string name="camera_close">Close camera</string>
+    <string name="camera_mode_photo">Photo</string>
+    <string name="camera_mode_video">Video</string>
+    <string name="camera_take_photo">Take photo</string>
+    <string name="camera_start_recording">Start recording</string>
+    <string name="camera_stop_recording">Stop recording</string>
+    <string name="camera_switch">Switch camera</string>
+    <string name="camera_video_without_sound">Microphone access is off, so videos record without sound.</string>
+    <string name="camera_capture_failed">Couldn\'t save that. Try again.</string>
+</resources>

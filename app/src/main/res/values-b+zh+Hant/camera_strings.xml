@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In-app camera opened by the composer's Camera action. -->
+    <string name="camera_close">關閉相機</string>
+    <string name="camera_mode_photo">照片</string>
+    <string name="camera_mode_video">影片</string>
+    <string name="camera_take_photo">拍照</string>
+    <string name="camera_start_recording">開始錄影</string>
+    <string name="camera_stop_recording">停止錄影</string>
+    <string name="camera_switch">切換鏡頭</string>
+    <string name="camera_video_without_sound">麥克風權限已關閉，錄製的影片將沒有聲音。</string>
+    <string name="camera_capture_failed">無法儲存，請再試一次。</string>
+</resources>
