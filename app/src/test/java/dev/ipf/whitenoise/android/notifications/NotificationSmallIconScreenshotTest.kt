@@ -76,7 +76,8 @@ class NotificationSmallIconScreenshotTest {
                 if (x >= micCorner && y >= micCorner) continue
                 val expected = Color.alpha(message.getPixel(x, y))
                 val actual = Color.alpha(dictation.getPixel(x, y))
-                assertTrue("Pixel ($x, $y) alpha $actual, expected $expected", abs(actual - expected) <= EDGE_ALPHA_TOLERANCE)
+                val matches = abs(actual - expected) <= EDGE_ALPHA_TOLERANCE
+                assertTrue("Pixel ($x, $y) alpha $actual, expected $expected", matches)
             }
         }
     }
