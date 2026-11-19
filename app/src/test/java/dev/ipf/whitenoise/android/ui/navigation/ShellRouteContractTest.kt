@@ -211,7 +211,7 @@ private fun WhiteNoiseAppState.replaceActiveAccount(accountRef: String?) {
 
 /** Reads attached route controllers under the same lock used by production state. */
 @Suppress("UNCHECKED_CAST")
-private fun WhiteNoiseAppState.attachedConversationControllers(): List<ConversationController> {
+internal fun WhiteNoiseAppState.attachedConversationControllers(): List<ConversationController> {
     val lock =
         WhiteNoiseAppState::class.java
             .getDeclaredField("conversationControllerLock")
