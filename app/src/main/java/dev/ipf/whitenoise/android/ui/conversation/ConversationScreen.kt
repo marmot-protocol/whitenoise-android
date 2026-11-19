@@ -535,16 +535,18 @@ internal fun ConversationScreen(
         }
     val projectedUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     val entryProjectionAvailable = chat.projection != null
+    // The controller row is seeded from the live chat-list row; the open item can predate newer messages.
+    val entryRow = controller.latestChatListRow ?: chat.projection
     val entryUnreadSnapshot =
         rememberConversationEntryUnreadSnapshot(
             controllerIdentity = entryUnreadSessionIdentity,
-            projectionUnread = projectedUnreadCount,
-            projectionFirstUnreadMessageId = chat.projection?.firstUnreadMessageIdHex,
-            projectionAvailable = entryProjectionAvailable,
+            projectionUnread = (entryRow?.unreadCount ?: 0uL).coerceAtMost(Int.MAX_VALUE.toULong()).toInt(),
+            projectionFirstUnreadMessageId = entryRow?.firstUnreadMessageIdHex,
+            projectionAvailable = entryRow != null,
             // A one-row chat-list seed cannot establish the authoritative unread
             // boundary. Freeze only after MDK's first real page replaces it.
             timeline = if (controller.initialTimelineSeedActive) emptyList() else controller.timeline,
-            readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+            readAnchorMessageId = entryRow?.lastReadMessageIdHex,
         )
     val entryUnreadCount = entryUnreadSnapshot.count
     val entryFirstUnreadMessageId = entryUnreadSnapshot.firstUnreadMessageId

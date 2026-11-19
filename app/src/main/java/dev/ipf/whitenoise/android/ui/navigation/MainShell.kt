@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
+import dev.ipf.whitenoise.android.state.conversationEntryChatListRow
 import dev.ipf.whitenoise.android.state.conversationSourceGroup
 import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.folderQueries
@@ -1289,11 +1290,8 @@ internal fun MainShell(
                         initialGroup = appState.conversationSourceGroup(openChat, accountRef),
                         initialMemberSnapshot =
                             openChat.memberSnapshot
-                                ?: appState.cachedGroupMemberSnapshot(
-                                    accountRef,
-                                    openChat.group.groupIdHex,
-                                ),
-                        initialChatListRow = openChat.projection,
+                                ?: appState.cachedGroupMemberSnapshot(accountRef, openChat.group.groupIdHex),
+                        initialChatListRow = conversationEntryChatListRow(openChat, chatsController, accountRef),
                         initialInviteConfirmationUnresolved = openChat.inviteConfirmationUnresolved,
                         initialIsDm = openChat.isDm(),
                         initialTimelinePreview = openChat.projection?.lastMessage,

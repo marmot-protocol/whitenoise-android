@@ -121,6 +121,21 @@ class ConversationAnchoringSourceCoverageTest {
         )
     }
 
+    /** The entry unread line reads the live chat-list row, not the list copy a route opened with. */
+    @Test
+    fun entryUnreadLineReadsTheLiveChatListRow() {
+        val screen = conversationScreenSource().motionOwnerSource()
+        val mainShell = conversationScreenSource().parentFile.resolve("../navigation/MainShell.kt").motionOwnerSource()
+
+        assertTrue(
+            "the unread line must start from the controller's live row and seed it from the backing row",
+            screen.contains("val entryRow = controller.latestChatListRow ?: chat.projection") &&
+                mainShell.contains(
+                    "initialChatListRow = conversationEntryChatListRow(openChat, chatsController, accountRef)",
+                ),
+        )
+    }
+
     /** Physical top means older history only in the reversed transcript, and endpoint reads follow layout. */
     @Test
     fun reversedDragSelectionMapsEdgesBeforeReadingThePostScrollEndpoint() {

@@ -372,6 +372,14 @@
         "test_ids": [
           "MSG-045"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "The unread line on reopen starts from the conversation's current chat-list row",
+        "anchor": "val entryRow = controller.latestChatListRow ?: chat.projection",
+        "test_ids": [
+          "CON-002"
+        ]
       }
     ]
   },

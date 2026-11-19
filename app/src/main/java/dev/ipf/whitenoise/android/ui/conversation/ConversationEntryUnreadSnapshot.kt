@@ -59,6 +59,20 @@ private data class ConversationEntryUnreadProjection(
     val readAnchorMessageId: String?,
 )
 
+/**
+ * The projected first-unread id, unless the loaded rows place it at or before the read anchor. A row
+ * folded before newer messages arrived can keep an old first-unread id after the cursor moved past
+ * it; the divider then belongs on the first message after the anchor, found from the count.
+ */
+private fun ConversationEntryUnreadProjection.firstUnreadAfterReadAnchor(timeline: List<TimelineMessage>): String? {
+    val firstUnreadId = firstUnreadMessageId ?: return null
+
+    fun indexOf(id: String?) = if (id == null) -1 else timeline.indexOfFirst { it.record.messageIdHex == id }
+    val anchorIndex = indexOf(readAnchorMessageId)
+    val firstUnreadIndex = indexOf(firstUnreadId)
+    return firstUnreadId.takeUnless { anchorIndex >= 0 && firstUnreadIndex in 0..anchorIndex }
+}
+
 private class ConversationEntryUnreadProjectionHolder(
     var frozen: ConversationEntryUnreadProjection?,
 )
@@ -120,7 +134,7 @@ internal fun rememberConversationEntryUnreadSnapshot(
                 if (count <= 0) {
                     null
                 } else {
-                    entryProjection.firstUnreadMessageId
+                    entryProjection.firstUnreadAfterReadAnchor(timeline)
                         ?: timeline
                             .getOrNull(firstUnreadIndex)
                             ?.record

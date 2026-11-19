@@ -79,6 +79,42 @@ class ConversationEntryUnreadSnapshotTest {
         assertEquals(before, snapshot[0])
     }
 
+    /** A row folded before the user read on keeps an old first-unread id; the line follows the anchor. */
+    @Test
+    fun staleFirstUnreadAtOrBeforeReadAnchorMovesToFirstMessageAfterAnchor() {
+        val snapshot = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+        composeRule.setContent {
+            snapshot[0] =
+                rememberConversationEntryUnreadSnapshot(
+                    controllerIdentity = this,
+                    projectionUnread = 2,
+                    projectionFirstUnreadMessageId = "old-unread",
+                    timeline = listOf(received("old-unread"), received("read"), received("new-1"), received("new-2")),
+                    readAnchorMessageId = "read",
+                )
+        }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(count = 2, firstUnreadMessageId = "new-1"), snapshot[0])
+    }
+
+    /** A projected first-unread after the anchor is still trusted as-is. */
+    @Test
+    fun firstUnreadAfterReadAnchorIsKept() {
+        val snapshot = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+        composeRule.setContent {
+            snapshot[0] =
+                rememberConversationEntryUnreadSnapshot(
+                    controllerIdentity = this,
+                    projectionUnread = 2,
+                    projectionFirstUnreadMessageId = "new-1",
+                    timeline = listOf(received("read"), received("new-1"), received("new-2")),
+                    readAnchorMessageId = "read",
+                )
+        }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(count = 2, firstUnreadMessageId = "new-1"), snapshot[0])
+    }
+
     @Test
     fun controllerSwitchRecomputesUnreadSnapshotWhenBothTimelinesAreNonEmpty() {
         val controllerIdentity = mutableStateOf<Any>(Any())
