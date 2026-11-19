@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -152,11 +153,13 @@ class ComposerShortcutExplanationTest {
             onError = {},
         )
 
+    /** The explanation shows [body] in the composer's keyboard-safe popup, never the focusable modal sheet. */
     private fun assertExplanation(body: Int) {
-        composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
+        composeRule.onNode(hasTestTag("explanation.sheet") and hasAnyAncestor(isPopup())).assertIsDisplayed()
         composeRule.onNodeWithTag("explanation.body").assertTextEquals(context.getString(body))
     }
 
+    /** Renders ComposerBar with the More shortcut and [extra] pinned, inside the composer's explanation scope. */
     private fun render(
         extra: ComposerShortcut = ComposerShortcut.Camera,
         voice: VoiceRecordingController? = null,
@@ -176,20 +179,22 @@ class ComposerShortcutExplanationTest {
                 ExplanationHost {
                     Surface {
                         Box(Modifier.width(360.dp).height(600.dp), contentAlignment = Alignment.BottomCenter) {
-                            ComposerBar(
-                                appState = appState,
-                                onCustomizeToolbar = { customizeCalls++ },
-                                draftAccountRef = null,
-                                replyingTo = null,
-                                messageTextCopy = MessageTextCopy.Default,
-                                onCancelReply = {},
-                                onSend = { _, _ -> },
-                                textState = ComposerTextState(TextFieldValue(text)),
-                                onCaptureFromCamera = { cameraCalls++ },
-                                onPickFromGallery = { galleryCalls++ },
-                                onPickDocument = {},
-                                voiceRecordingController = voice,
-                            )
+                            ExplainAboveComposer {
+                                ComposerBar(
+                                    appState = appState,
+                                    onCustomizeToolbar = { customizeCalls++ },
+                                    draftAccountRef = null,
+                                    replyingTo = null,
+                                    messageTextCopy = MessageTextCopy.Default,
+                                    onCancelReply = {},
+                                    onSend = { _, _ -> },
+                                    textState = ComposerTextState(TextFieldValue(text)),
+                                    onCaptureFromCamera = { cameraCalls++ },
+                                    onPickFromGallery = { galleryCalls++ },
+                                    onPickDocument = {},
+                                    voiceRecordingController = voice,
+                                )
+                            }
                         }
                     }
                 }

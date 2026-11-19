@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
+import dev.ipf.whitenoise.android.ui.conversation.composer.ExplainAboveComposer
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
@@ -231,106 +232,108 @@ internal fun ConversationBottomBar(
                             controller.editingMessageId?.let { id ->
                                 controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                             }
-                        ComposerBar(
-                            conversationEmoji =
-                                dev.ipf.whitenoise.android.ui
-                                    .rememberConversationEmojiPicker(controller),
-                            replyingToEmoji =
-                                rememberReplyReceivedEmoji(
-                                    controller.replyingTo?.messageIdHex,
-                                    controller,
-                                    appState,
-                                ),
-                            replyingTo = controller.replyingTo,
-                            replyingToMedia =
-                                controller.replyingTo
-                                    ?.let(controller::mediaReferencesFor)
-                                    .orEmpty(),
-                            replyingToDisplay =
-                                controller.replyingTo
-                                    ?.let { controller.replyTargetPreview(it, messageTextCopy) },
-                            messageTextCopy = messageTextCopy,
-                            onCancelReply = { controller.replyingTo = null },
-                            onSend = { text, onAccepted ->
-                                appState.launchMutation {
-                                    appState.sendConversationText(controller, text, onAccepted = onAccepted)
-                                }
-                            },
-                            onSendWithPresentation = { text, onAccepted ->
-                                appState.launchMutation {
-                                    var acceptedId: String? = null
-                                    appState.sendConversationText(
-                                        controller = controller,
-                                        text = text,
-                                        onPresentationAccepted = { acceptedId = it },
-                                        onAccepted = { onAccepted(acceptedId) },
-                                    )
-                                }
-                            },
-                            initialDraft = initialDraft,
-                            onDraftChange = onDraftChange,
-                            draftKey =
-                                composerDraftOwnerKey(
-                                    controller.boundAccountRef,
-                                    controller.group.groupIdHex,
-                                ),
-                            draftAccountRef = controller.boundAccountRef,
-                            draftGroupIdHex = controller.group.groupIdHex,
-                            textState = composerTextState,
-                            attachmentSheetState = composerAttachmentSheet,
-                            attachmentContent = attachmentContent,
-                            hasPendingAttachments = hasPendingAttachments,
-                            attachmentsPreparing = attachmentsPreparing,
-                            onSendAttachments = onSendAttachments,
-                            editingMessageId = controller.editingMessageId,
-                            editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                            onCancelEdit = controller::cancelMessageEdit,
-                            onAfterSend = onAfterSend,
-                            onPickFromGallery = onPickFromGallery,
-                            onCaptureFromCamera = onCaptureFromCamera,
-                            onPickDocument = onPickDocument,
-                            onShareLocation = onShareLocation,
-                            onAttachmentRouteOrigin = onAttachmentRouteOrigin,
-                            onShareUser = onShareUser,
-                            onShareContact = onShareContact,
-                            onCreatePoll = onCreatePoll,
-                            onOpenStickers = onOpenStickers,
-                            onBrowseEmojiSets = onBrowseEmojiSets,
-                            onOpenEmojiSettings = onOpenEmojiSettings,
-                            onPasteImageUris = onPasteImageUris,
-                            voiceRecordingController = voiceRecordingController,
-                            voiceReview = voiceReview,
-                            dictationController = appState.conversationDictation,
-                            dictationAccountRef = controller.boundAccountRef,
-                            dictationGroupIdHex = controller.group.groupIdHex,
-                            dictationControlsVisible = dictationControlsVisible,
-                            dictationOriginVisible = dictationOriginVisible,
-                            appState = appState,
-                            onCustomizeToolbar = onCustomizeComposer,
-                            mentionCandidates = mentionCandidates,
-                            mentionPickerEnabled = mentionPickerEnabled,
-                            autoFocusOnEnter = autoFocusOnEnter,
-                            autoFocusOnDraftRestore = autoFocusOnDraftRestore,
-                            autoFocusConsumedState = autoFocusConsumedState,
-                            enterKeyBehavior = appState.enterKeyBehavior,
-                            composerFocus = composerFocus,
-                            onComposerFocusChanged = onComposerFocusChanged,
-                            onComposerPreImeBack = onComposerPreImeBack,
-                            composerDismissInProgress = composerDismissInProgress,
-                            preserveComposerEditingLayout = preserveComposerEditingLayout,
-                            onBottomInputChanged = onBottomInputChanged,
-                            onTimelineComposerMeasured = onTimelineComposerMeasured,
-                            onKeyboardRestoreFromCustomInput = onKeyboardRestoreFromCustomInput,
-                            onKeyboardRestoreFromCustomInputFailed = onKeyboardRestoreFromCustomInputFailed,
-                            recentEmojis = recentEmojis,
-                            onEmojiUsed = onEmojiUsed,
-                            topInteractionClearance =
-                                if (compactHeight) {
-                                    compactTopClearanceFor(LocalDensity.current.fontScale)
-                                } else {
-                                    ConversationTopInteractionClearance
+                        ExplainAboveComposer {
+                            ComposerBar(
+                                conversationEmoji =
+                                    dev.ipf.whitenoise.android.ui
+                                        .rememberConversationEmojiPicker(controller),
+                                replyingToEmoji =
+                                    rememberReplyReceivedEmoji(
+                                        controller.replyingTo?.messageIdHex,
+                                        controller,
+                                        appState,
+                                    ),
+                                replyingTo = controller.replyingTo,
+                                replyingToMedia =
+                                    controller.replyingTo
+                                        ?.let(controller::mediaReferencesFor)
+                                        .orEmpty(),
+                                replyingToDisplay =
+                                    controller.replyingTo
+                                        ?.let { controller.replyTargetPreview(it, messageTextCopy) },
+                                messageTextCopy = messageTextCopy,
+                                onCancelReply = { controller.replyingTo = null },
+                                onSend = { text, onAccepted ->
+                                    appState.launchMutation {
+                                        appState.sendConversationText(controller, text, onAccepted = onAccepted)
+                                    }
                                 },
-                        )
+                                onSendWithPresentation = { text, onAccepted ->
+                                    appState.launchMutation {
+                                        var acceptedId: String? = null
+                                        appState.sendConversationText(
+                                            controller = controller,
+                                            text = text,
+                                            onPresentationAccepted = { acceptedId = it },
+                                            onAccepted = { onAccepted(acceptedId) },
+                                        )
+                                    }
+                                },
+                                initialDraft = initialDraft,
+                                onDraftChange = onDraftChange,
+                                draftKey =
+                                    composerDraftOwnerKey(
+                                        controller.boundAccountRef,
+                                        controller.group.groupIdHex,
+                                    ),
+                                draftAccountRef = controller.boundAccountRef,
+                                draftGroupIdHex = controller.group.groupIdHex,
+                                textState = composerTextState,
+                                attachmentSheetState = composerAttachmentSheet,
+                                attachmentContent = attachmentContent,
+                                hasPendingAttachments = hasPendingAttachments,
+                                attachmentsPreparing = attachmentsPreparing,
+                                onSendAttachments = onSendAttachments,
+                                editingMessageId = controller.editingMessageId,
+                                editingInitialText = editingRecord?.let { controller.displayedText(it) },
+                                onCancelEdit = controller::cancelMessageEdit,
+                                onAfterSend = onAfterSend,
+                                onPickFromGallery = onPickFromGallery,
+                                onCaptureFromCamera = onCaptureFromCamera,
+                                onPickDocument = onPickDocument,
+                                onShareLocation = onShareLocation,
+                                onAttachmentRouteOrigin = onAttachmentRouteOrigin,
+                                onShareUser = onShareUser,
+                                onShareContact = onShareContact,
+                                onCreatePoll = onCreatePoll,
+                                onOpenStickers = onOpenStickers,
+                                onBrowseEmojiSets = onBrowseEmojiSets,
+                                onOpenEmojiSettings = onOpenEmojiSettings,
+                                onPasteImageUris = onPasteImageUris,
+                                voiceRecordingController = voiceRecordingController,
+                                voiceReview = voiceReview,
+                                dictationController = appState.conversationDictation,
+                                dictationAccountRef = controller.boundAccountRef,
+                                dictationGroupIdHex = controller.group.groupIdHex,
+                                dictationControlsVisible = dictationControlsVisible,
+                                dictationOriginVisible = dictationOriginVisible,
+                                appState = appState,
+                                onCustomizeToolbar = onCustomizeComposer,
+                                mentionCandidates = mentionCandidates,
+                                mentionPickerEnabled = mentionPickerEnabled,
+                                autoFocusOnEnter = autoFocusOnEnter,
+                                autoFocusOnDraftRestore = autoFocusOnDraftRestore,
+                                autoFocusConsumedState = autoFocusConsumedState,
+                                enterKeyBehavior = appState.enterKeyBehavior,
+                                composerFocus = composerFocus,
+                                onComposerFocusChanged = onComposerFocusChanged,
+                                onComposerPreImeBack = onComposerPreImeBack,
+                                composerDismissInProgress = composerDismissInProgress,
+                                preserveComposerEditingLayout = preserveComposerEditingLayout,
+                                onBottomInputChanged = onBottomInputChanged,
+                                onTimelineComposerMeasured = onTimelineComposerMeasured,
+                                onKeyboardRestoreFromCustomInput = onKeyboardRestoreFromCustomInput,
+                                onKeyboardRestoreFromCustomInputFailed = onKeyboardRestoreFromCustomInputFailed,
+                                recentEmojis = recentEmojis,
+                                onEmojiUsed = onEmojiUsed,
+                                topInteractionClearance =
+                                    if (compactHeight) {
+                                        compactTopClearanceFor(LocalDensity.current.fontScale)
+                                    } else {
+                                        ConversationTopInteractionClearance
+                                    },
+                            )
+                        }
                     }
                 }
         }

@@ -4,16 +4,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -34,6 +39,9 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
  * focused conversation that steals window focus from the composer and Android closes the IME.
  * [KeyboardSafePopup] supplies the shared non-focusable popup, outside-tap consumption, and
  * overlay-priority Back dismissal. This wrapper adds the sheet styling and accessibility semantics.
+ *
+ * With [bottomWindowY], such as the composer's top edge, the sheet's bottom stays at that host-window y instead
+ * of the window's bottom, and its height is bounded to the space above it below the status bar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,13 +49,24 @@ internal fun KeyboardPreservingBottomSheet(
     paneTitle: String,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    bottomWindowY: Int? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val dismissLabel = stringResource(R.string.dismiss)
+    val density = LocalDensity.current
+    val statusBarTop = WindowInsets.statusBars.getTop(density)
+    val placement =
+        remember(bottomWindowY) {
+            bottomWindowY?.let(::AboveWindowYPopupPositionProvider) ?: BottomAnchoredPopupPositionProvider
+        }
+    val heightBound =
+        bottomWindowY?.let { y ->
+            Modifier.heightIn(max = with(density) { (y - statusBarTop).coerceAtLeast(0).toDp() })
+        }
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismissRequest,
-        popupPositionProvider = BottomAnchoredPopupPositionProvider,
+        popupPositionProvider = placement,
         scrimModifier =
             Modifier
                 .background(BottomSheetDefaults.ScrimColor)
@@ -66,6 +85,7 @@ internal fun KeyboardPreservingBottomSheet(
                     .then(modifier)
                     .widthIn(max = BottomSheetDefaults.SheetMaxWidth)
                     .fillMaxWidth()
+                    .then(heightBound ?: Modifier)
                     .semantics {
                         isTraversalGroup = true
                         dialog()
@@ -76,10 +96,11 @@ internal fun KeyboardPreservingBottomSheet(
             shape = BottomSheetDefaults.ExpandedShape,
             color = amoledSheetContainerColor(),
         ) {
+            // Above the composer the sheet ends clear of the navigation bar, so only a window-bottom sheet pads for it.
             Column(
                 modifier =
                     Modifier
-                        .navigationBarsPadding()
+                        .then(if (bottomWindowY == null) Modifier.navigationBarsPadding() else Modifier)
                         .padding(top = 8.dp),
                 content = content,
             )

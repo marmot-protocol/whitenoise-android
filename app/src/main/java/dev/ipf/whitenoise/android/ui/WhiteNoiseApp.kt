@@ -596,7 +596,7 @@ internal fun WhiteNoiseApp(
             LocalTopNoticeHost provides topNoticeHost,
             LocalCustomEmoji provides customEmojiStore.emoji,
             LocalInAppLinkHandler provides inAppLinkHandler,
-            LocalExplanationHost provides explanationHost.show,
+            LocalExplanationHost provides explanationHost,
         ) {
             // Holding a control explains it; the lock drops any open explanation.
             ExplanationSheetHost(explanationHost, visible = !appState.appLock.screenVisible)

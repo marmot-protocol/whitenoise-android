@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.ui.common.ExplanationHost
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.composer.ExplainAboveComposer
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -35,7 +36,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Holding a composer control explains it, and the + menu ends with Customize composer. */
+/** Holding a composer control explains it above the composer, and the + menu ends with Customize composer. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
@@ -89,6 +90,7 @@ class LongPressExplanationScreenshotTest {
         captureScreenRoboImage("src/test/snapshots/long_press_explanation_plus_menu_$name.png")
     }
 
+    /** Renders ComposerBar inside the composer's explanation scope, as the conversation does. */
     private fun render(
         darkTheme: Boolean,
         amoled: Boolean,
@@ -114,21 +116,23 @@ class LongPressExplanationScreenshotTest {
                     ExplanationHost {
                         Surface {
                             Box(Modifier.width(360.dp).height(780.dp), contentAlignment = Alignment.BottomCenter) {
-                                ComposerBar(
-                                    appState = appState,
-                                    onCustomizeToolbar = {},
-                                    draftAccountRef = null,
-                                    replyingTo = null,
-                                    messageTextCopy = MessageTextCopy.Default,
-                                    onCancelReply = {},
-                                    onSend = { _, _ -> },
-                                    textState = ComposerTextState(TextFieldValue()),
-                                    onCaptureFromCamera = {},
-                                    onPickFromGallery = {},
-                                    onPickDocument = {},
-                                    onShareLocation = {},
-                                    onCreatePoll = {},
-                                )
+                                ExplainAboveComposer {
+                                    ComposerBar(
+                                        appState = appState,
+                                        onCustomizeToolbar = {},
+                                        draftAccountRef = null,
+                                        replyingTo = null,
+                                        messageTextCopy = MessageTextCopy.Default,
+                                        onCancelReply = {},
+                                        onSend = { _, _ -> },
+                                        textState = ComposerTextState(TextFieldValue()),
+                                        onCaptureFromCamera = {},
+                                        onPickFromGallery = {},
+                                        onPickDocument = {},
+                                        onShareLocation = {},
+                                        onCreatePoll = {},
+                                    )
+                                }
                             }
                         }
                     }
