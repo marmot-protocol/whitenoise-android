@@ -411,8 +411,7 @@ internal class SettingsPageMorph {
         val interiors = if (contours.isEmpty()) leaving?.body ?: bodyMask else movingBodyMask(contours, host)
         val borderlessEntry = native?.isEmpty() == true && leaving == null
         val showNativeBody = incomingPresence(time) > 0f || borderlessEntry
-        val showUnoutlinedBody =
-            entryStart > 0f || geometryFraction(time) >= CONTENT_HANDOFF_FRACTION || borderlessEntry
+        val showUnoutlinedBody = unoutlinedBodyIsVisible(time, borderlessEntry)
         contours.forEach { drawContourFill(it, host) }
         // One live display-list invocation: the fixed header and, after handoff, clipped body.
         val live =
@@ -429,6 +428,11 @@ internal class SettingsPageMorph {
         clipPath(interiors) { this@draw.drawOutgoingInk(host, time) }
         contours.forEach { drawContinuousContour(it, host) }
     }
+
+    private fun unoutlinedBodyIsVisible(
+        time: Float,
+        borderlessEntry: Boolean,
+    ): Boolean = entryStart > 0f || geometryFraction(time) >= CONTENT_HANDOFF_FRACTION || borderlessEntry
 
     private fun ContentDrawScope.drawSettledFrame(
         native: List<SettingsContour>?,

@@ -1281,7 +1281,11 @@ class SettingsPageMorphHostTest {
         assertEquals(
             "free body arrives at handoff",
             1f,
-            rule.onRoot().captureToImage().toPixelMap()[100, 450].blue,
+            rule
+                .onRoot()
+                .captureToImage()
+                .toPixelMap()[100, 450]
+                .blue,
             0.01f,
         )
         rule.runOnIdle {
@@ -1290,6 +1294,13 @@ class SettingsPageMorphHostTest {
             assertTrue(page.admitDestination())
             time.value = 0.5f
         }
+        assertComposerReturnHandoff(page) { time.value = 1f }
+    }
+
+    private fun assertComposerReturnHandoff(
+        page: SettingsPageMorph,
+        settle: () -> Unit,
+    ) {
         val pixels = rule.onRoot().captureToImage().toPixelMap()
         assertTrue("native composer text stays live", pixels[110, 685].green > 0.99f)
         assertTrue("settled composer stroke is suppressed", pixels[100, 650].red < 0.01f)
@@ -1301,7 +1312,7 @@ class SettingsPageMorphHostTest {
                 .color.alpha,
             0f,
         )
-        rule.runOnIdle { time.value = 1f }
+        rule.runOnIdle { settle() }
         assertTrue(
             "native stroke returns at handoff",
             rule

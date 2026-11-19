@@ -763,10 +763,13 @@ class DetailRouteMotionScreenshotTest {
         val borderlessComposer = name.startsWith("composer_light")
         val morphs =
             !borderlessComposer &&
-                ((profile && "_light" !in name && "_dark" !in name) ||
-                    name.startsWith("composer_") ||
-                    name.endsWith("_entry") ||
-                    (name.endsWith("_entry_back") && "_light" !in name && "_dark" !in name))
+                (
+                    (profile && "_light" !in name && "_dark" !in name) ||
+                        name.startsWith("composer_") ||
+                        name.endsWith("_entry") ||
+                        (name.endsWith("_entry_back") && "_light" !in name && "_dark" !in name)
+                )
+        val capturesSettledBody = morphs || profile || borderlessComposer
         // Ordinary checks retain their timing; private exports include settled frames after preparation.
         for (frame in 0..(if (captureFrames) 31 else 22)) {
             if (captureFrames || frame in listOf(0, 6, 20)) {
@@ -775,7 +778,7 @@ class DetailRouteMotionScreenshotTest {
                 if ((morphs || borderlessComposer) && frame == 6) {
                     intermediate = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
-                if ((morphs || profile || borderlessComposer) && frame == 20) {
+                if (capturesSettledBody && frame == 20) {
                     settled = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
                 exportTransitionFrame(frames, name, frame, bitmap)
