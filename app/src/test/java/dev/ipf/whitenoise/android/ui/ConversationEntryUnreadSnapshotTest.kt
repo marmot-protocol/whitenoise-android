@@ -315,7 +315,7 @@ class ConversationEntryUnreadSnapshotTest {
             assertEquals("fallback", resolved)
         }
 
-    /** A stale boundary paged in from before the read anchor is rejected for the first row after it. */
+    /** A stale boundary and count paged in from before the read anchor give way to the first row after it. */
     @Test
     fun staleBoundaryPagedInBeforeReadAnchorFallsBackToUnreadCount() =
         runTest {
@@ -323,7 +323,7 @@ class ConversationEntryUnreadSnapshotTest {
 
             val resolved =
                 resolveConversationEntryUnreadMessageId(
-                    snapshot = ConversationEntryUnreadSnapshot(2, "old-unread", readAnchorMessageId = "read"),
+                    snapshot = ConversationEntryUnreadSnapshot(3, "old-unread", readAnchorMessageId = "read"),
                     timeline = { timeline },
                     loadUntilMessageAvailable = {
                         timeline = listOf(received("old-unread"), received("read")) + timeline

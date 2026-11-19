@@ -180,8 +180,15 @@ internal suspend fun resolveConversationEntryUnreadMessageId(
         loadedAuthoritativeId?.let { firstUnreadAfterReadAnchor(it, snapshot.readAnchorMessageId, timeline()) }
             ?: run {
                 val currentTimeline = timeline()
+                // Once paging loads the anchor, only messages after it can still be unread.
+                val count =
+                    reconciledConversationEntryUnreadCount(
+                        projectionUnread = snapshot.count,
+                        timeline = currentTimeline,
+                        readAnchorMessageId = snapshot.readAnchorMessageId,
+                    )
                 currentTimeline
-                    .getOrNull(firstUnreadReceivedIndex(currentTimeline, snapshot.count))
+                    .getOrNull(firstUnreadReceivedIndex(currentTimeline, count))
                     ?.record
                     ?.messageIdHex
                     ?.takeIf { it.isNotBlank() }
