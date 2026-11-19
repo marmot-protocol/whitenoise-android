@@ -22,9 +22,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -169,6 +175,7 @@ internal fun SignUpScreen(
 
 /** Prototype 120 dp avatar, compact photo action, 24 dp sections, 16 dp field gaps and IME-aware 520 dp form. */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SignUpContent(
     name: TextFieldState,
@@ -265,13 +272,18 @@ internal fun SignUpContent(
                         modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_up.name"),
                         enabled = editable,
                         label = { Text(stringResource(R.string.name)) },
-                        supportingText = { Text(stringResource(R.string.signup_generated_name_hint)) },
                         trailingIcon = {
-                            RandomProfileNameButton(
-                                enabled = editable,
-                                onClick = onSuggestName,
-                                modifier = Modifier.testTag("onboarding.sign_up.suggest_name"),
-                            )
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                tooltip = { PlainTooltip { Text(stringResource(R.string.signup_generated_name_hint)) } },
+                                state = rememberTooltipState(),
+                            ) {
+                                RandomProfileNameButton(
+                                    enabled = editable,
+                                    onClick = onSuggestName,
+                                    modifier = Modifier.testTag("onboarding.sign_up.suggest_name"),
+                                )
+                            }
                         },
                         lineLimits = TextFieldLineLimits.SingleLine,
                         keyboardOptions =

@@ -12,12 +12,14 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -269,7 +271,11 @@ class SignUpProfileDraftSubmissionTest {
             }
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
-        composeRule.onNodeWithText(context.getString(R.string.signup_generated_name_hint)).assertExists()
+        val hint = context.getString(R.string.signup_generated_name_hint)
+        composeRule.onNodeWithText(hint).assertDoesNotExist()
+        composeRule.onNodeWithTag("onboarding.sign_up.suggest_name").performTouchInput { longClick() }
+        composeRule.onNodeWithText(hint).assertExists()
+        composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
         composeRule.runOnIdle {
             assertEquals(listOf<String?>(null), requests)
             assertEquals("Quiet Otter", controller.draft?.name)
