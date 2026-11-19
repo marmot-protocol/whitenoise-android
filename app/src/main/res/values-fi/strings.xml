@@ -347,6 +347,7 @@
     <string name="scroll_to_top">Vieritä alkuun</string>
     <string name="discard_failed_message">Hylkää epäonnistunut viesti</string>
     <string name="message_discard_still_sending">Tätä viestiä lähetetään vielä. Yritä hetken päästä uudelleen.</string>
+    <string name="reply_target_not_sent">Viestiä, johon vastaat, ei ole vielä lähetetty. Odota, että se lähtee, tai napauta siinä Yritä uudelleen, jos lähetys epäonnistui, ja lähetä sitten vastauksesi.</string>
     <string name="message_discard_not_failed">Tätä viestiä ei voi enää hylätä.</string>
     <string name="decline">Hylkää</string>
     <string name="accept">Hyväksy</string>
@@ -439,8 +440,8 @@
     <string name="group_leave_refresh_hint">Päivitä tarkistaaksesi, oletko yhä tässä ryhmässä.</string>
     <string name="group_leave_refresh_action">Päivitä</string>
     <string name="toast_couldnt_cancel_leave">Poistumista ei voitu perua</string>
-    <string name="export_conversation_transcript">Vie keskustelun tallenne</string>
-    <string name="toast_couldnt_export_transcript">Keskustelun tekstiä ei voitu viedä</string>
+    <string name="export_conversation_transcript">Vie keskusteluhistoria</string>
+    <string name="toast_couldnt_export_transcript">Keskusteluhistoriaa ei voitu viedä</string>
     <string name="no_share_target_available">Jakokohdetta ei ole saatavilla</string>
     <string name="outbound_share_failed">Jakamista ei voitu avata</string>
     <string name="mls">MLS</string>
@@ -481,7 +482,7 @@
     <string name="reaction_filter_all">Kaikki</string>
     <string name="view_reactors">Näytä, kuka reagoi</string>
     <string name="reaction_tap_to_remove">Poista napauttamalla</string>
-    <string name="remove_admin">Poista ylläpitäjä</string>
+    <string name="remove_admin">Poista ylläpitäjän oikeudet</string>
     <string name="step_down_as_admin">Luovu ylläpitäjän roolista</string>
     <string name="make_admin">Tee ylläpitäjäksi</string>
     <string name="remove_member">Poista jäsen</string>
@@ -551,7 +552,7 @@
     <string name="group_system_admin_added_you">%1$s teki sinusta ylläpitäjän</string>
     <string name="group_system_admin_added_you_passive">Olet nyt ylläpitäjä</string>
     <string name="group_system_you_admin_removed">Poistit käyttäjän %1$s ylläpitäjän oikeudet</string>
-    <string name="group_system_admin_removed_you">%1$s poisti ylläpitäjän oikeutesi</string>
+    <string name="group_system_admin_removed_you">%1$s poisti sinulta ylläpitäjän oikeudet</string>
     <string name="group_system_admin_removed_you_passive">Et ole enää ylläpitäjä</string>
     <string name="group_system_you_renamed">Muutit ryhmän nimeksi ”%1$s”</string>
     <string name="group_system_you_renamed_diff">Muutit ryhmän nimen ”%1$s” nimeksi ”%2$s”</string>
@@ -1194,9 +1195,9 @@
     <string name="toast_couldnt_remove_member">Jäsentä ei voitu poistaa</string>
     <string name="toast_group_roster_changed">Ryhmän jäsenyys muuttui. Tarkista ryhmä ja yritä uudelleen.</string>
     <string name="toast_keep_one_admin">Säilytä yksi ylläpitäjä</string>
-    <string name="toast_promote_before_removing_admin">Ylennä toinen jäsen ennen kuin poistat tämän ylläpitäjän.</string>
+    <string name="toast_promote_before_removing_admin">Ylennä toinen jäsen ylläpitäjäksi ennen kuin poistat tältä ylläpitäjän oikeudet.</string>
     <string name="toast_admin_added">Ylläpitäjä lisätty</string>
-    <string name="toast_admin_removed">Ylläpitäjä poistettu</string>
+    <string name="toast_admin_removed">Ylläpitäjän oikeudet poistettu</string>
     <string name="toast_couldnt_update_admin">Ylläpitäjää ei voitu päivittää</string>
     <string name="transfer_admin">Siirrä ylläpito</string>
     <string name="toast_admin_transferred">Ylläpito siirretty</string>
@@ -1333,7 +1334,7 @@
     <string name="notification_battery_unrestricted">Rajoittamaton</string>
     <string name="notification_battery_restricted">Rajoitettu</string>
     <string name="notification_battery_unknown">Ei saatavilla</string>
-    <string name="local_notifications_detail">Luo viesti-ilmoituksia tällä laitteella. Ilman push-ilmoituksia toimitus voi odottaa, kunnes White Noise on aktiivinen.</string>
+    <string name="local_notifications_detail">Näyttää tällä laitteella ilmoitukset uusista viesteistä. Ilman push-ilmoituksia ilmoitukset saattavat tulla vasta, kun White Noise on aktiivinen.</string>
     <string name="native_push_title">Push-ilmoitukset</string>
     <string name="notification_push_detail">Tarkista uudet viestit taustalla yleisen herätyssignaalin avulla. Viestien tiedot pysyvät tällä laitteella.</string>
     <string name="keep_connected_in_background">Pidä yhteys taustalla</string>
@@ -1511,7 +1512,7 @@
     <string name="attachment_type_android_package_description">Android-sovelluspaketti</string>
     <string name="attachment_type_pdf">PDF</string>
     <string name="attachment_type_pdf_description">PDF-dokumentti</string>
-    <string name="attachment_type_archive">Arkistoi</string>
+    <string name="attachment_type_archive">Arkisto</string>
     <string name="attachment_type_document">Dokumentti</string>
     <string name="attachment_type_spreadsheet">Laskentataulukko</string>
     <string name="attachment_type_presentation">Esitys</string>
@@ -1650,7 +1651,6 @@
     <string name="dictation_open_speech_service">Avaa puhepalvelu</string>
     <string name="dictation_permission_denied_permanently">Salli mikrofonin käyttö Asetuksissa</string>
     <string name="dictation_microphone_muted">Mikrofonin käyttö on pois päältä</string>
-    <string name="dictation_microphone_muted_help">Ota mikrofonin käyttö käyttöön Androidin tietosuoja-asetuksissa tai pika-asetuksissa ja yritä sanelua uudelleen.</string>
     <string name="dictation_microphone_in_use">Mikrofoni on jo käytössä</string>
     <string name="dictation_interrupted">Sanelu keskeytyi. Tarkista palautettu teksti ja jäljellä oleva ääni ennen lähettämistä.</string>
     <string name="dictation_audio_focus_unavailable">Muuta ääntä ei voitu keskeyttää. Yritä uudelleen tai poista Keskeytä muu ääni käytöstä sanelun asetuksissa.</string>
@@ -1878,6 +1878,8 @@
         <item quantity="other">Emojeja: %1$d</item>
     </plurals>
     <string name="emoji_sets_installed">Asennetut</string>
+    <string name="emoji_sets_section_installed">Asennetut</string>
+    <string name="emoji_sets_section_discover">Löydä</string>
     <string name="emoji_sets_update_available">Päivitys saatavilla</string>
     <string name="emoji_sets_load_image">Lataa esikatselukuva</string>
     <string name="emoji_sets_image_privacy">Esikatselun lataaminen tai sarjan asentaminen paljastaa IP-osoitteesi sen kuvien palvelimille.</string>
@@ -2426,7 +2428,7 @@
     <string name="group_actions">Ryhmän toiminnot</string>
     <string name="remove_from_group">Poista ryhmästä</string>
     <string name="make_admin_question">Nimitetäänkö %1$s ylläpitäjäksi?</string>
-    <string name="remove_admin_question">Poistetaanko käyttäjän %1$s ylläpito-oikeudet?</string>
+    <string name="remove_admin_question">Poistetaanko käyttäjän %1$s ylläpitäjän oikeudet?</string>
     <string name="remove_member_question">Poistetaanko %1$s ryhmästä?</string>
     <string name="mute_for">Mykistä ajaksi</string>
     <string name="group_member_updating">Päivitetään jäsentä…</string>
@@ -2656,7 +2658,7 @@
     </plurals>
     <string name="group_action_public_key_hex">Julkinen avain (hex)</string>
     <string name="group_action_account_label">Paikallinen tilin nimi: %1$s</string>
-    <string name="group_action_revoke_explanation">Tämä poistaa ylläpito-oikeudet. Henkilö pysyy jäsenenä.</string>
+    <string name="group_action_revoke_explanation">Tämä poistaa ylläpitäjän oikeudet. Henkilö pysyy jäsenenä.</string>
     <string name="group_action_add_members">Lisää jäseniä</string>
     <string name="group_action_transfer_and_leave">Siirrä ylläpito ja poistu</string>
     <string name="group_action_step_down_and_leave">Luovu ylläpidosta ja poistu</string>
@@ -2779,15 +2781,23 @@
     <string name="notification_preview_none_detail">Näyttää vain, että jotain saapui</string>
     <string name="photo_editor_rotate">Kierrä</string>
     <string name="toast_wipe_outcome_unconfirmed">Tyhjennyksen tulosta ei voitu vahvistaa. Tarkista tilisi ennen kuin jatkat.</string>
-    <string name="emoji_name_marmot_classic">Klassinen murmeli</string>
-    <string name="emoji_name_marmot_wave">Vilkuttava murmeli</string>
-    <string name="emoji_name_marmot_yes">Peukuttava murmeli</string>
-    <string name="emoji_name_marmot_laugh">Naurava murmeli</string>
-    <string name="emoji_name_marmot_love">Murmeli ja sydän</string>
-    <string name="emoji_name_marmot_party">Juhliva murmeli</string>
-    <string name="emoji_name_marmot_fire">Liekehtivä murmeli</string>
-    <string name="emoji_name_marmot_wow">Yllättynyt murmeli</string>
-    <string name="emoji_name_marmot_smirk">Virnistävä murmeli</string>
-    <string name="emoji_name_marmot_cry">Itkevä murmeli</string>
-    <string name="emoji_name_marmot_angry">Vihainen murmeli</string>
+    <string name="emoji_name_marmot_classic">Klassinen marmot</string>
+    <string name="emoji_name_marmot_wave">Vilkuttava marmot</string>
+    <string name="emoji_name_marmot_yes">Peukuttava marmot</string>
+    <string name="emoji_name_marmot_laugh">Naurava marmot</string>
+    <string name="emoji_name_marmot_love">Marmot ja sydän</string>
+    <string name="emoji_name_marmot_party">Juhliva marmot</string>
+    <string name="emoji_name_marmot_fire">Liekehtivä marmot</string>
+    <string name="emoji_name_marmot_wow">Yllättynyt marmot</string>
+    <string name="emoji_name_marmot_smirk">Virnistävä marmot</string>
+    <string name="emoji_name_marmot_cry">Itkevä marmot</string>
+    <string name="emoji_name_marmot_angry">Vihainen marmot</string>
+    <string name="document_rendered">Näkymä</string>
+    <string name="document_source">Lähdekoodi</string>
+    <string name="document_html_omitted">Kuvat, tyylit ja upotettu sisältö jätetään pois.</string>
+    <string name="document_html_unavailable">Tätä HTML-tiedostoa ei voi esikatsella. Se voi olla liian suuri tai monimutkainen tai käyttää merkistökoodausta, jota ei tueta.</string>
+    <string name="document_pdf_unavailable">Tätä PDF-tiedostoa ei voi esikatsella. Se voi olla vioittunut, suojattu tai liian suuri.</string>
+    <string name="document_pdf_page">Sivu %1$d/%2$d</string>
+    <string name="document_zoom_reset">Lähennä / palauta</string>
+    <string name="composer_preview_attachment">Esikatsele liitettä</string>
 </resources>

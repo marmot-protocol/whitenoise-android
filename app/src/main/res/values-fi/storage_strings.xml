@@ -32,13 +32,13 @@
     <string name="storage_clear_cache_subtitle">Kuvat ladataan uudelleen, kun tarvitset niitä</string>
     <string name="storage_removal_help">Poistetut liitteet säilyvät viesteissään. Voit ladata ne uudelleen niin kauan kuin lähettäjän kopio on saatavilla.</string>
     <string name="storage_keep_media">Säilytä media</string>
-    <string name="storage_keep_media_help">Tätä vanhemmat liitteet poistetaan tältä laitteelta nyt ja sitä mukaa kuin ne vanhenevat. Uudelleen ladattu liite säilytetään koko jakson ajan.</string>
+    <string name="storage_keep_media_help">Tätä vanhemmat liitteet poistetaan tältä laitteelta nyt ja sitä mukaa kuin ne vanhenevat. Jos lataat liitteen uudelleen, sen säilytysaika alkaa alusta.</string>
     <string name="storage_keep_media_failed">Ei voitu ladata</string>
     <string name="storage_keep_forever">Ikuisesti</string>
     <string name="storage_keep_one_year">1 vuosi</string>
     <string name="storage_keep_six_months">6 kuukautta</string>
     <string name="storage_keep_thirty_days">30 päivää</string>
-    <string name="storage_keep_confirm_title">Säilytetäänkö mediaa %1$s?</string>
+    <string name="storage_keep_confirm_title">Asetetaanko median säilytysajaksi %1$s?</string>
     <string name="storage_keep_confirm_message">Liitteet, jotka ovat vanhempia kuin %1$s, poistetaan tältä laitteelta nyt ja sitä mukaa kuin ne vanhenevat. Viestit säilyvät, ja voit ladata liitteet uudelleen niin kauan kuin lähettäjän kopio on saatavilla.</string>
     <string name="storage_older_one_week">Yli 1 viikon vanhat</string>
     <string name="storage_older_one_month">Yli 1 kuukauden vanhat</string>

@@ -2,5 +2,5 @@
 <resources>
     <string name="disappearing">Katoavat</string>
     <string name="advanced">Lisäasetukset</string>
-    <string name="save_conversation_transcript">Tallenna transkripti</string>
+    <string name="save_conversation_transcript">Tallenna keskusteluhistoria</string>
 </resources>
