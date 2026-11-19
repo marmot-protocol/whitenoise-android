@@ -1,21 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Notification small icon for an active dictation session: a bold microphone
-    silhouette, so it reads differently from the White Noise message mark in the
-    status bar. Must stay alpha-only white — the system tints small icons itself.
+    Notification small icon for an active dictation session: the White Noise
+    mark from ic_stat_whitenoise (same geometry, scaled into the upper left)
+    with a microphone in the lower-right corner, so dictation reads as White
+    Noise but differs from the message icon. The clip path cuts a gap around
+    the microphone out of the mark; its outer square and inner outline wind
+    in opposite directions so the nonzero clip excludes the outline. Must
+    stay alpha-only white: the system tints small icons itself.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <group>
+        <clip-path android:pathData="M0,0V1024H1024V0ZM638.5,471.75A137.75,137.75 0 0 1 914,471.75L914,580.5L1015.5,580.5L1015.5,624A239.25,239.25 0 0 1 856,849.567L856,848.75L950.25,848.75L950.25,1015.5L602.25,1015.5L602.25,848.75L696.5,848.75L696.5,849.567A239.25,239.25 0 0 1 537,624L537,580.5L638.5,580.5Z" />
+        <path
+            android:fillColor="@android:color/white"
+            android:fillType="evenOdd"
+            android:pathData="M53.800,640L53.800,52L250.653,52L250.653,232.108L337.574,52L534.426,52L534.426,232.108L621.347,52L818.200,52L818.200,640L621.347,640L621.347,459.892L534.426,640L337.574,640L337.574,459.892L250.653,640ZM219.974,82.678L84.478,82.678L84.478,576.432L219.974,295.676ZM652.026,609.322L787.522,609.322L787.522,115.568L652.026,396.324ZM515.167,609.322L769.330,82.678L640.607,82.678L386.444,609.322ZM485.556,82.678L356.833,82.678L102.670,609.322L231.393,609.322ZM503.748,115.568L368.252,396.324L368.252,576.432L503.748,295.676Z" />
+    </group>
     <path
         android:fillColor="@android:color/white"
-        android:pathData="M12,2A3,3 0 0 0 9,5V11A3,3 0 0 0 15,11V5A3,3 0 0 0 12,2Z" />
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M17.5,10.5A5.5,5.5 0 0 1 6.5,10.5H8.5A3.5,3.5 0 0 0 15.5,10.5Z" />
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M11,15.5H13V19.5H11ZM8,19.5H16V22H8Z" />
+        android:pathData="M682,471.75A94.25,94.25 0 0 1 870.5,471.75V624A94.25,94.25 0 0 1 682,624ZM580.5,624A195.75,195.75 0 0 0 740,816.364L740,892.25L645.75,892.25L645.75,972L906.75,972L906.75,892.25L812.5,892.25L812.5,816.364A195.75,195.75 0 0 0 972,624L906.75,624A130.5,130.5 0 0 1 645.75,624Z" />
 </vector>
