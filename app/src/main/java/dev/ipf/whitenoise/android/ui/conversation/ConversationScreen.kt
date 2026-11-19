@@ -533,14 +533,14 @@ internal fun ConversationScreen(
         remember(controller, notificationOpenRequestId) {
             controller to notificationOpenRequestId
         }
-    val projectedUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     // The controller row is seeded from the live chat-list row; the open item can predate newer messages.
     val entryRow = controller.latestChatListRow ?: chat.projection
     val entryProjectionAvailable = entryRow != null
+    val projectedUnreadCount = (entryRow?.unreadCount ?: 0uL).coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     val entryUnreadSnapshot =
         rememberConversationEntryUnreadSnapshot(
             controllerIdentity = entryUnreadSessionIdentity,
-            projectionUnread = (entryRow?.unreadCount ?: 0uL).coerceAtMost(Int.MAX_VALUE.toULong()).toInt(),
+            projectionUnread = projectedUnreadCount,
             projectionFirstUnreadMessageId = entryRow?.firstUnreadMessageIdHex,
             projectionAvailable = entryProjectionAvailable,
             // A one-row chat-list seed cannot establish the authoritative unread
@@ -3135,7 +3135,7 @@ internal fun ConversationScreen(
             unreadCountDivergenceReport(
                 projectionUnread = projectedUnreadCount,
                 timeline = controller.timeline,
-                readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+                readAnchorMessageId = entryRow?.lastReadMessageIdHex,
             )?.let { report ->
                 logUnreadCountDivergence("DMConversation", report)
             }
