@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming")
+
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.layout.fillMaxWidth

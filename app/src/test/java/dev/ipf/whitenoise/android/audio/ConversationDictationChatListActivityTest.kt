@@ -22,6 +22,7 @@ internal class ConversationDictationChatListActivityTest {
             val delivery = CompletableDeferred<Unit>()
             val host = DictationForegroundTestHost(scope = this, onDispatchClaimed = { delivery.await() })
             val controller = host.conversationDictation
+            val transcribing = ConversationDictationActivity.Transcribing
             try {
                 assertEquals(ConversationDictationActivity.Listening, controller.chatListActivity("account", "group"))
                 assertEquals(ConversationDictationActivity.Listening, controller.chatListActivity("account", "GROUP"))
@@ -29,11 +30,11 @@ internal class ConversationDictationChatListActivityTest {
                 assertNull(controller.chatListActivity("other", "group"))
 
                 controller.send()
-                assertEquals(ConversationDictationActivity.Transcribing, controller.chatListActivity("account", "group"))
+                assertEquals(transcribing, controller.chatListActivity("account", "group"))
 
                 host.platform.listener.onResult("dictated")
                 runCurrent()
-                assertEquals(ConversationDictationActivity.Transcribing, controller.chatListActivity("account", "group"))
+                assertEquals(transcribing, controller.chatListActivity("account", "group"))
 
                 delivery.complete(Unit)
                 runCurrent()

@@ -118,6 +118,11 @@ internal fun dictationHoldAction(
  * controls. A short tap reaches the button unchanged. [startCapture] returns the controller only when this composer
  * now owns a starting or open capture; release acts only on that same session.
  */
+@Suppress(
+    "CyclomaticComplexMethod",
+    "LongMethod",
+    "LoopWithTooManyJumpStatements",
+) // One pointer state machine keeps lock, send, cancel and interruption auditable together.
 @Composable
 internal fun dictationHoldGesture(
     state: DictationHoldState,
@@ -196,6 +201,7 @@ internal fun dictationHoldGesture(
 }
 
 /** Returns once the pointer lifts or travels past slop; a long-press timeout around it means the press held still. */
+@Suppress("ReturnCount") // A lost pointer, a lift and slop are distinct early ends.
 private suspend fun AwaitPointerEventScope.awaitReleaseOrSlop(
     pointer: PointerId,
     origin: Offset,
