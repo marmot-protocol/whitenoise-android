@@ -71,8 +71,8 @@ internal class ConversationDictationCallerAudioStream(
     /**
      * Ends an unfinished feed as soon as the provider reports a terminal callback, instead of
      * writing into a dead request until the pipe stalls. The feeder stops at its next poll; a claimed
-     * chunk is requeued with its exact bytes and keeps its failure identity, and a fully fed stream
-     * is left untouched. The callback runs once the feeder has closed.
+     * chunk is requeued with its exact bytes and failure identity and reported as a pipe failure before
+     * the callback runs, so the bounded retry replays it. A fully fed stream is left untouched.
      */
     fun endFeedAfterProviderTerminal(callback: () -> Unit) {
         providerEnded.set(true)
@@ -248,7 +248,8 @@ internal class ConversationDictationCallerAudioStream(
         } else if (providerEnded.get() && !cancelled.get()) {
             conversationDictationDiagnostic("event=caller_audio_feed_ended reason=provider_result claimed=true")
             failureIdentity.set(FailureIdentity(owned.chunk.chunkId, owned.version))
-            settle(requeue = true)
+            // The result cannot cover a partial feed; the bounded pipe-failure retry replays this chunk.
+            settle(requeue = true) { reportFailure(ConversationDictationCallerAudioFailure.PipeFailed) }
         }
     }
 

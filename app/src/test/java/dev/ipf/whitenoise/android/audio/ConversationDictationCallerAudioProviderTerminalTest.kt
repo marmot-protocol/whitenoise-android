@@ -72,7 +72,7 @@ class ConversationDictationCallerAudioProviderTerminalTest {
         }
     }
 
-    /** A terminal callback mid-write requeues the exact chunk, keeps its identity, and reports no pipe failure. */
+    /** A terminal callback mid-write requeues the exact chunk with its identity and reports a pipe failure first. */
     @Test
     fun terminalMidWriteRequeuesTheExactChunkWithoutAStall() {
         val writes = AtomicInteger(0)
@@ -98,13 +98,19 @@ class ConversationDictationCallerAudioProviderTerminalTest {
         try {
             assertTrue(stream.start())
             assertTrue(stalled.await(2, TimeUnit.SECONDS))
+            val failuresAtClose = AtomicReference<List<ConversationDictationCallerAudioFailure>>()
             val closed = CountDownLatch(1)
-            stream.endFeedAfterProviderTerminal(closed::countDown)
+            stream.endFeedAfterProviderTerminal {
+                failuresAtClose.set(failures.toList())
+                closed.countDown()
+            }
             assertTrue(closed.await(2, TimeUnit.SECONDS))
             val feeder = checkNotNull(worker.get())
             feeder.join(2_000L)
             assertFalse(feeder.isAlive)
-            assertTrue(failures.isEmpty())
+            val pipeFailed = listOf(ConversationDictationCallerAudioFailure.PipeFailed)
+            assertEquals(pipeFailed, failuresAtClose.get())
+            assertEquals(pipeFailed, failures.toList())
             assertFalse(stream.fullyFed())
             assertNull(stream.request())
             assertEquals(1L, stream.chunkId())
@@ -147,7 +153,7 @@ class ConversationDictationCallerAudioProviderTerminalTest {
         }
     }
 
-    /** A terminal callback during the final write requeues the chunk with its identity once that write returns. */
+    /** A terminal during the final write requeues the chunk and reports a pipe failure once that write returns. */
     @Test
     fun terminalDuringTheFinalWriteRequeuesTheChunk() {
         val inWrite = CountDownLatch(1)
@@ -167,11 +173,17 @@ class ConversationDictationCallerAudioProviderTerminalTest {
         try {
             assertTrue(stream.start())
             assertTrue(inWrite.await(2, TimeUnit.SECONDS))
+            val failuresAtClose = AtomicReference<List<ConversationDictationCallerAudioFailure>>()
             val closed = CountDownLatch(1)
-            stream.endFeedAfterProviderTerminal(closed::countDown)
+            stream.endFeedAfterProviderTerminal {
+                failuresAtClose.set(failures.toList())
+                closed.countDown()
+            }
             terminalSent.countDown()
             assertTrue(closed.await(2, TimeUnit.SECONDS))
-            assertTrue(failures.isEmpty())
+            val pipeFailed = listOf(ConversationDictationCallerAudioFailure.PipeFailed)
+            assertEquals(pipeFailed, failuresAtClose.get())
+            assertEquals(pipeFailed, failures.toList())
             assertFalse(stream.fullyFed())
             assertNull(stream.acknowledge("hello"))
             assertEquals(1L, stream.chunkId())
