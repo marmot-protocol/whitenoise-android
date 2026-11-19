@@ -239,7 +239,11 @@ private fun NostrEventReaderBody(
 ) {
     val blocks =
         preparation?.blocks ?: remember(document) {
-            document?.takeIf(::nostrReaderCanFormat)?.let(::nostrReaderBlocks).orEmpty()
+            document
+                ?.takeUnless { card.literalReaderBody }
+                ?.takeIf(::nostrReaderCanFormat)
+                ?.let(::nostrReaderBlocks)
+                .orEmpty()
         }
     val textChunks =
         preparation?.textChunks ?: remember(card.readerBody, card.summary) {
@@ -307,6 +311,23 @@ private fun NostrEventReaderContext(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         card.metadata.forEach { detail -> EmojiLabel(detail, style = MaterialTheme.typography.bodyMedium) }
+        if (card.gitLinks.isNotEmpty()) {
+            val clipboard = LocalClipboard.current
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            card.gitLinks.forEach { link ->
+                TextButton(
+                    onClick = { scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(link, link))) } },
+                ) {
+                    Text(stringResource(R.string.nostr_git_copy_url, link))
+                }
+                if (Uri.parse(link).scheme.equals("https", ignoreCase = true)) {
+                    TextButton(onClick = { openNostrEvent(context, link) }) {
+                        Text(stringResource(R.string.nostr_git_open_url, link))
+                    }
+                }
+            }
+        }
         if (onPlayVideo != null) {
             videoUrls.forEach { url ->
                 val (playModifier, play) =

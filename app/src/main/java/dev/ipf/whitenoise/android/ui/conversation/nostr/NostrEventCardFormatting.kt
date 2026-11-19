@@ -24,6 +24,7 @@ internal fun NostrEventCardKind.icon(): ImageVector =
         NostrEventCardKind.Article -> Icons.AutoMirrored.Outlined.Article
         NostrEventCardKind.Video -> Icons.Outlined.PlayCircleOutline
         NostrEventCardKind.Release -> Icons.Outlined.NewReleases
+        NostrEventCardKind.Git,
         NostrEventCardKind.File,
         NostrEventCardKind.Generic,
         -> Icons.Outlined.Description
@@ -37,6 +38,7 @@ internal fun NostrEventCardKind.label(eventKind: Int): String =
         NostrEventCardKind.Video -> stringResource(R.string.nostr_event_type_video)
         NostrEventCardKind.Release -> stringResource(R.string.nostr_event_type_release)
         NostrEventCardKind.File -> stringResource(R.string.nostr_event_type_file)
+        NostrEventCardKind.Git -> stringResource(gitCardLabel(eventKind))
         NostrEventCardKind.Generic ->
             if (eventKind == KIND_IMAGE_EVENT) {
                 stringResource(R.string.nostr_event_type_image)

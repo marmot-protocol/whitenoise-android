@@ -983,6 +983,7 @@ internal fun ConversationScreen(
             // so a promotion/demotion or roster verification is reflected.
             controller.isSelfAdmin,
             controller.canSendMessages,
+            controller.group.pendingConfirmation,
             selectionMediaCacheRevision,
             eligibilityNowSeconds,
         ) {
@@ -1200,7 +1201,8 @@ internal fun ConversationScreen(
             reconcileBatchSelections(
                 selected = selectedMessages,
                 selectableVisible = selectableMessages,
-                deletedMessageIds = controller.deletedMessageIds + pendingTimelineRemovals,
+                deletedMessageIds = controller.deletedMessageIds,
+                pendingTimelineRemovedMessageIds = pendingTimelineRemovals,
                 invalidVisibleMessageIds = invalidVisibleMessageIds,
             )
         selectedMessages.keys
@@ -4048,10 +4050,17 @@ internal fun ConversationScreen(
                 val retryState =
                     priorRetryState?.afterRetry(result)
                         ?: BatchDeleteRetryState.from(result)
-                selectedMessages.clear()
-                retryState.failedAttempts.forEach { attempt ->
-                    val selection = attempt.selection
-                    selectedMessages[selection.action.messageId] = selection
+                result.outcomes.filter { it.succeeded }.forEach { outcome ->
+                    val selection = outcome.attempt.selection
+                    val messageId = selection.action.messageId
+                    when (outcome.attempt.operation) {
+                        BatchDeleteOperationKind.HideLocally -> selectedMessages.remove(messageId)
+                        BatchDeleteOperationKind.DeleteForEveryone -> {
+                            if (messageId in selectedMessages) {
+                                selectedMessages[messageId] = selection.asPlaceholder(selection.action)
+                            }
+                        }
+                    }
                 }
                 if (retryState.failures.isEmpty()) {
                     batchDeleteRetryState = null

@@ -260,7 +260,7 @@ class MessageBatchActionsTest {
     }
 
     @Test
-    fun reconciliationPrunesOnlyVisibleInvalidOrKnownDeletedSelections() {
+    fun reconciliationKeepsAnOffscreenPlaceholderAndRestoresItsLiveActionsOnRollback() {
         val invalidVisible = selection("invalid-visible", recordedAt = 100uL, timelineOrder = 1uL)
         val deletedOffscreen = selection("deleted-offscreen", recordedAt = 200uL, timelineOrder = 2uL)
 
@@ -276,7 +276,23 @@ class MessageBatchActionsTest {
                 invalidVisibleMessageIds = setOf(invalidVisible.action.messageId),
             )
 
-        assertTrue(retained.isEmpty())
+        val placeholder = retained.getValue(deletedOffscreen.action.messageId)
+        assertEquals(1, retained.size)
+        assertTrue(placeholder.action.deleted)
+        assertFalse(placeholder.action.canDeleteForEveryone)
+        assertEquals(null, placeholder.action.copyableText)
+        val restored = reconcileBatchSelections(retained, emptyMap(), emptySet(), emptySet())
+        assertEquals(deletedOffscreen, restored.getValue(deletedOffscreen.action.messageId))
+    }
+
+    @Test
+    fun rollbackRestoresActionsWhenTheMessageWasFirstSelectedAsAPlaceholder() {
+        val live = selection("live", recordedAt = 100uL, timelineOrder = 1uL, canDeleteForEveryone = true)
+        val placeholder = live.asPlaceholder(live.action)
+        val offscreen = reconcileBatchSelections(mapOf("live" to placeholder), emptyMap(), setOf("live"), emptySet())
+        assertEquals(placeholder, offscreen.getValue("live"))
+        val restored = reconcileBatchSelections(offscreen, emptyMap(), emptySet(), emptySet())
+        assertEquals(live, restored.getValue("live"))
     }
 
     @Test
@@ -322,6 +338,38 @@ class MessageBatchActionsTest {
         assertEquals(BatchDeleteBreakdown(deleteForEveryone = 0, hideLocally = 2), breakdown)
         assertFalse(breakdown.canOfferDeleteForEveryone)
     }
+
+    @Test
+    fun mixedDeleteOnlySendsLiveRecordsToTheProtocolCallback() =
+        runBlocking {
+            val live = selection("live", recordedAt = 100uL, timelineOrder = 1uL, canDeleteForEveryone = true)
+            val placeholder = selection("deleted", recordedAt = 200uL, timelineOrder = 2uL).asPlaceholder()
+            val selections = listOf(live, placeholder)
+            for (scope in BatchDeleteScope.entries) {
+                val protocolDeletes = mutableListOf<String>()
+                val localHides = mutableListOf<String>()
+                val result =
+                    executeBatchDelete(
+                        batchDeleteAttempts(selections, scope),
+                        deleteForEveryone = { record ->
+                            protocolDeletes += record.messageIdHex
+                            Result.success(Unit)
+                        },
+                        hideLocally = { id ->
+                            localHides += id
+                            Result.success(Unit)
+                        },
+                    )
+                assertEquals(2, result.succeeded)
+                if (scope == BatchDeleteScope.EVERYONE) {
+                    assertEquals(listOf("live"), protocolDeletes)
+                    assertEquals(listOf("deleted"), localHides)
+                } else {
+                    assertTrue(protocolDeletes.isEmpty())
+                    assertEquals(listOf("live", "deleted"), localHides)
+                }
+            }
+        }
 
     @Test
     fun executeBatchDeleteEveryoneScopeRoutesByCapabilityAndAggregatesFailures() =

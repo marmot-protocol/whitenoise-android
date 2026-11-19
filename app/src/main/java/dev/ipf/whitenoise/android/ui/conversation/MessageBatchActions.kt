@@ -35,6 +35,7 @@ internal data class BatchMessageActionItem(
      * temporary identity has no reply, info, save or delete path in a batch.
      */
     val pendingSend: Boolean = false,
+    val deleted: Boolean = false,
 )
 
 /**
@@ -54,6 +55,8 @@ internal data class BatchMessageSelection(
     val record: AppMessageRecordFfi,
     val status: MessageStatus,
     val timelineOrder: ULong,
+    val beforeDeletion: BatchMessageActionItem? = null,
+    val confirmedDeleted: Boolean = false,
 )
 
 internal data class BatchDeleteBreakdown(
@@ -165,19 +168,19 @@ internal class BatchDeleteSubmissionGuard {
 
 private fun BatchDeleteOperationOutcome.retryKey() = attempt.selection.action.messageId to attempt.operation
 
-/** Whether a timeline row can join a batch selection: a visible, undeleted message that is committed or pending. */
+/** Whether a timeline row can join a batch selection: a committed or pending visible message, or a locally removable placeholder. */
 internal fun isBatchSelectableMessage(
     messageId: String,
     userVisibleMessage: Boolean,
     committedMessage: Boolean,
     projectedDeleted: Boolean,
     deletedMessageIds: Set<String>,
+    canRemovePlaceholder: Boolean = false,
 ): Boolean =
     messageId.isNotBlank() &&
         userVisibleMessage &&
         committedMessage &&
-        !projectedDeleted &&
-        messageId !in deletedMessageIds
+        (!projectedDeleted && messageId !in deletedMessageIds || canRemovePlaceholder)
 
 internal fun batchForwardSheetOpenForBodies(
     currentlyOpen: Boolean,
@@ -198,16 +201,48 @@ internal fun reconcileBatchSelections(
     selectableVisible: Map<String, BatchMessageSelection>,
     deletedMessageIds: Set<String>,
     invalidVisibleMessageIds: Set<String>,
+    pendingTimelineRemovedMessageIds: Set<String> = emptySet(),
 ): Map<String, BatchMessageSelection> =
     buildMap {
         selected.forEach { (messageId, snapshot) ->
             when {
-                messageId in deletedMessageIds || messageId in invalidVisibleMessageIds -> Unit
+                messageId in pendingTimelineRemovedMessageIds || messageId in invalidVisibleMessageIds -> Unit
+                selectableVisible[messageId]?.action?.deleted == true ->
+                    put(
+                        messageId,
+                        selectableVisible.getValue(messageId).let { visible ->
+                            visible.copy(beforeDeletion = (snapshot.liveAction ?: visible.beforeDeletion).takeUnless { visible.confirmedDeleted })
+                        },
+                    )
                 messageId in selectableVisible -> put(messageId, selectableVisible.getValue(messageId))
+                messageId in deletedMessageIds -> put(messageId, snapshot.asPlaceholder(snapshot.liveAction))
+                snapshot.beforeDeletion != null ->
+                    put(
+                        messageId,
+                        snapshot.copy(action = snapshot.beforeDeletion, beforeDeletion = null),
+                    )
                 else -> put(messageId, snapshot)
             }
         }
     }
+
+private val BatchMessageSelection.liveAction: BatchMessageActionItem?
+    get() = beforeDeletion ?: action.takeUnless(BatchMessageActionItem::deleted)
+
+internal fun BatchMessageSelection.asPlaceholder(previous: BatchMessageActionItem? = null): BatchMessageSelection =
+    copy(
+        action =
+            action.copy(
+                copyableText = null,
+                forwardableText = null,
+                hasSaveableMedia = false,
+                canDeleteForEveryone = false,
+                forwardPayload = null,
+                forwardBlockedReason = ForwardBlockedReason.Unsupported,
+                deleted = true,
+            ),
+        beforeDeletion = previous,
+    )
 
 internal fun orderedBatchSelections(selections: Collection<BatchMessageSelection>): List<BatchMessageSelection> =
     selections.sortedWith(
@@ -263,6 +298,9 @@ internal fun batchSelectionActionAvailability(
             canInfo = false,
             canDelete = false,
         )
+    }
+    if (items.any(BatchMessageActionItem::deleted)) {
+        return BatchSelectionActionAvailability(false, false, false, false, false, items.none(BatchMessageActionItem::pendingSend))
     }
     val forwardPayloads = batchForwardPayloads(items)
     val single = items.size == 1

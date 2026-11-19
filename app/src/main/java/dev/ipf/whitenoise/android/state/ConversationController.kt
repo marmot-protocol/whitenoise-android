@@ -1157,13 +1157,14 @@ class ConversationController(
     /**
      * The authoritative deletion capability for [message], shared by the
      * delete surface (what to offer) and [deleteMessage] (what to accept).
-     * [alreadyDeleted] defaults to the controller's optimistic/reconciled
-     * tombstone set; the UI passes its projection-aware `deleted` instead so
-     * a remotely deleted message reads as undeletable there too.
+     * [alreadyDeleted] defaults to the optimistic tombstone set and retained
+     * timeline projection. The visible row can supply its current projection.
      */
     fun deleteCapabilityFor(
         message: AppMessageRecordFfi,
-        alreadyDeleted: Boolean = message.messageIdHex in deletedMessageIds,
+        alreadyDeleted: Boolean =
+            message.messageIdHex in deletedMessageIds ||
+                retainedTimelineItem(message.messageIdHex)?.projected?.deleted == true,
         optimisticKeyOverride: String? = null,
     ): MessageDeleteCapability {
         val optimisticKey = optimisticKeyOverride ?: optimisticSendKey(message)

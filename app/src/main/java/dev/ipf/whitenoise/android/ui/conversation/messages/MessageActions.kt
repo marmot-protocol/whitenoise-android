@@ -75,6 +75,7 @@ internal fun MessageActionMenu(
     canReply: Boolean,
     canReact: Boolean,
     canDelete: Boolean,
+    localDeleteOnly: Boolean = false,
     canEdit: Boolean,
     canForward: Boolean,
     forwardBlockedReason: ForwardBlockedReason? = null,
@@ -162,7 +163,7 @@ internal fun MessageActionMenu(
     val labeledActions: List<Pair<MessageActionKind?, String>> =
         buildList {
             actionKinds.forEach { kind -> add(kind to messageActionLabel(kind)) }
-            if (canDelete) add(null to stringResource(R.string.delete))
+            if (canDelete) add(null to stringResource(if (localDeleteOnly) R.string.delete_for_me else R.string.delete))
         }
     val actions =
         labeledActions.map { (kind, label) ->

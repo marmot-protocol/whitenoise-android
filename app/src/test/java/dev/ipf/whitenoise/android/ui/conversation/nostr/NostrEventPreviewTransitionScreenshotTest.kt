@@ -106,7 +106,7 @@ class NostrEventPreviewTransitionScreenshotTest {
         composeRule.runOnUiThread { session?.close() }
     }
 
-    /** Asserts all six cards render their loaded header and that no loading indicator or label is present. */
+    /** Asserts all cards render their loaded header and that no loading indicator or label is present. */
     private fun assertCompleteWithoutProgress(configuration: TransitionConfiguration) {
         val loading = ApplicationProvider.getApplicationContext<Context>().getString(R.string.nostr_event_loading)
         assertEquals(
@@ -128,14 +128,14 @@ class NostrEventPreviewTransitionScreenshotTest {
         val cardNodes = composeRule.onAllNodesWithTag(NOSTR_EVENT_CARD_BOUNDS_TAG).fetchSemanticsNodes()
         val cards = cardNodes.map { it.boundsInRoot }
         val rows =
-            listOf(MESSAGE_TAG + 0, MESSAGE_TAG + 1, NEXT_ROW_TAG).map {
+            (CARD_KINDS.chunked(MAX_CARDS_PER_MESSAGE).indices.map { MESSAGE_TAG + it } + NEXT_ROW_TAG).map {
                 composeRule.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot
             }
         assertEquals(CARD_KINDS.size, cards.size)
         return cards + rows
     }
 
-    /** Two message bubbles of three cards each, then a following row, under [session]'s configuration. */
+    /** Message bubbles with all supported cards, then a following row, under [session]'s configuration. */
     @Composable
     private fun TransitionContent(session: TransitionSession) {
         val configuration = session.configuration
@@ -311,6 +311,7 @@ private fun card(kind: NostrEventCardKind): NostrEventCardModel =
                 NostrEventCardKind.Video -> 34_235
                 NostrEventCardKind.Release -> 30_063
                 NostrEventCardKind.File -> 1_063
+                NostrEventCardKind.Git -> 1618
                 NostrEventCardKind.Generic -> 9_001
             },
         title = "A ${kind.name.lowercase()} title that wraps across the reading width".takeUnless { kind.isNote() },

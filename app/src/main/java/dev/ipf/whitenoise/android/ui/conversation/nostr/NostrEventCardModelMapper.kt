@@ -6,7 +6,8 @@ import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 internal fun NostrEvent.toCardModel(): NostrEventCardModel {
     val cardKind = cardKind()
     val videoMetadata = videoMetadata()
-    val tagTitle = firstSafeTag("title") ?: firstSafeTag("name")
+    val tagTitle = if (cardKind == NostrEventCardKind.Git) firstSafeTag("subject") else null
+    val title = tagTitle ?: firstSafeTag("title") ?: firstSafeTag("name")
     val tagSummary = firstSafeExcerptTag("summary") ?: firstSafeExcerptTag("description")
     return NostrEventCardModel(
         kind = cardKind,
@@ -14,13 +15,14 @@ internal fun NostrEvent.toCardModel(): NostrEventCardModel {
         authorPubkeyHex = pubkey,
         createdAt = createdAt,
         eventKind = kind,
-        title = cardTitle(cardKind, tagTitle)?.safeField(),
+        title = cardTitle(cardKind, title)?.safeField(),
         summary = cardSummary(cardKind, tagSummary).safeExcerpt(),
         metadata = cardMetadata(cardKind, videoMetadata).map(String::safeField),
         readerBody = fullReaderBody(cardKind),
+        gitLinks = if (cardKind == NostrEventCardKind.Git) gitCardLinks() else emptyList(),
         mediaUrl = videoMetadata?.url,
         mediaMimeType = videoMetadata?.mimeType,
-        imageUrls = imageMetadataUrls(),
+        imageUrls = if (cardKind == NostrEventCardKind.Git) emptyList() else imageMetadataUrls(),
         publishedAt = if (cardKind == NostrEventCardKind.Article) publishedAtSeconds() else null,
     )
 }
@@ -54,7 +56,7 @@ private fun NostrEvent.cardKind(): NostrEventCardKind =
         -> NostrEventCardKind.Video
         KIND_SOFTWARE_RELEASE -> NostrEventCardKind.Release
         KIND_FILE_METADATA -> NostrEventCardKind.File
-        else -> NostrEventCardKind.Generic
+        else -> if (isGitCard()) NostrEventCardKind.Git else NostrEventCardKind.Generic
     }
 
 private fun NostrEvent.cardTitle(
@@ -63,6 +65,7 @@ private fun NostrEvent.cardTitle(
 ): String? =
     when (cardKind) {
         NostrEventCardKind.Note -> null
+        NostrEventCardKind.Git -> tagTitle ?: firstSafeTag("d")
         NostrEventCardKind.Article,
         NostrEventCardKind.Video,
         NostrEventCardKind.Generic,
@@ -97,13 +100,14 @@ private fun NostrEvent.cardMetadata(
         NostrEventCardKind.Release -> listOfNotNull(firstSafeTag("version"))
         NostrEventCardKind.File ->
             listOfNotNull(firstSafeTag("m"), firstSafeTag("size")?.asByteCountLabel())
+        NostrEventCardKind.Git -> gitCardMetadata()
         NostrEventCardKind.Note,
         NostrEventCardKind.Generic,
         -> emptyList()
     }
 
 @Suppress("MaxLineLength")
-private fun NostrEvent.firstSafeTag(name: String): String? = firstTagValue(name)?.safeField()?.takeIf(String::isNotBlank)
+internal fun NostrEvent.firstSafeTag(name: String): String? = firstTagValue(name)?.safeField()?.takeIf(String::isNotBlank)
 
 @Suppress("MaxLineLength")
 private fun NostrEvent.firstSafeExcerptTag(name: String): String? = firstTagValue(name)?.safeExcerpt()?.takeIf(String::isNotBlank)
@@ -119,6 +123,9 @@ private const val KIND_HORIZONTAL_VIDEO = 34_236
 
 /** Keeps the complete verified content available outside the three-line card preview. */
 private fun NostrEvent.fullReaderBody(cardKind: NostrEventCardKind): String? {
+    if (cardKind == NostrEventCardKind.Git && (kind == 1617 || kind == 1111)) {
+        return content.safeReaderBody(preserveWhitespace = true).takeIf(String::isNotBlank)
+    }
     val body =
         content.takeIf(String::isNotBlank)
             ?: firstTagValue("description")?.takeIf(String::isNotBlank)

@@ -1674,12 +1674,6 @@ internal fun MessageBubble(
                                     androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
                                 )
                                 textLayouts.pendingLongPressLinkDestination[0] = null
-                                // A tombstone has exactly one action, so it skips
-                                // the menu and opens its confirmation directly.
-                                if (deleted) {
-                                    requestDelete()
-                                    return@longPressOrVerticalDrag
-                                }
                                 val windowPosition =
                                     pressState.rowCoordinates[0]?.let {
                                         messageBubbleLongPressPositionInWindow(it, position)
@@ -1740,7 +1734,7 @@ internal fun MessageBubble(
                             },
                             onDragStart = { position ->
                                 pressState.initiatingMenuHoldActive = false
-                                if (deleted) return@longPressOrVerticalDrag
+                                if (deleted && !batchSelectable) return@longPressOrVerticalDrag
                                 // A range gesture begins after the threshold
                                 // action was shown. Hand ownership over without
                                 // leaving a stale popup above selection mode.
@@ -1751,20 +1745,20 @@ internal fun MessageBubble(
                                     ?.let(onDragSelectionStart)
                             },
                             onDrag = { position ->
-                                if (deleted) return@longPressOrVerticalDrag false
+                                if (deleted && !batchSelectable) return@longPressOrVerticalDrag false
                                 pressState.rowCoordinates[0]
                                     ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
                                     ?.let(onDragSelection)
                                     ?: false
                             },
                             onDragEnd = {
-                                if (!deleted) onDragSelectionEnd()
+                                if (!deleted || batchSelectable) onDragSelectionEnd()
                             },
                             onGestureCancel = {
                                 pressState.initiatingMenuHoldActive = false
                                 textLayouts.pendingLongPressLinkDestination[0] = null
                                 onActionMenuOpenChange(false)
-                                if (!deleted) onDragSelectionCancel()
+                                if (!deleted || batchSelectable) onDragSelectionCancel()
                             },
                         ),
                     ).messageBubbleSelectionRow(
@@ -1836,7 +1830,7 @@ internal fun MessageBubble(
                                         pressState.selectionSeedVisibleOffset = null
                                         longPressWindowY = null
                                         pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
-                                        if (deleted) requestDelete() else onActionMenuOpenChange(true)
+                                        onActionMenuOpenChange(true)
                                         true
                                     }
                                 }
@@ -2896,7 +2890,7 @@ internal fun MessageBubble(
                         teamAvailable = appState.teamReportingAvailable,
                     )
                 MessageActionMenu(
-                    // A tombstone gets a focused delete-only menu. Batch or partial
+                    // A placeholder offers local removal and selection. Batch or partial
                     // text selection still owns the row interaction completely.
                     expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
                     initiatingHoldActive = pressState.initiatingMenuHoldActive,
@@ -2905,6 +2899,7 @@ internal fun MessageBubble(
                     canReply = !deleted && !actionsReadOnly,
                     canReact = !deleted && !actionsReadOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
+                    localDeleteOnly = deleted,
                     canEdit = canEditMessage,
                     canForward = !deleted && !actionsReadOnly && forwardPayload != null,
                     forwardBlockedReason =
@@ -2913,7 +2908,7 @@ internal fun MessageBubble(
                         } else {
                             null
                         },
-                    canSelect = !deleted && !actionsReadOnly && batchSelectable,
+                    canSelect = !actionsReadOnly && batchSelectable,
                     // Whole-message Copy keeps using its actual clipboard payload,
                     // including card-style bubbles whose body is rendered by the
                     // card rather than the text renderer — a poll card copies its
@@ -2938,7 +2933,7 @@ internal fun MessageBubble(
                         collapseOverride = true
                     },
                     canTranslate =
-                        translationSource != null && translationSession != null && translationPreferences != null,
+                        !deleted && translationSource != null && translationSession != null && translationPreferences != null,
                     onTranslate = {
                         onActionMenuOpenChange(false)
                         if (translationPreferences?.providerNoticeAccepted() == true) {
@@ -2948,7 +2943,7 @@ internal fun MessageBubble(
                         }
                     },
                     canSpeak = !deleted && canSpeakAloud,
-                    canSpeakCodeLiterally = speakableProjection?.speechRoles?.isNotEmpty() == true,
+                    canSpeakCodeLiterally = !deleted && speakableProjection?.speechRoles?.isNotEmpty() == true,
                     canSelectText = !isPollRecord && !deleted && !bodyTextToRender.isNullOrBlank(),
                     canKeepOnScreen =
                         !isPollRecord &&

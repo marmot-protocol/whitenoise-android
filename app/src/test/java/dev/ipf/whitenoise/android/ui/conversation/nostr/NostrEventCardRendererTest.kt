@@ -74,6 +74,40 @@ class NostrEventCardRendererTest {
         assertEquals(listOf("Video", "Release", "File", "Generic"), nonReaders.map { it.readerBody })
     }
 
+    @Test
+    fun gitKindsRetainIdentityAndBoundUntrustedContext() {
+        val id = "a".repeat(64)
+        val kinds = listOf(30617, 30618, 1617, 1618, 1619, 1621, 1630, 1631, 1632, 1633, 10317)
+        kinds.forEach { kind -> assertEquals(NostrEventCardKind.Git, event(id, kind = kind).toCardModel().kind) }
+        val pullRequest =
+            event(
+                id,
+                kind = 1618,
+                tags =
+                    listOf(
+                        listOf("subject", "Fix parser"),
+                        listOf("a", "30617:$id:parser"),
+                        listOf("branch-name", "fix-parser"),
+                        listOf("clone", "https://example.org/parser.git", "nostr://bob@example.org/parser", "javascript:hello"),
+                    ),
+                content = "# Full description",
+            ).toCardModel()
+        assertEquals("Fix parser", pullRequest.title)
+        assertEquals("# Full description", pullRequest.readerBody)
+        assertEquals(listOf("30617:$id:parser", "fix-parser"), pullRequest.metadata)
+        assertEquals(listOf("https://example.org/parser.git", "nostr://bob@example.org/parser"), pullRequest.gitLinks)
+
+        val patch = event(id, kind = 1617, content = "diff --git a/file b/file\n-# old\n+# new").toCardModel()
+        assertEquals("diff --git a/file b/file\n-# old\n+# new", patch.readerBody)
+        assertEquals(true, patch.literalReaderBody)
+        assertEquals(NostrEventCardKind.Generic, event(id, kind = 1111).toCardModel().kind)
+        val malformed = event(id, kind = 1111, tags = listOf(listOf("K", "1618"), listOf("E", "wrong"))).toCardModel()
+        assertEquals(NostrEventCardKind.Generic, malformed.kind)
+        val comment = event(id, kind = 1111, tags = listOf(listOf("K", "1618"), listOf("E", id))).toCardModel()
+        assertEquals(NostrEventCardKind.Git, comment.kind)
+        assertEquals(listOf(id), comment.metadata)
+    }
+
     /** Field and excerpt bounds never split a Unicode surrogate pair. */
     @Test
     fun textBoundsPreserveCompleteUnicodeCodePoints() {
