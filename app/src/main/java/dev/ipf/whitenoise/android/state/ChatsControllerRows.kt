@@ -154,6 +154,7 @@ internal fun ChatsController.foldChatRow(
         }
     appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
     if (membershipChanged) noteMaterializedGroupMembershipChanged(removal = MembershipRemoval.None)
+    settleInvitationFromMdk(effectivePublicationRow)
     scheduleRecompute()
 }
 
@@ -220,6 +221,7 @@ internal fun ChatsController.replaceChatRows(
                 optimisticState = optimisticChatListPreviewByGroup[key],
             )
         appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
+        settleInvitationFromMdk(effectivePublicationRow)
     }
     optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
     val liveGroupIds = rows.mapTo(mutableSetOf()) { it.groupIdHex }
