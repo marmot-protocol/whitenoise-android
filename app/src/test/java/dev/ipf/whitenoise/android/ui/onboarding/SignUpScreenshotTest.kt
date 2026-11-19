@@ -5,15 +5,23 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -53,6 +61,12 @@ class SignUpScreenshotTest {
     /** Native upload stage blocks editing and names actual work. */
     @Test fun uploadingPhoto() = render("signup_uploading", stage = SignUpStage.UploadingPhoto)
 
+    @Test fun generatedNameHelp() = render("signup_generated_name_help", initialName = "Quiet Otter", showNameHelp = true)
+
+    @Test
+    fun generatedNameHelpRtlLargeText() =
+        render("signup_generated_name_help_rtl_200", dark = true, rtl = true, scale = 2f, initialName = "Quiet Otter", showNameHelp = true)
+
     private fun render(
         name: String,
         dark: Boolean = false,
@@ -62,8 +76,9 @@ class SignUpScreenshotTest {
         offline: Boolean = false,
         stage: SignUpStage = SignUpStage.Editing,
         initialName: String = "Alice",
+        showNameHelp: Boolean = false,
     ) {
-        composeRule.mainClock.autoAdvance = false
+        composeRule.mainClock.autoAdvance = showNameHelp
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
@@ -95,6 +110,13 @@ class SignUpScreenshotTest {
             }
         }
         composeRule.mainClock.advanceTimeBy(160)
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+        if (showNameHelp) {
+            composeRule.onNodeWithTag("onboarding.sign_up.suggest_name").performTouchInput { longClick() }
+            val hint = RuntimeEnvironment.getApplication().getString(R.string.signup_generated_name_hint)
+            composeRule.onNodeWithText(hint).assertIsDisplayed()
+            captureScreenRoboImage("src/test/snapshots/$name.png")
+        } else {
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+        }
     }
 }

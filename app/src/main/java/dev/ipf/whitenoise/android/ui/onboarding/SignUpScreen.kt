@@ -274,8 +274,11 @@ internal fun SignUpContent(
                         label = { Text(stringResource(R.string.name)) },
                         trailingIcon = {
                             TooltipBox(
-                                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                                tooltip = { PlainTooltip { Text(stringResource(R.string.signup_generated_name_hint)) } },
+                                positionProvider =
+                                    TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                tooltip = {
+                                    PlainTooltip { Text(stringResource(R.string.signup_generated_name_hint)) }
+                                },
                                 state = rememberTooltipState(),
                             ) {
                                 RandomProfileNameButton(
