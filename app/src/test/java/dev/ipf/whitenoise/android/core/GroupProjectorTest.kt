@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -689,6 +690,17 @@ class GroupProjectorTest {
                 memberCount = 0,
             ),
         )
+    }
+
+    /** An invitation passed on by one of the account's own devices names the other member, never the account. */
+    @Test
+    fun inviteAccountSkipsAWelcomerThatIsTheAccountItself() {
+        val forwarded = group(name = "", pending = true, welcomer = "ME")
+
+        assertEquals("bob", GroupProjector.inviteAccount(forwarded, "bob", selfAccountIdHex = "me"))
+        assertNull(GroupProjector.inviteAccount(forwarded, otherMemberAccount = null, selfAccountIdHex = "me"))
+        assertNull(GroupProjector.avatarAccount(forwarded, null, memberCount = 3, selfAccountIdHex = "me"))
+        assertEquals("ME", GroupProjector.inviteAccount(forwarded, otherMemberAccount = "bob"))
     }
 
     @Test

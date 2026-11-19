@@ -1074,7 +1074,7 @@ class ConversationController(
         get() {
             val me = conversationAccountIdHex
             val other = GroupProjector.otherMemberAccount(members, me)
-            return GroupProjector.inviteAccount(group, other)
+            return GroupProjector.inviteAccount(group, other, me)
         }
 
     /**
@@ -1085,13 +1085,13 @@ class ConversationController(
      */
     val avatarAccount: String?
         get() {
-            val identity =
+            val peer =
                 conversationIdentityProjection(
                     members = members,
                     activeAccountIdHex = conversationAccountIdHex,
                     acceptedInvitePeerAccount = acceptedInvitePeerAccount,
                 )
-            return GroupProjector.avatarAccount(group, identity.otherMemberAccount, identity.memberCount)
+            return GroupProjector.avatarAccount(group, peer.otherMemberAccount, peer.memberCount, boundAccountIdHex)
         }
 
     /**

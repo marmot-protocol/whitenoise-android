@@ -276,6 +276,23 @@ class DeviceLinkFlowTest {
         compose.onNodeWithText(context.getString(R.string.link_device_add_steps)).assertExists()
     }
 
+    /** While a device this one approved is still joining, the move stays offered with a note to let it finish. */
+    @Test
+    fun aMoveIsOfferedWithANoteWhileAnApprovedDeviceIsStillJoining() {
+        roster(fixtureRosterState(), LinkedDevicesLinking(approvedLinkJoining = true))
+
+        compose.onNodeWithText(context.getString(R.string.device_move_title)).assertExists()
+        compose.onNodeWithTag(LINKED_DEVICES_MOVE_FINISH_LINKING_TAG).assertExists()
+    }
+
+    /** With no approved device still joining, the move carries no note. */
+    @Test
+    fun aMoveCarriesNoNoteWhenNoApprovedDeviceIsJoining() {
+        roster(fixtureRosterState())
+
+        compose.onNodeWithTag(LINKED_DEVICES_MOVE_FINISH_LINKING_TAG).assertDoesNotExist()
+    }
+
     /** While a move is pending no further move is offered, because MDK accepts none. */
     @Test
     fun noMoveIsOfferedWhileOneIsPending() {

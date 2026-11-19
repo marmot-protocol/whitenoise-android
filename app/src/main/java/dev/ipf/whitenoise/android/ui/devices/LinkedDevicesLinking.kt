@@ -29,12 +29,13 @@ internal enum class DeviceLinkAvailability {
 
 /**
  * What the roster screen needs beyond the rows: whether linking is offered, how far this device's link is, the
- * moves MDK reports for it and whether a command is running.
+ * moves MDK reports for it, whether a device this one approved is still joining and whether a command is running.
  */
 internal data class LinkedDevicesLinking(
     val availability: DeviceLinkAvailability = DeviceLinkAvailability.Available,
     val newDevice: NewDeviceLinkStateFfi? = null,
     val moves: List<DeviceGroupMoveViewFfi> = emptyList(),
+    val approvedLinkJoining: Boolean = false,
     val busy: Boolean = false,
 )
 
@@ -175,7 +176,8 @@ internal fun LazyListScope.linkedDevicesLinking(
 
 /**
  * Move this device, last on the screen under Advanced because few people need it. A linked device starts a move
- * with the same request as a link, and MDK takes no new one while a move or a link is still under way.
+ * with the same request as a link, and MDK takes no new one while a move or a link is still under way. While a
+ * device this one approved is still joining, a note says to let it finish, because moving can fail that link.
  */
 internal fun LazyListScope.linkedDevicesMoveAction(
     state: LinkedDeviceRosterState,
@@ -188,6 +190,14 @@ internal fun LazyListScope.linkedDevicesMoveAction(
     item(key = "section.advanced") { SettingsSection(stringResource(R.string.device_move_advanced)) }
     item(key = "move-this-device") {
         LinkThisDeviceRow(R.string.device_move_title, R.string.device_move_detail, !linking.busy, onMoveThisDevice)
+    }
+    if (linking.approvedLinkJoining) {
+        item(key = "move-finish-linking") {
+            SettingsCallout(
+                stringResource(R.string.device_move_finish_linking),
+                Modifier.testTag(LINKED_DEVICES_MOVE_FINISH_LINKING_TAG),
+            )
+        }
     }
 }
 

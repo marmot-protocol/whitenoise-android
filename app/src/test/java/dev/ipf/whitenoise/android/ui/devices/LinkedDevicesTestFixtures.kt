@@ -23,6 +23,7 @@ internal fun fixtureDevice(
     lastActiveAtSeconds: Long? = null,
     inactive: Boolean = false,
     removalPending: Boolean = false,
+    linkedByLabel: String? = null,
 ) = LinkedDeviceRow(
     slotIdHex = slot,
     isThisDevice = isThisDevice,
@@ -34,6 +35,7 @@ internal fun fixtureDevice(
     lastActiveAtSeconds = lastActiveAtSeconds,
     inactive = inactive,
     removalPending = removalPending,
+    linkedByLabel = linkedByLabel,
 )
 
 /** This device, two siblings in different states and one pending removal. */

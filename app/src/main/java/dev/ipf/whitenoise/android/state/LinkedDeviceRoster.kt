@@ -21,6 +21,8 @@ internal data class LinkedDeviceRow(
     val addToAllChats: Boolean = true,
     val bringHistory: Boolean = false,
     val keepWhileInactive: Boolean = false,
+    /** The name of the device that linked this one, blank when that device has none, null when MDK names no linker. */
+    val linkedByLabel: String? = null,
 )
 
 /**
@@ -49,7 +51,8 @@ internal data class LinkedDeviceRoster(
 
 /** Groups MDK's roster for display without adding, dropping or reinterpreting a device. */
 internal fun linkedDeviceRoster(devices: List<LinkedDeviceFfi>): LinkedDeviceRoster {
-    val rows = devices.map(LinkedDeviceFfi::toRow)
+    val labels = devices.associate { it.slotIdHex to it.label }
+    val rows = devices.map { it.toRow(linkedByLabel = it.linkedBySlotIdHex?.let(labels::get)) }
     val siblings =
         rows
             .filterNot(LinkedDeviceRow::isThisDevice)
@@ -61,7 +64,7 @@ internal fun linkedDeviceRoster(devices: List<LinkedDeviceFfi>): LinkedDeviceRos
     )
 }
 
-private fun LinkedDeviceFfi.toRow(): LinkedDeviceRow =
+private fun LinkedDeviceFfi.toRow(linkedByLabel: String?): LinkedDeviceRow =
     LinkedDeviceRow(
         slotIdHex = slotIdHex,
         isThisDevice = isThisDevice,
@@ -76,4 +79,5 @@ private fun LinkedDeviceFfi.toRow(): LinkedDeviceRow =
         addToAllChats = addToAllChats,
         bringHistory = bringHistory,
         keepWhileInactive = keepWhileInactive,
+        linkedByLabel = linkedByLabel,
     )

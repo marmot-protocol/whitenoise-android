@@ -166,4 +166,6 @@
     <string name="unlinked_account_remove_failed">Couldn\'t remove the account from this device. Try again.</string>
     <string name="chats_arriving_title">This device is linked</string>
     <string name="chats_arriving_detail">Chats this account already has are added here by your other devices, usually within a minute or two. If it has none yet, start one.</string>
+    <string name="linked_devices_linked_by">Linked by %1$s</string>
+    <string name="device_move_finish_linking">A device you approved is still being linked. Let it finish before moving this device, or it may not join your chats.</string>
 </resources>

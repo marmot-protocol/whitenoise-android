@@ -35,6 +35,7 @@ internal const val LINKED_DEVICES_EMPTY_TAG = "linked_devices.empty"
 internal const val LINKED_DEVICES_LOADING_TAG = "linked_devices.loading"
 internal const val LINKED_DEVICES_LINK_THIS_TAG = "linked_devices.link_this_device"
 internal const val LINKED_DEVICES_EXTERNAL_SIGNER_TAG = "linked_devices.external_signer"
+internal const val LINKED_DEVICES_MOVE_FINISH_LINKING_TAG = "linked_devices.move.finish_linking"
 
 /**
  * The roster screen for [state]. This device leads, other devices follow, and devices whose removal the device
@@ -182,6 +183,10 @@ internal fun linkedDeviceSummary(device: LinkedDeviceRow): List<String> =
             ?.let(::add)
         deviceDate(device.linkedAtSeconds, withTime = false)?.let {
             add(stringResource(R.string.linked_devices_linked_on, it))
+        }
+        device.linkedByLabel?.let { linker ->
+            val name = linker.ifBlank { stringResource(R.string.linked_devices_unnamed) }
+            add(stringResource(R.string.linked_devices_linked_by, name))
         }
         if (!device.isThisDevice) {
             add(

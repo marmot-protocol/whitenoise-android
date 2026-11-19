@@ -335,6 +335,25 @@ class DeviceLinkControllerTest {
         assertFalse(roster.isEmpty)
     }
 
+    /** A row names the device that linked it: its label, blank when it has none, and nothing when MDK names none. */
+    @Test
+    fun aRowNamesTheDeviceThatLinkedIt() {
+        val roster =
+            linkedDeviceRoster(
+                listOf(
+                    device("self", isThisDevice = true, label = "Phone"),
+                    device("named", linkedBy = "self"),
+                    device("unnamed", linkedBy = "named"),
+                    device("gone", linkedBy = "missing"),
+                ),
+            )
+
+        assertNull(roster.thisDevice?.linkedByLabel)
+        assertEquals("Phone", roster.device("named")?.linkedByLabel)
+        assertEquals("", roster.device("unnamed")?.linkedByLabel)
+        assertNull(roster.device("gone")?.linkedByLabel)
+    }
+
     /** MDK's fields reach the row unchanged, including an absent heartbeat. */
     @Test
     fun aRowCarriesMdksFieldsUnchanged() {
@@ -518,6 +537,7 @@ class DeviceLinkControllerTest {
             lastActiveAt: ULong? = null,
             inactive: Boolean = false,
             removalPending: Boolean = false,
+            linkedBy: String? = null,
         ) = LinkedDeviceFfi(
             slotIdHex = slot,
             isThisDevice = isThisDevice,
@@ -525,7 +545,7 @@ class DeviceLinkControllerTest {
             client = client,
             platform = platform,
             linkedAt = linkedAt,
-            linkedBySlotIdHex = null,
+            linkedBySlotIdHex = linkedBy,
             status = status,
             addToAllChats = true,
             bringHistory = false,

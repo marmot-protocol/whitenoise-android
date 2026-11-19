@@ -110,6 +110,27 @@ class LinkedDevicesContentTest {
         compose.onNodeWithText(context.getString(R.string.linked_devices_unnamed), substring = true).assertIsDisplayed()
     }
 
+    /** A device says which device linked it, by name or as unnamed, and says nothing when MDK names no linker. */
+    @Test
+    fun theSummaryNamesTheLinkingDevice() {
+        lateinit var named: List<String>
+        lateinit var unnamed: List<String>
+        lateinit var unknown: List<String>
+        compose.setContent {
+            named = linkedDeviceSummary(fixtureDevice("named", linkedByLabel = "Phone"))
+            unnamed = linkedDeviceSummary(fixtureDevice("unnamed", linkedByLabel = ""))
+            unknown = linkedDeviceSummary(fixtureDevice("unknown"))
+        }
+        val unnamedDevice = context.getString(R.string.linked_devices_unnamed)
+        val prefix = context.getString(R.string.linked_devices_linked_by, "").trim()
+
+        compose.runOnIdle {
+            assertEquals(true, context.getString(R.string.linked_devices_linked_by, "Phone") in named)
+            assertEquals(true, context.getString(R.string.linked_devices_linked_by, unnamedDevice) in unnamed)
+            assertEquals(false, unknown.any { it.startsWith(prefix) })
+        }
+    }
+
     /** A sibling with no counted heartbeat says so, and this device never shows a last-active line. */
     @Test
     fun heartbeatLinesFollowWhatMdkObserved() {

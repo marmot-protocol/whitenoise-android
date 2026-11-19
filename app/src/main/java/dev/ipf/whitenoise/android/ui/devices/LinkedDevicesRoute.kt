@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.state.DeviceLinkController
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
@@ -176,6 +177,11 @@ private fun linkedDevicesLinking(
         availability = if (externalSigner) DeviceLinkAvailability.ExternalSigner else DeviceLinkAvailability.Available,
         newDevice = controller.link?.newDevice,
         moves = controller.link?.moves.orEmpty(),
+        approvedLinkJoining =
+            controller.link
+                ?.prompts
+                .orEmpty()
+                .any { it.state is DeviceLinkPromptStateFfi.Linking },
         busy = controller.running != null || management.devices.running != null,
     )
 }

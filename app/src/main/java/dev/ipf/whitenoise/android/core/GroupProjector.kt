@@ -101,12 +101,19 @@ object GroupProjector {
         return copy.unknownTitle
     }
 
+    /**
+     * The account a pending invitation is shown as coming from: MDK's welcomer, else the other member. A welcomer
+     * equal to [selfAccountIdHex] is one of the account's own devices passing the invitation on, which is not an
+     * inviter to name, so the other member stands in or nobody is named.
+     */
     fun inviteAccount(
         group: AppGroupRecordFfi,
         otherMemberAccount: String?,
+        selfAccountIdHex: String? = null,
     ): String? {
         if (!group.pendingConfirmation) return null
-        return group.welcomerAccountIdHex?.takeIf { it.isNotBlank() }
+        val welcomer = group.welcomerAccountIdHex?.takeIf { !it.equals(selfAccountIdHex, ignoreCase = true) }
+        return welcomer?.takeIf { it.isNotBlank() }
             ?: otherMemberAccount?.takeIf { it.isNotBlank() }
     }
 
@@ -122,8 +129,9 @@ object GroupProjector {
         group: AppGroupRecordFfi,
         otherMemberAccount: String?,
         memberCount: Int,
+        selfAccountIdHex: String? = null,
     ): String? =
-        inviteAccount(group, otherMemberAccount)
+        inviteAccount(group, otherMemberAccount, selfAccountIdHex)
             ?: otherMemberAccount?.takeIf { isUnnamed(group.name) && memberCount == 2 }
 
     /**
