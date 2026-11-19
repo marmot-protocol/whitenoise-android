@@ -4,11 +4,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class DictationHoldActionTest {
+    // Tests read deltaX as an LTR physical offset; the gesture converts RTL drags to the same start-relative value.
     private fun action(
         deltaX: Float,
         deltaY: Float,
         released: Boolean,
-    ) = dictationHoldAction(deltaX, deltaY, released, lockPx = LOCK, cancelPx = CANCEL)
+        interrupted: Boolean = false,
+    ) = dictationHoldAction(-deltaX, deltaY, released, lockPx = LOCK, cancelPx = CANCEL, interrupted = interrupted)
 
     @Test
     fun `holding still keeps listening and releasing sends`() {
@@ -34,6 +36,12 @@ class DictationHoldActionTest {
     fun `an armed cancel blocks the lock until the finger returns`() {
         assertEquals(DictationHoldAction.Cancel, action(-CANCEL - 1f, -LOCK - 1f, released = true))
         assertEquals(DictationHoldAction.Lock, action(-CANCEL + 1f, -LOCK - 1f, released = false))
+    }
+
+    @Test
+    fun `an interrupted pointer keeps the session open instead of sending`() {
+        assertEquals(DictationHoldAction.Lock, action(0f, 0f, released = false, interrupted = true))
+        assertEquals(DictationHoldAction.Lock, action(-CANCEL - 1f, 0f, released = false, interrupted = true))
     }
 
     @Test

@@ -32,8 +32,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -87,16 +89,22 @@ internal class DictationHoldState {
 
 internal enum class DictationHoldAction { Continue, Lock, Send, Cancel }
 
-/** Mirrors the voice-note hold: up locks, left arms cancel, and release sends unless cancel is armed. */
+/**
+ * Mirrors the voice-note hold: up locks, sliding toward the start edge arms cancel, and release sends unless cancel
+ * is armed. [startwardPx] grows as the finger moves toward the layout's start edge. An [interrupted] pointer never
+ * sends; the session stays open with its ordinary controls.
+ */
 internal fun dictationHoldAction(
-    deltaX: Float,
+    startwardPx: Float,
     deltaY: Float,
     released: Boolean,
     lockPx: Float,
     cancelPx: Float,
+    interrupted: Boolean = false,
 ): DictationHoldAction {
-    val cancelArmed = -deltaX > cancelPx
+    val cancelArmed = startwardPx > cancelPx
     return when {
+        interrupted -> DictationHoldAction.Lock
         !cancelArmed && -deltaY > lockPx -> DictationHoldAction.Lock
         !released -> DictationHoldAction.Continue
         cancelArmed -> DictationHoldAction.Cancel
@@ -105,10 +113,10 @@ internal fun dictationHoldAction(
 }
 
 /**
- * Long-pressing the dictation launcher starts dictation. Releasing sends the transcript, sliding left before release
- * cancels, and sliding up leaves the session running with the ordinary dictation controls. A short tap reaches the
- * button unchanged. [startCapture] returns the controller only when this composer now owns a starting or open
- * capture; release acts only on that same session.
+ * Long-pressing the dictation launcher starts dictation. Releasing sends the transcript, sliding toward the start
+ * edge (right in RTL) before release cancels, and sliding up leaves the session running with the ordinary dictation
+ * controls. A short tap reaches the button unchanged. [startCapture] returns the controller only when this composer
+ * now owns a starting or open capture; release acts only on that same session.
  */
 @Composable
 internal fun dictationHoldGesture(
@@ -118,6 +126,7 @@ internal fun dictationHoldGesture(
     val latestStart by rememberUpdatedState(startCapture)
     val haptics by rememberUpdatedState(LocalHapticFeedback.current)
     val launcher by rememberUpdatedState(LocalDictationLauncherOrigin.current)
+    val rtl by rememberUpdatedState(LocalLayoutDirection.current == LayoutDirection.Rtl)
     return Modifier
         .onGloballyPositioned { state.container = it }
         .pointerInput(state) {
@@ -149,17 +158,21 @@ internal fun dictationHoldGesture(
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         // A stolen pointer keeps the session open with its ordinary controls rather than guessing.
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        // Compose reports a system cancel as an already-consumed lift; only a real lift sends.
+                        val released = change.changedToUp()
+                        val interrupted = !change.pressed && !released
                         change.consume()
                         val delta = change.position - down.position
-                        val released = change.changedToUp() || !change.pressed
-                        val cancelArmed = -delta.x > cancelPx
+                        val startward = if (rtl) delta.x else -delta.x
+                        val cancelArmed = startward > cancelPx
                         if (cancelArmed && !state.willCancel) {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         }
                         state.track(delta.y, willLock = !cancelArmed && -delta.y > lockPx * 0.6f, cancelArmed)
-                        when (dictationHoldAction(delta.x, delta.y, released, lockPx, cancelPx)) {
+                        when (dictationHoldAction(startward, delta.y, released, lockPx, cancelPx, interrupted)) {
                             DictationHoldAction.Continue -> Unit
                             DictationHoldAction.Lock -> {
+                                if (interrupted) break
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 if (!released) consumeUntilUp(down.id)
                                 break
