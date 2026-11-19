@@ -1050,7 +1050,14 @@ class SettingsPageMorphHostTest {
                         val host = Rect(0f, 0f, size.width, size.height)
                         page.reportViewport(viewport, Rect(0f, 100f, size.width, size.height))
                         reportUnoutlinedBody(page, viewport, group, Rect(16f, 100f, 344f, 300f))
-                        with(page) { drawExternal(outlinedContour(Rect(16f, 500f, 344f, 550f), host), host, presence.value, Color.Black) }
+                        with(page) {
+                            drawExternal(
+                                outlinedContour(Rect(16f, 500f, 344f, 550f), host),
+                                host,
+                                presence.value,
+                                Color.Black,
+                            )
+                        }
                     }.drawWithContent { drawRect(Color.Blue) },
             )
         }

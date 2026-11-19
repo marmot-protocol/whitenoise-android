@@ -15,6 +15,8 @@ import androidx.compose.ui.graphics.isSpecified
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorderPath
 import kotlin.math.min
 
+private const val SeamPixelOffset = 0.5f
+
 /** Frozen activation metadata; this is presentation data, never a navigation owner. */
 internal data class SettingsRouteEndpoint(
     val key: Any,
@@ -76,9 +78,10 @@ internal fun SettingsPageMorph.buildNativeContours(host: Rect): List<SettingsCon
                 endpoint.strokeWidth,
                 nativeRows.filterNot { it.last }.map { row ->
                     val inset = row.strokeWidth / 2f
+                    val seamY = row.bounds.bottom - SeamPixelOffset
                     SettingsContourSeam(
-                        Offset(row.bounds.left + inset, row.bounds.bottom - 0.5f),
-                        Offset(row.bounds.right - inset, row.bounds.bottom - 0.5f),
+                        Offset(row.bounds.left + inset, seamY),
+                        Offset(row.bounds.right - inset, seamY),
                         row.seam,
                     )
                 },
