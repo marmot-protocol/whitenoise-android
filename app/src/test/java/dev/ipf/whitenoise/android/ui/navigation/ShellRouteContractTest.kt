@@ -5,7 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -15,12 +19,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
+import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.emptyTimelinePage
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowLayout
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Rule
@@ -76,12 +84,59 @@ class ShellRouteContractTest {
         }
     }
 
+    /**
+     * Beside the list, tapping another chat keeps the open conversation on screen while the tapped one is still
+     * preparing: the pane never falls back to its placeholder, and the selection moves once the new one is ready.
+     */
+    @Test
+    fun besideTheListTheOpenConversationStaysWhileTheTappedOnePrepares() {
+        val secondOpenMayAnswer = CompletableDeferred<Unit>()
+        val fixture =
+            ReturnFixture(
+                timelineScripts = List(2) { ScriptedConversationTimelineSubscription(emptyTimelinePage()) },
+                distinctGroupsPerRow = true,
+                beforeTimelineOpen = { index -> if (index == 1) secondOpenMayAnswer.await() },
+            )
+        try {
+            withMountedShell(mutableStateOf(EXPANDED_WIDTH), fixture) { _, holder ->
+                openTarget(fixture, holder)
+                val next = fixture.rows.first()
+
+                // Hold the clock so the probe lands inside the pending-open bound.
+                composeRule.mainClock.autoAdvance = false
+                composeRule.onNodeWithTag("chat.row.${next.groupIdHex}").assertIsDisplayed().performClick()
+                composeRule.mainClock.advanceTimeBy(PENDING_OPEN_PROBE_MILLIS)
+                shadowOf(Looper.getMainLooper()).idle()
+
+                composeRule.onNodeWithTag(CONVERSATION_PANE_PLACEHOLDER_TAG).assertDoesNotExist()
+                conversationComposer().assertIsDisplayed()
+                assertNotEquals(next.groupIdHex, holder.selectedChat.value?.id)
+
+                secondOpenMayAnswer.complete(Unit)
+                composeRule.mainClock.autoAdvance = true
+                awaitCondition { holder.selectedChat.value?.id == next.groupIdHex }
+                settle()
+                composeRule.onNodeWithTag(CONVERSATION_PANE_PLACEHOLDER_TAG).assertDoesNotExist()
+                conversationComposer().assertIsDisplayed()
+            }
+        } finally {
+            // A reader left suspended would hold a shared IO worker for every later test.
+            secondOpenMayAnswer.complete(Unit)
+        }
+    }
+
+    /** The conversation composer, never a text field inside the list pane. */
+    private fun conversationComposer(): SemanticsNodeInteraction {
+        val outsideTheListPane = !hasAnyAncestor(hasTestTag(TWO_PANE_LIST_TAG))
+        return composeRule.onNode(hasSetTextAction() and outsideTheListPane)
+    }
+
     /** Mounts the production shell under a test-controlled window width and always releases its jobs. */
     private fun withMountedShell(
         width: MutableState<Dp>,
+        fixture: ReturnFixture = ReturnFixture(),
         exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
     ) {
-        val fixture = ReturnFixture()
         val mounted = mutableStateOf(true)
         val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
         val controller =
@@ -140,6 +195,9 @@ class ShellRouteContractTest {
         val COMPACT_WIDTH = 839.dp
         val HEIGHT = 800.dp
         const val OTHER_ACCOUNT_REF = "other-contract-account"
+
+        /** Well inside the 300 ms pending-open bound, so the tapped chat is still being prepared. */
+        const val PENDING_OPEN_PROBE_MILLIS = 100L
     }
 }
 
