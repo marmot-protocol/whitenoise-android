@@ -575,7 +575,7 @@ private class AndroidConversationDictationRecognitionSession(
             callerAudioCompletionBarrier.deliverImmediately(delivery)
             return
         }
-        callerAudioCompletionBarrier.deliver(source::onFeedClosed, source::onCaptureClosed, delivery)
+        callerAudioCompletionBarrier.deliver(source::endFeedAfterProviderTerminal, source::onCaptureClosed, delivery)
     }
 
     /** Serializes terminal callback decisions with UI actions on Android's main thread. */

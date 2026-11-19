@@ -28,6 +28,9 @@ internal class ConversationDictationCallerAudioStream(
     private val settled = AtomicBoolean(false)
     private val feedClosed = AtomicBoolean(false)
     private val fullyFed = AtomicBoolean(false)
+
+    /** Decides once whether the feeder completed or a provider terminal callback ended the feed. */
+    private val feedResolved = AtomicBoolean(false)
     private val feedClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
     private val cancelled = AtomicBoolean(false)
     private val captureFailureReported = AtomicBoolean(false)
@@ -63,6 +66,23 @@ internal class ConversationDictationCallerAudioStream(
             feedClosedCallbacks.add(callback)
             if (feedClosed.get() && feedClosedCallbacks.remove(callback)) callback()
         }
+    }
+
+    /**
+     * Ends an unfinished feed as soon as the provider reports a terminal callback, instead of
+     * writing into a dead request until the pipe stalls. A claimed chunk is requeued with its exact
+     * bytes and keeps its failure identity; a fully fed stream is left untouched.
+     */
+    fun endFeedAfterProviderTerminal(callback: () -> Unit) {
+        if (!feedClosed.get() && feedResolved.compareAndSet(false, true)) {
+            val owned = request.get()
+            owned?.let { failureIdentity.set(FailureIdentity(it.chunk.chunkId, it.version)) }
+            conversationDictationDiagnostic(
+                "event=caller_audio_feed_ended reason=provider_result claimed=${owned != null}",
+            )
+            cancel(requeue = true)
+        }
+        onFeedClosed(callback)
     }
 
     /** Releases this generation’s chunk after a final transcript makes its audio expendable. */
@@ -221,7 +241,8 @@ internal class ConversationDictationCallerAudioStream(
                 "replay_bytes=${owned.replayParts.sumOf { it.pcm.size }} " +
                 "new_bytes=${owned.chunk.pcm.size} bytes=$totalWritten",
         )
-        fullyFed.set(totalWritten == owned.pcmParts.sumOf { it.pcm.size } && !cancelled.get() && !settled.get())
+        val complete = totalWritten == owned.pcmParts.sumOf { it.pcm.size } && !cancelled.get() && !settled.get()
+        if (complete && feedResolved.compareAndSet(false, true)) fullyFed.set(true)
     }
 
     /** Releases the active-stream lease exactly once, even before a chunk has been acquired. */

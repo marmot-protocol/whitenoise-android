@@ -9436,6 +9436,89 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
+    /** A provider idling out before any chunk was claimed recycles without spending retry or silence budgets. */
+    @Test
+    fun repeatedChunklessEmptyEndsWhileListeningNeitherFailNorConsumeRetries() {
+        val platform = FakePlatform().apply {
+            pendingCallerAudio = true
+            unclaimedCallerAudio = true
+        }
+        val fixture = fixture(draft = TextFieldValue("Draft"), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        repeat(4) { attempt ->
+            platform.listener.onReady()
+            val idle = platform.session
+            fixture.scheduler.sleepWithoutDispatch(10_000L)
+            idle.providerError(ConversationDictationFailure.NoMatch)
+            assertFalse("attempt=$attempt", fixture.controller.state is ConversationDictationState.Failed)
+            assertEquals(0, idle.retriedCallerAudio)
+            fixture.scheduler.runDelay(500L)
+            assertEquals(attempt + 2, platform.sessions.size)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        }
+        assertEquals("Draft", fixture.drafts.getValue(key()).text)
+        assertEquals(0, fixture.writes)
+        fixture.controller.cancel()
+    }
+
+    /** After Paste, a chunkless idle end drains straight into the next generation and delivers exactly once. */
+    @Test
+    fun chunklessEmptyEndAfterPasteDrainsAndDeliversOnce() {
+        val platform = FakePlatform().apply {
+            pendingCallerAudio = true
+            unclaimedCallerAudio = true
+        }
+        val fixture = fixture(draft = TextFieldValue("Draft", TextRange(5)), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.listener.onReady()
+        fixture.controller.paste()
+        val idle = platform.session
+        platform.unclaimedCallerAudio = false
+        fixture.scheduler.sleepWithoutDispatch(10_000L)
+        idle.providerError(ConversationDictationFailure.NoMatch)
+        assertFalse(fixture.controller.state is ConversationDictationState.Failed)
+        assertEquals(0, idle.retriedCallerAudio)
+        // The drain generation waits for the existing teardown settle, not a retry backoff.
+        fixture.scheduler.runDelay(500L)
+        assertEquals(2, platform.sessions.size)
+        assertEquals(1L, platform.session.callerAudioChunkId())
+
+        platform.pendingCallerAudio = false
+        platform.listener.onResult("hello")
+        idle.providerError(ConversationDictationFailure.NoMatch)
+        assertEquals("Draft hello", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals(2, platform.sessions.size)
+    }
+
+    /** A claimed chunk ending empty after a long generation still exhausts at its bound and keeps its PCM. */
+    @Test
+    fun claimedChunkLongEmptyEndsStillExhaustAndRetainAudio() {
+        val f = fixture(draft = TextFieldValue(""))
+        val buffer = ConversationDictationAudioChunkBuffer(1L, chunkBytes = 8, requestBytes = 16, maxBufferedBytes = 24)
+        assertTrue(buffer.append(ByteArray(8) { 1 }, 8, hasSpeech = true))
+        buffer.finish()
+        f.platform.audioBuffer = buffer
+        f.platform.pendingCallerAudio = true
+        f.platform.useRealAudioSettlements = true
+        assertTrue(f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue("")))
+        repeat(2) {
+            f.scheduler.sleepWithoutDispatch(10_000L)
+            f.platform.listener.onError(ConversationDictationFailure.NoMatch)
+            assertFalse(f.controller.state is ConversationDictationState.Failed)
+            f.scheduler.runDelay(500L)
+        }
+        f.scheduler.sleepWithoutDispatch(10_000L)
+        f.platform.listener.onError(ConversationDictationFailure.NoMatch)
+        assertTrue(f.controller.state is ConversationDictationState.Failed)
+        assertEquals(3, f.platform.sessions.size)
+        assertTrue(f.platform.sessions.all { it.callerAudioChunkId() == 1L })
+        assertEquals(8, buffer.bufferedBytes)
+        assertTrue(buffer.hasPending)
+        assertTrue(f.controller.canRetryRetainedAudio)
+    }
+
     /** A typed capture overflow must destroy the recognizer and surface its cause in the visible session. */
     @Test
     fun callerAudioBufferOverflowFailsTheVisibleSession() {
@@ -10127,6 +10210,9 @@ class ConversationDictationControllerTest {
         val claimedChunks = mutableListOf<ConversationDictationAudioChunk>()
         var sessionCallerAudioOwnedOverride: Boolean? = null
         var currentCallerAudioChunkId = 1L
+
+        /** Creates caller-audio sessions whose feeder has not claimed any chunk yet. */
+        var unclaimedCallerAudio = false
         var capturedSilenceMillis: Long? = null
         var forcedCallerAudioClosures = 0
         var discardedCallerAudio = 0
@@ -10278,7 +10364,7 @@ class ConversationDictationControllerTest {
                     completePreparationOnStop,
                     deferCaptureCompletion,
                     callerAudioOwned = sessionCallerAudioOwnedOverride ?: pendingCallerAudio,
-                    callerAudioChunkId = chunk?.chunkId ?: currentCallerAudioChunkId,
+                    callerAudioChunkId = if (unclaimedCallerAudio) null else chunk?.chunkId ?: currentCallerAudioChunkId,
                     onCallerAudioAcknowledged = {
                         currentCallerAudioChunkId += 1L
                         chunk?.let { audioBuffer?.acknowledge(it.chunkId) }

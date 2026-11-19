@@ -242,6 +242,8 @@ internal fun ConversationDictationController.startRecognition(
                         error
                     }
                 if (!owns(sessionId, generationId)) return
+                val elapsedMillis = elapsedRealtime() - generationStartedAtElapsedMillis
+                if (recycleIdleCallerAudioGeneration(sessionId, target, error, elapsedMillis)) return
                 unresolvedRecognitionFailure = failure
                 val currentSession = generation.session
                 if (error.isEmptyRecognition && dropSilentFinalTail(sessionId, target, currentSession, failure)) {
