@@ -12,6 +12,13 @@
             android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
+        <!-- Opts in to Back callbacks as MainActivity does, for device tests of the app's real Back routing. -->
+        <activity
+            android:name=".BackOptInFixtureActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
 
         <service
                     android:name=".media.sandbox.NativeMediaSandboxProbeService"
