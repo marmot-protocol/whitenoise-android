@@ -31,7 +31,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -68,6 +67,7 @@ import kotlin.coroutines.startCoroutine
 @OptIn(ExperimentalCoroutinesApi::class)
 class FirstFrameDurableAvatarsTest {
     private val controllers = mutableListOf<ChatsController>()
+    private val storedReadReleases = mutableListOf<CompletableDeferred<Unit>>()
 
     /** Starts every test with an empty decoded-pixel cache. */
     @Before
@@ -78,6 +78,7 @@ class FirstFrameDurableAvatarsTest {
     /** Releases controllers and decoded pixels. */
     @After
     fun tearDown() {
+        storedReadReleases.forEach { it.complete(Unit) }
         controllers.forEach(ChatsController::onCleared)
         AvatarImageLoader.clear()
     }
@@ -176,10 +177,12 @@ class FirstFrameDurableAvatarsTest {
     @Test
     fun slowStoredReadGivesUpWithinTheBudget() {
         val readEntered = CompletableDeferred<Unit>()
+        val releaseRead = CompletableDeferred<Unit>().also(storedReadReleases::add)
         val fixture =
             NativeAvatars {
                 readEntered.complete(Unit)
-                awaitCancellation()
+                releaseRead.await()
+                emptyList()
             }
         val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
@@ -194,7 +197,7 @@ class FirstFrameDurableAvatarsTest {
             assertTrue("prewarm still waits at 249ms", !prewarm.isCompleted)
             scheduler.advanceTimeBy(1)
             scheduler.runCurrent()
-            // Let the real IO read unwind cancellation without advancing the budget clock.
+            // The detached stored read remains pending; only its frame waiter times out.
             val handoff = prewarm.await()
             assertTrue(handoff.isEmpty())
             assertEquals(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS, scheduler.currentTime)

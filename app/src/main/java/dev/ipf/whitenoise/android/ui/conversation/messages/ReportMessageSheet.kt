@@ -101,8 +101,13 @@ internal fun ReportMessageSheet(
     var explanation by remember { mutableStateOf("") }
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheet, ownerKey)
+    var closingAudience by remember(terminal) { mutableStateOf<ReportAudience?>(null) }
+    val close = {
+        closingAudience = audience
+        terminal.close(onDismissRequest)
+    }
     ModalBottomSheet(
-        onDismissRequest = { terminal.close(onDismissRequest) },
+        onDismissRequest = close,
         sheetState = sheet,
         sheetGesturesEnabled = terminal.acceptsInput,
         properties =
@@ -120,9 +125,9 @@ internal fun ReportMessageSheet(
             { explanation = it },
             form.sending || !terminal.acceptsInput,
             { acceptedReason, acceptedExplanation ->
-                onSubmit(acceptedReason, acceptedExplanation) { terminal.close(onDismissRequest) }
+                onSubmit(acceptedReason, acceptedExplanation, close)
             },
-            ReportTeamChoice(audience, sendToTeam, onSendToTeamChange),
+            ReportTeamChoice(closingAudience ?: audience, sendToTeam, onSendToTeamChange),
             form,
         )
     }

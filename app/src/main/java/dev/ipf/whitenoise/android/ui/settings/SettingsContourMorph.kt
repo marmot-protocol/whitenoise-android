@@ -208,6 +208,12 @@ private fun interpolateContourViewport(
     b: SettingsContour,
     t: Float,
 ): Rect {
+    val visibleA = a.bounds.intersect(a.viewport)
+    val visibleB = b.bounds.intersect(b.viewport)
+    // A stationary outline resumes from its displayed clip, not an off-outline viewport edge.
+    if (a.bounds == b.bounds && !visibleA.isEmpty && !visibleB.isEmpty) {
+        return lerp(visibleA, visibleB, t)
+    }
     val interpolatedViewport = lerp(a.viewport, b.viewport, t)
     // A rebased surplus can already be partially hidden. Never reveal that ink again
     // while its rigid outline leaves; incoming surplus uses its native target window.

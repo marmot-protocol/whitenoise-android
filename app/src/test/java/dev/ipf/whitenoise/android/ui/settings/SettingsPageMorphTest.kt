@@ -63,6 +63,24 @@ class SettingsPageMorphTest {
             assertTrue(page.begin("child", true, true, host))
         }
 
+    @Test fun hiddenFirstGroupDoesNotDonateItsKeyToTheVisibleGroup() {
+        val page = SettingsPageMorph()
+        page.begin("parent", true, false, host)
+        val viewport = Any()
+        val firstToken = Any()
+        val secondToken = Any()
+        page.reportDestination(firstToken, surface(first).copy(key = "first", viewportToken = viewport))
+        page.reportDestination(secondToken, surface(second).copy(key = "second", viewportToken = viewport))
+        page.reportViewport(viewport, host)
+        val before = requireNotNull(page.buildNativeContours(host))
+        page.reportViewport(viewport, host.copy(top = first.bottom))
+        val visible = requireNotNull(page.buildNativeContours(host)).single()
+        assertEquals(second, visible.bounds)
+        assertEquals(before[1].key, visible.key)
+        page.reportViewport(viewport, host)
+        assertEquals(before.map { it.key }, requireNotNull(page.buildNativeContours(host)).map { it.key })
+    }
+
     @Test fun unchangedNativeFramesReuseGeometryButChangedReportsReplaceIt() {
         val page = SettingsPageMorph()
         page.begin("parent", true, false, host)

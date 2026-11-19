@@ -67,6 +67,22 @@ class SettingsContourMorphTest {
         assertEquals(expected.bottom, actual.bottom, tolerance)
     }
 
+    @Test fun stationaryInterruptedOutlineInterpolatesItsVisibleClipInBothDirections() {
+        val native = group(100f, 120f)
+        val frozen = native.copy(viewport = viewport.copy(top = 160f))
+        for ((source, target) in listOf(frozen to native, native to frozen)) {
+            for (step in 1 until 100) {
+                val t = step / 100f
+                val frame = sample(listOf(source), listOf(target), t).single()
+                assertEquals(native.bounds, frame.bounds)
+                assertBounds(
+                    lerp(source.bounds.intersect(source.viewport), target.bounds.intersect(target.viewport), t),
+                    frame.bounds.intersect(frame.viewport),
+                )
+            }
+        }
+    }
+
     @Test fun oneToManyRemeasureKeepsSemanticAnchorWhenNeighbourIsNearer() {
         val source = listOf(group(100f, key = 1))
         val target = listOf(group(100f, key = 20), group(500f, key = 10).copy(destination = "child"))

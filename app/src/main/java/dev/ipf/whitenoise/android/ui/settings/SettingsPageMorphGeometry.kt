@@ -61,41 +61,35 @@ internal fun SettingsPageMorph.buildNativeContours(host: Rect): List<SettingsCon
             .filter { it.value.outline.isSpecified }
             .distinctBy { it.value.bounds }
             .sortedWith(compareBy({ it.value.bounds.top }, { it.value.bounds.left }))
-    val contours =
-        orderedSettingsContours(
-            groups.map { (token, endpoint) ->
-                val nativeRows = rows[token]?.values.orEmpty().sortedBy { it.bounds.top }
-                SettingsContour(
-                    endpoint.bounds,
-                    endpoint.corners,
-                    viewports[endpoint.viewportToken] ?: host,
-                    endpoint.outline,
-                    endpoint.strokeWidth,
-                    nativeRows.filterNot { it.last }.map { row ->
-                        val inset = row.strokeWidth / 2f
-                        SettingsContourSeam(
-                            Offset(row.bounds.left + inset, row.bounds.bottom - 0.5f),
-                            Offset(row.bounds.right - inset, row.bounds.bottom - 0.5f),
-                            row.seam,
-                        )
-                    },
-                    nativeRows.map { SettingsNativeRow(it.bounds, it.corners, it.first, it.last) },
-                    destination = endpoint.destination,
-                    fill = endpoint.fill,
-                    rtl = endpoint.rtl,
-                )
-            },
-        ) ?: return null
-    if (contours.isEmpty()) return contours
     val saved = routeGroupKeys.getOrPut(target) { mutableMapOf() }
     nextGroupKey = maxOf(nextGroupKey, (sourceContours.maxOfOrNull { it.key } ?: 0) + 1)
-    val keys =
-        contours.indices.map { index ->
-            val identity = groups[index].value.key
-            val occurrence = groups.take(index).count { it.value.key == identity }
-            saved.getOrPut(identity to occurrence) { nextGroupKey++ }
-        }
-    return contours.mapIndexed { index, contour -> contour.copy(key = keys[index]) }
+    return orderedSettingsContours(
+        groups.mapIndexed { index, (token, endpoint) ->
+            val occurrence = groups.take(index).count { it.value.key == endpoint.key }
+            val key = saved.getOrPut(endpoint.key to occurrence) { nextGroupKey++ }
+            val nativeRows = rows[token]?.values.orEmpty().sortedBy { it.bounds.top }
+            SettingsContour(
+                endpoint.bounds,
+                endpoint.corners,
+                viewports[endpoint.viewportToken] ?: host,
+                endpoint.outline,
+                endpoint.strokeWidth,
+                nativeRows.filterNot { it.last }.map { row ->
+                    val inset = row.strokeWidth / 2f
+                    SettingsContourSeam(
+                        Offset(row.bounds.left + inset, row.bounds.bottom - 0.5f),
+                        Offset(row.bounds.right - inset, row.bounds.bottom - 0.5f),
+                        row.seam,
+                    )
+                },
+                nativeRows.map { SettingsNativeRow(it.bounds, it.corners, it.first, it.last) },
+                key = key,
+                destination = endpoint.destination,
+                fill = endpoint.fill,
+                rtl = endpoint.rtl,
+            )
+        },
+    )
 }
 
 /** Native group interiors only: no header replay and no travelling cell-sized crop. */
