@@ -28,8 +28,10 @@ internal suspend fun WhiteNoiseAppState.publishMissingRelayLists(account: String
 }
 
 /**
- * Replaces both relay lists with White Noise's defaults through the same validation an edit passes. The projection
- * must be readable, as for any other relay edit, though its `defaultRelays` are the account's own and go unused.
+ * Replaces both relay lists with White Noise's defaults in one publication that declares no read or write roles, as
+ * account setup does. A default relay the account had marked read-only or write-only comes back with both roles, which
+ * the per-list setters would preserve. The projection must be readable, as for any other relay edit, though its
+ * `defaultRelays` are the account's own and go unused.
  */
 internal suspend fun WhiteNoiseAppState.restoreDefaultAccountRelays(account: String?): AccountRelayListsFfi? {
     val current = account?.let { loadAccountRelayLists(it) }
@@ -42,7 +44,22 @@ internal suspend fun WhiteNoiseAppState.restoreDefaultAccountRelays(account: Str
             present(R.string.toast_relay_update_failed, R.string.no_relay_projection)
             null
         }
-        else -> restoreDefaultRelayKinds { kind, plan -> publishAccountRelays(account, kind, plan) }
+        else ->
+            runCatchingCancellable {
+                marmotIo {
+                    publishRelayLists(
+                        account,
+                        whiteNoiseDefaultRelays(RelayListKind.Nip65),
+                        MarmotClient.bootstrapRelays,
+                        whiteNoiseDefaultRelays(RelayListKind.Inbox),
+                    )
+                }
+            }.onSuccess {
+                presentTransient(R.string.toast_relay_list_updated)
+            }.onFailure {
+                presentFailure(R.string.toast_relay_update_failed, "RELAY_LIST_UPDATE", it)
+            }.getOrNull()
+                ?.let { loadAccountRelayLists(account) }
     }
 }
 
