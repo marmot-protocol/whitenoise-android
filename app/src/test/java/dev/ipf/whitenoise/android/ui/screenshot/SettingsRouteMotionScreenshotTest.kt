@@ -317,7 +317,7 @@ class SettingsRouteMotionScreenshotTest {
         gestures.performClick()
         rule.mainClock.advanceTimeByFrame()
         // The actual Gestures row supplies the container origin; capture its first, middle and settled frames.
-        captureFrame(name, "first", inked = false)
+        captureFrame(name, "first", inked = !amoled)
         rule.mainClock.advanceTimeBy(SETTINGS_CARD_MORPH_MILLIS / 2L)
         captureFrame(name, "middle")
         rule.mainClock.advanceTimeBy(SETTINGS_CARD_MORPH_MILLIS.toLong())

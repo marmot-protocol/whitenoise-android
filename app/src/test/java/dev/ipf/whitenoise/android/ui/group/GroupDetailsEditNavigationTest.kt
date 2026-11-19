@@ -178,7 +178,7 @@ class GroupDetailsEditNavigationTest {
         try {
             composeRule.setContent {
                 CompositionLocalProvider(LocalConversationMotionEnabled provides true) {
-                    WhiteNoiseTheme {
+                    WhiteNoiseTheme(darkTheme = true, amoled = true) {
                         GroupDetailsScreen(
                             appState = fixture.appState,
                             controller = fixture.controller,

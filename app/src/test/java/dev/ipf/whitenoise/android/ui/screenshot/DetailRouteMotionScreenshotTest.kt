@@ -760,20 +760,22 @@ class DetailRouteMotionScreenshotTest {
         var intermediate: Bitmap? = null
         var settled: Bitmap? = null
         // Only AMOLED cards draw outlines, so only there do details cards visibly fold into the composer.
+        val borderlessComposer = name.startsWith("composer_light")
         val morphs =
-            (profile && "_light" !in name && "_dark" !in name) ||
-                name.startsWith("composer_") ||
-                name.endsWith("_entry") ||
-                (name.endsWith("_entry_back") && "_light" !in name && "_dark" !in name)
+            !borderlessComposer &&
+                ((profile && "_light" !in name && "_dark" !in name) ||
+                    name.startsWith("composer_") ||
+                    name.endsWith("_entry") ||
+                    (name.endsWith("_entry_back") && "_light" !in name && "_dark" !in name))
         // Ordinary checks retain their timing; private exports include settled frames after preparation.
         for (frame in 0..(if (captureFrames) 31 else 22)) {
             if (captureFrames || frame in listOf(0, 6, 20)) {
                 val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
                 val bitmap = node.captureToImage().asAndroidBitmap()
-                if (morphs && frame == 6) {
+                if ((morphs || borderlessComposer) && frame == 6) {
                     intermediate = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
-                if ((morphs || profile) && frame == 20) {
+                if ((morphs || profile || borderlessComposer) && frame == 20) {
                     settled = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
                 exportTransitionFrame(frames, name, frame, bitmap)
@@ -788,7 +790,7 @@ class DetailRouteMotionScreenshotTest {
             }
             rule.mainClock.advanceTimeBy(16)
         }
-        if (profile) {
+        if (profile || borderlessComposer) {
             // Borderless themes hand off their body once; no synthetic contour or dissolve is required.
             org.junit.Assert.assertFalse(
                 "$name must replace its source body at the destination",
@@ -805,9 +807,9 @@ class DetailRouteMotionScreenshotTest {
                 "$name must contain intermediate motion before settling",
                 middle.sameAs(checkNotNull(settled)),
             )
-            if (name.startsWith("composer_") && name.endsWith("_entry")) {
-                assertNativeComposerHeader(name, middle, checkNotNull(settled))
-            }
+        }
+        if (name.startsWith("composer_") && name.endsWith("_entry")) {
+            assertNativeComposerHeader(name, checkNotNull(intermediate), checkNotNull(settled))
         }
     }
 
@@ -859,7 +861,7 @@ class DetailRouteMotionScreenshotTest {
             // real source pixels, rather than a theme-color guess, define continuity.
             // Returning to the conversation keeps its native margin visible outside the morphing cards.
             val expected =
-                if (name.endsWith("_entry_back")) {
+                if (name.endsWith("_entry_back") || (name.startsWith("composer_light") && name.endsWith("_entry"))) {
                     checkNotNull(routeBackground)
                 } else {
                     source?.getPixel(edge, y) ?: checkNotNull(morphBackplate)

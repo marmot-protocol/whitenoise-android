@@ -1246,8 +1246,10 @@ class SettingsPageMorphHostTest {
         val composer = Rect(20f, 650f, 340f, 730f)
         val details = Rect(40f, 150f, 320f, 350f)
         val closing = mutableStateOf(false)
-        val time = mutableStateOf(1f)
+        val time = mutableStateOf(0f)
         val token = Any()
+        val viewport = Any()
+        val freeBody = Any()
         val contour = outlinedContour(composer, host)
         page.anchorContour = { contour }
         page.closingAnchorContour = { contour }
@@ -1260,15 +1262,28 @@ class SettingsPageMorphHostTest {
                     .fillMaxSize()
                     .drawWithContent {
                         if (!closing.value) {
+                            page.reportViewport(viewport, Rect(0f, 100f, host.right, host.bottom))
                             page.reportOutlinedDestination(token, details)
+                            reportUnoutlinedBody(page, viewport, freeBody, Rect(16f, 400f, 344f, 500f))
                         }
                         with(page) { draw(host, time.value, true, Color.Black) }
                     }.drawWithContent {
                         drawComposerReturnNative(closing.value, if (closing.value) composer else details)
+                        if (!closing.value) {
+                            clipRect(16f, 400f, 344f, 500f) { drawRect(Color.Blue) }
+                        }
                     },
             )
         }
-        rule.onRoot().captureToImage()
+        val first = rule.onRoot().captureToImage().toPixelMap()
+        assertEquals("free body waits while composer perimeter expands", 0f, first[100, 450].blue, 0.01f)
+        rule.runOnIdle { time.value = 1f }
+        assertEquals(
+            "free body arrives at handoff",
+            1f,
+            rule.onRoot().captureToImage().toPixelMap()[100, 450].blue,
+            0.01f,
+        )
         rule.runOnIdle {
             assertTrue(page.begin("chat", false, true, host))
             closing.value = true
