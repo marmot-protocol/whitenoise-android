@@ -234,6 +234,15 @@ class RelaysContentTest {
         composeRule.onAllNodesWithText(app.getString(R.string.relay_list_published)).assertCountEquals(2)
     }
 
+    /** An entry the defaults lack still offers Restore, even one that does not normalize, since Restore removes it. */
+    @Test
+    fun restoreIsOfferedWhenADefaultListAlsoHoldsAnUnusableEntry() {
+        val lists = relayLists(nip65 = MarmotClient.accountRelays + LEGACY, inbox = MarmotClient.bootstrapRelays)
+        assertFalse(lists.usesDefaultRelays())
+        render(lists)
+        composeRule.onNodeWithTag("relays.restore").performScrollTo().assertIsEnabled()
+    }
+
     /** Lists that share one relay MarmotKit reports as the account's default are not White Noise's defaults. */
     @Test
     fun restoreIsOfferedWhenBothListsHoldTheAccountsOwnRelay() {

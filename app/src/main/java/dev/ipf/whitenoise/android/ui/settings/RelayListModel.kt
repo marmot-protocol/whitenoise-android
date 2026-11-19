@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayAddressAttention
 import dev.ipf.whitenoise.android.state.RelayListKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
 import dev.ipf.whitenoise.android.state.normalizeRelayUrls
 import dev.ipf.whitenoise.android.state.relayAddressAttention
 import dev.ipf.whitenoise.android.state.whiteNoiseDefaultRelays
@@ -32,10 +33,15 @@ internal fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
         RelayListKind.Inbox -> inbox.relays
     }
 
-/** True when each list already holds White Noise's defaults for it, so Restore default relays has nothing to do. */
+/**
+ * True when each list already holds White Noise's defaults for it, so Restore default relays has nothing to do. An
+ * entry that does not normalize, such as an insecure imported relay, is one Restore would remove, so it counts.
+ */
 internal fun AccountRelayListsFfi.usesDefaultRelays(): Boolean =
     RelayListKind.entries.all { kind ->
-        normalizeRelayUrls(relaysFor(kind)).toSet() == normalizeRelayUrls(whiteNoiseDefaultRelays(kind)).toSet()
+        val stored = relaysFor(kind)
+        stored.all(::isAcceptableRelayUrl) &&
+            normalizeRelayUrls(stored).toSet() == normalizeRelayUrls(whiteNoiseDefaultRelays(kind)).toSet()
     }
 
 /** Published, Missing, or Status unavailable while there is no projection to read. */
