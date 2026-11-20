@@ -70,7 +70,6 @@ import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
-import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
 import dev.ipf.whitenoise.android.core.DateFormatPreference
@@ -1344,6 +1343,7 @@ class WhiteNoiseAppState private constructor(
                     enginePackage = handle.enginePackage,
                     selectedVoice = { ttsVoicePreferences.selectedVoice(handle.enginePackage) },
                     onVoiceResolved = { voiceResolution -> ttsVoiceResolution = voiceResolution },
+                    requireOfflineVoice = handle.voiceResolution.effectiveKey != null,
                 ),
                 engineKey = handle.enginePackage,
             )
@@ -6084,13 +6084,6 @@ class WhiteNoiseAppState private constructor(
     fun acknowledgeTtsTrustWarning(enginePackage: String) {
         ttsWarningPreferences.acknowledge(enginePackage)
     }
-
-    fun runtimeTrustForTtsSelectionWarning(enginePackage: String) =
-        runtimeTrustForSelectionWarning(
-            enginePackage = enginePackage,
-            adoptedHandle = ttsResolution?.handle,
-            selectedOverride = ttsEnginePreferences.selectedEngine(),
-        )
 
     fun selectTtsEngine(enginePackage: String) {
         mutationsScope.launch {

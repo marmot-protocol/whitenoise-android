@@ -9,6 +9,8 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
+import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
+import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
@@ -201,6 +203,29 @@ class WhiteNoiseAppStateReaderSpeechTest {
             assertTrue(appState.ttsController.state.value is TtsState.Idle)
             assertFalse(appState.ownsCurrentAccountSpeech())
             assertTrue(engine.spoken.isEmpty())
+        }
+
+    @Test
+    fun installedOfflineVoiceDoesNotPromptForAnUnverifiedConnection() =
+        runBlocking {
+            val appState = testAppState()
+            val enginePackage = "test.external.reader"
+            val voice = TtsVoiceKey(enginePackage, "offline", "en-US")
+            val handle =
+                TtsEngineHandle(
+                    TextToSpeech(context, {}),
+                    enginePackage,
+                    EngineTrust.Unknown,
+                    voiceResolution = TtsVoiceResolution.Empty.copy(effectiveKey = voice),
+                )
+            val consent = TtsPlaybackTrustConsent(appState) { handle }
+            try {
+                assertFalse(consent.needsAcknowledgment())
+                assertTrue(consent.confirm { true })
+                assertNull(consent.pending)
+            } finally {
+                handle.release()
+            }
         }
 
     @Test

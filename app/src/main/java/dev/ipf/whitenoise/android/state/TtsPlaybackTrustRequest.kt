@@ -37,7 +37,9 @@ internal class TtsPlaybackTrustConsent(
     fun needsAcknowledgment(): Boolean = attachedHandle()?.let(::needsAcknowledgment) == true
 
     private fun needsAcknowledgment(handle: TtsEngineHandle): Boolean =
-        if (handle.connectedPackageVerified) {
+        if (handle.voiceResolution.effectiveKey != null) {
+            false
+        } else if (handle.connectedPackageVerified) {
             requiresTtsTrustWarning(handle.enginePackage, handle.trust, appState.ttsWarningPreferences)
         } else {
             approvedUnverifiedHandle !== handle

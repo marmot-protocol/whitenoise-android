@@ -11,6 +11,7 @@ internal class AndroidTtsSpeechEngine(
     private val enginePackage: String = "",
     private val selectedVoice: () -> TtsVoiceKey? = { null },
     private val onVoiceResolved: (TtsVoiceResolution) -> Unit = {},
+    private val requireOfflineVoice: Boolean = false,
 ) : TtsSpeechEngine {
     override val effectiveLocale: Locale? get() = textToSpeech.voice?.locale
 
@@ -40,7 +41,9 @@ internal class AndroidTtsSpeechEngine(
                 )
             }
         onVoiceResolved(resolution)
-        return if (voices.isNotEmpty() && resolution.effectiveKey == null) TextToSpeech.LANG_NOT_SUPPORTED else status
+        // A handle that skipped the warning for an offline voice cannot fall back to unchecked speech.
+        val offlineVoiceRequired = requireOfflineVoice || voices.isNotEmpty()
+        return if (offlineVoiceRequired && resolution.effectiveKey == null) TextToSpeech.LANG_NOT_SUPPORTED else status
     }
 
     /** Applies the controller's bounded speech-rate preference to the framework engine. */
@@ -70,13 +73,7 @@ internal class AndroidTtsSpeechEngine(
     override fun speak(
         text: String,
         utteranceId: String,
-    ): Int =
-        textToSpeech.speak(
-            text,
-            TextToSpeech.QUEUE_ADD,
-            null,
-            utteranceId,
-        )
+    ): Int = enqueue(text, utteranceId, null)
 
     /** Sends Android's per-utterance volume only for explicit media mixing. */
     override fun speak(
@@ -84,14 +81,24 @@ internal class AndroidTtsSpeechEngine(
         utteranceId: String,
         volume: Float,
     ): Int =
-        textToSpeech.speak(
+        enqueue(
             text,
-            TextToSpeech.QUEUE_ADD,
+            utteranceId,
             Bundle().apply {
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume.coerceIn(0f, 1f))
             },
-            utteranceId,
         )
+
+    private fun enqueue(
+        text: String,
+        utteranceId: String,
+        params: Bundle?,
+    ): Int {
+        if (requireOfflineVoice && textToSpeech.voice?.isNetworkConnectionRequired != false) {
+            return TextToSpeech.ERROR
+        }
+        return textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
+    }
 
     /** Stops framework synthesis for the active queue. */
     override fun stop() {

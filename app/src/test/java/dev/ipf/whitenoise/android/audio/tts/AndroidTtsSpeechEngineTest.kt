@@ -191,6 +191,20 @@ class AndroidTtsSpeechEngineTest {
         assertNull(resolution?.effectiveKey)
     }
 
+    @Test
+    fun offlinePlaybackRejectsAnEmptyCatalogAfterLanguageSelection() {
+        val engine =
+            AndroidTtsSpeechEngine(
+                textToSpeech = EmptyCatalogTextToSpeech(),
+                enginePackage = "engine.a",
+                requireOfflineVoice = true,
+            )
+
+        assertEquals(TextToSpeech.LANG_NOT_SUPPORTED, engine.setLanguage(Locale.FRANCE))
+        assertEquals(TextToSpeech.ERROR, engine.speak("Private text", "start"))
+        assertEquals(TextToSpeech.ERROR, engine.speak("Private text", "mix", volume = 0.5f))
+    }
+
     /** Builds a listener that records each lifecycle callback in order. */
     private fun listener(calls: MutableList<String>) =
         androidTtsProgressListener(
