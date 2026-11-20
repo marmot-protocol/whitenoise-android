@@ -31,8 +31,7 @@ name: keys-rotation-cancel
 - setOrientation: PORTRAIT
 - assertVisible: "Encrypted Private Key"
 - tapOn: "Cancel"
-- assertVisible: "Private key hidden"
-- assertNotVisible: "Encrypted Private Key"
+- runFlow: ../fixtures/assert-private-key-hidden-after-backup.yaml
 - runFlow: ../fixtures/open-encrypted-key-editor.yaml
 - assertVisible: "Encrypted Private Key"
 - assertVisible:
@@ -52,5 +51,4 @@ name: keys-rotation-cancel
     id: "profile_keys.export_file"
     enabled: false
 - tapOn: "Cancel"
-- assertVisible: "Private key hidden"
-- assertNotVisible: "Encrypted Private Key"
+- runFlow: ../fixtures/assert-private-key-hidden-after-backup.yaml

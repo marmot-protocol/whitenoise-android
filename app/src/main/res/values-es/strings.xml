@@ -980,6 +980,7 @@
     <string name="hide_private_key">Ocultar clave privada</string>
     <string name="show_private_key">Mostrar clave privada</string>
     <string name="copy_private_key">Copiar clave privada</string>
+    <string name="raw_key_export_auth_title">Verifica tu identidad para acceder a tu clave privada</string>
     <string name="export">Exportar</string>
     <string name="export_encrypted_private_key">Exportar clave privada cifrada</string>
     <string name="keep_your_private_key_safe">Mantén segura tu clave privada</string>

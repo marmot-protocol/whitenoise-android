@@ -963,6 +963,7 @@
     <string name="hide_private_key">隐藏私钥</string>
     <string name="show_private_key">显示私钥</string>
     <string name="copy_private_key">复制私钥</string>
+    <string name="raw_key_export_auth_title">请验证身份以访问私钥</string>
     <string name="export">导出</string>
     <string name="export_encrypted_private_key">导出加密私钥</string>
     <string name="keep_your_private_key_safe">妥善保管你的私钥</string>
