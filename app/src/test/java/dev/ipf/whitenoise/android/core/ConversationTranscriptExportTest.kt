@@ -356,7 +356,13 @@ class ConversationTranscriptExportTest {
             assertTrue(second.exists())
             assertFalse("legacy plaintext should be reaped", legacy.exists())
             assertTrue("another account's transcript must survive", other.exists())
-            assertEquals(setOf(second.name, other.name), second.parentFile?.listFiles()?.map { it.name }?.toSet())
+            val names =
+                checkNotNull(second.parentFile)
+                    .listFiles()
+                    .orEmpty()
+                    .map { it.name }
+                    .toSet()
+            assertEquals(setOf(second.name, other.name), names)
         } finally {
             root.deleteRecursively()
         }
