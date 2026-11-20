@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AccountSetupReadinessFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.CreateGroupOptionsFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -93,12 +92,7 @@ internal class AppReviewDemoNative(
         }
         return try {
             appState.marmotIo(MarmotTraceSection.CREATE_GROUP) {
-                createGroupWithOptions(
-                    ref,
-                    "",
-                    listOf(member.memberRef),
-                    CreateGroupOptionsFfi(description = null, initialImage = null, disappearingMessageSecs = 0u),
-                ).requireCreatedGroupId()
+                startDirectConversation(ref, member.memberRef)
             }
         } catch (projection: MarmotKitException.CreatedGroupProjectionUnavailable) {
             projection.groupIdHex

@@ -108,24 +108,34 @@ internal fun WhiteNoiseAppState.setDefaultDisappearingMessagesSeconds(
 }
 
 /**
- * Creates a 1:1 DM group atomically with the active account's current default.
- * This lower-level variant leaves failure presentation to the caller so the
- * New Message flow can keep an inline retry state instead of collapsing
- * everything into a transient toast.
+ * Starts a 1:1 DM with the active account's current disappearing-message default.
+ *
+ * Without a default, MarmotKit's shared direct-conversation operation reuses an existing DM with this
+ * peer or creates one with both people as founding admins. That operation cannot yet carry a founding
+ * retention, so a nonzero default still goes through creator-only group creation to keep the timer in
+ * the founding state; switch it to the direct operation once MarmotKit accepts founding options there.
+ * The direct operation reports a recipient on an outdated client or with unfinished relay lists as a
+ * generic runtime failure, so those cases show the retry copy until MarmotKit types them.
+ * This lower-level variant leaves failure presentation to the caller so the New Message flow can keep
+ * an inline retry state instead of collapsing everything into a transient toast.
  */
 internal suspend fun WhiteNoiseAppState.createProfileChatGroup(npub: String): String {
     val account = activeAccountRef ?: throw StartProfileChatNoActiveAccountException()
     val retentionSeconds = defaultDisappearingMessagesSeconds(account)
     return marmotIo(MarmotTraceSection.CREATE_GROUP) {
-        createGroupWithOptions(
-            account,
-            "",
-            listOf(npub),
-            CreateGroupOptionsFfi(
-                description = null,
-                initialImage = null,
-                disappearingMessageSecs = retentionSeconds.toULong(),
-            ),
-        ).requireCreatedGroupId()
+        if (retentionSeconds == DefaultDisappearingMessagesPreferences.OFF_SECONDS) {
+            startDirectConversation(account, npub)
+        } else {
+            createGroupWithOptions(
+                account,
+                "",
+                listOf(npub),
+                CreateGroupOptionsFfi(
+                    description = null,
+                    initialImage = null,
+                    disappearingMessageSecs = retentionSeconds.toULong(),
+                ),
+            ).requireCreatedGroupId()
+        }
     }
 }
