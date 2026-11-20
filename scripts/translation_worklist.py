@@ -128,11 +128,15 @@ def check_entry(source, target):
         # Languages differ on which forms spell out the count, so allow any English form's arguments.
         plural_arguments = set().union(*(arguments(item) for item in original))
         # Each form keeps its matching English form's arguments, except the count, which may be spelled out.
-        integers = [
+        integers = {
             argument[0] for item in original for argument in arguments(item)
             if argument[3] in {"d", "i"} and argument[0] is not None
-        ]
-        optional_indices = {None, min(integers, default=None)}
+        }
+        if original.get("name") == "attachment_collection_limit_result":
+            # ConversationImportedMediaSlots uses rejected (argument 3) as the quantity.
+            optional_indices = {3}
+        else:
+            optional_indices = integers if len(integers) == 1 else set()
     elif kind == "string-array":
         if len(original) != len(translated) or any(item.tag != "item" for item in translated):
             return "array items differ from the source"

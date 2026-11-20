@@ -53,11 +53,11 @@ practical so reviewers can find the corresponding text quickly.
 ## Check and submit a pull request
 
 Run `python3 scripts/translation_worklist.py` to check the resource files. You
-can add `--base origin/master` to see new or changed English keys and their
+can add `--base "$(git merge-base origin/master HEAD)"` to see new or changed English keys and their
 affected locales. A changed source entry calls for a review of its meaning.
 Name the locale and screens in your PR. List the checks you ran and flag wording that needs a fluent reviewer.
 Screenshot tests render in English, so a PR that edits a shipped locale under
-`app/src/main/res/` should include `Visual changes: none` in its description.
+`app/src/main/res/` should include `Visual changes: none` in its description when you open the PR.
 
 For a new locale, ask for the stable PR preview. Set the preview app's language
 to **System default**, then put your target language first in Android's language

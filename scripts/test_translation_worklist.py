@@ -189,15 +189,23 @@ class TranslationWorklistTest(unittest.TestCase):
                    '<item quantity="other">%1$d чатов в %2$s</item></plurals>')
         self.assertEqual(self.scan()[3], [])
 
-    def test_plural_forms_exempt_only_the_count_among_integer_arguments(self):
-        self.write("main/values/counts.xml", '<plurals name="count"><item quantity="one">%1$d chat in %2$d rooms</item>'
-                   '<item quantity="other">%1$d chats in %2$d rooms</item></plurals>')
-        self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат</item>'
-                   '<item quantity="other">%1$d чатов</item></plurals>')
-        self.assertIn("format arguments differ", self.scan()[3][0])
-        self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат в %2$d комнатах</item>'
-                   '<item quantity="other">%1$d чатов в %2$d комнатах</item></plurals>')
-        self.assertEqual(self.scan()[3], [])
+    def test_plural_forms_exempt_the_actual_quantity_among_integer_arguments(self):
+        self.write("main/values/counts.xml",
+                   '<plurals name="attachment_collection_limit_result">'
+                   '<item quantity="other">%1$d accepted, %2$d maximum, %3$d rejected</item></plurals>')
+        for one, expected in [
+            ("%1$d accepted, %2$d maximum, one rejected", []),
+            ("one accepted, %2$d maximum, %3$d rejected", ["format arguments differ"]),
+        ]:
+            with self.subTest(one=one):
+                self.write("preview/values-fr/counts.xml",
+                           '<plurals name="attachment_collection_limit_result">'
+                           f'<item quantity="one">{one}</item>'
+                           '<item quantity="other">%1$d accepted, %2$d maximum, %3$d rejected</item></plurals>')
+                errors = self.scan()[3]
+                self.assertEqual(len(errors), len(expected))
+                if expected:
+                    self.assertIn(expected[0], errors[0])
 
     def test_plural_forms_keep_arguments_of_their_matching_english_form(self):
         self.write("main/values/counts.xml", '<plurals name="count"><item quantity="one">One chat</item>'
