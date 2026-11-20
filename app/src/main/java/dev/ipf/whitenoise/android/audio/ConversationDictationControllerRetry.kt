@@ -66,6 +66,8 @@ internal fun ConversationDictationController.retryRetainedCallerAudio(failed: Co
     state = ConversationDictationState.Starting(failed.sessionId, failed.target)
     armCallerAudioDrainTimeout(failed.sessionId, failed.target)
     recognition.resetFailure()
+    // Retry starts a fresh finish measurement; the failed attempt's clock was cleared when it failed.
+    finishTiming.tap(elapsedRealtime())
     val failure = failed.cause ?: failed.reason
     val delayMillis =
         failure.retainedCallerAudioRetryDelayMillis(if (failure.hasProviderCapacityBackoff) 1 else 0)
@@ -150,6 +152,7 @@ internal fun ConversationDictationController.failWithRetainedCallerAudio(
     val drainAlreadyExpired = finishRequested && failure == ConversationDictationFailure.TimedOut
     finishRequested = true
     retainedAudioFailure = failure
+    finishTiming.reset()
     val retained = recognizedTranscript ?: accumulatedTranscript.trim().ifBlank { null }
     // An explicit Send requests the whole recording, never automatic submission of a prefix.
     val recovery = recoverRecognizedDraftResult(sessionId, target, retained)

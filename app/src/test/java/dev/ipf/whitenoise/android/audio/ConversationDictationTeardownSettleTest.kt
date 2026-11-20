@@ -63,7 +63,7 @@ class ConversationDictationTeardownSettleTest {
     fun cancelTeardownStillWaitsFullSettleBeforeNextGeneration() {
         val fixture = callerAudioFixture()
         fixture.platform.listener.onResult("first")
-        fixture.scheduler.runDelay(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS)
+        fixture.scheduler.runDelay(ConversationDictationController.SUCCESS_RESULT_RESTART_DELAY_MILLIS)
         assertEquals(2, fixture.platform.sessions.size)
         fixture.controller.cancel()
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
@@ -79,7 +79,7 @@ class ConversationDictationTeardownSettleTest {
     fun timeoutTeardownStillWaitsFullSettleBeforeRetry() {
         val fixture = callerAudioFixture()
         fixture.platform.listener.onResult("body")
-        fixture.scheduler.runDelay(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS)
+        fixture.scheduler.runDelay(ConversationDictationController.SUCCESS_RESULT_RESTART_DELAY_MILLIS)
         fixture.controller.paste()
         fixture.scheduler.advanceBy(90_000L)
         assertTrue(fixture.controller.state is ConversationDictationState.Failed)
@@ -121,9 +121,9 @@ class ConversationDictationTeardownSettleTest {
         assertEquals(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS, timing["settle_wait_ms"])
     }
 
-    /** Confirmed silence with live capture and no queued chunk restarts after the short settle, not 500 ms. */
+    /** Confirmed silence while still listening keeps the full restart delay; only a finish drain is shortened. */
     @Test
-    fun confirmedSilenceWithoutQueuedChunkRestartsAfterShortSettle() {
+    fun confirmedSilenceWhileListeningKeepsFullRestart() {
         val fixture = callerAudioFixture()
         val silent = fixture.platform.sessions.single()
         silent.callerAudioHasSpeech = false
@@ -131,14 +131,37 @@ class ConversationDictationTeardownSettleTest {
         silent.providerError(ConversationDictationFailure.NoSpeech)
 
         assertEquals(1, silent.acknowledgedCallerAudio)
-        assertEquals(
-            0,
-            fixture.scheduler.liveTaskCount(ConversationDictationController.GENERATION_RESTART_DELAY_MILLIS),
-        )
+        assertEquals(0, fixture.scheduler.liveTaskCount(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS))
         fixture.platform.pendingCallerAudio = true
-        fixture.scheduler.advanceBy(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS - 1L)
+        fixture.scheduler.advanceBy(ConversationDictationController.GENERATION_RESTART_DELAY_MILLIS - 1L)
         assertEquals(1, fixture.platform.sessions.size)
         fixture.scheduler.advanceBy(1L)
         assertEquals(2, fixture.platform.sessions.size)
+    }
+
+    /** A disconnect right after a short settle costs no retry attempt and restores the full settle afterwards. */
+    @Test
+    fun disconnectAfterShortSettleFallsBackToFullSettle() {
+        val fixture = callerAudioFixture()
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS)
+        assertEquals(2, fixture.platform.sessions.size)
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderDisconnected)
+
+        assertEquals(0, fixture.controller.recognition.failureAttempts)
+        assertEquals(0, fixture.scheduler.liveTaskCount(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS))
+        fixture.scheduler.runDelay(ConversationDictationController.PROVIDER_DISCONNECT_RETRY_DELAYS_MILLIS.first())
+        assertEquals(3, fixture.platform.sessions.size)
+        fixture.platform.listener.onResult("second")
+        assertEquals(0, fixture.scheduler.liveTaskCount(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS))
+        fixture.scheduler.runDelay(ConversationDictationController.GENERATION_RESTART_DELAY_MILLIS)
+        assertEquals(4, fixture.platform.sessions.size)
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onResult("tail")
+
+        assertEquals("first second tail", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 }

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
+import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.GENERATION_RESTART_DELAY_MILLIS
 import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.MAX_RETAINED_CALLER_AUDIO_RETRIES
 import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.MAX_SESSION_MILLIS
 import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.PROCESSING_TIMEOUT_MILLIS
@@ -63,6 +64,7 @@ internal fun ConversationDictationController.startRecognition(
     }
     val generationId = generation.begin()
     val generationStartedAtElapsedMillis = elapsedRealtime()
+    restart.noteGenerationStart(generationStartedAtElapsedMillis)
     conversationDictationDiagnostic("event=recognizer_generation_start generation=$generationId")
     finishTiming.generationStarted()
     state = ConversationDictationState.Starting(sessionId, target)
@@ -252,6 +254,7 @@ internal fun ConversationDictationController.startRecognition(
                 val elapsedMillis = elapsedRealtime() - generationStartedAtElapsedMillis
                 if (recycleIdleCallerAudioGeneration(sessionId, target, error, elapsedMillis)) return
                 if (providerEnded) generation.markProviderEnded()
+                val shortSettleDisconnect = restart.takeShortSettleDisconnect(error)
                 unresolvedRecognitionFailure = failure
                 val currentSession = generation.session
                 if (error.isEmptyRecognition && dropSilentFinalTail(sessionId, target, currentSession, failure)) {
@@ -268,7 +271,8 @@ internal fun ConversationDictationController.startRecognition(
                             callerAudioPending = callerAudioPending,
                             countInputRetry =
                                 (finishRequested || error.isEmptyRecognition) &&
-                                    failure.canRetryRetainedCallerAudio,
+                                    failure.canRetryRetainedCallerAudio &&
+                                    !shortSettleDisconnect,
                             capacityFailure = failure.hasProviderCapacityBackoff,
                             maxRetries = MAX_RETAINED_CALLER_AUDIO_RETRIES,
                         ),
@@ -314,6 +318,8 @@ internal fun ConversationDictationController.startRecognition(
                     error.isEmptyRecognition -> restartAfterNoSpeech(sessionId, target, readyAt)
                     error == ConversationDictationFailure.PermissionDenied ->
                         recoverPermissionFailure(sessionId, target)
+                    shortSettleDisconnect ->
+                        scheduleRestart(sessionId, target, GENERATION_RESTART_DELAY_MILLIS, "short_settle_disconnect")
                     error == ConversationDictationFailure.ProviderDisconnected ->
                         recoverProviderDisconnect(sessionId, target)
                     else -> failOrRetainTranscript(sessionId, target, failure)
@@ -389,7 +395,7 @@ internal fun ConversationDictationController.advancePastConfirmedSilentCallerAud
         runCatching(platform::callerAudioHasPending).getOrDefault(false) ->
             startRecognition(sessionId, target)
         finishRequested -> finalizeAccumulatedTranscript(sessionId, target)
-        else -> scheduleRestart(sessionId, target, restart.teardownSettleMillis, "no_speech_advanced")
+        else -> scheduleRestart(sessionId, target, GENERATION_RESTART_DELAY_MILLIS, "no_speech_advanced")
     }
 }
 

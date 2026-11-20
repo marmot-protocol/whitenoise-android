@@ -1170,7 +1170,7 @@ internal class ConversationDictationController internal constructor(
                 (attempt - 1).coerceIn(0, PROVIDER_DISCONNECT_RETRY_DELAYS_MILLIS.lastIndex),
             ]
         } else {
-            conversationDictationTeardownSettleMillis(providerEnded = isEmptyRecognition)
+            restart.settleMillis(providerEnded = isEmptyRecognition)
         }
 
     internal companion object {
@@ -1198,7 +1198,7 @@ internal class ConversationDictationController internal constructor(
         const val MAX_CONSECUTIVE_RAPID_EMPTY_GENERATIONS = 3
         const val MAX_RETAINED_CALLER_AUDIO_RETRIES = 2
         const val GENERATION_RESTART_DELAY_MILLIS = 500L
-        const val SUCCESS_RESULT_RESTART_DELAY_MILLIS = PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS
+        const val SUCCESS_RESULT_RESTART_DELAY_MILLIS = 500L
         const val PERMISSION_RETRY_DELAY_MILLIS = 500L
         val PROVIDER_DISCONNECT_RETRY_DELAYS_MILLIS = longArrayOf(500L, 1_000L, 2_000L)
     }

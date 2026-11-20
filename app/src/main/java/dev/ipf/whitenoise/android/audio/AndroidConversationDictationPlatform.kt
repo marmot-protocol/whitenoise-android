@@ -562,7 +562,7 @@ private class AndroidConversationDictationRecognitionSession(
     /** Requests a final result when no capture acknowledgement is required. */
     override fun stop() = stop {}
 
-    /** Delivers a terminal provider callback only after caller-owned audio has fully closed. */
+    /** Delivers a terminal callback after caller audio closes, posted to queue behind any PipeFailed the feeder already posted. */
     private fun deliverAfterCallerAudioCloses(delivery: () -> Unit) {
         if (!callerAudioCapturing) {
             reportCaptureFinished()

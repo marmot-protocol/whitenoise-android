@@ -196,6 +196,41 @@ class ConversationDictationCallerAudioProviderTerminalTest {
         }
     }
 
+    /** A terminal before the claimed chunk wrote any byte requeues it unidentified and reports no pipe failure. */
+    @Test
+    fun terminalBeforeAnyByteOfAClaimRequeuesWithoutFailure() {
+        val inWrite = CountDownLatch(1)
+        val terminalSent = CountDownLatch(1)
+        val buffer = pcmBuffer()
+        val capture =
+            sealedCapture(
+                buffer,
+                ConversationDictationAudioPipeWriter { _, _, _, _ ->
+                    inWrite.countDown()
+                    terminalSent.await(2, TimeUnit.SECONDS)
+                    0
+                },
+            )
+        val failures = CopyOnWriteArrayList<ConversationDictationCallerAudioFailure>()
+        val stream = checkNotNull(capture.openProviderStream(failures::add))
+        try {
+            assertTrue(stream.start())
+            assertTrue(inWrite.await(2, TimeUnit.SECONDS))
+            val closed = CountDownLatch(1)
+            stream.endFeedAfterProviderTerminal { closed.countDown() }
+            terminalSent.countDown()
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
+            assertEquals(emptyList<ConversationDictationCallerAudioFailure>(), failures.toList())
+            assertFalse(stream.fullyFed())
+            assertNull(stream.chunkId())
+            assertArrayEquals(PCM, checkNotNull(buffer.poll()).pcm)
+        } finally {
+            stream.cancel()
+            stream.closeProviderEnd()
+            capture.discard {}
+        }
+    }
+
     /** A terminal callback racing the feeder's claim never closes the feed while the chunk is unaccounted for. */
     @Test
     fun terminalRacingAClaimLeavesTheChunkQueuedOrIdentified() {

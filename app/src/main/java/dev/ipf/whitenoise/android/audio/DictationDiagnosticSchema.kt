@@ -308,6 +308,7 @@ internal object DictationDiagnosticSchema {
             "permission",
             "provider_disconnected",
             "no_speech_advanced",
+            "short_settle_disconnect",
             "retained_transcript",
             "already_finishing",
             "retain",

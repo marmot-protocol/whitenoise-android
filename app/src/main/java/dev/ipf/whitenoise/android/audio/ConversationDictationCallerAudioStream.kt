@@ -247,10 +247,17 @@ internal class ConversationDictationCallerAudioStream(
         if (totalWritten == owned.pcmParts.sumOf { it.pcm.size } && feedOpen()) {
             fullyFed.set(true)
         } else if (providerEnded.get() && !cancelled.get()) {
-            conversationDictationDiagnostic("event=caller_audio_feed_ended reason=provider_result claimed=true")
-            failureIdentity.set(FailureIdentity(owned.chunk.chunkId, owned.version))
-            // The result cannot cover a partial feed; the bounded pipe-failure retry replays this chunk.
-            settle(requeue = true) { reportFailure(ConversationDictationCallerAudioFailure.PipeFailed) }
+            conversationDictationDiagnostic(
+                "event=caller_audio_feed_ended reason=provider_result claimed=true bytes=$totalWritten",
+            )
+            // An unwritten claim leaves the chunk as if never claimed, so an empty terminal can still recycle.
+            if (totalWritten == 0) {
+                settle(requeue = true)
+            } else {
+                failureIdentity.set(FailureIdentity(owned.chunk.chunkId, owned.version))
+                // The result cannot cover a partial feed; the bounded pipe-failure retry replays this chunk.
+                settle(requeue = true) { reportFailure(ConversationDictationCallerAudioFailure.PipeFailed) }
+            }
         }
     }
 
