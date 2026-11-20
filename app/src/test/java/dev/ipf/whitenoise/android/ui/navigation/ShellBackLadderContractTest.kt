@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.test.espresso.Espresso
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -110,9 +111,9 @@ class ShellBackLadderContractTest {
         }
     }
 
-    /** Delivers one system Back press and lets the route settle. */
+    /** Delivers Back as the system does, to whichever window has focus, and lets the route settle. */
     private fun pressBack() {
-        composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        Espresso.pressBack()
         shell.settle()
     }
 
