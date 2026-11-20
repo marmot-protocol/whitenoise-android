@@ -1013,7 +1013,7 @@
     <string name="wipe_outcome_local_wipe_done">Local data wiped</string>
     <string name="wipe_outcome_local_wipe_incomplete">Local data wipe incomplete</string>
     <string name="export_nsec">Export Private Key</string>
-    <string name="raw_key_export_auth_title">Authenticate to export your private key</string>
+    <string name="raw_key_export_auth_title">Authenticate to access your private key</string>
     <string name="share_secret_key">Share secret key</string>
     <string name="signed_out">Signed out</string>
     <string name="toast_couldnt_sign_in_account">Couldn\'t sign in to account</string>

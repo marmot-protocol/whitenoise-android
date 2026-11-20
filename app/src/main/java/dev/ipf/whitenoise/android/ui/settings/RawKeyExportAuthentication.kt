@@ -1,13 +1,12 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.biometric.BiometricPrompt
+import android.app.Activity
+import android.hardware.biometrics.BiometricPrompt
+import android.os.CancellationSignal
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.APP_LOCK_ALLOWED_AUTHENTICATORS
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -17,6 +16,9 @@ import dev.ipf.whitenoise.android.ui.findActivity
 /** A fresh, one-shot challenge for the selected raw export destination. */
 internal fun interface RawKeyExportAuthentication {
     fun request(onAuthenticated: () -> Unit)
+
+    /** Invalidates the result before dismissing a pending challenge. */
+    fun cancel() = Unit
 }
 
 @Composable
@@ -27,7 +29,7 @@ internal fun rememberRawKeyExportAuthentication(
     val context = LocalContext.current
     val authentication =
         remember(context, owner, appState) {
-            RawKeyExportPrompt(context.findActivity() as? FragmentActivity) {
+            RawKeyExportPrompt(context.findActivity()) {
                 appState.present(R.string.toast_app_lock_screen_lock_required)
             }
         }
@@ -37,85 +39,69 @@ internal fun rememberRawKeyExportAuthentication(
     return authentication
 }
 
-/** A dedicated Fragment keeps this prompt's callback separate from MainActivity's App Lock prompt. */
+/** Uses the framework prompt so profile-key callbacks are independent of App Lock's AndroidX host. */
 private class RawKeyExportPrompt(
-    private val activity: FragmentActivity?,
+    private val activity: Activity?,
     private val onUnavailable: () -> Unit,
 ) : RawKeyExportAuthentication {
-    private var host: Fragment? = null
-    private var prompt: BiometricPrompt? = null
+    private var activeRequest: CancellationSignal? = null
 
+    /** Shows a fresh credential challenge owned by one screen action. */
     override fun request(onAuthenticated: () -> Unit) {
-        if (host != null) return
-        val hostActivity = activity
-        if (hostActivity == null ||
-            hostActivity.supportFragmentManager.isStateSaved ||
-            !isAppLockCredentialAvailable(hostActivity)
-        ) {
+        if (activeRequest != null) return
+        val host = activity?.takeUnless { it.isFinishing || it.isDestroyed }
+        if (host == null || !isAppLockCredentialAvailable(host)) {
             onUnavailable()
             return
         }
-        val fragment = Fragment()
+        val request = CancellationSignal()
+        activeRequest = request
         runCatching {
-            hostActivity.supportFragmentManager
-                .beginTransaction()
-                .add(fragment, null)
-                .commitNow()
-            host = fragment
-            val callback =
-                object : BiometricPrompt.AuthenticationCallback() {
-                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                        if (retire(fragment, cancelPrompt = false)) onAuthenticated()
-                    }
+            BiometricPrompt
+                .Builder(host)
+                .setTitle(host.getString(R.string.raw_key_export_auth_title))
+                .setAllowedAuthenticators(APP_LOCK_ALLOWED_AUTHENTICATORS)
+                .build()
+                .authenticate(
+                    request,
+                    host.mainExecutor,
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                            if (finish(request)) onAuthenticated()
+                        }
 
-                    override fun onAuthenticationError(
-                        errorCode: Int,
-                        errString: CharSequence,
-                    ) {
-                        retire(fragment, cancelPrompt = false)
-                    }
-                }
-            val challenge =
-                BiometricPrompt.PromptInfo
-                    .Builder()
-                    .setTitle(hostActivity.getString(R.string.raw_key_export_auth_title))
-                    .setAllowedAuthenticators(APP_LOCK_ALLOWED_AUTHENTICATORS)
-                    .build()
-            BiometricPrompt(fragment, ContextCompat.getMainExecutor(hostActivity), callback)
-                .also { prompt = it }
-                .authenticate(challenge)
+                        override fun onAuthenticationError(
+                            errorCode: Int,
+                            errString: CharSequence,
+                        ) {
+                            finish(request)
+                        }
+                    },
+                )
         }.onFailure {
-            retire(fragment, cancelPrompt = true)
+            if (finish(request)) request.cancel()
             onUnavailable()
         }
     }
 
-    fun cancel() {
-        host?.let { retire(it, cancelPrompt = true) }
+    /** Retires the owner synchronously even when the framework callback is posted later. */
+    override fun cancel() {
+        activeRequest?.let { request ->
+            if (finish(request)) request.cancel()
+        }
     }
 
-    /** Invalidates the attempt before cancelling or accepting a terminal callback. */
-    private fun retire(
-        fragment: Fragment,
-        cancelPrompt: Boolean,
-    ): Boolean {
-        if (host !== fragment) return false
-        host = null
-        val activePrompt = prompt
-        prompt = null
-        if (cancelPrompt) activePrompt?.cancelAuthentication()
-        activity
-            ?.supportFragmentManager
-            ?.beginTransaction()
-            ?.remove(fragment)
-            ?.commitAllowingStateLoss()
+    /** Accepts only the first terminal event for this exact challenge. */
+    private fun finish(request: CancellationSignal): Boolean {
+        if (activeRequest !== request) return false
+        activeRequest = null
         return true
     }
 }
 
 /** Gives each presentation its own consent, so reopening cannot accept a retired callback. */
 internal fun ProfileKeysUiState.openRawExport() {
-    rawExportConsent = Any()
+    rawKeyConsent = Any()
     rawExportDialog = true
 }
 
@@ -128,13 +114,23 @@ internal fun RawKeyExportAuthentication.gateExport(
     { encrypted, destination ->
         if (encrypted) {
             beginExport(true, destination)
-        } else if (ui.rawExportDialog && ui.exportIdle && canDeliverSecret()) {
-            val consent = ui.rawExportConsent
-            request {
-                val dialogIsCurrent = ui.rawExportConsent === consent && ui.rawExportDialog
-                if (dialogIsCurrent && ui.exportIdle && canDeliverSecret()) {
-                    beginExport(false, destination)
-                }
-            }
+        } else {
+            authorizedAction(ui, { ui.rawExportDialog && ui.exportIdle && canDeliverSecret() }) {
+                beginExport(false, destination)
+            }.invoke()
         }
     }
+
+/** Applies the same one-shot ownership check before every plaintext key disclosure. */
+internal fun RawKeyExportAuthentication.authorizedAction(
+    ui: ProfileKeysUiState,
+    canDeliver: () -> Boolean,
+    onAuthenticated: () -> Unit,
+): () -> Unit = {
+    if (canDeliver()) {
+        val consent = ui.rawKeyConsent
+        request {
+            if (ui.rawKeyConsent === consent && canDeliver()) onAuthenticated()
+        }
+    }
+}

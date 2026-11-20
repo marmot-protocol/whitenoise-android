@@ -103,6 +103,42 @@ class AccountKeysExportDeliveryTest {
         assertEquals(listOf(KeyExportDestination.File), exports)
     }
 
+    /** A late result loses authority immediately when the dialog begins its exit. */
+    @Test
+    fun dismissalStartRejectsAuthenticationBeforeTheDialogDisappears() {
+        var pending: (() -> Unit)? = null
+        var delivered = false
+        val ui = ProfileKeysUiState().apply { openRawExport() }
+        val authentication = RawKeyExportAuthentication { pending = it }
+        val export = authentication.gateExport(ui, { true }) { _, _ -> delivered = true }
+
+        export(false, KeyExportDestination.Share)
+        ui.cancelExportPreparation()
+        assertTrue(ui.rawExportDialog)
+        checkNotNull(pending).invoke()
+
+        assertFalse(delivered)
+    }
+
+    /** Copy and reveal require an authentication result and lose ownership on stop. */
+    @Test
+    fun plaintextAccessRejectsAResultAfterTheScreenStops() {
+        var pending: (() -> Unit)? = null
+        var delivered = false
+        val ui = ProfileKeysUiState()
+        val action = RawKeyExportAuthentication { pending = it }.authorizedAction(ui, { true }) { delivered = true }
+
+        action()
+        assertFalse(delivered)
+        ui.stopSensitiveOperations()
+        checkNotNull(pending).invoke()
+        assertFalse(delivered)
+
+        action()
+        checkNotNull(pending).invoke()
+        assertTrue(delivered)
+    }
+
     /** Opening the file picker stops the screen, but an authorized raw export still writes on an idle return. */
     @Test
     fun stoppedRawPickerRetainsItsAuthorizedExport() {

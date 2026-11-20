@@ -69,16 +69,8 @@ internal enum class CopiedProfileKey { Public, Private, Encrypted }
 /** Explicit user-selected delivery of an account-bound native export. */
 internal enum class KeyExportDestination { File, Preview, Share }
 
-/** A confirmed native result held temporarily for preview or document delivery, with one original expiry. */
-internal data class PendingKeyExport(
-    val encrypted: Boolean,
-    val content: String,
-    val createdAtMillis: Long,
-)
-
 /** Timing and geometry the prototype fixes for Profile Keys. */
 private object ProfileKeysDefaults {
-    const val EXPIRY_MILLIS = 30_000L
     const val COPIED_MILLIS = 2_000L
     const val MASK = "••••••••••••••••••••••••••••••••"
     const val FILE_STEM_LENGTH = 16
@@ -98,7 +90,7 @@ internal class ProfileKeysUiState {
     var nativeExportError by mutableStateOf<Int?>(null)
     var passwordDialog by mutableStateOf(false)
     var rawExportDialog by mutableStateOf(false)
-    var rawExportConsent = Any()
+    var rawKeyConsent = Any()
     var saveErrorDialog by mutableStateOf(false)
     var expiredExportDialog by mutableStateOf(false)
     var exportBusy by mutableStateOf(false)
@@ -122,6 +114,7 @@ internal class ProfileKeysUiState {
 
     /** Invalidates native work immediately while the inert confirmation finishes its exit. */
     fun cancelExportPreparation() {
+        rawKeyConsent = Any()
         exportOperation.cancel()
         exportBusy = false
         clearPasswords()
@@ -304,7 +297,7 @@ internal fun AccountKeysScreen(
         )
     }
 
-    ProfileKeysEffects(ui = ui, lifecycle = lifecycle)
+    ProfileKeysEffects(ui, lifecycle, rawAuthentication::cancel)
     LaunchedEffect(hasLocalKey, appState.signOutInProgress, appState.wipeInProgress) {
         if (!hasLocalKey || appState.signOutInProgress || appState.wipeInProgress) {
             ui.stopSensitiveOperations()
@@ -340,20 +333,22 @@ internal fun AccountKeysScreen(
             onToggleReveal = {
                 if (ui.revealRequested) {
                     ui.hidePrivateKey()
-                } else if (canDeliverSecret()) {
-                    ui.revealRequested = true
-                    ui.revealOperation.start(
-                        scope = scope,
-                        canDeliver = { ui.revealRequested && canDeliverSecret() },
-                        load = { appState.exportActiveAccountNsec() },
-                        onResult = { secret ->
-                            ui.privateKey = secret
-                            if (secret == null) ui.revealRequested = false
-                        },
-                    )
+                } else {
+                    rawAuthentication.authorizedAction(ui, ::canDeliverSecret) {
+                        ui.revealRequested = true
+                        ui.revealOperation.start(
+                            scope = scope,
+                            canDeliver = { ui.revealRequested && canDeliverSecret() },
+                            load = { appState.exportActiveAccountNsec() },
+                            onResult = { secret ->
+                                ui.privateKey = secret
+                                if (secret == null) ui.revealRequested = false
+                            },
+                        )
+                    }.invoke()
                 }
             },
-            onCopyPrivate = {
+            onCopyPrivate = rawAuthentication.authorizedAction(ui, ::canDeliverSecret) {
                 ui.copyOperation.start(
                     scope = scope,
                     canDeliver = ::canDeliverSecret,
@@ -376,6 +371,7 @@ internal fun AccountKeysScreen(
         ui = ui,
         canExport = hasLocalKey,
         onExport = rawAuthentication.gateExport(ui, ::canDeliverSecret, ::beginExport),
+        cancelRawAuthentication = rawAuthentication::cancel,
         onCopyBackup = {
             val backup = ui.encryptedBackup
             if (backup != null && !backup.isExpired() && canDeliverSecret()) {
@@ -413,10 +409,11 @@ internal fun AccountKeysScreen(
 private fun ProfileKeysEffects(
     ui: ProfileKeysUiState,
     lifecycle: Lifecycle,
+    cancelAuthentication: () -> Unit,
 ) {
     LaunchedEffect(ui.privateKey) {
         if (ui.privateKey != null) {
-            delay(ProfileKeysDefaults.EXPIRY_MILLIS)
+            delay(PRIVATE_KEY_EXPIRY_MILLIS)
             ui.hidePrivateKey()
         }
     }
@@ -442,7 +439,10 @@ private fun ProfileKeysEffects(
     DisposableEffect(lifecycle, ui) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_STOP) ui.stopSensitiveOperations()
+                if (event == Lifecycle.Event.ON_STOP) {
+                    ui.stopSensitiveOperations()
+                    cancelAuthentication()
+                }
             }
         lifecycle.addObserver(observer)
         onDispose {
@@ -734,15 +734,3 @@ private fun ProfileKeySupportingText(text: String) {
 /** The copy action's glyph: a check while the last copy is still fresh. */
 @DrawableRes
 internal fun copyGlyph(copied: Boolean): Int = if (copied) R.drawable.ic_check else R.drawable.ic_content_copy
-
-/** Whether a pending export has outlived the prototype's 30 s window. */
-private fun PendingKeyExport.isExpired(): Boolean {
-    val age = SystemClock.elapsedRealtime() - createdAtMillis
-    return age >= ProfileKeysDefaults.EXPIRY_MILLIS
-}
-
-/** Remaining lifetime follows the native result when a preview is handed to the document picker. */
-private fun PendingKeyExport.remainingMillis(): Long {
-    val age = SystemClock.elapsedRealtime() - createdAtMillis
-    return (ProfileKeysDefaults.EXPIRY_MILLIS - age).coerceAtLeast(0L)
-}
