@@ -101,10 +101,12 @@ class NotificationReplyWorker(
         if (!actionsAllowed && !completionStore.hasStarted(completionKey)) {
             return lockedReplyResult(action, containsLegacyPlaintext, retryStore, retryKey)
         }
-        if (actionsAllowed && retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS) {
+        val sendBudgetAvailable = retryStore.operationFailureCount(retryKey) < MAX_SEND_ATTEMPTS
+        if (actionsAllowed && !sendBudgetAvailable) {
             return finalizeReplyFailure(action, containsLegacyPlaintext, completionStore, completionKey, retryStore, retryKey)
         }
 
+        var lockedDuringRecovery = !actionsAllowed
         return try {
             withContext(Dispatchers.Main.immediate) {
                 application.appState.ensureNotificationRuntimeStarted()
@@ -119,10 +121,17 @@ class NotificationReplyWorker(
                         completionStore = completionStore,
                         completionKey = completionKey,
                         recoveryScope = notificationReplyRecoveryScope(action.target.accountRef, action.target.groupIdHex),
-                        allowNewSend = actionsAllowed,
+                        refusalAfterRecovery = {
+                            lockedDuringRecovery = !application.appState.appLock.notificationActionsAllowed
+                            when {
+                                lockedDuringRecovery -> NotificationReplySendOutcome.BlockedByAppLock
+                                !sendBudgetAvailable -> NotificationReplySendOutcome.NonRetryableFailure
+                                else -> null
+                            }
+                        },
                     )
                 }
-            if (!actionsAllowed && sendOutcome == NotificationReplySendOutcome.RetryableFailure) {
+            if (lockedDuringRecovery && sendOutcome == NotificationReplySendOutcome.RetryableFailure) {
                 return lockedReplyResult(
                     action,
                     containsLegacyPlaintext,
@@ -165,7 +174,7 @@ class NotificationReplyWorker(
             throw cancel
         } catch (throwable: Throwable) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply worker failed group=${action.target.groupIdHex.take(8)}", throwable)
-            if (!actionsAllowed) {
+            if (lockedDuringRecovery) {
                 lockedReplyResult(action, containsLegacyPlaintext, retryStore, retryKey, priorAcceptanceUnknown = true)
             } else {
                 replyFailureResult(
