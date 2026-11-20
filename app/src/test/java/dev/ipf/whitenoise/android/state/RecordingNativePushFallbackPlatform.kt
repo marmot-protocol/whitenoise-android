@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
+import kotlinx.coroutines.CompletableDeferred
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Test boundary that records request generations while preserving production persistence semantics. */
@@ -15,7 +17,8 @@ internal class RecordingNativePushFallbackPlatform(
     private val beforePersist: () -> Unit = {},
     private val beforeClear: () -> Unit = {},
 ) : NativePushFallbackPlatform {
-    val starts = mutableListOf<Long>()
+    val starts = CopyOnWriteArrayList<Long>()
+    private val firstStart = CompletableDeferred<Unit>()
     val stops = AtomicInteger()
     private val persistCallCount = AtomicInteger()
     private val clearCallCount = AtomicInteger()
@@ -48,9 +51,14 @@ internal class RecordingNativePushFallbackPlatform(
         }
     }
 
+    /** Waits for a service start request from the production reconciliation coroutine. */
+    suspend fun awaitFirstStart() = firstStart.await()
+
     override fun startBackgroundConnection(requestGeneration: Long): Boolean {
+        val accepted = startResults.removeFirstOrNull() ?: true
         starts += requestGeneration
-        return startResults.removeFirstOrNull() ?: true
+        firstStart.complete(Unit)
+        return accepted
     }
 
     override fun stopBackgroundConnection(): Boolean {

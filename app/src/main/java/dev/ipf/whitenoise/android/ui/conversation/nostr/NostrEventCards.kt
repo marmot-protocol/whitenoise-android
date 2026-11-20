@@ -382,8 +382,7 @@ private fun LoadedEventHeader(
             title = author,
             seed = card.authorPubkeyHex,
             size = 32.dp,
-            pictureUrl = card.authorMetadata?.pictureUrl,
-            pictureDomain = AvatarImageLoader.publicProfiles(),
+            picture = AvatarImageLoader.peek(card.authorMetadata?.pictureUrl),
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             EmojiLabel(
