@@ -256,7 +256,10 @@ class NotificationReplyWorker(
     ): Result {
         return when {
             containsLegacyPlaintext -> Result.failure().also { retryStore.clear(retryKey) }
-            retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS) -> Result.retry()
+            retryStore.shouldDeferForLock(
+                retryKey,
+                NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS,
+            ) -> Result.retry()
             else -> {
                 notificationWarning(TAG, "reply lock wait expired") {
                     "group=${action.target.groupIdHex.take(8)}"
