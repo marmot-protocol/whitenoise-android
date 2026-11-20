@@ -109,12 +109,16 @@ class NotificationProfilePreferencesTest {
         val paused = NotificationProfileManual.Paused(localMs("2026-11-21T07:00", utc))
         assertEquals(paused, store.state.value.manual)
         assertNull(store.active(now, utc))
-        // Renaming the paused profile or saving an unrelated one keeps the paused window quiet.
-        assertTrue(store.save(sleep.copy(name = "Night")))
-        assertTrue(store.save(testProfile("work")))
+        // Renaming the paused profile, saving an unrelated one or moving another profile's future schedule
+        // keeps the paused window quiet.
+        assertTrue(store.save(sleep.copy(name = "Night"), now, utc))
+        val work = testProfile("work", profileSchedule("09:00", "17:00"))
+        assertTrue(store.save(work, now, utc))
+        assertTrue(store.save(work.copy(schedule = profileSchedule("09:30", "17:00")), now, utc))
         assertEquals(paused, store.state.value.manual)
         assertNull(store.active(now, utc))
-        assertTrue(store.save(sleep.copy(name = "Night", schedule = profileSchedule("22:30", "07:00"))))
+        // Changing the paused window itself ends the pause so the edit applies at once.
+        assertTrue(store.save(sleep.copy(name = "Night", schedule = profileSchedule("22:30", "07:00")), now, utc))
         assertNull(store.state.value.manual)
         assertEquals("Night", store.active(now, utc)?.profile?.name)
     }

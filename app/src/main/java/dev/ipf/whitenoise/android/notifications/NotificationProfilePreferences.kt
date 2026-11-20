@@ -35,10 +35,14 @@ internal class NotificationProfilePreferences(
 
     /**
      * Inserts or replaces [profile] by id; call off the main thread. Rejects a blank name, an enabled invalid
-     * schedule or an eleventh profile. A save that changes a schedule ends any pause so the new schedule
-     * applies at once.
+     * schedule or an eleventh profile. A pause ends only when this save changes a schedule whose old or new
+     * window is open now, so that edit applies at once while other edits keep the paused window quiet.
      */
-    fun save(profile: NotificationProfile): Boolean =
+    fun save(
+        profile: NotificationProfile,
+        nowMs: Long = clock(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): Boolean =
         mutate { current ->
             val name = normalizedNotificationProfileName(profile.name)
             val schedule = profile.schedule
@@ -55,10 +59,11 @@ internal class NotificationProfilePreferences(
                 )
             val others = current.profiles.map { if (it.id == saved.id) saved else it }
             val profiles = if (isNew) current.profiles + saved else others
-            // A pause only ends when this save changes a schedule, so the edited schedule shows at once
-            // while name or allowed-chat edits keep the window the user paused quiet.
-            val scheduleChanged = current.profiles.firstOrNull { it.id == saved.id }?.schedule != saved.schedule
-            val endsPause = scheduleChanged && current.manual is NotificationProfileManual.Paused
+            val previous = current.profiles.firstOrNull { it.id == saved.id }?.schedule
+            val endsPause =
+                current.manual is NotificationProfileManual.Paused &&
+                    previous != saved.schedule &&
+                    listOfNotNull(previous, saved.schedule).any { scheduleWindowContaining(it, nowMs, zone) != null }
             current.copy(profiles = profiles, manual = if (endsPause) null else current.manual)
         }
 
