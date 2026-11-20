@@ -6,6 +6,7 @@ import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -154,20 +155,21 @@ class NotificationMarkReadWorker(
         internal fun notificationMarkReadRequest(
             action: NotificationAction,
             dismissCard: Boolean = true,
-        ) =
-            OneTimeWorkRequestBuilder<NotificationMarkReadWorker>()
-                .setInputData(
-                    Data
-                        .Builder()
-                        .putAll(NotificationActionWorkData.encode(action))
-                        .putBoolean(DISMISS_CARD_KEY, dismissCard)
-                        .build(),
-                )
+        ): OneTimeWorkRequest {
+            val input =
+                Data
+                    .Builder()
+                    .putAll(NotificationActionWorkData.encode(action))
+                    .putBoolean(DISMISS_CARD_KEY, dismissCard)
+                    .build()
+            return OneTimeWorkRequestBuilder<NotificationMarkReadWorker>()
+                .setInputData(input)
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
                     BACKOFF_DELAY_SECONDS,
                     TimeUnit.SECONDS,
                 ).build()
+        }
     }
 }
 

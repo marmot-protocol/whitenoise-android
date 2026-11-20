@@ -280,12 +280,12 @@ class NotificationReplyWorker(
         retryStore: NotificationActionRetryStore,
         retryKey: String,
         priorAcceptanceUnknown: Boolean = false,
-    ): Result =
-        when {
-            !containsLegacyPlaintext && retryStore.shouldDeferForLock(
-                retryKey,
-                NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS,
-            ) -> Result.retry()
+    ): Result {
+        val shouldDefer =
+            !containsLegacyPlaintext &&
+                retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)
+        return when {
+            shouldDefer -> Result.retry()
             priorAcceptanceUnknown -> {
                 retryStore.clear(retryKey)
                 surfaceReplyFailure(action, R.string.delivery_not_confirmed)
@@ -303,6 +303,7 @@ class NotificationReplyWorker(
                     notice = R.string.notification_action_unlock_required,
                 )
         }
+    }
 
     /** Records the reply as abandoned, then restores the card with [notice] so the user can try again. */
     private suspend fun finalizeReplyFailure(
