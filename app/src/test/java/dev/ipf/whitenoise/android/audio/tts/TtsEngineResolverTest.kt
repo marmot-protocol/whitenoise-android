@@ -690,6 +690,8 @@ class TtsEngineResolverTest {
     private class FakeTtsEngineCatalog(
         private val engines: List<TextToSpeech.EngineInfo>,
         private val defaultEngine: String? = null,
+        // The fake reports a verified connection so trust classification (RHVoice -> Local) can be exercised;
+        // the real Android catalog returns null (see the AndroidTtsEngineCatalog test), i.e. unverified.
         private val connectedEngineForRequest: (String?) -> String? = { requested ->
             if (requested == null) defaultEngine else null
         },

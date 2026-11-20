@@ -1065,9 +1065,14 @@ class WhiteNoiseAppState private constructor(
         val started =
             synchronized(ttsController) {
                 val previousGeneration = ttsController.state.value.messageProgressGeneration
+                val previousCallbackGeneration = ttsController.playbackCallbackGeneration()
                 val accepted =
                     !ttsEngineNeedsAcknowledgment() && ttsController.speak(entries, locale, startSentenceIndex)
-                if (accepted || ttsController.state.value.messageProgressGeneration != previousGeneration) {
+                // A pre-playback refusal (offline-language) tears down the queue without a new message generation.
+                if (accepted ||
+                    ttsController.state.value.messageProgressGeneration != previousGeneration ||
+                    ttsController.playbackCallbackGeneration() != previousCallbackGeneration
+                ) {
                     clearTtsPlaybackOwnership()
                 }
                 if (accepted) ttsSpeechAccountRef = activeAccountRef
@@ -1329,7 +1334,7 @@ class WhiteNoiseAppState private constructor(
     private var attachedTtsHandle: TtsEngineHandle? = null
 
     /** Publishes discovery state and atomically replaces the controller's engine adapter. */
-    private fun publishTtsResolution(resolution: TtsResolutionResult?) {
+    internal fun publishTtsResolution(resolution: TtsResolutionResult?) {
         ttsResolution = resolution
         val handle = resolution?.handle
         // A refresh that kept the same engine handle must not re-attach:

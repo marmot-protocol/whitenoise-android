@@ -245,10 +245,33 @@ class WhiteNoiseAppStateReaderSpeechTest {
             assertTrue(engine.spoken.isEmpty())
         }
 
+    /** An offline-language refusal tears the queue down, so the earlier session's ownership must go too. */
     @Test
-    fun installedOfflineVoiceDoesNotPromptForAnUnverifiedConnection() =
+    fun unsupportedLanguageRefusalReleasesPriorSpeechOwnership() {
+        val appState = testAppState()
+        val entries = listOf(TtsSpeakableEntry("s", "Sender", "Private speech."))
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        assertTrue(appState.speakAloud(entries, Locale.US))
+        assertTrue(appState.ownsCurrentAccountSpeech())
+
+        val delegate = FakeSessionEngine()
+        appState.ttsController.attachEngine(
+            object : TtsSpeechEngine by delegate {
+                override fun setLanguage(locale: Locale): Int = TextToSpeech.LANG_NOT_SUPPORTED
+            },
+        )
+        assertFalse(appState.speakAloud(entries, Locale.US))
+        assertFalse(appState.ownsCurrentAccountSpeech())
+        assertTrue(delegate.spoken.isEmpty())
+    }
+
+    /** An offline voice never substitutes for consent: Android cannot name the engine that answered. */
+    @Test
+    fun installedOfflineVoiceStillPromptsOnceForAnUnverifiedConnection() =
         runBlocking {
             val appState = testAppState()
+            val engine = FakeSessionEngine()
+            appState.ttsController.attachEngine(engine)
             val enginePackage = "test.external.reader"
             val voice = TtsVoiceKey(enginePackage, "offline", "en-US")
             val handle =
@@ -260,9 +283,40 @@ class WhiteNoiseAppStateReaderSpeechTest {
                 )
             val consent = TtsPlaybackTrustConsent(appState) { handle }
             try {
-                assertFalse(consent.needsAcknowledgment())
-                assertTrue(consent.confirm { true })
+                assertTrue(consent.needsAcknowledgment())
+                val pending = async(start = CoroutineStart.UNDISPATCHED) { consent.confirm { true } }
+                val request = requireNotNull(consent.pending)
+                assertTrue(engine.spoken.isEmpty())
+                assertTrue(appState.ttsController.state.value is TtsState.Idle)
+                request.respond(false)
+                assertFalse(pending.await())
                 assertNull(consent.pending)
+            } finally {
+                handle.release()
+            }
+        }
+
+    /** Per-connection approval belongs to one account session; a switch (even A-B-A) prompts again. */
+    @Test
+    fun unverifiedApprovalDoesNotSurviveAnAccountSwitch() =
+        runBlocking {
+            val appState = testAppState(twoAccounts = true)
+            val handle = TtsEngineHandle(TextToSpeech(context, {}), "test.external.reader", EngineTrust.Unknown)
+            val consent = TtsPlaybackTrustConsent(appState) { handle }
+            try {
+                val approved = async(start = CoroutineStart.UNDISPATCHED) { consent.confirm { true } }
+                requireNotNull(consent.pending).respond(true)
+                assertTrue(approved.await())
+                assertFalse(consent.needsAcknowledgment())
+
+                appState.setActiveAccount("account-b")
+                assertTrue(consent.needsAcknowledgment())
+                val prompted = async(start = CoroutineStart.UNDISPATCHED) { consent.confirm { true } }
+                requireNotNull(consent.pending).respond(false)
+                assertFalse(prompted.await())
+
+                appState.setActiveAccount("account-a")
+                assertTrue(consent.needsAcknowledgment())
             } finally {
                 handle.release()
             }
@@ -328,10 +382,6 @@ class WhiteNoiseAppStateReaderSpeechTest {
             val entries = listOf(TtsSpeakableEntry("s", "Sender", "Private speech."))
             val original = ConsentRecordingTts(context)
             val replacement = ConsentRecordingTts(context)
-            val publish =
-                WhiteNoiseAppState::class.java
-                    .getDeclaredMethod("publishTtsResolution", TtsResolutionResult::class.java)
-                    .apply { isAccessible = true }
 
             fun attach(
                 tts: TextToSpeech,
@@ -340,7 +390,9 @@ class WhiteNoiseAppStateReaderSpeechTest {
                 enginePackage: String = packageName,
             ) {
                 val handle = TtsEngineHandle(tts, enginePackage, trust, connectedPackageVerified = verified)
-                publish.invoke(appState, TtsResolutionResult(TextToSpeech.SUCCESS, emptyList(), enginePackage, handle))
+                appState.publishTtsResolution(
+                    TtsResolutionResult(TextToSpeech.SUCCESS, emptyList(), enginePackage, handle),
+                )
             }
 
             suspend fun startSpeech(): Boolean {
@@ -366,6 +418,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
                 attach(replacement)
                 assertTrue(original.stops > previousStops)
                 assertTrue(appState.ttsController.queuedMessagesSnapshot().isEmpty())
+                assertTrue(appState.ttsController.state.value is TtsState.Idle)
                 originalRequest.respond(true)
                 val pending = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
                 assertEquals(0, replacement.utterances)
@@ -378,7 +431,52 @@ class WhiteNoiseAppStateReaderSpeechTest {
                 attach(replacement, trust = EngineTrust.Local, verified = true, enginePackage = "test.local.reader")
                 assertTrue(appState.confirmTtsPlaybackTrust { true })
             } finally {
-                publish.invoke(appState, null)
+                appState.publishTtsResolution(null)
+                original.shutdown()
+                replacement.shutdown()
+            }
+        }
+
+    /**
+     * An admitted auto-read session cannot survive a swap to an unverified connection: the swap stops the queue and
+     * revokes ownership, so the continuation (whose host also requires consent) has nothing left to speak.
+     */
+    @Test
+    fun autoReadSessionDoesNotContinueOntoAnUnverifiedReplacement() =
+        runBlocking {
+            val appState = testAppState()
+            val original = ConsentRecordingTts(context)
+            val replacement = ConsentRecordingTts(context)
+            val entries = listOf(TtsSpeakableEntry("m1", "Sender", "Private speech."))
+
+            fun attach(
+                tts: TextToSpeech,
+                verified: Boolean,
+            ) {
+                val trust = if (verified) EngineTrust.Local else EngineTrust.Unknown
+                val handle = TtsEngineHandle(tts, "test.local.reader", trust, connectedPackageVerified = verified)
+                appState.publishTtsResolution(
+                    TtsResolutionResult(TextToSpeech.SUCCESS, emptyList(), "test.local.reader", handle),
+                )
+            }
+            try {
+                shadowOf(context.getSystemService(AudioManager::class.java))
+                    .setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+                attach(original, verified = true)
+                assertTrue(appState.speakAloudAutoRead("group-1", entries, Locale.US))
+                assertTrue(appState.ownsTtsAutoReadSession("group-1"))
+                assertTrue(original.utterances > 0)
+
+                attach(replacement, verified = false)
+                shadowOf(android.os.Looper.getMainLooper()).idle()
+
+                assertEquals(0, replacement.utterances)
+                assertNull(appState.ttsPlaybackTrust.pending)
+                assertFalse(appState.ownsTtsAutoReadSession("group-1"))
+                assertTrue(appState.ttsEngineNeedsAcknowledgment())
+                assertTrue(appState.ttsController.state.value is TtsState.Idle)
+            } finally {
+                appState.publishTtsResolution(null)
                 original.shutdown()
                 replacement.shutdown()
             }

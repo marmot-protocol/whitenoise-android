@@ -41,7 +41,7 @@ internal class AndroidTtsSpeechEngine(
                 )
             }
         onVoiceResolved(resolution)
-        // A handle that skipped the warning for an offline voice cannot fall back to unchecked speech.
+        // A handle that resolved an offline voice cannot fall back to a network voice, even after consent.
         val offlineVoiceRequired = requireOfflineVoice || voices.isNotEmpty()
         return if (offlineVoiceRequired && resolution.effectiveKey == null) TextToSpeech.LANG_NOT_SUPPORTED else status
     }

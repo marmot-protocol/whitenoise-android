@@ -30,6 +30,7 @@ internal class TtsPlaybackTrustConsent(
     private val attachedHandle: () -> TtsEngineHandle?,
 ) {
     private var approvedUnverifiedHandle: TtsEngineHandle? = null
+    private var approvedUnverifiedGeneration: Long? = null
 
     var pending by mutableStateOf<TtsPlaybackTrustRequest?>(null)
         private set
@@ -37,17 +38,18 @@ internal class TtsPlaybackTrustConsent(
     fun needsAcknowledgment(): Boolean = attachedHandle()?.let(::needsAcknowledgment) == true
 
     private fun needsAcknowledgment(handle: TtsEngineHandle): Boolean =
-        if (handle.voiceResolution.effectiveKey != null) {
-            false
-        } else if (handle.connectedPackageVerified) {
+        if (handle.connectedPackageVerified) {
             requiresTtsTrustWarning(handle.enginePackage, handle.trust, appState.ttsWarningPreferences)
         } else {
-            approvedUnverifiedHandle !== handle
+            // Approval covers one connection within one account session; any account switch revokes it.
+            approvedUnverifiedHandle !== handle ||
+                approvedUnverifiedGeneration?.let(appState.accountSwitchHandoff::isCurrent) != true
         }
 
     /** A replacement connection cannot inherit consent from an inferred package. */
     fun onHandleReplaced() {
         approvedUnverifiedHandle = null
+        approvedUnverifiedGeneration = null
         cancel()
     }
 
@@ -65,6 +67,7 @@ internal class TtsPlaybackTrustConsent(
         handle: TtsEngineHandle,
         isCurrent: () -> Boolean,
     ): Boolean {
+        val accountGeneration = appState.accountSwitchHandoff.capture()
         val accountIsCurrent = appState.captureTtsAccountOwner(appState.activeAccountRef)
         val playbackIsCurrent = appState.ttsController.speechStartProjectionGuard()
         val question =
@@ -85,6 +88,7 @@ internal class TtsPlaybackTrustConsent(
                     appState.acknowledgeTtsTrustWarning(handle.enginePackage)
                 } else {
                     approvedUnverifiedHandle = handle
+                    approvedUnverifiedGeneration = accountGeneration
                 }
                 true
             }

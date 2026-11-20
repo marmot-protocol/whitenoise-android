@@ -162,11 +162,33 @@ class TtsAutoReadWiringCoverageTest {
             assertTrue(capture >= 0 && capture < projected && projected < consent && consent < start)
             assertTrue("canCommit = canCommit" in effect)
         }
+        // A refused or discarded consent result must leave the effect before any start call.
+        val openGate = open.replace(Regex("\\s+"), " ")
+        assertTrue(
+            "open-time start must sit inside the consent condition",
+            "if (entries.isNotEmpty() && appState.confirmTtsPlaybackTrust(canCommit)) { appState.speakAloudAutoRead(" in
+                openGate,
+        )
+        assertTrue(
+            "resume start must follow an early return on refused consent",
+            "if (!appState.confirmTtsPlaybackTrust(canCommit)) return@LaunchedEffect appState.speakAloudAutoRead(" in
+                resume.replace(Regex("\\s+"), " "),
+        )
         val message = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
         val reader = source("ui/conversation/media/TextAttachmentSpeech.kt")
         val messageConsent = message.indexOf("confirmTtsPlaybackTrust(canCommit)")
         assertTrue(messageConsent in 0 until message.indexOf("speakAloudAutoRead("))
         assertTrue(reader.indexOf("confirmTtsPlaybackTrust(") in 0 until reader.indexOf("speakAloudPrepared("))
+        // Long-press only captures its start; speech begins in startSpeakAloud(press = ...), which confirms first.
+        val longPress = source("ui/conversation/messages/TtsLongPressStart.kt")
+        assertFalse("long-press capture must not start speech itself", "speakAloud" in longPress)
+        assertTrue(
+            "long-press must start through the consent-gated startSpeakAloud",
+            "startSpeakAloud(pressState.longPressTtsStart?.renderedHit, press = pressState.longPressTtsStart)" in
+                source("ui/conversation/messages/MessageBubble.kt"),
+        )
+        // Resume (TtsController.resume) cannot reach a new connection: handle replacement stops the queue, so a
+        // Paused session never survives onto an unapproved engine. Nothing to gate there.
         assertTrue("!appState.ttsEngineNeedsAcknowledgment()" in source("state/TtsAutoReadContinuation.kt"))
         val appState = source("state/AppState.kt")
         val replaceEngine = appState.functionBody("publishTtsResolution")
