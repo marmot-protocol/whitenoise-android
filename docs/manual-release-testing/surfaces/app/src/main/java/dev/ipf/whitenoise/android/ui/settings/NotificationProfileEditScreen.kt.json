@@ -1,0 +1,149 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AllowedChatsPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "fun AllowedChatsPicker(",
+        "test_ids": [
+          "NTF-050",
+          "NTF-053"
+        ]
+      },
+      {
+        "surface": "NotificationProfileDeleteDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "fun NotificationProfileDeleteDialog(",
+        "test_ids": [
+          "NTF-053"
+        ]
+      },
+      {
+        "surface": "NotificationProfileDiscardDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "fun NotificationProfileDiscardDialog(",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "NotificationProfileEditScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "fun NotificationProfileEditScreen(",
+        "test_ids": [
+          "NTF-049",
+          "NTF-050"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.delete",
+        "test_ids": [
+          "NTF-053"
+        ]
+      },
+      {
+        "surface": "string:folder_discard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.folder_discard",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:folder_discard_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.folder_discard_title",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:folder_keep_editing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.folder_keep_editing",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_allowed_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_allowed_chats",
+        "test_ids": [
+          "NTF-050"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_allowed_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_allowed_hint",
+        "test_ids": [
+          "NTF-050"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_delete_confirm_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_delete_confirm_body",
+        "test_ids": [
+          "NTF-053"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_delete_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_delete_confirm_title",
+        "test_ids": [
+          "NTF-053"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_discard_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_discard_detail",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_save_failed",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_end",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_schedule_end",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_start",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_schedule_start",
+        "test_ids": [
+          "NTF-049"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

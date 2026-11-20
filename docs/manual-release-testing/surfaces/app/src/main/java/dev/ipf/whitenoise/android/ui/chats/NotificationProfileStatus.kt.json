@@ -1,0 +1,69 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NotificationProfileBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
+        "anchor": "fun NotificationProfileBanner(",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "NotificationProfileChatListNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
+        "anchor": "fun NotificationProfileChatListNotice(",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "NotificationProfileQuickAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
+        "anchor": "fun NotificationProfileQuickAction(",
+        "test_ids": [
+          "NTF-051"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:explanation_chats_notification_profiles",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
+        "anchor": "R.string.explanation_chats_notification_profiles",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
+        "anchor": "R.string.notification_profile_banner_detail",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_quick_open_active",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
+        "anchor": "R.string.notification_profile_quick_open_active",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profiles_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
+        "anchor": "R.string.notification_profiles_title",
+        "test_ids": [
+          "NTF-051"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

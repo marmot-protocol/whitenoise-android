@@ -1,0 +1,117 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ActiveProfileSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "fun ActiveProfileSummary(",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "ColumnScope.NotificationProfileQuickSheetContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "fun ColumnScope.NotificationProfileQuickSheetContent(",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "DurationChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "fun DurationChoices(",
+        "test_ids": [
+          "NTF-051",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "NotificationProfileQuickSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "fun NotificationProfileQuickSheet(",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "ProfileChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "fun ProfileChoices(",
+        "test_ids": [
+          "NTF-051"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:notification_profile_banner_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "R.string.notification_profile_banner_detail",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_change_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "R.string.notification_profile_change_failed",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_for_one_hour",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "R.string.notification_profile_for_one_hour",
+        "test_ids": [
+          "NTF-051",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_turn_off_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "R.string.notification_profile_turn_off_named",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_turn_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "R.string.notification_profile_turn_on",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_until_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "R.string.notification_profile_until_off",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_until_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "R.string.notification_profile_until_time",
+        "test_ids": [
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profiles_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+        "anchor": "R.string.notification_profiles_title",
+        "test_ids": [
+          "NTF-051"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
