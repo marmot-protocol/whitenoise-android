@@ -99,12 +99,21 @@ class NostrEventCardRendererTest {
             ).toCardModel()
         assertEquals("Fix parser", pullRequest.title)
         assertEquals("# Full description", pullRequest.readerBody)
-        assertEquals(listOf("30617:$id:parser", "fix-parser"), pullRequest.metadata)
+        assertEquals(listOf("parser", "branch fix-parser"), pullRequest.metadata)
         assertEquals(listOf("https://example.org/parser.git", "nostr://bob@example.org/parser"), pullRequest.gitLinks)
 
         val patch = event(id, kind = 1617, content = "diff --git a/file b/file\n-# old\n+# new").toCardModel()
         assertEquals("diff --git a/file b/file\n-# old\n+# new", patch.readerBody)
         assertEquals(true, patch.literalReaderBody)
+        val formatted =
+            event(
+                id,
+                kind = 1617,
+                content =
+                    "From 1234 Mon Sep 17 00:00:00 2001\nSubject: [PATCH 1/2] Fix parser\n crash\n\nExplain it.\n---\n diff",
+            ).toCardModel()
+        assertEquals("Fix parser crash", formatted.title)
+        assertEquals("Explain it.\n---\n diff", formatted.summary)
         assertEquals(NostrEventCardKind.Generic, event(id, kind = 1111).toCardModel().kind)
         val malformed = event(id, kind = 1111, tags = listOf(listOf("K", "1618"), listOf("E", "wrong"))).toCardModel()
         assertEquals(NostrEventCardKind.Generic, malformed.kind)

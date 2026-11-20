@@ -41,7 +41,7 @@ private fun gitKindLabel(kind: Int): Int? =
 
 internal fun NostrEvent.gitCardMetadata(): List<String> =
     buildList {
-        firstSafeTag("a")?.let(::add)
+        firstSafeTag("a")?.let { add(gitRepositoryName(it)) }
         when (kind) {
             KIND_GIT_REFS -> {
                 firstSafeTag("HEAD")?.let(::add)
@@ -51,12 +51,12 @@ internal fun NostrEvent.gitCardMetadata(): List<String> =
                     .take(MAX_GIT_REFS)
                     .forEach { add("${it[0].safeField()} · ${it[1].safeField()}") }
             }
-            KIND_GIT_PATCH -> firstSafeTag("commit")?.let(::add)
+            KIND_GIT_PATCH -> firstSafeTag("commit")?.let { add("commit $it") }
             KIND_GIT_PULL_REQUEST, KIND_GIT_PULL_REQUEST_UPDATE ->
                 listOfNotNull(
-                    firstSafeTag("branch-name"),
-                    firstSafeTag("c"),
-                    firstSafeTag("merge-base"),
+                    firstSafeTag("branch-name")?.let { "branch $it" },
+                    firstSafeTag("c")?.let { "commit $it" },
+                    firstSafeTag("merge-base")?.let { "merge-base $it" },
                     firstSafeTag(if (kind == KIND_GIT_PULL_REQUEST_UPDATE) "E" else "e"),
                 ).let(::addAll)
             in KIND_GIT_OPEN..KIND_GIT_DRAFT ->
@@ -73,7 +73,13 @@ internal fun NostrEvent.gitCardMetadata(): List<String> =
         }
     }
 
-/** Copy exact advertised URLs on demand. Rendering never opens them or starts a Git operation. */
+/** The repository identifier of a `30617:<pubkey>:<d>` coordinate, or the value itself when it has another shape. */
+private fun gitRepositoryName(coordinate: String): String {
+    val parts = coordinate.split(':', limit = 3)
+    return if (parts.size == 3 && parts[2].isNotBlank()) parts[2] else coordinate
+}
+
+/** Exact advertised URLs for the reader's Copy and confirmed Open actions. Rendering never opens them or starts a Git operation. */
 internal fun NostrEvent.gitCardLinks(): List<String> {
     val allowedTags =
         when (kind) {

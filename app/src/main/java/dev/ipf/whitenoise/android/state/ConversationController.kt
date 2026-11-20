@@ -1162,9 +1162,7 @@ class ConversationController(
      */
     fun deleteCapabilityFor(
         message: AppMessageRecordFfi,
-        alreadyDeleted: Boolean =
-            message.messageIdHex in deletedMessageIds ||
-                retainedTimelineItem(message.messageIdHex)?.projected?.deleted == true,
+        alreadyDeleted: Boolean = isMessageDeleted(message.messageIdHex),
         optimisticKeyOverride: String? = null,
     ): MessageDeleteCapability {
         val optimisticKey = optimisticKeyOverride ?: optimisticSendKey(message)

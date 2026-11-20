@@ -55,7 +55,6 @@ internal data class BatchMessageSelection(
     val record: AppMessageRecordFfi,
     val status: MessageStatus,
     val timelineOrder: ULong,
-    val beforeDeletion: BatchMessageActionItem? = null,
     val confirmedDeleted: Boolean = false,
 )
 
@@ -207,33 +206,14 @@ internal fun reconcileBatchSelections(
         selected.forEach { (messageId, snapshot) ->
             when {
                 messageId in pendingTimelineRemovedMessageIds || messageId in invalidVisibleMessageIds -> Unit
-                selectableVisible[messageId]?.action?.deleted == true ->
-                    put(
-                        messageId,
-                        selectableVisible.getValue(messageId).let { visible ->
-                            visible.copy(
-                                beforeDeletion =
-                                    (snapshot.liveAction ?: visible.beforeDeletion)
-                                        .takeUnless { visible.confirmedDeleted },
-                            )
-                        },
-                    )
                 messageId in selectableVisible -> put(messageId, selectableVisible.getValue(messageId))
-                messageId in deletedMessageIds -> put(messageId, snapshot.asPlaceholder(snapshot.liveAction))
-                snapshot.beforeDeletion != null ->
-                    put(
-                        messageId,
-                        snapshot.copy(action = snapshot.beforeDeletion, beforeDeletion = null),
-                    )
+                messageId in deletedMessageIds -> put(messageId, snapshot.asPlaceholder())
                 else -> put(messageId, snapshot)
             }
         }
     }
 
-private val BatchMessageSelection.liveAction: BatchMessageActionItem?
-    get() = beforeDeletion ?: action.takeUnless(BatchMessageActionItem::deleted)
-
-internal fun BatchMessageSelection.asPlaceholder(previous: BatchMessageActionItem? = null): BatchMessageSelection =
+internal fun BatchMessageSelection.asPlaceholder(): BatchMessageSelection =
     copy(
         action =
             action.copy(
@@ -245,7 +225,6 @@ internal fun BatchMessageSelection.asPlaceholder(previous: BatchMessageActionIte
                 forwardBlockedReason = ForwardBlockedReason.Unsupported,
                 deleted = true,
             ),
-        beforeDeletion = previous,
     )
 
 internal fun orderedBatchSelections(selections: Collection<BatchMessageSelection>): List<BatchMessageSelection> =

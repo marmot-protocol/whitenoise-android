@@ -6,7 +6,8 @@ import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 internal fun NostrEvent.toCardModel(): NostrEventCardModel {
     val cardKind = cardKind()
     val videoMetadata = videoMetadata()
-    val tagTitle = if (cardKind == NostrEventCardKind.Git) firstSafeTag("subject") else null
+    val tagTitle =
+        if (cardKind == NostrEventCardKind.Git) firstSafeTag("subject") ?: patchSubject() else null
     val title = tagTitle ?: firstSafeTag("title") ?: firstSafeTag("name")
     val tagSummary = firstSafeExcerptTag("summary") ?: firstSafeExcerptTag("description")
     return NostrEventCardModel(
@@ -16,7 +17,7 @@ internal fun NostrEvent.toCardModel(): NostrEventCardModel {
         createdAt = createdAt,
         eventKind = kind,
         title = cardTitle(cardKind, title)?.safeField(),
-        summary = cardSummary(cardKind, tagSummary).safeExcerpt(),
+        summary = cardSummary(cardKind, tagSummary, patchMessageBody()).safeExcerpt(),
         metadata = cardMetadata(cardKind, videoMetadata).map(String::safeField),
         readerBody = fullReaderBody(cardKind),
         gitLinks = if (cardKind == NostrEventCardKind.Git) gitCardLinks() else emptyList(),
@@ -77,12 +78,32 @@ private fun NostrEvent.cardTitle(
 private fun NostrEvent.cardSummary(
     cardKind: NostrEventCardKind,
     tagSummary: String?,
+    patchBody: String?,
 ): String =
     if (cardKind == NostrEventCardKind.Release) {
         firstSafeExcerptTag("changelog") ?: tagSummary ?: content.safeExcerpt()
     } else {
-        tagSummary ?: content.safeExcerpt()
+        tagSummary ?: patchBody?.safeExcerpt() ?: content.safeExcerpt()
     }
+
+private val patchSubjectPrefix = Regex("^(\\[[^\\]]*]\\s*)+")
+
+/** The format-patch `Subject:` header of a kind 1617 patch, without its `[PATCH n/m]` tag. */
+private fun NostrEvent.patchSubject(): String? {
+    if (kind != KIND_GIT_PATCH) return null
+    val header = content.lineSequence().takeWhile(String::isNotBlank).toList()
+    val start = header.indexOfFirst { it.startsWith("Subject:", ignoreCase = true) }
+    if (start < 0) return null
+    val folded = header.drop(start + 1).takeWhile { it.firstOrNull()?.isWhitespace() == true }
+    val subject = (listOf(header[start].substringAfter(':')) + folded).joinToString(" ") { it.trim() }
+    return subject.replace(patchSubjectPrefix, "").safeField().takeIf(String::isNotBlank)
+}
+
+/** A format-patch message without its mail headers, so the preview starts at the commit message. */
+private fun NostrEvent.patchMessageBody(): String? {
+    if (kind != KIND_GIT_PATCH || patchSubject() == null) return null
+    return content.substringAfter("\n\n", "").takeIf(String::isNotBlank)
+}
 
 /** Kind-specific details shown under a card, never a second date beside the one in its header. */
 private fun NostrEvent.cardMetadata(

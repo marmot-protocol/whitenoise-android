@@ -4050,17 +4050,10 @@ internal fun ConversationScreen(
                 val retryState =
                     priorRetryState?.afterRetry(result)
                         ?: BatchDeleteRetryState.from(result)
-                result.outcomes.filter { it.succeeded }.forEach { outcome ->
-                    val selection = outcome.attempt.selection
-                    val messageId = selection.action.messageId
-                    when (outcome.attempt.operation) {
-                        BatchDeleteOperationKind.HideLocally -> selectedMessages.remove(messageId)
-                        BatchDeleteOperationKind.DeleteForEveryone -> {
-                            if (messageId in selectedMessages) {
-                                selectedMessages[messageId] = selection.asPlaceholder(selection.action)
-                            }
-                        }
-                    }
+                selectedMessages.clear()
+                retryState.failedAttempts.forEach { attempt ->
+                    val selection = attempt.selection
+                    selectedMessages[selection.action.messageId] = selection
                 }
                 if (retryState.failures.isEmpty()) {
                     batchDeleteRetryState = null

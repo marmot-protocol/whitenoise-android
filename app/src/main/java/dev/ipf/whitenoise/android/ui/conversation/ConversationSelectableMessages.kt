@@ -70,7 +70,7 @@ private fun selectableMessageProjection(
         ).asPlaceholder()
     } else {
         val live = liveSelectableMessage(item, controller, eligibilityNowSeconds)
-        if (deleted) live.asPlaceholder(live.action) else live
+        if (deleted) live.asPlaceholder() else live
     }
 }
 

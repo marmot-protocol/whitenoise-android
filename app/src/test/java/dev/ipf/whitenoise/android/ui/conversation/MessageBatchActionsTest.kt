@@ -260,7 +260,7 @@ class MessageBatchActionsTest {
     }
 
     @Test
-    fun reconciliationKeepsAnOffscreenPlaceholderAndRestoresItsLiveActionsOnRollback() {
+    fun reconciliationKeepsAnOffscreenPlaceholderAfterItsOverlayIdIsPruned() {
         val invalidVisible = selection("invalid-visible", recordedAt = 100uL, timelineOrder = 1uL)
         val deletedOffscreen = selection("deleted-offscreen", recordedAt = 200uL, timelineOrder = 2uL)
 
@@ -281,18 +281,21 @@ class MessageBatchActionsTest {
         assertTrue(placeholder.action.deleted)
         assertFalse(placeholder.action.canDeleteForEveryone)
         assertEquals(null, placeholder.action.copyableText)
-        val restored = reconcileBatchSelections(retained, emptyMap(), emptySet(), emptySet())
-        assertEquals(deletedOffscreen, restored.getValue(deletedOffscreen.action.messageId))
+        // The overlay set is pruned to the loaded window, so leaving it is not a rollback signal.
+        val afterPrune = reconcileBatchSelections(retained, emptyMap(), emptySet(), emptySet())
+        assertEquals(retained, afterPrune)
     }
 
     @Test
-    fun rollbackRestoresActionsWhenTheMessageWasFirstSelectedAsAPlaceholder() {
+    fun offscreenPlaceholderNeverRegainsLiveActionsWhenItsOverlayIdIsPruned() {
         val live = selection("live", recordedAt = 100uL, timelineOrder = 1uL, canDeleteForEveryone = true)
-        val placeholder = live.asPlaceholder(live.action)
-        val offscreen = reconcileBatchSelections(mapOf("live" to placeholder), emptyMap(), setOf("live"), emptySet())
-        assertEquals(placeholder, offscreen.getValue("live"))
-        val restored = reconcileBatchSelections(offscreen, emptyMap(), emptySet(), emptySet())
-        assertEquals(live, restored.getValue("live"))
+        val offscreen = reconcileBatchSelections(mapOf("live" to live), emptyMap(), setOf("live"), emptySet())
+        val placeholder = offscreen.getValue("live")
+        assertTrue(placeholder.action.deleted)
+        assertFalse(placeholder.action.canDeleteForEveryone)
+        assertEquals(null, placeholder.action.copyableText)
+        val afterPrune = reconcileBatchSelections(offscreen, emptyMap(), emptySet(), emptySet())
+        assertEquals(placeholder, afterPrune.getValue("live"))
     }
 
     @Test
