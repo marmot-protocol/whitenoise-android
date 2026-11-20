@@ -41,7 +41,12 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.NostrEventReference
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
+import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
+import dev.ipf.whitenoise.android.ui.conversation.messages.BubbleFooterLayout
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleFooterColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -180,16 +185,35 @@ class NostrEventPreviewTransitionScreenshotTest {
             shape = MaterialTheme.shapes.large,
             modifier = Modifier.fillMaxWidth().testTag(tag),
         ) {
-            NostrEventCards(
-                references = references,
-                resolver = session.resolver,
-                authorDisplayName = { "Contact" },
-                mentionDisplayName = { null },
-                onNostrProfileTap = {},
-                parseMarkdown = session::parseAfterFirstFrame,
-                contentColor = content,
+            BubbleFooterLayout(
                 modifier = Modifier.padding(8.dp),
-            )
+                footer = {
+                    MessageInlineFooter(
+                        timeText = rememberedMessageBubbleTime(1_765_000_000uL),
+                        color =
+                            messageBubbleFooterColor(
+                                mine = false,
+                                persistedFailure = false,
+                                bubbleBackgroundColor = colorFromArgb(presentation.backgroundArgb),
+                                bubbleContentColor = content,
+                            ),
+                        showStatus = false,
+                        status = MessageStatus.Received,
+                        editedLabel = null,
+                        onEditedClick = null,
+                    )
+                },
+            ) {
+                NostrEventCards(
+                    references = references,
+                    resolver = session.resolver,
+                    authorDisplayName = { "Contact" },
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                    parseMarkdown = session::parseAfterFirstFrame,
+                    contentColor = content,
+                )
+            }
         }
     }
 
@@ -198,7 +222,16 @@ class NostrEventPreviewTransitionScreenshotTest {
         const val MESSAGE_TAG = "message-"
         const val NEXT_ROW_TAG = "next-row"
         const val CACHED_AUTHOR = "Cached author"
-        val CARD_KINDS = NostrEventCardKind.entries
+        val CARD_KINDS =
+            listOf(
+                NostrEventCardKind.Note,
+                NostrEventCardKind.Article,
+                NostrEventCardKind.Release,
+                NostrEventCardKind.Video,
+                NostrEventCardKind.File,
+                NostrEventCardKind.Git,
+                NostrEventCardKind.Generic,
+            )
     }
 
     /** One configuration's resolver, seeded snapshots and gated refreshes. */
@@ -314,15 +347,30 @@ private fun card(kind: NostrEventCardKind): NostrEventCardModel =
                 NostrEventCardKind.Git -> 1618
                 NostrEventCardKind.Generic -> 9_001
             },
-        title = "A ${kind.name.lowercase()} title that wraps across the reading width".takeUnless { kind.isNote() },
-        summary = "A readable ${kind.name.lowercase()} summary with enough words to fill several preview lines.",
-        metadata = if (kind == NostrEventCardKind.Note) emptyList() else listOf("2.4 MB", "1920x1080"),
+        title =
+            when (kind) {
+                NostrEventCardKind.Note -> null
+                NostrEventCardKind.Git -> "Fix event parsing in the reader"
+                else -> "A ${kind.name.lowercase()} title that wraps across the reading width"
+            },
+        summary =
+            if (kind == NostrEventCardKind.Git) {
+                "Preserve spacing when rendering multiline patch descriptions."
+            } else {
+                "A readable ${kind.name.lowercase()} summary with enough words to fill several preview lines."
+            },
+        metadata =
+            when (kind) {
+                NostrEventCardKind.Note -> emptyList()
+                NostrEventCardKind.Git -> listOf("30617:${"b".repeat(64)}:parser", "fix-event-parsing")
+                NostrEventCardKind.Video -> listOf("3:42", "1920x1080")
+                NostrEventCardKind.Release -> listOf("v0.17.0")
+                NostrEventCardKind.File -> listOf("application/pdf", "2.4 MB")
+                else -> emptyList()
+            },
         readerBody = "The complete ${kind.name.lowercase()} body.",
         mediaUrl = "https://cdn.example/video.mp4".takeIf { kind == NostrEventCardKind.Video },
     )
-
-/** True for the kind-1 note card, which carries no title. */
-private fun NostrEventCardKind.isNote(): Boolean = this == NostrEventCardKind.Note
 
 /** A one-paragraph Markdown document holding [text], standing in for MDK's parser. */
 private fun document(text: String): MarkdownDocumentFfi =

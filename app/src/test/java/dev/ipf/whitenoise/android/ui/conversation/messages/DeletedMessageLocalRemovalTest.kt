@@ -316,8 +316,13 @@ class DeletedMessageLocalRemovalTest {
             assertEquals(0, runtimeOpens.get())
         }
 
+    /** The placeholder's code body offers no Copy or Select text: the menu is exactly Select and Delete for me. */
     private fun openPlaceholderDeleteConfirmation() {
         composeRule.onNodeWithText(string(R.string.select), substring = false).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.delete_for_me), substring = false).assertIsDisplayed()
+        PLACEHOLDER_ABSENT_MENU_LABELS.forEach { label ->
+            composeRule.onNodeWithText(string(label), substring = false).assertDoesNotExist()
+        }
         composeRule.onNodeWithText(string(R.string.delete_for_me), substring = false).performClick()
     }
 
@@ -628,7 +633,7 @@ class DeletedMessageLocalRemovalTest {
     }
 
     private fun deletedRecord(deletionSource: DeletionSourceFfi = DeletionSourceFfi.UNKNOWN) =
-        messageRecord(body = LIVE_BODY, deleted = true, deletionSource = deletionSource)
+        messageRecord(body = CODE_BODY, deleted = true, deletionSource = deletionSource)
 
     /** Builds the received test message record with the given body, deletion state and reactions. */
     private fun messageRecord(
@@ -809,6 +814,7 @@ class DeletedMessageLocalRemovalTest {
         val GROUP_ID = "04" + "00".repeat(31)
         val MESSAGE_ID = "05" + "00".repeat(31)
         const val LIVE_BODY = "secret body retained in protocol storage"
+        const val CODE_BODY = "secret code retained in protocol storage\n\n```\nval secret = 1\n```"
         const val ASYNC_TIMEOUT_MILLIS = 20_000L
         const val SCREENSHOT_TAG = "message-bubble.admin-removal"
         const val SCREENSHOT_PATH = "src/test/snapshots/message_bubble_admin_removal_light.png"
