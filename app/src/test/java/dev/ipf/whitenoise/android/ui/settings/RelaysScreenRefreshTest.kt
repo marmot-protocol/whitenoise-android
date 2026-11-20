@@ -13,12 +13,14 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MissingRelayListKindFfi
+import dev.ipf.marmotkit.RelayEndpointClassificationFfi
+import dev.ipf.marmotkit.RelayEndpointPolicyFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.relayListRefreshRelays
+import dev.ipf.whitenoise.android.state.relayListRefreshBatches
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
@@ -43,7 +45,10 @@ class RelaysScreenRefreshTest {
     private val app = ApplicationProvider.getApplicationContext<Context>()
     private val fetches = mutableListOf<Pair<String, List<String>>>()
 
-    /** An Inbox list the cache never saw is found by Refresh, which then hides Publish missing lists. */
+    /**
+     * An Inbox list the cache never saw is found by Refresh, which then hides Publish missing lists. The fetch goes to
+     * the discovery relays and the cached NIP-65 relay MarmotKit allows, never the plaintext one it would refuse.
+     */
     @Test
     fun refreshFindsAnInboxListPublishedElsewhereAndHidesPublish() {
         show { relayLists(nip65 = listOf(POST), inbox = listOf(INBOX)) }
@@ -71,16 +76,51 @@ class RelaysScreenRefreshTest {
         awaitCondition { fetches.size == 2 }
     }
 
-    /** Refresh asks every discovery relay, then each cached NIP-65 relay once, even one the publish check refuses. */
+    /** More relays than MarmotKit takes in one fetch are asked in batches, and the last batch's status is shown. */
     @Test
-    fun refreshRelaysAreDiscoveryThenCachedNip65WithoutRepeats() {
-        val cached = listOf(POST, MarmotClient.discoveryRelays.first(), CUSTOM_PORT)
+    fun refreshAsksMoreThanSixteenRelaysInBatches() {
+        val cached = (1..10).map { "wss://write$it.example.com" }
+        show(cachedNip65 = cached) { relayLists(nip65 = cached, inbox = listOf(INBOX)) }
+        awaitTag(PUBLISH, present = true)
 
-        assertEquals(MarmotClient.discoveryRelays + POST + CUSTOM_PORT, relayListRefreshRelays(cached))
+        compose.onNodeWithTag(REFRESH).performClick()
+
+        awaitTag(PUBLISH, present = false)
+        val asked = MarmotClient.discoveryRelays + cached
+        assertEquals(listOf(asked.take(BATCH), asked.drop(BATCH)), fetches.map { it.second })
     }
 
-    /** Shows the Relays screen for an account whose cache lacks an Inbox list; [fetched] answers each refresh. */
-    private fun show(fetched: () -> AccountRelayListsFfi) {
+    /**
+     * A batch holds each relay MarmotKit allows once, in its spelling, even one the app's publish check refuses, and
+     * leaves out the ones MarmotKit would refuse.
+     */
+    @Test
+    fun refreshBatchesKeepAllowedRelaysOnceAndSplitAtSixteen() {
+        val allowed = (1..BATCH + 1).map { "wss://relay$it.example.com" }
+        val classified =
+            allowed.map { classification(it) } +
+                listOf(
+                    classification(" ${allowed.first()} ", normalized = allowed.first()),
+                    classification(CUSTOM_PORT),
+                    classification(LEGACY, policy = RelayEndpointPolicyFfi.UNSAFE),
+                    classification("wss://retired.example.com", policy = RelayEndpointPolicyFfi.RETIRED),
+                    classification("not a relay", normalized = null, policy = RelayEndpointPolicyFfi.INVALID),
+                )
+
+        assertEquals(
+            listOf(allowed.take(BATCH), allowed.drop(BATCH) + CUSTOM_PORT),
+            relayListRefreshBatches(classified),
+        )
+    }
+
+    /**
+     * Shows the Relays screen for an account whose cache holds [cachedNip65] and no Inbox list; [fetched] answers each
+     * refresh.
+     */
+    private fun show(
+        cachedNip65: List<String> = listOf(POST, LEGACY),
+        fetched: () -> AccountRelayListsFfi,
+    ) {
         val appState =
             WhiteNoiseAppState(
                 context = app,
@@ -88,21 +128,32 @@ class RelaysScreenRefreshTest {
                 accountIdHexResolver = { ACCOUNT_ID },
                 accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, ACCOUNT_ID, true, false, false, true, false)),
                 activeAccountRef = ACCOUNT_REF,
-                initialMarmotRuntime = AppMarmotRuntime("relays-refresh-test", native(fetched)),
+                initialMarmotRuntime = AppMarmotRuntime("relays-refresh-test", native(cachedNip65, fetched)),
                 marmotIoDispatcher = Dispatchers.Unconfined,
             )
         compose.setContent { WhiteNoiseTheme(darkTheme = false) { RelaysScreen(appState = appState, onBack = {}) } }
     }
 
-    /** A MarmotKit fake whose cache lacks an Inbox list and whose relay fetch is recorded and answered by [fetched]. */
-    private fun native(fetched: () -> AccountRelayListsFfi): MarmotInterface =
+    /**
+     * A MarmotKit fake whose cache holds [cachedNip65] and no Inbox list, which refuses plaintext relays, and whose
+     * relay fetches are recorded and answered by [fetched].
+     */
+    private fun native(
+        cachedNip65: List<String>,
+        fetched: () -> AccountRelayListsFfi,
+    ): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
             val args = arguments.orEmpty()
             when (method.name) {
-                "accountRelayLists" -> relayLists(listOf(POST), emptyList(), listOf(MissingRelayListKindFfi.INBOX))
+                "accountRelayLists" -> relayLists(cachedNip65, emptyList(), listOf(MissingRelayListKindFfi.INBOX))
+                "classifyRelayEndpoints" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val endpoints = args[0] as List<String>
+                    endpoints.map { classification(it, policy = policyOf(it)) }
+                }
                 "refreshUserRelayLists" -> {
                     @Suppress("UNCHECKED_CAST")
                     fetches += args[0] as String to args[1] as List<String>
@@ -128,12 +179,29 @@ class RelaysScreenRefreshTest {
             condition()
         }
 
+    /** MarmotKit's verdict on [endpoint], which it spells as [normalized]. */
+    private fun classification(
+        endpoint: String,
+        normalized: String? = endpoint,
+        policy: RelayEndpointPolicyFfi = RelayEndpointPolicyFfi.ALLOWED,
+    ) = RelayEndpointClassificationFfi(endpoint, normalized, policy)
+
     private companion object {
         const val ACCOUNT_REF = "relays-account"
         val ACCOUNT_ID = "a1".repeat(32)
         const val POST = "wss://post.example.com"
         const val INBOX = "wss://inbox.example.com"
         const val CUSTOM_PORT = "wss://relay.example.com:7777"
+        const val LEGACY = "ws://legacy.example.com"
+        const val BATCH = 16
+
+        /** The fake's verdict: plaintext relays are refused, everything else is allowed. */
+        fun policyOf(url: String) =
+            when {
+                url.startsWith("ws://") -> RelayEndpointPolicyFfi.UNSAFE
+                else -> RelayEndpointPolicyFfi.ALLOWED
+            }
+
         const val PUBLISH = "relay.publication.publish"
         const val REFRESH = "relay.publication.refresh"
         const val RETRY = "relay.publication.retry"
