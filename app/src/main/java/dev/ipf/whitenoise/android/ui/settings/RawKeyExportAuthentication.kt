@@ -46,13 +46,17 @@ private class RawKeyExportPrompt(
 
     override fun request(onAuthenticated: () -> Unit) {
         if (host != null) return
-        if (activity == null || activity.supportFragmentManager.isStateSaved || !isAppLockCredentialAvailable(activity)) {
+        val hostActivity = activity
+        if (hostActivity == null ||
+            hostActivity.supportFragmentManager.isStateSaved ||
+            !isAppLockCredentialAvailable(hostActivity)
+        ) {
             onUnavailable()
             return
         }
         val fragment = Fragment()
         runCatching {
-            activity.supportFragmentManager.beginTransaction().add(fragment, null).commitNow()
+            hostActivity.supportFragmentManager.beginTransaction().add(fragment, null).commitNow()
             host = fragment
             val callback =
                 object : BiometricPrompt.AuthenticationCallback() {
@@ -70,10 +74,10 @@ private class RawKeyExportPrompt(
             val challenge =
                 BiometricPrompt.PromptInfo
                     .Builder()
-                    .setTitle(activity.getString(R.string.raw_key_export_auth_title))
+                    .setTitle(hostActivity.getString(R.string.raw_key_export_auth_title))
                     .setAllowedAuthenticators(APP_LOCK_ALLOWED_AUTHENTICATORS)
                     .build()
-            BiometricPrompt(fragment, ContextCompat.getMainExecutor(activity), callback)
+            BiometricPrompt(fragment, ContextCompat.getMainExecutor(hostActivity), callback)
                 .also { prompt = it }
                 .authenticate(challenge)
         }.onFailure {
