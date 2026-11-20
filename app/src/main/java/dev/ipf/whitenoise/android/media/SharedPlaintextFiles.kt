@@ -156,23 +156,23 @@ private fun deleteSharedPlaintext(
                     emptyArray()
                 }
             }.onFailure { onFailure(name, it) }.getOrNull() ?: continue
-        entries
-            .filter { file ->
+        val matching =
+            entries.filter { file ->
                 // Legacy private shares have no prefix. Public profile cards also use the shared root.
                 file.name.startsWith(prefix) ||
                     (!file.name.startsWith(ACCOUNT_SHARE_PREFIX) && !file.name.startsWith("profile_card_"))
             }
-            .forEach { file ->
-                runCatching {
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                    context.revokeUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
-                }.onFailure { onFailure(name, it) }
-                runCatching {
-                    check(file.delete() || !file.exists()) { "could not delete shared plaintext" }
-                }.onFailure { onFailure(name, it) }
-            }
+        matching.forEach { file ->
+            runCatching {
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                context.revokeUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }.onFailure { onFailure(name, it) }
+            runCatching {
+                check(file.delete() || !file.exists()) { "could not delete shared plaintext" }
+            }.onFailure { onFailure(name, it) }
+        }
     }
 }
