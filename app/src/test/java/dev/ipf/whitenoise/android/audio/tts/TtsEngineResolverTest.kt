@@ -477,7 +477,10 @@ class TtsEngineResolverTest {
         runBlocking {
             val localDefault = "com.github.olga_yakovleva.rhvoice.android"
             val fallbackTrust =
-                mapOf("com.google.android.tts" to EngineTrust.Unknown, "app.grapheneos.speechservices" to EngineTrust.Local)
+                mapOf(
+                    "com.google.android.tts" to EngineTrust.Unknown,
+                    "app.grapheneos.speechservices" to EngineTrust.Local,
+                )
             for ((fallback, trust) in fallbackTrust) {
                 val factory = ControllableTtsFactory()
                 val resolver =
