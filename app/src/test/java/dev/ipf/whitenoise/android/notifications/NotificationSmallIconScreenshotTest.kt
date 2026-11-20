@@ -54,6 +54,20 @@ class NotificationSmallIconScreenshotTest {
         assertClearance(bounds)
     }
 
+    /**
+     * Keeps the logo outline heavy enough to stay sharp in the status bar. Summing alpha across a
+     * stroke gives its width in pixels, independent of where its edges fall on the pixel grid.
+     */
+    @Test
+    fun messageMarkOutlineIsHeavyEnoughForTheStatusBar() {
+        val mark = render(R.drawable.ic_stat_whitenoise, MEASURE_SIZE_PX, Color.WHITE)
+        val topStroke = (0 until OUTLINE_PROBE_SPAN_PX).sumOf { Color.alpha(mark.getPixel(OUTLINE_PROBE_PX, it)) } / 255f
+        val leftStroke = (0 until OUTLINE_PROBE_SPAN_PX).sumOf { Color.alpha(mark.getPixel(it, OUTLINE_PROBE_PX)) } / 255f
+        for ((edge, width) in listOf("Top" to topStroke, "Left" to leftStroke)) {
+            assertTrue("$edge outline is $width px, under $MIN_OUTLINE_PX px", width >= MIN_OUTLINE_PX)
+        }
+    }
+
     /** Keeps the dictation icon's logo and microphone inside the canvas. */
     @Test
     fun dictationIconKeepsClearance() {
@@ -159,6 +173,16 @@ class NotificationSmallIconScreenshotTest {
         /** 24dp at xxxhdpi, where one dp is four pixels. */
         const val MEASURE_SIZE_PX = 96
         const val MIN_CLEARANCE_PX = 4
+
+        /**
+         * The status bar draws the 24dp icon at 15 to 17dp. To stay sharp at 15dp and 2.625x density a
+         * stroke needs two pixels, which is 2 / (15 * 2.625) of the canvas: about 4.9 px at [MEASURE_SIZE_PX].
+         */
+        const val MIN_OUTLINE_PX = 4.9f
+
+        /** A row and column that cross the outline inside the logo's left part, away from corners. */
+        const val OUTLINE_PROBE_PX = 22
+        const val OUTLINE_PROBE_SPAN_PX = 22
 
         /** The microphone and its gap stay right of and below this fraction of the canvas. */
         const val MIC_CORNER_START = 0.45f
