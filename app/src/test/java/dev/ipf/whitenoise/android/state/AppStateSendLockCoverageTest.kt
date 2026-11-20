@@ -94,7 +94,8 @@ class AppStateSendLockCoverageTest {
             )
         mutations.forEach { (body, nativeCall) ->
             val gate = body.indexOf("appLock.notificationActionsAllowed")
-            assertTrue(body.indexOf("marmotIo(") in 0 until gate)
+            val ioBridge = Regex("""\bmarmotIo\s*[(\{]""").find(body)?.range?.first ?: -1
+            assertTrue(ioBridge in 0 until gate)
             assertTrue(gate in 0 until body.indexOf(nativeCall))
         }
     }

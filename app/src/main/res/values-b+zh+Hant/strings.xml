@@ -858,6 +858,7 @@
     <string name="toast_send_emoji_limit">此訊息的自訂表情太多，因此未送出。請移除一些後再試一次。</string>
     <string name="toast_chat_still_loading">此聊天仍在載入中，稍後再試。</string>
     <string name="toast_send_membership_verifying">正在確認群組成員身分 — 訊息尚未送出。文字已保留在輸入框中，請稍後再試。</string>
+    <string name="notification_action_unlock_required">請解鎖 White Noise 後再試一次。</string>
     <string name="toast_reaction_failed">反應失敗</string>
     <string name="toast_couldnt_delete_message">刪除訊息失敗。請再試一次。</string>
     <string name="toast_couldnt_edit_message">無法編輯訊息</string>

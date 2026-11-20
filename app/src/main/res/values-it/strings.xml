@@ -875,6 +875,7 @@
     <string name="toast_send_emoji_limit">Questo messaggio ha troppe emoji personalizzate, quindi non è stato inviato. Rimuovine alcune e riprova.</string>
     <string name="toast_chat_still_loading">Questa chat si sta ancora caricando. Riprova tra un attimo.</string>
     <string name="toast_send_membership_verifying">Verifica dell’appartenenza al gruppo — il messaggio non è stato inviato. È rimasto nella casella; riprova tra un istante.</string>
+    <string name="notification_action_unlock_required">Sblocca White Noise e riprova.</string>
     <string name="toast_reaction_failed">La reazione è fallita</string>
     <string name="toast_couldnt_delete_message">Eliminazione del messaggio fallita. Riprova.</string>
     <string name="toast_couldnt_edit_message">Impossibile modificare il messaggio</string>

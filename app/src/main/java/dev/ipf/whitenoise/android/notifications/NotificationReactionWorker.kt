@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -95,7 +96,7 @@ class NotificationReactionWorker(
         return when (val input = decodeReactionInput(inputData)) {
             is NotificationReactionInput.Ready -> processReaction(application, input, retryStore, retryKey)
             is NotificationReactionInput.CryptoFailure -> cryptoFailureResult(input.failure, retryStore, retryKey)
-            NotificationReactionInput.Malformed -> terminalReactionResult(retryStore, retryKey, surfaceFailure = false)
+            NotificationReactionInput.Malformed -> terminalReactionResult(retryStore, retryKey, failureMessage = null)
         }
     }
 
@@ -112,11 +113,12 @@ class NotificationReactionWorker(
         return when {
             !actionsAllowed -> lockedReactionResult(retryStore, retryKey)
             retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS ->
-                terminalReactionResult(retryStore, retryKey, surfaceFailure = true)
+                terminalReactionResult(retryStore, retryKey, failureMessage = R.string.toast_reaction_failed)
             else -> sendReaction(application, input, retryStore, retryKey)
         }
     }
 
+    /** Gives an unlock instruction when the retry budget expires without App Lock authorization. */
     private suspend fun lockedReactionResult(
         retryStore: NotificationActionRetryStore,
         retryKey: String,
@@ -124,7 +126,7 @@ class NotificationReactionWorker(
         if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
             Result.retry()
         } else {
-            terminalReactionResult(retryStore, retryKey, surfaceFailure = true)
+            terminalReactionResult(retryStore, retryKey, failureMessage = R.string.notification_action_unlock_required)
         }
 
     /** Sends once and completes MDK-accepted reactions without resending; failures follow the retry budget. */
@@ -179,7 +181,7 @@ class NotificationReactionWorker(
                     NotificationReactionSendOutcome.RetryableFailure ->
                         retryableReactionFailureResult(retryStore, retryKey)
                     NotificationReactionSendOutcome.NonRetryableFailure ->
-                        terminalReactionResult(retryStore, retryKey, surfaceFailure = true)
+                        terminalReactionResult(retryStore, retryKey, failureMessage = R.string.toast_reaction_failed)
                 }
         }
     }
@@ -231,7 +233,7 @@ class NotificationReactionWorker(
         return if (attempt != null && shouldRetryAfterFailure(attempt)) {
             Result.retry()
         } else {
-            terminalReactionResult(retryStore, retryKey, surfaceFailure = true)
+            terminalReactionResult(retryStore, retryKey, failureMessage = R.string.toast_reaction_failed)
         }
     }
 
@@ -245,23 +247,23 @@ class NotificationReactionWorker(
         return if (attempt != null && NotificationReplyWorker.shouldRetryAfterCryptoFailure(failure, attempt)) {
             Result.retry()
         } else {
-            terminalReactionResult(retryStore, retryKey, surfaceFailure = false)
+            terminalReactionResult(retryStore, retryKey, failureMessage = null)
         }
     }
 
     private suspend fun terminalReactionResult(
         retryStore: NotificationActionRetryStore,
         retryKey: String,
-        surfaceFailure: Boolean,
+        @StringRes failureMessage: Int?,
     ): Result {
         retryStore.clear(retryKey)
-        if (surfaceFailure) surfaceReactionFailure()
+        if (failureMessage != null) surfaceReactionFailure(failureMessage)
         return Result.failure()
     }
 
-    private suspend fun surfaceReactionFailure() {
+    private suspend fun surfaceReactionFailure(@StringRes message: Int) {
         withContext(NonCancellable + Dispatchers.Main.immediate) {
-            Toast.makeText(applicationContext, R.string.toast_reaction_failed, Toast.LENGTH_LONG).show()
+            Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
         }
     }
 

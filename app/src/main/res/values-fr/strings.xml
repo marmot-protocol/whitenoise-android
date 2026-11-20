@@ -875,6 +875,7 @@
     <string name="toast_send_emoji_limit">Ce message contient trop d\'emoji personnalisés, il n\'a donc pas été envoyé. Retirez-en quelques-uns et réessayez.</string>
     <string name="toast_chat_still_loading">Cette discussion est encore en cours de chargement. Réessayez dans un instant.</string>
     <string name="toast_send_membership_verifying">Vérification de votre appartenance au groupe — votre message n’a pas été envoyé. Il est conservé dans le champ ; réessayez dans un instant.</string>
+    <string name="notification_action_unlock_required">Déverrouillez White Noise et réessayez.</string>
     <string name="toast_reaction_failed">La réaction a échoué</string>
     <string name="toast_couldnt_delete_message">Échec de la suppression du message. Veuillez réessayer.</string>
     <string name="toast_couldnt_edit_message">Impossible de modifier le message</string>

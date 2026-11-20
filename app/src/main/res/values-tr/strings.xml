@@ -873,6 +873,7 @@
     <string name="toast_send_emoji_limit">Bu mesajda çok fazla özel emoji var, bu yüzden gönderilmedi. Bazılarını kaldırıp tekrar dene.</string>
     <string name="toast_chat_still_loading">Bu sohbet hâlâ yükleniyor. Birazdan yeniden deneyin.</string>
     <string name="toast_send_membership_verifying">Grup üyeliğin doğrulanıyor — mesajın gönderilmedi. Metin kutusunda saklandı; birazdan tekrar dene.</string>
+    <string name="notification_action_unlock_required">White Noise kilidini açıp tekrar deneyin.</string>
     <string name="toast_reaction_failed">Tepki başarısız oldu</string>
     <string name="toast_couldnt_delete_message">Mesaj silinemedi. Lütfen tekrar deneyin.</string>
     <string name="toast_couldnt_edit_message">Mesaj düzenlenemedi</string>
