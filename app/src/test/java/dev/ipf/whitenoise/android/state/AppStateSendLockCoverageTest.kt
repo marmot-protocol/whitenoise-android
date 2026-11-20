@@ -93,7 +93,7 @@ class AppStateSendLockCoverageTest {
                 appStateFunctionBody("markNotificationMessageReadIfAllowed", source) to "markTimelineMessageRead(",
             )
         mutations.forEach { (body, nativeCall) ->
-            val gate = body.indexOf("if (!appLock.notificationActionsAllowed)")
+            val gate = body.indexOf("appLock.notificationActionsAllowed")
             assertTrue(body.indexOf("marmotIo(") in 0 until gate)
             assertTrue(gate in 0 until body.indexOf(nativeCall))
         }

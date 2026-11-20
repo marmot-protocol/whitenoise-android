@@ -248,22 +248,26 @@ internal suspend fun WhiteNoiseAppState.markNotificationMessageReadIfAllowed(
     groupIdHex: String,
     messageIdHex: String,
 ): Boolean? {
-    val account = accountRef.takeIf { it.isNotBlank() } ?: return false
-    val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
-    val message = messageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
+    if (accountRef.isBlank() || groupIdHex.isBlank() || !ConversationController.HEX_MESSAGE_ID.matches(messageIdHex)) {
+        return false
+    }
     return runCatchingCancellable {
-        // markTimelineMessageRead advances the persisted cursor monotonically;
-        // an old notification tap must not move the read marker backwards.
+        // The native cursor advances monotonically; an old tap cannot move it backwards.
         val result =
             marmotIo {
-                if (!appLock.notificationActionsAllowed) return@marmotIo null
-                Result.success(markTimelineMessageRead(account, group, message))
-            } ?: return null
-        val row = result.getOrThrow()
-        if (!applyChatListRowFromMarkRead(account, row)) {
-            reconcileAccountUnreadAfterNotificationMarkRead(account, cursorAdvanced = row != null)
+                if (appLock.notificationActionsAllowed) {
+                    Result.success(markTimelineMessageRead(accountRef, groupIdHex, messageIdHex))
+                } else {
+                    null
+                }
+            }
+        result?.let { admitted ->
+            val row = admitted.getOrThrow()
+            if (!applyChatListRowFromMarkRead(accountRef, row)) {
+                reconcileAccountUnreadAfterNotificationMarkRead(accountRef, cursorAdvanced = row != null)
+            }
+            true
         }
-        true
     }.onFailure {
         if (BuildConfig.DEBUG) Log.w("DMAppState", "notification mark read failed", it)
     }.getOrDefault(false)
