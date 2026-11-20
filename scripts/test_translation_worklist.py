@@ -44,6 +44,15 @@ class TranslationWorklistTest(unittest.TestCase):
         self.write("preview/values-fr/account.xml", '<string name="hint">Maintenir pour obtenir de l’aide</string>')
         self.assertTrue(any("already exists in the main resources" in error for error in self.scan()[3]))
 
+    def test_preview_cannot_override_a_shipped_locale_with_a_bcp47_qualifier(self):
+        self.write("main/values-fr/account.xml", '<string name="sign_in">Connexion : %1$s</string>')
+        self.write("main/values-fr/help.xml", '<string name="hint">Maintenir</string>')
+        self.write("preview/values-b+fr/account.xml", '<string name="hint">Maintenir pour obtenir de l’aide</string>')
+        self.write("preview/values-b+fr+CA/account.xml", '<string name="hint">Maintenir</string>')
+        errors = self.scan()[3]
+        self.assertEqual(1, sum("already exists in the main resources" in error for error in errors), errors)
+        self.assertTrue(any("values-b+fr:" in error for error in errors), errors)
+
     def test_target_plural_categories_can_differ_but_need_other(self):
         self.write(
             "main/values/counts.xml",

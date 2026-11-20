@@ -225,11 +225,18 @@ def source_changes(base, paths, source):
     }
 
 
+def locale_identity(tag):
+    """Return one identity for equivalent qualifiers, such as fr-rCA and b+fr+CA."""
+    parts = tag.removeprefix("b+").split("+") if tag.startswith("b+") else tag.replace("-r", "+", 1).split("+")
+    return tuple(part.lower() for part in parts)
+
+
 def scan(main, preview, rules, previously_shipped=()):
     source = entries((main / "values").glob("*.xml"))
     required = priorities(source, rules)
     broken = {name: plural_problem(entry.node) for name, entry in source.items() if plural_problem(entry.node)}
     catalogs = {}
+    seen = set()
     present = shipped_locales(str(file) for file in main.glob("values-*/*.xml"))
     errors = [f"{source[name].file}: {name}: {problem}" for name, problem in broken.items()]
     errors += [
@@ -242,9 +249,10 @@ def scan(main, preview, rules, previously_shipped=()):
                 continue
             tag = directory.name.removeprefix("values-")
             localized = entries(directory.glob("*.xml"))
-            if tag in catalogs:
+            if locale_identity(tag) in seen:
                 errors.append(f"{directory}: locale already exists in the main resources")
                 continue
+            seen.add(locale_identity(tag))
             catalogs[tag] = localized
             for name, target in localized.items():
                 problem = (
