@@ -428,6 +428,16 @@
     <string name="media_attachment">媒體附件</string>
     <string name="generic_message">訊息</string>
     <string name="giphy_media_preview">來自 GIPHY 的 GIF</string>
+    <string name="giphy_search_title">搜尋 GIF</string>
+    <string name="giphy_search_hint">搜尋 GIPHY</string>
+    <string name="giphy_search_privacy">GIPHY 會收到您的搜尋內容、語言設定和 IP 位址。收件人的手機可能會自動從 GIPHY 載入 GIF，並分享其 IP 位址。</string>
+    <string name="giphy_search_powered_by_prefix">內容提供者</string>
+    <string name="giphy_search_powered_by">由 GIPHY 提供</string>
+    <string name="giphy_search_empty">找不到 GIF</string>
+    <string name="giphy_search_failed">無法在 GIPHY 中搜尋</string>
+    <string name="giphy_preview_loading">正在載入預覽</string>
+    <string name="giphy_preview_unavailable">無法預覽</string>
+    <string name="giphy_send_result">傳送 GIF：%1$s</string>
     <string name="waiting_for_stream">正在等待串流...</string>
     <string name="stream_failed_format">串流失敗：%1$s</string>
     <string name="copy_text">複製文字</string>

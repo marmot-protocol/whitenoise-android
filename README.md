@@ -288,6 +288,13 @@ Always eyeball the regenerated PNGs before committing — that review is the poi
 of the check. If `verifyRoborazziDevZapstoreDebug` or `verifyRoborazziDevPlayDebug` fails on a change you did *not* intend,
 that is a caught regression: fix the UI, don't re-record.
 
+## GIF search
+
+Set `GIPHY_API_KEY_WN_ANDROID` in `local.properties` or the build environment
+to enable Search GIFs in the composer. Use an Android client key from GIPHY.
+The production build reads the GitHub Actions secret of the same name. Builds
+without a key can still display GIFs shared in chat.
+
 ## Release Builds
 
 The complete Android release process, store metadata, required GitHub

@@ -443,6 +443,16 @@
     <string name="media_attachment">Allegato multimediale</string>
     <string name="generic_message">Messaggio</string>
     <string name="giphy_media_preview">GIF tramite GIPHY</string>
+    <string name="giphy_search_title">Cerca GIF</string>
+    <string name="giphy_search_hint">Cerca su GIPHY</string>
+    <string name="giphy_search_privacy">GIPHY riceve la tua ricerca, la lingua impostata e il tuo indirizzo IP. I telefoni dei destinatari possono caricare automaticamente le GIF da GIPHY, condividendo il loro indirizzo IP.</string>
+    <string name="giphy_search_powered_by_prefix">Fornito da</string>
+    <string name="giphy_search_powered_by">Fornito da GIPHY</string>
+    <string name="giphy_search_empty">Nessuna GIF trovata</string>
+    <string name="giphy_search_failed">Impossibile cercare su GIPHY</string>
+    <string name="giphy_preview_loading">Caricamento anteprima</string>
+    <string name="giphy_preview_unavailable">Anteprima non disponibile</string>
+    <string name="giphy_send_result">Invia GIF: %1$s</string>
     <string name="waiting_for_stream">In attesa dello stream...</string>
     <string name="stream_failed_format">Stream non riuscito: %1$s</string>
     <string name="copy_text">Copia testo</string>
