@@ -66,6 +66,7 @@ internal object PlatformInterruptedAttachmentProbe {
         val retryAt: ULong?,
         val hostPermissionRevision: Long,
         val permissionRefreshInFlight: Boolean,
+        val hostInputs: JSONObject,
     )
 
     /** Both observers belong to one probe lifetime and supply its success or failure evidence. */
@@ -140,6 +141,7 @@ internal object PlatformInterruptedAttachmentProbe {
         check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
         check(shell("getprop ro.kernel.qemu").trim() == "1")
         val (permissionRevision, permissionInFlight) = permissionCounters(state)
+        val hostDiagnostics = PlatformResumeHostDiagnostics(state, request.accountRef)
         val restoreApplication = PlatformBackgroundAttachmentProbe.bindGeneratedApplication(context, state)
         val manager = WorkManager.getInstance(context)
         val workName = attachmentDownloadWorkName(request)
@@ -175,6 +177,7 @@ internal object PlatformInterruptedAttachmentProbe {
                                     retryAt = it.retryAt,
                                     hostPermissionRevision = permissionRevision.get(),
                                     permissionRefreshInFlight = permissionInFlight.get() != 0L,
+                                    hostInputs = hostDiagnostics.snapshot(),
                                 )
                             }.collect(observations::recordNativeSnapshot)
                     }
@@ -417,6 +420,7 @@ internal object PlatformInterruptedAttachmentProbe {
                     .put("observed_elapsed_ms", snapshot.observedElapsedMillis)
                     .put("host_permission_revision", snapshot.hostPermissionRevision)
                     .put("permission_refresh_in_flight", snapshot.permissionRefreshInFlight)
+                    .put("host_inputs", snapshot.hostInputs)
                     .put("state", snapshot.phase.name)
                     .put("attempt", snapshot.attempt.toLong())
                     .put(
@@ -500,6 +504,7 @@ internal object PlatformInterruptedAttachmentProbe {
                     .groupingBy { it.optString("kind") }
                     .eachCount()
             }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         val sinceStop = if (stoppedAt == 0L) JSONObject.NULL else SystemClock.elapsedRealtime() - stoppedAt
         ControlledAttachmentProbe.report(
             JSONObject()
@@ -512,6 +517,7 @@ internal object PlatformInterruptedAttachmentProbe {
                 ).put("resume_phase_timings", observations.phaseDiagnostics())
                 .put("native_resume_states", nativeResumeDiagnostics(observations.nativeStates))
                 .put("native_initial_states", nativeResumeDiagnostics(observations.initialNativeStates))
+                .put("platform_network", platformResumeNetworkFailureSnapshot(context))
                 .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
                 .put("ms_since_stop", sinceStop),
         )

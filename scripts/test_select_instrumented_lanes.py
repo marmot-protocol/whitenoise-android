@@ -105,9 +105,10 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
                          {'attachment_fixture': True, 'attachment_fixture_scope': 'full', 'connected': False})
         self.assertEqual(select('pull_request', [process_stop], TRIGGERS), FULL)
 
-    def test_platform_resume_helpers_alone_run_their_fixture(self):
-        """A resume helper edit always receives its real fixture, including changes limited to setup."""
+    def test_resume_and_scheduler_helpers_alone_run_their_fixture(self):
+        """A shared fixture helper edit, setup alone included, must not skip its real emulator qualification."""
         for name in ['PlatformInterruptedAttachmentProbe.kt', 'PlatformResumeLedger.kt',
+                     'PlatformResumeHostDiagnostics.kt', 'BackgroundReceiptSchedulingDiagnostics.kt',
                      'PlatformResumePermissionSetup.kt']:
             with self.subTest(name=name):
                 path = MEDIA_TEST + name
