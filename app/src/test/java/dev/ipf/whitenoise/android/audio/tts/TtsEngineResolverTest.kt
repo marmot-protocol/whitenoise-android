@@ -757,6 +757,8 @@ class TtsEngineResolverTest {
         var shutdownCount = 0
             private set
 
+        override fun getVoices(): MutableSet<Voice> = mutableSetOf()
+
         override fun shutdown() {
             shutdownCount += 1
             super.shutdown()

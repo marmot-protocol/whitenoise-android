@@ -323,8 +323,8 @@ class TtsEngineResolver(
         if (tts.setAudioAttributes(speechAudioAttributes) != TextToSpeech.SUCCESS) return null
         val configuredLocales = appContext.resources.configuration.locales
         val locale = if (configuredLocales.isEmpty) Locale.getDefault() else configuredLocales[0]
-        val voices = tts.voices.orEmpty().toList()
-        return applyResolvedVoice(tts, enginePackage, locale, voices, requestedVoice)
+        val voices = tts.voices ?: return null
+        return applyResolvedVoice(enginePackage, locale, voices, requestedVoice, tts::setVoice) { tts.voice }
     }
 
     /** Normalizes framework engine metadata into a stable, label-sorted catalog. */
@@ -427,22 +427,23 @@ class TtsEngineResolver(
 
         /** Resolves, applies, and reports one deterministic installed offline voice. */
         internal fun applyResolvedVoice(
-            tts: TextToSpeech,
             enginePackage: String,
             locale: Locale,
             voices: Collection<Voice>,
             requestedKey: TtsVoiceKey?,
+            setVoice: (Voice) -> Int,
+            currentVoice: () -> Voice?,
         ): TtsVoiceResolution {
             val resolution = resolveVoiceSelection(enginePackage, locale, voices, requestedKey)
             val preferred = resolution.preferredVoice
             val appliedVoice =
-                preferred?.takeIf { tts.setVoice(it) == TextToSpeech.SUCCESS }
+                preferred?.takeIf { setVoice(it) == TextToSpeech.SUCCESS }
                     ?: offlineVoiceCandidates(locale, voices)
                         .asSequence()
                         .filterNot { it == preferred }
-                        .firstOrNull { tts.setVoice(it) == TextToSpeech.SUCCESS }
+                        .firstOrNull { setVoice(it) == TextToSpeech.SUCCESS }
             val effective =
-                (appliedVoice ?: tts.voice?.takeIf { it.isOfflineInstalledFor(locale) })
+                (appliedVoice ?: currentVoice()?.takeIf { it.isOfflineInstalledFor(locale) })
                     ?.toVoiceKey(enginePackage)
             return resolution.copy(effectiveKey = effective)
         }
@@ -452,10 +453,7 @@ class TtsEngineResolver(
 
         /** Enforces language, installation, and network invariants together. */
         private fun Voice.isOfflineInstalledFor(locale: Locale): Boolean =
-            name.isNotBlank() &&
-                this.locale.matchesLanguage(locale) &&
-                !isNetworkConnectionRequired &&
-                !features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
+            this.locale.matchesLanguage(locale) && isInstalledOffline()
 
         /** Matches equivalent ISO-639-1 and ISO-639-2 language codes without trusting malformed locale data. */
         private fun Locale.matchesLanguage(other: Locale): Boolean =
@@ -474,3 +472,8 @@ class TtsEngineResolver(
         const val TTS_INIT_TIMEOUT_MS = 30_000L
     }
 }
+
+/** Rejects network voices and voices Android is still downloading before any text is submitted. */
+internal fun Voice.isInstalledOffline(): Boolean =
+    name.isNotBlank() && !isNetworkConnectionRequired &&
+        !features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)

@@ -1326,16 +1326,14 @@ class WhiteNoiseAppState private constructor(
         ttsController.onSpeechRateChanged()
     }
 
-    private var attachedTtsHandle: TtsEngineHandle? = null
+    internal var attachedTtsHandle: TtsEngineHandle? = null
+        private set
 
     /** Publishes discovery state and atomically replaces the controller's engine adapter. */
     internal fun publishTtsResolution(resolution: TtsResolutionResult?) {
         ttsResolution = resolution
         val handle = resolution?.handle
-        // A refresh that kept the same engine handle must not re-attach:
-        // attachEngine treats every attach as a replacement and stops any
-        // in-flight speech. It must also preserve the utterance-locale voice
-        // resolution most recently published by the attached adapter.
+        // Reattaching the same healthy handle would stop speech and reset its current voice.
         if (handle === attachedTtsHandle) return
         ttsPlaybackTrust.onHandleReplaced()
         clearTtsPlaybackOwnership()
@@ -1349,6 +1347,7 @@ class WhiteNoiseAppState private constructor(
                     selectedVoice = { ttsVoicePreferences.selectedVoice(handle.enginePackage) },
                     onVoiceResolved = { voiceResolution -> ttsVoiceResolution = voiceResolution },
                     requireOfflineVoice = handle.voiceResolution.effectiveKey != null,
+                    onConnectionUncertain = { retireFailedTtsConnection(handle) },
                 ),
                 engineKey = handle.enginePackage,
             )

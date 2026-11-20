@@ -3,7 +3,9 @@ package dev.ipf.whitenoise.android.audio.tts
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Thin adapter that keeps Android framework calls out of the queue state machine. */
 internal class AndroidTtsSpeechEngine(
@@ -12,38 +14,67 @@ internal class AndroidTtsSpeechEngine(
     private val selectedVoice: () -> TtsVoiceKey? = { null },
     private val onVoiceResolved: (TtsVoiceResolution) -> Unit = {},
     private val requireOfflineVoice: Boolean = false,
+    private val onConnectionUncertain: () -> Unit = {},
 ) : TtsSpeechEngine {
-    override val effectiveLocale: Locale? get() = textToSpeech.voice?.locale
+    private val retired = AtomicBoolean()
+    private var enforceOfflineVoice = requireOfflineVoice
 
-    /** Applies the utterance locale and then enforces the saved offline voice policy. */
+    override var effectiveLocale: Locale? = null
+        private set
+
+    /** Applies voice policy without reusing a framework object which may have silently reconnected. */
+    @Suppress("ReturnCount")
     override fun setLanguage(locale: Locale): Int {
+        if (retired.get()) return TextToSpeech.LANG_NOT_SUPPORTED
         val status = textToSpeech.setLanguage(locale)
-        if (status < TextToSpeech.LANG_AVAILABLE || enginePackage.isEmpty()) return status
-        val voices = textToSpeech.voices.orEmpty().toList()
+        if (status < TextToSpeech.LANG_AVAILABLE) return retire(status)
+        effectiveLocale = locale
+        if (enginePackage.isEmpty()) return status
+        val voices = textToSpeech.voices ?: return retire(TextToSpeech.LANG_NOT_SUPPORTED)
+        val requested = selectedVoice()
+        enforceOfflineVoice = requireOfflineVoice || requested != null || voices.isNotEmpty()
         val resolution =
             if (voices.isEmpty()) {
-                // Some otherwise usable engines synthesize through their default
-                // language without exposing a Voice catalog. Clear any prior
-                // catalog-derived UI state while preserving the accepted status.
-                TtsEngineResolver.resolveVoiceSelection(
-                    enginePackage = enginePackage,
-                    locale = locale,
-                    voices = emptyList(),
-                    requestedKey = selectedVoice(),
-                )
+                TtsEngineResolver.resolveVoiceSelection(enginePackage, locale, voices, requested)
             } else {
                 TtsEngineResolver.applyResolvedVoice(
-                    tts = textToSpeech,
                     enginePackage = enginePackage,
                     locale = locale,
                     voices = voices,
-                    requestedKey = selectedVoice(),
+                    requestedKey = requested,
+                    setVoice = ::selectFrameworkVoice,
+                    currentVoice = ::currentFrameworkVoice,
                 )
             }
+        effectiveLocale = resolution.effectiveKey?.localeTag?.let(Locale::forLanguageTag) ?: locale
         onVoiceResolved(resolution)
-        // A handle that resolved an offline voice cannot fall back to a network voice, even after consent.
-        val offlineVoiceRequired = requireOfflineVoice || voices.isNotEmpty()
-        return if (offlineVoiceRequired && resolution.effectiveKey == null) TextToSpeech.LANG_NOT_SUPPORTED else status
+        return if (retired.get() || (enforceOfflineVoice && resolution.effectiveKey == null)) {
+            TextToSpeech.LANG_NOT_SUPPORTED
+        } else {
+            status
+        }
+    }
+
+    /** Treats an ambiguous framework failure as the end of the consented connection. */
+    private fun retire(status: Int): Int {
+        if (retired.compareAndSet(false, true)) onConnectionUncertain()
+        return status
+    }
+
+    /** The framework can return its normal error value after reconnecting behind the same object. */
+    private fun selectFrameworkVoice(voice: Voice): Int {
+        if (retired.get()) return TextToSpeech.ERROR
+        val status = textToSpeech.setVoice(voice)
+        return if (status == TextToSpeech.SUCCESS) status else retire(status)
+    }
+
+    /** Null cannot distinguish an unavailable voice from framework IPC failure. */
+    private fun currentFrameworkVoice(): Voice? {
+        if (retired.get()) return null
+        return textToSpeech.voice ?: run {
+            retire(TextToSpeech.ERROR)
+            null
+        }
     }
 
     /** Applies the controller's bounded speech-rate preference to the framework engine. */
@@ -60,7 +91,16 @@ internal class AndroidTtsSpeechEngine(
         onStop: (String?, Boolean) -> Unit,
     ) {
         textToSpeech.setOnUtteranceProgressListener(
-            androidTtsProgressListener(onStart, onDone, onError, onRangeStart, onStop),
+            androidTtsProgressListener(
+                onStart,
+                onDone,
+                { id, error ->
+                    if (error == TextToSpeech.ERROR_SERVICE || error == TextToSpeech.ERROR) retire(error)
+                    onError(id, error)
+                },
+                onRangeStart,
+                onStop,
+            ),
         )
     }
 
@@ -95,15 +135,17 @@ internal class AndroidTtsSpeechEngine(
         utteranceId: String,
         params: Bundle?,
     ): Int {
-        if (requireOfflineVoice && textToSpeech.voice?.isNetworkConnectionRequired != false) {
+        if (retired.get()) return TextToSpeech.ERROR
+        if ((enforceOfflineVoice || selectedVoice() != null) && currentFrameworkVoice()?.isInstalledOffline() != true) {
             return TextToSpeech.ERROR
         }
-        return textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
+        val status = textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
+        return if (status == TextToSpeech.SUCCESS) status else retire(status)
     }
 
     /** Stops framework synthesis for the active queue. */
     override fun stop() {
-        textToSpeech.stop()
+        if (!retired.get() && textToSpeech.stop() != TextToSpeech.SUCCESS) retire(TextToSpeech.ERROR)
     }
 }
 
