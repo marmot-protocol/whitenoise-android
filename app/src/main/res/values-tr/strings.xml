@@ -1456,6 +1456,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d davet anahtarı kaldırıldı</string>
     <string name="wipe_outcome_local_wipe_done">Yerel veriler silindi</string>
     <string name="wipe_outcome_local_wipe_incomplete">Yerel veriler tamamen silinemedi</string>
+    <string name="wipe_media_cleanup_failed">Bazı yerel medya dosyaları silinemedi veya paylaşım izinleri kaldırılamadı.</string>
     <string name="export_nsec">nsec dışa aktar</string>
     <string name="share_secret_key">Gizli anahtarı paylaş</string>
     <string name="signed_out">Oturum kapalı</string>

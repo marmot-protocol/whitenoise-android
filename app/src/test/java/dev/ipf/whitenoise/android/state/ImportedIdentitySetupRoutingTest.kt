@@ -144,7 +144,7 @@ class ImportedIdentitySetupRoutingTest {
                 Fixture(amber = false, recoveryRequired = false, onLegacyLogin = {
                     wipe =
                         async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
-                            fixture.state.signOutAndWipeActiveAccount()
+                            fixture.state.signOutAndWipeActiveAccount()?.native
                         }
                 })
             try {

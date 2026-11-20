@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -98,6 +96,7 @@ import dev.ipf.whitenoise.android.state.conversationNotifyMode
 import dev.ipf.whitenoise.android.state.conversationVibrationPattern
 import dev.ipf.whitenoise.android.state.disbandGroup
 import dev.ipf.whitenoise.android.state.enableGroupDisbanding
+import dev.ipf.whitenoise.android.state.exportConversationTranscriptFile
 import dev.ipf.whitenoise.android.state.folderMemberIds
 import dev.ipf.whitenoise.android.state.inviteMembers
 import dev.ipf.whitenoise.android.state.inviteProfileToGroups
@@ -135,7 +134,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
-import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Check
@@ -171,31 +169,11 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.Locale
-
-internal fun conversationTranscriptShareIntent(
-    context: Context,
-    file: java.io.File,
-): Intent {
-    val uri = fileProviderUri(context, file)
-    val intent =
-        Intent(Intent.ACTION_SEND).apply {
-            type = "application/json"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, file.name)
-            putExtra(Intent.EXTRA_TITLE, file.name)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-    return Intent.createChooser(intent, null).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-}
 
 @Composable
 internal fun GroupDetailsLocalDeleteControl(
@@ -739,7 +717,6 @@ internal fun GroupDetailsScreen(
             )
         }
 
-        /** Exports the transcript through the native save flow. */
         fun exportTranscript() {
             if (transcriptExportInFlight || transcriptSave.busy) return
             transcriptExportInFlight = true
@@ -749,10 +726,11 @@ internal fun GroupDetailsScreen(
                     val file = controller.exportConversationTranscriptFile(context.cacheDir) ?: return@launchMutation
                     pendingTranscriptShareFile = file
                     try {
-                        withContext(Dispatchers.Main) {
-                            transcriptShareLauncher.launch(conversationTranscriptShareIntent(context, file))
-                            shareSheetLaunched = true
+                        if (!controller.ownsRetainedForegroundPresentation) {
+                            throw CancellationException("transcript owner changed")
                         }
+                        transcriptShareLauncher.launch(conversationTranscriptShareIntent(context, file))
+                        shareSheetLaunched = true
                     } catch (_: ActivityNotFoundException) {
                         pendingTranscriptShareFile = null
                         file.delete()

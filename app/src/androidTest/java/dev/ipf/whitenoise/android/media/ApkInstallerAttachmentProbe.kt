@@ -513,7 +513,7 @@ internal object ApkInstallerAttachmentProbe {
         val reference = MediaLifecycleAttachmentProbe.publishedReference(session.marmot, request)
         val state = session.state(request.accountRef)
         // The materializer returns a valid published copy before it asks for the source, so remove every copy first.
-        removePublishedCopies(session.context)
+        removePublishedCopies(session.context, request.accountRef)
         var readRetention = false
         val file = materializeVerified(session.context, state, request, reference) { readRetention = true }
         assertTrue("readback was served without reading the retained bytes", readRetention)
@@ -521,13 +521,16 @@ internal object ApkInstallerAttachmentProbe {
     }
 
     /** Deletes the published copies, so a readback must republish from native retention, not from the cache. */
-    private suspend fun removePublishedCopies(context: Context) =
-        withContext(Dispatchers.IO) {
-            val shared = File(context.cacheDir, MediaCacheDirs.SHARED)
-            shared.listFiles { file -> file.name.startsWith(PUBLISHED_PREFIX) }?.forEach { file ->
-                check(file.delete()) { "could not remove a published copy before readback" }
-            }
+    private suspend fun removePublishedCopies(
+        context: Context,
+        accountRef: String,
+    ) = withContext(Dispatchers.IO) {
+        val shared = File(context.cacheDir, MediaCacheDirs.SHARED)
+        val prefix = sharedPlaintextPrefix(context, accountRef) + PUBLISHED_PREFIX
+        shared.listFiles { file -> file.name.startsWith(prefix) }?.forEach { file ->
+            check(file.delete()) { "could not remove a published copy before readback" }
         }
+    }
 
     /**
      * Publishes the completed download exactly as the installer handoff does, never a partial file. [onResolve] runs
@@ -540,7 +543,13 @@ internal object ApkInstallerAttachmentProbe {
         reference: MediaAttachmentReferenceFfi,
         onResolve: () -> Unit = {},
     ): File =
-        materializeDocumentAttachmentSource(context, request.messageIdHex, request.attachmentIndex, reference) {
+        materializeDocumentAttachmentSource(
+            context,
+            request.accountRef,
+            request.messageIdHex,
+            request.attachmentIndex,
+            reference,
+        ) {
             onResolve()
             state.downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false)
         }

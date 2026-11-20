@@ -122,7 +122,7 @@ internal object AttachmentCachePublication {
 
     /** Commits one closeable plaintext source behind the captured wipe and invalidation fence. */
     @Suppress("ReturnCount", "ThrowsCount")
-    private fun publishSourceWithPermit(
+    internal fun publishSourceWithPermit(
         attachmentKey: String,
         finalFile: File,
         source: AttachmentPlaintext,

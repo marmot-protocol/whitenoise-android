@@ -675,15 +675,15 @@ internal fun FullScreenMediaViewer(
                                                 request.reference.fileName,
                                                 request.reference.mediaType,
                                                 chooserTitle = shareChooserTitle,
+                                                accountRef = checkNotNull(controller.conversationAccountRef),
                                                 beforeLaunch = { requireExportPageOwner(selected, controller) },
                                             ).getOrThrow()
                                         }
                                     else ->
-                                        // Explicit Share stages the verified image through the message cache,
-                                        // streamed without a whole-image array. Leaving the viewer cancels
-                                        // this scope, which stops staging and opens no share sheet.
+                                        // Stream the verified file only while this viewer owns the share.
                                         shareAttachmentExternally(
                                             context = context,
+                                            accountRef = checkNotNull(controller.conversationAccountRef),
                                             attachmentIndex = request.attachmentIndex,
                                             reference = request.reference,
                                             chooserTitle = shareChooserTitle,

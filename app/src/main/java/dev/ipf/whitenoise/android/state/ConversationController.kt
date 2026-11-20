@@ -36,14 +36,11 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
-import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
-import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
-import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
@@ -3442,47 +3439,6 @@ class ConversationController(
             appState.marmotIo { groupPushDebugInfo(account, group.groupIdHex) }
         }.onFailure {
             appState.presentFailure(R.string.toast_couldnt_load_push_debug_info, "GROUP_PUSH_DEBUG_LOAD", it)
-        }.getOrNull()
-    }
-
-    suspend fun exportConversationTranscriptFile(cacheDir: java.io.File): java.io.File? {
-        val account = conversationAccountRef ?: return null
-        // One timestamp for the whole export so the JSON `exported_at` and the
-        // file name stamp match instead of drifting across two now() reads.
-        val exportedAt = java.time.Instant.now()
-        return runCatchingCancellable {
-            val messages =
-                withContext(Dispatchers.Default) {
-                    ConversationTranscriptExport.fetchAllMessages(
-                        timelineReader =
-                            object : ConversationTranscriptTimelineReader {
-                                override suspend fun timelineMessages(
-                                    accountRef: String,
-                                    query: TimelineMessageQueryFfi,
-                                ): TimelinePageFfi =
-                                    appState.marmotIo(MarmotTraceSection.TIMELINE_READ) {
-                                        timelineMessages(accountRef, query)
-                                    }
-                            },
-                        accountRef = account,
-                        groupIdHex = group.groupIdHex,
-                    )
-                }
-            val data =
-                withContext(Dispatchers.Default) {
-                    val document = ConversationTranscriptExport.makeDocument(group, messages, exportedAt)
-                    ConversationTranscriptExport.encodeJson(document)
-                }
-            withContext(Dispatchers.IO) {
-                ConversationTranscriptExport.writeTemporaryFile(
-                    cacheDir = cacheDir,
-                    data = data,
-                    groupIdHex = group.groupIdHex,
-                    exportedAt = exportedAt,
-                )
-            }
-        }.onFailure {
-            appState.presentFailure(R.string.toast_couldnt_export_transcript, "CONVERSATION_TRANSCRIPT_EXPORT", it)
         }.getOrNull()
     }
 
