@@ -17,13 +17,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.OpenInNew
-import dev.ipf.whitenoise.android.ui.icons.filled.LocationOn
 
 /**
  * Location bubble rendered from the shared coordinates with **no network
@@ -54,7 +52,7 @@ internal fun LocationMessageBubble(
         ) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                 Icon(
-                    Icons.Default.LocationOn,
+                    painterResource(R.drawable.ic_location_on),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(10.dp).size(24.dp),
@@ -81,7 +79,7 @@ internal fun LocationMessageBubble(
                 )
             }
             Icon(
-                Icons.AutoMirrored.Filled.OpenInNew,
+                painterResource(R.drawable.ic_open_in_new),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),

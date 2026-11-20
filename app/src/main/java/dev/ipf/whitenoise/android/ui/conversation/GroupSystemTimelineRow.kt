@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntRect
@@ -32,8 +33,6 @@ import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillFlow
 import dev.ipf.whitenoise.android.ui.conversation.reactions.localReactionOverlay
 import dev.ipf.whitenoise.android.ui.conversation.reactions.rememberLocalReactionMotion
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 
 /** Transient overlay state scoped to one mounted activity row, never a second reaction store. */
 private class GroupSystemActionSurface {
@@ -167,7 +166,7 @@ private fun GroupSystemFocusedActions(
             supportingLabel = null,
             enabled = true,
             destructive = true,
-            icon = { Icon(Icons.Default.Delete, contentDescription = null) },
+            icon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
             onClick = {
                 onMenuChange(false)
                 actions.deleteForMe()

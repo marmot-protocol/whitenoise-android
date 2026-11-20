@@ -66,6 +66,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.SoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextRange
@@ -110,8 +111,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppr
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.rememberInstalledEmojiPicker
@@ -2039,7 +2038,7 @@ internal fun ComposerBar(
                                             ),
                                 ) {
                                     Icon(
-                                        Icons.Default.Delete,
+                                        painterResource(R.drawable.ic_delete),
                                         contentDescription = stringResource(R.string.voice_message_cancel),
                                         tint = MaterialTheme.colorScheme.error,
                                     )

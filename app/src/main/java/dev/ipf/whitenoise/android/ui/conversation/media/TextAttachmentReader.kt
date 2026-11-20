@@ -68,8 +68,6 @@ import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.conversation.messages.RenderedTextHit
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Info
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import kotlinx.coroutines.Dispatchers
@@ -610,7 +608,7 @@ private fun TextAttachmentTruncatedNotice(onOpenExternal: (() -> Unit)?) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                Icon(Icons.Default.Info, contentDescription = null)
+                Icon(painterResource(R.drawable.ic_info), contentDescription = null)
                 Text(
                     stringResource(R.string.text_attachment_preview_truncated),
                     modifier = Modifier.weight(1f),

@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -39,7 +40,6 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Reply
 import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Info
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
@@ -132,7 +132,7 @@ internal fun MessageSelectionBottomBar(
                                         ),
                                 ) {
                                     Icon(
-                                        Icons.Default.Delete,
+                                        painterResource(R.drawable.ic_delete),
                                         contentDescription = deleteLabel,
                                     )
                                 }

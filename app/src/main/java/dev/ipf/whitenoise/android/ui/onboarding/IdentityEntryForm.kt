@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.ImeAction
@@ -42,10 +43,6 @@ import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentPaste
-import dev.ipf.whitenoise.android.ui.icons.filled.QrCodeScanner
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 
 /**
@@ -105,7 +102,10 @@ internal fun IdentityEntryForm(
                     when {
                         identity.isNotEmpty() -> {
                             IconButton(onClick = { onIdentityChange("") }, enabled = !busy) {
-                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear))
+                                Icon(
+                                    painterResource(R.drawable.ic_close),
+                                    contentDescription = stringResource(R.string.clear),
+                                )
                             }
                         }
                         else -> {
@@ -123,7 +123,7 @@ internal fun IdentityEntryForm(
                                     enabled = !busy,
                                 ) {
                                     Icon(
-                                        Icons.Default.ContentPaste,
+                                        painterResource(R.drawable.ic_content_paste),
                                         contentDescription = stringResource(R.string.paste),
                                     )
                                 }
@@ -131,7 +131,7 @@ internal fun IdentityEntryForm(
                             if (allowScan) {
                                 IconButton(onClick = { showScanner = true }, enabled = !busy) {
                                     Icon(
-                                        Icons.Default.QrCodeScanner,
+                                        painterResource(R.drawable.ic_qr_code_scanner),
                                         contentDescription = stringResource(R.string.scan_qr_code),
                                     )
                                 }
@@ -165,7 +165,7 @@ internal fun IdentityEntryForm(
                 shape = RoundedCornerShape(28.dp),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
             ) {
-                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                Icon(painterResource(R.drawable.ic_qr_code_scanner), contentDescription = null)
                 Spacer(Modifier.width(10.dp))
                 Text(stringResource(R.string.scan_qr_code), style = MaterialTheme.typography.titleMedium)
             }
@@ -216,7 +216,7 @@ internal fun PublicIdentifierFieldTrailingAction(
     when {
         value.isNotEmpty() -> {
             IconButton(onClick = { onValueChange("") }, enabled = enabled) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear))
+                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.clear))
             }
         }
         canOfferPaste -> {
@@ -236,7 +236,7 @@ internal fun PublicIdentifierFieldTrailingAction(
                 enabled = enabled,
             ) {
                 Icon(
-                    Icons.Default.ContentPaste,
+                    painterResource(R.drawable.ic_content_paste),
                     contentDescription = stringResource(R.string.paste),
                 )
             }

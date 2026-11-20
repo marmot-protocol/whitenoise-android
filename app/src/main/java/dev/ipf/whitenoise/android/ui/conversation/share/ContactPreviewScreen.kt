@@ -44,9 +44,7 @@ import dev.ipf.whitenoise.android.ui.common.nativePageFooter
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Email
-import dev.ipf.whitenoise.android.ui.icons.filled.Person
 import dev.ipf.whitenoise.android.ui.icons.filled.Phone
 
 /**
@@ -86,7 +84,10 @@ internal fun ContactPreviewScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = dismiss) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+                            Icon(
+                                painterResource(R.drawable.ic_close),
+                                contentDescription = stringResource(R.string.close),
+                            )
                         }
                         Text(
                             stringResource(R.string.share_contact_title),
@@ -99,7 +100,7 @@ internal fun ContactPreviewScreen(
                     ) {
                         Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                             Icon(
-                                Icons.Default.Person,
+                                painterResource(R.drawable.ic_person),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                 modifier = Modifier.padding(12.dp).size(28.dp),
@@ -165,7 +166,10 @@ internal fun ContactPreviewScreen(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
                 ) {
-                    Icon(painterResource(R.drawable.ic_arrow_upward), contentDescription = stringResource(R.string.send))
+                    Icon(
+                        painterResource(R.drawable.ic_arrow_upward),
+                        contentDescription = stringResource(R.string.send),
+                    )
                 }
             }
         }

@@ -33,6 +33,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
@@ -51,11 +52,7 @@ import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
-import dev.ipf.whitenoise.android.ui.icons.filled.QrCode
-import dev.ipf.whitenoise.android.ui.icons.filled.QrCodeScanner
 import dev.ipf.whitenoise.android.ui.icons.filled.RadioButtonUnchecked
-import dev.ipf.whitenoise.android.ui.icons.filled.Search
-import dev.ipf.whitenoise.android.ui.icons.filled.Share
 import dev.ipf.whitenoise.android.ui.onboarding.PublicIdentifierFieldTrailingAction
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -80,7 +77,7 @@ internal fun FlowSearchField(
         value = value,
         onValueChange = onValueChange,
         placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
         trailingIcon = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PublicIdentifierFieldTrailingAction(
@@ -90,7 +87,10 @@ internal fun FlowSearchField(
                 )
                 if (value.isEmpty() && onScanQr != null) {
                     IconButton(onClick = onScanQr) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_qr_code))
+                        Icon(
+                            painterResource(R.drawable.ic_qr_code_scanner),
+                            contentDescription = stringResource(R.string.scan_qr_code),
+                        )
                     }
                 }
             }
@@ -522,19 +522,19 @@ internal fun NewMessageQuickActions(
         penFlightIndex = 0,
     )
     FlowQuickActionRow(
-        icon = Icons.Default.Share,
+        icon = ImageVector.vectorResource(R.drawable.ic_share),
         title = stringResource(R.string.invite_friends),
         onClick = onInviteFriends,
         penFlightIndex = 1,
     )
     FlowQuickActionRow(
-        icon = Icons.Default.QrCodeScanner,
+        icon = ImageVector.vectorResource(R.drawable.ic_qr_code_scanner),
         title = stringResource(R.string.scan_qr_code),
         onClick = onScanQr,
         penFlightIndex = 2,
     )
     FlowQuickActionRow(
-        icon = Icons.Default.QrCode,
+        icon = ImageVector.vectorResource(R.drawable.ic_settings_qr_code_2),
         title = showMyQrLabel,
         onClick = onShowMyQr,
         enabled = showMyQrEnabled,

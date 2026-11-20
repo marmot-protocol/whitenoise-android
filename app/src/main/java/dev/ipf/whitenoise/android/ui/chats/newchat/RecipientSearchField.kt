@@ -27,6 +27,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -39,11 +40,6 @@ import dev.ipf.whitenoise.android.core.RecipientPastePolicy
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentPaste
-import dev.ipf.whitenoise.android.ui.icons.filled.QrCodeScanner
-import dev.ipf.whitenoise.android.ui.icons.filled.Search
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /**
@@ -96,13 +92,16 @@ internal fun RecipientSearchField(
         state = state,
         enabled = enabled,
         placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
         trailingIcon = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 when {
                     state.text.isNotEmpty() -> {
                         IconButton(onClick = { state.replaceRecipientText("") }, enabled = enabled) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.clear))
+                            Icon(
+                                painterResource(R.drawable.ic_close),
+                                contentDescription = stringResource(R.string.clear),
+                            )
                         }
                     }
                     canOfferPaste -> {
@@ -120,13 +119,19 @@ internal fun RecipientSearchField(
                                 }
                             },
                         ) {
-                            Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
+                            Icon(
+                                painterResource(R.drawable.ic_content_paste),
+                                contentDescription = stringResource(R.string.paste),
+                            )
                         }
                     }
                 }
                 if (state.text.isEmpty() && onScanQr != null) {
                     IconButton(onClick = onScanQr, enabled = enabled) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = stringResource(R.string.scan_qr_code))
+                        Icon(
+                            painterResource(R.drawable.ic_qr_code_scanner),
+                            contentDescription = stringResource(R.string.scan_qr_code),
+                        )
                     }
                 }
             }

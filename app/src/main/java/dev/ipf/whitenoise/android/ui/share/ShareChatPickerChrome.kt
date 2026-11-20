@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -30,16 +31,13 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /** Emits the picker's dismiss action through a close control with a localized accessibility label. */
 @Composable
 internal fun ShareChatPickerCloseButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
     }
 }
 
@@ -138,7 +136,7 @@ internal fun ChatPickerSendingAccountRow(
             )
             if (multipleAccounts) {
                 Icon(
-                    Icons.Default.ExpandMore,
+                    painterResource(R.drawable.ic_expand_more),
                     contentDescription = stringResource(R.string.share_choose_sending_account),
                 )
             }

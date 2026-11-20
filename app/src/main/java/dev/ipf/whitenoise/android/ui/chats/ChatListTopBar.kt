@@ -71,10 +71,8 @@ import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSearchScanStatus
 import dev.ipf.whitenoise.android.ui.conversation.allowsSearchSteps
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -233,7 +231,7 @@ internal fun ChatListTopBar(
                         searchOpen ->
                             IconButton(onClick = onSearchClose) {
                                 Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    painterResource(R.drawable.ic_arrow_back),
                                     contentDescription = stringResource(R.string.back),
                                 )
                             }
@@ -519,7 +517,7 @@ internal fun ConversationSearchNavBar(
             if (status == ConversationSearchScanStatus.FAILED) {
                 IconButton(onClick = onRetryScan) {
                     Icon(
-                        Icons.Default.Refresh,
+                        painterResource(R.drawable.ic_refresh),
                         contentDescription = stringResource(R.string.conversation_search_retry),
                     )
                 }

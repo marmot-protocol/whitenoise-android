@@ -21,15 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.OpenInNew
-import dev.ipf.whitenoise.android.ui.icons.outlined.ContentCopy
-import dev.ipf.whitenoise.android.ui.icons.outlined.ErrorOutline
-import dev.ipf.whitenoise.android.ui.icons.outlined.Refresh
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 @Composable
@@ -39,7 +36,7 @@ internal fun EventCardActions(
     openDescription: String,
     onCopy: () -> Unit,
     onOpen: () -> Unit,
-    openIcon: ImageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+    openIcon: ImageVector = ImageVector.vectorResource(R.drawable.ic_open_in_new),
     onLaunchOrigin: (Rect?) -> Unit = {},
 ) {
     val (openModifier, open) =
@@ -50,7 +47,7 @@ internal fun EventCardActions(
     Row {
         IconButton(onClick = onCopy, modifier = Modifier.size(48.dp)) {
             Icon(
-                Icons.Outlined.ContentCopy,
+                painterResource(R.drawable.ic_content_copy),
                 contentDescription = copyDescription,
                 modifier = Modifier.size(18.dp),
                 tint = contentColor.copy(alpha = 0.8f),
@@ -138,7 +135,7 @@ internal fun EventCardFailure(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Outlined.ErrorOutline,
+                painterResource(R.drawable.ic_error),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = contentColor,
@@ -156,7 +153,7 @@ internal fun EventCardFailure(
                 modifier = Modifier.size(48.dp),
             ) {
                 Icon(
-                    Icons.Outlined.Refresh,
+                    painterResource(R.drawable.ic_refresh),
                     contentDescription = stringResource(R.string.retry),
                     modifier = Modifier.size(18.dp),
                     tint = contentColor,

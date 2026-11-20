@@ -90,7 +90,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMe
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -900,7 +899,11 @@ private fun VoiceActionGlyph(actionVisual: VoiceActionVisual) {
         VoiceActionVisual.FAILED,
         VoiceActionVisual.STORAGE_BLOCKED,
         ->
-            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(24.dp))
+            Icon(
+                painter = painterResource(R.drawable.ic_refresh),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
         VoiceActionVisual.DOWNLOAD ->
             Icon(imageVector = Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(24.dp))
         VoiceActionVisual.PAUSE ->

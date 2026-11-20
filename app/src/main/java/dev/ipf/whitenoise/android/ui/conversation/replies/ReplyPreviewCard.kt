@@ -52,9 +52,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.safeAttachmentDisplayName
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Description
-import dev.ipf.whitenoise.android.ui.icons.filled.Image
 import dev.ipf.whitenoise.android.ui.previewTake
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 import dev.ipf.whitenoise.android.ui.resolveMentionsInPlaintext
@@ -199,10 +196,12 @@ internal fun ReplyPreviewCard(
         } else {
             attachmentPresentation?.let { fileIconFor(it.iconCategory) }
                 ?: when (mediaKind) {
-                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo -> Icons.Default.Image
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo ->
+                        ImageVector.vectorResource(R.drawable.ic_image)
                     dev.ipf.whitenoise.android.core.ReplyMediaKind.Video -> ImageVector.vectorResource(R.drawable.ic_videocam)
                     dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice -> ImageVector.vectorResource(R.drawable.ic_voice_note)
-                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Document -> Icons.Default.Description
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Document ->
+                        ImageVector.vectorResource(R.drawable.ic_description)
                     dev.ipf.whitenoise.android.core.ReplyMediaKind.None -> null
                 }
         }

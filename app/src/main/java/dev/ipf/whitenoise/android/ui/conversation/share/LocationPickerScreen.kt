@@ -49,8 +49,6 @@ import dev.ipf.whitenoise.android.ui.common.nativePageFooter
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.LocationOn
 import dev.ipf.whitenoise.android.ui.icons.filled.MyLocation
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapListener
@@ -177,7 +175,7 @@ internal fun LocationPickerScreen(
             // Fixed center pin — the map pans beneath it, and its map coordinate
             // at send time is the picked point (standard map-picker pattern).
             Icon(
-                Icons.Default.LocationOn,
+                painterResource(R.drawable.ic_location_on),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier =
@@ -198,7 +196,7 @@ internal fun LocationPickerScreen(
             ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
                     IconButton(onClick = dismiss) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+                        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
                     }
                 }
                 Spacer(Modifier.width(12.dp))
@@ -267,7 +265,11 @@ internal fun LocationPickerScreen(
                     enabled = selectedCenter != null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(painterResource(R.drawable.ic_arrow_upward), contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        painterResource(R.drawable.ic_arrow_upward),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.location_send_this))
                 }

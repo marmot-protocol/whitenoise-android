@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
@@ -35,8 +36,6 @@ import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -310,7 +309,7 @@ private fun VideoViewerUnavailable(
             cacheInvalidating -> CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
             playbackInvalidated ->
                 Icon(
-                    Icons.Default.Refresh,
+                    painterResource(R.drawable.ic_refresh),
                     contentDescription = stringResource(R.string.video_failed),
                     tint = Color.White,
                     modifier = Modifier.size(48.dp).clickable(onClick = onPlaybackRetry),

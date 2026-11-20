@@ -55,6 +55,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -103,8 +104,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighligh
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchMatchRanges
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import java.net.IDN
 import java.net.URI
@@ -1003,7 +1002,7 @@ private fun MarkdownDetailsScaffold(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Default.ExpandMore,
+                painterResource(R.drawable.ic_expand_more),
                 contentDescription = null,
                 modifier =
                     Modifier

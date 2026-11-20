@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.DisbandFailureReasonFfi
@@ -19,8 +20,6 @@ import dev.ipf.marmotkit.DisbandRequestFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.DeleteForever
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -122,7 +121,7 @@ private fun DisbandLeading(
         CircularProgressIndicator(modifier = Modifier.size(DisbandProgressSize), strokeWidth = 2.dp)
     } else {
         Icon(
-            Icons.Default.DeleteForever,
+            painterResource(R.drawable.ic_delete),
             contentDescription = null,
             tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         )

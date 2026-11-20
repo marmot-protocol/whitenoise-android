@@ -78,6 +78,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
@@ -270,9 +271,6 @@ import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
 import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.group.rememberConversationMuteControl
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
@@ -5092,7 +5090,7 @@ internal fun ConversationScreen(
                                                 } else {
                                                     IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
                                                         Icon(
-                                                            Icons.Default.Refresh,
+                                                            painterResource(R.drawable.ic_refresh),
                                                             contentDescription = stringResource(R.string.refresh),
                                                         )
                                                     }
