@@ -37,6 +37,16 @@ class SignInStepMappingTest {
         assertEquals("account-setup states must not share a message", 4, messages.toSet().size)
     }
 
+    /** A correct key for a profile this device was unlinked from says so, on sign-in and on recovery alike. */
+    @Test
+    fun anUnlinkedProfileIsNotReportedAsAWrongKey() {
+        assertEquals(R.string.error_account_unlinked, inlineErrorRes(IdentityImportOutcome.Unlinked))
+        assertEquals(
+            SignInStep.InlineError(R.string.error_account_unlinked),
+            recoveryStepFor(IdentityImportOutcome.Unlinked),
+        )
+    }
+
     @Test
     fun resumableStatesReadAsRetryableAndNotAsTheGuardMessage() {
         val retry = inlineErrorRes(IdentityImportOutcome.SetupRetryRequired)

@@ -256,6 +256,8 @@ internal fun signInStepFor(
             SignInStep.InlineError(R.string.sign_in_error_setup_key_package_retry)
         IdentityImportOutcome.SetupResetNotApplicable ->
             SignInStep.InlineError(R.string.sign_in_error_setup_unexpected_state)
+        // The key is right, so say what is wrong instead of asking the user to check it.
+        IdentityImportOutcome.Unlinked -> SignInStep.InlineError(R.string.error_account_unlinked)
         IdentityImportOutcome.Failed -> SignInStep.InlineError(importIdentityErrorRes(identity))
     }
 
@@ -276,6 +278,7 @@ internal fun recoveryStepFor(outcome: IdentityImportOutcome): SignInStep =
             SignInStep.InlineError(R.string.sign_in_error_setup_recovery_unexpected_state)
         // The key was well-formed enough for the engine to report a setup state a
         // moment ago, so a bare failure here is the recovery failing, not a bad key.
+        IdentityImportOutcome.Unlinked -> SignInStep.InlineError(R.string.error_account_unlinked)
         IdentityImportOutcome.SetupRecoveryRequired,
         IdentityImportOutcome.Failed,
         -> SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed)

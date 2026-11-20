@@ -145,7 +145,11 @@ internal fun ProfileSwitcherSheet(
                                     enabled = enabled,
                                 )
                                 if (account.isReadOnly) Text(stringResource(R.string.read_only))
-                                if (account.isSignedOut) Text(stringResource(R.string.signed_out))
+                                if (account.isUnlinked) {
+                                    Text(stringResource(R.string.device_unlinked_title))
+                                } else if (account.isSignedOut) {
+                                    Text(stringResource(R.string.signed_out))
+                                }
                             }
                         },
                         leadingContent = {

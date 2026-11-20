@@ -148,6 +148,41 @@ class UnlinkedAccountTest {
         compose.onNodeWithTag(UNLINKED_ACCOUNT_PROMPT_TAG).assertDoesNotExist()
     }
 
+    /** Only a profile saved as unlinked asks to be removed when picked. */
+    @Test
+    fun onlyAnUnlinkedProfileAsksToBeRemoved() {
+        assertTrue(asksToRemoveUnlinkedProfile("old", unlinked = listOf("old")))
+        assertFalse(asksToRemoveUnlinkedProfile("main", unlinked = listOf("old")))
+        assertFalse(asksToRemoveUnlinkedProfile("main", unlinked = emptyList()))
+    }
+
+    /** The removal question says what is deleted, removes on confirmation and changes nothing on Cancel. */
+    @Test
+    fun theRemovalQuestionRemovesOnlyOnConfirmation() {
+        var removals = 0
+        var cancels = 0
+        compose.setContent {
+            WhiteNoiseTheme { UnlinkedProfileRemovalDialog(onRemove = { removals++ }, onCancel = { cancels++ }) }
+        }
+
+        compose.onNodeWithText(context.getString(R.string.unlinked_account_remove_detail)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        compose.runOnIdle { assertEquals(0 to 1, removals to cancels) }
+        compose.onNodeWithTag(UNLINKED_PROFILE_REMOVAL_CONFIRM_TAG).performClick()
+        compose.runOnIdle { assertEquals(1, removals) }
+    }
+
+    /** A pick is remembered until it is closed, so the question can be asked after its sheet has gone. */
+    @Test
+    fun aPickedProfileIsRememberedUntilClosed() {
+        UnlinkedProfileRemoval.ask("old")
+        assertEquals("old", UnlinkedProfileRemoval.askedFor)
+
+        UnlinkedProfileRemoval.close()
+
+        assertEquals(null, UnlinkedProfileRemoval.askedFor)
+    }
+
     /** The arrival hint belongs to the account that linked, in any letter case, until it is ended. */
     @Test
     fun theArrivalHintIsForTheAccountThatLinked() {

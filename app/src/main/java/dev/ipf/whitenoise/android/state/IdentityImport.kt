@@ -42,6 +42,9 @@ internal sealed interface IdentityImportOutcome {
      * acknowledgement.
      */
     data object SetupRecoveryRequired : IdentityImportOutcome
+
+    /** Another of the account's devices unlinked this one, so the saved profile must be removed before it signs in. */
+    data object Unlinked : IdentityImportOutcome
 }
 
 /**
@@ -78,5 +81,6 @@ internal fun identityImportOutcome(error: Throwable): IdentityImportOutcome =
             IdentityImportOutcome.SetupKeyPackageRecoveryAvailable
         is MarmotKitException.AccountSetupResetNotApplicable -> IdentityImportOutcome.SetupResetNotApplicable
         is MarmotKitException.AccountSetupRecoveryRequired -> IdentityImportOutcome.SetupRecoveryRequired
+        is MarmotKitException.AccountUnlinked -> IdentityImportOutcome.Unlinked
         else -> IdentityImportOutcome.Failed
     }
