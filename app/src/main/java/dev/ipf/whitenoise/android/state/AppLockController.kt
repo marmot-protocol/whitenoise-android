@@ -48,6 +48,7 @@ internal class AppLockController(
         private set
     var screenVisible by mutableStateOf(false)
         private set
+
     /** Notification workers may run before any lock UI exists. Evaluate the in-process grace period on Main. */
     val notificationActionsAllowed: Boolean
         get() =

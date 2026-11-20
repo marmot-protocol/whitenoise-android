@@ -253,8 +253,8 @@ class NotificationReplyWorker(
         containsLegacyPlaintext: Boolean,
         retryStore: NotificationActionRetryStore,
         retryKey: String,
-    ): Result {
-        return when {
+    ): Result =
+        when {
             containsLegacyPlaintext -> Result.failure().also { retryStore.clear(retryKey) }
             retryStore.shouldDeferForLock(
                 retryKey,
@@ -268,7 +268,6 @@ class NotificationReplyWorker(
                 Result.failure().also { retryStore.clear(retryKey) }
             }
         }
-    }
 
     /** Records the reply as abandoned, then restores the card with [notice] so the user can try again. */
     private suspend fun finalizeReplyFailure(
