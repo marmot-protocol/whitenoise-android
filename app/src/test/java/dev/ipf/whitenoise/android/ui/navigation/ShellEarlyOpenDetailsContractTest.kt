@@ -102,6 +102,8 @@ class ShellEarlyOpenDetailsContractTest {
 
         assertFalse("details must stay closed after the switch lands", tagShown(DETAILS_TAG))
         assertTrue(transcriptShown())
+        assertEquals(1, composed(hasText(TARGET_ACCOUNT_MESSAGE, substring = true)))
+        assertEquals(0, composed(hasText(SOURCE_ACCOUNT_MESSAGE, substring = true)))
         assertEquals(SHARED_GROUP, holder.selectedChat.value?.id)
         assertEquals(earlyContext, holder.selectedChatOpenContext.value)
         assertEquals(MainSection.Chats.name, holder.sectionState.sectionName)
@@ -122,6 +124,7 @@ class ShellEarlyOpenDetailsContractTest {
         val earlyController = appState.attachedConversationControllers().single()
         assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
         assertEquals(1, composed(hasText(TARGET_ACCOUNT_MESSAGE, substring = true)))
+        assertEquals(0, composed(hasText(SOURCE_ACCOUNT_MESSAGE, substring = true)))
         assertTrue(composed(readable()) > 0)
 
         composeRule.onNode(conversationHeader()).performClick()
@@ -139,6 +142,7 @@ class ShellEarlyOpenDetailsContractTest {
         Espresso.pressBack()
         awaitCondition("Back never returned to the held conversation") { transcriptShown() }
         assertEquals(1, composed(hasText(TARGET_ACCOUNT_MESSAGE, substring = true)))
+        assertEquals(0, composed(hasText(SOURCE_ACCOUNT_MESSAGE, substring = true)))
         assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
         assertSame(earlyController, appState.attachedConversationControllers().single())
     }
@@ -173,6 +177,33 @@ class ShellEarlyOpenDetailsContractTest {
         assertEquals(SHARED_GROUP, holder.selectedChat.value?.id)
         assertTrue(routeCarries(REPEAT_REQUEST_ID))
         assertEquals(TARGET_ACCOUNT, appState.attachedConversationControllers().single().boundAccountRef)
+    }
+
+    /**
+     * The same tap repeated after the switch has settled is a different case from a repeat during the held switch:
+     * the conversation is already open on the active account, and it keeps its controller.
+     */
+    @Test
+    fun aRepeatTapAfterTheSwitchSettlesKeepsTheSameController() {
+        mountShellWithTheTap()
+        activationHold.releaseAll()
+        awaitCondition("the switch never landed") { appState.activeAccountRef == TARGET_ACCOUNT && transcriptShown() }
+        repeat(SETTLE_PUMPS) { pump() }
+        val settledController = appState.attachedConversationControllers().single()
+
+        composeRule.runOnIdle {
+            inboundRequestId.longValue = REPEAT_REQUEST_ID
+            inbound.value = routed.notificationTarget
+        }
+        awaitCondition("the repeat tap was never handled") { inbound.value == null }
+        repeat(SETTLE_PUMPS) { pump() }
+        assertTrue(routeCarries(REPEAT_REQUEST_ID))
+
+        assertTrue(transcriptShown())
+        assertEquals(SHARED_GROUP, holder.selectedChat.value?.id)
+        assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
+        assertSame(settledController, appState.attachedConversationControllers().single())
+        assertEquals(1, composed(hasText(TARGET_ACCOUNT_MESSAGE, substring = true)))
     }
 
     /** True once the open conversation was committed by notification request [requestId]. */
@@ -226,14 +257,18 @@ class ShellEarlyOpenDetailsContractTest {
     /** True once the conversation transcript is revealed. */
     private fun transcriptShown(): Boolean = tagShown(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE)
 
-    /** One short scripted timeline for the shared group, so the transcript can reveal. */
+    /**
+     * One short scripted timeline for the shared group, answered per account: each account reads only its own
+     * message, so the text on screen says which account the conversation was read through.
+     */
     private fun conversations(): ConversationLiveSubscriptions {
         val group = conversationTimelineTestGroup().copy(groupIdHex = SHARED_GROUP)
-        val record =
-            timelineRecord(NotificationScenario.NOTIFIED_ID, 1uL)
-                .copy(groupIdHex = SHARED_GROUP, plaintext = TARGET_ACCOUNT_MESSAGE)
+        val notified = timelineRecord(NotificationScenario.NOTIFIED_ID, 1uL).copy(groupIdHex = SHARED_GROUP)
         return ConversationLiveSubscriptions(
-            openTimeline = { _, _, _ -> ScriptedConversationTimelineSubscription(timelinePage(record)) },
+            openTimeline = { account, _, _ ->
+                val text = if (account == TARGET_ACCOUNT) TARGET_ACCOUNT_MESSAGE else SOURCE_ACCOUNT_MESSAGE
+                ScriptedConversationTimelineSubscription(timelinePage(notified.copy(plaintext = text)))
+            },
             openGroupState = { _, _ -> ScriptedConversationGroupStateSubscription(group) },
         )
     }
@@ -273,6 +308,7 @@ class ShellEarlyOpenDetailsContractTest {
         val SHARED_GROUP = NotificationRouteHarness.SHARED_GROUP
         const val DETAILS_TAG = "chat_info.list"
         const val TARGET_ACCOUNT_MESSAGE = "target account only message"
+        const val SOURCE_ACCOUNT_MESSAGE = "source account only message"
         const val POLL_MILLIS = 20L
 
         /** Any request id other than the first tap's. */

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -18,12 +19,13 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.emptyTimelinePage
+import dev.ipf.whitenoise.android.state.timelinePage
+import dev.ipf.whitenoise.android.state.timelineRecord
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -123,37 +125,55 @@ class ShellRouteContractTest {
     }
 
     /**
-     * Beside the list, tapping another chat keeps the open conversation on screen while the tapped one is still
-     * preparing: the pane never falls back to its placeholder, and the selection moves once the new one is ready.
+     * Beside the list, tapping another chat clears the selection at once but keeps the open conversation's message
+     * on screen while the tapped one is still preparing. The tapped chat becomes the selection, and its message
+     * replaces the first one, once it is ready.
      */
     @Test
     fun besideTheListTheOpenConversationStaysWhileTheTappedOnePrepares() {
+        val secondOpenReached = CompletableDeferred<Unit>()
         val secondOpenMayAnswer = CompletableDeferred<Unit>()
+        val nextGroup = ReturnFixture(distinctGroupsPerRow = true).rows.first().groupIdHex
         val fixture =
             ReturnFixture(
-                timelineScripts = List(2) { ScriptedConversationTimelineSubscription(emptyTimelinePage()) },
+                timelineScripts =
+                    listOf(
+                        messageScript(ConversationTimelineTestIds.GROUP_ID, "ab", OPEN_CHAT_MESSAGE),
+                        messageScript(nextGroup, "cd", TAPPED_CHAT_MESSAGE),
+                    ),
                 distinctGroupsPerRow = true,
-                beforeTimelineOpen = { index -> if (index == 1) secondOpenMayAnswer.await() },
+                beforeTimelineOpen = { index ->
+                    if (index == 1) {
+                        secondOpenReached.complete(Unit)
+                        secondOpenMayAnswer.await()
+                    }
+                },
             )
         try {
             withMountedShell(mutableStateOf(EXPANDED_WIDTH), fixture) { _, holder ->
                 openTarget(fixture, holder)
-                val next = fixture.rows.first()
+                awaitCondition { composed(OPEN_CHAT_MESSAGE) == 1 }
 
                 // Hold the clock so the probe lands inside the pending-open bound.
                 composeRule.mainClock.autoAdvance = false
-                composeRule.onNodeWithTag("chat.row.${next.groupIdHex}").assertIsDisplayed().performClick()
+                composeRule.onNodeWithTag("chat.row.$nextGroup").assertIsDisplayed().performClick()
                 composeRule.mainClock.advanceTimeBy(PENDING_OPEN_PROBE_MILLIS)
-                shadowOf(Looper.getMainLooper()).idle()
+                awaitHeldClock { secondOpenReached.isCompleted }
 
+                // The tap retires the open conversation at once, so nothing is selected while the tapped chat
+                // prepares. What keeps the pane filled is the retired conversation, still composed.
+                assertNull(holder.selectedChat.value)
+                assertEquals(1, composed(OPEN_CHAT_MESSAGE))
+                assertEquals(0, composed(TAPPED_CHAT_MESSAGE))
                 composeRule.onNodeWithTag(CONVERSATION_PANE_PLACEHOLDER_TAG).assertDoesNotExist()
                 conversationComposer().assertIsDisplayed()
-                assertNotEquals(next.groupIdHex, holder.selectedChat.value?.id)
 
                 secondOpenMayAnswer.complete(Unit)
                 composeRule.mainClock.autoAdvance = true
-                awaitCondition { holder.selectedChat.value?.id == next.groupIdHex }
+                awaitCondition { holder.selectedChat.value?.id == nextGroup }
+                awaitCondition { composed(TAPPED_CHAT_MESSAGE) == 1 }
                 settle()
+                assertEquals(0, composed(OPEN_CHAT_MESSAGE))
                 composeRule.onNodeWithTag(CONVERSATION_PANE_PLACEHOLDER_TAG).assertDoesNotExist()
                 conversationComposer().assertIsDisplayed()
             }
@@ -161,6 +181,33 @@ class ShellRouteContractTest {
             // A reader left suspended would hold a shared IO worker for every later test.
             secondOpenMayAnswer.complete(Unit)
         }
+    }
+
+    /** A one-message timeline for [groupIdHex] whose only message reads [text]. */
+    private fun messageScript(
+        groupIdHex: String,
+        idByte: String,
+        text: String,
+    ): ScriptedConversationTimelineSubscription {
+        val record = timelineRecord(idByte.repeat(32), 1uL).copy(groupIdHex = groupIdHex, plaintext = text)
+        return ScriptedConversationTimelineSubscription(timelinePage(record))
+    }
+
+    /** How many composed nodes outside the list pane carry [text], so a list preview can never count. */
+    private fun composed(text: String): Int {
+        val outsideTheListPane = !hasAnyAncestor(hasTestTag(TWO_PANE_LIST_TAG))
+        val carriers = composeRule.onAllNodes(hasText(text, substring = true) and outsideTheListPane, true)
+        return carriers.fetchSemanticsNodes().size
+    }
+
+    /** Waits in real time for [condition] without moving the held test clock. */
+    private fun awaitHeldClock(condition: () -> Boolean) {
+        val deadline = System.nanoTime() + HELD_CLOCK_WAIT_NANOS
+        while (!condition() && System.nanoTime() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(HELD_CLOCK_POLL_MILLIS)
+        }
+        assertTrue("the tapped chat never asked for its timeline", condition())
     }
 
     /** The conversation composer, never a text field inside the list pane. */
@@ -195,6 +242,10 @@ class ShellRouteContractTest {
 
         /** Well inside the 300 ms pending-open bound, so the tapped chat is still being prepared. */
         const val PENDING_OPEN_PROBE_MILLIS = 100L
+        const val OPEN_CHAT_MESSAGE = "open chat only message"
+        const val TAPPED_CHAT_MESSAGE = "tapped chat only message"
+        const val HELD_CLOCK_WAIT_NANOS = 10_000_000_000L
+        const val HELD_CLOCK_POLL_MILLIS = 10L
     }
 }
 
