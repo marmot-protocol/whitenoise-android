@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">開啟此聊天的詳細資料，例如成員和設定。</string>
     <string name="explanation_conversation_jump_to_mention">捲動到下一則提到你的未讀訊息。</string>
     <string name="explanation_composer_draft_top">將草稿捲動到第一行。文字不會改變。</string>
+    <string name="explanation_composer_draft_bottom">將草稿捲動到最後一行。文字不會改變。</string>
     <string name="explanation_emoji_search">依名稱搜尋表情符號。</string>
     <string name="explanation_emoji_configure">開啟設定，在那裡選擇你的快速回應表情符號。</string>
 

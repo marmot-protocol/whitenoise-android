@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -48,6 +49,7 @@ import dev.ipf.whitenoise.android.state.REPORT_REASONS
 import dev.ipf.whitenoise.android.state.boundedExplanation
 import dev.ipf.whitenoise.android.state.reportReasonLabel
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 
 internal const val REPORT_SHEET_TEST_TAG = "message.report"
 internal const val REPORT_BODY_TEST_TAG = "message.report.body"
@@ -87,8 +89,9 @@ internal data class ReportFormState(
 @Composable
 internal fun ReportMessageSheet(
     onDismissRequest: () -> Unit,
-    onSubmit: (ReportReasonFfi, String) -> Unit,
+    onSubmit: (ReportReasonFfi, String, () -> Unit) -> Unit,
     sending: Boolean = false,
+    ownerKey: Any? = Unit,
     audience: ReportAudience = ReportAudience.Group,
     sendToTeam: Boolean = true,
     onSendToTeamChange: (Boolean) -> Unit = {},
@@ -96,9 +99,22 @@ internal fun ReportMessageSheet(
 ) {
     var reason by remember { mutableStateOf(REPORT_REASONS.first()) }
     var explanation by remember { mutableStateOf("") }
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheet, ownerKey)
+    var closingAudience by remember(terminal) { mutableStateOf<ReportAudience?>(null) }
+    val close = {
+        closingAudience = audience
+        terminal.close(onDismissRequest)
+    }
     ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = close,
+        sheetState = sheet,
+        sheetGesturesEnabled = terminal.acceptsInput,
+        properties =
+            ModalBottomSheetProperties(
+                shouldDismissOnBackPress = terminal.acceptsInput,
+                shouldDismissOnClickOutside = terminal.acceptsInput,
+            ),
         modifier = Modifier.testTag(REPORT_SHEET_TEST_TAG),
         dragHandle = { ReportMessageDragHandle() },
     ) {
@@ -107,9 +123,11 @@ internal fun ReportMessageSheet(
             { reason = it },
             explanation,
             { explanation = it },
-            form.sending,
-            onSubmit,
-            ReportTeamChoice(audience, sendToTeam, onSendToTeamChange),
+            form.sending || !terminal.acceptsInput,
+            { acceptedReason, acceptedExplanation ->
+                onSubmit(acceptedReason, acceptedExplanation, close)
+            },
+            ReportTeamChoice(closingAudience ?: audience, sendToTeam, onSendToTeamChange),
             form,
         )
     }

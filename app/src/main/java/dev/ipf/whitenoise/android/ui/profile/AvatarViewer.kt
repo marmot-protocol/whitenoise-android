@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -84,6 +83,7 @@ import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Download
@@ -94,7 +94,6 @@ import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 
 private const val AVATAR_VIEWER_MAX_BYTES = 8 * 1024 * 1024
 
@@ -440,19 +439,21 @@ internal fun AvatarViewerFrame(
                     )
                 }
                 val menuScrollState = rememberScrollState()
-                DropdownMenu(
+                AnimatedDropdownMenu(
                     scrollState = menuScrollState,
                     modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
                     expanded = menuOpen,
                     onDismissRequest = { onMenuOpenChange(false) },
-                ) {
+                ) { surface ->
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.media_save)) },
                         leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
                         enabled = saveEnabled,
                         onClick = {
-                            onMenuOpenChange(false)
-                            onSave()
+                            surface.close {
+                                onMenuOpenChange(false)
+                                onSave()
+                            }
                         },
                     )
                     if (editActionLabel != null && onEditPicture != null) {
@@ -460,8 +461,10 @@ internal fun AvatarViewerFrame(
                             text = { Text(editActionLabel) },
                             leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                             onClick = {
-                                onMenuOpenChange(false)
-                                onEditPicture()
+                                surface.close {
+                                    onMenuOpenChange(false)
+                                    onEditPicture()
+                                }
                             },
                         )
                     }
@@ -580,39 +583,6 @@ private fun ZoomableAvatarImage(
         }
     }
 }
-
-private fun avatarViewerFileName(url: String): String {
-    val parsed = runCatching { android.net.Uri.parse(url) }.getOrNull()
-    val lastSegment =
-        parsed
-            ?.lastPathSegment
-            ?.takeIf { it.isNotBlank() }
-            ?: "avatar.jpg"
-    val safe = MediaPipeline.safeDisplayName(lastSegment)
-    return if (safe.contains('.')) safe else "$safe.jpg"
-}
-
-// Sniff the real content type from the bytes being saved — the URL filename is
-// only a fallback, since extensionless or mislabeled URLs would otherwise store
-// PNG/WebP bytes under JPEG metadata in MediaStore.
-private fun avatarViewerMimeType(
-    bytes: ByteArray,
-    fallbackFileName: String,
-): String =
-    dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-        .inspect(bytes)
-        ?.mime
-        ?.takeIf { it.isNotEmpty() } ?: avatarViewerMimeType(fallbackFileName)
-
-private fun avatarViewerMimeType(fileName: String): String =
-    when (fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)) {
-        "png" -> "image/png"
-        "webp" -> "image/webp"
-        "gif" -> "image/gif"
-        "heic" -> "image/heic"
-        "heif" -> "image/heif"
-        else -> MediaPipeline.RECOMPRESSED_MIME
-    }
 
 internal sealed interface AvatarViewerImageState {
     data object Loading : AvatarViewerImageState

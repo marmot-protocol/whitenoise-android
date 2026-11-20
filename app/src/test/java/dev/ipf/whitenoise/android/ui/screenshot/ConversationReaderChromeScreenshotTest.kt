@@ -165,6 +165,7 @@ class ConversationReaderChromeScreenshotTest {
             composeRule.onNodeWithTag("message.history.body.0").performScrollTo().assertIsDisplayed()
         }
         composeRule.onNodeWithContentDescription("Back").performClick()
+        composeRule.waitForIdle()
         assertEquals(1, dismissed)
     }
 

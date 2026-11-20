@@ -25,6 +25,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -32,11 +33,13 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class PollConversationActionsTest {
+    /** A vote waits for another commit on the same group, then reaches MDK once with the pinned native ids. */
     @Test
     fun voteWaitsForOtherGroupMutationAndUsesPinnedNativeIds() =
         runTest {
             val entered = CountDownLatch(1)
-            val calls = mutableListOf<List<Any?>>()
+            // Written on the native call's thread and read here, so the list is copy-on-write.
+            val calls = CopyOnWriteArrayList<List<Any?>>()
             val native =
                 native { name, args ->
                     assertEquals("castPollVote", name)

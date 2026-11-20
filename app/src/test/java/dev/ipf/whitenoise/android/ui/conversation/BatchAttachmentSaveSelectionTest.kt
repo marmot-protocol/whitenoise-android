@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.media.MessageAttachmentSaveSummary
 import dev.ipf.whitenoise.android.ui.conversation.media.aggregateMessageAttachmentSaveSummaries
@@ -72,7 +73,7 @@ class BatchAttachmentSaveSelectionTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
-        ).first(File::exists).readText()
+        ).first(File::exists).motionOwnerSource()
 
     /** Builds a batch selection for the given message id, recorded time and timeline order. */
     private fun selection(

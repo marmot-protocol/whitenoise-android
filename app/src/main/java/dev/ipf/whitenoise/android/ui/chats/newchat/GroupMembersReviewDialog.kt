@@ -63,7 +63,8 @@ internal data class MemberReviewGroup(
 
 /** Destination and acting account head one compact row per member; actions stay outside the scrolling body. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
+// Keep ticket ownership, exit completion, and conditional dialog slots together at the confirmation boundary.
 internal fun GroupMembersReviewDialog(
     appState: WhiteNoiseAppState,
     groups: List<MemberReviewGroup>,
@@ -83,13 +84,13 @@ internal fun GroupMembersReviewDialog(
 ) {
     val actingAccount = remember(appState) { appState.activeAccountRef }
     val runtime = remember(appState) { appState.runtimeGeneration }
-    val ticket = remember { GroupMembersReviewTicket() }
     val liveBusy = rememberUpdatedState(busy)
     val liveMembers = rememberUpdatedState(members)
     val liveGroups = rememberUpdatedState(groups)
     // Identities are captured once when the review opens; Admin toggles made inside it are intended edits.
     val reviewedMembers = remember { members.map { it.accountIdHex } }
     val reviewedGroups = remember { groups.map { it.id } }
+    val ticket = remember(appState) { GroupMembersReviewTicket() }
     DisposableEffect(ticket) { onDispose { ticket.invalidate() } }
     val current = groupMembersReviewOwnerCurrent(appState, actingAccount, runtime)
 
@@ -107,6 +108,8 @@ internal fun GroupMembersReviewDialog(
         }
     }
     WhiteNoiseAlertDialog(
+        ownerKey = ticket,
+        dismissEnabled = { dismissEnabled && ticket.active },
         modifier = Modifier.testTag("group.members.review.dialog"),
         onDismissRequest = {
             if (dismissEnabled && ticket.active) {
@@ -118,20 +121,26 @@ internal fun GroupMembersReviewDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (ticket.claim(
-                            ownerCurrent = { groupMembersReviewOwnerCurrent(appState, actingAccount, runtime) },
-                            busy = { liveBusy.value },
-                            selectionCurrent = {
-                                sameReviewSelection(
-                                    reviewedMembers,
-                                    reviewedGroups,
-                                    liveMembers.value,
-                                    liveGroups.value,
-                                )
-                            },
-                        )
-                    ) {
-                        onConfirm()
+                    close {
+                        if (ticket.claim(
+                                ownerCurrent = { groupMembersReviewOwnerCurrent(appState, actingAccount, runtime) },
+                                busy = { liveBusy.value },
+                                selectionCurrent = {
+                                    sameReviewSelection(
+                                        reviewedMembers,
+                                        reviewedGroups,
+                                        liveMembers.value,
+                                        liveGroups.value,
+                                    )
+                                },
+                            )
+                        ) {
+                            onConfirm()
+                        } else if (ticket.active) {
+                            // Retire this request after rejection; replacement/disposed tickets stay inert.
+                            ticket.invalidate()
+                            onDismiss()
+                        }
                     }
                 },
                 colors =
@@ -150,12 +159,7 @@ internal fun GroupMembersReviewDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = {
-                if (ticket.active) {
-                    ticket.invalidate()
-                    onDismiss()
-                }
-            }, enabled = dismissEnabled) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss, enabled = dismissEnabled) { Text(stringResource(R.string.cancel)) }
         },
         text = {
             Column(

@@ -1,10 +1,19 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package dev.ipf.whitenoise.android.ui.group
 
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.ipf.whitenoise.android.ui.common.SheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -44,6 +53,50 @@ class ImageSearchSheetProgressTest {
             assertEquals(1, applyCalls)
         }
         composeRule.onNodeWithText(applyLabel).assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun parentUploadAndRemovalDoNotReplaceTheAcceptedPickerPresentation() {
+        val originalUrl = "https://example.com/original.jpg"
+        val parentUrl = mutableStateOf(originalUrl)
+        val busy = mutableStateOf(true)
+        lateinit var terminal: SheetTerminalMotion
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                terminal = rememberSheetTerminalMotion(sheet)
+                ImageSearchSheet(
+                    initialUrl = parentUrl.value,
+                    hasCurrentImage = parentUrl.value.isNotBlank(),
+                    header = "Edit image",
+                    title = "Test image",
+                    seed = "test",
+                    urlLabel = "Image URL",
+                    removeImageLabel = "Remove test image",
+                    applyInFlight = busy.value,
+                    onDismiss = {},
+                    onApply = {},
+                    suppliedSheetState = sheet,
+                    suppliedTerminal = terminal,
+                )
+            }
+        }
+        composeRule.runOnIdle {
+            terminal.closeWhenReady({ !busy.value }) {}
+            parentUrl.value = "https://example.com/new-cold-cache.jpg"
+        }
+        composeRule.onNodeWithTag("image_search.url").assertTextContains(originalUrl)
+        composeRule.runOnIdle { parentUrl.value = "" }
+        composeRule.onNodeWithTag("image_search.url").assertTextContains(originalUrl)
+        composeRule.onNodeWithText("Remove test image").assertExists()
+        // Busy clears while exit is accepted, without changing the session's presentation.
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle { busy.value = false }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithTag("image_search.url").assertTextContains(originalUrl)
+        composeRule.onNodeWithText("Remove test image").assertExists()
+        composeRule.mainClock.advanceTimeBy(1000)
     }
 
     @Test

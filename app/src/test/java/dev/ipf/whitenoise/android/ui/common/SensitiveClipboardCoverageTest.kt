@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.appModuleFile
 import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,9 +22,10 @@ class SensitiveClipboardCoverageTest {
             root
                 .walkTopDown()
                 .filter { it.extension == "kt" }
-                .filter { file -> file.readText().let { "EXTRA_IS_SENSITIVE" in it && "setPrimaryClip" in it } }
-                .flatMap { file ->
-                    val source = file.readText()
+                .filter { file ->
+                    file.motionOwnerSource().let { "EXTRA_IS_SENSITIVE" in it && "setPrimaryClip" in it }
+                }.flatMap { file ->
+                    val source = file.motionOwnerSource()
                     blockFunctions(source)
                         .filter { (_, body) -> "EXTRA_IS_SENSITIVE" in body && "setPrimaryClip" in body }
                         .map { (name, _) -> "${file.relativeTo(root).invariantSeparatorsPath}#$name" }
@@ -47,7 +49,7 @@ class SensitiveClipboardCoverageTest {
         assertTrue("copySensitiveToClipboard(context, privateKeyLabel, " in screen)
         assertTrue("copySensitiveToClipboard(context, encryptedBackupLabel, " in screen)
         assertTrue("copyToClipboard(context, publicKeyLabel, " in screen)
-        assertTrue("EXTRA_IS_SENSITIVE" !in screen.functionBody("copyToClipboard"))
+        assertTrue("EXTRA_IS_SENSITIVE" !in appModuleSource(PROFILE_KEY_CLIPBOARD).functionBody("copyToClipboard"))
     }
 
     /** Pairs each block-bodied function name with its body; expression bodies cannot hold two statements. */
@@ -65,6 +67,7 @@ class SensitiveClipboardCoverageTest {
     private companion object {
         val FUNCTION = Regex("""\bfun\s+(?:<[^>]*>\s*)?(?:[\w<>?,*. ]+\.)?(\w+)\s*\(""")
         const val CLIPBOARD = "src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt"
+        const val PROFILE_KEY_CLIPBOARD = "src/main/java/dev/ipf/whitenoise/android/ui/settings/ProfileKeyClipboard.kt"
         const val ACCOUNT_KEYS = "src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt"
         const val HELPER = "dev/ipf/whitenoise/android/ui/common/Clipboard.kt#copySensitiveToClipboard"
     }

@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-image-camera-close
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: camera.shutter
+- assertVisible:
+    id: camera.mode.photo
+- assertVisible:
+    id: camera.mode.video
+- assertVisible:
+    id: camera.switch
+- tapOn:
+    id: camera.close
+- assertVisible:
+    id: presentation.complete

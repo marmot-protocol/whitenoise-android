@@ -43,12 +43,14 @@ import dev.ipf.whitenoise.android.state.EmojiSetsController
 import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emojiSetsBackend
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.decodeEmojiImage
+import dev.ipf.whitenoise.android.ui.rememberBuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -125,6 +127,8 @@ internal fun EmojiSetsScreen(
             onCancel = controller::cancelInstall,
             onRemove = { appState.launchMutation { controller.remove() } },
             profileName = selected?.let { appState.accountDisplayNameCached(it.accountIdHex) },
+            // Pre-installed sets are a device choice, so the share flow's per-profile browser leaves them out.
+            builtinSets = rememberBuiltinEmojiSetChoices().takeIf { targetAccount == null },
         )
     }
 }
@@ -142,6 +146,7 @@ internal fun EmojiSetsContent(
     onCancel: () -> Unit,
     onRemove: () -> Unit,
     profileName: String? = null,
+    builtinSets: BuiltinEmojiSetChoices? = null,
 ) {
     val title = stringResource(R.string.emoji_sets_title)
     val query = rememberTextFieldState()
@@ -170,7 +175,7 @@ internal fun EmojiSetsContent(
     ) {
         val set = state.preview
         if (set == null) {
-            EmojiSetBrowser(state, query, onSearch, onShow)
+            EmojiSetBrowser(state, query, onSearch, onShow, builtinSets)
         } else {
             EmojiSetPreview(state, set, onLoadArtwork, onInstall, onCancel, onRemove) { onSearch(set.coordinate) }
         }
@@ -196,51 +201,29 @@ private fun EmojiSetBrowser(
     field: TextFieldState,
     onSearch: (String) -> Unit,
     onShow: (EmojiSetFfi) -> Unit,
+    builtinSets: BuiltinEmojiSetChoices?,
 ) {
     val loading = state.busy || state.discovering
+    // Search results replace the library, so the pre-installed rows return when the search is cleared.
+    val listedBuiltins = builtinSets.takeIf { !state.searched }
     SettingsList {
         item { EmojiSetQuery(field, busy = loading, onSearch = onSearch) }
         item { EmojiSetStatus(state, syncing = state.discovering) }
         // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
-        val discoveryFailed =
-            state.notice == EmojiSetNotice.Error || state.notice == EmojiSetNotice.DiscoveryIncomplete
-        if (state.sets.isEmpty() && !loading && !discoveryFailed) {
+        if (!loading && state.showsNoSets(builtinsListed = listedBuiltins != null)) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
         // Installed sets, then relay results, under the sticker browser's headings (#3882).
         val (installed, discovered) = state.sets.partition { it.installed != null }
-        for ((heading, sets) in listOf(
-            R.string.emoji_sets_section_installed to installed,
-            R.string.emoji_sets_section_discover to discovered,
-        )) {
-            if (sets.isEmpty()) continue
-            item(key = "heading.$heading") { SettingsSection(stringResource(heading)) }
-            items(sets, key = { it.coordinate }) { set ->
-                SettingsGroup {
-                    row("set") { context ->
-                        SettingsAction(
-                            context = context,
-                            title = set.displayTitle(),
-                            subtitle =
-                                when {
-                                    set.installed?.updateAvailable == true ->
-                                        stringResource(R.string.emoji_sets_update_available)
-                                    set.installed != null -> stringResource(R.string.emoji_sets_installed)
-                                    else -> {
-                                        val count = set.emoji.size
-                                        pluralStringResource(R.plurals.emoji_sets_item_count, count, count)
-                                    }
-                                },
-                            explanation = stringResource(R.string.explanation_organize_emoji_set),
-                            enabled = !state.busy,
-                            onClick = { onShow(set) },
-                            leading = { SettingsLeadingIcon(R.drawable.ic_category) },
-                        )
-                    }
-                }
-            }
-        }
+        emojiSetSection(R.string.emoji_sets_section_installed, installed, state.busy, onShow, listedBuiltins)
+        emojiSetSection(R.string.emoji_sets_section_discover, discovered, state.busy, onShow)
     }
+}
+
+/** Whether to say nothing matched: no rows at all, and no failed discovery notice that explains why. */
+private fun EmojiSetsState.showsNoSets(builtinsListed: Boolean): Boolean {
+    val discoveryFailed = notice == EmojiSetNotice.Error || notice == EmojiSetNotice.DiscoveryIncomplete
+    return sets.isEmpty() && !builtinsListed && !discoveryFailed
 }
 
 /** The query field and its explicit Find action. */
@@ -492,4 +475,5 @@ private fun EmojiSetStatus(
     state.installedWithSkips?.let { SettingsExplainer(pluralStringResource(R.plurals.emoji_sets_skipped, it, it)) }
 }
 
-private fun EmojiSetFfi.displayTitle(): String = title?.takeIf { it.isNotBlank() } ?: identifier.ifBlank { coordinate }
+/** The set's title, falling back to its identifier and then its coordinate when unnamed. */
+internal fun EmojiSetFfi.displayTitle(): String = title?.takeIf { it.isNotBlank() } ?: identifier.ifBlank { coordinate }

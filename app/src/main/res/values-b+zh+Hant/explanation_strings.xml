@@ -11,7 +11,7 @@
     <string name="explanation_composer_dictation">使用 Android 語音辨識將你說的話轉為文字。White Noise 會要求離線辨識，但你的裝置仍可能使用線上服務。</string>
     <string name="explanation_composer_translate">開啟或關閉翻譯模式。開啟期間，傳送會傳送「將傳送」列中顯示的譯文，譯文就緒之前不會傳送任何內容。</string>
     <string name="explanation_composer_voice_note">按住可錄製語音訊息。</string>
-    <string name="explanation_composer_camera">開啟相機，以便你附加新照片。Android 首次會要求相機權限。</string>
+    <string name="explanation_composer_camera">開啟相機，以便你拍照或錄製影片並附加。Android 首次會要求相機權限，首次錄影時會要求麥克風權限。</string>
     <string name="explanation_composer_gallery">開啟 Android 照片選擇器。White Noise 只會收到你選擇的照片和影片。</string>
     <string name="explanation_composer_files">開啟 Android 檔案選擇器，可附加任何檔案。</string>
     <string name="explanation_composer_location">以地圖連結的形式傳送一次你目前的位置。不會持續分享你的位置。</string>

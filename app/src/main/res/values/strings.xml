@@ -351,6 +351,7 @@
     <string name="chat_row_draft_prefix">Draft: </string>
     <string name="jump_to_newest">Jump to newest</string>
     <string name="scroll_to_top">Scroll to top</string>
+    <string name="scroll_to_bottom">Scroll to bottom</string>
     <string name="discard_failed_message">Discard failed message</string>
     <string name="message_discard_still_sending">This message is still sending. Try again in a moment.</string>
     <string name="reply_target_not_sent">The message you\'re replying to hasn\'t been sent yet. Wait for it to send, or tap Retry on it if it failed, then send your reply.</string>
@@ -1960,6 +1961,8 @@
     <string name="emoji_sets_installed">Installed</string>
     <string name="emoji_sets_section_installed">Installed</string>
     <string name="emoji_sets_section_discover">Discover</string>
+    <string name="emoji_sets_builtin_shown">Pre-installed · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Hidden from picker. Still shows in messages.</string>
     <string name="emoji_sets_update_available">Update available</string>
     <string name="emoji_sets_load_image">Load preview image</string>
     <string name="emoji_sets_image_privacy">Loading a preview or installing a set shares your IP address with its image hosts.</string>

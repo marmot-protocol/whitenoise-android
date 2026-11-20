@@ -15,7 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
 
@@ -29,20 +29,26 @@ internal fun NostrLinkedImageDialog(
         AvatarImageLoader.retryBanner(url, width, dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
     },
 ) {
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = null,
+        ownerKey = url to AvatarImageLoader.currentCacheLifetime(),
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
-                IconButton(onClick = onDismiss) {
+                IconButton(onClick = dismiss) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.back))
                 }
                 NostrEventImagePane(
                     url = url,
                     loadImage = loadImage,
                     initiallyRequested = true,
-                    onFullscreenDismiss = onDismiss,
+                    onFullscreenDismiss = {
+                        // The inner viewer already completed its exit; retire this source without another fade.
+                        cancelCompletion()
+                        onDismiss()
+                    },
                 )
             }
         }

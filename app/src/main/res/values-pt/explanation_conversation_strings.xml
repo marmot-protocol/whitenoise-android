@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Abre os detalhes desta conversa, como membros e configurações.</string>
     <string name="explanation_conversation_jump_to_mention">Rola até a próxima mensagem não lida que menciona você.</string>
     <string name="explanation_composer_draft_top">Rola o rascunho de volta para a primeira linha. O texto não é alterado.</string>
+    <string name="explanation_composer_draft_bottom">Rola o rascunho até a última linha. O texto não é alterado.</string>
     <string name="explanation_emoji_search">Pesquisa emojis pelo nome.</string>
     <string name="explanation_emoji_configure">Abre as configurações onde você escolhe seus emojis de reação rápida.</string>
 

@@ -189,15 +189,6 @@
         ]
       },
       {
-        "surface": "R.string.tts_bar_error",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
-        "anchor": "R.string.tts_bar_error",
-        "test_ids": [
-          "MED-010",
-          "MED-056"
-        ]
-      },
-      {
         "surface": "Readable active document speech at scroll edge",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "fadeEnabled = playback == null",

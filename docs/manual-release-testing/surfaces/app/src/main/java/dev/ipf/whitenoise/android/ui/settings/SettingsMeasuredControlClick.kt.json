@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsMeasuredControlClick.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "rememberMeasuredControlClick",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsMeasuredControlClick.kt",
+        "anchor": "fun rememberMeasuredControlClick(",
+        "test_ids": [
+          "NAV-011",
+          "CON-037"
+        ]
+      },
+      {
+        "surface": "rememberMeasuredContourClick",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsMeasuredControlClick.kt",
+        "anchor": "fun rememberMeasuredContourClick(",
+        "test_ids": [
+          "NAV-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

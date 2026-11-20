@@ -13,8 +13,10 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 
 internal data class ConversationOpenContext(
+    val activationBounds: androidx.compose.ui.geometry.Rect? = null,
     val focusMessageId: String? = null,
     // Set only when focusMessageId is a search result opened from the chat list (#1945). Voice, playback and
     // attachment-speech destinations also name a message to focus, but land with their own rules and wording.
@@ -47,6 +49,7 @@ internal data class PendingConversationOpen(
     val focusMessageId: String?,
     val justCreated: Boolean,
     val visibleActiveListHead: ChatListReturnHead?,
+    val activationBounds: androidx.compose.ui.geometry.Rect? = null,
 )
 
 internal fun pendingConversationOpenBelongsToAccount(
@@ -146,11 +149,25 @@ internal class ProfileGroupForegroundState {
     var initialMember by mutableStateOf<RecipientSearch.Candidate?>(null)
         private set
 
-    fun open(member: RecipientSearch.Candidate) {
+    var launchContour by mutableStateOf<SettingsContour?>(null)
+        private set
+
+    var launchOrigin by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
+        private set
+
+    fun open(
+        member: RecipientSearch.Candidate,
+        origin: androidx.compose.ui.geometry.Rect? = null,
+        contour: SettingsContour? = null,
+    ) {
+        launchContour = contour
+        launchOrigin = origin
         initialMember = member
     }
 
     fun close() {
+        launchContour = null
+        launchOrigin = null
         initialMember = null
     }
 }

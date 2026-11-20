@@ -48,12 +48,12 @@ internal suspend fun MarmotInterface.listAccountsWithAppAttachmentPolicy(): List
 }
 
 /**
- * Creates an identity and returns its durable native receipt. Its NIP-65 list declares
- * [MarmotClient.accountRelays]; publication and the inbox list use the full bootstrap relay set.
+ * Creates an identity and returns its durable native receipt. Its NIP-65 list declares [whiteNoiseNip65Relays] and
+ * its Inbox list [whiteNoiseInboxRelays], while publication uses the full bootstrap relay set.
  */
 internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): AccountSummaryFfi {
     val relays = MarmotClient.bootstrapRelays
-    return createIdentity(MarmotClient.accountRelays, relays, relays)
+    return createIdentity(whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)
 }
 
 /**
@@ -63,7 +63,7 @@ internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): Accoun
  */
 internal suspend fun MarmotInterface.createNamedIdentity(profile: UserProfileMetadataFfi): AccountSummaryFfi {
     val relays = MarmotClient.bootstrapRelays
-    return createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays).account
+    return createIdentityWithInitialProfile(profile, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays).account
 }
 
 /**

@@ -6,7 +6,8 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingSubscription
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.whitenoise.android.core.MarmotClient
+import dev.ipf.whitenoise.android.state.whiteNoiseInboxRelays
+import dev.ipf.whitenoise.android.state.whiteNoiseNip65Relays
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -184,12 +185,8 @@ internal class MarmotAccountSetupClient(
             marmot.proposeOnboardingRelays(
                 account,
                 request.step,
-                if (request.step == OnboardingStepFfi.INBOX_RELAYS) {
-                    MarmotClient.bootstrapRelays
-                } else {
-                    MarmotClient.accountRelays
-                },
-                if (request.step == OnboardingStepFfi.RELAYS) MarmotClient.accountRelays else emptyList(),
+                if (request.step == OnboardingStepFfi.INBOX_RELAYS) whiteNoiseInboxRelays else whiteNoiseNip65Relays,
+                if (request.step == OnboardingStepFfi.RELAYS) whiteNoiseNip65Relays else emptyList(),
             )
         } else {
             marmot.proposeOnboardingRelayRepair(account, request.step)

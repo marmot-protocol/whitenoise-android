@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarAvailabilityFfi
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
@@ -51,6 +52,7 @@ class RetainedAvatarNavigationCoverageTest {
     private var account by mutableStateOf<String?>(ACCOUNT)
     private var surface by mutableStateOf(0)
     private var mounted by mutableStateOf(true)
+    private var destination by mutableStateOf<AvatarAssetFfi?>(null)
     private lateinit var owner: RetainedGroupAvatarPreparation
 
     /** Removes only synthetic process pixels after each fixture. */
@@ -296,6 +298,71 @@ class RetainedAvatarNavigationCoverageTest {
             rule.waitForIdle()
             assertNull("the current selection is authoritative over retained pins", shown)
         }
+    }
+
+    /**
+     * A conversation, its details or its edit screen opened from the list draws the list's retained picture on its
+     * own first commit, after the shared decoded cache has evicted it and before any local read could finish.
+     */
+    @Test
+    fun forwardDestinationDrawsTheListsPictureOnItsFirstCommitAfterEviction() {
+        seed(assets.take(1))
+        val commits = mountDestination()
+        select(assets.take(1))
+        evictDecodedPixels()
+        assertNull(AvatarImageLoader.cachedImage(checkNotNull(assets.first().cacheKey(ACCOUNT))))
+
+        rule.runOnIdle { destination = assets.first() }
+        rule.waitForIdle()
+
+        assertTrue("the destination must have committed", commits.isNotEmpty())
+        assertSame("the destination's first commit draws the list's picture", image, commits.first())
+    }
+
+    /** A destination showing another revision of the picture never starts from the list's older pixels. */
+    @Test
+    fun forwardDestinationNeverBorrowsAnotherRevision() {
+        seed(assets.take(1))
+        val commits = mountDestination()
+        select(assets.take(1))
+        evictDecodedPixels()
+
+        rule.runOnIdle { destination = assets.first().copy(contentRevision = 2uL) }
+        rule.waitForIdle()
+
+        assertTrue("the destination must have committed", commits.isNotEmpty())
+        assertNull("another revision's first commit has no borrowed pixels", commits.first())
+    }
+
+    /** The shell hands its retained window to the conversation route that hosts details and editing. */
+    @Test
+    fun shellProvidesItsRetainedWindowToTheConversationRoute() {
+        val shell = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt")
+        assertTrue(
+            "the conversation route must receive the list's retained pixels",
+            "LocalRetainedGroupAvatarPixels provides retainedAvatarPreparation," in shell,
+        )
+    }
+
+    /**
+     * Mounts the shell owner and, once [destination] is set, a destination preparing that one picture under the
+     * shell's retained window, recording every avatar it commits.
+     */
+    private fun mountDestination(): List<ImageBitmap?> {
+        val commits = mutableListOf<ImageBitmap?>()
+        rule.setContent {
+            owner = rememberRetainedGroupAvatarPreparation(state, account, surface)
+            destination?.let { shownAsset ->
+                CompositionLocalProvider(LocalRetainedGroupAvatarPixels provides owner) {
+                    PreparedGroupAvatarContent(state, listOf(shownAsset), account) {
+                        val shown = rememberDurableAvatar(state, shownAsset, account)
+                        SideEffect { commits += shown }
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        return commits
     }
 
     /** Mounts the shell-owned preparation without a list, as while a conversation is open. */

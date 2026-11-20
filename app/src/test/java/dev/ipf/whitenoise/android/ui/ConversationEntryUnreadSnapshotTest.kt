@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.conversation.ConversationEntryUnreadSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.conversationReadAnchorCandidateIndex
+import dev.ipf.whitenoise.android.ui.conversation.firstUnreadAfterReadAnchor
 import dev.ipf.whitenoise.android.ui.conversation.hasSentMessageAfterUnreadBoundary
 import dev.ipf.whitenoise.android.ui.conversation.loadConversationTimelineToNewest
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationEntryUnreadSnapshot
@@ -75,8 +76,112 @@ class ConversationEntryUnreadSnapshotTest {
             timeline.value = listOf(received("older"), received("read"), received("unread"))
         }
         composeRule.waitForIdle()
-        assertEquals(ConversationEntryUnreadSnapshot(count = 1, firstUnreadMessageId = "unread"), snapshot[0])
+        assertEquals(ConversationEntryUnreadSnapshot(1, "unread", readAnchorMessageId = "read"), snapshot[0])
         assertEquals(before, snapshot[0])
+    }
+
+    /** A row folded before the user read on keeps an old first-unread id; the line follows the anchor. */
+    @Test
+    fun staleFirstUnreadAtOrBeforeReadAnchorMovesToFirstMessageAfterAnchor() {
+        val snapshot = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+        composeRule.setContent {
+            snapshot[0] =
+                rememberConversationEntryUnreadSnapshot(
+                    controllerIdentity = this,
+                    projectionUnread = 2,
+                    projectionFirstUnreadMessageId = "old-unread",
+                    timeline = listOf(received("old-unread"), received("read"), received("new-1"), received("new-2")),
+                    readAnchorMessageId = "read",
+                )
+        }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(2, "new-1", readAnchorMessageId = "read"), snapshot[0])
+    }
+
+    /** The rendered line moves too once paging loads the anchor behind a stale first-unread id. */
+    @Test
+    fun staleFirstUnreadMovesWhenPagingLoadsReadAnchor() {
+        val timeline = mutableStateOf(listOf(received("new-1"), received("new-2")))
+        val snapshot = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+        composeRule.setContent {
+            snapshot[0] =
+                rememberConversationEntryUnreadSnapshot(
+                    controllerIdentity = this,
+                    projectionUnread = 1,
+                    projectionFirstUnreadMessageId = "old-unread",
+                    timeline = timeline.value,
+                    readAnchorMessageId = "read",
+                )
+        }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(1, "old-unread", readAnchorMessageId = "read"), snapshot[0])
+
+        // The anchor arrives a page before the stale id; only loading both can prove it stale.
+        composeRule.runOnUiThread { timeline.value = listOf(received("read")) + timeline.value }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(1, "old-unread", readAnchorMessageId = "read"), snapshot[0])
+
+        composeRule.runOnUiThread {
+            timeline.value = listOf(received("old-unread"), received("read-earlier")) + timeline.value
+        }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(1, "new-1", readAnchorMessageId = "read"), snapshot[0])
+
+        // The line stays put when the window later drops the anchor again.
+        composeRule.runOnUiThread { timeline.value = listOf(received("new-1"), received("new-2")) }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(1, "new-1", readAnchorMessageId = "read"), snapshot[0])
+    }
+
+    /** Without a projected id, a later anchor page cannot push the count-based line onto live arrivals. */
+    @Test
+    fun countBasedLineIgnoresMessagesArrivingBeforeAnchorPagesIn() {
+        val timeline = mutableStateOf(listOf(received("new-1"), received("new-2")))
+        val snapshot = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+        composeRule.setContent {
+            snapshot[0] =
+                rememberConversationEntryUnreadSnapshot(
+                    controllerIdentity = this,
+                    projectionUnread = 2,
+                    projectionFirstUnreadMessageId = null,
+                    timeline = timeline.value,
+                    readAnchorMessageId = "read",
+                )
+        }
+        composeRule.waitForIdle()
+        val entry = snapshot[0]
+        assertEquals(ConversationEntryUnreadSnapshot(2, "new-1", readAnchorMessageId = "read"), entry)
+
+        composeRule.runOnUiThread { timeline.value = timeline.value + received("live") }
+        composeRule.waitForIdle()
+        composeRule.runOnUiThread { timeline.value = listOf(received("read")) + timeline.value }
+        composeRule.waitForIdle()
+        assertEquals(entry, snapshot[0])
+    }
+
+    @Test
+    fun staleFirstUnreadBeforeLoadedAnchorMovesToNextReceivedMessage() {
+        val timeline = listOf(received("old-unread"), received("read"), received("new-1"), received("new-2"))
+        assertEquals("new-1", firstUnreadAfterReadAnchor("old-unread", "read", timeline))
+        assertEquals(null, firstUnreadAfterReadAnchor("old-unread", "read", timeline.take(2) + sent("reply")))
+    }
+
+    /** A projected first-unread after the anchor is still trusted as-is. */
+    @Test
+    fun firstUnreadAfterReadAnchorIsKept() {
+        val snapshot = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+        composeRule.setContent {
+            snapshot[0] =
+                rememberConversationEntryUnreadSnapshot(
+                    controllerIdentity = this,
+                    projectionUnread = 2,
+                    projectionFirstUnreadMessageId = "new-1",
+                    timeline = listOf(received("read"), received("new-1"), received("new-2"), received("new-3")),
+                    readAnchorMessageId = "read",
+                )
+        }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(2, "new-1", readAnchorMessageId = "read"), snapshot[0])
     }
 
     @Test
@@ -97,7 +202,7 @@ class ConversationEntryUnreadSnapshotTest {
                 )
         }
         composeRule.waitForIdle()
-        assertEquals(ConversationEntryUnreadSnapshot(count = 0, firstUnreadMessageId = null), snapshot[0])
+        assertEquals(ConversationEntryUnreadSnapshot(0, null, readAnchorMessageId = "a2"), snapshot[0])
 
         composeRule.runOnUiThread {
             controllerIdentity.value = Any()
@@ -128,7 +233,7 @@ class ConversationEntryUnreadSnapshotTest {
         }
         composeRule.waitForIdle()
         assertEquals(
-            ConversationEntryUnreadSnapshot(count = 75, firstUnreadMessageId = "oldest-unread"),
+            ConversationEntryUnreadSnapshot(75, "oldest-unread", readAnchorMessageId = "last-read"),
             snapshot[0],
         )
 
@@ -140,7 +245,7 @@ class ConversationEntryUnreadSnapshotTest {
         composeRule.waitForIdle()
 
         assertEquals(
-            ConversationEntryUnreadSnapshot(count = 75, firstUnreadMessageId = "oldest-unread"),
+            ConversationEntryUnreadSnapshot(75, "oldest-unread", readAnchorMessageId = "last-read"),
             snapshot[0],
         )
     }
@@ -277,6 +382,83 @@ class ConversationEntryUnreadSnapshotTest {
                 )
 
             assertEquals("fallback", resolved)
+        }
+
+    /** A stale boundary and count paged in from before the read anchor give way to the first row after it. */
+    @Test
+    fun staleBoundaryPagedInBeforeReadAnchorResolvesAfterAnchor() =
+        runTest {
+            var timeline = listOf(received("new-1"), received("new-2"))
+
+            val resolved =
+                resolveConversationEntryUnreadMessageId(
+                    snapshot = ConversationEntryUnreadSnapshot(3, "old-unread", readAnchorMessageId = "read"),
+                    timeline = { timeline },
+                    loadUntilMessageAvailable = {
+                        timeline = listOf(received("old-unread"), received("read")) + timeline
+                        true
+                    },
+                )
+
+            assertEquals("new-1", resolved)
+        }
+
+    /** A first-unread id equal to an unloaded anchor stays the paging target when more than a page is unread. */
+    @Test
+    fun firstUnreadEqualToUnloadedAnchorPagesToTheAnchor() =
+        runTest {
+            val page = (1..50).map { received("new-$it") }
+            val composed = mutableStateOf(page)
+            val entry = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+            composeRule.setContent {
+                entry[0] =
+                    rememberConversationEntryUnreadSnapshot(
+                        controllerIdentity = this,
+                        projectionUnread = 60,
+                        projectionFirstUnreadMessageId = "read",
+                        timeline = composed.value,
+                        readAnchorMessageId = "read",
+                    )
+            }
+            composeRule.waitForIdle()
+            assertEquals(ConversationEntryUnreadSnapshot(60, "read", readAnchorMessageId = "read"), entry[0])
+
+            var timeline = page
+            val resolved =
+                resolveConversationEntryUnreadMessageId(
+                    snapshot = entry[0]!!,
+                    timeline = { timeline },
+                    loadUntilMessageAvailable = {
+                        timeline = listOf(received("older"), received("read")) + timeline
+                        true
+                    },
+                )
+
+            assertEquals("new-1", resolved)
+
+            // The rendered line follows once the paged anchor reaches composition.
+            composeRule.runOnUiThread { composed.value = timeline }
+            composeRule.waitForIdle()
+            assertEquals(ConversationEntryUnreadSnapshot(60, "new-1", readAnchorMessageId = "read"), entry[0])
+        }
+
+    /** The stale row's count can be too low as well; the anchor still puts the line above new-1. */
+    @Test
+    fun staleBoundaryPagedInBeforeReadAnchorIgnoresStaleUndercount() =
+        runTest {
+            var timeline = listOf(received("new-1"), received("new-2"))
+
+            val resolved =
+                resolveConversationEntryUnreadMessageId(
+                    snapshot = ConversationEntryUnreadSnapshot(1, "old-unread", readAnchorMessageId = "read"),
+                    timeline = { timeline },
+                    loadUntilMessageAvailable = {
+                        timeline = listOf(received("old-unread"), received("read")) + timeline
+                        true
+                    },
+                )
+
+            assertEquals("new-1", resolved)
         }
 
     @Test

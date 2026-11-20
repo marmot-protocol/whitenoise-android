@@ -209,6 +209,7 @@ class ChatFolderEditScreenTest {
 
         composeRule.onNodeWithTag("folder.delete").performClick()
         composeRule.onNodeWithTag("folder.delete_confirm").performClick()
+        composeRule.waitForIdle()
         assertTrue(closed)
         val remaining = appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
         assertTrue(remaining.none { it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID })

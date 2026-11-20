@@ -20,7 +20,7 @@ import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
  * them while composing: a send moves the anchor, then the badge, then the jump target, and each of those reads in
  * the screen body recomposed the whole conversation once more.
  *
- * [projectionUnread] is the entry projection's unread count when one was available, and [nearBottom] whether the
+ * [projectionUnread] is the live chat-list row's unread count when one was available, and [nearBottom] whether the
  * reader is at the newest edge, which retires the current unread stack.
  */
 @Composable

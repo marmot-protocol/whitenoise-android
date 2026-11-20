@@ -73,6 +73,12 @@ internal fun GroupDetailsHeader(
     pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
+    val (editOrigin, editClick) =
+        dev.ipf.whitenoise.android.ui.settings
+            .rememberSettingsRouteClick { onEdit?.invoke() }
+    val (descriptionOrigin, descriptionClick) =
+        dev.ipf.whitenoise.android.ui.settings
+            .rememberSettingsRouteClick { onAddDescription?.invoke() }
     val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl.takeIf { picture == null }, pictureDomain)
@@ -134,12 +140,13 @@ internal fun GroupDetailsHeader(
                             .padding(top = 4.dp)
                             .heightIn(min = 48.dp)
                             .testTag("chat_info.name")
+                            .then(editOrigin)
                             .onGloballyPositioned { onNameBottom(it.positionInWindow().y + it.size.height) }
                             .clickable(
                                 enabled = editEnabled,
                                 onClickLabel = stringResource(R.string.edit_group_name_and_description),
                                 role = Role.Button,
-                                onClick = onEdit,
+                                onClick = editClick,
                             ),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -188,7 +195,7 @@ internal fun GroupDetailsHeader(
                     )
                 }
             } else if (onAddDescription != null) {
-                TextButton(onClick = onAddDescription) {
+                TextButton(onClick = descriptionClick, modifier = descriptionOrigin) {
                     Text(
                         stringResource(R.string.add_group_description),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

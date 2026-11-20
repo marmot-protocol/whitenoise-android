@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.em
 import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationActivity
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
@@ -69,9 +70,8 @@ import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.PushPin
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 @OptIn(ExperimentalFoundationApi::class)
 internal fun Modifier.chatListSelectionRowClickable(
@@ -162,6 +162,7 @@ internal fun ChatRow(
     accountRef: String? = appState.activeAccountRef,
     ownerAccountIdHex: String? = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex,
     titleOverride: String? = null,
+    dictationActivity: ConversationDictationActivity? = appState.chatListDictationActivity(accountRef, item),
     onClick: () -> Unit,
     onOpenProfile: (String) -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -187,6 +188,9 @@ internal fun ChatRow(
         )
     val haptics = LocalHapticFeedback.current
     val rowCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val routeOrigin = dev.ipf.whitenoise.android.ui.navigation.LocalConversationRouteOrigin.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val activatingBounds = remember { arrayOf<androidx.compose.ui.geometry.Rect?>(null) }
     val actionsLabel = stringResource(R.string.actions)
 
     fun pointerWindowY(position: Offset): Float? = rowCoordinates[0]?.localToWindow(position)?.y
@@ -280,11 +284,19 @@ internal fun ChatRow(
                 .then(profileActionModifier)
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
-                .testTag("chat.row.${item.id}"),
-        onClick = onClick,
+                .testTag("chat.row.${item.id}")
+                .onGloballyPositioned { activatingBounds[0] = it.settingsMorphBounds(view) },
+        onClick = {
+            if (!selectionMode && routeOrigin != null) {
+                routeOrigin.activate(item.group.groupIdHex, activatingBounds[0], onClick)
+            } else {
+                onClick()
+            }
+        },
         interactionsEnabled = interactionsEnabled,
         consumeSelectionLongPress = selectionMode && !rangeDragActive,
         titleMetadata = {
+            dictationActivity?.let { ChatRowDictationStatus(it) }
             if (isMuted) {
                 ChatRowTitleStatus(R.drawable.ic_notifications_off, stringResource(R.string.chat_muted_badge))
             }
@@ -540,18 +552,6 @@ internal fun ChatRowPreviewLine(
         overflow = TextOverflow.Ellipsis,
         fontStyle = fontStyle,
         modifier = modifier.fillMaxWidth(),
-    )
-}
-
-/** Decoration follows the engine's typed attachment kind; text remains the production projected preview. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun PinnedBadge(modifier: Modifier = Modifier) {
-    Icon(
-        imageVector = Icons.Default.PushPin,
-        contentDescription = stringResource(R.string.chat_pinned_badge),
-        modifier = modifier.size(14.dp),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 

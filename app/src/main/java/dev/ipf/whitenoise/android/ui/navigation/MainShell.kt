@@ -5,7 +5,6 @@ package dev.ipf.whitenoise.android.ui.navigation
 import android.animation.ValueAnimator
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.items
@@ -49,6 +48,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
+import dev.ipf.whitenoise.android.state.conversationEntryChatListRow
 import dev.ipf.whitenoise.android.state.conversationSourceGroup
 import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.folderQueries
@@ -71,8 +71,8 @@ import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.account.rememberRetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
-import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.LocalRetainedGroupAvatarPixels
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.WindowWidthClass
@@ -87,7 +87,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHando
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.icons.filled.Settings
-import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewportEvent
@@ -99,75 +98,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming")
-@Composable
-internal fun ProfileGroupForegroundCoordinator(
-    appState: WhiteNoiseAppState,
-    conversationController: ConversationController?,
-    profileGroupForegroundState: ProfileGroupForegroundState,
-    secureWindowEnabled: Boolean?,
-    profileSecurePolicy: SecureFlagPolicy,
-    onOpenConversation: (ChatListItem, Boolean) -> Unit,
-    onGroupCreateSubmitted: () -> Long = { 0L },
-    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ -> onOpenConversation(item, false) },
-    onGroupCreateFlowSuperseded: () -> Unit = {},
-    onDismissProfile: () -> Unit,
-    onClosePicker: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    val foregroundState = profileGroupForegroundState
-    val route =
-        profileForegroundRoute(
-            pendingProfileNpub = appState.pendingProfileNpub,
-            startGroupMember = foregroundState.initialMember,
-            conversationOpen = conversationController != null,
-        )
-    when (route) {
-        is ProfileForegroundRoute.NewGroup -> {
-            secureWindowEnabled?.let { WindowSecureFlag(enabled = it) }
-            NewGroupFlow(
-                appState = appState,
-                initialMembers = listOf(route.initialMember),
-                onCreateCompletedOpen = { item, requestToken ->
-                    foregroundState.close()
-                    onGroupCreateCompletedOpen(item, requestToken)
-                },
-                onCreateSubmitted = onGroupCreateSubmitted,
-                onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
-                onClose = {
-                    onClosePicker()
-                    foregroundState.close()
-                    onGroupCreateFlowSuperseded()
-                },
-            )
-            return
-        }
-        else -> content()
-    }
-    val profileNpub =
-        when (route) {
-            is ProfileForegroundRoute.ShellProfile -> route.npub
-            is ProfileForegroundRoute.ConversationProfile -> route.npub
-            else -> null
-        }
-    profileNpub?.let {
-        ProfileSheet(
-            appState = appState,
-            npub = it,
-            onOpenGroup = onOpenConversation,
-            onStartGroup = { candidate ->
-                appState.clearPresentedProfile()
-                foregroundState.open(candidate)
-            },
-            onDismiss = onDismissProfile,
-            adminController = conversationController,
-            securePolicy = profileSecurePolicy,
-            openGroupsInCommon = appState.pendingProfileGroupsInCommon,
-        )
-    }
-}
 
 /** Coordinates account-owned chat-list and conversation routes for the main app surface. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -314,6 +244,8 @@ internal fun MainShell(
     // Once ready, the same controller is promoted into the conversation route,
     // so that route's first composition already owns real data and final index
     // math instead of painting an empty destination and filling it afterward.
+    val conversationRouteOrigin =
+        remember(appState.activeAccountRef, appState.runtimeGeneration) { ConversationRouteOrigin() }
     var pendingConversationOpen by remember { mutableStateOf<PendingConversationOpen?>(null) }
     var nextPendingConversationOpenRequestId by remember { mutableLongStateOf(0L) }
     // Open-time conversation state. Search hits carry a focus id; every
@@ -337,7 +269,9 @@ internal fun MainShell(
     // Visible active-list head provenance while a conversation opened from
     // ChatsScreen is foregrounded. Published back to the list only after
     // setChatListVisible(true) flushes pending recompute (issue #1313).
-    var chatListReturnHeadSnap by remember { mutableStateOf<ChatListReturnHeadSnapState>(ChatListReturnHeadSnapState.Unarmed) }
+    var chatListReturnHeadSnap by remember {
+        mutableStateOf<ChatListReturnHeadSnapState>(ChatListReturnHeadSnapState.Unarmed)
+    }
     // Active chat-list folder filter (null = All). Owned here so opening a
     // conversation does not dispose the selection when ChatsScreen leaves
     // composition (issue #1897).
@@ -441,8 +375,7 @@ internal fun MainShell(
                 .ShellPlaybackHost(appState) { currentSourceOpen() }
         }
     val guardedPlaybackSourceOpen: () -> Unit = { shellPlaybackHost.requestOpenSource() }
-    val profileGroupForegroundState =
-        remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
+    val profileGroupForegroundState = remember(appState.activeAccountRef) { ProfileGroupForegroundState() }
     // Process-owned, so unmounting the shell for a frame cannot release the route's priority window (#586).
     val notificationFirstFrameGate = shellStateHolder.notificationFirstFrame.gate
 
@@ -1355,11 +1288,8 @@ internal fun MainShell(
                         initialGroup = appState.conversationSourceGroup(openChat, accountRef),
                         initialMemberSnapshot =
                             openChat.memberSnapshot
-                                ?: appState.cachedGroupMemberSnapshot(
-                                    accountRef,
-                                    openChat.group.groupIdHex,
-                                ),
-                        initialChatListRow = openChat.projection,
+                                ?: appState.cachedGroupMemberSnapshot(accountRef, openChat.group.groupIdHex),
+                        initialChatListRow = conversationEntryChatListRow(openChat, chatsController, accountRef),
                         initialInviteConfirmationUnresolved = openChat.inviteConfirmationUnresolved,
                         initialIsDm = openChat.isDm(),
                         initialTimelinePreview = openChat.projection?.lastMessage,
@@ -1577,6 +1507,7 @@ internal fun MainShell(
                 // Canonicalized once here, so every lookup during the landing compares exact ids.
                 focusMessageId = request.focusMessageId?.let(::canonicalMessageId),
                 focusFromSearch = request.focusMessageId != null,
+                activationBounds = request.activationBounds,
             )
         selectedChatJustCreated = request.justCreated
         selectedChatOpenedAsDmHint = request.justCreated
@@ -1622,8 +1553,7 @@ internal fun MainShell(
     val twoPaneRetainedContent =
         accountOwnedExitingConversationContent.takeIf { twoPane && accountOwnedPendingConversationOpen != null }
     // The open or closing conversation beside the list owns the one player bar.
-    val conversationBesideList =
-        twoPane && (selectedChat != null || accountOwnedExitingConversationContent != null)
+    val conversationBesideList = twoPane && (selectedChat != null || accountOwnedExitingConversationContent != null)
     // The rendered Chats slot keeps its player during preparation and while AnimatedContent exits it.
     // Promoting a pending tap to the shell would move the player above the account picker for one frame.
     val playbackInChatList = section == MainSection.Chats
@@ -1670,7 +1600,7 @@ internal fun MainShell(
     ) { dictationControlOwner ->
         if (!navAccountStable && !quickSwitchOwnsTargetFrame) {
             // Account invalidation is a privacy boundary, not an ordinary Back
-            // navigation. Remove the AnimatedContent subtree immediately so its
+            // navigation. Remove the retained route subtree immediately so its
             // outgoing slot cannot retain a decrypted route for the exit tween.
             LoadingScreen()
             return@MainShellNoticeLayout
@@ -1758,11 +1688,16 @@ internal fun MainShell(
                 selectedChatOpenedAsDmHint = false
             }
 
+            val suppressConversationMotion =
+                routingNotification || routingShare || routingAppUpdate || pendingTtsDestinationNavigation != null
             val routeTransition =
-                updateTransition(
-                    targetState = transitionContent ?: twoPaneRetainedContent,
-                    label = "conversation route",
-                )
+                rememberConversationRouteTransition(
+                    transitionContent ?: twoPaneRetainedContent,
+                    suppressConversationMotion,
+                    ownerKey =
+                        (if (navAccountStable) conversationAccountRef else appState.activeAccountRef) to
+                            appState.runtimeGeneration,
+                ) { it?.chat?.id ?: MAIN_SHELL_ROUTE_KEY }
             LaunchedEffect(
                 exitingConversationContent?.chat?.id,
                 selectedChat?.id,
@@ -1784,7 +1719,7 @@ internal fun MainShell(
                     )
                 }.filter { it }
                     .first()
-                // AnimatedContent removes its outgoing slot at completion. Give that
+                // The route owner removes its outgoing slot at completion. Give that
                 // disposal one committed frame before releasing the controller that
                 // the outgoing ConversationScreen may still reference.
                 withFrameNanos { }
@@ -1835,6 +1770,8 @@ internal fun MainShell(
                             pendingTtsDestinationNavigation != null,
                     contentVisible = !appState.appLock.screenVisible,
                     topLevelBubble = true,
+                    cardMorph = true,
+                    closingAnchor = dev.ipf.whitenoise.android.ui.chats.ChatsPenMorphAnchor,
                 ) { animatedSection ->
                     when (animatedSection) {
                         MainSection.Chats -> {
@@ -1927,6 +1864,10 @@ internal fun MainShell(
                                                 focusMessageId = focusMessageId,
                                                 justCreated = justCreated,
                                                 visibleActiveListHead = visibleHead,
+                                                activationBounds =
+                                                    conversationRouteOrigin.take(
+                                                        item.group.groupIdHex,
+                                                    ),
                                             )
                                     }
                                 },
@@ -2014,12 +1955,10 @@ internal fun MainShell(
                 ConversationRouteAnimatedContent(
                     transition = routeTransition,
                     routeForwardDirection = routeForwardDirection,
-                    suppressMotion =
-                        routingNotification ||
-                            routingShare ||
-                            routingAppUpdate ||
-                            pendingTtsDestinationNavigation != null,
+                    suppressMotion = suppressConversationMotion,
                     contentKey = { content -> content?.chat?.id ?: MAIN_SHELL_ROUTE_KEY },
+                    activatingBounds = { it?.openContext?.activationBounds },
+                    originOwner = conversationRouteOrigin,
                 ) { animatedConversation ->
                     when (
                         resolveMainShellContentRoute(
@@ -2066,7 +2005,12 @@ internal fun MainShell(
                             )
                             // Banners scoped to this conversation render only in slots inside it, including the
                             // group details and modals it opens (#3312).
-                            ConversationScope(appState, content.accountRef, chat.group.groupIdHex) {
+                            ConversationScope(
+                                appState,
+                                content.accountRef,
+                                chat.group.groupIdHex,
+                                LocalRetainedGroupAvatarPixels provides retainedAvatarPreparation,
+                            ) {
                                 ConversationScreen(
                                     appState = appState,
                                     chat = chat,
@@ -2165,7 +2109,10 @@ internal fun MainShell(
                                             conversationScrollSnapshots[scrollKey] = snapshot
                                         }
                                     },
-                                    onStartGroupWithPeer = profileGroupForegroundState::open,
+                                    onStartGroupWithPeer = { profileGroupForegroundState.open(it) },
+                                    onStartGroupWithPeerMeasured = { member, origin ->
+                                        profileGroupForegroundState.open(member, origin)
+                                    },
                                     onBack = {
                                         // A very quick Back can leave before the provisional
                                         // open receives its chat-list projection. The entry
@@ -2252,6 +2199,7 @@ internal fun MainShell(
                     progress = shareImportProgress,
                     request = visibleShareRequest,
                     onCancel = clearSharePickerRequest,
+                    importRequestId = inboundShareRequest?.requestId ?: visibleShareRequest?.requestId,
                 ) { importAccepted ->
                     visiblePickerRequest?.takeIf { importAccepted && it.payload.isSupported() }?.let { request ->
                         ShareChatPickerFullScreen(

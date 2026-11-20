@@ -474,12 +474,12 @@ class WhiteNoiseAppState private constructor(
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
+    private var initializedDictation by mutableStateOf<ConversationDictationController?>(null)
     internal val conversationDictation: ConversationDictationController
         get() = conversationDictationOwner.value
 
-    /** Connection lifecycle checks must not create a speech controller in an idle process. */
-    internal fun initializedConversationDictation(): ConversationDictationController? =
-        if (conversationDictationOwner.isInitialized()) conversationDictationOwner.value else null
+    /** Lifecycle checks and the chat list observe dictation without creating a controller in an idle process. */
+    internal fun initializedConversationDictation(): ConversationDictationController? = initializedDictation
 
     private val conversationDictationOwner =
         lazy {
@@ -531,7 +531,7 @@ class WhiteNoiseAppState private constructor(
                 },
                 sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
                 onSendBlocked = { presentTransient(R.string.dictation_send_blocked) },
-            )
+            ).also { initializedDictation = it }
         }
 
     internal val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
@@ -1535,6 +1535,13 @@ class WhiteNoiseAppState private constructor(
     // staleness-exempt: monotonically unique notice identity, not an async publication fence.
     private var transientNoticeSequence = 0L
 
+    /** Launch geometry belongs to this one profile presentation, never the next request. */
+    internal var pendingProfileContour: dev.ipf.whitenoise.android.ui.settings.SettingsContour? = null
+        private set
+    internal var pendingProfileOrigin by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
+        private set
+    internal var pendingProfilePresentationId by mutableLongStateOf(0L)
+        private set
     var pendingProfileNpub by mutableStateOf<String?>(null)
         private set
 
@@ -1604,12 +1611,7 @@ class WhiteNoiseAppState private constructor(
     // staleness-exempt: observable profile versions invalidate narrowly keyed Compose projections.
     internal var profileRevision by mutableIntStateOf(0)
     private var contactNicknameRevision by mutableIntStateOf(0)
-    private var profileAccountRevisionEpoch by mutableIntStateOf(0)
-
-    // staleness-exempt: bounded per-account ordering value, not an async publication guard.
-    private var profileAccountRevisionSequence = 0
-    private val profileAccountRevisions = mutableStateMapOf<String, Int>()
-    private val profileAccountRevisionOrder = linkedSetOf<String>()
+    private val profileAccountRevisions = ProfileAccountRevisions(MAX_PROFILE_PRESENTATION_CACHE_ENTRIES)
 
     /**
      * Read-only Compose-tracked snapshot of profile-presentation invalidations
@@ -1621,34 +1623,9 @@ class WhiteNoiseAppState private constructor(
     internal val profileRevisionForCompose: ProfilePresentationRevision
         get() = ProfilePresentationRevision(profileRevision, contactNicknameRevision)
 
-    internal fun profileAccountRevisionForCompose(accountIdHex: String): ProfileAccountRevision {
-        val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
-        return ProfileAccountRevision(
-            epoch = profileAccountRevisionEpoch,
-            account = profileAccountRevisions[normalized] ?: 0,
-        )
-    }
+    internal fun profileAccountRevisionForCompose(accountIdHex: String) = profileAccountRevisions.revision(accountIdHex)
 
-    internal fun bumpProfileAccountRevision(accountIdHex: String) {
-        val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
-        if (normalized.isEmpty()) return
-        profileAccountRevisionSequence += 1
-        profileAccountRevisions[normalized] = profileAccountRevisionSequence
-        profileAccountRevisionOrder.remove(normalized)
-        profileAccountRevisionOrder.add(normalized)
-        if (profileAccountRevisionOrder.size > MAX_PROFILE_PRESENTATION_CACHE_ENTRIES) {
-            val evicted = profileAccountRevisionOrder.first()
-            profileAccountRevisionOrder.remove(evicted)
-            profileAccountRevisions.remove(evicted)
-        }
-    }
-
-    private fun bumpAllProfileAccountRevisions() {
-        profileAccountRevisionEpoch += 1
-        profileAccountRevisionSequence = 0
-        profileAccountRevisions.clear()
-        profileAccountRevisionOrder.clear()
-    }
+    internal fun bumpProfileAccountRevision(accountIdHex: String) = profileAccountRevisions.bump(accountIdHex)
 
     internal val profilePresentations =
         ScopedCache<String, ProfilePresentation>(
@@ -4501,8 +4478,8 @@ class WhiteNoiseAppState private constructor(
     private suspend fun engineLoginLocked(nsec: String): AccountSummaryFfi {
         val relays = MarmotClient.bootstrapRelays
         val injected = identityLoginCalls
-        if (injected != null) return injected.login(nsec, MarmotClient.accountRelays, relays)
-        return marmotIo { login(nsec, MarmotClient.accountRelays, relays, relays) }
+        if (injected != null) return injected.login(nsec, whiteNoiseNip65Relays, relays)
+        return marmotIo { login(nsec, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays) }
     }
 
     /**
@@ -4524,7 +4501,7 @@ class WhiteNoiseAppState private constructor(
         if (injected != null) {
             return injected.loginRecoveringIncompleteSetup(
                 nsec,
-                MarmotClient.accountRelays,
+                whiteNoiseNip65Relays,
                 relays,
                 acknowledgePossibleKeyPackageOrphan = true,
             )
@@ -4532,10 +4509,10 @@ class WhiteNoiseAppState private constructor(
         return marmotIo {
             loginRecoveringIncompleteSetup(
                 nsec,
-                MarmotClient.accountRelays,
+                whiteNoiseNip65Relays,
                 relays,
                 acknowledgePossibleKeyPackageOrphan = true,
-                inboxRelays = relays,
+                inboxRelays = whiteNoiseInboxRelays,
             )
         }
     }
@@ -4671,9 +4648,9 @@ class WhiteNoiseAppState private constructor(
                     runtime.loginExternalSigner(
                         pubkeyHex,
                         amberSigner.buildSigner(pubkeyHex),
-                        MarmotClient.accountRelays,
+                        whiteNoiseNip65Relays,
                         MarmotClient.bootstrapRelays,
-                        MarmotClient.bootstrapRelays,
+                        whiteNoiseInboxRelays,
                     )
                 }
             }
@@ -5342,7 +5319,7 @@ class WhiteNoiseAppState private constructor(
             }
         if (nicknamesCleared) {
             contactNicknameRevision += 1
-            bumpAllProfileAccountRevisions()
+            profileAccountRevisions.reset()
         }
     }
 
@@ -5390,7 +5367,7 @@ class WhiteNoiseAppState private constructor(
         GroupAvatarImageLoader.clear()
         pruneIdleGroupCommitLocks()
         profileRevision += 1
-        bumpAllProfileAccountRevisions()
+        profileAccountRevisions.reset()
     }
 
     /** Exercises the production account-cache invalidation boundary without starting an account switch. */
@@ -7128,7 +7105,7 @@ class WhiteNoiseAppState private constructor(
         if (isContactRefBeingCleared(account)) return
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
-            bumpProfileAccountRevision(accountIdHex)
+            profileAccountRevisions.bump(accountIdHex)
             notificationNicknameRefresh.refresh(account, accountIdHex)
         }
     }
@@ -7453,7 +7430,7 @@ class WhiteNoiseAppState private constructor(
                 }
                 warmPrivateContactAvatar(account, contact)
                 contactNicknameRevision += 1
-                bumpProfileAccountRevision(contact)
+                profileAccountRevisions.bump(contact)
                 mutationsScope.launch { refreshPrivateContactPresentation(account, contact, adoptLegacy = true) }
             }
         }
@@ -7530,7 +7507,7 @@ class WhiteNoiseAppState private constructor(
         synchronized(profilePresentationLock) { !profilePresentations.containsKey(accountIdHex) }
 
     /** Profile publication or account-cache reset invalidates last-drawn top-bar pixels. */
-    internal val profilePresentationEpochForCompose: Int get() = profileAccountRevisionEpoch
+    internal val profilePresentationEpochForCompose: Int get() = profileAccountRevisions.epoch
 
     /**
      * Start local profile materialization and image decoding without waiting for
@@ -7785,6 +7762,9 @@ class WhiteNoiseAppState private constructor(
 
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
+        pendingProfilePresentationId++
+        pendingProfileContour = null
+        pendingProfileOrigin = null
         pendingProfileGroupsInCommon = false
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
@@ -7799,7 +7779,18 @@ class WhiteNoiseAppState private constructor(
     fun presentProfile(
         npub: String,
         groupsInCommon: Boolean = false,
+        origin: androidx.compose.ui.geometry.Rect? = null,
+    ) = presentProfileWithContour(npub, groupsInCommon, origin, null)
+
+    internal fun presentProfileWithContour(
+        npub: String,
+        groupsInCommon: Boolean = false,
+        origin: androidx.compose.ui.geometry.Rect? = null,
+        contour: dev.ipf.whitenoise.android.ui.settings.SettingsContour? = null,
     ) {
+        pendingProfilePresentationId++
+        pendingProfileOrigin = origin?.takeUnless { it.isEmpty }
+        pendingProfileContour = contour
         pendingProfileGroupsInCommon = groupsInCommon
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
@@ -7809,7 +7800,11 @@ class WhiteNoiseAppState private constructor(
     fun presentDiscoveredProfile(
         npub: String,
         profile: UserProfileMetadataFfi?,
+        origin: androidx.compose.ui.geometry.Rect? = null,
     ) {
+        pendingProfilePresentationId++
+        pendingProfileContour = null
+        pendingProfileOrigin = origin?.takeUnless { it.isEmpty }
         pendingProfileGroupsInCommon = false
         pendingProfileMetadata = profile
         pendingProfileFromDiscovery = true
@@ -7913,6 +7908,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun clearPresentedProfile() {
+        pendingProfilePresentationId++
+        pendingProfileContour = null
+        pendingProfileOrigin = null
         pendingProfileGroupsInCommon = false
         pendingProfileNpub = null
         pendingProfileMetadata = null
@@ -8299,7 +8297,7 @@ class WhiteNoiseAppState private constructor(
         if (canonicalNpub == null || npubs.get(accountIdHex) == canonicalNpub) return
         npubs.put(accountIdHex, canonicalNpub)
         profileRevision += 1
-        bumpProfileAccountRevision(accountIdHex)
+        profileAccountRevisions.bump(accountIdHex)
     }
 
     /** Read one persisted profile without mutating the active account caches. */
@@ -8351,7 +8349,7 @@ class WhiteNoiseAppState private constructor(
         }
         if (changed) {
             profileRevision += 1
-            bumpProfileAccountRevision(accountIdHex)
+            profileAccountRevisions.bump(accountIdHex)
             scheduleInviteNotificationIdentityRefresh(accountIdHex, presentation)
             refreshProfileNotificationChannelLabels(accountIdHex, presentation.displayName)
             val viewers = accounts.filter { !it.signedOut && contactPictureStore.hasChoice(it.label, accountIdHex) }
@@ -8371,7 +8369,7 @@ class WhiteNoiseAppState private constructor(
             profileMaterializations.clear()
         }
         profileRevision += 1
-        bumpAllProfileAccountRevisions()
+        profileAccountRevisions.reset()
     }
 
     // Keep platform callbacks at the end of instance initialization. These

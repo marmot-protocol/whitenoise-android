@@ -65,7 +65,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -75,7 +74,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatListViewFfi
@@ -249,10 +247,6 @@ internal fun ChatsScreen(
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
     }
     val groupTitleCopy = rememberGroupTitleCopy()
-    val placementAccount = appState.activeAccountRef
-    val placementRuntime = appState.runtimeGeneration
-    val placementCurrent = dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent.current
-    val fabMinimumTopInWindow = remember(placementAccount, placementRuntime) { mutableStateOf<Float?>(null) }
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     // The list head when New Message opened, the row its keyed scroll anchor holds while the
     // flow replaces it. Not saved: after process death the open falls back to the current head.
@@ -1165,6 +1159,7 @@ internal fun ChatsScreen(
     // Taken while the list is still on screen, since it may already include the new chat
     // by the time the flow completes (#3529).
     val penFlight = remember { NewMessagePenFlight() }
+    var newChatFlowOrigin by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     val openNewMessageFlow = {
         newChatFlowOriginHead = visibleReturnHead()
         showNewChatFlow = true
@@ -1840,34 +1835,42 @@ internal fun ChatsScreen(
     }
 
     if (showNewChatFlow) {
-        dev.ipf.whitenoise.android.ui.conversation.PlaybackFlowContent(
-            enabled = showPlaybackTransport,
-            onSourceLeave = {
-                showNewChatFlow = false
-                onGroupCreateFlowSuperseded()
-            },
+        CompositionLocalProvider(
+            dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost provides
+                dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost.current
+                    .takeIf { showPlaybackTransport },
         ) {
-            LaunchedEffect(penFlight.origin) { penFlight.fly() }
-            CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                NewChatFlowHost(
-                    appState = appState,
-                    onOpenConversation = { item, justCreated ->
-                        showNewChatFlow = false
-                        onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
-                    },
-                    onClose = {
-                        showNewChatFlow = false
-                        onGroupCreateFlowSuperseded()
-                    },
-                    onGroupCreateSubmitted = onGroupCreateSubmitted,
-                    onGroupCreateCompletedOpen = { item, requestToken ->
-                        showNewChatFlow = false
-                        onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
-                    },
-                )
+            dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog(
+                origin = newChatFlowOrigin,
+                ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
+                properties =
+                    androidx.compose.ui.window.DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false,
+                    ),
+                onDismissRequest = {
+                    showNewChatFlow = false
+                    onGroupCreateFlowSuperseded()
+                },
+            ) {
+                LaunchedEffect(penFlight.origin) { penFlight.fly() }
+                CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
+                    NewChatFlowHost(
+                        appState = appState,
+                        onOpenConversation = { item, justCreated ->
+                            showNewChatFlow = false
+                            onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
+                        },
+                        onClose = dismiss,
+                        onGroupCreateSubmitted = onGroupCreateSubmitted,
+                        onGroupCreateCompletedOpen = { item, requestToken ->
+                            showNewChatFlow = false
+                            onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
+                        },
+                    )
+                }
             }
         }
-        return
     }
 
     // Folder editor handoff: create-from-selection (folderId = null) or
@@ -1915,7 +1918,7 @@ internal fun ChatsScreen(
             folderHandoff.pickerChatIds != null ||
             pendingBulkDelete != null ||
             pendingLeaveAndDelete != null
-    if (!anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
+    if (!showNewChatFlow && !anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
         diagnosticsPrompt()
     }
 
@@ -2536,7 +2539,11 @@ internal fun ChatsScreen(
                 motionEnabled = rememberSystemAnimationsEnabled(),
             ) {
                 CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                    ChatsNewMessageFab(appState, openNewMessageFlow, minimumTopInWindow = fabMinimumTopInWindow)
+                    ChatsNewMessageFab(
+                        appState,
+                        openNewMessageFlow,
+                        onNewMessageOrigin = { newChatFlowOrigin = it },
+                    )
                 }
             }
         },
@@ -2552,15 +2559,6 @@ internal fun ChatsScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .onPlaced { coordinates ->
-                    if (
-                        placementCurrent &&
-                        appState.activeAccountRef == placementAccount &&
-                        appState.runtimeGeneration == placementRuntime
-                    ) {
-                        fabMinimumTopInWindow.value = coordinates.positionInWindow().y
-                    }
-                }
                 // The scaffold padding above already clears a side cutout or side navigation bar, so the
                 // body frame's banner slot must not pad for them again (#3312).
                 .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
@@ -2816,7 +2814,11 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(appState, onCreate = openNewMessageFlow)
+                                EmptyChats(
+                                    appState,
+                                    onCreate = openNewMessageFlow,
+                                    onCreateOrigin = { newChatFlowOrigin = it },
+                                )
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
@@ -2919,6 +2921,7 @@ internal fun ChatsScreen(
     pendingBulkDelete?.let { request ->
         val isCurrent = { request.isCurrent(appState, controller) }
         ChatDeleteConfirmationDialog(
+            ownerKey = request,
             count = request.groupIds.size,
             confirmEnabled = isCurrent(),
             identity = {
@@ -2938,6 +2941,7 @@ internal fun ChatsScreen(
                 }
             },
             onConfirm = {
+                if (pendingBulkDelete !== request) return@ChatDeleteConfirmationDialog
                 pendingBulkDelete = null
                 if (!isCurrent()) return@ChatDeleteConfirmationDialog
                 if (request.groupIds.any { it in leavingAndDeleting }) {
@@ -2985,7 +2989,7 @@ internal fun ChatsScreen(
                     }
                 }
             },
-            onDismiss = { pendingBulkDelete = null },
+            onDismiss = { if (pendingBulkDelete === request) pendingBulkDelete = null },
         )
     }
 }
@@ -3191,23 +3195,3 @@ internal const val CHAT_LIST_SEARCH_MESSAGES_HEADER_TAG = CHAT_LIST_SEARCH_MESSA
 // Debounce before global message results read their first MDK page (#1944). Sits inside the existing
 // 250–300 ms chat-list input debounce band so a fast typist doesn't trigger a query per keystroke.
 internal const val CHAT_LIST_SEARCH_DEBOUNCE_MS: Long = 275L
-
-/** Section header above the search result groups. */
-@Composable
-@Suppress("FunctionNaming")
-internal fun ChatListSearchSectionHeader(
-    title: String,
-    testTag: String,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text = title,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .semantics { heading() }
-                .testTag(testTag)
-                .padding(16.dp),
-        style = MaterialTheme.typography.titleSmall,
-    )
-}

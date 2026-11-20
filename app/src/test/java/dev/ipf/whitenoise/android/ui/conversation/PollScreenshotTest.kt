@@ -210,6 +210,7 @@ class PollScreenshotTest {
         assertTrue(form.config[SemanticsProperties.VerticalScrollAxisRange].maxValue() > 0f)
         dialogRoot.captureRoboImage("src/test/snapshots/poll_create_dialog_ime_$name.png")
         cancel.performClick()
+        composeRule.waitForIdle()
         assertTrue(dismissed)
     }
 

@@ -433,6 +433,15 @@
       "postcondition": "none",
       "fixture": "creation"
     },
+    "creation-new-chat-back-reopen": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-001"
+      ],
+      "assertions": "Native chat list opens New Message, Android Back removes the inline dialog and restores the chat list, and reopening remains usable.",
+      "postcondition": "none",
+      "fixture": "creation"
+    },
     "creation-group-setup-cancel": {
       "suite": "creation",
       "manual_ids": [
@@ -3578,6 +3587,7 @@
     "presentation-image-editor-coordinates":{"suite":"presentation","manual_ids":["MED-006"],"assertions":"Photo coordinates numeric controls open and cancel without modifying the staged recipe.","postcondition":"presentation-checked","presentation":"image-editor-coordinates","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-image-editor-draw":{"suite":"presentation","manual_ids":["MED-006"],"assertions":"Photo draw numeric controls open and cancel without modifying the staged recipe.","postcondition":"presentation-checked","presentation":"image-editor-draw","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-image-editor-quality":{"suite":"presentation","manual_ids":["MED-006"],"assertions":"Editor output-quality picker opens and cancels without saving or exporting.","postcondition":"presentation-checked","presentation":"image-editor-quality","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-image-camera-close":{"suite":"presentation","manual_ids":["MED-001"],"assertions":"Actual in-app conversation camera opens in Photo mode with its shutter, Photo/Video switch and lens switch, and Close returns without a capture; preview, recording and capture are unproven.","postcondition":"presentation-checked","presentation":"image-camera-close","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-nostr-note":{"suite":"presentation","manual_ids":["RDR-001","RDR-002"],"assertions":"Actual resolved note reader renders full synthetic content and closes; signature/relay resolution is not simulated proof.","postcondition":"presentation-checked","presentation":"nostr-note","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-nostr-article":{"suite":"presentation","manual_ids":["RDR-001","RDR-002"],"assertions":"Actual resolved article reader renders full synthetic content and closes; signature/relay resolution is not simulated proof.","postcondition":"presentation-checked","presentation":"nostr-article","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-nostr-image":{"suite":"presentation","manual_ids":["RDR-004"],"assertions":"Public image pane explicitly requests generated pixels, opens the real fullscreen viewer and dismisses it; no network fetch.","postcondition":"presentation-checked","presentation":"nostr-image","presentation_actions":["image-load","dismiss"],"layer":"production-presentation-ui"},

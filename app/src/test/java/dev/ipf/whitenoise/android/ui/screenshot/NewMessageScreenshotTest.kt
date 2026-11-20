@@ -206,7 +206,7 @@ class NewMessageScreenshotTest {
                         true,
                         null,
                         error,
-                        NewMessageActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}),
+                        NewMessageActions({}, {}, {}, {}, {}, {}, {}, { _, _ -> }, { _, _ -> }, {}),
                         isValidNpub = { true },
                         startingAs = StartingAccount("a".repeat(64), "Carol", null, "npub1carol"),
                         identifierLookupFailed = lookupFailed,

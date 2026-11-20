@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -68,5 +69,5 @@ class VoiceRecordingOwnershipCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$path"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$path"),
-        ).first { it.isFile }.readText()
+        ).first { it.isFile }.motionOwnerSource()
 }

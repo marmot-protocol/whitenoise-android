@@ -14,6 +14,39 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ComposerTranslationStateTest {
+    @Test fun consentCannotApproveAReplacementOrRetiredOwner() =
+        runTest {
+            var current = true
+            var accepted = 0
+            val state =
+                ComposerTranslationState(
+                    scope = backgroundScope,
+                    engine = { error("Consent must not contact the engine") },
+                    ownerCurrent = { current },
+                    initialTarget = "de",
+                    noticeAccepted = { false },
+                    onNoticeAccepted = { accepted += 1 },
+                )
+            state.toggle()
+            val old = state.consentRequestId
+            state.declineNotice(old)
+            state.toggle()
+            state.acceptNotice(old)
+            assertTrue(state.consenting)
+            assertEquals(0, accepted)
+            current = false
+            state.acceptNotice(state.consentRequestId)
+            assertFalse(state.consenting)
+            assertFalse(state.active)
+            assertEquals(0, accepted)
+            current = true
+            state.toggle()
+            state.acceptNotice(state.consentRequestId)
+            state.acceptNotice(state.consentRequestId)
+            assertEquals(1, accepted)
+            assertTrue(state.active)
+        }
+
     /** Typing settles into one request, and Send uses only the translation of the exact current text. */
     @Test
     fun typingSettlesBeforeOneRequestAndSendUsesTheTranslation() =

@@ -279,6 +279,7 @@
     <string name="chat_row_draft_prefix">Brouillon : </string>
     <string name="jump_to_newest">Aller au plus récent</string>
     <string name="scroll_to_top">Faire défiler vers le haut</string>
+    <string name="scroll_to_bottom">Faire défiler vers le bas</string>
     <string name="discard_failed_message">Supprimer le message échoué</string>
     <string name="message_discard_still_sending">Ce message est encore en cours d’envoi. Réessayez dans un instant.</string>
     <string name="reply_target_not_sent">Le message auquel vous répondez n’a pas encore été envoyé. Attendez son envoi, ou touchez « Réessayer » sur ce message en cas d’échec, puis envoyez votre réponse.</string>
@@ -1672,6 +1673,8 @@
     <string name="emoji_sets_installed">Installé</string>
     <string name="emoji_sets_section_installed">Installés</string>
     <string name="emoji_sets_section_discover">Découvrir</string>
+    <string name="emoji_sets_builtin_shown">Préinstallé · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Masqué dans le sélecteur. Toujours visible dans les messages.</string>
     <string name="emoji_sets_update_available">Mise à jour disponible</string>
     <string name="emoji_sets_load_image">Charger l’image d’aperçu</string>
     <string name="emoji_sets_image_privacy">Charger un aperçu ou installer un ensemble partage votre adresse IP avec ses hébergeurs d’images.</string>

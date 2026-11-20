@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowPinnedBadge.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PinnedBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowPinnedBadge.kt",
+        "anchor": "fun PinnedBadge(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.chat_pinned_badge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowPinnedBadge.kt",
+        "anchor": "R.string.chat_pinned_badge",
+        "test_ids": [
+          "CHL-002"
+        ]
+      }
+    ]
+  }
+}

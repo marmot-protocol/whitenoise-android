@@ -76,6 +76,14 @@
         "test_ids": [
           "CON-049"
         ]
+      },
+      {
+        "surface": "Per-set tabs in the emoji bar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "emojiPickerCategoryTestTag",
+        "test_ids": [
+          "SET-059"
+        ]
       }
     ]
   },

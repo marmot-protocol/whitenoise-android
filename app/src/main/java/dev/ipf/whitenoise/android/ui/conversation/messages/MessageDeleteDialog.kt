@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
+import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
 import dev.ipf.whitenoise.android.ui.conversation.BatchDeleteBreakdown
 
 /**
@@ -87,7 +87,7 @@ internal fun MessageDeleteDialog(
     onDeleteForMe: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
-    BasicAlertDialog(onDismissRequest = onDismissRequest) {
+    AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest) {
         Surface(
             shape = AlertDialogDefaults.shape,
             color = AlertDialogDefaults.containerColor,
@@ -100,14 +100,14 @@ internal fun MessageDeleteDialog(
                 deleteInFlight = deleteInFlight,
                 onDeleteForEveryone = onDeleteForEveryone,
                 onDeleteForMe = onDeleteForMe,
-                onCancel = onDismissRequest,
+                onCancel = dismiss,
             )
         }
     }
 }
 
 /**
- * The dialog body, separated from the [BasicAlertDialog] wrapper so behavior
+ * The dialog body, separated from the [AnimatedBasicAlertDialog] wrapper so behavior
  * and screenshot tests can compose it directly (a dialog renders in its own
  * window, which the JVM screenshot harness can't capture).
  */
@@ -224,7 +224,7 @@ internal fun BatchMessageDeleteDialog(
     onDeleteForMe: () -> Unit,
     onDismissRequest: () -> Unit,
 ) {
-    BasicAlertDialog(onDismissRequest = onDismissRequest) {
+    AnimatedBasicAlertDialog(onDismissRequest = onDismissRequest, dismissEnabled = { !deleteInFlight }) {
         Surface(
             shape = AlertDialogDefaults.shape,
             color = AlertDialogDefaults.containerColor,
@@ -236,7 +236,7 @@ internal fun BatchMessageDeleteDialog(
                 deleteInFlight = deleteInFlight,
                 onDeleteForEveryone = onDeleteForEveryone,
                 onDeleteForMe = onDeleteForMe,
-                onCancel = onDismissRequest,
+                onCancel = dismiss,
             )
         }
     }

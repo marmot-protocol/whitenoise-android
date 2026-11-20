@@ -279,6 +279,7 @@
     <string name="chat_row_draft_prefix">Bozza: </string>
     <string name="jump_to_newest">Vai al più recente</string>
     <string name="scroll_to_top">Scorri verso l\'alto</string>
+    <string name="scroll_to_bottom">Scorri verso il basso</string>
     <string name="discard_failed_message">Elimina messaggio non riuscito</string>
     <string name="message_discard_still_sending">Questo messaggio è ancora in fase di invio. Riprova tra poco.</string>
     <string name="reply_target_not_sent">Il messaggio a cui stai rispondendo non è ancora stato inviato. Attendi che venga inviato, o tocca «Riprova» sul messaggio se l’invio non è riuscito, poi invia la risposta.</string>
@@ -1672,6 +1673,8 @@
     <string name="emoji_sets_installed">Installato</string>
     <string name="emoji_sets_section_installed">Installati</string>
     <string name="emoji_sets_section_discover">Scopri</string>
+    <string name="emoji_sets_builtin_shown">Preinstallato · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Nascosto nel selettore. Resta visibile nei messaggi.</string>
     <string name="emoji_sets_update_available">Aggiornamento disponibile</string>
     <string name="emoji_sets_load_image">Carica immagine di anteprima</string>
     <string name="emoji_sets_image_privacy">Caricare un’anteprima o installare un set condivide il tuo indirizzo IP con i suoi host di immagini.</string>

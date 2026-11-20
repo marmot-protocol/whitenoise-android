@@ -277,6 +277,7 @@
     <string name="chat_row_draft_prefix">Entwurf: </string>
     <string name="jump_to_newest">Zum Neuesten springen</string>
     <string name="scroll_to_top">Nach oben scrollen</string>
+    <string name="scroll_to_bottom">Nach unten scrollen</string>
     <string name="discard_failed_message">Fehlgeschlagene Nachricht verwerfen</string>
     <string name="message_discard_still_sending">Diese Nachricht wird noch gesendet. Versuche es gleich noch einmal.</string>
     <string name="reply_target_not_sent">Die Nachricht, auf die du antwortest, wurde noch nicht gesendet. Warte, bis sie gesendet ist, oder tippe bei ihr auf „Erneut versuchen“, falls das Senden fehlgeschlagen ist. Sende dann deine Antwort.</string>
@@ -1668,6 +1669,8 @@
     <string name="emoji_sets_installed">Installiert</string>
     <string name="emoji_sets_section_installed">Installiert</string>
     <string name="emoji_sets_section_discover">Entdecken</string>
+    <string name="emoji_sets_builtin_shown">Vorinstalliert · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">In der Auswahl ausgeblendet. Wird in Nachrichten weiter angezeigt.</string>
     <string name="emoji_sets_update_available">Update verfügbar</string>
     <string name="emoji_sets_load_image">Vorschaubild laden</string>
     <string name="emoji_sets_image_privacy">Beim Laden einer Vorschau oder Installieren eines Sets sehen dessen Bild-Hosts deine IP-Adresse.</string>

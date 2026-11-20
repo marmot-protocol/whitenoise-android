@@ -26,8 +26,9 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
  * dismissing the dialog waits. When a relay refused an earlier change for good, waiting cannot help, so the dismiss
  * action reads Cancel.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
+// Keep the confirmation copy and guarded terminal action in the same dialog declaration.
 internal fun GroupChangeConfirmationDialog(
     question: GroupChangeConfirmation,
     appState: WhiteNoiseAppState? = null,
@@ -36,10 +37,15 @@ internal fun GroupChangeConfirmationDialog(
     val (title, message, confirm) = groupChangeConfirmationText(question.caution, question.invite, refused)
     val chat = question.target.title
     ConfirmDialog(
+        ownerKey = question,
         title = stringResource(title),
         message = stringResource(message),
         confirmLabel = stringResource(confirm),
-        onConfirm = { question.answer(proceed = appState?.ownsGroupChange(question.target) != false) },
+        onConfirm = {
+            if (appState == null || appState.groupChangeConfirmations.pending === question) {
+                question.answer(proceed = appState?.ownsGroupChange(question.target) != false)
+            }
+        },
         onDismiss = { question.answer(proceed = false) },
         destructive = true,
         dismissLabel = stringResource(if (refused) R.string.cancel else R.string.group_change_wait),

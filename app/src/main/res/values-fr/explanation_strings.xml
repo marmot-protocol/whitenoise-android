@@ -11,7 +11,7 @@
     <string name="explanation_composer_dictation">Saisit ce que vous dites grâce à la reconnaissance vocale d’Android. White Noise demande une reconnaissance hors ligne, mais votre appareil peut quand même utiliser un service en ligne.</string>
     <string name="explanation_composer_translate">Active ou désactive le mode traduction. Tant qu’il est activé, Envoyer envoie la traduction affichée sur la ligne Sera envoyé, et rien n’est envoyé tant qu’une traduction n’est pas prête.</string>
     <string name="explanation_composer_voice_note">Maintenez appuyé pour enregistrer un message vocal.</string>
-    <string name="explanation_composer_camera">Ouvre l’appareil photo pour joindre une nouvelle photo. Android demande l’accès à l’appareil photo la première fois.</string>
+    <string name="explanation_composer_camera">Ouvre l’appareil photo pour prendre une photo ou filmer une vidéo à joindre. Android demande l’accès à l’appareil photo la première fois, et au micro la première fois que vous filmez.</string>
     <string name="explanation_composer_gallery">Ouvre le sélecteur de photos d’Android. White Noise ne reçoit que les photos et vidéos que vous choisissez.</string>
     <string name="explanation_composer_files">Ouvre le sélecteur de fichiers d’Android pour joindre n’importe quel fichier.</string>
     <string name="explanation_composer_location">Envoie votre position actuelle une seule fois, sous forme de lien de carte. Votre position n’est pas partagée en continu.</string>

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -165,7 +166,7 @@ class TopNoticePlacementCoverageTest {
     @Test
     fun theRoutedConversationScopesItsBanners() {
         val shell = mainSource("ui/navigation/MainShell.kt")
-        val open = shell.indexOf("ConversationScope(appState, content.accountRef, chat.group.groupIdHex) {")
+        val open = shell.indexOf("ConversationScope(\n")
         val screen = shell.indexOf("ConversationScreen(", open)
         assertTrue("the scope must wrap the conversation", open >= 0 && screen > open)
         val scope = mainSource("ui/conversation/ConversationScope.kt").functionBody("ConversationScope")
@@ -216,11 +217,11 @@ class TopNoticePlacementCoverageTest {
         sourceRoot()
             .walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
-            .map { it.relativeTo(sourceRoot()).path to it.readText() }
+            .map { it.relativeTo(sourceRoot()).path to it.motionOwnerSource() }
             .toList()
 
     /** One production source by its path below the app package. */
-    private fun mainSource(path: String): String = File(sourceRoot(), path).readText()
+    private fun mainSource(path: String): String = File(sourceRoot(), path).motionOwnerSource()
 
     /** The app package's source root, from either the module or the repository working directory. */
     private fun sourceRoot(): File =

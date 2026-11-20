@@ -23,12 +23,14 @@ fun requiresTtsTrustWarning(
 fun TtsTrustWarningDialog(
     onProceed: () -> Unit,
     onDismiss: () -> Unit,
+    ownerKey: Any? = Unit,
 ) {
     ConfirmDialog(
         title = stringResource(R.string.tts_warning_title),
         message = stringResource(R.string.tts_warning_message),
         confirmLabel = stringResource(R.string.tts_warning_proceed),
         onConfirm = onProceed,
+        ownerKey = ownerKey,
         onDismiss = onDismiss,
     )
 }

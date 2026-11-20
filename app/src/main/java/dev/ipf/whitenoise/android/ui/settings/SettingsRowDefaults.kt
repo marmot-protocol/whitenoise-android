@@ -143,7 +143,13 @@ internal fun Modifier.settingsRowBorder(context: SettingsRowContext): Modifier {
     val shape = context.shapes.shape
     return if (shape is ConnectedRowShape) {
         val outline = context.borderColor
-        connectedRowBorder(shape, outline, seamColor = amoledRowSeamColor(outline))
+        connectedRowBorder(
+            shape,
+            outline,
+            seamColor = amoledRowSeamColor(outline),
+            suppressChrome = context.suppressChrome,
+            suppressSeam = context.suppressSeam,
+        )
     } else {
         this
     }

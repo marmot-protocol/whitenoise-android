@@ -207,37 +207,48 @@ private fun NostrFullscreenImage(
     bitmap: ImageBitmap,
     onDismiss: () -> Unit,
 ) {
+    val surface =
+        dev.ipf.whitenoise.android.ui.design
+            .rememberPopupSurfaceMotion(true, onDismiss, ownerKey = bitmap)
+    if (!surface.visible) return
     var scale by remember(bitmap) { mutableFloatStateOf(1f) }
     var offset by remember(bitmap) { mutableStateOf(Offset.Zero) }
     var chromeVisible by remember(bitmap) { mutableStateOf(true) }
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = surface.dismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        MediaViewerFrame(
-            senderLabel = stringResource(R.string.nostr_event_type_image),
-            recordedAtLabel = "",
-            onDismiss = onDismiss,
-            snackbarHostState = remember { SnackbarHostState() },
-            actionOwner = bitmap,
-            chromeVisible = chromeVisible,
+        androidx.compose.foundation.layout.Box(
+            Modifier.fillMaxSize().then(
+                dev.ipf.whitenoise.android.ui.common
+                    .fullScreenSurfaceMotion(surface),
+            ),
         ) {
-            ImageViewerViewport(
-                sourceKey = bitmap,
-                imageWidth = bitmap.width,
-                imageHeight = bitmap.height,
-                scale = scale,
-                offset = offset,
-                onScaleChange = { scale = it },
-                onOffsetChange = { offset = it },
-                onChromeToggle = { chromeVisible = !chromeVisible },
-            ) { imageModifier ->
-                Image(
-                    bitmap = bitmap,
-                    contentDescription = stringResource(R.string.nostr_event_type_image),
-                    contentScale = ContentScale.FillBounds,
-                    modifier = imageModifier,
-                )
+            MediaViewerFrame(
+                senderLabel = stringResource(R.string.nostr_event_type_image),
+                recordedAtLabel = "",
+                onDismiss = surface.dismiss,
+                snackbarHostState = remember { SnackbarHostState() },
+                actionOwner = bitmap,
+                chromeVisible = chromeVisible,
+            ) {
+                ImageViewerViewport(
+                    sourceKey = bitmap,
+                    imageWidth = bitmap.width,
+                    imageHeight = bitmap.height,
+                    scale = scale,
+                    offset = offset,
+                    onScaleChange = { scale = it },
+                    onOffsetChange = { offset = it },
+                    onChromeToggle = { chromeVisible = !chromeVisible },
+                ) { imageModifier ->
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = stringResource(R.string.nostr_event_type_image),
+                        contentScale = ContentScale.FillBounds,
+                        modifier = imageModifier,
+                    )
+                }
             }
         }
     }

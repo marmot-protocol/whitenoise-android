@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In-app camera opened by the composer's Camera action. -->
+    <string name="camera_close">Kamera schließen</string>
+    <string name="camera_mode_photo">Foto</string>
+    <string name="camera_mode_video">Video</string>
+    <string name="camera_take_photo">Foto aufnehmen</string>
+    <string name="camera_start_recording">Aufnahme starten</string>
+    <string name="camera_stop_recording">Aufnahme beenden</string>
+    <string name="camera_switch">Kamera wechseln</string>
+    <string name="camera_video_without_sound">Der Mikrofonzugriff ist aus, daher werden Videos ohne Ton aufgenommen.</string>
+    <string name="camera_capture_failed">Konnte nicht gespeichert werden. Versuche es erneut.</string>
+</resources>

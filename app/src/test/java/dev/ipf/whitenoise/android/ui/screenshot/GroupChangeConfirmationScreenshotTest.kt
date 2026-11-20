@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -48,6 +49,8 @@ class GroupChangeConfirmationScreenshotTest {
 
         composeRule.onNodeWithText("Weekend hikers").assertExists()
         composeRule.onNodeWithText("Wait").performClick()
+        composeRule.runOnIdle { Snapshot.sendApplyNotifications() }
+        composeRule.mainClock.advanceTimeUntil { decision.isCompleted }
         assertEquals(false, decision.getCompleted())
     }
 
@@ -79,6 +82,8 @@ class GroupChangeConfirmationScreenshotTest {
         capture("refused_light")
 
         composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.runOnIdle { Snapshot.sendApplyNotifications() }
+        composeRule.mainClock.advanceTimeUntil { decision.isCompleted }
         assertEquals(false, decision.getCompleted())
     }
 

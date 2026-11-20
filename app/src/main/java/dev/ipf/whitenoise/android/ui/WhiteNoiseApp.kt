@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.ui
 
 import android.Manifest
 import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.speech.RecognizerIntent
 import android.view.ViewTreeObserver
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -585,7 +583,6 @@ internal fun WhiteNoiseApp(
         }
     }
 
-    val customEmojiStore = rememberCustomEmojiStore(context)
     val explanationHost = rememberExplanationHostState()
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
     // whole app UI so every descendant text field requests incognito mode from
@@ -594,9 +591,10 @@ internal fun WhiteNoiseApp(
         CompositionLocalProvider(
             LocalPendingCameraCaptureFiles provides mainShellStateHolder.pendingCameraCaptureFiles,
             LocalTopNoticeHost provides topNoticeHost,
-            LocalCustomEmoji provides customEmojiStore.emoji,
+            LocalCustomEmoji provides rememberCustomEmojiStore(context).emoji,
+            LocalHiddenBuiltinEmojiSets provides rememberBuiltinEmojiSetChoices(context).pickerHidden,
             LocalInAppLinkHandler provides inAppLinkHandler,
-            LocalExplanationHost provides explanationHost.show,
+            LocalExplanationHost provides explanationHost,
         ) {
             // Holding a control explains it; the lock drops any open explanation.
             ExplanationSheetHost(explanationHost, visible = !appState.appLock.screenVisible)
@@ -848,8 +846,9 @@ internal fun WhiteNoiseApp(
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(
             offlineSpeechToText = dictationState.usesOfflineSpeechToText,
-            onConfirm = dictation::acceptDisclosure,
-            onDismiss = dictation::cancel,
+            ownerKey = dictationState,
+            onConfirm = { dictation.acceptDisclosure(dictationState) },
+            onDismiss = { if (dictation.state === dictationState) dictation.cancel() },
         )
     }
 }
@@ -899,10 +898,3 @@ private fun WarmResumeFrameSurface(
     }
     content()
 }
-
-private tailrec fun Context.findActivity(): Activity? =
-    when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
-    }

@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,8 +42,13 @@ import dev.ipf.whitenoise.android.ui.chats.ChatListBodyFrame
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.chats.ChatRowPortFixtures
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.navigation.CONVERSATION_ROUTE_TRANSITION_MILLIS
+import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.ConversationRouteAnimatedContent
+import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
+import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
+import dev.ipf.whitenoise.android.ui.navigation.rememberConversationRouteTransition
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
@@ -296,17 +300,30 @@ class PlaybackHeaderNavigationScreenshotTest {
                     ) {
                         if (animated) {
                             val transition =
-                                updateTransition(
+                                rememberConversationRouteTransition(
                                     targetState = if (conversation.value) "conversation" else null,
-                                    label = "playback route",
+                                    suppressMotion = false,
                                 )
-                            ConversationRouteAnimatedContent(
-                                transition = transition,
-                                routeForwardDirection = if (rtl) -1 else 1,
-                                suppressMotion = false,
-                                contentKey = { it ?: "chat-list" },
-                            ) { destination ->
-                                PlaybackScreen(destination != null, focus)
+                            val handoff =
+                                rememberMeasuredControlHandoff(
+                                    owner = "playback",
+                                    destination =
+                                        if (conversation.value) {
+                                            ComposerFabEndpoint.Composer
+                                        } else {
+                                            ComposerFabEndpoint.NewMessage
+                                        },
+                                    morphSurface = true,
+                                )
+                            CompositionLocalProvider(LocalComposerFabHandoff provides handoff) {
+                                ConversationRouteAnimatedContent(
+                                    transition = transition,
+                                    routeForwardDirection = if (rtl) -1 else 1,
+                                    suppressMotion = false,
+                                    contentKey = { it ?: "chat-list" },
+                                ) { destination ->
+                                    PlaybackScreen(destination != null, focus)
+                                }
                             }
                         } else {
                             PlaybackScreen(conversation.value, focus)
@@ -338,7 +355,11 @@ class PlaybackHeaderNavigationScreenshotTest {
                 }
             },
         ) { padding ->
-            Box(Modifier.padding(padding)) {
+            Box(
+                Modifier.fillMaxSize().padding(padding).then(
+                    if (inConversation) Modifier.conversationRouteBodyMotion() else Modifier,
+                ),
+            ) {
                 if (inConversation) {
                     Box(Modifier.testTag("playback.$route.content")) {
                         Text("Conversation messages", Modifier.testTag("playback.content"))

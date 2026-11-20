@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Abre los detalles de este chat, como sus miembros y ajustes.</string>
     <string name="explanation_conversation_jump_to_mention">Se desplaza al siguiente mensaje sin leer en el que te mencionan.</string>
     <string name="explanation_composer_draft_top">Desplaza el borrador de vuelta a su primera línea. No cambia el texto.</string>
+    <string name="explanation_composer_draft_bottom">Desplaza el borrador hasta su última línea. No cambia el texto.</string>
     <string name="explanation_emoji_search">Busca emojis por nombre.</string>
     <string name="explanation_emoji_configure">Abre los ajustes donde eliges tus emojis de reacción rápida.</string>
 

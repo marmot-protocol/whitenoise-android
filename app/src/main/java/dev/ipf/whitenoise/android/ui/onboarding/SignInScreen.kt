@@ -180,16 +180,17 @@ internal fun SignInContent(
     }
     if (recoveryConsentVisible && !busy) {
         WhiteNoiseAlertDialog(
+            ownerKey = identity,
             onDismissRequest = onRecoveryConsentDismiss,
             title = { Text(stringResource(R.string.sign_in_recovery_title)) },
             text = { Text(stringResource(R.string.sign_in_recovery_message)) },
             confirmButton = {
-                TextButton(onClick = onRecoveryConsentConfirm) {
+                TextButton(onClick = { close(onRecoveryConsentConfirm) }) {
                     Text(stringResource(R.string.sign_in_recovery_confirm))
                 }
             },
             dismissButton = {
-                TextButton(onClick = onRecoveryConsentDismiss) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

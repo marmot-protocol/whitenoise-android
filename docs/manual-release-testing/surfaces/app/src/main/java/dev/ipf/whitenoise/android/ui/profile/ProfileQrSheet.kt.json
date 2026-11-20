@@ -65,6 +65,15 @@
         "test_ids": [
           "ACC-019"
         ]
+      },
+      {
+        "surface": "profile-qr:string:copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
       }
     ],
     "source_coverage": [

@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.APP_UPDATE_DIALOG_TAG
 import dev.ipf.whitenoise.android.ui.AppSelfUpdateContent
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.ui.updateTestAsset
 import dev.ipf.whitenoise.android.ui.updateTestFile
@@ -146,7 +147,11 @@ class AppUpdateScreenshotTest {
                 }
             }
         }
-        composeRule.mainClock.advanceTimeBy(250)
+        // Pin the indeterminate progress phase after the complete dialog entrance.
+        // Keep this sample time explicit: changing motion duration must not silently rephase it.
+        val snapshotTimeMillis = 384L
+        check(snapshotTimeMillis >= APP_MOTION_OPEN_MILLIS + 32L)
+        composeRule.mainClock.advanceTimeBy(snapshotTimeMillis)
         composeRule.onNodeWithTag(APP_UPDATE_DIALOG_TAG).captureRoboImage("src/test/snapshots/$name.png")
     }
 

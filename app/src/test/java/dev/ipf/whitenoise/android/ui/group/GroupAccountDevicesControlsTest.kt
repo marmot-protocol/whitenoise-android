@@ -120,7 +120,7 @@ class GroupAccountDevicesControlsTest {
         )
     }
 
-    /** The confirmation says the change cannot be undone, and only its confirm button proceeds. */
+    /** The confirmation says the change cannot be undone, and cancelling it changes nothing. */
     @Test
     fun theConfirmationSaysItCannotBeUndone() {
         var confirms = 0
@@ -134,6 +134,16 @@ class GroupAccountDevicesControlsTest {
         compose.onNodeWithText(context.getString(R.string.group_account_devices_confirm_message)).assertExists()
         compose.onNodeWithText(context.getString(R.string.cancel)).performClick()
         compose.runOnIdle { assertEquals(0 to 1, confirms to dismissals) }
+    }
+
+    /** Only the confirm button turns linked devices on for the chat. */
+    @Test
+    fun onlyTheConfirmButtonProceeds() {
+        var confirms = 0
+        compose.setContent {
+            WhiteNoiseTheme { GroupAccountDevicesConfirmDialog(onConfirm = { confirms++ }, onDismiss = {}) }
+        }
+
         compose.onNodeWithText(context.getString(R.string.group_account_devices_confirm)).performClick()
         compose.runOnIdle { assertEquals(1, confirms) }
     }

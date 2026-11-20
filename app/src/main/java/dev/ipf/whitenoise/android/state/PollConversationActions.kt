@@ -26,8 +26,9 @@ internal fun pollDeadlineEpochSeconds(
 }
 
 /**
- * Publish a group poll through MDK, as a reply to [reply]'s message when one is selected. Native
- * failures and a reply with no event id yet are reported; cancellation must propagate.
+ * Publish a group poll through MDK, as a reply to [reply]'s message when one is selected. A reply to a
+ * message that hasn't been sent yet gets the same notice as a text reply; native failures are reported, and
+ * cancellation must propagate.
  */
 @Suppress("TooGenericExceptionCaught")
 internal suspend fun ConversationController.createPoll(
@@ -46,11 +47,11 @@ internal suspend fun ConversationController.createPoll(
             cleanOptions.size in 2..MAX_POLL_OPTIONS &&
             cleanOptions.none(String::isEmpty) &&
             (deadlineDurationSeconds == null || deadlineDurationSeconds in 1..MAX_POLL_DEADLINE_SECONDS)
-    return if (!canPublish || !validDraft) {
+    val replyTags = if (canPublish && validDraft) replyTagsForSend(reply).getOrNull() else null
+    return if (replyTags == null) {
         false
     } else {
         try {
-            val replyTags = reply.messageTags
             appState.withGroupCommitLock(account, group.groupIdHex) {
                 check(canSendMessages && !isDirectConversation)
                 appState.marmotIo {

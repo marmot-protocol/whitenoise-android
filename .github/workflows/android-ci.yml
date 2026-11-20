@@ -300,7 +300,10 @@ jobs:
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Robolectric jar prefetch
-        run: bash .github/scripts/test-prefetch-robolectric-android-all.sh
+        run: |
+          timeout --version
+          if command -v gnutimeout; then gnutimeout --version; fi
+          bash .github/scripts/test-prefetch-robolectric-android-all.sh
 
       - name: Test Android CI aggregate gate
         run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_ci_reuse.py scripts/test_unit_test_diagnostics.py scripts/test_verify_compose_release_apk.py scripts/test_kover_class_outputs.py

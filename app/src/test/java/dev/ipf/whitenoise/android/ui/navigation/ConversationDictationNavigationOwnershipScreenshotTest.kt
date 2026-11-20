@@ -2,10 +2,13 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -17,13 +20,21 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_COMPACT_ACTIONS_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_HANDLE_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.ACCOUNT
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.COMPOSER_TAG
@@ -32,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -39,11 +51,14 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+// Shared Compose fixture and screenshot identity bind this navigation scenario catalog.
+@Suppress("LargeClass")
 internal class ConversationDictationNavigationOwnershipScreenshotTest : DictationNavigationScenarioFixture() {
     /** Captures shared scenarios through this selected owner using its existing Compose rule. */
     protected override fun captureGolden(path: String) {
@@ -304,13 +319,46 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
 
     /** First/intermediate/settled pixels come from the production shell and its single control set. */
     @Test
+    // Keep frame-clock actions and ownership assertions in causal order.
+    @Suppress("LongMethod")
     fun dictationMorphFramesAmoled() {
-        val fixture = render(dark = true, amoled = true)
+        val fixture = render(dark = true, amoled = true, withComposerMorph = true)
         firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
-        composeRule.mainClock.advanceTimeBy(256)
+        settleDictationHandoff(fixture)
         val chatsTop = requireNotNull(fixture.anchor?.topInWindow)
         firstNavigationFrame { fixture.route = origin }
-        composeRule.mainClock.advanceTimeBy(256)
+        settleDictationHandoff(fixture)
+        if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
+            repeat(3) { cycle ->
+                listOf(false, true).forEach { returning ->
+                    val name = "dictation_cycle_$cycle" + if (returning) "_back" else ""
+                    val folder = File("build/dictation-route-motion/$name").apply { mkdirs() }
+                    captureScreenRoboImage(File(folder, "source.png").path)
+                    firstNavigationFrame {
+                        fixture.route =
+                            if (returning) origin else origin.copy(selectedChatId = null, selectedGroupIdHex = null)
+                    }
+                    if (!returning) {
+                        composeRule.onNodeWithTag(COMPOSER_TAG).assertExists()
+                        assertEquals(chatsTop, requireNotNull(fixture.anchor?.topInWindow), 0.5f)
+                    }
+                    repeat(32) { frame ->
+                        assertSingleActionSet()
+                        val frameTime = composeRule.mainClock.currentTime
+                        composeRule
+                            .onRoot()
+                            .captureToImage()
+                            .asAndroidBitmap()
+                            .captureRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+                        assertEquals(frameTime, composeRule.mainClock.currentTime)
+                        composeRule.mainClock.advanceTimeBy(16)
+                    }
+                    if (!returning) assertEquals(chatsTop, requireNotNull(fixture.anchor?.topInWindow), 0.5f)
+                    assertSingleActionSet()
+                }
+            }
+            return
+        }
         listOf(false, true).forEach { returning ->
             firstNavigationFrame {
                 fixture.route = if (returning) origin else origin.copy(selectedChatId = null, selectedGroupIdHex = null)
@@ -332,10 +380,140 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
             composeRule.mainClock.advanceTimeBy(48)
             assertSingleActionSet()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_late_amoled.png")
-            composeRule.mainClock.advanceTimeBy(144)
+            settleDictationHandoff(fixture)
+            assertFalse(requireNotNull(fixture.handoff).active)
             if (!returning) assertEquals(chatsTop, requireNotNull(fixture.anchor?.topInWindow), 0.5f)
             assertSingleActionSet()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_settled_amoled.png")
+        }
+    }
+
+    /** Source-render only: models IME release before committing a route, not production Back dispatch. */
+    @Test
+    // Three real activation cycles share one retained composer fixture and clock.
+    @Suppress("LongMethod")
+    fun tallComposerDictationThreeCyclesAmoled() {
+        val fixture = render(dark = true, amoled = true, withComposerMorph = true, startImmediately = false)
+        val draft = "First synthetic line\nSecond synthetic line\nThird synthetic line\nFourth synthetic line"
+        composeRule.onNode(hasSetTextAction()).performTextReplacement(draft)
+        composeRule.runOnIdle {
+            fixture.draft = TextFieldValue(draft)
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+            fixture.platform.listener.onReady()
+        }
+        val session = fixture.controller.state.sessionId
+        val target = requireNotNull(fixture.controller.state.target)
+        assertEquals(ACCOUNT, target.accountRef)
+        assertEquals(GROUP, target.groupIdHex)
+        val captureRoot =
+            if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
+                val parent = File("build/dictation-route-motion").apply { mkdirs() }
+                java.nio.file.Files
+                    .createTempDirectory(parent.toPath(), "tall-origin-three-cycles-")
+                    .toFile()
+            } else {
+                null
+            }
+        val measurements = captureRoot?.resolve("measurements.tsv")
+        measurements?.writeText("chapter\tframe\ttimeMs\timeBottom\tpenBounds\tcapsuleBounds\n")
+
+        fun assertOwnership() {
+            assertSingleActionSet()
+            assertEquals(session, fixture.controller.state.sessionId)
+            assertEquals(target, fixture.controller.state.target)
+            assertEquals(0, fixture.platform.cancels)
+            assertTrue(fixture.writes.isEmpty())
+        }
+
+        fun dispatchIme(bottom: Int) {
+            composeRule.runOnUiThread {
+                ViewCompat.dispatchApplyWindowInsets(
+                    renderedView.rootView,
+                    WindowInsetsCompat
+                        .Builder()
+                        .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, 24))
+                        .setVisible(WindowInsetsCompat.Type.navigationBars(), true)
+                        .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, bottom))
+                        .setVisible(WindowInsetsCompat.Type.ime(), bottom > 0)
+                        .build(),
+                )
+            }
+            // Insets update Compose state; a paused capture clock must apply that frame first.
+            if (!composeRule.mainClock.autoAdvance) composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            assertEquals(bottom, observedImeBottom)
+        }
+
+        fun captureChapter(
+            name: String,
+            frames: Int,
+        ) {
+            val folder = captureRoot?.resolve(name)?.apply { check(mkdir()) }
+            repeat(frames) { frame ->
+                assertOwnership()
+                if (folder != null) {
+                    val time = composeRule.mainClock.currentTime
+                    composeRule
+                        .onRoot()
+                        .captureToImage()
+                        .asAndroidBitmap()
+                        .captureRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+                    assertEquals(time, composeRule.mainClock.currentTime)
+                    val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
+                    val pen =
+                        if (fixture.route.selectedChatId == null) {
+                            composeRule.onNodeWithContentDescription("New Message").fetchSemanticsNode().boundsInRoot
+                        } else {
+                            null
+                        }
+                    measurements?.appendText("$name\t$frame\t$time\t$observedImeBottom\t$pen\t$capsule\n")
+                }
+                composeRule.mainClock.advanceTimeBy(16)
+            }
+        }
+
+        repeat(3) { cycle ->
+            // Re-created route content owns its own edit/expansion state; seed through its real actions.
+            composeRule.mainClock.autoAdvance = true
+            composeRule.onNode(hasSetTextAction()).performTextReplacement(draft)
+            dispatchIme(280)
+            val expand =
+                composeRule
+                    .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .config[SemanticsActions.CustomActions]
+                    .single()
+            composeRule.runOnIdle { assertTrue(expand.action()) }
+            composeRule.waitForIdle()
+            val surface =
+                composeRule
+                    .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG, useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            assertTrue("Exercise a genuinely tall ComposerBar", surface.height > 96f)
+            composeRule.mainClock.autoAdvance = false
+            captureChapter("cycle_${cycle}_01_origin_active", 8)
+            // The fixture omits ConversationScreen/its exit coordinator. Never claim this proves Back's wait.
+            listOf(180, 80, 0).forEachIndexed { index, bottom ->
+                dispatchIme(bottom)
+                assertEquals(origin, fixture.route)
+                captureChapter("cycle_${cycle}_02_ime_release_$index", 4)
+            }
+            firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+            captureChapter("cycle_${cycle}_03_departure", 32)
+            val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+            val pen = composeRule.onNodeWithContentDescription("New Message").fetchSemanticsNode().boundsInRoot
+            val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
+            assertEquals(0, observedImeBottom)
+            assertEquals("Pen retains compact action height", 48f, pen.height, 0.5f)
+            assertEquals("Fixed bottom baseline after tall composer", root.bottom - 24f - 6f, pen.bottom, 0.5f)
+            assertEquals("Painted capsule-to-pen gap", FloatingControlGap.value, pen.top - capsule.bottom, 0.5f)
+            captureChapter("cycle_${cycle}_04_chats_settled", 32)
+            firstNavigationFrame { fixture.route = origin }
+            captureChapter("cycle_${cycle}_05_return", 32)
+            assertEquals(origin, fixture.route)
+            assertOwnership()
+            composeRule.onNodeWithTag(COMPOSER_TAG).assertExists()
         }
     }
 
@@ -500,7 +678,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
             composeRule.onRoot().captureRoboImage(
                 "src/test/snapshots/dictation_combined_${direction}_middle_amoled.png",
             )
-            composeRule.mainClock.advanceTimeBy(192)
+            settleDictationHandoff(fixture)
             assertSingleActionSet()
             composeRule.onRoot().captureRoboImage(
                 "src/test/snapshots/dictation_combined_${direction}_settled_amoled.png",
@@ -515,7 +693,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         composeRule.mainClock.advanceTimeBy(64)
         assertSingleActionSet()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_combined_reverse_middle_amoled.png")
-        composeRule.mainClock.advanceTimeBy(192)
+        settleDictationHandoff(fixture)
         assertSingleActionSet()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_combined_reverse_settled_amoled.png")
     }
@@ -531,12 +709,24 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
                 .fetchSemanticsNode()
                 .boundsInRoot
         fixture.gripTopOffset = initialGrip.top - initialTarget.top
+        // Include the placement/start frames before the shared tween begins advancing.
+        val settleFrameBudget = (APP_MOTION_OPEN_MILLIS + 15) / 16 + 2
+
+        fun exportUntilSettled(
+            scene: String,
+            firstIndex: Int,
+        ) {
+            var frames = 0
+            while (requireNotNull(fixture.handoff).active && frames < settleFrameBudget) {
+                composeRule.mainClock.advanceTimeByFrame()
+                frames++
+                exportCurrentFrame(scene, firstIndex + frames)
+            }
+            assertTrue("$scene must settle within the shared motion budget", !requireNotNull(fixture.handoff).active)
+        }
         firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
         exportCurrentFrame("active_departure", 0)
-        repeat(16) { index ->
-            composeRule.mainClock.advanceTimeByFrame()
-            exportCurrentFrame("active_departure", index + 1)
-        }
+        exportUntilSettled("active_departure", 0)
         fixture.incomingCapsuleLeft =
             composeRule
                 .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
@@ -544,10 +734,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
                 .boundsInRoot.left
         firstNavigationFrame { fixture.route = origin }
         exportCurrentFrame("active_return", 0)
-        repeat(16) { index ->
-            composeRule.mainClock.advanceTimeByFrame()
-            exportCurrentFrame("active_return", index + 1)
-        }
+        exportUntilSettled("active_return", 0)
         firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
         exportCurrentFrame("active_reverse", 0)
         repeat(4) { index ->
@@ -556,10 +743,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         }
         firstNavigationFrame { fixture.route = origin }
         exportCurrentFrame("active_reverse", 5)
-        repeat(16) { index ->
-            composeRule.mainClock.advanceTimeByFrame()
-            exportCurrentFrame("active_reverse", index + 6)
-        }
+        exportUntilSettled("active_reverse", 5)
         assertTrue("Every route must exercise its settled pixel checks", fixture.checkedArtworkFrames >= 3)
     }
 }

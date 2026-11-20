@@ -4,16 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "GroupEditPhotoMenu",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "fun GroupEditPhotoMenu(",
-        "test_ids": [
-          "GRP-001",
-          "GRP-025",
-          "GRP-034"
-        ]
-      },
-      {
         "surface": "GroupEditScaffold",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "fun GroupEditScaffold(",
@@ -55,36 +45,9 @@
         ]
       },
       {
-        "surface": "string:choose_files",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.choose_files",
-        "test_ids": [
-          "GRP-001",
-          "GRP-025"
-        ]
-      },
-      {
-        "surface": "string:choose_photos",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.choose_photos",
-        "test_ids": [
-          "GRP-001",
-          "GRP-025"
-        ]
-      },
-      {
         "surface": "string:edit_group_info_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.edit_group_info_title",
-        "test_ids": [
-          "GRP-001",
-          "GRP-025"
-        ]
-      },
-      {
-        "surface": "string:find_web_image",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.find_web_image",
         "test_ids": [
           "GRP-001",
           "GRP-025"
@@ -103,15 +66,6 @@
         "surface": "string:group_description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_description",
-        "test_ids": [
-          "GRP-001",
-          "GRP-025"
-        ]
-      },
-      {
-        "surface": "string:group_emoji_create",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.group_emoji_create",
         "test_ids": [
           "GRP-001",
           "GRP-025"
@@ -208,15 +162,6 @@
         "surface": "string:profile_view_picture",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.profile_view_picture",
-        "test_ids": [
-          "GRP-001",
-          "GRP-025"
-        ]
-      },
-      {
-        "surface": "string:remove_photo",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.remove_photo",
         "test_ids": [
           "GRP-001",
           "GRP-025"

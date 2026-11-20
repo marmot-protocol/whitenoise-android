@@ -4,22 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "DangerLeading",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "fun DangerLeading(",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "DeveloperInfoPanel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "fun DeveloperInfoPanel(",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "developerPanels",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun developerPanels()",
@@ -51,22 +35,6 @@
         "surface": "GroupMutationErrorBanner",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun GroupMutationErrorBanner(",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "PushDeliveryDebugSection",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "fun PushDeliveryDebugSection(",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "PushTokenDebugRows",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "fun PushTokenDebugRows(",
         "test_ids": [
           "GRP-001"
         ]
@@ -394,14 +362,6 @@
         ]
       },
       {
-        "surface": "string:loading_push_debug_info",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.loading_push_debug_info",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:member",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.member",
@@ -442,22 +402,6 @@
         ]
       },
       {
-        "surface": "string:native_push",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.native_push",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:no",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.no",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:no_matches",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.no_matches",
@@ -469,198 +413,6 @@
         "surface": "string:no_share_target_available",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.no_share_target_available",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_active_leaf",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_active_leaf",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_active_tokens",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_active_tokens",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_info_unavailable",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_info_unavailable",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_is_local_member",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_is_local_member",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_last_token_list_update",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_last_token_list_update",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_leaf_index",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_leaf_index",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_local_leaf_index",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_local_leaf_index",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_local_notifications_enabled",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_local_notifications_enabled",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_local_registration",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_local_registration",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_local_token_cached",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_local_token_cached",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_member",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_member",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_member_matches_active_leaf",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_member_matches_active_leaf",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_member_tokens",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_member_tokens",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_missing_relay_hints",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_missing_relay_hints",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_platform",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_platform",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_push_server_pubkey",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_push_server_pubkey",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_registered",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_registered",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_relay_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_relay_hint",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_shareable",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_shareable",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_stale_tokens",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_stale_tokens",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_token_fingerprint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_token_fingerprint",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_total_tokens",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_total_tokens",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_debug_updated_at",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_debug_updated_at",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:push_delivery",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.push_delivery",
         "test_ids": [
           "GRP-001"
         ]
@@ -750,14 +502,6 @@
         "surface": "string:unarchive_chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.unarchive_chat",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:yes",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.yes",
         "test_ids": [
           "GRP-001"
         ]
@@ -1020,7 +764,7 @@
       {
         "surface": "Scroll boundaries: GroupDetailsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": ".whiteNoiseVerticalScroll(",
+        "anchor": ".fadingVerticalScroll(",
         "test_ids": [
           "SCR-001",
           "SCR-002",

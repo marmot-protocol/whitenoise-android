@@ -12,13 +12,36 @@ class ModalDiscoveryTests(unittest.TestCase):
     def test_production_primitive_wrappers_must_be_in_the_constructor_audit(self):
         root = Path(__file__).resolve().parents[1] / 'app/src/main/java/dev/ipf/whitenoise/android'
         wrappers = set()
-        for source in ('ui/common/WhiteNoiseDialogs.kt', 'ui/conversation/PlaybackDialog.kt'):
+        for source in ('ui/common/WhiteNoiseDialogs.kt', 'ui/conversation/PlaybackDialog.kt',
+                       'ui/common/AnimatedAlertDialog.kt', 'ui/common/AnimatedDatePickerDialog.kt',
+                       'ui/design/AnimatedDropdownMenu.kt', 'ui/conversation/MeasuredPlaybackDialog.kt'):
             wrappers.update(modal_owners((root / source).read_text()))
-        self.assertGreaterEqual(wrappers, {'ChoiceDialog', 'SpeechChoiceDialog', 'PlaybackDialog'})
+        self.assertGreaterEqual(wrappers, {'ChoiceDialog', 'SpeechChoiceDialog', 'WhiteNoiseAlertDialog', 'PlaybackDialog',
+                                             'AnimatedAlertDialog', 'AnimatedBasicAlertDialog',
+                                             'AnimatedDatePickerDialog', 'AnimatedDropdownMenu', 'MeasuredPlaybackDialog'})
         self.assertFalse(wrappers - MODAL_CONSTRUCTORS, 'Production modal wrapper escapes caller discovery')
         for wrapper in wrappers:
             self.assertEqual(modal_owners('@Composable fun UnsuffixedContent() { ' + wrapper + '() }'),
                              {'UnsuffixedContent'})
+
+    def test_animated_modal_calls_retain_unsuffixed_owners(self):
+        for constructor in ('AnimatedAlertDialog', 'AnimatedBasicAlertDialog',
+                            'AnimatedDatePickerDialog', 'AnimatedDropdownMenu', 'DatePickerDialog',
+                            'MeasuredPlaybackDialog'):
+            with self.subTest(constructor=constructor):
+                self.assertEqual(modal_owners('@Composable fun DetailsContent() { ' + constructor + '() }'),
+                                 {'DetailsContent'})
+
+    def test_groups_in_common_keeps_its_direct_screen_mapping(self):
+        root = Path(__file__).resolve().parents[1]
+        source = 'app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt'
+        with tempfile.TemporaryDirectory() as folder:
+            synthetic = Path(folder)
+            target = synthetic / source
+            target.parent.mkdir(parents=True)
+            target.write_text((root / source).read_text())
+            screens = screen_catalog(synthetic, {'ui': [{'source': source, 'test_ids': ['PROFILE-001']}]}, {})
+            self.assertIn('PersonGroupsInCommonContent', {row['symbol'] for row in screens})
 
     def test_real_gesture_picker_owner_requires_a_direct_binding(self):
         root = Path(__file__).resolve().parents[1]

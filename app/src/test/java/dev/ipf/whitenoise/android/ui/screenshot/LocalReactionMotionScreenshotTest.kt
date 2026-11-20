@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.CustomEmoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.conversation.messages.FOCUSED_OVERLAY_FRAME_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageAction
 import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageActions
@@ -412,8 +413,8 @@ class LocalReactionMotionScreenshotTest {
             }
         }
         rule.waitForIdle()
-        // Popup placement and the lifted-stack snap complete before measuring/clicking the real rail.
-        flushQueuedComposition(64)
+        // Measure the settled quick rail after its native popup entry, before starting the reaction flight.
+        flushQueuedComposition(APP_MOTION_OPEN_MILLIS.toLong() + 32)
         rule.onNodeWithTag(FOCUSED_OVERLAY_FRAME_TEST_TAG).captureToImage()
         flushQueuedComposition()
         val folder = File("build/local-reaction-motion/$name").apply { mkdirs() }

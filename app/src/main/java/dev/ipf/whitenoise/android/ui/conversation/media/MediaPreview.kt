@@ -29,11 +29,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.DialogProperties
@@ -48,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -238,61 +244,6 @@ private fun decodeStagedPreviewBitmap(
         }.getOrNull()
     }
 
-/** One staged attachment in the preview, in send order — media first, then documents. */
-internal sealed class StagedPreviewItem {
-    abstract val uri: android.net.Uri
-
-    /** The pick whose draft's outgoing worker decodes this item: the slot id, or the document's URI. */
-    abstract val pick: String
-
-    data class Media(
-        val slot: PendingMediaSlot,
-    ) : StagedPreviewItem() {
-        override val uri: android.net.Uri = slot.uri
-        override val pick: String = slot.id
-    }
-
-    /** A staged document; [occurrence] tells repeated picks of one URI apart, starting at 1. */
-    data class Document(
-        override val uri: android.net.Uri,
-        val occurrence: Int = 1,
-    ) : StagedPreviewItem() {
-        override val pick: String = uri.toString()
-    }
-}
-
-/** The preview's items in send order, numbering repeated document URIs so each keeps its own key. */
-internal fun stagedPreviewItems(
-    mediaSlots: List<PendingMediaSlot>,
-    documentUris: List<android.net.Uri>,
-): List<StagedPreviewItem> {
-    val media = mediaSlots.map { StagedPreviewItem.Media(it) }
-    val seen = mutableMapOf<android.net.Uri, Int>()
-    return media +
-        documentUris.map { uri ->
-            val occurrence = (seen[uri] ?: 0) + 1
-            seen[uri] = occurrence
-            StagedPreviewItem.Document(uri, occurrence)
-        }
-}
-
-/**
- * Where the preview cursor lands after removing [removedIndex] from a list
- * that now holds [remainingCount] items. Removing an item before the cursor
- * shifts it left, removing the cursor itself keeps its slot (the next item
- * slides in), clamped to the new bounds.
- */
-internal fun previewIndexAfterRemoval(
-    removedIndex: Int,
-    currentIndex: Int,
-    remainingCount: Int,
-): Int =
-    when {
-        remainingCount <= 0 -> 0
-        removedIndex < currentIndex -> (currentIndex - 1).coerceIn(0, remainingCount - 1)
-        else -> currentIndex.coerceIn(0, remainingCount - 1)
-    }
-
 /** Full-screen preview of staged media before sending. */
 @Composable
 @Suppress("LongParameterList")
@@ -306,7 +257,7 @@ internal fun MediaPreviewScreen(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
-    onEditMediaAt: ((Int) -> Unit)? = null,
+    onEditMediaAt: ((Int, Rect?) -> Unit)? = null,
     onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
     preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
     preparedPhotoQualities: Map<String, PreparedPhotoQuality> = emptyMap(),
@@ -317,9 +268,28 @@ internal fun MediaPreviewScreen(
     previewOnly: Boolean = false,
     initialIndex: Int = 0,
     onCollectionChange: ((StagedCollectionOrder) -> Unit)? = null,
+    interactive: Boolean = true,
 ) {
+    // Picker/camera and restored entries do not retain an activated app control.
+    // Keep the fullscreen fallback; do not infer an origin from the whole preview.
     PlaybackDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (interactive) onDismiss() },
+        onSourceDismiss = onDismiss,
+        // The real preview remains under the editor, including its source Edit button.
+        // Only the top editor owns interaction until its final exit frame.
+        rootModifier = {
+            if (interactive) {
+                Modifier
+            } else {
+                Modifier.clearAndSetSemantics {}.onPreviewKeyEvent { true }.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                        }
+                    }
+                }
+            }
+        },
         properties =
             DialogProperties(
                 usePlatformDefaultWidth = false,
@@ -369,7 +339,7 @@ internal fun MediaPreviewContent(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
-    onEditMediaAt: ((Int) -> Unit)? = null,
+    onEditMediaAt: ((Int, Rect?) -> Unit)? = null,
     onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
     preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
     preparedPhotoQualities: Map<String, PreparedPhotoQuality> = emptyMap(),
@@ -440,7 +410,7 @@ internal fun MediaPreviewContent(
                                             nonEditableSlotIds = nonEditableMediaSlotIds,
                                             genericRefusal = genericEditRefusal,
                                         ),
-                                    onEdit = { onEditMediaAt?.invoke(pagerState.currentPage) },
+                                    onEdit = { origin -> onEditMediaAt?.invoke(pagerState.currentPage, origin) },
                                 )
                             },
                     onClose = onClose,
@@ -523,7 +493,7 @@ internal fun MediaPreviewContent(
 internal data class MediaPreviewEditAction(
     val enabled: Boolean,
     val description: String?,
-    val onEdit: () -> Unit,
+    val onEdit: (Rect?) -> Unit,
 )
 
 /**
@@ -618,7 +588,8 @@ private fun MediaPreviewTopBar(
             editAction?.let { action ->
                 val fallback = stringResource(R.string.photo_editor_edit_action)
                 val describe = Modifier.semantics { contentDescription = action.description ?: fallback }
-                TextButton(onClick = action.onEdit, enabled = action.enabled, modifier = describe) {
+                val (editBounds, editClick) = rememberMeasuredControlClick(action.onEdit)
+                TextButton(onClick = editClick, enabled = action.enabled, modifier = describe.then(editBounds)) {
                     Text(stringResource(R.string.photo_editor_title))
                 }
             }

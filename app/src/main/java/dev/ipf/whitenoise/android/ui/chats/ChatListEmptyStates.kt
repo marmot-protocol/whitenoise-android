@@ -10,12 +10,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatsArrivingHint
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 /** Empty filtering remains specific to query, unread folder, or the selected folder's contents. */
 @Suppress("FunctionNaming")
@@ -49,7 +51,8 @@ internal fun ChatListNoResults(
 internal fun EmptyChats(
     appState: WhiteNoiseAppState,
     onCreate: () -> Unit,
-) = EmptyChats(onCreate, arriving = ChatsArrivingHint.showsFor(appState.activeAccount?.accountIdHex))
+    onCreateOrigin: (Rect?) -> Unit = {},
+) = EmptyChats(onCreate, ChatsArrivingHint.showsFor(appState.activeAccount?.accountIdHex), onCreateOrigin)
 
 /**
  * Keeps the existing actionable first-chat entry while adopting the prototype's title/detail presentation. While
@@ -60,13 +63,19 @@ internal fun EmptyChats(
 internal fun EmptyChats(
     onCreate: () -> Unit,
     arriving: Boolean = false,
+    onCreateOrigin: (Rect?) -> Unit = {},
 ) {
     val title = if (arriving) R.string.chats_arriving_title else R.string.chat_rows_no_chats_title
     val detail = if (arriving) R.string.chats_arriving_detail else R.string.chat_rows_no_chats_detail
+    val (origin, create) =
+        rememberMeasuredControlClick {
+            onCreateOrigin(it)
+            onCreate()
+        }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             WhiteNoiseEmptyState(title = stringResource(title), detail = stringResource(detail))
-            Button(onClick = onCreate, modifier = Modifier.padding(horizontal = 24.dp)) {
+            Button(onClick = create, modifier = Modifier.padding(horizontal = 24.dp).then(origin)) {
                 Text(stringResource(R.string.new_chat))
             }
         }

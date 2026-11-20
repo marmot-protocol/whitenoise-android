@@ -6,7 +6,9 @@ import org.json.JSONObject
 private const val MAX_STORED_COMPOSER_SHORTCUTS = 128
 
 // Version 3 marks records whose unpinned voice launcher shares Send's slot.
-private const val COMPOSER_TOOLBAR_RECORD_VERSION = 3
+// Version 4 adds the draft jump shortcuts; older records gain them at their default place.
+private const val COMPOSER_TOOLBAR_RECORD_VERSION = 4
+private const val FIRST_RECORD_WITH_DRAFT_JUMPS = 4
 
 /** Stable presentation IDs only: callbacks, accounts and current capability never enter storage. */
 internal enum class ComposerShortcut(
@@ -27,7 +29,12 @@ internal enum class ComposerShortcut(
     Contact("contact"),
     Poll("poll"),
     Sticker("sticker"),
+    JumpTop("jump_top"),
+    JumpBottom("jump_bottom"),
 }
+
+/** Draft navigation shortcuts; they appear only while a long draft is scrolled away from their edge. */
+internal val composerDraftJumpShortcuts = setOf(ComposerShortcut.JumpTop, ComposerShortcut.JumpBottom)
 
 internal enum class ComposerToolbarLayout(
     val id: String,
@@ -155,6 +162,12 @@ internal data class ComposerToolbarSettings(
             .put("voiceEnabled", voiceEnabled)
             .toString()
 
+    /** Records saved before the jump shortcuts existed keep their choices and gain the default jump placement. */
+    private fun withDefaultDraftJumps(): ComposerToolbarSettings =
+        composerDraftJumpShortcuts.fold(this) { settings, shortcut ->
+            settings.insertOnSide(shortcut, ComposerShortcutSide.Right, Int.MAX_VALUE)
+        }
+
     companion object {
         /** Unknown IDs are ignored without scrambling surviving choices; malformed records reset safely. */
         fun decode(encoded: String?): ComposerToolbarSettings {
@@ -191,7 +204,8 @@ internal data class ComposerToolbarSettings(
                     }
                 // An unpinned voice launcher from any version now shares Send's slot.
                 val voiceEnabled = record.opt("voiceEnabled")?.let { it as Boolean } ?: true
-                ComposerToolbarSettings(shortcuts, layout, right, voiceEnabled).normalized()
+                val decoded = ComposerToolbarSettings(shortcuts, layout, right, voiceEnabled)
+                (if (version < FIRST_RECORD_WITH_DRAFT_JUMPS) decoded.withDefaultDraftJumps() else decoded).normalized()
             }.getOrElse { ComposerToolbarSettings() }
         }
     }
@@ -202,7 +216,10 @@ internal val defaultComposerShortcuts =
         ComposerShortcut.SendingIdentity,
         ComposerShortcut.More,
         ComposerShortcut.Emoji,
+        ComposerShortcut.JumpTop,
+        ComposerShortcut.JumpBottom,
     )
 
 /** Remembered for a voice launcher moved out of Send's slot; Send placement ignores toolbar sides. */
-internal val defaultRightComposerShortcuts = setOf(ComposerShortcut.VoiceNote)
+internal val defaultRightComposerShortcuts =
+    setOf(ComposerShortcut.VoiceNote, ComposerShortcut.JumpTop, ComposerShortcut.JumpBottom)

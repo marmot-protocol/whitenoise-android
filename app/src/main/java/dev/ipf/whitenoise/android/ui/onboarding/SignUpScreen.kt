@@ -161,7 +161,7 @@ internal fun SignUpScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { leaveConfirmation = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

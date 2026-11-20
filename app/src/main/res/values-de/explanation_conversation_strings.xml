@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Öffnet die Details dieses Chats, etwa Mitglieder und Einstellungen.</string>
     <string name="explanation_conversation_jump_to_mention">Scrollt zur nächsten ungelesenen Nachricht, in der du erwähnt wirst.</string>
     <string name="explanation_composer_draft_top">Scrollt den Entwurf zurück zur ersten Zeile. Der Text wird nicht verändert.</string>
+    <string name="explanation_composer_draft_bottom">Scrollt den Entwurf zur letzten Zeile. Der Text wird nicht verändert.</string>
     <string name="explanation_emoji_search">Durchsucht die Emoji-Liste nach Namen.</string>
     <string name="explanation_emoji_configure">Öffnet die Einstellungen, in denen du deine Schnellreaktions-Emoji auswählst.</string>
 

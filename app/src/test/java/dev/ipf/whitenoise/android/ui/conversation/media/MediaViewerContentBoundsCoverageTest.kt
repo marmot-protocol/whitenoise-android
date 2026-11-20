@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -223,7 +224,7 @@ class MediaViewerContentBoundsCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/$name"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/$name"),
-        ).firstOrNull(File::exists)?.readText() ?: error("Missing $name")
+        ).firstOrNull(File::exists)?.motionOwnerSource() ?: error("Missing $name")
 
     /** Synthetic safe-area insets for one display shape. */
     private data class Insets(

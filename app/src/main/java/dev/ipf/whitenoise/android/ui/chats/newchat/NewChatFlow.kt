@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -72,6 +73,7 @@ import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.settings.AiAgentsScreen
+import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
 import dev.ipf.whitenoise.android.ui.settings.ShareConnectScreen
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
@@ -80,20 +82,6 @@ internal enum class NewGroupCreateStage {
 }
 
 private enum class NewChatStep { NewMessage, NewGroup }
-
-internal data class StartChatErrorUiState(
-    val npub: String,
-    val progressHex: String,
-    val detail: AppText,
-    val diagnosticReport: String? = null,
-    val recipientName: String? = null,
-    val invitation: Boolean = false,
-    val title: AppText = AppText.Resource(R.string.toast_couldnt_start_chat),
-    val retryGroupIdHex: String? = null,
-) {
-    val copyable: Boolean
-        get() = !diagnosticReport.isNullOrBlank()
-}
 
 /**
  * MDK created the canonical group but could not load its local chat row yet.
@@ -259,25 +247,32 @@ internal fun NewChatFlowHost(
 ) {
     var stepName by rememberSaveable { mutableStateOf(NewChatStep.NewMessage.name) }
     val step = runCatching { NewChatStep.valueOf(stepName) }.getOrDefault(NewChatStep.NewMessage)
-    when (step) {
-        NewChatStep.NewMessage ->
-            NewMessageScreen(
-                appState = appState,
-                onBack = onClose,
-                onNewGroup = { stepName = NewChatStep.NewGroup.name },
-                onOpenConversation = onOpenConversation,
-            )
-        NewChatStep.NewGroup ->
-            NewGroupFlow(
-                appState = appState,
-                onCreateCompletedOpen = onGroupCreateCompletedOpen,
-                onCreateSubmitted = onGroupCreateSubmitted,
-                onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
-                onClose = {
-                    onGroupCreateFlowSuperseded()
-                    stepName = NewChatStep.NewMessage.name
-                },
-            )
+    SettingsRouteMotion(
+        target = step,
+        depth = if (step == NewChatStep.NewGroup) 1 else 0,
+        ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
+        cardMorph = true,
+    ) { visibleStep ->
+        when (visibleStep) {
+            NewChatStep.NewMessage ->
+                NewMessageScreen(
+                    appState = appState,
+                    onBack = onClose,
+                    onNewGroup = { stepName = NewChatStep.NewGroup.name },
+                    onOpenConversation = onOpenConversation,
+                )
+            NewChatStep.NewGroup ->
+                NewGroupFlow(
+                    appState = appState,
+                    onCreateCompletedOpen = onGroupCreateCompletedOpen,
+                    onCreateSubmitted = onGroupCreateSubmitted,
+                    onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
+                    onClose = {
+                        onGroupCreateFlowSuperseded()
+                        stepName = NewChatStep.NewMessage.name
+                    },
+                )
+        }
     }
 }
 
@@ -694,12 +689,15 @@ private fun NewMessageAccountScreen(
             queryState.text.toString() == query
 
     /** Opens the candidate's profile, discovered or known. */
-    fun presentPerson(candidate: RecipientSearch.Candidate) {
+    fun presentPerson(
+        candidate: RecipientSearch.Candidate,
+        origin: Rect?,
+    ) {
         if (!canInteract()) return
         if (candidate.searchProfile != null) {
-            appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
+            appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile, origin = origin)
         } else {
-            appState.presentProfile(candidate.npub)
+            appState.presentProfile(candidate.npub, origin = origin)
         }
     }
     val connectSession = scannerSession
@@ -761,10 +759,10 @@ private fun NewMessageAccountScreen(
                     pasteRejected = {
                         if (session.isCurrent()) appState.present(R.string.error_invalid_identity_reference)
                     },
-                    person = { candidate ->
+                    person = { candidate, origin ->
                         if (canInteract()) {
                             if (candidate.source == null && candidate.searchProfile != null) {
-                                presentPerson(candidate)
+                                presentPerson(candidate, origin)
                             } else {
                                 startOrOpenConversation(candidate)
                             }

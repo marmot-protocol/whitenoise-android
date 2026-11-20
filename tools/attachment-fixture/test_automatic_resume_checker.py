@@ -26,6 +26,20 @@ def evidence():
     return metrics, [{"seq": s, "request": r, "kind": k, "value": v} for s, (r,k,v) in enumerate(rows,1)]
 
 
+def with_aborted_setup(events):
+    """Keep request provenance while inserting a real pre-stop setup loss."""
+    shifted = deepcopy(events)
+    for event in shifted:
+        if event["seq"] >= 4:
+            event["seq"] += 5
+        if event["request"] is not None and event["request"] >= 4:
+            event["request"] += 5
+    setup = [(None, "get", 0), (4, "range_offset", 0), (4, "status", 200),
+             (4, "body_bytes", 442368), (4, "disconnect", 0)]
+    return shifted[:3] + [{"seq": i, "request": r, "kind": k, "value": v}
+                          for i, (r, k, v) in enumerate(setup, 4)] + shifted[3:]
+
+
 class AutomaticResumeEvidenceTest(unittest.TestCase):
     """Transport success cannot stand in for genuine stopped and resumed ordinary platform work."""
 
@@ -40,6 +54,48 @@ class AutomaticResumeEvidenceTest(unittest.TestCase):
             self.assertTrue(result["platform_job_stop_qualified"])
             self.assertFalse(result["android_process_restart_qualified"])
             self.assertFalse(result["performance_qualified"])
+
+    def test_aborted_setup_is_reported_and_selected_pair_still_qualifies(self):
+        metrics, events = evidence()
+        result = check_automatic_resume(metrics, with_aborted_setup(events))
+        self.assertTrue(result["passed"], result)
+        self.assertEqual(1, result["setup_acquisition_count"])
+        self.assertEqual(442368, result["setup_body_bytes"])
+        self.assertEqual(3, result["ledger_acquisition_count"])
+        self.assertEqual(PAYLOAD_BYTES + 16 + 442368, result["ledger_body_bytes"])
+        self.assertFalse(result["performance_qualified"])
+
+    def test_selected_recovery_boundaries_reject_corrupt_evidence_even_with_setup(self):
+        metrics, original = evidence()
+        original = with_aborted_setup(original)
+        def change(kind, field, value, request=None):
+            rows = deepcopy(original)
+            row = next(e for e in rows if e["kind"] == kind and (request is None or e["request"] == request))
+            row[field] = value
+            return rows
+        cases = {
+            "multiple post-stop acquisitions": original + [{"seq": 99, "request": None, "kind": "get", "value": 0}],
+            "stale initial hold": change("disconnect", "seq", 12, 9),
+            "stale resumed hold": change("held", "seq", 13, 17),
+            "wrong checkpoint": change("range_requested_offset", "value", PREFIX_BYTES - 1),
+            "pre-stop Range event": change("range_requested_offset", "seq", 13),
+            "wrong validator": change("if_range_match", "value", 0),
+            "unmatched validator": change("if_range_match", "request", 4),
+            "early resumed disconnect": change("complete", "kind", "disconnect"),
+            "early resumed complete": change("complete", "seq", 23),
+            "early release": change("release_acquisition", "seq", 22),
+            "initial byte mismatch": change("body_bytes", "value", PREFIX_BYTES - 1, 9),
+            "resumed byte mismatch": change("body_bytes", "value", 1024 * 1024 - 1, 17),
+            "wrong live hold": change("held", "value", PREFIX_BYTES, 17),
+            "unclosed setup": change("disconnect", "kind", "complete", 4),
+        }
+        compensated = deepcopy(original)
+        next(e for e in compensated if e["kind"] == "body_bytes" and e["request"] == 9)["value"] -= 1
+        next(e for e in compensated if e["kind"] == "body_bytes" and e["request"] == 17)["value"] += 1
+        cases["compensated selected byte totals"] = compensated
+        for label, events in cases.items():
+            with self.subTest(label=label):
+                self.assertFalse(check_automatic_resume(metrics, events)["passed"], label)
 
     def test_a_probe_failure_row_fails_and_names_its_step_without_free_text(self):
         """The probe's own failure row is surfaced as a violation, and only a closed step and exception name pass through."""

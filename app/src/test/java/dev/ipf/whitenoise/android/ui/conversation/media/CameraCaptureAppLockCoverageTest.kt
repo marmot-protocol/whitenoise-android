@@ -363,6 +363,8 @@ private class CameraCaptureFixture(
                 assertTrue(it.readBytes().contentEquals(byteArrayOf(3, 5, 7)))
             }
         }
+        val video = File(context.cacheDir, "camera/${checkNotNull(registry.videoUri).lastPathSegment}")
+        assertFalse("the video output the camera did not use is removed", video.exists())
         if (fullComposer) {
             val reused = File(context.cacheDir, "camera/${captured.lastPathSegment}").apply { writeText("reused") }
             dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
@@ -401,8 +403,9 @@ private class Camera :
     override val activityResultRegistry: ActivityResultRegistry get() = this
     private var requestCode = 0
     var uri: Uri? = null
+    var videoUri: Uri? = null
 
-    /** Records the launch instead of starting a camera, keeping the output URI for later delivery. */
+    /** Records the launch instead of starting a camera, keeping both outputs for later delivery. */
     override fun <I, O> onLaunch(
         requestCode: Int,
         contract: ActivityResultContract<I, O>,
@@ -410,11 +413,17 @@ private class Camera :
         options: ActivityOptionsCompat?,
     ) {
         this.requestCode = requestCode
-        uri = input as Uri
+        val outputs = input as CameraOutputs
+        uri = outputs.photo
+        videoUri = outputs.video
     }
 
-    /** Dispatches the camera result for the recorded launch, successful unless [success] is false. */
+    /** Dispatches the camera result for the recorded launch: a photo, unless [success] is false. */
     fun deliver(success: Boolean = true) {
-        dispatchResult(requestCode, if (success) Activity.RESULT_OK else Activity.RESULT_CANCELED, null)
+        dispatchResult(
+            requestCode,
+            if (success) Activity.RESULT_OK else Activity.RESULT_CANCELED,
+            if (success) CaptureConversationMedia.result(CameraCaptureKind.Photo) else null,
+        )
     }
 }

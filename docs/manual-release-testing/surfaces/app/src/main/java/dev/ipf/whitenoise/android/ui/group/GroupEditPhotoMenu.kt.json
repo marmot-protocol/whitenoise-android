@@ -1,0 +1,65 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditPhotoMenu.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupEditPhotoMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditPhotoMenu.kt",
+        "anchor": "fun GroupEditPhotoMenu(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025",
+          "GRP-034"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:choose_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditPhotoMenu.kt",
+        "anchor": "R.string.choose_files",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:choose_photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditPhotoMenu.kt",
+        "anchor": "R.string.choose_photos",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:find_web_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditPhotoMenu.kt",
+        "anchor": "R.string.find_web_image",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_emoji_create",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditPhotoMenu.kt",
+        "anchor": "R.string.group_emoji_create",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:remove_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditPhotoMenu.kt",
+        "anchor": "R.string.remove_photo",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      }
+    ]
+  }
+}
