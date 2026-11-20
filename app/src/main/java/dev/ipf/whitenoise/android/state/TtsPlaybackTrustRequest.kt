@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
 import kotlinx.coroutines.CompletableDeferred

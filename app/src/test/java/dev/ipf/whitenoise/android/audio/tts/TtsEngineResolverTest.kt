@@ -473,70 +473,32 @@ class TtsEngineResolverTest {
     }
 
     @Test
-    fun defaultBootstrapWithUnverifiableIdentityFailsClosedToUnknownTrust() =
+    fun defaultBootstrapRequiresEveryFallbackToBeKnownLocal() =
         runBlocking {
-            val factory = ControllableTtsFactory()
             val localDefault = "com.github.olga_yakovleva.rhvoice.android"
-            val unknownFallback = "com.google.android.tts"
-            val resolver =
-                TtsEngineResolver(
-                    context,
-                    ttsFactory = factory,
-                    engineCatalog =
-                        FakeTtsEngineCatalog(
-                            engines =
-                                listOf(
-                                    engineInfo(localDefault, "RHVoice"),
-                                    engineInfo(unknownFallback, "Google"),
-                                ),
-                            defaultEngine = localDefault,
-                            connectedEngineForRequest = { null },
-                        ),
-                )
-
-            val deferred = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
-            factory.completeInit(TextToSpeech.SUCCESS)
-            val result = deferred.await()
-
-            assertNotNull(result.handle)
-            assertEquals(localDefault, result.handle?.enginePackage)
-            assertEquals(EngineTrust.Unknown, result.handle?.trust)
-            result.handle?.release()
-            Unit
-        }
-
-    @Test
-    fun defaultBootstrapTrustsADeviceWithOnlyKnownLocalEngines() =
-        runBlocking {
-            val factory = ControllableTtsFactory()
-            val localDefault = "com.github.olga_yakovleva.rhvoice.android"
-            val localFallback = "app.grapheneos.speechservices"
-            val resolver =
-                TtsEngineResolver(
-                    context,
-                    ttsFactory = factory,
-                    engineCatalog =
-                        FakeTtsEngineCatalog(
-                            engines =
-                                listOf(
-                                    engineInfo(localDefault, "RHVoice"),
-                                    engineInfo(localFallback, "GrapheneOS"),
-                                ),
-                            defaultEngine = localDefault,
-                            connectedEngineForRequest = { null },
-                        ),
-                )
-
-            val deferred = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
-            factory.completeInit(TextToSpeech.SUCCESS)
-            val result = deferred.await()
-
-            assertNotNull(result.handle)
-            assertEquals(localDefault, result.handle?.enginePackage)
-            assertEquals(EngineTrust.Local, result.handle?.trust)
-            assertEquals(false, result.handle?.connectedPackageVerified)
-            result.handle?.release()
-            Unit
+            val fallbackTrust =
+                mapOf("com.google.android.tts" to EngineTrust.Unknown, "app.grapheneos.speechservices" to EngineTrust.Local)
+            for ((fallback, trust) in fallbackTrust) {
+                val factory = ControllableTtsFactory()
+                val resolver =
+                    TtsEngineResolver(
+                        context,
+                        ttsFactory = factory,
+                        engineCatalog =
+                            FakeTtsEngineCatalog(
+                                engines = listOf(engineInfo(localDefault, "RHVoice"), engineInfo(fallback, "Fallback")),
+                                defaultEngine = localDefault,
+                                connectedEngineForRequest = { null },
+                            ),
+                    )
+                val deferred = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
+                factory.completeInit(TextToSpeech.SUCCESS)
+                val handle = requireNotNull(deferred.await().handle)
+                assertEquals(localDefault, handle.enginePackage)
+                assertEquals(trust, handle.trust)
+                assertFalse(handle.connectedPackageVerified)
+                handle.release()
+            }
         }
 
     /** The resolver's own deadline during construction releases its candidate and returns quietly. */
