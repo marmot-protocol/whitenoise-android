@@ -23,7 +23,9 @@ class NotificationPreviewPreferencesTest {
     @Test
     fun messageTextPreviewsAreLocalOnly() {
         for (messageText in listOf(false, true)) {
-            val builder = androidx.core.app.NotificationCompat.Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
+            val builder =
+                androidx.core.app.NotificationCompat
+                    .Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
             val token = NotificationPreviewToken("test", 0L, allowed = true, messageText = messageText)
             NotificationPreviewPreferences.stamp(builder, token, correction = false)
             assertEquals(messageText, builder.build().flags and android.app.Notification.FLAG_LOCAL_ONLY != 0)

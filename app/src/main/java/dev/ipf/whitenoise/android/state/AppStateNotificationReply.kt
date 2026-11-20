@@ -95,7 +95,9 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReply(
                 delay(NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS)
             }
 
-            if (!appLock.notificationActionsAllowed) return@withGroupCommitLock NotificationReplySendOutcome.BlockedByAppLock
+            if (!appLock.notificationActionsAllowed) {
+                return@withGroupCommitLock NotificationReplySendOutcome.BlockedByAppLock
+            }
             val summary = marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, group, body) }
             // MDK assigns the app-event id before deciding whether this call
             // can publish it immediately. Persist it before returning either
@@ -141,7 +143,9 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReaction(
     }
     return runCatchingCancellable {
         withGroupCommitLock(accountRef, groupIdHex) {
-            if (!appLock.notificationActionsAllowed) return@withGroupCommitLock NotificationReactionSendOutcome.BlockedByAppLock
+            if (!appLock.notificationActionsAllowed) {
+                return@withGroupCommitLock NotificationReactionSendOutcome.BlockedByAppLock
+            }
             val summary =
                 marmotIo(MarmotTraceSection.MESSAGE_REACT) {
                     reactToMessage(accountRef, groupIdHex, messageIdHex, emoji)

@@ -30,7 +30,10 @@ class NotificationMarkReadWorker(
                 .decode(inputData)
                 ?.takeIf { it.kind == NotificationActionKind.MARK_READ }
                 ?: return Result.failure().also { retryStore.clear(retryKey) }
-        val actionsAllowed = withContext(Dispatchers.Main.immediate) { application.appState.appLock.notificationActionsAllowed }
+        val actionsAllowed =
+            withContext(Dispatchers.Main.immediate) {
+                application.appState.appLock.notificationActionsAllowed
+            }
         if (!actionsAllowed) return lockedMarkReadResult(retryStore, retryKey)
         if (retryStore.operationFailureCount(retryKey) >= MAX_ATTEMPTS) {
             return Result.failure().also { retryStore.clear(retryKey) }

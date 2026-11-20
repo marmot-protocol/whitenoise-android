@@ -91,7 +91,10 @@ class NotificationReplyWorker(
             }
             null -> Unit
         }
-        val actionsAllowed = withContext(Dispatchers.Main.immediate) { application.appState.appLock.notificationActionsAllowed }
+        val actionsAllowed =
+            withContext(Dispatchers.Main.immediate) {
+                application.appState.appLock.notificationActionsAllowed
+            }
         if (!actionsAllowed) return lockedReplyResult(action, containsLegacyPlaintext, retryStore, retryKey)
         if (retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS) {
             return finalizeReplyFailure(action, containsLegacyPlaintext, completionStore, completionKey, retryStore, retryKey)
@@ -251,15 +254,17 @@ class NotificationReplyWorker(
         retryStore: NotificationActionRetryStore,
         retryKey: String,
     ): Result {
-        if (containsLegacyPlaintext) return Result.failure().also { retryStore.clear(retryKey) }
-        if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
-            return Result.retry()
+        return when {
+            containsLegacyPlaintext -> Result.failure().also { retryStore.clear(retryKey) }
+            retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS) -> Result.retry()
+            else -> {
+                notificationWarning(TAG, "reply lock wait expired") {
+                    "group=${action.target.groupIdHex.take(8)}"
+                }
+                surfaceReplyFailure(action)
+                Result.failure().also { retryStore.clear(retryKey) }
+            }
         }
-        notificationWarning(TAG, "reply lock wait expired") {
-            "group=${action.target.groupIdHex.take(8)}"
-        }
-        surfaceReplyFailure(action)
-        return Result.failure().also { retryStore.clear(retryKey) }
     }
 
     /** Records the reply as abandoned, then restores the card with [notice] so the user can try again. */

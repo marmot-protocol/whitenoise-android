@@ -57,7 +57,11 @@ internal class AppLockController(
                 credentialAvailable = credentialAvailable,
                 authenticatedSessionAvailable =
                     appInForeground() ||
-                        notificationBackgroundGraceAllows(notificationBackgroundedAt, SystemClock.elapsedRealtime(), lockDelay),
+                        notificationBackgroundGraceAllows(
+                            notificationBackgroundedAt,
+                            SystemClock.elapsedRealtime(),
+                            lockDelay,
+                        ),
             )
 
     private var notificationBackgroundedAt: Long? = null
