@@ -95,6 +95,7 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReply(
                 delay(NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS)
             }
 
+            if (!appLock.notificationActionsAllowed) return@withGroupCommitLock NotificationReplySendOutcome.BlockedByAppLock
             val summary = marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, group, body) }
             // MDK assigns the app-event id before deciding whether this call
             // can publish it immediately. Persist it before returning either
@@ -140,6 +141,7 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReaction(
     }
     return runCatchingCancellable {
         withGroupCommitLock(accountRef, groupIdHex) {
+            if (!appLock.notificationActionsAllowed) return@withGroupCommitLock NotificationReactionSendOutcome.BlockedByAppLock
             val summary =
                 marmotIo(MarmotTraceSection.MESSAGE_REACT) {
                     reactToMessage(accountRef, groupIdHex, messageIdHex, emoji)
@@ -225,6 +227,7 @@ suspend fun WhiteNoiseAppState.markNotificationMessageRead(
     return runCatchingCancellable {
         // markTimelineMessageRead advances the persisted cursor monotonically;
         // an old notification tap must not move the read marker backwards.
+        if (!appLock.notificationActionsAllowed) return false
         val row = marmotIo { markTimelineMessageRead(account, group, message) }
         if (!applyChatListRowFromMarkRead(account, row)) {
             reconcileAccountUnreadAfterNotificationMarkRead(account, cursorAdvanced = row != null)

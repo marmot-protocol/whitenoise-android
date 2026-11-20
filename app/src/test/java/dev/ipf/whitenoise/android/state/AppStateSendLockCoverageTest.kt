@@ -110,10 +110,19 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /** A cold worker has no foreground transition. Grace expires at the configured boundary. */
     @Test
-    fun notificationActionsAreBlockedWhileAppLockScreenIsVisible() {
-        assertTrue(notificationActionsAllowed(appLockScreenVisible = false))
-        assertFalse(notificationActionsAllowed(appLockScreenVisible = true))
+    fun notificationActionsRequireAnAuthenticatedSession() {
+        assertTrue(notificationBackgroundGraceAllows(1L, 60_000L, AppLockDelay.OneMinute))
+        assertFalse(notificationBackgroundGraceAllows(1L, 60_001L, AppLockDelay.OneMinute))
+        assertFalse(notificationBackgroundGraceAllows(null, 60_001L, AppLockDelay.OneMinute))
+        assertFalse(notificationBackgroundGraceAllows(2L, 1L, AppLockDelay.OneMinute))
+        assertFalse(notificationBackgroundGraceAllows(1L, 1L, AppLockDelay.Immediately))
+        assertTrue(notificationActionsAllowed(false, true, true, true))
+        assertFalse(notificationActionsAllowed(false, true, true, false))
+        assertFalse(notificationActionsAllowed(true, true, true, true))
+        assertFalse(notificationActionsAllowed(false, true, false, true))
+        assertTrue(notificationActionsAllowed(false, false, false, false))
     }
 
     @Test

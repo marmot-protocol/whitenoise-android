@@ -30,18 +30,8 @@ class NotificationMarkReadWorker(
                 .decode(inputData)
                 ?.takeIf { it.kind == NotificationActionKind.MARK_READ }
                 ?: return Result.failure().also { retryStore.clear(retryKey) }
-        if (!application.appState.appLock.notificationActionsAllowed) {
-            notificationWarning(TAG, "mark-read deferred by app lock") {
-                "group=${action.target.groupIdHex.take(8)}"
-            }
-            if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
-                return Result.retry()
-            }
-            notificationWarning(TAG, "mark-read lock wait expired") {
-                "group=${action.target.groupIdHex.take(8)}"
-            }
-            return Result.failure().also { retryStore.clear(retryKey) }
-        }
+        val actionsAllowed = withContext(Dispatchers.Main.immediate) { application.appState.appLock.notificationActionsAllowed }
+        if (!actionsAllowed) return lockedMarkReadResult(retryStore, retryKey)
         if (retryStore.operationFailureCount(retryKey) >= MAX_ATTEMPTS) {
             return Result.failure().also { retryStore.clear(retryKey) }
         }
@@ -53,12 +43,14 @@ class NotificationMarkReadWorker(
             val markedRead =
                 withContext(Dispatchers.Main.immediate) {
                     application.appState.ensureNotificationRuntimeStarted()
+                    if (!application.appState.appLock.notificationActionsAllowed) return@withContext null
                     application.appState.markNotificationMessageRead(
                         accountRef = action.target.accountRef,
                         groupIdHex = action.target.groupIdHex,
                         messageIdHex = action.target.messageIdHex.orEmpty(),
                     )
                 }
+            if (markedRead == null) return lockedMarkReadResult(retryStore, retryKey)
             if (!markedRead) return markReadFailureResult(retryStore, retryKey)
 
             LocalNotificationPresenter(applicationContext).dismissActionNotificationAndOlderSiblings(
@@ -78,6 +70,17 @@ class NotificationMarkReadWorker(
             }
             markReadFailureResult(retryStore, retryKey)
         }
+    }
+
+    /** Uses the independent lock-wait budget when the action cannot reach the runtime. */
+    private fun lockedMarkReadResult(
+        retryStore: NotificationActionRetryStore,
+        retryKey: String,
+    ): Result {
+        if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
+            return Result.retry()
+        }
+        return Result.failure().also { retryStore.clear(retryKey) }
     }
 
     private fun markReadFailureResult(

@@ -91,20 +91,8 @@ class NotificationReplyWorker(
             }
             null -> Unit
         }
-        if (!application.appState.appLock.notificationActionsAllowed) {
-            if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
-            if (containsLegacyPlaintext) {
-                return Result.failure().also { retryStore.clear(retryKey) }
-            }
-            if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
-                return Result.retry()
-            }
-            notificationWarning(TAG, "reply lock wait expired") {
-                "group=${action.target.groupIdHex.take(8)}"
-            }
-            surfaceReplyFailure(action)
-            return Result.failure().also { retryStore.clear(retryKey) }
-        }
+        val actionsAllowed = withContext(Dispatchers.Main.immediate) { application.appState.appLock.notificationActionsAllowed }
+        if (!actionsAllowed) return lockedReplyResult(action, containsLegacyPlaintext, retryStore, retryKey)
         if (retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS) {
             return finalizeReplyFailure(action, containsLegacyPlaintext, completionStore, completionKey, retryStore, retryKey)
         }
@@ -135,6 +123,9 @@ class NotificationReplyWorker(
                     }
                     completedReplyResult(application, action, reply).also { retryStore.clear(retryKey) }
                 }
+
+                NotificationReplySendOutcome.BlockedByAppLock ->
+                    lockedReplyResult(action, containsLegacyPlaintext, retryStore, retryKey)
 
                 NotificationReplySendOutcome.RetryableFailure,
                 NotificationReplySendOutcome.NonRetryableFailure,
@@ -251,6 +242,24 @@ class NotificationReplyWorker(
                     R.string.toast_send_failed
                 },
         )
+    }
+
+    /** Defers encrypted work while locked without consuming the send-attempt budget. */
+    private suspend fun lockedReplyResult(
+        action: NotificationAction,
+        containsLegacyPlaintext: Boolean,
+        retryStore: NotificationActionRetryStore,
+        retryKey: String,
+    ): Result {
+        if (containsLegacyPlaintext) return Result.failure().also { retryStore.clear(retryKey) }
+        if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
+            return Result.retry()
+        }
+        notificationWarning(TAG, "reply lock wait expired") {
+            "group=${action.target.groupIdHex.take(8)}"
+        }
+        surfaceReplyFailure(action)
+        return Result.failure().also { retryStore.clear(retryKey) }
     }
 
     /** Records the reply as abandoned, then restores the card with [notice] so the user can try again. */

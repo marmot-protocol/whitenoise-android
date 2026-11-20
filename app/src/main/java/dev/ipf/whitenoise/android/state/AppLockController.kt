@@ -48,8 +48,19 @@ internal class AppLockController(
         private set
     var screenVisible by mutableStateOf(false)
         private set
+    /** Notification workers may run before any lock UI exists. Evaluate the in-process grace period on Main. */
     val notificationActionsAllowed: Boolean
-        get() = notificationActionsAllowed(screenVisible)
+        get() =
+            notificationActionsAllowed(
+                appLockScreenVisible = screenVisible,
+                requireUnlock = required,
+                credentialAvailable = credentialAvailable,
+                authenticatedSessionAvailable =
+                    appInForeground() ||
+                        notificationBackgroundGraceAllows(notificationBackgroundedAt, SystemClock.elapsedRealtime(), lockDelay),
+            )
+
+    private var notificationBackgroundedAt: Long? = null
     var unlockError by mutableStateOf<AppText?>(null)
         private set
 
@@ -152,6 +163,7 @@ internal class AppLockController(
     /** Start the away-time grace period only for an authenticated, credentialed background transition. */
     fun onAppBackgrounded(nowMillis: Long = System.currentTimeMillis()) {
         sessions.clearForegroundReturn()
+        notificationBackgroundedAt = null
         refreshCredentialAvailability()
         if (
             !shouldRefreshAppLockDelayBaselineOnBackground(
@@ -163,6 +175,7 @@ internal class AppLockController(
             return
         }
         val normalizedNow = nowMillis.coerceAtLeast(0L)
+        notificationBackgroundedAt = SystemClock.elapsedRealtime()
         // The delay means time spent away from the app, not time since the
         // last credential prompt while the user was actively reading chats.
         lastUnlockAtMillis = normalizedNow

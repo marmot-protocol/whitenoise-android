@@ -19,6 +19,17 @@ import org.robolectric.annotation.Config
 class NotificationPreviewPreferencesTest {
     private val context: Context = RuntimeEnvironment.getApplication()
 
+    /** Only a preview containing message text opts out of Android's companion-device bridging. */
+    @Test
+    fun messageTextPreviewsAreLocalOnly() {
+        for (messageText in listOf(false, true)) {
+            val builder = androidx.core.app.NotificationCompat.Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
+            val token = NotificationPreviewToken("test", 0L, allowed = true, messageText = messageText)
+            NotificationPreviewPreferences.stamp(builder, token, correction = false)
+            assertEquals(messageText, builder.build().flags and android.app.Notification.FLAG_LOCAL_ONLY != 0)
+        }
+    }
+
     /** Existing installs keep previews until an explicit opt-out, including after a new settings owner. */
     @Test
     fun defaultOnAndPersistedOptOutSurviveSettingsRecreation() =

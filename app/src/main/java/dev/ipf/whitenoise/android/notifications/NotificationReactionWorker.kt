@@ -37,6 +37,9 @@ internal enum class NotificationReactionSendOutcome {
 
     /** MDK froze the event but relay acknowledgement is unknown; it must not be sent again. */
     CompletionUnknown,
+
+    /** The lock became active before MDK accepted the reaction. */
+    BlockedByAppLock,
     RetryableFailure,
     NonRetryableFailure,
 }
@@ -172,6 +175,7 @@ class NotificationReactionWorker(
                         Log.i(TAG, "notification_reaction_accepted outcome=${sendAttempt.outcome.name}")
                         completedReactionResult(application, input, retryStore, retryKey)
                     }
+                    NotificationReactionSendOutcome.BlockedByAppLock -> lockedReactionResult(retryStore, retryKey)
                     NotificationReactionSendOutcome.RetryableFailure ->
                         retryableReactionFailureResult(retryStore, retryKey)
                     NotificationReactionSendOutcome.NonRetryableFailure ->
