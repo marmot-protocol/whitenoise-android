@@ -149,18 +149,30 @@ internal class DeviceLinkRequestWatcher(
         blocked: Boolean,
     ) {
         val account = (event as? MarmotEventFfi.DeviceLinkChanged)?.accountLabel?.takeIf { it in accounts } ?: return
+        reread(account, blocked)
+    }
+
+    /**
+     * Re-reads [accountRef] alone. The host calls it after [accept], because the command's snapshot can be older
+     * than a read MDK's change event already published, and no further event is due once a link has settled.
+     */
+    suspend fun reread(
+        accountRef: String,
+        blocked: Boolean,
+    ) {
         reads.withLock {
-            val before = accepted[account]
-            val snapshot = read(account)
-            if (snapshot != null && owns() && accepted[account] == before) {
-                publish(snapshots + (account to snapshot), blocked)
+            val before = accepted[accountRef]
+            val snapshot = read(accountRef)
+            if (snapshot != null && owns() && accepted[accountRef] == before) {
+                publish(snapshots + (accountRef to snapshot), blocked)
             }
         }
     }
 
     /**
      * Applies a snapshot a command on [accountRef] returned, so the prompt updates without waiting for an event. A
-     * read of that profile still in flight began before the command finished, so its result is dropped.
+     * read of that profile still in flight began before the command finished, so its result is dropped. Follow it
+     * with [reread], which settles which of the two was newer.
      */
     fun accept(
         accountRef: String,

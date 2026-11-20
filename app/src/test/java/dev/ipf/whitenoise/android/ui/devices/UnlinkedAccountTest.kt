@@ -112,6 +112,42 @@ class UnlinkedAccountTest {
         compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).assertDoesNotExist()
     }
 
+    /** Closing one account's prompt does not hide it after another account, linked or not, was in view. */
+    @Test
+    fun aClosedPromptReturnsAfterAnotherAccountWasInView() {
+        var inView by mutableStateOf<String?>("a")
+        compose.setContent {
+            WhiteNoiseTheme { UnlinkedAccountPromptGate(inView.takeIf { it == "a" }, hidden = false, inView) {} }
+        }
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_REMOVE_TAG).performClick()
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).performClick()
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_PROMPT_TAG).assertDoesNotExist()
+
+        inView = "b"
+        compose.waitForIdle()
+        inView = "a"
+
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_PROMPT_TAG).assertIsDisplayed()
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).assertDoesNotExist()
+    }
+
+    /** A removal takes the account out of view for a moment, which forgets neither the attempt nor a close. */
+    @Test
+    fun theGapARemovalLeavesKeepsAClosedPromptClosed() {
+        var inView by mutableStateOf<String?>("a")
+        compose.setContent {
+            WhiteNoiseTheme { UnlinkedAccountPromptGate(inView.takeIf { it == "a" }, hidden = false, inView) {} }
+        }
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_REMOVE_TAG).performClick()
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_CLOSE_TAG).performClick()
+
+        inView = null
+        compose.waitForIdle()
+        inView = "a"
+
+        compose.onNodeWithTag(UNLINKED_ACCOUNT_PROMPT_TAG).assertDoesNotExist()
+    }
+
     /** The arrival hint belongs to the account that linked, in any letter case, until it is ended. */
     @Test
     fun theArrivalHintIsForTheAccountThatLinked() {

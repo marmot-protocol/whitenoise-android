@@ -132,7 +132,10 @@ private fun ActiveProfileLinkRequest(
         }
     DisposableEffect(controller) { onDispose { controller.retire() } }
     LaunchedEffect(controller.link) {
-        controller.link?.let { watcher.accept(request.accountRef, it, blocked) }
+        val result = controller.link ?: return@LaunchedEffect
+        watcher.accept(request.accountRef, result, blocked)
+        // This effect runs a frame after the command, so MDK's own event may already have published a newer state.
+        watcher.reread(request.accountRef, blocked)
     }
     val failed = rememberDeviceLinkFailed(controller)
     Dialog(

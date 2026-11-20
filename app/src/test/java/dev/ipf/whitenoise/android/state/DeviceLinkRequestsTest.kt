@@ -260,6 +260,21 @@ class DeviceLinkRequestsTest {
             assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
         }
 
+    /** A command's snapshot that lands after MDK's newer state is corrected by the re-read that follows it. */
+    @Test
+    fun aRereadAfterACommandsResultRestoresTheNewerState() =
+        runTest {
+            val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p1", 10u, ENDED)) })
+            watcher.refresh(listOf("a"), blocked = false)
+            watcher.onEvent(MarmotEventFfi.DeviceLinkChanged("id", "a"), listOf("a"), blocked = false)
+
+            watcher.accept("a", snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking)), blocked = false)
+            assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.prompt("a", "p1")?.state)
+            watcher.reread("a", blocked = false)
+
+            assertEquals(ENDED, watcher.prompt("a", "p1")?.state)
+        }
+
     /** Closing the prompt hides it and answers nothing; unblocking later does not bring it back. */
     @Test
     fun hidingThePresentedRequestAnswersNothing() =

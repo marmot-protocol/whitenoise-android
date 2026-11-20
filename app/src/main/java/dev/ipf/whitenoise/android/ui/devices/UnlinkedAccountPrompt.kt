@@ -5,6 +5,7 @@ package dev.ipf.whitenoise.android.ui.devices
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,7 @@ internal fun UnlinkedAccountPromptHost(
 ) {
     UnlinkedAccountPromptGate(
         unlinkedLabel = appState.activeAccount?.takeIf { it.unlinked }?.label,
+        inView = appState.activeAccountRef,
         hidden = blocked || appState.wipeInProgress,
         onRemove = { launchAccountWipe(appState) },
     )
@@ -45,16 +47,23 @@ internal fun UnlinkedAccountPromptHost(
  * Shows the prompt for the unlinked account in view, [unlinkedLabel], unless it is [hidden] or was closed. It
  * remembers which account a removal was attempted for, and which was closed, by label. A removal takes the account
  * out of view while it runs and a failed one puts it back, and the attempt has to survive that gap for Close to be
- * offered. Another account coming into view starts with neither.
+ * offered. Another account coming [inView], unlinked or not, forgets both, so returning to the first account shows
+ * its prompt again.
  */
 @Composable
 internal fun UnlinkedAccountPromptGate(
     unlinkedLabel: String?,
     hidden: Boolean,
+    inView: String? = unlinkedLabel,
     onRemove: () -> Unit,
 ) {
     var attemptedFor by remember { mutableStateOf<String?>(null) }
     var closedFor by remember { mutableStateOf<String?>(null) }
+    // No account in view is the gap a removal leaves, which keeps both.
+    LaunchedEffect(inView) {
+        if (inView != null && inView != attemptedFor) attemptedFor = null
+        if (inView != null && inView != closedFor) closedFor = null
+    }
     val label = unlinkedLabel ?: return
     if (hidden || closedFor == label) return
     UnlinkedAccountPrompt(

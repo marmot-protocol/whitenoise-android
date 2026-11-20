@@ -3064,7 +3064,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Restores account and notification state after a wipe fails before commit. */
     private suspend fun restoreAfterFailedDestructiveAccountWipe(
-        accountRef: String,
+        accountRef: String?,
         restartNotifications: Boolean,
     ) {
         applyDestructiveWipeRuntimeState(
@@ -5706,6 +5706,7 @@ class WhiteNoiseAppState private constructor(
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     private suspend fun finishRevokedAccountWipe(wipedRef: String): WipeOutcomeFfi? {
         val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
+        val inView = activeAccountRef
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
         try {
@@ -5718,9 +5719,8 @@ class WhiteNoiseAppState private constructor(
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
-                                // The wipe invalidates server-side registration state for this account.
-                                // withSerializedNativePushWipe already holds
-                                // notificationDelivery.nativePushSyncMutex here.
+                                // The wipe invalidates server-side registration state for this account, and
+                                // withSerializedNativePushWipe already holds nativePushSyncMutex here.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)
                                 runCatching { pushTokenStore.clear() }
                             }
@@ -5732,19 +5732,19 @@ class WhiteNoiseAppState private constructor(
                 appStateDebug(failure) {
                     "signOutAndWipe failed account=${wipedRef.take(8)}: ${failure.readableMessage()}"
                 }
-                restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
                 return null
             }
             val outcome =
                 wipeResult.getOrNull() ?: run {
-                    restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                    restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
                     return null
                 }
             if (!outcome.localCleanup.completed) {
                 appStateDebug {
                     "signOutAndWipe kept active account=${wipedRef.take(8)} because engine cleanup did not complete"
                 }
-                restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
                 return outcome
             }
             chatMutePreferences.removeAccount(wipedRef)
