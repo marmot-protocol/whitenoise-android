@@ -123,8 +123,18 @@ internal fun NotificationProfileEditScreen(
             allowMentions != initialMentions ||
             schedule != initialSchedule
 
+    /** Back waits for an in-flight write: it either closes the editor or hands the draft back. */
     fun back() {
-        if (dirty && !missing) discard = true else onClose()
+        when {
+            submitted -> Unit
+            dirty && !missing -> discard = true
+            else -> onClose()
+        }
+    }
+
+    /** Draft edits apply only while no write is in flight, so nothing typed during a save is lost. */
+    fun edit(change: () -> Unit) {
+        if (!submitted) change()
     }
     BackHandler(onBack = ::back)
 
@@ -188,6 +198,7 @@ internal fun NotificationProfileEditScreen(
                 schedule = schedule,
                 canSave = draftValid && !submitted && canMutate(),
                 canDelete = profileId != null && !missing,
+                busy = submitted,
                 error =
                     when {
                         failed || (missing && !submitted) -> stringResource(R.string.notification_profile_save_failed)
@@ -198,13 +209,13 @@ internal fun NotificationProfileEditScreen(
             NotificationProfileEditActions(
                 onBack = ::back,
                 onSave = ::save,
-                onOpenChats = { if (accountRef != null) pickerOpen = true },
-                onMentionsChange = { allowMentions = it },
-                onScheduleChange = { enabled -> schedule = schedule.copy(enabled = enabled) },
-                onEditStart = { timeField = ProfileTimeField.START },
-                onEditEnd = { timeField = ProfileTimeField.END },
-                onToggleDay = { day -> schedule = schedule.copy(days = schedule.days.toggled(day)) },
-                onDelete = { if (canMutate()) confirmDelete = true },
+                onOpenChats = { edit { if (accountRef != null) pickerOpen = true } },
+                onMentionsChange = { edit { allowMentions = it } },
+                onScheduleChange = { enabled -> edit { schedule = schedule.copy(enabled = enabled) } },
+                onEditStart = { edit { timeField = ProfileTimeField.START } },
+                onEditEnd = { edit { timeField = ProfileTimeField.END } },
+                onToggleDay = { day -> edit { schedule = schedule.copy(days = schedule.days.toggled(day)) } },
+                onDelete = { edit { if (canMutate()) confirmDelete = true } },
             ),
     )
 

@@ -26,6 +26,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -50,6 +51,7 @@ import java.time.format.TextStyle
 
 internal const val NOTIFICATION_PROFILE_EDIT_LIST_TAG = "notification-profile.edit"
 private const val MINUTES_PER_HOUR = 60
+private const val DISABLED_ALPHA = 0.38f
 private val DayToggleSize = 40.dp
 private val DayToggleTarget = 48.dp
 
@@ -64,6 +66,8 @@ internal data class NotificationProfileEditFormState(
     val canSave: Boolean,
     val canDelete: Boolean,
     val error: String?,
+    /** A save or delete is being written; the draft is read-only until it finishes. */
+    val busy: Boolean = false,
 )
 
 /** The editor's callbacks, grouped so the form stays a stateless rendering of [NotificationProfileEditFormState]. */
@@ -115,9 +119,9 @@ internal fun NotificationProfileEditContent(
         SettingsList(listTag = NOTIFICATION_PROFILE_EDIT_LIST_TAG) {
             item(key = "name") { ProfileNameField(state) }
             item(key = "allowed") { AllowedNotificationsSection(state, actions) }
-            item(key = "schedule") { ScheduleSection(state.schedule, actions) }
+            item(key = "schedule") { ScheduleSection(state.schedule, actions, enabled = !state.busy) }
             if (state.canDelete) {
-                item(key = "delete") { DeleteProfileGroup(actions.onDelete) }
+                item(key = "delete") { DeleteProfileGroup(actions.onDelete, enabled = !state.busy) }
             }
         }
     }
@@ -135,6 +139,7 @@ private fun ProfileNameField(state: NotificationProfileEditFormState) {
     ) {
         WhiteNoiseTextField(
             state = state.name,
+            enabled = !state.busy,
             emojiAction = true,
             modifier = Modifier.fillMaxWidth().testTag("notification-profile.name"),
             label = { Text(stringResource(R.string.notification_profile_name_label)) },
@@ -159,11 +164,13 @@ private fun AllowedNotificationsSection(
     state: NotificationProfileEditFormState,
     actions: NotificationProfileEditActions,
 ) {
+    val enabled = !state.busy
     SettingsSection(stringResource(R.string.notification_profile_allowed_section))
     SettingsGroup {
         row("chats") { context ->
             SettingsLink(
                 context = context,
+                enabled = enabled,
                 title = stringResource(R.string.notification_profile_allowed_chats),
                 value =
                     if (state.allowedChatCount == 0) {
@@ -183,6 +190,7 @@ private fun AllowedNotificationsSection(
         row("mentions") { context ->
             SettingsSwitch(
                 context = context,
+                enabled = enabled,
                 title = stringResource(R.string.notification_profile_mentions),
                 subtitle = stringResource(R.string.notification_profile_mentions_detail),
                 checked = state.allowMentions,
@@ -201,12 +209,14 @@ private fun AllowedNotificationsSection(
 private fun ScheduleSection(
     schedule: NotificationProfileSchedule,
     actions: NotificationProfileEditActions,
+    enabled: Boolean,
 ) {
     SettingsSection(stringResource(R.string.notification_profile_schedule_section))
     SettingsGroup {
         row("schedule") { context ->
             SettingsSwitch(
                 context = context,
+                enabled = enabled,
                 title = stringResource(R.string.notification_profile_schedule_enable),
                 subtitle =
                     if (schedule.enabled &&
@@ -226,6 +236,7 @@ private fun ScheduleSection(
             row("start") { context ->
                 SettingsLink(
                     context = context,
+                    enabled = enabled,
                     title = stringResource(R.string.notification_profile_schedule_start),
                     value = notificationProfileClock(schedule.startMinuteOfDay),
                     onClick = actions.onEditStart,
@@ -237,6 +248,7 @@ private fun ScheduleSection(
                 val end = notificationProfileClock(schedule.endMinuteOfDay)
                 SettingsLink(
                     context = context,
+                    enabled = enabled,
                     title = stringResource(R.string.notification_profile_schedule_end),
                     value =
                         if (schedule.endsNextDay && schedule.startMinuteOfDay != schedule.endMinuteOfDay) {
@@ -250,7 +262,7 @@ private fun ScheduleSection(
                 )
             }
             row("days") { context ->
-                SettingsGroupPanel(context) { DayPicker(schedule.days, actions.onToggleDay) }
+                SettingsGroupPanel(context) { DayPicker(schedule.days, actions.onToggleDay, enabled) }
             }
         }
     }
@@ -289,6 +301,7 @@ private fun ScheduleError(text: String) {
 private fun DayPicker(
     days: Set<DayOfWeek>,
     onToggle: (DayOfWeek) -> Unit,
+    enabled: Boolean,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     Column(
@@ -307,6 +320,7 @@ private fun DayPicker(
                     description = day.getDisplayName(TextStyle.FULL, locale),
                     selected = day in days,
                     onToggle = { onToggle(day) },
+                    enabled = enabled,
                     modifier = Modifier.weight(1f).testTag("notification-profile.day.${day.name}"),
                 )
             }
@@ -321,13 +335,15 @@ private fun DayToggle(
     description: String,
     selected: Boolean,
     onToggle: () -> Unit,
+    enabled: Boolean,
     modifier: Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
     Box(
         modifier
             .heightIn(min = DayToggleTarget)
-            .toggleable(value = selected, role = Role.Checkbox, onValueChange = { onToggle() })
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .toggleable(value = selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onToggle() })
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
@@ -347,13 +363,17 @@ private fun DayToggle(
 
 @Suppress("FunctionNaming")
 @Composable
-private fun DeleteProfileGroup(onDelete: () -> Unit) {
+private fun DeleteProfileGroup(
+    onDelete: () -> Unit,
+    enabled: Boolean,
+) {
     SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
         row("delete") { context ->
             SettingsAction(
                 context = context,
                 title = stringResource(R.string.notification_profile_delete),
                 onClick = onDelete,
+                enabled = enabled,
                 destructive = true,
                 modifier = Modifier.testTag("notification-profile.delete"),
                 leading = { SettingsLeadingIcon(R.drawable.ic_delete, tint = MaterialTheme.colorScheme.error) },
