@@ -85,7 +85,23 @@ class SharedPlaintextWipeCoverageTest {
             assertTrue(child.delete())
             recoverSharedPlaintextWipes(context) { _, error -> throw AssertionError(error) }
             assertFalse(blocked.exists())
-            assertEquals(listOf(blocked.name, blocked.name), context.revoked)
+            assertEquals(blocked.name, context.revoked.last())
+        }
+
+    /** A native rejection leaves the account and its staged shares available after startup recovery. */
+    @Test
+    fun rejectedWipeDisarmsStartupRecovery() =
+        runBlocking {
+            val context = RecordingRevocations(application)
+            val account = "retained"
+            val file = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(account) + "document_fixture.pdf")
+            assertTrue(recordSharedPlaintextWipe(context, account))
+            assertTrue(discardSharedPlaintextWipe(context, account))
+
+            recoverSharedPlaintextWipes(context) { _, error -> throw AssertionError(error) }
+
+            assertTrue(file.exists())
+            assertTrue(context.revoked.isEmpty())
         }
 
     private fun share(

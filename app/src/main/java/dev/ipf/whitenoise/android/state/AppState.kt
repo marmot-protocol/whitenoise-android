@@ -5693,6 +5693,7 @@ class WhiteNoiseAppState private constructor(
                     return null
                 }
             if (!outcome.localCleanup.completed) {
+                discardRejectedSharedPlaintextWipe(wipedRef)
                 appStateDebug {
                     "signOutAndWipe kept active account=${wipedRef.take(8)} because engine cleanup did not complete"
                 }

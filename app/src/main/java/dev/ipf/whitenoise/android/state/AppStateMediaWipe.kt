@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.discardSharedPlaintextWipe
 import dev.ipf.whitenoise.android.media.recordSharedPlaintextWipe
 import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
 import dev.ipf.whitenoise.android.media.wipeSharedPlaintext
@@ -12,6 +13,12 @@ import kotlinx.coroutines.withContext
 /** Fails closed before native deletion if Android cannot persist the share cleanup obligation. */
 internal suspend fun WhiteNoiseAppState.prepareSharedPlaintextWipe(accountRef: String): Boolean =
     runCatchingCancellable { recordSharedPlaintextWipe(appContext, accountRef) }.getOrDefault(false)
+
+/** Keeps the staged files when a definitive native outcome leaves the owning account intact. */
+internal suspend fun WhiteNoiseAppState.discardRejectedSharedPlaintextWipe(accountRef: String) {
+    val discarded = runCatchingCancellable { discardSharedPlaintextWipe(appContext, accountRef) }.getOrDefault(false)
+    if (!discarded) appStateDebug { "could not disarm rejected shared plaintext wipe" }
+}
 
 /**
  * Wipes the session plaintext caches. Only a destructive wipe also ends FileProvider access to

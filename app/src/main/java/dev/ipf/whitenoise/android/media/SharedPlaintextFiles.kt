@@ -71,6 +71,20 @@ internal suspend fun recordSharedPlaintextWipe(
         }
     }
 
+/** Disarms recovery when native explicitly retains the account after a rejected wipe. */
+internal suspend fun discardSharedPlaintextWipe(
+    context: Context,
+    accountRef: String,
+): Boolean =
+    withContext(Dispatchers.IO) {
+        sharedPlaintextMutex.withLock {
+            val prefix = sharedPlaintextPrefix(accountRef)
+            val discarded = removePendingWipe(context, prefix)
+            if (discarded) pendingLiveWipes -= prefix
+            discarded
+        }
+    }
+
 /** Retries unfinished cleanup in a new process, including a process started by a background worker. */
 internal suspend fun recoverSharedPlaintextWipes(
     context: Context,
@@ -111,13 +125,19 @@ private fun finishSharedPlaintextWipe(
         failed = true
         onFailure(area, error)
     }
-    if (!failed) {
-        val preferences = context.getSharedPreferences(WIPE_PREFERENCES, Context.MODE_PRIVATE)
-        val pending = preferences.getStringSet(PENDING_WIPES, emptySet()).orEmpty()
-        if (prefix in pending && !preferences.edit().putStringSet(PENDING_WIPES, pending - prefix).commit()) {
-            onFailure(WIPE_PREFERENCES, IOException("could not record shared plaintext cleanup"))
-        }
+    if (!failed && !removePendingWipe(context, prefix)) {
+        onFailure(WIPE_PREFERENCES, IOException("could not record shared plaintext cleanup"))
     }
+}
+
+/** Updates the durable cleanup set while holding the share mutex. */
+private fun removePendingWipe(
+    context: Context,
+    prefix: String,
+): Boolean {
+    val preferences = context.getSharedPreferences(WIPE_PREFERENCES, Context.MODE_PRIVATE)
+    val pending = preferences.getStringSet(PENDING_WIPES, emptySet()).orEmpty()
+    return prefix !in pending || preferences.edit().putStringSet(PENDING_WIPES, pending - prefix).commit()
 }
 
 /** Lists both private share roots and attempts every matching file even after an individual failure. */
