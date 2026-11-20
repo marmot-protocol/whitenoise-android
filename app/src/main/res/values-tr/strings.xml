@@ -978,6 +978,7 @@
     <string name="hide_private_key">Özel anahtarı gizle</string>
     <string name="show_private_key">Özel anahtarı göster</string>
     <string name="copy_private_key">Özel Anahtarı Kopyala</string>
+    <string name="raw_key_export_auth_title">Özel anahtarınıza erişmek için kimliğinizi doğrulayın</string>
     <string name="export">İhracat</string>
     <string name="export_encrypted_private_key">Şifrelenmiş Özel Anahtarı Dışa Aktar</string>
     <string name="keep_your_private_key_safe">Özel Anahtarınızı Güvende Tutun</string>
