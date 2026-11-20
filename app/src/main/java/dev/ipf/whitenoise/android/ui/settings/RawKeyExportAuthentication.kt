@@ -4,13 +4,13 @@ import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.APP_LOCK_ALLOWED_AUTHENTICATORS
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isAppLockCredentialAvailable
 import dev.ipf.whitenoise.android.ui.findActivity
 
@@ -22,13 +22,14 @@ internal fun interface RawKeyExportAuthentication {
 @Composable
 internal fun rememberRawKeyExportAuthentication(
     owner: ProfileKeysUiState,
-    onUnavailable: () -> Unit,
+    appState: WhiteNoiseAppState,
 ): RawKeyExportAuthentication {
     val context = LocalContext.current
-    val latestUnavailable = rememberUpdatedState(onUnavailable)
     val authentication =
-        remember(context, owner) {
-            RawKeyExportPrompt(context.findActivity() as? FragmentActivity) { latestUnavailable.value() }
+        remember(context, owner, appState) {
+            RawKeyExportPrompt(context.findActivity() as? FragmentActivity) {
+                appState.present(R.string.toast_app_lock_screen_lock_required)
+            }
         }
     DisposableEffect(authentication) {
         onDispose { authentication.cancel() }
@@ -56,7 +57,10 @@ private class RawKeyExportPrompt(
         }
         val fragment = Fragment()
         runCatching {
-            hostActivity.supportFragmentManager.beginTransaction().add(fragment, null).commitNow()
+            hostActivity.supportFragmentManager
+                .beginTransaction()
+                .add(fragment, null)
+                .commitNow()
             host = fragment
             val callback =
                 object : BiometricPrompt.AuthenticationCallback() {
@@ -100,7 +104,11 @@ private class RawKeyExportPrompt(
         val activePrompt = prompt
         prompt = null
         if (cancelPrompt) activePrompt?.cancelAuthentication()
-        activity?.supportFragmentManager?.beginTransaction()?.remove(fragment)?.commitAllowingStateLoss()
+        activity
+            ?.supportFragmentManager
+            ?.beginTransaction()
+            ?.remove(fragment)
+            ?.commitAllowingStateLoss()
         return true
     }
 }

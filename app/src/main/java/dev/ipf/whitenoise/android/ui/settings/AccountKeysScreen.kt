@@ -193,9 +193,7 @@ internal fun AccountKeysScreen(
     val runtimeGeneration = appState.runtimeGeneration
     val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
     var showSignOut by remember(ui) { mutableStateOf(false) }
-    val rawAuthentication = rawExportAuthenticator ?: rememberRawKeyExportAuthentication(ui) {
-        appState.present(R.string.toast_app_lock_screen_lock_required)
-    }
+    val rawAuthentication = rawExportAuthenticator ?: rememberRawKeyExportAuthentication(ui, appState)
 
     fun ownsAccount(): Boolean =
         accountIdHex != null &&
