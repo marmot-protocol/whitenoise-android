@@ -2258,6 +2258,7 @@
     <string name="onboarding_signing_in">Anmeldung…</string>
     <string name="onboarding_choose_profile">Profil auswählen</string>
     <string name="onboarding_enter_private_key">Privaten Schlüssel eingeben</string>
+    <string name="signup_generated_name_hint">Bei der Registrierung erscheint zuerst ein Zufallsname. Behalte ihn, würfle erneut oder gib deinen eigenen Namen ein.</string>
     <string name="signup_about_prompt">Erzähle etwas über dich</string>
     <string name="signup_preparing_photo">Foto wird vorbereitet…</string>
     <string name="signup_publishing_profile">Profil wird veröffentlicht…</string>

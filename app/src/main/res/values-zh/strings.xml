@@ -2206,6 +2206,7 @@
     <string name="onboarding_signing_in">正在登录…</string>
     <string name="onboarding_choose_profile">选择个人资料</string>
     <string name="onboarding_enter_private_key">输入私钥</string>
+    <string name="signup_generated_name_hint">注册时会提供一个随机名字。你可以保留它、掷骰子换一个，或输入自己的名字。</string>
     <string name="signup_about_prompt">介绍一下自己</string>
     <string name="signup_preparing_photo">正在准备照片…</string>
     <string name="signup_publishing_profile">正在发布个人资料…</string>

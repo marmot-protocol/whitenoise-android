@@ -2246,6 +2246,7 @@
     <string name="onboarding_signing_in">Accesso…</string>
     <string name="onboarding_choose_profile">Scegli profilo</string>
     <string name="onboarding_enter_private_key">Inserisci la chiave privata</string>
+    <string name="signup_generated_name_hint">La registrazione inizia con un nome casuale. Tienilo, tira i dadi per averne un altro o scrivi il tuo.</string>
     <string name="signup_about_prompt">Raccontaci di te</string>
     <string name="signup_preparing_photo">Preparazione della foto…</string>
     <string name="signup_publishing_profile">Pubblicazione del profilo…</string>

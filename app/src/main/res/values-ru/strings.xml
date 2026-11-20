@@ -2315,6 +2315,7 @@
     <string name="onboarding_signing_in">Вход…</string>
     <string name="onboarding_choose_profile">Выберите профиль</string>
     <string name="onboarding_enter_private_key">Введите закрытый ключ</string>
+    <string name="signup_generated_name_hint">При регистрации предлагается случайное имя. Оставьте его, бросьте кубик, чтобы получить другое, или введите своё.</string>
     <string name="signup_about_prompt">Расскажите о себе</string>
     <string name="signup_preparing_photo">Подготовка фото…</string>
     <string name="signup_publishing_profile">Публикация профиля…</string>
