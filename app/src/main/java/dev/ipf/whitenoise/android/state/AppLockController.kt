@@ -65,8 +65,12 @@ internal class AppLockController(
                         ),
             )
 
-    @Volatile private var notificationBackgroundedAt: Long? = null
-    @Volatile private var notificationForegroundEvaluated = false
+    @Volatile
+    private var notificationBackgroundedAt: Long? = null
+
+    @Volatile
+    private var notificationForegroundEvaluated = false
+
     var unlockError by mutableStateOf<AppText?>(null)
         private set
 
