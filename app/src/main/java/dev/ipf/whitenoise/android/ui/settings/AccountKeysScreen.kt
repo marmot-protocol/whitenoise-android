@@ -98,6 +98,7 @@ internal class ProfileKeysUiState {
     var nativeExportError by mutableStateOf<Int?>(null)
     var passwordDialog by mutableStateOf(false)
     var rawExportDialog by mutableStateOf(false)
+    var rawExportConsent = Any()
     var saveErrorDialog by mutableStateOf(false)
     var expiredExportDialog by mutableStateOf(false)
     var exportBusy by mutableStateOf(false)
@@ -174,9 +175,8 @@ internal fun AccountKeysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
+    rawExportAuthenticator: RawKeyExportAuthentication? = null,
 ) {
-    // The screen surfaces the raw nsec; keep it out of Recents thumbnails and
-    // screenshots, matching the encrypted-backup sheet's posture.
     WindowSecureFlag()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -192,24 +192,25 @@ internal fun AccountKeysScreen(
     val accountRef = appState.activeAccountRef
     val runtimeGeneration = appState.runtimeGeneration
     val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
-    var showSignOut by remember(accountIdHex, accountRef, runtimeGeneration) { mutableStateOf(false) }
+    var showSignOut by remember(ui) { mutableStateOf(false) }
+    val rawAuthentication = rawExportAuthenticator ?: rememberRawKeyExportAuthentication(ui) {
+        appState.present(R.string.toast_app_lock_screen_lock_required)
+    }
 
-    /** True while the screen still shows the active account. */
     fun ownsAccount(): Boolean =
         accountIdHex != null &&
             appState.activeAccount?.accountIdHex == accountIdHex &&
             appState.activeAccountRef == accountRef &&
             appState.runtimeGeneration == runtimeGeneration
 
-    /** Secrets are delivered only to the owning account while started and signing locally. */
     fun canDeliverSecret(): Boolean =
         ownsAccount() &&
             lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
             appState.activeAccount?.localSigning == true &&
+            !appState.appLock.screenVisible &&
             !appState.signOutInProgress &&
             !appState.wipeInProgress
 
-    /** Writes the picked document on IO; only the still-owning, started screen hears whether it failed. */
     fun saveExport(
         uri: Uri,
         content: String,
@@ -237,7 +238,6 @@ internal fun AccountKeysScreen(
             }
         }
 
-    /** Launches the export share with the prepared content. */
     fun launchExport(
         encrypted: Boolean,
         content: String,
@@ -253,7 +253,6 @@ internal fun AccountKeysScreen(
         }
     }
 
-    /** Begins an export to the chosen destination. */
     fun beginExport(
         encrypted: Boolean,
         destination: KeyExportDestination,
@@ -370,7 +369,7 @@ internal fun AccountKeysScreen(
                 )
             },
             onExportEncrypted = { ui.passwordDialog = true },
-            onExportRaw = { ui.rawExportDialog = true },
+            onExportRaw = ui::openRawExport,
             onWipe = { ui.wipeSheet = true },
             onSignOut = { if (ownsAccount()) showSignOut = true },
         )
@@ -378,7 +377,7 @@ internal fun AccountKeysScreen(
     ProfileKeysDialogs(
         ui = ui,
         canExport = hasLocalKey,
-        onExport = ::beginExport,
+        onExport = rawAuthentication.gateExport(ui, ::canDeliverSecret, ::beginExport),
         onCopyBackup = {
             val backup = ui.encryptedBackup
             if (backup != null && !backup.isExpired() && canDeliverSecret()) {

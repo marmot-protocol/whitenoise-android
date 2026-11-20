@@ -82,6 +82,27 @@ class AccountKeysExportDeliveryTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Raw export waits for a fresh challenge and ignores success after its consent is dismissed. */
+    @Test
+    fun rawExportWaitsForAuthenticationInItsOwnDialog() {
+        var pending: (() -> Unit)? = null
+        val exports = mutableListOf<KeyExportDestination>()
+        val ui = ProfileKeysUiState().apply { openRawExport() }
+        val authenticate = RawKeyExportAuthentication { pending = it }
+        val export = authenticate.gateExport(ui, { true }) { _, destination -> exports += destination }
+
+        export(false, KeyExportDestination.Share)
+        assertTrue(exports.isEmpty())
+        ui.cancelExport()
+        ui.openRawExport()
+        checkNotNull(pending).invoke()
+        assertTrue(exports.isEmpty())
+
+        export(false, KeyExportDestination.File)
+        checkNotNull(pending).invoke()
+        assertEquals(listOf(KeyExportDestination.File), exports)
+    }
+
     /** Opening the file picker stops the screen, but an authorized raw export still writes on an idle return. */
     @Test
     fun stoppedRawPickerRetainsItsAuthorizedExport() {
@@ -575,7 +596,11 @@ class AccountKeysExportDeliveryTest {
                 LocalLifecycleOwner provides owner,
             ) {
                 WhiteNoiseTheme {
-                    AccountKeysScreen(appState = appState, onBack = {})
+                    AccountKeysScreen(
+                        appState = appState,
+                        onBack = {},
+                        rawExportAuthenticator = RawKeyExportAuthentication { authenticated -> authenticated() },
+                    )
                 }
             }
         }
