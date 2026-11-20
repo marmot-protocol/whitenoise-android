@@ -85,7 +85,6 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt" to 751,
         "dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt" to 903,
         "dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt" to 622,
-        "dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt" to 625,
         "dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt" to 926,
         "dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt" to 730,
         "dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt" to 716,
