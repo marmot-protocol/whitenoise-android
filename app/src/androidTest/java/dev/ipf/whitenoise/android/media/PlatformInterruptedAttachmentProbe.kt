@@ -477,12 +477,10 @@ internal object PlatformInterruptedAttachmentProbe {
             }
         }
         // Host connectivity and Compose policy precede asynchronous native synchronization.
-        // Join this actual request, then observe the account's applied approval. A counter increment from an
-        // unrelated refresh is not proof that the requested setup has finished. No permission is seeded here.
+        // An unrelated counter increment cannot prove that this requested refresh has completed.
         withTimeout(15_000L) {
             val refresh = withContext(Dispatchers.Main.immediate) { state.refreshNativeAttachmentPermissions() }
-            requireNotNull(refresh).join()
-            platformResumePermissions(state).awaitApplied(account) { it.files }
+            awaitPlatformResumePermissionSetup(state, account, refresh)
         }
         ControlledAttachmentProbe.checkpoint("automatic-policy-ready")
     }

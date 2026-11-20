@@ -25,5 +25,4 @@ name: keys-short-boundary
     enabled: false
 - assertVisible: "Too short"
 - tapOn: "Cancel"
-- assertVisible: "Private key hidden"
-- assertNotVisible: "Encrypted Private Key"
+- runFlow: ../fixtures/assert-private-key-hidden-after-backup.yaml

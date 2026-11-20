@@ -29,6 +29,8 @@ import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.captureTtsAccountOwner
+import dev.ipf.whitenoise.android.state.captureTtsAutoReadPolicy
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
@@ -124,6 +126,20 @@ internal fun ConversationTtsAutoReadEffects(
     entryFirstUnreadMessageId: String?,
     transcriptReadyToReveal: Boolean,
 ) {
+    val lifecycleOwner = LocalContext.current.lifecycleOwner()
+
+    /** Invalidates pending auto-read work when the account, chat, or policy changes. */
+    fun captureAutoReadOwner(): () -> Boolean {
+        val account = controller.boundAccountRef
+        val accountIsCurrent = appState.captureTtsAccountOwner(account)
+        val policyIsCurrent = appState.captureTtsAutoReadPolicy(controller.group.groupIdHex)
+        return {
+            accountIsCurrent() &&
+                controller.acceptsConversationActionOwner(account, controller.group.groupIdHex) &&
+                policyIsCurrent()
+        }
+    }
+
     suspend fun projectEntry(record: AppMessageRecordFfi) = projectConversationTtsEntry(appState, controller, record)
 
     suspend fun autoReadBacklogEntries(): List<TtsSpeakableEntry> {
@@ -158,13 +174,16 @@ internal fun ConversationTtsAutoReadEffects(
     LaunchedEffect(controller, chatId, transcriptReadyToReveal) {
         if (!transcriptReadyToReveal) return@LaunchedEffect
         if (appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) return@LaunchedEffect
+        val canCommit = captureAutoReadOwner()
+        if (!canCommit()) return@LaunchedEffect
         val entries = autoReadBacklogEntries()
-        if (entries.isNotEmpty()) {
+        if (entries.isNotEmpty() && appState.confirmTtsPlaybackTrust(canCommit)) {
             appState.speakAloudAutoRead(
                 controller.group.groupIdHex,
                 entries,
                 Locale.getDefault(),
                 backgroundPreparation = true,
+                canCommit = canCommit,
             )
         }
     }
@@ -180,7 +199,6 @@ internal fun ConversationTtsAutoReadEffects(
         }
     var autoReadResumeGeneration by remember(controller, chatId) { mutableLongStateOf(0L) }
     var handledAutoReadResumeGeneration by remember(controller, chatId) { mutableLongStateOf(0L) }
-    val lifecycleOwner = LocalContext.current.lifecycleOwner()
     DisposableEffect(controller, chatId, lifecycleOwner) {
         if (lifecycleOwner == null) {
             onDispose { }
@@ -215,6 +233,8 @@ internal fun ConversationTtsAutoReadEffects(
         if (!transcriptReadyToReveal) return@LaunchedEffect
         if (!appState.ttsHasUsableEngine) return@LaunchedEffect
         if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
+        val canCommit = captureAutoReadOwner()
+        if (!canCommit()) return@LaunchedEffect
         val cursor = autoReadResumeCursor
         val entries =
             withTimeoutOrNull(TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS) {
@@ -232,12 +252,13 @@ internal fun ConversationTtsAutoReadEffects(
         ) {
             return@LaunchedEffect
         }
-        if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
+        if (!appState.confirmTtsPlaybackTrust(canCommit)) return@LaunchedEffect
         appState.speakAloudAutoRead(
             controller.group.groupIdHex,
             entries,
             Locale.getDefault(),
             backgroundPreparation = true,
+            canCommit = canCommit,
         )
     }
 }

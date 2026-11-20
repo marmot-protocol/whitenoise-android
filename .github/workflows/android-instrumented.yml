@@ -317,6 +317,7 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeLedger.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeHostDiagnostics.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptSchedulingDiagnostics.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumePermissionSetup.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnostics.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptProcessStopDiagnostics.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnosticsAndroidTest.kt'

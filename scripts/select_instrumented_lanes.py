@@ -44,6 +44,7 @@ FIXTURE_ONLY = (
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeLedger.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeHostDiagnostics.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptSchedulingDiagnostics.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumePermissionSetup.kt',
 )
 
 # Production and build inputs the fixture exercises alongside other device tests.

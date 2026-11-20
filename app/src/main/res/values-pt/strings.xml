@@ -443,6 +443,16 @@
     <string name="media_attachment">Anexo de mídia</string>
     <string name="generic_message">Mensagem</string>
     <string name="giphy_media_preview">GIF fornecido pelo GIPHY</string>
+    <string name="giphy_search_title">Pesquisar GIFs</string>
+    <string name="giphy_search_hint">Pesquisar no GIPHY</string>
+    <string name="giphy_search_privacy">O GIPHY recebe sua pesquisa, idioma e endereço IP. Os telefones dos destinatários podem carregar GIFs automaticamente do GIPHY, compartilhando seu endereço IP.</string>
+    <string name="giphy_search_powered_by_prefix">Fornecido por</string>
+    <string name="giphy_search_powered_by">Fornecido pelo GIPHY</string>
+    <string name="giphy_search_empty">Nenhum GIF encontrado</string>
+    <string name="giphy_search_failed">Não foi possível pesquisar no GIPHY</string>
+    <string name="giphy_preview_loading">Carregando prévia</string>
+    <string name="giphy_preview_unavailable">Prévia indisponível</string>
+    <string name="giphy_send_result">Enviar GIF: %1$s</string>
     <string name="waiting_for_stream">Aguardando fluxo...</string>
     <string name="stream_failed_format">Falha no fluxo: %1$s</string>
     <string name="copy_text">Copiar texto</string>
@@ -980,6 +990,7 @@
     <string name="hide_private_key">Ocultar chave privada</string>
     <string name="show_private_key">Mostrar chave privada</string>
     <string name="copy_private_key">Copiar chave privada</string>
+    <string name="raw_key_export_auth_title">Autentique-se para acessar sua chave privada</string>
     <string name="export">Exportar</string>
     <string name="export_encrypted_private_key">Exportar chave privada criptografada</string>
     <string name="keep_your_private_key_safe">Mantenha sua chave privada segura</string>

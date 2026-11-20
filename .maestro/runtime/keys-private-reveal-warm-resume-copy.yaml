@@ -2,6 +2,16 @@ appId: dev.ipf.whitenoise.android.maestrolab
 name: keys-private-reveal-warm-resume-copy
 ---
 - runFlow: ../fixtures/runtime-profile-keys-ready.yaml
+# Background while the system owns the credential prompt; a fresh request must still work.
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: DOWN
+- tapOn: Show private key
+- assertVisible:
+    id: '^(com.android.systemui|com.android.settings):id/(pinEntry|password_entry|lockPassword)$'
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible: Private key hidden
 - runFlow: ../fixtures/reveal-fixture-private-key.yaml
 - runFlow: ../fixtures/runtime-warm-resume.yaml
 - assertVisible: Private key hidden

@@ -106,9 +106,10 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
         self.assertEqual(select('pull_request', [process_stop], TRIGGERS), FULL)
 
     def test_resume_and_scheduler_helpers_alone_run_their_fixture(self):
-        """Editing one shared fixture helper must not silently skip its real emulator qualification."""
+        """A shared fixture helper edit, setup alone included, must not skip its real emulator qualification."""
         for name in ['PlatformInterruptedAttachmentProbe.kt', 'PlatformResumeLedger.kt',
-                     'PlatformResumeHostDiagnostics.kt', 'BackgroundReceiptSchedulingDiagnostics.kt']:
+                     'PlatformResumeHostDiagnostics.kt', 'BackgroundReceiptSchedulingDiagnostics.kt',
+                     'PlatformResumePermissionSetup.kt']:
             with self.subTest(name=name):
                 path = MEDIA_TEST + name
                 self.assertTrue(matches(path, TRIGGERS))

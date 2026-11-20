@@ -29,8 +29,14 @@ only for an opt-in qualification that consumes the unsigned isolated artifact:
 
 ```sh
 gh workflow run android-pr-apk.yml --repo marmot-protocol/whitenoise-android \
-  --ref master -f pr_number=NUMBER
+  --ref master -f pr_number=NUMBER \
+  -f expected_head=REVIEWED_PR_SHA -f expected_workflow_sha=REVIEWED_MASTER_SHA
 ```
+
+Use both full commit SHAs for a reviewed candidate. If the workflow reports that
+either revision moved, review the current revision before requesting the preview
+again. The [preview resolver shell contract](../.github/scripts/test-pr-preview-contract.sh)
+covers matching, moved and partial pins, plus legacy requests.
 
 Hermes agents use the maintained authenticated CLI at `/opt/data/.local/bin/gh`
 with `HERMES_GH_NO_CACHE=1` for live reads and writes. Dispatch from the trusted

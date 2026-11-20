@@ -441,6 +441,16 @@
     <string name="media_attachment">Medya eki</string>
     <string name="generic_message">Mesaj</string>
     <string name="giphy_media_preview">GIPHY üzerinden GIF</string>
+    <string name="giphy_search_title">GIF ara</string>
+    <string name="giphy_search_hint">GIPHY’de ara</string>
+    <string name="giphy_search_privacy">GIPHY aramanızı, dil ayarınızı ve IP adresinizi alır. Alıcıların telefonları GIF’leri GIPHY’den otomatik olarak yükleyerek IP adreslerini paylaşabilir.</string>
+    <string name="giphy_search_powered_by_prefix">Sağlayan</string>
+    <string name="giphy_search_powered_by">GIPHY tarafından sağlanır</string>
+    <string name="giphy_search_empty">GIF bulunamadı</string>
+    <string name="giphy_search_failed">GIPHY’de arama yapılamadı</string>
+    <string name="giphy_preview_loading">Önizleme yükleniyor</string>
+    <string name="giphy_preview_unavailable">Önizleme kullanılamıyor</string>
+    <string name="giphy_send_result">GIF gönder: %1$s</string>
     <string name="waiting_for_stream">Akış bekleniyor...</string>
     <string name="stream_failed_format">Akış başarısız: %1$s</string>
     <string name="copy_text">Metni kopyala</string>
@@ -978,6 +988,7 @@
     <string name="hide_private_key">Özel anahtarı gizle</string>
     <string name="show_private_key">Özel anahtarı göster</string>
     <string name="copy_private_key">Özel Anahtarı Kopyala</string>
+    <string name="raw_key_export_auth_title">Özel anahtarınıza erişmek için kimliğinizi doğrulayın</string>
     <string name="export">İhracat</string>
     <string name="export_encrypted_private_key">Şifrelenmiş Özel Anahtarı Dışa Aktar</string>
     <string name="keep_your_private_key_safe">Özel Anahtarınızı Güvende Tutun</string>
