@@ -28,22 +28,6 @@ class TtsTrustWarningTest {
     }
 
     @Test
-    fun catalogLocalEngineRequiresWarningUntilRuntimeHandleIsAdopted() {
-        assertTrue(
-            requiresTtsTrustWarning(
-                enginePackage = "app.grapheneos.speechservices",
-                trust =
-                    runtimeTrustForSelectionWarning(
-                        enginePackage = "app.grapheneos.speechservices",
-                        adoptedHandle = null,
-                        selectedOverride = null,
-                    ),
-                preferences = preferences,
-            ),
-        )
-    }
-
-    @Test
     fun requiresWarningForUnknownUnacknowledgedEngine() {
         assertTrue(
             requiresTtsTrustWarning(

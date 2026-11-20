@@ -80,5 +80,4 @@ name: keys-correct-mismatch
     enabled: true
 - assertNotVisible: "Passwords don’t match.*"
 - tapOn: "Cancel"
-- assertVisible: "Private key hidden"
-- assertNotVisible: "Encrypted Private Key"
+- runFlow: ../fixtures/assert-private-key-hidden-after-backup.yaml

@@ -48,12 +48,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.RandomProfileNameButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
@@ -266,10 +268,18 @@ internal fun SignUpContent(
                         enabled = editable,
                         label = { Text(stringResource(R.string.name)) },
                         trailingIcon = {
+                            val nameExplanation =
+                                Explanation(
+                                    title = stringResource(R.string.profile_suggest_name),
+                                    body = stringResource(R.string.signup_generated_name_hint),
+                                )
                             RandomProfileNameButton(
                                 enabled = editable,
                                 onClick = onSuggestName,
-                                modifier = Modifier.testTag("onboarding.sign_up.suggest_name"),
+                                modifier =
+                                    Modifier
+                                        .testTag("onboarding.sign_up.suggest_name")
+                                        .explainOnLongPress(nameExplanation, enabled = editable),
                             )
                         },
                         lineLimits = TextFieldLineLimits.SingleLine,

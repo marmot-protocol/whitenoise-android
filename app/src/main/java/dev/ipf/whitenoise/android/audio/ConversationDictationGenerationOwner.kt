@@ -15,12 +15,15 @@ internal class ConversationDictationGenerationOwner(
         private set
     var readyAtElapsedMillis: Long? = null
         private set
+    var providerEnded = false
+        private set
 
     fun begin(): Long {
         val id = ++nextId
         activeId = id
         hasSpeech = false
         readyAtElapsedMillis = null
+        providerEnded = false
         return id
     }
 
@@ -40,6 +43,11 @@ internal class ConversationDictationGenerationOwner(
         hasSpeech = true
     }
 
+    /** Records that the provider itself delivered this generation's terminal result or error. */
+    fun markProviderEnded() {
+        providerEnded = true
+    }
+
     fun markCallerAudioEndpointing() {
         callerAudioEndpointingActive = true
     }
@@ -52,6 +60,7 @@ internal class ConversationDictationGenerationOwner(
         activeId = null
         hasSpeech = false
         readyAtElapsedMillis = null
+        providerEnded = false
         return retired
     }
 
