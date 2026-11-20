@@ -3,7 +3,10 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -22,6 +25,7 @@ import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.appModuleSource
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.hexString
 import dev.ipf.whitenoise.android.core.nip19
 import dev.ipf.whitenoise.android.core.nip19Tlv
@@ -35,6 +39,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,6 +50,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * Invariant gate for #3317: an event a card represents has one visible rich representation. Every reference that
@@ -72,6 +78,54 @@ class NostrReferencePresentationCoverageTest {
     /** Cancels the resolver scope each test opens. */
     @After
     fun closeScope() = scope.cancel()
+
+    /** Rendering a card uses initials or existing pixels and never invokes its image fetcher. */
+    @Test
+    fun eventAvatarRemainsCacheOnlyThroughColdAndWarmComposition() {
+        val url = "https://example.com/fixture-event-author.png"
+        val positiveControl = "https://example.com/fixture-profile-control.png"
+        val requests = ConcurrentLinkedQueue<String>()
+        val warm = mutableStateOf(false)
+        val card = EVENT.toCardModel().copy(authorMetadata = NostrEventAuthorMetadata("Ada Example", url))
+        AvatarImageLoader.clear()
+        AvatarImageLoader.attachProfileImageFetcher { requested, _ ->
+            requests += requested
+            byteArrayOf()
+        }
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    key(warm.value) {
+                        NostrEventCard(
+                            state = NostrEventCardState.Loaded(card),
+                            authorDisplayName = { "Ada Example" },
+                            contentColor = Color.Black,
+                            onRetry = {},
+                            onCopy = {},
+                            onOpen = {},
+                        )
+                    }
+                }
+            }
+            composeRule.onNodeWithText("A").assertIsDisplayed()
+            assertFalse(AvatarImageLoader.isInFlightForTest(url))
+            assertTrue(requests.isEmpty())
+
+            composeRule.runOnIdle {
+                AvatarImageLoader.putCached(url, ImageBitmap(8, 8))
+                warm.value = true
+            }
+            composeRule.onNodeWithText("Ada Example").assertIsDisplayed()
+            composeRule.onAllNodesWithText("A").assertCountEquals(0)
+            runBlocking { AvatarImageLoader.load(positiveControl, AvatarImageLoader.publicProfiles()) }
+
+            assertFalse(AvatarImageLoader.isInFlightForTest(url))
+            assertEquals(listOf(positiveControl), requests.toList())
+        } finally {
+            AvatarImageLoader.resetProfileImageFetcherForTests()
+            AvatarImageLoader.clear()
+        }
+    }
 
     /** One represented event shows as its card alone, copies in full and leaves the unrelated prose intact. */
     @Test
