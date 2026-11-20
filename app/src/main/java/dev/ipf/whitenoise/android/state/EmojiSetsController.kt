@@ -125,6 +125,8 @@ internal data class EmojiSetsState(
     val cancelling: Boolean = false,
     val notice: EmojiSetNotice? = null,
     val installedWithSkips: Int? = null,
+    /** True while [sets] holds the results of a search rather than the full library. */
+    val searched: Boolean = false,
 )
 
 /** Owns presentation for one screen. Installed state and the version check remain in MarmotKit. */
@@ -273,7 +275,7 @@ internal class EmojiSetsController(
         val sets = backend.sets(search)
         if (read > appliedRead) {
             appliedRead = read
-            state = state.copy(sets = sets)
+            state = state.copy(sets = sets, searched = search != null)
         }
     }
 

@@ -41,19 +41,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
-import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiEntry
+import dev.ipf.whitenoise.android.ui.EmojiPickerTab
 import dev.ipf.whitenoise.android.ui.EmojiSection
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
+import dev.ipf.whitenoise.android.ui.LocalHiddenBuiltinEmojiSets
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
+import dev.ipf.whitenoise.android.ui.emojiSearchLayout
 import dev.ipf.whitenoise.android.ui.emojiSearchSections
+import dev.ipf.whitenoise.android.ui.hides
+import dev.ipf.whitenoise.android.ui.installedSetSearchSections
 import dev.ipf.whitenoise.android.ui.libraryEmojiArtwork
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
@@ -64,11 +67,11 @@ internal const val EMOJI_PICKER_SEARCH_TEST_TAG = "emoji.picker.search"
 internal const val EMOJI_PICKER_GRID_TEST_TAG = "emoji.picker.grid"
 
 /** Stable test tag for an emoji section header. */
-internal fun emojiPickerHeaderTestTag(category: EmojiCategory): String = "emoji.picker.header.${category.id}"
+internal fun emojiPickerHeaderTestTag(category: EmojiPickerTab): String = "emoji.picker.header.${category.id}"
 
 /** Stable test tag for an emoji cell. */
 internal fun emojiPickerItemTestTag(
-    category: EmojiCategory,
+    category: EmojiPickerTab,
     index: Int,
 ): String = "emoji.picker.item.${category.id}.$index"
 
@@ -77,7 +80,7 @@ internal val EmojiPickerEmojiSize = 32.dp
 private val EmojiPickerSectionHeaderMinimumHeight = 36.dp
 
 private data class EmojiSectionRange(
-    val category: EmojiCategory,
+    val category: EmojiPickerTab,
     val firstItemIndex: Int,
 )
 
@@ -97,7 +100,7 @@ private class EmojiPickerModel(
     val sectionRanges = emojiSectionRanges(sections)
 
     /** Grid index of [category]'s section header, or null when the category is not shown. */
-    fun firstItemIndex(category: EmojiCategory): Int? {
+    fun firstItemIndex(category: EmojiPickerTab): Int? {
         val range = sectionRanges.firstOrNull { it.category == category }
         return range?.firstItemIndex
     }
@@ -111,7 +114,7 @@ private fun rememberEmojiPickerModel(
     purpose: EmojiPickerPurpose,
 ): EmojiPickerModel {
     val context = LocalContext.current
-    val entries by produceState(initialValue = emptyList<EmojiEntry>(), context, purpose) {
+    val loadedEntries by produceState(initialValue = emptyList<EmojiEntry>(), context, purpose) {
         value =
             withContext(Dispatchers.IO) {
                 val loaded = EmojiData.load(context)
@@ -122,25 +125,19 @@ private fun rememberEmojiPickerModel(
                 }
             }
     }
+    // Removed pre-installed sets leave the picker and search; their emoji still render in messages.
+    val hidden = LocalHiddenBuiltinEmojiSets.current
+    val entries = remember(loadedEntries, hidden) { loadedEntries.filterNot { hidden.hides(it.emoji) } }
     // Group images are drawn from a system-font glyph, so artwork emoji cannot become one.
     val customEmoji = LocalCustomEmoji.current
-    val custom =
-        remember(customEmoji, purpose) {
-            emojiPickerShortcodes(customEmoji, purpose)
-        }
+    val pickerSets = remember(customEmoji, purpose, hidden) { emojiPickerSets(customEmoji, purpose, hidden) }
+    val custom = pickerSets.custom
     val recents =
-        remember(recentEmojis, purpose, custom) {
-            val available =
-                if (purpose == EmojiPickerPurpose.GROUP_IMAGE) {
-                    emptySet()
-                } else {
-                    (custom + EmojiShortcodes.builtins).toSet()
-                }
-            recentEmojis
-                .filter { it.isNotBlank() && (!EmojiShortcodes.isShortcode(it) || it in available) }
-                .distinct()
+        remember(recentEmojis, purpose, customEmoji, hidden) {
+            pickerRecents(recentEmojis, purpose, customEmoji, hidden)
         }
-    val browseSections = remember(entries, recents, custom) { emojiBrowseSections(entries, recents, custom) }
+    val browseSections =
+        remember(entries, recents, pickerSets) { emojiBrowseSections(entries, recents, custom, pickerSets.sets) }
     var searchSections by remember { mutableStateOf<List<EmojiSection>>(emptyList()) }
     var searchedQuery by remember { mutableStateOf("") }
     LaunchedEffect(query, entries) {
@@ -153,11 +150,15 @@ private fun rememberEmojiPickerModel(
         searchedQuery = query
     }
     val searching = query.isNotBlank()
-    return remember(browseSections, searchSections, searching, searchedQuery, custom) {
+    return remember(browseSections, searchSections, searching, searchedQuery, pickerSets) {
         EmojiPickerModel(
             sections =
                 if (searching) {
-                    listOfNotNull(customEmojiSearchSection(custom, searchedQuery)) + searchSections
+                    emojiSearchLayout(
+                        customEmojiSearchSection(custom, searchedQuery),
+                        searchSections,
+                        installedSetSearchSections(pickerSets.sets, searchedQuery),
+                    )
                 } else {
                     browseSections
                 },
@@ -230,7 +231,7 @@ internal fun EmojiPickerContent(
     }
     val noResults = model.searching && model.searchedQuery == query && model.sections.isEmpty()
     val categories = model.sections.map { it.category }
-    val onCategory: (EmojiCategory) -> Unit = { category ->
+    val onCategory: (EmojiPickerTab) -> Unit = { category ->
         model.firstItemIndex(category)?.let { scope.launch { gridState.animateScrollToItem(it) } }
     }
     if (searchBehindIcon) {
@@ -315,7 +316,7 @@ internal fun EmojiPickerResults(
 @Composable
 private fun EmojiPickerScrollSync(
     model: EmojiPickerModel,
-    activeCategory: EmojiCategory?,
+    activeCategory: EmojiPickerTab?,
     rowState: LazyListState?,
     gridState: LazyGridState,
     categoryState: LazyListState,
@@ -376,9 +377,9 @@ internal fun EmojiSectionGrid(
 
 /** Header text of one emoji section. */
 @Composable
-private fun EmojiSectionHeader(category: EmojiCategory) {
+private fun EmojiSectionHeader(category: EmojiPickerTab) {
     Text(
-        text = stringResource(category.titleRes),
+        text = emojiPickerTabTitle(category),
         modifier =
             Modifier
                 .fillMaxWidth()
@@ -414,7 +415,6 @@ internal fun EmojiGlyph(
     emoji: String,
     modifier: Modifier = Modifier,
     size: Dp = EmojiPickerEmojiSize,
-    fitPickerArtwork: Boolean = false,
 ) {
     val baseStyle = MaterialTheme.typography.headlineMedium
     val (fontSize, lineHeight) =
@@ -431,16 +431,8 @@ internal fun EmojiGlyph(
             EmojiShortcodes.art(emoji, customEmoji, emptyMap())
         }
     if (art != null) {
-        val artSize =
-            if (
-                fitPickerArtwork &&
-                art is EmojiArt.Bundled &&
-                art.drawable == R.drawable.builtin_emoji_marmot_classic
-            ) {
-                with(LocalDensity.current) { fontSize.toDp() }
-            } else {
-                size
-            }
+        // Artwork takes the Unicode glyph's em box, so every emoji in a row reads at one size.
+        val artSize = with(LocalDensity.current) { emojiGlyphArtworkSize(fontSize, size) }
         Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
             EmojiArtImage(art, contentDescription = emojiPlainLabel(emoji), modifier = Modifier.size(artSize))
         }

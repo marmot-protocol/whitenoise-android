@@ -37,8 +37,9 @@ internal fun ExplainAboveComposer(content: @Composable () -> Unit) {
 
 /**
  * Records this element's top as the composer's top edge, in the window coordinates popups are placed in. The
- * composer marks the box around its visible surface, not its own root: in a short landscape window with the
- * keyboard open, the root reaches far above the surface.
+ * composer marks its visible surface, which holds the reply preview, attachments and status rows above the editor,
+ * so an explanation never covers them. It does not mark its own root: in a short landscape window with the keyboard
+ * open, the root reaches far above the surface.
  */
 @Composable
 internal fun Modifier.composerExplanationEdge(): Modifier {

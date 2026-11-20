@@ -2,13 +2,14 @@ package dev.ipf.whitenoise.android.ui.design
 
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import org.junit.Assert.assertEquals
@@ -23,7 +24,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class AnimatedDropdownMenuBackTest {
-    @get:Rule val rule = createComposeRule()
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
     // One chronological scenario verifies Back registration survives exit and unregisters exactly once.
     @Suppress("LongMethod")
@@ -94,5 +95,25 @@ class AnimatedDropdownMenuBackTest {
             assertEquals(false, mounted)
             assertNull(callback)
         }
+    }
+
+    /**
+     * On Android 13, which drops the app's own Back callbacks because MainActivity's opt-in is activity-level, the
+     * activity's Back still closes a keyboard-preserving menu, such as the media preview's Add more.
+     */
+    @Test
+    @Config(sdk = [33])
+    fun activityBackClosesAKeyboardPreservingMenuOnAndroid13() {
+        var dismissals = 0
+        rule.setContent {
+            AnimatedDropdownMenu(expanded = true, onDismissRequest = { dismissals++ }, keyboardPreserving = true) {
+                Box(Modifier.size(120.dp))
+            }
+        }
+        rule.waitForIdle()
+
+        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
+
+        rule.runOnIdle { assertEquals(1, dismissals) }
     }
 }

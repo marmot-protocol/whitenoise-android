@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -30,5 +32,14 @@ class EmojiSuggestionsTest {
     fun explicitFamilyAndUserAliasesRemainAvailable() {
         assertEquals(12, emojiSuggestions(entries, emptyList(), "marmot").size)
         assertEquals(":moon_party:", emojiSuggestions(entries, listOf(":moon_party:"), "mo").first())
+    }
+
+    /** A removed set's codes leave the strip, and the freed slots go to the next matches. */
+    @Test
+    fun removedSetsGiveUpTheirSlots() {
+        val hidden = setOf(BuiltinEmojiSet.Marmot)
+        val suggestions = emojiSuggestions(entries, emptyList(), "m", hidden)
+        assertFalse(suggestions.any { it in BuiltinEmojiSet.Marmot.shortcodes })
+        assertTrue(suggestions.containsAll(listOf("🌙", "🐒", "💰", "👨")))
     }
 }

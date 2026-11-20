@@ -1641,6 +1641,8 @@
     <string name="emoji_sets_installed">已安裝</string>
     <string name="emoji_sets_section_installed">已安裝</string>
     <string name="emoji_sets_section_discover">探索</string>
+    <string name="emoji_sets_builtin_shown">預先安裝 · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">已從選擇器中隱藏。訊息中仍會顯示。</string>
     <string name="emoji_sets_update_available">有可用更新</string>
     <string name="emoji_sets_load_image">載入預覽圖片</string>
     <string name="emoji_sets_image_privacy">載入預覽或安裝表情包會向其圖片伺服器透露你的 IP 位址。</string>

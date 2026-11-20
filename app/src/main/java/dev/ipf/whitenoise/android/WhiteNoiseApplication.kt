@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
 import dev.ipf.whitenoise.android.state.persistedApplicationLanguageTag
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.createRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.navigation.MainShellProcessState
@@ -77,6 +78,8 @@ open class WhiteNoiseApplication :
                 .customEmojiDomain(this)
         }
     }
+
+    internal val builtinEmojiSetChoices by lazy { BuiltinEmojiSetChoices(this) }
 
     private val mainShellProcessStateDelegate =
         lazy {

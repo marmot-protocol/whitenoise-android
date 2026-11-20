@@ -45,9 +45,9 @@ class IdentityCreationFlowTest {
 
         assertTrue(body.contains("createIdentityWithBootstrapRelays"))
         assertTrue(body.contains("val relays = MarmotClient.bootstrapRelays"))
-        // NIP-65 gets the account defaults; the bootstrap route and inbox stay on bootstrapRelays.
-        assertTrue(body.contains("createIdentity(MarmotClient.accountRelays, relays, relays)"))
-        val initial = "createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)"
+        // NIP-65 and Inbox take White Noise's defaults, and the bootstrap route stays on bootstrapRelays.
+        assertTrue(body.contains("createIdentity(whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)"))
+        val initial = "createIdentityWithInitialProfile(profile, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)"
         assertTrue(body.contains(initial))
         // Creation returns the receipt at local readiness; the publication stage owns the wait.
         assertFalse(body.functionBody("MarmotInterface.createNamedIdentity").contains("awaitAccountNetworkReady"))

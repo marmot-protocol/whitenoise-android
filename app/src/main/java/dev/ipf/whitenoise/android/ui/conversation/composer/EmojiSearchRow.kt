@@ -99,7 +99,6 @@ internal fun EmojiTapTarget(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     glyphSize: Dp = EmojiPickerEmojiSize,
-    fitPickerArtwork: Boolean = true,
 ) {
     Surface(
         onClick = onClick,
@@ -109,7 +108,7 @@ internal fun EmojiTapTarget(
         color = Color.Transparent,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            EmojiGlyph(emoji, size = glyphSize, fitPickerArtwork = fitPickerArtwork)
+            EmojiGlyph(emoji, size = glyphSize)
         }
     }
 }

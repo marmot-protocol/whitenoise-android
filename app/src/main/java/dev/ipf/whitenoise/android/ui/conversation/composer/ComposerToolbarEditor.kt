@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -70,6 +69,7 @@ import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.design.platformBackCallbacksEnabled
 import dev.ipf.whitenoise.android.ui.settings.SettingsNativeViewport
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 
@@ -119,7 +119,7 @@ internal fun ComposerToolbarEditor(
         }
     }
     BackHandler { latestCancel() }
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    if (platformBackCallbacksEnabled()) {
         ComposerPlatformPreImeBackHandler(true, { latestCancel() }, overlayBackRegistrar)
     }
     Surface(

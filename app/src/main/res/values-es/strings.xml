@@ -1662,6 +1662,8 @@
     <string name="emoji_sets_installed">Instalado</string>
     <string name="emoji_sets_section_installed">Instalados</string>
     <string name="emoji_sets_section_discover">Descubrir</string>
+    <string name="emoji_sets_builtin_shown">Preinstalado · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Oculto en el selector. Se sigue viendo en los mensajes.</string>
     <string name="emoji_sets_update_available">Actualización disponible</string>
     <string name="emoji_sets_load_image">Cargar imagen de vista previa</string>
     <string name="emoji_sets_image_privacy">Cargar una vista previa o instalar un conjunto comparte tu dirección IP con sus servidores de imágenes.</string>

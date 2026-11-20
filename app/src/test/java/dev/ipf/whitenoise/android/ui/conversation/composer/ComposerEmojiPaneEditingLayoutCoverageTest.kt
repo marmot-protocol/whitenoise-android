@@ -15,7 +15,6 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -93,12 +92,10 @@ class ComposerEmojiPaneEditingLayoutCoverageTest {
         // Emoji data loads on IO, which Compose idleness alone does not await.
         composeRule.waitUntil(5_000) {
             composeRule
-                .onAllNodesWithTag(emojiPickerHeaderTestTag(EmojiCategory.SmileysAndPeople), useUnmergedTree = true)
+                .onAllNodesWithTag(emojiPickerCategoryTestTag(EmojiCategory.SmileysAndPeople), useUnmergedTree = true)
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
-        // The catalog loads off the main thread, which waitForIdle does not cover.
-        composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText("😀").fetchSemanticsNodes().isNotEmpty() }
         composeRule.waitForIdle()
         composeRule
             .onNodeWithTag(ROOT_TAG)

@@ -4476,8 +4476,8 @@ class WhiteNoiseAppState private constructor(
     private suspend fun engineLoginLocked(nsec: String): AccountSummaryFfi {
         val relays = MarmotClient.bootstrapRelays
         val injected = identityLoginCalls
-        if (injected != null) return injected.login(nsec, MarmotClient.accountRelays, relays)
-        return marmotIo { login(nsec, MarmotClient.accountRelays, relays, relays) }
+        if (injected != null) return injected.login(nsec, whiteNoiseNip65Relays, relays)
+        return marmotIo { login(nsec, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays) }
     }
 
     /**
@@ -4499,7 +4499,7 @@ class WhiteNoiseAppState private constructor(
         if (injected != null) {
             return injected.loginRecoveringIncompleteSetup(
                 nsec,
-                MarmotClient.accountRelays,
+                whiteNoiseNip65Relays,
                 relays,
                 acknowledgePossibleKeyPackageOrphan = true,
             )
@@ -4507,10 +4507,10 @@ class WhiteNoiseAppState private constructor(
         return marmotIo {
             loginRecoveringIncompleteSetup(
                 nsec,
-                MarmotClient.accountRelays,
+                whiteNoiseNip65Relays,
                 relays,
                 acknowledgePossibleKeyPackageOrphan = true,
-                inboxRelays = relays,
+                inboxRelays = whiteNoiseInboxRelays,
             )
         }
     }
@@ -4646,9 +4646,9 @@ class WhiteNoiseAppState private constructor(
                     runtime.loginExternalSigner(
                         pubkeyHex,
                         amberSigner.buildSigner(pubkeyHex),
-                        MarmotClient.accountRelays,
+                        whiteNoiseNip65Relays,
                         MarmotClient.bootstrapRelays,
-                        MarmotClient.bootstrapRelays,
+                        whiteNoiseInboxRelays,
                     )
                 }
             }
