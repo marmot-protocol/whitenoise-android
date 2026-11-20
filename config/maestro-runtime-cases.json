@@ -68,6 +68,41 @@
       "assertions": "Notifications Delivery & battery page opens its delivery choices; Back returns to Notifications, then Settings and Chats.",
       "postcondition": "none"
     },
+    "notification-profiles-create-schedule": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-049",
+        "NTF-052"
+      ],
+      "assertions": "Create a named profile from the empty list, turn on its schedule, confirm the start time dialog, clear Saturday and Sunday and save; the reopened editor keeps the weekday choices. Back from an unchanged editor asks nothing. No clock, time zone or delivery proof.",
+      "postcondition": "none"
+    },
+    "notification-profiles-allowed-chats": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-050",
+        "NTF-053"
+      ],
+      "assertions": "The editor names the active account, the allowed-chats picker selects the fixture group and the saved profile reopens with 1 chat; an unsaved deselection asks before discarding, Keep Editing keeps it and Discard restores the saved chat. No delivery or account-switch proof.",
+      "postcondition": "none"
+    },
+    "notification-profiles-delete": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-049",
+        "NTF-053"
+      ],
+      "assertions": "Delete on a saved profile asks first; Cancel keeps the editor and the profile, confirming returns to the empty list.",
+      "postcondition": "none"
+    },
+    "notification-profiles-quick-sheet": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-051"
+      ],
+      "assertions": "After saving a profile the chat-list profile button opens the quick sheet; For 1 hour shows the banner with an end time, the banner reopens the sheet and Turn off removes it; Until I turn it off shows the banner and the top-bar button turns it off. No relaunch, schedule-window or delivery proof.",
+      "postcondition": "none"
+    },
     "settings-read-aloud": {
       "suite": "settings",
       "manual_ids": [

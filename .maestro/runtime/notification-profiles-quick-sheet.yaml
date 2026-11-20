@@ -1,0 +1,57 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: notification-profiles-quick-sheet
+---
+- runFlow: ../fixtures/open-new-notification-profile.yaml
+# The instrumentation host owns launch, reset and disposal.
+- tapOn:
+    id: "notification-profile.save"
+- assertVisible:
+    id: "notification-profiles.list"
+- tapOn: "Back"
+- assertVisible:
+    id: "notifications.profiles"
+- tapOn: "Back"
+- assertVisible: "Settings"
+- tapOn: "Back"
+- assertVisible: "Maestro group"
+- assertNotVisible:
+    id: "chats.notificationProfileBanner"
+- tapOn:
+    id: "chats.notificationProfileAction"
+- assertVisible:
+    id: "chats.notificationProfileSheet"
+- assertVisible:
+    id: "notificationProfile.forHour"
+- assertVisible:
+    id: "notificationProfile.untilOff"
+- tapOn:
+    id: "notificationProfile.forHour"
+- assertNotVisible:
+    id: "chats.notificationProfileSheet"
+- assertVisible:
+    id: "chats.notificationProfileBanner"
+- assertVisible: ".*Maestro sleep is on until .*"
+- tapOn:
+    id: "chats.notificationProfileBanner"
+- assertVisible:
+    id: "notificationProfile.turnOff"
+- tapOn:
+    id: "notificationProfile.turnOff"
+- assertNotVisible:
+    id: "chats.notificationProfileBanner"
+- tapOn:
+    id: "chats.notificationProfileAction"
+- assertVisible:
+    id: "chats.notificationProfileSheet"
+- tapOn:
+    id: "notificationProfile.untilOff"
+- assertVisible: ".*Maestro sleep is on.*"
+- tapOn:
+    id: "chats.notificationProfileAction"
+- assertVisible:
+    id: "notificationProfile.turnOff"
+- tapOn:
+    id: "notificationProfile.turnOff"
+- assertNotVisible:
+    id: "chats.notificationProfileBanner"
+- assertVisible: "Maestro group"

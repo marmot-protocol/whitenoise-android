@@ -430,14 +430,47 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
       "symbol": "ColumnScope.NotificationProfileQuickSheetContent",
-      "bindings": [],
-      "remaining": "Maestro flow: with a saved profile, open the chat-list profile button and assert the profile choices and For 1 hour / Until I turn it off rows (NTF-051)."
+      "bindings": [
+        {
+          "case": "notification-profiles-quick-sheet",
+          "selector": {
+            "id": "notificationProfile.forHour"
+          },
+          "scope": "Inactive sheet body for one saved profile lists For 1 hour and Until I turn it off; For 1 hour applies and closes the sheet.",
+          "opened_by": {
+            "id": "chats.notificationProfileAction"
+          }
+        },
+        {
+          "case": "notification-profiles-quick-sheet",
+          "selector": {
+            "id": "notificationProfile.turnOff"
+          },
+          "scope": "Active sheet body opened from the chat-list banner offers Turn off, which removes the banner.",
+          "opened_by": {
+            "id": "chats.notificationProfileBanner"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
       "symbol": "NotificationProfileQuickSheet",
-      "bindings": [],
-      "remaining": "Maestro flow: open the quick sheet from the chat-list profile button and from the active banner; turn a profile on and off (NTF-051)."
+      "bindings": [
+        {
+          "case": "notification-profiles-quick-sheet",
+          "selector": {
+            "id": "chats.notificationProfileSheet"
+          },
+          "scope": "Chat-list top-bar profile button opens the production quick sheet once a profile exists; each choice closes it.",
+          "entry_assertion": {
+            "id": "chats.notificationProfileSheet"
+          },
+          "opened_by": {
+            "id": "chats.notificationProfileAction"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
@@ -3862,44 +3895,132 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
       "symbol": "DayPicker",
-      "bindings": [],
-      "remaining": "Maestro flow: toggle weekday cells in the profile editor and assert the no-days error and schedule summary (NTF-049)."
+      "bindings": [
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "id": "notification-profile.day.SATURDAY",
+            "checked": false
+          },
+          "scope": "Seven-day row under a newly enabled schedule starts with every day; clearing Saturday and Sunday leaves weekdays checked and survives save and reopen.",
+          "opened_by": {
+            "id": "notification-profile.day.SATURDAY"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
       "symbol": "NotificationProfileTimeDialog",
-      "bindings": [],
-      "remaining": "Maestro flow: open Starts and Ends in the profile editor, change the time and assert the next-day hint (NTF-049, NTF-052)."
+      "bindings": [
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "id": "notification-profile.time-confirm"
+          },
+          "scope": "Starts opens the Material time dialog for the default 22:00 start; OK closes it. No time change, clock-format or next-day proof.",
+          "entry_assertion": {
+            "id": "notification-profile.time-dialog"
+          },
+          "opened_by": {
+            "id": "notification-profile.start"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
       "symbol": "AllowedChatsPicker",
-      "bindings": [],
-      "remaining": "Maestro flow: choose allowed chats from the picker and assert the editor count for the active account (NTF-050, NTF-053)."
+      "bindings": [
+        {
+          "case": "notification-profiles-allowed-chats",
+          "selector": {
+            "id": "notification-profile.pickerSearch"
+          },
+          "scope": "Allowed chats opens the active account's multi-select chat picker; selecting the fixture group and Done shows 1 chat in the editor.",
+          "opened_by": {
+            "id": "notification-profile.chats"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
       "symbol": "NotificationProfileDeleteDialog",
-      "bindings": [],
-      "remaining": "Maestro flow: delete a saved profile, cancel once, then confirm and assert it is gone from the list (NTF-049)."
+      "bindings": [
+        {
+          "case": "notification-profiles-delete",
+          "selector": {
+            "text": "Delete Maestro sleep[?]"
+          },
+          "scope": "Delete profile asks with the profile name; Cancel keeps the editor and confirming returns to the empty list.",
+          "entry_assertion": {
+            "id": "notification-profile.delete-dialog"
+          },
+          "opened_by": {
+            "id": "notification-profile.delete"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
       "symbol": "NotificationProfileDiscardDialog",
-      "bindings": [],
-      "remaining": "Maestro flow: edit a profile, press Back, assert Keep editing and Discard (NTF-049)."
+      "bindings": [
+        {
+          "case": "notification-profiles-allowed-chats",
+          "selector": {
+            "text": "Keep Editing"
+          },
+          "scope": "Back from an editor with an unsaved allowed-chat change asks before discarding; Keep Editing keeps the draft and Discard Changes restores the saved chat.",
+          "entry_assertion": {
+            "text": "Discard changes[?]"
+          },
+          "opened_by": {
+            "back": true
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
       "symbol": "NotificationProfileEditScreen",
-      "bindings": [],
-      "remaining": "Maestro flow: create a profile with a schedule, save and reopen it, and assert name, mentions switch and schedule survive (NTF-049)."
+      "bindings": [
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "id": "notification-profile.save",
+            "enabled": false
+          },
+          "scope": "New profile editor blocks Save for an empty name, enables it once named, and the saved profile reopens as Edit profile with its day choices.",
+          "opened_by": {
+            "id": "notification-profiles.create-first"
+          }
+        },
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "text": "Edit profile"
+          },
+          "scope": "Tapping a saved profile reopens the editor on its saved schedule."
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfilesScreen.kt",
       "symbol": "NotificationProfilesScreen",
-      "bindings": [],
-      "remaining": "Maestro flow: open Settings > Notifications > Notification profiles, assert the empty state and Create profile, then the saved list (NTF-049)."
+      "bindings": [
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "text": "No profiles yet"
+          },
+          "scope": "Settings, Notifications, Notification profiles opens the empty list with Create profile on fresh fixture data.",
+          "opened_by": {
+            "id": "notifications.profiles"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
