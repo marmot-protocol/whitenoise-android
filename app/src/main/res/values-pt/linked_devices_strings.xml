@@ -166,4 +166,6 @@
     <string name="unlinked_account_remove_failed">Não foi possível remover a conta deste dispositivo. Tente novamente.</string>
     <string name="chats_arriving_title">Este dispositivo está vinculado</string>
     <string name="chats_arriving_detail">As conversas que esta conta já tem são adicionadas aqui pelos seus outros dispositivos, geralmente em um ou dois minutos. Se ainda não houver nenhuma, inicie uma.</string>
+    <string name="linked_devices_linked_by">Vinculado por %1$s</string>
+    <string name="device_move_finish_linking">Um dispositivo que você aprovou ainda está sendo vinculado. Deixe-o terminar antes de mover este dispositivo, ou ele pode não entrar nas suas conversas.</string>
 </resources>

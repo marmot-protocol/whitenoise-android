@@ -166,4 +166,6 @@
     <string name="unlinked_account_remove_failed">Impossible de retirer le compte de cet appareil. Réessayez.</string>
     <string name="chats_arriving_title">Cet appareil est associé</string>
     <string name="chats_arriving_detail">Les discussions que ce compte possède déjà sont ajoutées ici par vos autres appareils, généralement en une à deux minutes. S’il n’en a pas encore, commencez-en une.</string>
+    <string name="linked_devices_linked_by">Associé par %1$s</string>
+    <string name="device_move_finish_linking">Un appareil que vous avez approuvé est encore en cours d’association. Laissez-le terminer avant de déplacer cet appareil, sinon il risque de ne pas rejoindre vos discussions.</string>
 </resources>

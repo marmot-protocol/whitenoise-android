@@ -41,10 +41,13 @@ class MultiDeviceExperimentTest {
         }
     }
 
-    /** Only the client wrapper names an MDK constructor, so every opener of the root opens it the same way. */
+    /**
+     * Only the client wrapper names an MDK constructor, so every opener of the root opens it the same way. The
+     * pattern skips an enum entry named Marmot, recognised by the string literal it takes first.
+     */
     @Test
     fun onlyTheClientWrapperCallsAnMdkConstructor() {
-        val constructors = Regex("""Marmot(\.Companion)?(\.|::)newWith\w+|[^\w.]Marmot\(""")
+        val constructors = Regex("""Marmot(\.Companion)?(\.|::)newWith\w+|[^\w.]Marmot\((?!")""")
         val callers =
             mainSources()
                 .filter { constructors.containsMatchIn(it.readText()) }

@@ -166,4 +166,6 @@
     <string name="unlinked_account_remove_failed">Das Konto konnte nicht von diesem Gerät entfernt werden. Versuche es erneut.</string>
     <string name="chats_arriving_title">Dieses Gerät ist verknüpft</string>
     <string name="chats_arriving_detail">Chats, die dieses Konto schon hat, werden von deinen anderen Geräten hier hinzugefügt, meist innerhalb von ein bis zwei Minuten. Wenn es noch keine gibt, starte einen.</string>
+    <string name="linked_devices_linked_by">Verknüpft von %1$s</string>
+    <string name="device_move_finish_linking">Ein Gerät, das du bestätigt hast, wird noch verknüpft. Warte, bis es fertig ist, bevor du dieses Gerät verschiebst, sonst tritt es deinen Chats vielleicht nicht bei.</string>
 </resources>

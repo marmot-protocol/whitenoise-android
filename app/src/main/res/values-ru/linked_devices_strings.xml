@@ -166,4 +166,6 @@
     <string name="unlinked_account_remove_failed">Не удалось удалить учётную запись с этого устройства. Повторите попытку.</string>
     <string name="chats_arriving_title">Это устройство связано</string>
     <string name="chats_arriving_detail">Чаты, которые уже есть у этой учётной записи, добавляются сюда другими вашими устройствами, обычно за минуту-две. Если их пока нет, начните новый.</string>
+    <string name="linked_devices_linked_by">Связано устройством %1$s</string>
+    <string name="device_move_finish_linking">Одобренное вами устройство всё ещё связывается. Дождитесь завершения, прежде чем перемещать это устройство, иначе оно может не присоединиться к вашим чатам.</string>
 </resources>
