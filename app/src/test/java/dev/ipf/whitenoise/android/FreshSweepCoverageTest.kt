@@ -292,7 +292,8 @@ class FreshSweepCoverageTest {
             Regex(
                 """withContext\(Dispatchers\.Main\.immediate\) \{\s*""" +
                     """application\.appState\.ensureNotificationRuntimeStarted\(\)\s*""" +
-                    """if \(!application\.appState\.appLock\.notificationActionsAllowed\) return@withContext null\s*""" +
+                    """if \(!application\.appState\.appLock\.notificationActionsAllowed\) """ +
+                    """return@withContext null\s*""" +
                     """application\.appState\.markNotificationMessageReadIfAllowed\(""",
             )
 
