@@ -157,4 +157,5 @@ internal fun ConversationDictationController.resetTranscriptSession() {
     recognition.resetFailure()
     unresolvedRecognitionFailure = null
     silenceDeadlineElapsedMillis = null
+    finishTiming.reset()
 }

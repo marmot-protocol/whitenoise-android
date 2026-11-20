@@ -257,7 +257,7 @@ internal class ConversationDictationController internal constructor(
     internal val generation = ConversationDictationGenerationOwner(recognitionDeadlines::cancelGeneration)
     internal val restart = ConversationDictationRestartOwner()
     internal val accumulatedTranscript: String get() = recognition.transcript
-
+    internal val finishTiming = ConversationDictationFinishTiming()
     internal var retainedAudioFailure: ConversationDictationFailure? = null
     var recoveryHandedToComposer by mutableStateOf(false)
         internal set
@@ -1170,7 +1170,7 @@ internal class ConversationDictationController internal constructor(
                 (attempt - 1).coerceIn(0, PROVIDER_DISCONNECT_RETRY_DELAYS_MILLIS.lastIndex),
             ]
         } else {
-            GENERATION_RESTART_DELAY_MILLIS
+            restart.shortSettle.settleMillis(providerEnded = isEmptyRecognition, finishing = finishRequested)
         }
 
     internal companion object {

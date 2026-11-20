@@ -8,6 +8,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationDictationRecognitionCoordinatorTest {
+    /** A failure before any chunk is claimed charges the held chunk instead of resetting its budget. */
+    @Test
+    fun unclaimedFailureChargesTheHeldChunk() {
+        val recognition = ConversationDictationRecognitionCoordinator()
+        assertEquals(1, recognition.recordFailure(chunkId = 7L, version = "1:4:0", capacity = false))
+        assertEquals(2, recognition.recordFailure(chunkId = null, version = null, capacity = false))
+        assertEquals(3, recognition.recordFailure(chunkId = 7L, version = "1:4:0", capacity = false))
+        assertEquals(1, recognition.recordFailure(chunkId = 8L, version = "1:4:0", capacity = false))
+    }
+
     /** Four accepted ten-second spans followed by the reported quiet tail replay only the fourth. */
     @Test
     fun reportedTailReplacesWholeLastSpanWithoutDroppingQuietSamples() {

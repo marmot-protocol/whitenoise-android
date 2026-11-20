@@ -28,6 +28,9 @@ internal class ConversationDictationCallerAudioStream(
     private val settled = AtomicBoolean(false)
     private val feedClosed = AtomicBoolean(false)
     private val fullyFed = AtomicBoolean(false)
+
+    /** Set by a provider terminal callback; only the feeder thread acts on it, so claims cannot race it. */
+    private val providerEnded = AtomicBoolean(false)
     private val feedClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
     private val cancelled = AtomicBoolean(false)
     private val captureFailureReported = AtomicBoolean(false)
@@ -63,6 +66,18 @@ internal class ConversationDictationCallerAudioStream(
             feedClosedCallbacks.add(callback)
             if (feedClosed.get() && feedClosedCallbacks.remove(callback)) callback()
         }
+    }
+
+    /**
+     * Ends an unfinished feed as soon as the provider reports a terminal callback, instead of
+     * writing into a dead request until the pipe stalls. The feeder stops at its next poll; a claimed
+     * chunk is requeued with its exact bytes and failure identity and reported as a pipe failure before
+     * the callback runs, so the bounded retry replays it. A caller that queues failures to a thread must
+     * queue the callback behind them too. A fully fed stream is left untouched.
+     */
+    fun endFeedAfterProviderTerminal(callback: () -> Unit) {
+        providerEnded.set(true)
+        onFeedClosed(callback)
     }
 
     /** Releases this generation’s chunk after a final transcript makes its audio expendable. */
@@ -145,11 +160,18 @@ internal class ConversationDictationCallerAudioStream(
     private fun feed() {
         try {
             var owned: ConversationDictationAudioRequest? = null
-            while (!cancelled.get() && !settled.get() && owned == null) {
+            while (feedOpen() && owned == null) {
                 owned = buffer.requests.pollRequest()
                 if (owned == null) Thread.sleep(PIPE_RETRY_MILLIS)
             }
-            if (owned == null) return
+            if (owned == null) {
+                if (providerEnded.get()) {
+                    conversationDictationDiagnostic(
+                        "event=caller_audio_feed_ended reason=provider_result claimed=false",
+                    )
+                }
+                return
+            }
             request.set(owned)
             chunk.set(owned.chunk)
             if (cancelled.get() || settled.get()) {
@@ -189,7 +211,7 @@ internal class ConversationDictationCallerAudioStream(
         var stalledAt: Long? = null
         for (part in owned.pcmParts) {
             var offset = 0
-            while (!cancelled.get() && !settled.get() && offset < part.pcm.size) {
+            while (feedOpen() && offset < part.pcm.size) {
                 val written =
                     try {
                         pipeWriter.write(sink, part.pcm, offset, part.pcm.size - offset)
@@ -221,8 +243,34 @@ internal class ConversationDictationCallerAudioStream(
                 "replay_bytes=${owned.replayParts.sumOf { it.pcm.size }} " +
                 "new_bytes=${owned.chunk.pcm.size} bytes=$totalWritten",
         )
-        fullyFed.set(totalWritten == owned.pcmParts.sumOf { it.pcm.size } && !cancelled.get() && !settled.get())
+        finishChunkFeed(owned, totalWritten)
     }
+
+    /** Marks a complete write fed, or requeues a claim that a provider terminal cut short. */
+    private fun finishChunkFeed(
+        owned: ConversationDictationAudioRequest,
+        totalWritten: Int,
+    ) {
+        // A terminal that lands during the final write still wins: its result cannot cover this feed.
+        if (totalWritten == owned.pcmParts.sumOf { it.pcm.size } && feedOpen()) {
+            fullyFed.set(true)
+        } else if (providerEnded.get() && !cancelled.get()) {
+            conversationDictationDiagnostic(
+                "event=caller_audio_feed_ended reason=provider_result claimed=true bytes=$totalWritten",
+            )
+            // An unwritten claim leaves the chunk as if never claimed, so an empty terminal can still recycle.
+            if (totalWritten == 0) {
+                settle(requeue = true)
+            } else {
+                failureIdentity.set(FailureIdentity(owned.chunk.chunkId, owned.version))
+                // The result cannot cover a partial feed; the bounded pipe-failure retry replays this chunk.
+                settle(requeue = true) { reportFailure(ConversationDictationCallerAudioFailure.PipeFailed) }
+            }
+        }
+    }
+
+    /** True while no cancellation, settlement or provider terminal has ended this feed. */
+    private fun feedOpen() = !cancelled.get() && !settled.get() && !providerEnded.get()
 
     /** Releases the active-stream lease exactly once, even before a chunk has been acquired. */
     private fun settle(
