@@ -40,14 +40,6 @@
         ]
       },
       {
-        "surface": "string:notification_profile_banner_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
-        "anchor": "R.string.notification_profile_banner_detail",
-        "test_ids": [
-          "NTF-051"
-        ]
-      },
-      {
         "surface": "string:notification_profile_quick_open_active",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileStatus.kt",
         "anchor": "R.string.notification_profile_quick_open_active",

@@ -47,14 +47,6 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:notification_profile_banner_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
-        "anchor": "R.string.notification_profile_banner_detail",
-        "test_ids": [
-          "NTF-051"
-        ]
-      },
-      {
         "surface": "string:notification_profile_change_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
         "anchor": "R.string.notification_profile_change_failed",

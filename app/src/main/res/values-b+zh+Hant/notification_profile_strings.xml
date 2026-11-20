@@ -3,7 +3,7 @@
     <string name="notification_profiles_title">通知模式</string>
     <string name="notification_profiles_value_off">關閉</string>
     <string name="explanation_privacy_notif_profiles">依排程或暫時暫停通知，並選擇哪些聊天仍可以通知你。</string>
-    <string name="notification_profiles_explainer">模式開啟時，此裝置上只有允許的聊天會通知你。訊息仍會照常收到並顯示為未讀。</string>
+    <string name="notification_profiles_explainer">模式開啟時，此裝置上只有允許的聊天會通知你；如果開啟提及通知，提及你的訊息也會通知你。訊息仍會照常收到並顯示為未讀。</string>
     <string name="notification_profiles_empty_title">還沒有模式</string>
     <string name="notification_profiles_empty_body">建立一個模式，在夜間、工作時或任何需要安靜的時候暫停通知。</string>
     <string name="notification_profile_create">建立模式</string>
@@ -35,6 +35,7 @@
     <string name="notification_profile_banner_on">%1$s 已開啟</string>
     <string name="notification_profile_banner_on_until">%1$s 已開啟，至 %2$s 結束</string>
     <string name="notification_profile_banner_detail">只有允許的聊天會通知你。</string>
+    <string name="notification_profile_banner_detail_mentions">只有允許的聊天和提及會通知你。</string>
     <string name="notification_profile_turn_on">開啟</string>
     <string name="notification_profile_turn_off_named">關閉 %1$s</string>
     <string name="notification_profile_for_one_hour">1 小時</string>

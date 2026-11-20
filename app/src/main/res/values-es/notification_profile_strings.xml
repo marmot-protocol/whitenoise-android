@@ -3,7 +3,7 @@
     <string name="notification_profiles_title">Perfiles de notificación</string>
     <string name="notification_profiles_value_off">Desactivado</string>
     <string name="explanation_privacy_notif_profiles">Pausa las notificaciones según un horario o durante un tiempo y elige qué chats pueden seguir avisándote.</string>
-    <string name="notification_profiles_explainer">Mientras un perfil está activo, solo los chats permitidos te notifican en este dispositivo. Los mensajes siguen llegando y aparecen como no leídos.</string>
+    <string name="notification_profiles_explainer">Mientras un perfil está activo, solo los chats permitidos y, si lo activas, las menciones te notifican en este dispositivo. Los mensajes siguen llegando y aparecen como no leídos.</string>
     <string name="notification_profiles_empty_title">Aún no hay perfiles</string>
     <string name="notification_profiles_empty_body">Crea un perfil para pausar las notificaciones por la noche, en el trabajo o cuando necesites tranquilidad.</string>
     <string name="notification_profile_create">Crear perfil</string>
@@ -35,6 +35,7 @@
     <string name="notification_profile_banner_on">%1$s está activado</string>
     <string name="notification_profile_banner_on_until">%1$s está activado hasta las %2$s</string>
     <string name="notification_profile_banner_detail">Solo te notifican los chats permitidos.</string>
+    <string name="notification_profile_banner_detail_mentions">Solo te notifican los chats permitidos y las menciones.</string>
     <string name="notification_profile_turn_on">Activar</string>
     <string name="notification_profile_turn_off_named">Desactivar %1$s</string>
     <string name="notification_profile_for_one_hour">Durante 1 hora</string>

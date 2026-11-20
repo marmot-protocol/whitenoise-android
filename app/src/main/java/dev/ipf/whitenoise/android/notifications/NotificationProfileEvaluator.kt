@@ -15,6 +15,31 @@ import java.util.Locale
  */
 private const val SCHEDULE_LOOKAHEAD_DAYS = 15L
 
+private const val ONE_HOUR_MS = 60L * 60L * 1_000L
+
+/** How long a profile the user turns on by hand stays on. */
+internal enum class NotificationProfileDuration { ONE_HOUR, UNTIL_SCHEDULE_END, UNTIL_TURNED_OFF }
+
+/**
+ * When a profile turned on at [nowMs] for [duration] turns off again; null keeps it on until turned off.
+ * Read [nowMs] when the user chooses, so the end is never in the past. Until-schedule-end falls back to one
+ * hour if [profile] no longer has a running schedule.
+ */
+internal fun notificationProfileManualUntilMs(
+    profile: NotificationProfile,
+    duration: NotificationProfileDuration,
+    nowMs: Long,
+    zone: ZoneId,
+): Long? {
+    val scheduleEnd = profile.schedule?.takeIf { it.enabled && it.isValid }?.endMinuteOfDay
+    return when (duration) {
+        NotificationProfileDuration.ONE_HOUR -> nowMs + ONE_HOUR_MS
+        NotificationProfileDuration.UNTIL_SCHEDULE_END ->
+            scheduleEnd?.let { nextLocalTimeMs(it, nowMs, zone) } ?: (nowMs + ONE_HOUR_MS)
+        NotificationProfileDuration.UNTIL_TURNED_OFF -> null
+    }
+}
+
 /**
  * The profile in force at [nowMs] in [zone]. A live manual choice wins; a live pause hides schedules;
  * otherwise the open scheduled window that started last wins, ties going to the earlier listed profile.

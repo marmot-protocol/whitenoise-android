@@ -277,4 +277,34 @@ class NotificationProfileEvaluatorTest {
         val capped = normalizedNotificationProfileName(emoji)
         assertEquals(MAX_NOTIFICATION_PROFILE_NAME_CODE_POINTS, capped.codePointCount(0, capped.length))
     }
+
+    @Test
+    fun manualDurationsAreTimedFromTheTapAndNeverEndInThePast() {
+        val sleep = testProfile("sleep", profileSchedule("22:00", "07:00"))
+        val drawnAt = localMs("2026-11-21T06:59", utc)
+        val tappedAt = localMs("2026-11-21T07:01", utc)
+        assertEquals(
+            localMs("2026-11-21T07:00", utc),
+            until(sleep, NotificationProfileDuration.UNTIL_SCHEDULE_END, drawnAt),
+        )
+        // Tapped after 07:00, "Until 07:00" means tomorrow's end, not a moment already past.
+        assertEquals(
+            localMs("2026-11-22T07:00", utc),
+            until(sleep, NotificationProfileDuration.UNTIL_SCHEDULE_END, tappedAt),
+        )
+        assertEquals(tappedAt + 3_600_000L, until(sleep, NotificationProfileDuration.ONE_HOUR, tappedAt))
+        assertNull(until(sleep, NotificationProfileDuration.UNTIL_TURNED_OFF, tappedAt))
+        // A schedule switched off meanwhile falls back to one hour rather than staying on indefinitely.
+        val unscheduled = sleep.copy(schedule = sleep.schedule?.copy(enabled = false))
+        assertEquals(
+            tappedAt + 3_600_000L,
+            until(unscheduled, NotificationProfileDuration.UNTIL_SCHEDULE_END, tappedAt),
+        )
+    }
+
+    private fun until(
+        profile: NotificationProfile,
+        duration: NotificationProfileDuration,
+        nowMs: Long,
+    ): Long? = notificationProfileManualUntilMs(profile, duration, nowMs, utc)
 }

@@ -4,6 +4,24 @@
   "categories": {
     "settings_controls": [
       {
+        "surface": "string:notification_profile_banner_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_mentions",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051"
+        ]
+      },
+      {
         "surface": "string:notification_profile_banner_on",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
         "anchor": "R.string.notification_profile_banner_on",

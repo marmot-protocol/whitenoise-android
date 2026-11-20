@@ -5,7 +5,7 @@
     <!-- Value on the Notifications settings row when no profile is on. -->
     <string name="notification_profiles_value_off">Off</string>
     <string name="explanation_privacy_notif_profiles">Pause notifications on a schedule or for a while, and choose which chats can still notify you.</string>
-    <string name="notification_profiles_explainer">While a profile is on, only the chats you allow can notify you on this device. Messages still arrive and show as unread.</string>
+    <string name="notification_profiles_explainer">While a profile is on, only the chats you allow, and mentions if you turn them on, can notify you on this device. Messages still arrive and show as unread.</string>
     <string name="notification_profiles_empty_title">No profiles yet</string>
     <string name="notification_profiles_empty_body">Create a profile to pause notifications at night, at work, or whenever you need quiet.</string>
     <string name="notification_profile_create">Create profile</string>
@@ -46,6 +46,7 @@
     <!-- %1$s is the profile name and %2$s a clock time. -->
     <string name="notification_profile_banner_on_until">%1$s is on until %2$s</string>
     <string name="notification_profile_banner_detail">Only allowed chats notify you.</string>
+    <string name="notification_profile_banner_detail_mentions">Only allowed chats and mentions notify you.</string>
     <string name="notification_profile_turn_on">Turn on</string>
     <!-- %1$s is the profile name. -->
     <string name="notification_profile_turn_off_named">Turn off %1$s</string>

@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.settings.notificationProfileActiveDetail
 import dev.ipf.whitenoise.android.ui.settings.notificationProfileActiveLabel
 import dev.ipf.whitenoise.android.ui.settings.rememberActiveNotificationProfile
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -110,7 +111,7 @@ internal fun NotificationProfileBanner(
     zone: ZoneId = ZoneId.systemDefault(),
 ) {
     val title = notificationProfileActiveLabel(active, zone)
-    val detail = stringResource(R.string.notification_profile_banner_detail)
+    val detail = notificationProfileActiveDetail(active.profile)
     Surface(
         onClick = onClick,
         modifier =

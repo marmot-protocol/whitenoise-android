@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationProfileSource
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileBanner
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileQuickActions
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileQuickSheetContent
+import dev.ipf.whitenoise.android.ui.chats.NotificationProfileTapClock
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditActions
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditContent
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditFormState
@@ -220,9 +221,9 @@ class NotificationProfilesScreenshotTest {
                         profiles = allProfiles(),
                         active = active,
                         selectedId = sleep.id,
-                        nowMs = now,
                         actions = NotificationProfileQuickActions({}, { _, _ -> }, {}),
                         zone = zone,
+                        tapClock = NotificationProfileTapClock(nowMs = { now }, zone = { zone }),
                     )
                 }
             }
@@ -239,7 +240,12 @@ class NotificationProfilesScreenshotTest {
                 Column {
                     NotificationProfileBanner(active = active, onClick = {}, zone = zone)
                     NotificationProfileBanner(
-                        active = ActiveNotificationProfile(longName, NotificationProfileSource.MANUAL, null),
+                        active =
+                            ActiveNotificationProfile(
+                                longName.copy(allowMentions = false),
+                                NotificationProfileSource.MANUAL,
+                                null,
+                            ),
                         onClick = {},
                         zone = zone,
                     )

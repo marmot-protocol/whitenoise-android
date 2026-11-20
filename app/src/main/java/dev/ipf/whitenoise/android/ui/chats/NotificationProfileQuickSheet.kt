@@ -22,7 +22,8 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ActiveNotificationProfile
 import dev.ipf.whitenoise.android.notifications.NotificationProfile
-import dev.ipf.whitenoise.android.notifications.nextLocalTimeMs
+import dev.ipf.whitenoise.android.notifications.NotificationProfileDuration
+import dev.ipf.whitenoise.android.notifications.notificationProfileManualUntilMs
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
@@ -35,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsChoice
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
+import dev.ipf.whitenoise.android.ui.settings.notificationProfileActiveDetail
 import dev.ipf.whitenoise.android.ui.settings.notificationProfileActiveLabel
 import dev.ipf.whitenoise.android.ui.settings.notificationProfileClock
 import dev.ipf.whitenoise.android.ui.settings.notificationProfileStatus
@@ -44,9 +46,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
 
-private const val ONE_HOUR_MS = 60L * 60L * 1_000L
-
 internal const val NOTIFICATION_PROFILE_QUICK_SHEET_TAG = "chats.notificationProfileSheet"
+
+/** The clock and time zone read when the user taps a duration, not when the sheet was drawn. */
+internal class NotificationProfileTapClock(
+    val nowMs: () -> Long = System::currentTimeMillis,
+    val zone: () -> ZoneId = ZoneId::systemDefault,
+)
 
 /** What the quick sheet asks the store to do; each choice applies at once and closes the sheet. */
 internal class NotificationProfileQuickActions(
@@ -89,7 +95,6 @@ internal fun NotificationProfileQuickSheet(
             active = active,
             selectedId =
                 selected?.takeIf { id -> state.profiles.any { it.id == id } } ?: state.profiles.firstOrNull()?.id,
-            nowMs = System.currentTimeMillis(),
             actions =
                 NotificationProfileQuickActions(
                     onSelect = { selected = it },
@@ -107,9 +112,9 @@ internal fun ColumnScope.NotificationProfileQuickSheetContent(
     profiles: List<NotificationProfile>,
     active: ActiveNotificationProfile?,
     selectedId: String?,
-    nowMs: Long,
     actions: NotificationProfileQuickActions,
     zone: ZoneId = ZoneId.systemDefault(),
+    tapClock: NotificationProfileTapClock = NotificationProfileTapClock(),
 ) {
     WhiteNoiseSheetHeader(stringResource(R.string.notification_profiles_title))
     Column(
@@ -127,7 +132,7 @@ internal fun ColumnScope.NotificationProfileQuickSheetContent(
             ProfileChoices(profiles, active = null, selectedId = selectedId, zone = zone, onSelect = actions.onSelect)
             profiles.firstOrNull { it.id == selectedId }?.let { profile ->
                 SettingsSection(stringResource(R.string.notification_profile_turn_on))
-                DurationChoices(profile, nowMs, zone, actions.onTurnOn)
+                DurationChoices(profile, tapClock, actions.onTurnOn)
             }
         }
     }
@@ -151,7 +156,7 @@ private fun ActiveProfileSummary(
     ) {
         Text(notificationProfileActiveLabel(active, zone), style = MaterialTheme.typography.titleMedium)
         Text(
-            stringResource(R.string.notification_profile_banner_detail),
+            notificationProfileActiveDetail(active.profile),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -198,18 +203,22 @@ private fun ProfileChoices(
 @Composable
 private fun DurationChoices(
     profile: NotificationProfile,
-    nowMs: Long,
-    zone: ZoneId,
+    tapClock: NotificationProfileTapClock,
     onTurnOn: (profileId: String, untilMs: Long?) -> Unit,
 ) {
     val scheduleEnd = profile.schedule?.takeIf { it.enabled && it.isValid }?.endMinuteOfDay
     val scheduleEndLabel = scheduleEnd?.let { notificationProfileClock(it) }
+
+    /** Turns [profile] on, timing [duration] from the moment of the tap. */
+    fun turnOn(duration: NotificationProfileDuration) {
+        onTurnOn(profile.id, notificationProfileManualUntilMs(profile, duration, tapClock.nowMs(), tapClock.zone()))
+    }
     SettingsGroup {
         row("hour") { context ->
             SettingsAction(
                 context = context,
                 title = stringResource(R.string.notification_profile_for_one_hour),
-                onClick = { onTurnOn(profile.id, nowMs + ONE_HOUR_MS) },
+                onClick = { turnOn(NotificationProfileDuration.ONE_HOUR) },
                 modifier = Modifier.testTag("notificationProfile.forHour"),
                 leading = { SettingsLeadingIcon(R.drawable.ic_timer) },
             )
@@ -219,7 +228,7 @@ private fun DurationChoices(
                 SettingsAction(
                     context = context,
                     title = stringResource(R.string.notification_profile_until_time, scheduleEndLabel),
-                    onClick = { onTurnOn(profile.id, nextLocalTimeMs(scheduleEnd, nowMs, zone)) },
+                    onClick = { turnOn(NotificationProfileDuration.UNTIL_SCHEDULE_END) },
                     modifier = Modifier.testTag("notificationProfile.untilEnd"),
                     leading = { SettingsLeadingIcon(R.drawable.ic_schedule) },
                 )
@@ -229,7 +238,7 @@ private fun DurationChoices(
             SettingsAction(
                 context = context,
                 title = stringResource(R.string.notification_profile_until_off),
-                onClick = { onTurnOn(profile.id, null) },
+                onClick = { turnOn(NotificationProfileDuration.UNTIL_TURNED_OFF) },
                 modifier = Modifier.testTag("notificationProfile.untilOff"),
                 leading = { SettingsLeadingIcon(R.drawable.ic_notifications_paused) },
             )

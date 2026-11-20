@@ -155,3 +155,14 @@ internal fun notificationProfileActiveLabel(
             notificationProfileInstantClock(it, zone),
         )
     } ?: stringResource(R.string.notification_profile_banner_on, active.profile.name)
+
+/** What still notifies while [profile] is on: allowed chats, plus mentions when the profile lets them through. */
+@Composable
+internal fun notificationProfileActiveDetail(profile: NotificationProfile): String =
+    stringResource(
+        if (profile.allowMentions) {
+            R.string.notification_profile_banner_detail_mentions
+        } else {
+            R.string.notification_profile_banner_detail
+        },
+    )

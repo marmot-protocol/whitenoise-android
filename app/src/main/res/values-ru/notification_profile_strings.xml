@@ -3,7 +3,7 @@
     <string name="notification_profiles_title">Профили уведомлений</string>
     <string name="notification_profiles_value_off">Выкл.</string>
     <string name="explanation_privacy_notif_profiles">Приостанавливайте уведомления по расписанию или на время и выбирайте, какие чаты всё равно могут вас уведомлять.</string>
-    <string name="notification_profiles_explainer">Пока профиль включён, на этом устройстве вас уведомляют только разрешённые чаты. Сообщения всё равно приходят и отображаются как непрочитанные.</string>
+    <string name="notification_profiles_explainer">Пока профиль включён, на этом устройстве вас уведомляют только разрешённые чаты и, если вы это включите, упоминания. Сообщения всё равно приходят и отображаются как непрочитанные.</string>
     <string name="notification_profiles_empty_title">Профилей пока нет</string>
     <string name="notification_profiles_empty_body">Создайте профиль, чтобы приостанавливать уведомления ночью, на работе или когда нужна тишина.</string>
     <string name="notification_profile_create">Создать профиль</string>
@@ -35,6 +35,7 @@
     <string name="notification_profile_banner_on">Профиль «%1$s» включён</string>
     <string name="notification_profile_banner_on_until">Профиль «%1$s» включён до %2$s</string>
     <string name="notification_profile_banner_detail">Уведомляют только разрешённые чаты.</string>
+    <string name="notification_profile_banner_detail_mentions">Уведомляют только разрешённые чаты и упоминания.</string>
     <string name="notification_profile_turn_on">Включить</string>
     <string name="notification_profile_turn_off_named">Выключить «%1$s»</string>
     <string name="notification_profile_for_one_hour">На 1 час</string>
