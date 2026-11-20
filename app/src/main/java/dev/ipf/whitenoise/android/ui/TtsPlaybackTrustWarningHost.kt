@@ -10,6 +10,7 @@ import androidx.lifecycle.compose.currentStateAsState
 import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
+/** Presents an engine consent request only while its owner and the resumed host can accept input. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun TtsPlaybackTrustWarningHost(appState: WhiteNoiseAppState) {

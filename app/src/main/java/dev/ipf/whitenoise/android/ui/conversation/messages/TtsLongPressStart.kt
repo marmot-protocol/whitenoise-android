@@ -39,6 +39,7 @@ internal fun captureTtsLongPressStart(
         appState.runtimeGeneration,
     )
 
+/** Retires a captured speech start when the pressed message or its owner changes. */
 internal fun captureTtsLongPressGuard(
     owner: TtsLongPressStart,
     record: AppMessageRecordFfi,

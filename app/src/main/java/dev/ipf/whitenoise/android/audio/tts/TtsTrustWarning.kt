@@ -15,7 +15,7 @@ fun requiresTtsTrustWarning(
         enginePackage.isNotBlank() &&
         !preferences.hasAcknowledged(enginePackage)
 
-/** First-use warning shared by engine selection and private read-aloud. */
+/** Asks for consent before read-aloud sends private text through an unapproved engine connection. */
 @Composable
 fun TtsTrustWarningDialog(
     onProceed: () -> Unit,

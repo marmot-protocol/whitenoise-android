@@ -16,12 +16,14 @@ fun resolveConversationAutoRead(
     override: TtsAutoReadOverride?,
 ): Boolean = override?.let { it == TtsAutoReadOverride.ON } ?: globalDefaultEnabled
 
+/** Captures the policy generation used by one pending auto-read projection. */
 internal fun WhiteNoiseAppState.captureTtsAutoReadPolicy(groupIdHex: String): () -> Boolean {
     val policy = ttsAutoReadPreferences.state.value
     // Turning auto-read off and back on publishes a new snapshot and revokes old projections.
     return { ttsAutoReadPreferences.state.value === policy && isConversationAutoRead(groupIdHex) }
 }
 
+/** Scopes the auto-read session key to one account and conversation. */
 internal fun ttsAutoReadKey(
     account: String?,
     group: String,

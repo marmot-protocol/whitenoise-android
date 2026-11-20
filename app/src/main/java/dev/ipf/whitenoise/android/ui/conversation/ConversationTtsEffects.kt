@@ -128,6 +128,7 @@ internal fun ConversationTtsAutoReadEffects(
 ) {
     val lifecycleOwner = LocalContext.current.lifecycleOwner()
 
+    /** Invalidates pending auto-read work when the account, chat, or policy changes. */
     fun captureAutoReadOwner(): () -> Boolean {
         val account = controller.boundAccountRef
         val accountIsCurrent = appState.captureTtsAccountOwner(account)

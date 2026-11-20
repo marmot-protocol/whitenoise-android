@@ -191,6 +191,7 @@ class AndroidTtsSpeechEngineTest {
         assertNull(resolution?.effectiveKey)
     }
 
+    /** A required installed voice must still be available after language selection. */
     @Test
     fun offlinePlaybackRejectsAnEmptyCatalogAfterLanguageSelection() {
         val engine =

@@ -1010,8 +1010,10 @@ class WhiteNoiseAppState private constructor(
     internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
     internal val ttsPlaybackTrust = TtsPlaybackTrustConsent(this) { attachedTtsHandle }
 
+    /** Reports whether the connected engine still requires playback consent. */
     internal fun ttsEngineNeedsAcknowledgment(): Boolean = ttsPlaybackTrust.needsAcknowledgment()
 
+    /** Checks engine consent and the playback owner before any text can be sent. */
     internal suspend fun confirmTtsPlaybackTrust(current: () -> Boolean): Boolean = ttsPlaybackTrust.confirm(current)
 
     internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
@@ -1039,12 +1041,12 @@ class WhiteNoiseAppState private constructor(
     // appends only for the owner: a manual Speak aloud replaces the queue and
     // ends the session; another chat's — or another ACCOUNT'S view of the
     // same group — must never extend it.
-    private var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
+    internal var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
     private val ttsAutoReadContinuation by lazy { createTtsAutoReadContinuation(this) }
 
     // Manual speech deliberately has no auto-read session key, but it still
     // owns decrypted text that must stop when its account is removed.
-    private var ttsSpeechAccountRef: String? = null
+    internal var ttsSpeechAccountRef: String? = null
     internal val attachmentSpeechDestination =
         MutableStateFlow<dev.ipf.whitenoise.android.audio.AttachmentSpeechDestination?>(null)
 
@@ -1317,13 +1319,6 @@ class WhiteNoiseAppState private constructor(
         ttsPlaybackTrust.cancel()
         ttsController.stop()
         clearTtsPlaybackOwnership()
-    }
-
-    private fun clearTtsPlaybackOwnership() {
-        ttsSpeechAccountRef = null
-        ttsAutoReadSessionKey = null
-        ttsHistorySession.onSessionCleared()
-        attachmentSpeechDestination.value = null
     }
 
     fun setTtsRateOverride(rate: Float?) {

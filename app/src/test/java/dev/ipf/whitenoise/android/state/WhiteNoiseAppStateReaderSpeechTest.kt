@@ -91,6 +91,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
             appState.stopSpeaking()
         }
 
+    /** An unadmitted replacement cannot clear an active session owner. */
     @Test
     fun onlyAReplacementThatReachesTheQueueRevokesPriorOwnership() {
         val appState = testAppState()
@@ -322,6 +323,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
             }
         }
 
+    /** Playback stays unstarted until its current unverified engine is approved. */
     @Test
     fun unacknowledgedEngineRequiresConsentBeforePlayback() =
         runBlocking {
@@ -551,6 +553,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
             assertTrue(appState.ttsController.state.value is TtsState.Idle)
         }
 
+    /** Toggling the policy twice does not revive a projection captured before either change. */
     @Test
     fun staleProjectionCannotStartAfterAutoReadIsTurnedOffAndBackOn() {
         val appState = testAppState()
@@ -579,6 +582,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
         assertTrue(appState.ttsController.state.value is TtsState.Idle)
     }
 
+    /** Returning to an earlier account does not revive its previous projection. */
     @Test
     fun staleProjectionCannotStartAfterSwitchingAwayAndBack() {
         val appState = testAppState(twoAccounts = true)

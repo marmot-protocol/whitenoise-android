@@ -192,7 +192,7 @@ class TtsAutoReadWiringCoverageTest {
         assertTrue("!appState.ttsEngineNeedsAcknowledgment()" in source("state/TtsAutoReadContinuation.kt"))
         val appState = source("state/AppState.kt")
         val replaceEngine = appState.functionBody("publishTtsResolution")
-        val ownership = appState.functionBody("clearTtsPlaybackOwnership")
+        val ownership = source("state/AppStateTtsPlaybackOwnership.kt").functionBody("clearTtsPlaybackOwnership")
         val released = replaceEngine.indexOf("clearTtsPlaybackOwnership()")
         assertTrue(released in 0 until replaceEngine.indexOf("ttsController.attachEngine("))
         assertTrue("ttsAutoReadSessionKey = null" in ownership)

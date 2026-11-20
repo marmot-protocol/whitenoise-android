@@ -427,6 +427,7 @@ class TtsEngineResolverTest {
             Unit
         }
 
+    /** A verified package matching the requested local engine retains local trust. */
     @Test
     fun explicitLocalEngineRequestUsesLocalTrustWhenConnectedMatches() =
         runBlocking {

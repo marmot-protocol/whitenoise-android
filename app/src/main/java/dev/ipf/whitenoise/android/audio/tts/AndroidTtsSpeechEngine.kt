@@ -89,6 +89,7 @@ internal class AndroidTtsSpeechEngine(
             },
         )
 
+    /** Submits an utterance only while the installed-voice restriction still holds. */
     private fun enqueue(
         text: String,
         utteranceId: String,

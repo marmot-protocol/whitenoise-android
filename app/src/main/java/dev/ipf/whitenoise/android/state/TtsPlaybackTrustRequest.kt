@@ -14,13 +14,16 @@ internal class TtsPlaybackTrustRequest(
     private val answer = CompletableDeferred<Boolean>()
     private var dismissed = false
 
+    /** Rejects dismissed questions and questions whose playback owner has retired. */
     fun isCurrent(): Boolean = !dismissed && ownerIsCurrent()
 
+    /** Completes this question once, refusing affirmative answers from a retired owner. */
     fun respond(proceed: Boolean) {
         if (!proceed) dismissed = true
         answer.complete(proceed && isCurrent())
     }
 
+    /** Checks that an affirmative answer still belongs to the current playback owner. */
     suspend fun awaitApproval(): Boolean = answer.await() && isCurrent()
 }
 
@@ -35,8 +38,10 @@ internal class TtsPlaybackTrustConsent(
     var pending by mutableStateOf<TtsPlaybackTrustRequest?>(null)
         private set
 
+    /** Reports whether the attached connection can receive text without a new prompt. */
     fun needsAcknowledgment(): Boolean = attachedHandle()?.let(::needsAcknowledgment) == true
 
+    /** Uses package trust only when Android has verified the connected package. */
     private fun needsAcknowledgment(handle: TtsEngineHandle): Boolean =
         if (handle.connectedPackageVerified) {
             requiresTtsTrustWarning(handle.enginePackage, handle.trust, appState.ttsWarningPreferences)
@@ -53,16 +58,19 @@ internal class TtsPlaybackTrustConsent(
         cancel()
     }
 
+    /** Dismisses any pending question before its playback owner retires. */
     fun cancel() {
         pending?.respond(false)
     }
 
+    /** Waits for consent only when the current engine connection requires it. */
     suspend fun confirm(isCurrent: () -> Boolean): Boolean {
         if (!isCurrent()) return false
         val handle = attachedHandle()
         return if (handle == null || !needsAcknowledgment(handle)) true else requestApproval(handle, isCurrent)
     }
 
+    /** Binds approval to this engine connection, account generation, and playback request. */
     private suspend fun requestApproval(
         handle: TtsEngineHandle,
         isCurrent: () -> Boolean,
