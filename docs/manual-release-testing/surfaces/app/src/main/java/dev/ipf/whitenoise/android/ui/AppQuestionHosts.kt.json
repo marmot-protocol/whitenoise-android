@@ -19,7 +19,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppQuestionHosts.kt",
         "anchor": "fun AppQuestionHosts(",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       }
     ]

@@ -8,9 +8,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_detail",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -18,9 +18,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_dismiss",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -28,9 +28,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_dismiss_detail",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -38,9 +38,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_failed",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -48,9 +48,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_joining",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -58,9 +58,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_made",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -68,9 +68,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_old_sibling",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -78,9 +78,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_old_sibling_unnamed",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -88,9 +88,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_overridden",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -98,9 +98,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_section",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -108,9 +108,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_title",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -118,9 +118,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_waiting",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -128,9 +128,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.link_device_add_steps",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -138,9 +138,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.link_device_add_title",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -148,9 +148,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.link_device_external_signer",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -158,9 +158,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.link_device_in_progress",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -168,9 +168,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.link_device_this_detail",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -178,9 +178,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.link_device_this_title",
         "test_ids": [
-          "SET-059",
           "SET-060",
-          "SET-062"
+          "SET-061",
+          "SET-063"
         ]
       },
       {
@@ -189,7 +189,7 @@
         "anchor": "R.string.device_move_advanced",
         "test_ids": [
           "ACC-025",
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -198,7 +198,7 @@
         "anchor": "fun LinkThisDeviceRow(",
         "test_ids": [
           "ACC-025",
-          "SET-060"
+          "SET-061"
         ]
       }
     ]

@@ -37,7 +37,7 @@ library. An account on this runtime can receive a link request from another
 installation, and a nonlast admin's Leave steps down first. Android therefore
 ships the linked-device screens in the same change: the build switch in
 `MultiDeviceExperiment.kt` is on, and the manual cases `ACC-025`, `GRP-043` and
-`SET-059` to `SET-066` cover linking, the roster, device management, sign-in
+`SET-060` to `SET-067` cover linking, the roster, device management, sign-in
 review, history and the group setting.
 
 ## Consumer changes

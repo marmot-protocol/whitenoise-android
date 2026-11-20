@@ -212,7 +212,7 @@
     "settings-linked-devices": {
       "suite": "settings",
       "manual_ids": [
-        "SET-059"
+        "SET-060"
       ],
       "assertions": "Linked devices opens from Account for an account that has linked no device and says so; Back returns to Account without starting a link.",
       "postcondition": "none"

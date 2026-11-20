@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DeviceUnlinkedNotice.kt",
         "anchor": "R.string.device_unlinked_detail",
         "test_ids": [
-          "SET-065"
+          "SET-066"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DeviceUnlinkedNotice.kt",
         "anchor": "R.string.device_unlinked_title",
         "test_ids": [
-          "SET-065"
+          "SET-066"
         ]
       }
     ]

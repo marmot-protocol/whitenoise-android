@@ -8,8 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "R.string.cancel",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -17,8 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "R.string.devices_closed_chats",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -26,8 +26,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "R.string.devices_closed_chats_detail",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -35,8 +35,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "R.string.devices_key_refresh_overdue",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -44,8 +44,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "R.string.devices_leftover_chats",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -53,8 +53,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "R.string.devices_leftover_chats_detail",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -62,8 +62,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "R.string.devices_repair",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -71,8 +71,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "R.string.devices_repair_confirm",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -80,8 +80,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "R.string.devices_stalled",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -89,8 +89,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
         "anchor": "fun RepairDeviceLinkDialog(",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       }
     ]

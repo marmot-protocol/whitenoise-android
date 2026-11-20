@@ -8,8 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
         "anchor": "fun LinkThisDeviceRoute(",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -17,8 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
         "anchor": "fun LinkedDeviceDetailRoute(",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -26,8 +26,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
         "anchor": "fun LinkedDevicesScreen(",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -35,9 +35,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
         "anchor": "fun LinkedDevicesDialogs(",
         "test_ids": [
-          "SET-059",
-          "SET-063",
-          "SET-064"
+          "SET-060",
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -45,9 +45,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
         "anchor": "fun LinkedDevicesPages(",
         "test_ids": [
-          "SET-059",
-          "SET-063",
-          "SET-064"
+          "SET-060",
+          "SET-064",
+          "SET-065"
         ]
       }
     ]

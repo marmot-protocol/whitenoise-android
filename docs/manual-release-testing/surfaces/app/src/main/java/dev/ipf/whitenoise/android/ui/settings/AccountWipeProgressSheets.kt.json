@@ -41,7 +41,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeProgressSheets.kt",
         "anchor": "R.string.wipe_report_left_to_other_devices",
         "test_ids": [
-          "SET-065"
+          "SET-066"
         ]
       },
       {
@@ -49,7 +49,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeProgressSheets.kt",
         "anchor": "R.string.wipe_report_other_devices_not_reached",
         "test_ids": [
-          "SET-065"
+          "SET-066"
         ]
       }
     ],

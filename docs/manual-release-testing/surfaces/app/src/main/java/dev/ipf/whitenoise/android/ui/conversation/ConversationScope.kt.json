@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScope.kt",
         "anchor": "fun ConversationScope(",
         "test_ids": [
-          "SET-066"
+          "SET-067"
         ]
       }
     ]

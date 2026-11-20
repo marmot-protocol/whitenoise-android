@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.explanation_linked_device_row",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_detail",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_empty",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_judged_inactive",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_last_active",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_linked_on",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -64,7 +64,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_load_failed",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -72,7 +72,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_loading",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -80,7 +80,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_no_activity_seen",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -88,7 +88,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_no_others",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -96,7 +96,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_other_devices",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -104,7 +104,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_removal_pending",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -112,7 +112,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_removing",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -120,7 +120,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_status_inactive",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -128,7 +128,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_status_leaving",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -136,7 +136,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_status_moved",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -144,7 +144,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_this_device",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -152,7 +152,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_unnamed",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -160,7 +160,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.retry",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -168,7 +168,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "fun LinkedDevicesContent(",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       }
     ]

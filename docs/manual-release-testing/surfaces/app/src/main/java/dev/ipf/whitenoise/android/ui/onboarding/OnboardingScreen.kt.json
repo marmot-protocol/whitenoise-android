@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
         "anchor": "R.string.unlinked_account_remove_failed",
         "test_ids": [
-          "SET-065"
+          "SET-066"
         ]
       }
     ],

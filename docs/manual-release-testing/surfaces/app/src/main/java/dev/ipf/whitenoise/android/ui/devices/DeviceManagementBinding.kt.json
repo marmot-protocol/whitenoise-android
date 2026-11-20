@@ -8,8 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
         "anchor": "R.string.device_action_busy",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -17,8 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
         "anchor": "R.string.device_action_failed",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -26,8 +26,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
         "anchor": "R.string.device_action_link_pending",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -35,8 +35,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
         "anchor": "R.string.sign_in_answer_failed",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       },
       {
@@ -44,8 +44,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
         "anchor": "fun DeviceManagementFailureEffect(",
         "test_ids": [
-          "SET-063",
-          "SET-064"
+          "SET-064",
+          "SET-065"
         ]
       }
     ]

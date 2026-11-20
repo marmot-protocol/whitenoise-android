@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
         "anchor": "R.string.history_imported_from_another_device",
         "test_ids": [
-          "SET-066"
+          "SET-067"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
         "anchor": "R.string.history_imported_from_device",
         "test_ids": [
-          "SET-066"
+          "SET-067"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
         "anchor": "R.string.history_receiving",
         "test_ids": [
-          "SET-066"
+          "SET-067"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
         "anchor": "R.string.history_restored_from_backup",
         "test_ids": [
-          "SET-066"
+          "SET-067"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
         "anchor": "R.string.history_retrying",
         "test_ids": [
-          "SET-066"
+          "SET-067"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
         "anchor": "fun ChatHistoryTransferNotice(",
         "test_ids": [
-          "SET-066"
+          "SET-067"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
         "anchor": "fun ImportedHistoryBoundary(",
         "test_ids": [
-          "SET-066"
+          "SET-067"
         ]
       },
       {
@@ -64,7 +64,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
         "anchor": "fun ImportedHistoryMarkers(",
         "test_ids": [
-          "SET-066"
+          "SET-067"
         ]
       }
     ]

@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchLinkedDevices.kt",
         "anchor": "R.string.linked_devices",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchLinkedDevices.kt",
         "anchor": "R.string.account",
         "test_ids": [
-          "SET-059"
+          "SET-060"
         ]
       }
     ]

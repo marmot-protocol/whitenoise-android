@@ -9,7 +9,7 @@
         "anchor": "R.string.link_request_default_label",
         "test_ids": [
           "ACC-025",
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -18,7 +18,7 @@
         "anchor": "fun DeviceSelfNameEffect(",
         "test_ids": [
           "ACC-025",
-          "SET-060"
+          "SET-061"
         ]
       }
     ]

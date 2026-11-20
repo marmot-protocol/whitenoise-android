@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.cancel",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_add_to_chats_detail",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_bring_history_detail",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_keep",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_keep_detail",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_remove",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_remove_confirm",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -64,7 +64,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_remove_detail",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -72,7 +72,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_rename",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -80,7 +80,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.device_detail_rename_detail",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -88,7 +88,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.explanation_linked_device_row",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -96,7 +96,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.link_request_add_to_chats",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -104,7 +104,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.link_request_bring_history",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -112,7 +112,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.link_request_label",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -120,7 +120,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.link_request_label_too_long",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -128,7 +128,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.linked_devices_removal_pending",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -136,7 +136,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.linked_devices_unnamed",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -144,7 +144,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "R.string.save",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -152,7 +152,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "fun LinkedDeviceDetailContent(",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -160,7 +160,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "fun LinkedDeviceSettingsGroup(",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -168,7 +168,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "fun RemoveDeviceDialog(",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       },
       {
@@ -176,7 +176,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
         "anchor": "fun RenameDeviceDialog(",
         "test_ids": [
-          "SET-063"
+          "SET-064"
         ]
       }
     ]

@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "R.string.link_device_action_failed",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "R.string.link_request_not_now",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "R.string.link_request_other_profile",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "R.string.link_request_review",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "R.string.link_request_title",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "fun ActiveProfileLinkRequest(",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "fun DeviceLinkFailureEffect(",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -64,7 +64,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "fun DeviceLinkOtherProfileDialog(",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       },
       {
@@ -72,7 +72,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "fun DeviceLinkRequestHost(",
         "test_ids": [
-          "SET-060"
+          "SET-061"
         ]
       }
     ]

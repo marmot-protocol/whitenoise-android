@@ -91,7 +91,7 @@
         "anchor": "R.string.setup_device_link_next",
         "test_ids": [
           "ACC-025",
-          "SET-060"
+          "SET-061"
         ]
       }
     ]
