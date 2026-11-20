@@ -54,7 +54,9 @@ private fun sharedPlaintextKey(directory: File): ByteArray =
                     keyFile.failWrite(output)
                     throw error
                 }
-                keyFile.readFully().also { check(it.contentEquals(generated)) { "could not persist share filename key" } }
+                val persisted = keyFile.readFully()
+                check(persisted.contentEquals(generated)) { "could not persist share filename key" }
+                persisted
             }
         check(key.size == SHARE_KEY_BYTES) { "invalid share filename key" }
         key

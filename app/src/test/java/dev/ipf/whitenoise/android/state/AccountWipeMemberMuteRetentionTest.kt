@@ -127,7 +127,8 @@ class AccountWipeMemberMuteRetentionTest {
     fun completedWipeRemovesOnlyTheWipedAccountsStagedCopies() =
         runBlocking {
             val shared = File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
-            val removed = File(shared, sharedPlaintextPrefix(context, WIPED_ACCOUNT) + "wipe.pdf").apply { writeText("test") }
+            val removed =
+                File(shared, sharedPlaintextPrefix(context, WIPED_ACCOUNT) + "wipe.pdf").apply { writeText("test") }
             val preserved =
                 File(shared, sharedPlaintextPrefix(context, SURVIVING_ACCOUNT) + "keep.pdf").apply { writeText("test") }
 

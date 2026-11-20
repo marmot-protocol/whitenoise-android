@@ -33,9 +33,9 @@ class SharedPlaintextWipeCoverageTest {
     fun removesOnlyOwnedAndLegacyPrivateCopies() =
         runBlocking {
             val context = RecordingRevocations(application)
-            val owned = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, "alice") + "message_1.pdf")
-            val transcript =
-                share(ConversationTranscriptExport.CacheDirName, sharedPlaintextPrefix(application, "alice") + "export.json")
+            val alice = sharedPlaintextPrefix(application, "alice")
+            val owned = share(MediaCacheDirs.SHARED, alice + "message_1.pdf")
+            val transcript = share(ConversationTranscriptExport.CacheDirName, alice + "export.json")
             val legacy = share(MediaCacheDirs.SHARED, "document_old.pdf")
             val oldScoped = share(MediaCacheDirs.SHARED, legacySharedPlaintextPrefix("alice") + "share_fixture.pdf")
             val other = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, "bob") + "message_2.pdf")
@@ -92,7 +92,8 @@ class SharedPlaintextWipeCoverageTest {
         runBlocking {
             val context = RecordingRevocations(application)
             val account = "interrupted"
-            val blocked = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, account) + "document_fixture.pdf")
+            val prefix = sharedPlaintextPrefix(application, account)
+            val blocked = share(MediaCacheDirs.SHARED, prefix + "document_fixture.pdf")
             assertTrue(blocked.delete())
             assertTrue(blocked.mkdir())
             val child = File(blocked, "child").apply { writeText("test") }
@@ -117,7 +118,8 @@ class SharedPlaintextWipeCoverageTest {
         runBlocking {
             val context = RecordingRevocations(application)
             val account = "retained"
-            val file = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, account) + "document_fixture.pdf")
+            val prefix = sharedPlaintextPrefix(application, account)
+            val file = share(MediaCacheDirs.SHARED, prefix + "document_fixture.pdf")
             assertTrue(recordSharedPlaintextWipe(context, account))
             assertTrue(discardSharedPlaintextWipe(context, account))
 
