@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Process
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.IntState
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
@@ -161,7 +160,7 @@ internal object PlatformInterruptedAttachmentProbe {
         try {
             HeldAttachmentCancellationProbe.control(port, "/__hold-resumable-acquisition")
             ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
-                enableAutomaticDocumentPolicy(state)
+                enableAutomaticDocumentPolicy(state, request.accountRef)
                 nativeObserver =
                     launch(start = CoroutineStart.UNDISPATCHED) {
                         state
@@ -449,7 +448,10 @@ internal object PlatformInterruptedAttachmentProbe {
     }
 
     /** Enable only the generated account's document matrix and wait for real validated Android connectivity. */
-    private suspend fun enableAutomaticDocumentPolicy(state: WhiteNoiseAppState) {
+    private suspend fun enableAutomaticDocumentPolicy(
+        state: WhiteNoiseAppState,
+        account: String,
+    ) {
         withContext(Dispatchers.IO) {
             // The injected test constructor skips process callbacks; register the unchanged real listener explicitly.
             WhiteNoiseAppState::class.java
@@ -471,15 +473,11 @@ internal object PlatformInterruptedAttachmentProbe {
             }
         }
         // Host connectivity and Compose policy precede asynchronous native synchronization.
-        // Observe a completed real generation; do not grant permission or reset demand in the fixture.
-        val revision =
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("attachmentDownloadPolicyRevision\$delegate")
-                .apply { isAccessible = true }
-                .get(state) as IntState
-        val before = revision.intValue
-        withContext(Dispatchers.Main.immediate) { state.refreshNativeAttachmentPermissions() }
-        withTimeout(15_000L) { while (revision.intValue == before) delay(25L) }
+        // An unrelated counter increment cannot prove that this requested refresh has completed.
+        withTimeout(15_000L) {
+            val refresh = withContext(Dispatchers.Main.immediate) { state.refreshNativeAttachmentPermissions() }
+            awaitPlatformResumePermissionSetup(state, account, refresh)
+        }
         ControlledAttachmentProbe.checkpoint("automatic-policy-ready")
     }
 
