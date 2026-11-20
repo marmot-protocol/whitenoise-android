@@ -10,6 +10,7 @@ import org.junit.Test
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
+import java.time.ZonedDateTime
 
 class NotificationProfileEvaluatorTest {
     private val utc = ZoneId.of("UTC")
@@ -241,6 +242,20 @@ class NotificationProfileEvaluatorTest {
                 NotificationProfilesState(listOf(sleep)),
                 localMs("2026-11-21T07:00", utc),
                 utc,
+            ),
+        )
+    }
+
+    @Test
+    fun nextTransitionLooksPastAStartSkippedByADaylightSavingGap() {
+        // Berlin skips 02:00-03:00 on Sunday 29 March 2026, so a Sunday 02:30-03:00 window collapses that week.
+        val sundayNight = testProfile("night", profileSchedule("02:30", "03:00", setOf(DayOfWeek.SUNDAY)))
+        assertEquals(
+            ZonedDateTime.of(2026, 4, 5, 2, 30, 0, 0, berlin).toInstant().toEpochMilli(),
+            nextNotificationProfileTransitionMs(
+                NotificationProfilesState(listOf(sundayNight)),
+                ZonedDateTime.of(2026, 3, 24, 12, 0, 0, 0, berlin).toInstant().toEpochMilli(),
+                berlin,
             ),
         )
     }

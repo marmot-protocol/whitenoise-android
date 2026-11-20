@@ -99,16 +99,22 @@ class NotificationProfilePreferencesTest {
     }
 
     @Test
-    fun turningOffPausesAnOpenWindowAndSavingEndsThePause() {
+    fun turningOffPausesAnOpenWindowAndOnlyAScheduleChangeEndsThePause() {
         now = localMs("2026-11-20T23:00", utc)
         val store = store()
         val sleep = testProfile("sleep", profileSchedule("22:00", "07:00"))
         assertTrue(store.save(sleep))
         assertEquals("sleep", store.active(now, utc)?.profile?.id)
         assertTrue(store.turnOff(now, utc))
-        assertEquals(NotificationProfileManual.Paused(localMs("2026-11-21T07:00", utc)), store.state.value.manual)
+        val paused = NotificationProfileManual.Paused(localMs("2026-11-21T07:00", utc))
+        assertEquals(paused, store.state.value.manual)
         assertNull(store.active(now, utc))
+        // Renaming the paused profile or saving an unrelated one keeps the paused window quiet.
         assertTrue(store.save(sleep.copy(name = "Night")))
+        assertTrue(store.save(testProfile("work")))
+        assertEquals(paused, store.state.value.manual)
+        assertNull(store.active(now, utc))
+        assertTrue(store.save(sleep.copy(name = "Night", schedule = profileSchedule("22:30", "07:00"))))
         assertNull(store.state.value.manual)
         assertEquals("Night", store.active(now, utc)?.profile?.name)
     }

@@ -9,8 +9,11 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.Locale
 
-/** Days to look ahead for a schedule's next start; one week covers every weekday set. */
-private const val SCHEDULE_LOOKAHEAD_DAYS = 8L
+/**
+ * Days to look ahead for a schedule's next start. One week covers every weekday set; the second week covers
+ * a start skipped because its window collapsed in a DST gap.
+ */
+private const val SCHEDULE_LOOKAHEAD_DAYS = 15L
 
 /**
  * The profile in force at [nowMs] in [zone]. A live manual choice wins; a live pause hides schedules;
@@ -129,7 +132,7 @@ private fun scheduleWindowStartingOn(
     return if (end > start) NotificationProfileWindow(start, end) else null
 }
 
-/** The first start of [schedule] strictly after [nowMs] within the next week. */
+/** The first start of [schedule] strictly after [nowMs] within the next two weeks. */
 private fun nextScheduleStartMs(
     schedule: NotificationProfileSchedule,
     nowMs: Long,
