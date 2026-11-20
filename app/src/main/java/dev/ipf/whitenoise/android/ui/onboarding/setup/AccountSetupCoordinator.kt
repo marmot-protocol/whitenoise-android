@@ -12,6 +12,8 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.appStateDebug
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.whiteNoiseInboxRelays
+import dev.ipf.whitenoise.android.state.whiteNoiseNip65Relays
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -317,9 +319,9 @@ internal fun OnboardingSnapshotFfi.requiresSetup(): Boolean = !ready || cancella
 /** Discover existing Nostr lists beyond our messaging relays before offering additive defaults. */
 internal fun setupOptions() =
     OnboardingOptionsFfi(
-        defaultRelays = MarmotClient.accountRelays,
+        defaultRelays = whiteNoiseNip65Relays,
         discoveryRelays = MarmotClient.discoveryRelays,
-        inboxRelays = MarmotClient.bootstrapRelays,
+        inboxRelays = whiteNoiseInboxRelays,
     )
 
 private data class SetupRuntimeOwner(
