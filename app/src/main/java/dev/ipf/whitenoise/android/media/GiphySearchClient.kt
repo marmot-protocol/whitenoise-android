@@ -158,7 +158,9 @@ private fun canonicalGiphyRenditionUrl(providerUrl: String): String? {
     val uri = URI(providerUrl)
     val renditionPath =
         Regex("^/media/(?:v1\\.[^/]+/)?([A-Za-z0-9]+)/([A-Za-z0-9_.-]+\\.gif)$", RegexOption.IGNORE_CASE)
-            .matchEntire(uri.rawPath.orEmpty()) ?: return null
-    val (id, filename) = renditionPath.destructured
-    return "https://${uri.host.lowercase(Locale.ROOT)}/media/$id/$filename"
+            .matchEntire(uri.rawPath.orEmpty())
+    return renditionPath?.let {
+        val (id, filename) = it.destructured
+        "https://${uri.host.lowercase(Locale.ROOT)}/media/$id/$filename"
+    }
 }

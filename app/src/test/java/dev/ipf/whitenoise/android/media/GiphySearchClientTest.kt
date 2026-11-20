@@ -90,8 +90,8 @@ class GiphySearchClientTest {
             "cat%2Fsender-token/giphy.gif",
             "cat/giphy%2Egif",
         )) {
-            val item =
-                JSONObject().put("images", JSONObject().put("original", rendition("https://media.giphy.com/media/$path")))
+            val images = JSONObject().put("original", rendition("https://media.giphy.com/media/$path"))
+            val item = JSONObject().put("images", images)
             assertEquals(emptyList<GiphySearchResult>(), decodeGiphySearchResults(response(item)))
         }
     }
