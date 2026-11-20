@@ -1745,12 +1745,14 @@ class ConversationController(
      * a terminal group, or a reply to a message that has no event id yet).
      * The edit path also leaves [onAccepted] uncalled: the composer restores its
      * pre-edit draft via the `editingMessageId` LaunchedEffect, not by clearing.
+     * Set [consumeReply] to false for a separate picker send that must retain the composer's pending reply.
      */
     suspend fun send(
         text: String,
         onAccepted: () -> Unit = {},
         onTerminalFailure: () -> Unit = {},
         onPresentationAccepted: (String) -> Unit = {},
+        consumeReply: Boolean = true,
         onDurablyAccepted: () -> Unit = {},
     ) {
         if (showsBlockedLeave) {
@@ -1843,7 +1845,7 @@ class ConversationController(
             }
             return
         }
-        val replyTarget = replyTargetForSend(replyingTo?.messageIdHex).getOrElse { return }
+        val replyTarget = replyTargetForSend(replyingTo?.messageIdHex?.takeIf { consumeReply }).getOrElse { return }
         val sendHostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEND)
         val outboundVisibleAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE)
 
@@ -1904,7 +1906,7 @@ class ConversationController(
                 tempId,
             )
         publishTimelineFromIndexes()
-        replyingTo = null
+        if (consumeReply) replyingTo = null
         // The optimistic bubble is now in the projection and published — the
         // send has visibly started. Only now is it safe to clear the input and
         // draft (issue #264): clearing earlier, synchronously in the UI on the
@@ -3980,18 +3982,6 @@ class ConversationController(
 
     /** Drops entries for messages that left the loaded window and have no in-flight optimistic record. */
     internal fun MutableMap<String, *>.retainTimelineWindow() = retainWindowMessageKeys(this, timelineRecords.keys, optimisticMessages.values)
-
-    internal fun Throwable.isUseAfterEviction(): Boolean {
-        // Stopgap until Marmot exposes a typed UniFFI error/code for
-        // GroupStateError::UseAfterEviction. Keep this in sync with the Rust
-        // OpenMLS group-state error variant name.
-        val text =
-            generateSequence(this) { it.cause }
-                .joinToString(separator = "\n") { error ->
-                    listOfNotNull(error.message, error.javaClass.simpleName).joinToString(" ")
-                }
-        return "UseAfterEviction" in text || ("GroupStateError" in text && "eviction" in text.lowercase())
-    }
 
     /**
      * Re-publish the timeline after the streaming-debug toggle may have changed.

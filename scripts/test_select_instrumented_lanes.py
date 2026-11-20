@@ -105,6 +105,16 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
                          {'attachment_fixture': True, 'attachment_fixture_scope': 'full', 'connected': False})
         self.assertEqual(select('pull_request', [process_stop], TRIGGERS), FULL)
 
+    def test_platform_resume_helpers_alone_run_their_fixture(self):
+        """A resume helper edit always receives its real fixture, including changes limited to setup."""
+        for name in ['PlatformInterruptedAttachmentProbe.kt', 'PlatformResumeLedger.kt',
+                     'PlatformResumePermissionSetup.kt']:
+            with self.subTest(name=name):
+                path = MEDIA_TEST + name
+                self.assertTrue(matches(path, TRIGGERS))
+                self.assertEqual(select('pull_request', [path], TRIGGERS),
+                                 {'attachment_fixture': True, 'attachment_fixture_scope': 'full', 'connected': False})
+
     def test_unrelated_files_beside_fixture_inputs_do_not_start_connected(self):
         """The fixture run script on its own runs the whole campaign, and unrelated files start nothing more."""
         lanes = select('pull_request', ['README.md', 'app/src/main/java/Other.kt',
