@@ -102,7 +102,7 @@ private fun VoiceLibraryActionIcon(
             )
         } else if (!playable) {
             Icon(
-                imageVector = Icons.Default.Download,
+                imageVector = Icons.Default.ArrowDownward,
                 contentDescription = stringResource(R.string.media_tap_to_download),
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(24.dp),

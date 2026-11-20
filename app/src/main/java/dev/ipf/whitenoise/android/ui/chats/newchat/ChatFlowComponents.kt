@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -50,7 +51,6 @@ import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
-import dev.ipf.whitenoise.android.ui.icons.filled.Group
 import dev.ipf.whitenoise.android.ui.icons.filled.QrCode
 import dev.ipf.whitenoise.android.ui.icons.filled.QrCodeScanner
 import dev.ipf.whitenoise.android.ui.icons.filled.RadioButtonUnchecked
@@ -515,7 +515,7 @@ internal fun NewMessageQuickActions(
 ) {
     if (query.isNotBlank()) return
     FlowQuickActionRow(
-        icon = Icons.Default.Group,
+        icon = ImageVector.vectorResource(R.drawable.ic_group_add),
         title = stringResource(R.string.new_group),
         onClick = onNewGroup,
         modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_GROUP),

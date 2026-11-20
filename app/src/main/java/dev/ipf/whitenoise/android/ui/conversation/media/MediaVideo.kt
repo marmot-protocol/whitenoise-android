@@ -596,7 +596,7 @@ internal fun MediaVideoBubble(
                                 )
                             !startDownload && localFile == null ->
                                 Icon(
-                                    Icons.Default.Download,
+                                    Icons.Default.ArrowDownward,
                                     contentDescription = stringResource(R.string.media_tap_to_download),
                                     modifier = Modifier.size(24.dp),
                                 )

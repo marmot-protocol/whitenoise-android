@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
@@ -43,7 +44,6 @@ import dev.ipf.whitenoise.android.ui.common.nativePageFooter
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Email
 import dev.ipf.whitenoise.android.ui.icons.filled.Person
@@ -165,7 +165,7 @@ internal fun ContactPreviewScreen(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
+                    Icon(painterResource(R.drawable.ic_arrow_upward), contentDescription = stringResource(R.string.send))
                 }
             }
         }

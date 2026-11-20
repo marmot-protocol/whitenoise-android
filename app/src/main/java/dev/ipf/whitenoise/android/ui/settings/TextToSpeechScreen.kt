@@ -142,7 +142,7 @@ internal fun TextToSpeechScreen(
                                     },
                                 enabled = resolvedPackage != null,
                                 explanation = stringResource(R.string.explanation_appearance_tts_voice),
-                                leading = { SettingsLeadingIcon(R.drawable.ic_record_voice_over) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_text_to_speech) },
                             )
                         }
                     }
@@ -180,7 +180,7 @@ internal fun TextToSpeechScreen(
                             modifier = Modifier.testTag(TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG),
                             subtitle = stringResource(R.string.tts_auto_read_default_global_subtitle),
                             explanation = stringResource(R.string.explanation_appearance_tts_auto_read),
-                            leading = { SettingsLeadingIcon(R.drawable.ic_text_to_speech) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_record_voice_over) },
                         )
                     }
                     row("media_mix") { context ->

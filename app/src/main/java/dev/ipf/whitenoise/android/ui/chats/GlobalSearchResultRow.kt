@@ -169,8 +169,8 @@ private fun GlobalSearchResultAttachmentLine(attachment: GlobalSearchResultAttac
     val (icon, type) =
         when (attachment.kind) {
             GlobalSearchResultAttachmentKind.IMAGE -> R.drawable.ic_image to R.string.attachment_type_image
-            GlobalSearchResultAttachmentKind.VIDEO -> R.drawable.ic_play_arrow to R.string.attachment_type_video
-            GlobalSearchResultAttachmentKind.AUDIO -> R.drawable.ic_mic to R.string.attachment_type_audio
+            GlobalSearchResultAttachmentKind.VIDEO -> R.drawable.ic_videocam to R.string.attachment_type_video
+            GlobalSearchResultAttachmentKind.AUDIO -> R.drawable.ic_voice_note to R.string.attachment_type_audio
             GlobalSearchResultAttachmentKind.FILE -> R.drawable.ic_description to R.string.attachment_type_file
         }
     val typeLabel = stringResource(type)

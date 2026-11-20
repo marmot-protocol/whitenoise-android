@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -48,7 +49,6 @@ import dev.ipf.whitenoise.android.ui.common.nativePageFooter
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.LocationOn
 import dev.ipf.whitenoise.android.ui.icons.filled.MyLocation
@@ -267,7 +267,7 @@ internal fun LocationPickerScreen(
                     enabled = selectedCenter != null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(painterResource(R.drawable.ic_arrow_upward), contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.location_send_this))
                 }

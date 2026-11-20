@@ -66,6 +66,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -79,6 +80,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -5500,7 +5502,7 @@ internal fun ConversationScreen(
                     shareUserSelection.clear()
                     picked.forEach { sendSharedUser(it) }
                 },
-                confirmIcon = Icons.AutoMirrored.Filled.Send,
+                confirmIcon = ImageVector.vectorResource(R.drawable.ic_arrow_upward),
                 confirmLabel = stringResource(R.string.send),
                 autoSelectResolvedIdentifier = true,
                 excludeAccountIdHexes = setOfNotNull(activeHex),

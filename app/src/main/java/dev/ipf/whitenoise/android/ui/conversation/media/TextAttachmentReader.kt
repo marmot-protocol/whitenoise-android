@@ -352,7 +352,7 @@ private fun TextAttachmentReaderTopBar(
             if (onReadAloud != null) {
                 IconButton(onClick = onReadAloud, enabled = canRead) {
                     Icon(
-                        painterResource(R.drawable.ic_volume_up),
+                        painterResource(R.drawable.ic_record_voice_over),
                         contentDescription = stringResource(R.string.read_aloud),
                     )
                 }

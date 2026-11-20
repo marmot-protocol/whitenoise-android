@@ -27,7 +27,7 @@ internal fun NewGroupPhotoMenu(
                 add(WhiteNoiseMenuItem(stringResource(R.string.group_photo_photos), onPhotos, R.drawable.ic_image))
                 add(WhiteNoiseMenuItem(stringResource(R.string.group_photo_files), onFiles, R.drawable.ic_description))
                 add(WhiteNoiseMenuItem(stringResource(R.string.group_photo_web), onWeb, R.drawable.ic_search))
-                add(WhiteNoiseMenuItem(stringResource(R.string.group_photo_emoji), onEmoji, R.drawable.ic_add))
+                add(WhiteNoiseMenuItem(stringResource(R.string.group_photo_emoji), onEmoji, R.drawable.ic_emoji_smileys))
                 if (hasImage) {
                     add(
                         WhiteNoiseMenuItem(

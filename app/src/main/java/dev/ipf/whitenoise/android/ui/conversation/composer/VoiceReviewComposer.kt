@@ -123,7 +123,7 @@ internal fun VoiceReviewComposerContent(
                         ),
                     ),
         ) {
-            Icon(painterResource(R.drawable.ic_close), discardLabel, modifier = Modifier.size(24.dp))
+            Icon(painterResource(R.drawable.ic_delete), discardLabel, modifier = Modifier.size(24.dp))
         }
     }
     val recordAgainAction: @Composable () -> Unit = {
@@ -141,7 +141,7 @@ internal fun VoiceReviewComposerContent(
                     ),
         ) {
             Icon(
-                painterResource(R.drawable.ic_mic),
+                painterResource(R.drawable.ic_voice_note),
                 stringResource(R.string.voice_record_again),
                 modifier = Modifier.size(24.dp),
             )
