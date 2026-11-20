@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.os.Looper
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +40,17 @@ internal class MountedContractShell(
         width: MutableState<Dp>,
         fixture: ReturnFixture = ReturnFixture(),
         exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
+    ) = withMountedShell(width, fixture, { MainShell(appState = fixture.appState, stateHolder = it) }, exercise)
+
+    /**
+     * Mounts the shell through the test's own [shell] call, for a test that feeds it an inbound route, and always
+     * releases its jobs.
+     */
+    fun withMountedShell(
+        width: MutableState<Dp>,
+        fixture: ReturnFixture,
+        shell: @Composable (MainShellStateHolder) -> Unit,
+        exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
     ) {
         val mounted = mutableStateOf(true)
         val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
@@ -50,7 +62,7 @@ internal class MountedContractShell(
                 CompositionLocalProvider(
                     LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, SHELL_HEIGHT)),
                 ) {
-                    WhiteNoiseTheme { MainShell(appState = fixture.appState, stateHolder = holder) }
+                    WhiteNoiseTheme { shell(holder) }
                 }
             }
         }
