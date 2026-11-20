@@ -7,7 +7,7 @@
         "surface": "An empty provider end before any caller-audio chunk is claimed restarts or drains without spending the retry budget",
         "anchor": "internal fun ConversationDictationController.recycleIdleCallerAudioGeneration(",
         "test_ids": [
-          "DIC-016"
+          "DIC-018"
         ],
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationControllerCallerAudioIdle.kt"
       }
