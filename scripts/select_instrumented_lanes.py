@@ -42,6 +42,8 @@ FIXTURE_ONLY = (
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptNetworkDiagnostics.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformInterruptedAttachmentProbe.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeLedger.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeHostDiagnostics.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptSchedulingDiagnostics.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumePermissionSetup.kt',
 )
 

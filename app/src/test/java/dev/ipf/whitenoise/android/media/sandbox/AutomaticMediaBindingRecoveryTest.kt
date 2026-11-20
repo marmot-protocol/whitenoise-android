@@ -128,6 +128,7 @@ class AutomaticMediaBindingRecoveryTest {
             val firstWorker = context.next()
             deliverAutomaticReply(firstWorker, success = false)
             first.join()
+            assertTrue("Initial worker must retire before testing its refusal", awaitAutomaticRelease(transport))
             assertNull(first.result.get())
             assertNull(transport.probe(file, 1, false))
             assertEquals(1, context.bindings.size)
@@ -135,6 +136,7 @@ class AutomaticMediaBindingRecoveryTest {
             val revised = request()
             deliverAutomaticReply(context.next(), success = false)
             revised.join()
+            assertTrue("Revised worker must retire before the clock advances", awaitAutomaticRelease(transport))
             assertNull(transport.probe(file, 1, false))
             assertEquals(2, context.bindings.size)
             clock += MediaDecodePolicy.REFUSAL_TTL_MS

@@ -96,6 +96,7 @@ internal class NotificationReplyCompletion(
                             extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
                             extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
                         }.setRemoteInputHistory(arrayOf(handledText))
+                        .setLocalOnly(true)
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()

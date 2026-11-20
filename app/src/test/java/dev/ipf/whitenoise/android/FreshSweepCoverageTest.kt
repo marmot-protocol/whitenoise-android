@@ -292,7 +292,9 @@ class FreshSweepCoverageTest {
             Regex(
                 """withContext\(Dispatchers\.Main\.immediate\) \{\s*""" +
                     """application\.appState\.ensureNotificationRuntimeStarted\(\)\s*""" +
-                    """application\.appState\.markNotificationMessageRead\(""",
+                    """if \(!application\.appState\.appLock\.notificationActionsAllowed\) """ +
+                    """return@withContext null\s*""" +
+                    """application\.appState\.markNotificationMessageReadIfAllowed\(""",
             )
 
         assertTrue("mark-read broadcasts must only enqueue durable work", "NotificationMarkReadWorker.enqueue" in markReadEnqueue)
