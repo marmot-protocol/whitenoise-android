@@ -54,6 +54,17 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class NostrReferencePresentationCoverageTest {
+    /** The card can reuse local pixels, but must never hand the author's URL to a view that loads it. */
+    @Test
+    fun eventHeaderUsesOnlyCachedAvatarPixels() {
+        val source =
+            dev.ipf.whitenoise.android.appModuleFile(
+                "src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+            ).readText()
+        assertTrue("picture = AvatarImageLoader.peek(card.authorMetadata?.pictureUrl)" in source)
+        assertFalse("pictureUrl = card.authorMetadata?.pictureUrl" in source)
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 

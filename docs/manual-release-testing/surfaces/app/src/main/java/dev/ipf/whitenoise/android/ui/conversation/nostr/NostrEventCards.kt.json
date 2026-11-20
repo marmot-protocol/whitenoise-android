@@ -1,0 +1,142 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+  "legacy_sha256": "c08928261bdfddbbddc00185dfce88a77745898707f48fe0e94ef8e845a39531",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Kind1 video card action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "R.string.nostr_event_play_video",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "Compact event image loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "NostrEventImagePane(url = url, compact = true)",
+        "test_ids": [
+          "RDR-004",
+          "RDR-005"
+        ]
+      },
+      {
+        "surface": "Content-sized referenced event preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "nostrEventPreviewMaximumHeight()",
+        "test_ids": [
+          "RDR-005"
+        ]
+      },
+      {
+        "surface": "Referenced event local emoji: NostrEventCards.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037",
+          "RDR-002",
+          "RDR-003"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_expand",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "R.string.nostr_event_expand",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "R.string.nostr_event_open",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_read_note",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "R.string.nostr_event_read_note",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "EventCardBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "fun EventCardBody(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "LoadedEventCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "fun LoadedEventCard(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "LoadedEventHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "fun LoadedEventHeader(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "LoadedEventMetadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "fun LoadedEventMetadata(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "LoadedEventSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "fun LoadedEventSummary(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "NostrEventCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "fun NostrEventCard(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "NostrEventCards",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "fun NostrEventCards(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "ResolvedNostrEventCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "fun ResolvedNostrEventCard(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Referenced author avatar uses cached pixels only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "picture = AvatarImageLoader.peek",
+        "test_ids": [
+          "RDR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
