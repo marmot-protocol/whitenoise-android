@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.GENERATION_RESTART_DELAY_MILLIS
+import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.SUCCESS_RESULT_RESTART_DELAY_MILLIS
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationParkedAudio
@@ -43,6 +45,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
+import dev.ipf.whitenoise.android.audio.PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.timelineAppMessage
@@ -98,19 +101,19 @@ class ComposerDictationControlTest {
                 markDisclosureAccepted = {},
                 elapsedRealtime = { now },
                 scheduleTimeout = { delay, callback ->
-                    if (delay == 500L) restarts += callback
+                    if (delay == PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS) restarts += callback
                     ConversationDictationTimeoutHandle {}
                 },
             )
         assertTrue(controller.requestStart(ACCOUNT, GROUP, draft))
         platform.listener.onResult("Recognized prefix")
-        now += 500L
+        now += PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS
         restarts.last().invoke()
         controller.send()
         repeat(3) {
             platform.listener.onError(ConversationDictationFailure.NoMatch)
             if (controller.state is ConversationDictationState.Starting) {
-                now += 500L
+                now += PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS
                 restarts.last().invoke()
             }
         }
@@ -427,10 +430,14 @@ class ComposerDictationControlTest {
             if (mode == "silence") {
                 runDeadline(fixture, 3_000L, 3_000L)
             } else {
-                runDeadline(fixture, 500L, 500L)
+                // The result restart is short, but a microphone recognizer still waits the full teardown settle.
+                runDeadline(fixture, SUCCESS_RESULT_RESTART_DELAY_MILLIS, SUCCESS_RESULT_RESTART_DELAY_MILLIS)
+                assertTrue(firstListener === FakeDictationPlatform.listener)
+                val settleRemainder = GENERATION_RESTART_DELAY_MILLIS - SUCCESS_RESULT_RESTART_DELAY_MILLIS
+                runDeadline(fixture, settleRemainder, GENERATION_RESTART_DELAY_MILLIS)
                 assertTrue(firstListener !== FakeDictationPlatform.listener)
                 if (mode == "watchdog") {
-                    runDeadline(fixture, 10_000L, 10_500L)
+                    runDeadline(fixture, 10_000L, GENERATION_RESTART_DELAY_MILLIS + 10_000L)
                 } else {
                     FakeDictationPlatform.listener.onError(ConversationDictationFailure.Unknown)
                 }
