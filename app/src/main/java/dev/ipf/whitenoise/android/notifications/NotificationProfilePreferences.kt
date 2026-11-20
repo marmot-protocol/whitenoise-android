@@ -14,7 +14,8 @@ import java.util.Locale
 /**
  * Device-local notification profiles (#3601): names, schedules and allowed chat ids, with the user's latest
  * manual on/off choice. Holds no protocol data. Reads are in memory so the notification gate can consult it
- * synchronously; every write commits durably before publishing and returns false on failure.
+ * synchronously; every write commits durably before publishing and returns false on failure. The first read
+ * on a device that has never stored any state adds the starter profiles once.
  */
 @Suppress("TooManyFunctions")
 internal class NotificationProfilePreferences(
@@ -24,7 +25,7 @@ internal class NotificationProfilePreferences(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val mutationLock = Any()
-    private val _state = MutableStateFlow(read())
+    private val _state = MutableStateFlow(load(context))
     val state: StateFlow<NotificationProfilesState> = _state.asStateFlow()
 
     /** The profile in force now, if any. */
@@ -64,7 +65,7 @@ internal class NotificationProfilePreferences(
                 current.manual is NotificationProfileManual.Paused &&
                     previous != saved.schedule &&
                     listOfNotNull(previous, saved.schedule).any { scheduleWindowContaining(it, nowMs, zone) != null }
-            current.copy(profiles = profiles, manual = if (endsPause) null else current.manual)
+            current.copy(profiles = profiles, manual = if (endsPause) null else current.manual, engaged = true)
         }
 
     /** Removes [profileId] and any manual choice that names it; call off the main thread. */
@@ -84,7 +85,7 @@ internal class NotificationProfilePreferences(
         mutate { current ->
             val valid = current.profiles.any { it.id == profileId } && (untilMs == null || untilMs > nowMs)
             if (!valid) return@mutate null
-            current.copy(manual = NotificationProfileManual.On(profileId, untilMs))
+            current.copy(manual = NotificationProfileManual.On(profileId, untilMs), engaged = true)
         }
 
     /**
@@ -140,9 +141,30 @@ internal class NotificationProfilePreferences(
             committed
         }
 
-    private fun read(): NotificationProfilesState =
-        runCatching { preferences.getString(STATE_KEY, null)?.let { decode(JSONObject(it)) } }
-            .getOrNull() ?: NotificationProfilesState()
+    /**
+     * Reads the stored state. Only a state that was never stored gets the starter profiles; unreadable state
+     * fails open to no profiles and is left untouched, so it never turns into a fresh seed.
+     */
+    private fun load(context: Context): NotificationProfilesState {
+        val stored = runCatching { preferences.getString(STATE_KEY, null) }
+        val raw = stored.getOrNull()
+        return when {
+            raw != null -> runCatching { decode(JSONObject(raw)) }.getOrNull() ?: NotificationProfilesState()
+            stored.isFailure || preferences.contains(STATE_KEY) -> NotificationProfilesState()
+            else -> seedPresets(context)
+        }
+    }
+
+    /** Stores the starter profiles with the seeded marker; publishing does not wait for the disk write. */
+    private fun seedPresets(context: Context): NotificationProfilesState {
+        val seeded =
+            runCatching {
+                val names = NotificationProfilePresetNames.from(context)
+                NotificationProfilesState(notificationProfilePresets(names, clock()), presetsSeeded = true)
+            }.getOrNull() ?: return NotificationProfilesState()
+        runCatching { preferences.edit().putString(STATE_KEY, encode(seeded).toString()).apply() }
+        return seeded
+    }
 
     companion object {
         const val PREFERENCES_NAME = "whitenoise.notification_profiles"
@@ -171,6 +193,8 @@ private fun NotificationProfilesState.withoutExpiredManual(nowMs: Long): Notific
 private fun encode(state: NotificationProfilesState): JSONObject =
     JSONObject()
         .put("profiles", JSONArray(state.profiles.map(::encodeProfile)))
+        .put("engaged", state.engaged)
+        .put("presetsSeeded", state.presetsSeeded)
         .apply {
             when (val manual = state.manual) {
                 is NotificationProfileManual.On ->
@@ -219,7 +243,12 @@ private fun decode(json: JSONObject): NotificationProfilesState {
             .mapNotNull { array.optJSONObject(it)?.let(::decodeProfile) }
             .distinctBy { it.id }
             .take(MAX_NOTIFICATION_PROFILES)
-    return NotificationProfilesState(profiles, json.optJSONObject("manual")?.let(::decodeManual))
+    return NotificationProfilesState(
+        profiles = profiles,
+        manual = json.optJSONObject("manual")?.let(::decodeManual),
+        engaged = json.optBoolean("engaged", false),
+        presetsSeeded = json.optBoolean("presetsSeeded", false),
+    )
 }
 
 private fun decodeManual(choice: JSONObject): NotificationProfileManual? {

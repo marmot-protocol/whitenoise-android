@@ -8,6 +8,10 @@
     <string name="notification_profiles_explainer">While a profile is on, only the chats you allow, and mentions if you turn them on, can notify you on this device. Messages still arrive and show as unread.</string>
     <string name="notification_profiles_empty_title">No profiles yet</string>
     <string name="notification_profiles_empty_body">Create a profile to pause notifications at night, at work, or whenever you need quiet.</string>
+    <!-- Names of the starter profiles every install begins with; saved once as ordinary, editable names. -->
+    <string name="notification_profile_preset_sleep">Sleep</string>
+    <string name="notification_profile_preset_work">Work</string>
+    <string name="notification_profile_preset_focus">Focus</string>
     <string name="notification_profile_create">Create profile</string>
     <string name="notification_profile_new_title">New profile</string>
     <string name="notification_profile_edit_title">Edit profile</string>

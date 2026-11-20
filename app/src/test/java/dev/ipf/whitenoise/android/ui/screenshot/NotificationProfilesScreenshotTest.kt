@@ -22,8 +22,10 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.notifications.ActiveNotificationProfile
 import dev.ipf.whitenoise.android.notifications.NotificationProfile
+import dev.ipf.whitenoise.android.notifications.NotificationProfilePresetNames
 import dev.ipf.whitenoise.android.notifications.NotificationProfileSchedule
 import dev.ipf.whitenoise.android.notifications.NotificationProfileSource
+import dev.ipf.whitenoise.android.notifications.notificationProfilePresets
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileBanner
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileQuickActions
 import dev.ipf.whitenoise.android.ui.chats.NotificationProfileQuickSheetContent
@@ -37,6 +39,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.time.DayOfWeek
@@ -84,6 +87,16 @@ class NotificationProfilesScreenshotTest {
 
     @Test fun listEmptyRtlLargeFont() {
         captureList("notification_profiles_empty_rtl_large_font", emptyList(), Theme.LightRtlLarge)
+    }
+
+    @Test fun presetsLight() = captureList("notification_profiles_presets_light", presets(), Theme.Light)
+
+    @Test fun presetsDark() = captureList("notification_profiles_presets_dark", presets(), Theme.Dark)
+
+    @Test fun presetsAmoled() = captureList("notification_profiles_presets_amoled", presets(), Theme.Amoled)
+
+    @Test fun presetsRtlLargeFont() {
+        captureList("notification_profiles_presets_rtl_large_font", presets(), Theme.LightRtlLarge)
     }
 
     @Test fun listLight() = captureList("notification_profiles_list_light", allProfiles(), Theme.Light, active)
@@ -158,6 +171,12 @@ class NotificationProfilesScreenshotTest {
     @Test fun bannerRtlLargeFont() = captureBanner("notification_profile_banner_rtl_large_font", Theme.LightRtlLarge)
 
     private fun allProfiles() = listOf(sleep, work, focus, longName)
+
+    /** The starter profiles exactly as a new install stores them. */
+    private fun presets(): List<NotificationProfile> {
+        val names = NotificationProfilePresetNames.from(RuntimeEnvironment.getApplication())
+        return notificationProfilePresets(names, 0L)
+    }
 
     private fun newForm() =
         NotificationProfileEditFormState(

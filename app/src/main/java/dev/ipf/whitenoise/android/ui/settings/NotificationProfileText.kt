@@ -36,7 +36,7 @@ private const val NOTIFICATION_PROFILE_TICK_MS = 60_000L
 
 /**
  * The profile in force now, re-evaluated at its next transition (at most a minute apart) while composed.
- * Nothing ticks while no profile exists.
+ * Nothing ticks while no manual choice or switched-on schedule could change it, as with untouched starter profiles.
  */
 @Composable
 internal fun rememberActiveNotificationProfile(store: NotificationProfilePreferences): ActiveNotificationProfile? {
@@ -44,7 +44,7 @@ internal fun rememberActiveNotificationProfile(store: NotificationProfilePrefere
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(state) {
         now = System.currentTimeMillis()
-        while (state.profiles.isNotEmpty()) {
+        while (state.manual != null || state.profiles.any { it.schedule?.enabled == true }) {
             val next = nextNotificationProfileTransitionMs(state, now, ZoneId.systemDefault())
             val wait = ((next ?: Long.MAX_VALUE) - now).coerceIn(1L, NOTIFICATION_PROFILE_TICK_MS)
             delay(wait)

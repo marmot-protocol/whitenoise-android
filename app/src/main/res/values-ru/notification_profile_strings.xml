@@ -6,6 +6,9 @@
     <string name="notification_profiles_explainer">Пока профиль включён, на этом устройстве вас уведомляют только разрешённые чаты и, если вы это включите, упоминания. Сообщения всё равно приходят и отображаются как непрочитанные.</string>
     <string name="notification_profiles_empty_title">Профилей пока нет</string>
     <string name="notification_profiles_empty_body">Создайте профиль, чтобы приостанавливать уведомления ночью, на работе или когда нужна тишина.</string>
+    <string name="notification_profile_preset_sleep">Сон</string>
+    <string name="notification_profile_preset_work">Работа</string>
+    <string name="notification_profile_preset_focus">Фокус</string>
     <string name="notification_profile_create">Создать профиль</string>
     <string name="notification_profile_new_title">Новый профиль</string>
     <string name="notification_profile_edit_title">Изменить профиль</string>

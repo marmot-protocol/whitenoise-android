@@ -6,6 +6,9 @@
     <string name="notification_profiles_explainer">Quand un profil est actif, seules les discussions autorisées et, si vous l\'activez, les mentions vous notifient sur cet appareil. Les messages arrivent quand même et restent non lus.</string>
     <string name="notification_profiles_empty_title">Aucun profil pour l\'instant</string>
     <string name="notification_profiles_empty_body">Créez un profil pour mettre les notifications en pause la nuit, au travail ou dès que vous avez besoin de calme.</string>
+    <string name="notification_profile_preset_sleep">Sommeil</string>
+    <string name="notification_profile_preset_work">Travail</string>
+    <string name="notification_profile_preset_focus">Concentration</string>
     <string name="notification_profile_create">Créer un profil</string>
     <string name="notification_profile_new_title">Nouveau profil</string>
     <string name="notification_profile_edit_title">Modifier le profil</string>

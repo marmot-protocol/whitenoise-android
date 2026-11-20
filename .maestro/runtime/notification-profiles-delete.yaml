@@ -1,13 +1,9 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: notification-profiles-delete
 ---
-- runFlow: ../fixtures/open-new-notification-profile.yaml
+- runFlow: ../fixtures/open-notification-profiles.yaml
 # The instrumentation host owns launch, reset and disposal.
-- tapOn:
-    id: "notification-profile.save"
-- assertVisible:
-    id: "notification-profiles.list"
-- tapOn: "Maestro sleep"
+- tapOn: "Work"
 - assertVisible: "Edit profile"
 - scrollUntilVisible:
     element:
@@ -17,7 +13,7 @@ name: notification-profiles-delete
     id: "notification-profile.delete"
 - assertVisible:
     id: "notification-profile.delete-dialog"
-- assertVisible: "Delete Maestro sleep[?]"
+- assertVisible: "Delete Work[?]"
 - tapOn: "Cancel"
 - assertNotVisible:
     id: "notification-profile.delete-dialog"
@@ -30,5 +26,6 @@ name: notification-profiles-delete
     id: "notification-profile.delete-confirm"
 - assertVisible:
     id: "notification-profiles.list"
-- assertVisible: "No profiles yet"
-- assertNotVisible: "Maestro sleep"
+- assertNotVisible: "Work"
+- assertVisible: "Sleep"
+- assertVisible: "Focus"

@@ -6,6 +6,9 @@
     <string name="notification_profiles_explainer">Bir profil açıkken bu cihazda yalnızca izin verilen sohbetler ve, açarsanız, bahsedilmeler bildirim gönderir. Mesajlar yine gelir ve okunmamış olarak görünür.</string>
     <string name="notification_profiles_empty_title">Henüz profil yok</string>
     <string name="notification_profiles_empty_body">Bildirimleri gece, işte ya da sessizliğe ihtiyaç duyduğunuz her an duraklatmak için bir profil oluşturun.</string>
+    <string name="notification_profile_preset_sleep">Uyku</string>
+    <string name="notification_profile_preset_work">İş</string>
+    <string name="notification_profile_preset_focus">Odak</string>
     <string name="notification_profile_create">Profil oluştur</string>
     <string name="notification_profile_new_title">Yeni profil</string>
     <string name="notification_profile_edit_title">Profili düzenle</string>

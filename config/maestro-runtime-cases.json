@@ -74,7 +74,7 @@
         "NTF-049",
         "NTF-052"
       ],
-      "assertions": "Create a named profile from the empty list, turn on its schedule, confirm the start time dialog, clear Saturday and Sunday and save; the reopened editor keeps the weekday choices. Back from an unchanged editor asks nothing. No clock, time zone or delivery proof.",
+      "assertions": "Create a named profile next to the starter profiles, turn on its schedule, confirm the start time dialog, clear Saturday and Sunday and save; the reopened editor keeps the weekday choices. Back from an unchanged editor asks nothing. No clock, time zone or delivery proof.",
       "postcondition": "none"
     },
     "notification-profiles-allowed-chats": {
@@ -90,9 +90,10 @@
       "suite": "settings",
       "manual_ids": [
         "NTF-049",
-        "NTF-053"
+        "NTF-053",
+        "NTF-054"
       ],
-      "assertions": "Delete on a saved profile asks first; Cancel keeps the editor and the profile, confirming returns to the empty list.",
+      "assertions": "Fresh data lists the Sleep, Work and Focus starter profiles. Delete on Work asks first; Cancel keeps the editor and the profile, confirming removes Work while Sleep and Focus stay.",
       "postcondition": "none"
     },
     "notification-profiles-quick-sheet": {
@@ -100,7 +101,7 @@
       "manual_ids": [
         "NTF-051"
       ],
-      "assertions": "After saving a profile the chat-list profile button opens the quick sheet; For 1 hour shows the banner with an end time, the banner reopens the sheet and Turn off removes it; Until I turn it off shows the banner and the top-bar button turns it off. No relaunch, schedule-window or delivery proof.",
+      "assertions": "Saving a profile adds the chat-list profile button, which opens the quick sheet; choosing the saved profile, For 1 hour shows the banner with an end time, the banner reopens the sheet and Turn off removes it; Until I turn it off shows the banner and the top-bar button turns it off. No relaunch, schedule-window or delivery proof.",
       "postcondition": "none"
     },
     "settings-read-aloud": {

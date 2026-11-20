@@ -6,6 +6,9 @@
     <string name="notification_profiles_explainer">Solange ein Profil aktiv ist, benachrichtigen dich auf diesem Gerät nur die erlaubten Chats und, wenn du es einschaltest, Erwähnungen. Nachrichten kommen trotzdem an und werden als ungelesen angezeigt.</string>
     <string name="notification_profiles_empty_title">Noch keine Profile</string>
     <string name="notification_profiles_empty_body">Erstelle ein Profil, um Benachrichtigungen nachts, bei der Arbeit oder immer dann zu pausieren, wenn du Ruhe brauchst.</string>
+    <string name="notification_profile_preset_sleep">Schlafen</string>
+    <string name="notification_profile_preset_work">Arbeit</string>
+    <string name="notification_profile_preset_focus">Fokus</string>
     <string name="notification_profile_create">Profil erstellen</string>
     <string name="notification_profile_new_title">Neues Profil</string>
     <string name="notification_profile_edit_title">Profil bearbeiten</string>

@@ -21,9 +21,11 @@ class NotificationProfilePreferencesTest {
     private val defaultName = "notification-profiles-test"
     private var now = localMs("2026-11-20T12:00", utc)
 
+    /** Preferences of an install that has stored profile state before, so no starter profiles are added. */
     private fun preferences(name: String = defaultName): SharedPreferences {
-        val mode = Context.MODE_PRIVATE
-        return context.getSharedPreferences(name, mode)
+        val preferences = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+        if (!preferences.contains("state.v1")) preferences.edit().putString("state.v1", "{\"profiles\":[]}").commit()
+        return preferences
     }
 
     private fun store(preferences: SharedPreferences = preferences()) =

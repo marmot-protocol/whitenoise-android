@@ -20,6 +20,8 @@ name: notification-profiles-quick-sheet
     id: "chats.notificationProfileAction"
 - assertVisible:
     id: "chats.notificationProfileSheet"
+# The sheet lists the starter profiles first; choose the one this case saved.
+- tapOn: "Maestro sleep"
 - assertVisible:
     id: "notificationProfile.forHour"
 - assertVisible:
@@ -43,6 +45,7 @@ name: notification-profiles-quick-sheet
     id: "chats.notificationProfileAction"
 - assertVisible:
     id: "chats.notificationProfileSheet"
+- tapOn: "Maestro sleep"
 - tapOn:
     id: "notificationProfile.untilOff"
 - assertVisible: ".*Maestro sleep is on.*"

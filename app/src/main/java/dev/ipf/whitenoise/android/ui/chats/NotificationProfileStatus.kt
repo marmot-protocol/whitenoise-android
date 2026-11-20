@@ -42,15 +42,16 @@ internal const val NOTIFICATION_PROFILE_BANNER_TAG = "chats.notificationProfileB
 internal const val NOTIFICATION_PROFILE_QUICK_ACTION_TAG = "chats.notificationProfileAction"
 
 /**
- * Chat-list status for notification profiles: a top-bar button once a profile exists, which opens the quick
- * sheet. The icon is tinted while a profile is on.
+ * Chat-list status for notification profiles: a top-bar button that opens the quick sheet, shown once the user
+ * has saved or turned on a profile and one still exists. The starter profiles alone do not add it. The icon is
+ * tinted while a profile is on.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun NotificationProfileQuickAction(appState: WhiteNoiseAppState) {
     val store = appState.notificationProfiles
     val state by store.state.collectAsState()
-    if (state.profiles.isEmpty()) return
+    if (!state.engaged || state.profiles.isEmpty()) return
     val active = rememberActiveNotificationProfile(store)
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
     val label =

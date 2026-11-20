@@ -1,25 +1,9 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 ---
-# Fresh fixture data has no profiles: open the empty list and start a named draft.
-- runFlow: runtime-ready.yaml
-- assertVisible: "Maestro group"
-- runFlow: open-settings.yaml
-- scrollUntilVisible:
-    element:
-      text: "Notifications"
-    direction: DOWN
-- tapOn: "Notifications"
-- scrollUntilVisible:
-    element:
-      id: "notifications.profiles"
-    direction: DOWN
+# Start a named draft next to the starter profiles.
+- runFlow: open-notification-profiles.yaml
 - tapOn:
-    id: "notifications.profiles"
-- assertVisible:
-    id: "notification-profiles.list"
-- assertVisible: "No profiles yet"
-- tapOn:
-    id: "notification-profiles.create-first"
+    id: "notification-profiles.create"
 - assertVisible:
     id: "notification-profile.edit"
 - assertVisible: "New profile"

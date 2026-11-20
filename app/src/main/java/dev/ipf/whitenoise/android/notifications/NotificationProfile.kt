@@ -84,10 +84,16 @@ internal sealed interface NotificationProfileManual {
     ) : NotificationProfileManual
 }
 
-/** Everything the store persists: profiles in display order and the latest manual choice. */
+/**
+ * Everything the store persists: profiles in display order and the latest manual choice. [engaged] records
+ * that the user has saved or turned on a profile, which seeding never does; [presetsSeeded] marks that the
+ * starter profiles were added, so deleting them never brings them back.
+ */
 internal data class NotificationProfilesState(
     val profiles: List<NotificationProfile> = emptyList(),
     val manual: NotificationProfileManual? = null,
+    val engaged: Boolean = false,
+    val presetsSeeded: Boolean = false,
 )
 
 /** Why a profile is active now. */

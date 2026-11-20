@@ -6,6 +6,9 @@
     <string name="notification_profiles_explainer">Mentre un profilo è attivo, su questo dispositivo ti avvisano solo le chat consentite e, se lo attivi, le menzioni. I messaggi arrivano comunque e restano da leggere.</string>
     <string name="notification_profiles_empty_title">Ancora nessun profilo</string>
     <string name="notification_profiles_empty_body">Crea un profilo per mettere in pausa le notifiche di notte, al lavoro o quando hai bisogno di tranquillità.</string>
+    <string name="notification_profile_preset_sleep">Sonno</string>
+    <string name="notification_profile_preset_work">Lavoro</string>
+    <string name="notification_profile_preset_focus">Concentrazione</string>
     <string name="notification_profile_create">Crea profilo</string>
     <string name="notification_profile_new_title">Nuovo profilo</string>
     <string name="notification_profile_edit_title">Modifica profilo</string>

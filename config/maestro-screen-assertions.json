@@ -3951,9 +3951,9 @@
         {
           "case": "notification-profiles-delete",
           "selector": {
-            "text": "Delete Maestro sleep[?]"
+            "text": "Delete Work[?]"
           },
-          "scope": "Delete profile asks with the profile name; Cancel keeps the editor and confirming returns to the empty list.",
+          "scope": "Delete profile on the Work starter profile asks with its name; Cancel keeps the editor and confirming removes it while Sleep and Focus stay.",
           "entry_assertion": {
             "id": "notification-profile.delete-dialog"
           },
@@ -3994,7 +3994,7 @@
           },
           "scope": "New profile editor blocks Save for an empty name, enables it once named, and the saved profile reopens as Edit profile with its day choices.",
           "opened_by": {
-            "id": "notification-profiles.create-first"
+            "id": "notification-profiles.create"
           }
         },
         {
@@ -4013,9 +4013,9 @@
         {
           "case": "notification-profiles-create-schedule",
           "selector": {
-            "text": "No profiles yet"
+            "text": "Focus"
           },
-          "scope": "Settings, Notifications, Notification profiles opens the empty list with Create profile on fresh fixture data.",
+          "scope": "Settings, Notifications, Notification profiles opens the list with the Sleep, Work and Focus starter profiles on fresh fixture data, not the empty state.",
           "opened_by": {
             "id": "notifications.profiles"
           }

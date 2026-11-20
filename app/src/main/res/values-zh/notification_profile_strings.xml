@@ -6,6 +6,9 @@
     <string name="notification_profiles_explainer">模式开启时，此设备上只有允许的聊天会通知你；如果开启提及通知，提及你的消息也会通知你。消息仍会照常收到并显示为未读。</string>
     <string name="notification_profiles_empty_title">还没有模式</string>
     <string name="notification_profiles_empty_body">创建一个模式，在夜间、工作时或任何需要安静的时候暂停通知。</string>
+    <string name="notification_profile_preset_sleep">睡眠</string>
+    <string name="notification_profile_preset_work">工作</string>
+    <string name="notification_profile_preset_focus">专注</string>
     <string name="notification_profile_create">创建模式</string>
     <string name="notification_profile_new_title">新建模式</string>
     <string name="notification_profile_edit_title">编辑模式</string>

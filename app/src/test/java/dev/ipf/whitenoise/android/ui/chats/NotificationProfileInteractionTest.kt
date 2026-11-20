@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -10,16 +11,21 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import dev.ipf.whitenoise.android.notifications.NotificationProfile
 import dev.ipf.whitenoise.android.notifications.NotificationProfileSchedule
+import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditActions
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditContent
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditFormState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.time.DayOfWeek
 import java.time.Instant
@@ -94,6 +100,36 @@ class NotificationProfileInteractionTest {
         render(busy = false)
         composeRule.onNodeWithTag("notification-profile.mentions").assertIsEnabled()
         composeRule.onNodeWithTag("notification-profile.day.MONDAY").performScrollTo().assertIsEnabled()
+    }
+
+    @Test
+    fun theChatListButtonAppearsOnlyAfterTheUserSavesOrTurnsOnAProfile() {
+        val context = RuntimeEnvironment.getApplication()
+        val app =
+            WhiteNoiseAppState(
+                context = context,
+                draftStore = DraftStore.forContext(context),
+                accountIdHexResolver = { null },
+                accounts = emptyList(),
+                activeAccountRef = "account-a",
+            )
+        try {
+            val store = app.notificationProfiles
+            composeRule.setContent { WhiteNoiseTheme(darkTheme = false) { NotificationProfileQuickAction(app) } }
+            assertEquals(3, store.state.value.profiles.size)
+            composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertDoesNotExist()
+            composeRule.runOnIdle {
+                assertTrue(
+                    store.save(
+                        store.state.value.profiles[0]
+                            .copy(name = "Night"),
+                    ),
+                )
+            }
+            composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertIsDisplayed()
+        } finally {
+            app.mutationsScope.cancel()
+        }
     }
 
     private fun render(busy: Boolean) {
