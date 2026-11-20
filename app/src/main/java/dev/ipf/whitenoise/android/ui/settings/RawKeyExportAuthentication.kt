@@ -123,7 +123,8 @@ internal fun RawKeyExportAuthentication.gateExport(
         } else if (ui.rawExportDialog && ui.exportIdle && canDeliverSecret()) {
             val consent = ui.rawExportConsent
             request {
-                if (ui.rawExportConsent === consent && ui.rawExportDialog && ui.exportIdle && canDeliverSecret()) {
+                val dialogIsCurrent = ui.rawExportConsent === consent && ui.rawExportDialog
+                if (dialogIsCurrent && ui.exportIdle && canDeliverSecret()) {
                     beginExport(false, destination)
                 }
             }
