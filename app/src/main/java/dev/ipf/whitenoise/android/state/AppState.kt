@@ -5655,9 +5655,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** The caller holds launcher revocation through cleanup; completed native ownership is published first. */
+    /** Holds launcher revocation through cleanup and publishes native removal first. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     private suspend fun finishRevokedAccountWipe(wipedRef: String): AccountWipeCompletion? {
+        if (!prepareSharedPlaintextWipe(wipedRef)) return null
         val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
@@ -5671,9 +5672,7 @@ class WhiteNoiseAppState private constructor(
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
-                                // The wipe invalidates server-side registration state for this account.
-                                // withSerializedNativePushWipe already holds
-                                // notificationDelivery.nativePushSyncMutex here.
+                                // Native wipe invalidates registration while the push-sync mutex is held.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)
                                 runCatching { pushTokenStore.clear() }
                             }

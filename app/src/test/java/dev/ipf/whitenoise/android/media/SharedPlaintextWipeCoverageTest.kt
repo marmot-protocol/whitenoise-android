@@ -63,6 +63,31 @@ class SharedPlaintextWipeCoverageTest {
             assertFalse(owned.exists())
         }
 
+    /** Live ownership protects the journal until native teardown, and a failed cleanup can be retried. */
+    @Test
+    fun replaysJournalAfterUnfinishedCleanup() =
+        runBlocking {
+            val context = RecordingRevocations(application)
+            val account = "interrupted"
+            val blocked = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(account) + "document_fixture.pdf")
+            assertTrue(blocked.delete())
+            assertTrue(blocked.mkdir())
+            val child = File(blocked, "child").apply { writeText("test") }
+            assertTrue(recordSharedPlaintextWipe(context, account))
+
+            recoverSharedPlaintextWipes(context) { _, error -> throw AssertionError(error) }
+            assertTrue(blocked.exists())
+            assertTrue(context.revoked.isEmpty())
+            val failures = mutableListOf<String>()
+            wipeSharedPlaintext(context, account) { area, _ -> failures += area }
+            assertTrue(MediaCacheDirs.SHARED in failures)
+
+            assertTrue(child.delete())
+            recoverSharedPlaintextWipes(context) { _, error -> throw AssertionError(error) }
+            assertFalse(blocked.exists())
+            assertEquals(listOf(blocked.name, blocked.name), context.revoked)
+        }
+
     private fun share(
         directory: String,
         name: String,

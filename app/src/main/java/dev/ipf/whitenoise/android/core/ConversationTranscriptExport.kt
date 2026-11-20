@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.media.ACCOUNT_SHARE_PREFIX
 import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
 import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.ensureActive
@@ -125,7 +126,10 @@ object ConversationTranscriptExport {
         transcriptsDir
             .listFiles()
             .orEmpty()
-            .count { it.isFile && it.name.startsWith(filePrefix) && runCatching { it.delete() }.getOrDefault(false) }
+            .count { file ->
+                val ownedOrLegacy = file.name.startsWith(filePrefix) || !file.name.startsWith(ACCOUNT_SHARE_PREFIX)
+                file.isFile && ownedOrLegacy && runCatching { file.delete() }.getOrDefault(false)
+            }
 
     fun writeTemporaryFile(
         cacheDir: File,

@@ -3,10 +3,15 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
+import dev.ipf.whitenoise.android.media.recordSharedPlaintextWipe
 import dev.ipf.whitenoise.android.media.wipeSharedPlaintext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+
+/** Fails closed before native deletion if Android cannot persist the share cleanup obligation. */
+internal suspend fun WhiteNoiseAppState.prepareSharedPlaintextWipe(accountRef: String): Boolean =
+    runCatchingCancellable { recordSharedPlaintextWipe(appContext, accountRef) }.getOrDefault(false)
 
 /**
  * Wipes the session plaintext caches. Only a destructive wipe also ends FileProvider access to
@@ -21,7 +26,8 @@ internal suspend fun WhiteNoiseAppState.wipeDecryptedMediaFromDisk(wipedAccountR
         }
         AttachmentCachePublication.onWipeStarted()
         try {
-            runCatching { clearMediaDiskCaches() }.onFailure { onFailure("disk media cache", it) }
+            val reportDiskFailure: (Throwable) -> Unit = { onFailure("disk media cache", it) }
+            runCatching { clearMediaDiskCaches(reportDiskFailure) }.onFailure(reportDiskFailure)
             wipeSessionAttachmentPlaintext(appContext.cacheDir, onFailure)
             if (wipedAccountRef != null) wipeSharedPlaintext(appContext, wipedAccountRef, onFailure)
             runCatching { forwardRequestPersistence.clear() }.onFailure { onFailure("pending forward request", it) }
