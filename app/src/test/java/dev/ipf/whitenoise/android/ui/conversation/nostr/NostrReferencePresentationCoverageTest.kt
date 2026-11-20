@@ -21,6 +21,7 @@ import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.core.hexString
 import dev.ipf.whitenoise.android.core.nip19
 import dev.ipf.whitenoise.android.core.nip19Tlv
@@ -58,9 +59,7 @@ class NostrReferencePresentationCoverageTest {
     @Test
     fun eventHeaderUsesOnlyCachedAvatarPixels() {
         val source =
-            dev.ipf.whitenoise.android.appModuleFile(
-                "src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
-            ).readText()
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt")
         assertTrue("picture = AvatarImageLoader.peek(card.authorMetadata?.pictureUrl)" in source)
         assertFalse("pictureUrl = card.authorMetadata?.pictureUrl" in source)
     }
