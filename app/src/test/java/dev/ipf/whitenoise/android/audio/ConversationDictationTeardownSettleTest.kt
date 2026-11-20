@@ -4,6 +4,8 @@ import android.os.Looper
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.audio.ConversationDictationControllerTest.Companion.ACCOUNT
 import dev.ipf.whitenoise.android.audio.ConversationDictationControllerTest.Companion.GROUP
+import dev.ipf.whitenoise.android.audio.ConversationDictationControllerTest.Companion.OTHER_ACCOUNT
+import dev.ipf.whitenoise.android.audio.ConversationDictationControllerTest.Companion.OTHER_GROUP
 import dev.ipf.whitenoise.android.audio.ConversationDictationControllerTest.Companion.key
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -150,6 +152,39 @@ class ConversationDictationTeardownSettleTest {
         silent.providerError(ConversationDictationFailure.NoSpeech)
 
         assertEquals(0, fixture.scheduler.liveTaskCount(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS))
+        fixture.scheduler.advanceBy(ConversationDictationController.GENERATION_RESTART_DELAY_MILLIS - 1L)
+        assertEquals(1, fixture.platform.sessions.size)
+        fixture.scheduler.advanceBy(1L)
+        assertEquals(2, fixture.platform.sessions.size)
+    }
+
+    /** Paste during the same take's pending listening restart drains at that take's short settle boundary. */
+    @Test
+    fun pasteDuringOwnPendingRestartUsesShortSettle() {
+        val fixture = callerAudioFixture()
+        fixture.platform.listener.onResult("first")
+        fixture.controller.paste()
+
+        fixture.scheduler.advanceBy(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS - 1L)
+        assertEquals(1, fixture.platform.sessions.size)
+        fixture.scheduler.advanceBy(1L)
+        assertEquals(2, fixture.platform.sessions.size)
+    }
+
+    /** Paste on a new take before its first recognizer ignores the previous take's provider terminal. */
+    @Test
+    fun pasteOnNewTakeKeepsFullSettleAfterAnotherTakesProviderTerminal() {
+        val fixture = callerAudioFixture()
+        fixture.platform.pendingCallerAudio = false
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("first")
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        val other = OTHER_ACCOUNT to OTHER_GROUP
+        fixture.drafts[other] = TextFieldValue("")
+        fixture.platform.pendingCallerAudio = true
+        assertTrue(fixture.controller.requestStart(OTHER_ACCOUNT, OTHER_GROUP, fixture.drafts.getValue(other)))
+        fixture.controller.paste()
+
         fixture.scheduler.advanceBy(ConversationDictationController.GENERATION_RESTART_DELAY_MILLIS - 1L)
         assertEquals(1, fixture.platform.sessions.size)
         fixture.scheduler.advanceBy(1L)

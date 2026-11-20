@@ -5970,7 +5970,10 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
-    /** A pipe stall that pre-requeues the chunk consumes one budget per callback, after the one-time short-settle exemption. */
+    /**
+     * A pipe stall that pre-requeues the chunk consumes one budget per callback,
+     * after the one-time short-settle exemption.
+     */
     @Test
     fun stopBoundsAlternatingFailuresAfterCallerAudioWasPreRequeued() {
         listOf<ConversationDictationFailure?>(
@@ -5994,7 +5997,8 @@ class ConversationDictationControllerTest {
             }
             fixture.scheduler.runDelay(if (stalledProviderCallback == null) 50L else 500L)
             if (stalledProviderCallback != null) {
-                // The disconnect followed a short settle, so it was exempt once; the next restart waits the full settle.
+                // The disconnect followed a short settle, so it was exempt once.
+                // The next restart waits the full settle.
                 fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
                 fixture.scheduler.runDelay(500L)
             }

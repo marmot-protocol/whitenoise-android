@@ -89,5 +89,8 @@ internal fun ConversationDictationController.clearRecognitionGeneration(
     }
     runCatching { session.destroy(onAudioCaptureFinished) }
         .onFailure { onAudioCaptureFinished() }
-    restart.noteTeardown(elapsedRealtime(), providerEnded = !cancel && providerEnded && callerAudio)
+    restart.noteTeardown(
+        elapsedRealtime(),
+        providerEndedSession = state.sessionId.takeIf { !cancel && providerEnded && callerAudio },
+    )
 }

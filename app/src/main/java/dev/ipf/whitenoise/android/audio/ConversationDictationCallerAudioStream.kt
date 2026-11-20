@@ -243,6 +243,14 @@ internal class ConversationDictationCallerAudioStream(
                 "replay_bytes=${owned.replayParts.sumOf { it.pcm.size }} " +
                 "new_bytes=${owned.chunk.pcm.size} bytes=$totalWritten",
         )
+        finishChunkFeed(owned, totalWritten)
+    }
+
+    /** Marks a complete write fed, or requeues a claim that a provider terminal cut short. */
+    private fun finishChunkFeed(
+        owned: ConversationDictationAudioRequest,
+        totalWritten: Int,
+    ) {
         // A terminal that lands during the final write still wins: its result cannot cover this feed.
         if (totalWritten == owned.pcmParts.sumOf { it.pcm.size } && feedOpen()) {
             fullyFed.set(true)

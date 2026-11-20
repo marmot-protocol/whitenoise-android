@@ -100,7 +100,8 @@ class ComposerDictationControlTest {
                 markDisclosureAccepted = {},
                 elapsedRealtime = { now },
                 scheduleTimeout = { delay, callback ->
-                    if (delay == SUCCESS_RESULT_RESTART_DELAY_MILLIS || delay == PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS) {
+                    val restartDelay = delay == SUCCESS_RESULT_RESTART_DELAY_MILLIS
+                    if (restartDelay || delay == PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS) {
                         restarts += callback
                     }
                     ConversationDictationTimeoutHandle {}

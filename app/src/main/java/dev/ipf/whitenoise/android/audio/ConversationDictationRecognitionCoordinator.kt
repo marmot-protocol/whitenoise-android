@@ -76,7 +76,9 @@ internal class ConversationDictationRecognitionCoordinator {
         version: String?,
         capacity: Boolean,
     ): Int {
-        val current = retry?.takeIf { chunkId == null || it.chunkId == chunkId } ?: Retry(chunkId, version).also { retry = it }
+        val current =
+            retry?.takeIf { chunkId == null || it.chunkId == chunkId }
+                ?: Retry(chunkId, version).also { retry = it }
         if (chunkId != null && current.version != version) {
             // A changed byte request keeps its semantic failure budget but starts fresh capacity pacing.
             current.version = version

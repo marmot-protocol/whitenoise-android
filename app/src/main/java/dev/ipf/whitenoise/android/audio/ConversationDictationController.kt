@@ -1170,7 +1170,7 @@ internal class ConversationDictationController internal constructor(
                 (attempt - 1).coerceIn(0, PROVIDER_DISCONNECT_RETRY_DELAYS_MILLIS.lastIndex),
             ]
         } else {
-            restart.settleMillis(providerEnded = isEmptyRecognition, finishing = finishRequested)
+            restart.shortSettle.settleMillis(providerEnded = isEmptyRecognition, finishing = finishRequested)
         }
 
     internal companion object {

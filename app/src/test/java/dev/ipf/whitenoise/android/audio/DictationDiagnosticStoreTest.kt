@@ -125,12 +125,13 @@ class DictationDiagnosticStoreTest {
                 "event=app_record_audio_permission granted=true" to
                     mapOf("granted" to true),
             )
-        listOf("result", "permission", "provider_disconnected", "no_speech_advanced", "short_settle_disconnect").forEach { reason ->
-            val parsed =
-                requireNotNull(DictationDiagnosticSchema.parse("event=recognizer_restart_scheduled reason=$reason"))
-            assertEquals(reason, parsed.fields["reason"])
-            assertEquals(0L, parsed.filteredFields)
-        }
+        listOf("result", "permission", "provider_disconnected", "no_speech_advanced", "short_settle_disconnect")
+            .forEach { reason ->
+                val parsed =
+                    requireNotNull(DictationDiagnosticSchema.parse("event=recognizer_restart_scheduled reason=$reason"))
+                assertEquals(reason, parsed.fields["reason"])
+                assertEquals(0L, parsed.filteredFields)
+            }
         assertEquals("local", event("event=target_validation source=local")["source"])
         examples.forEach { (event, expected) ->
             val parsed = requireNotNull(DictationDiagnosticSchema.parse(event))
