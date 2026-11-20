@@ -2,8 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
-import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
 import dev.ipf.whitenoise.android.media.recordSharedPlaintextWipe
+import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
 import dev.ipf.whitenoise.android.media.wipeSharedPlaintext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
