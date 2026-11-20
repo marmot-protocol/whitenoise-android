@@ -311,7 +311,12 @@ private suspend fun stageShareFile(
         check(directory.isDirectory) { "Unable to create outbound share cache" }
         val safeName = safeOutboundFileName(source.fileName)
         val expectedBytes = plaintext.size
-        val file = File.createTempFile("${sharedPlaintextPrefix(accountRef)}message_", sharedPlaintextSuffix(safeName), directory)
+        val file =
+            File.createTempFile(
+                "${sharedPlaintextPrefix(accountRef)}message_",
+                sharedPlaintextSuffix(safeName),
+                directory,
+            )
         try {
             AttachmentPlaintextCache.requireEntryWithinLimit(file, expectedBytes)
             AttachmentPlaintextCache.protectPublicationFile(file)

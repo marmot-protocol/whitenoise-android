@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.Intent
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -176,26 +175,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.Locale
-
-/** Shares the exported transcript under its readable filename with a temporary read grant. */
-internal fun conversationTranscriptShareIntent(
-    context: Context,
-    file: java.io.File,
-): Intent {
-    val name = file.name.replaceFirst(Regex("^account_[0-9a-f]{64}_"), "")
-    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file, name)
-    val intent =
-        Intent(Intent.ACTION_SEND).apply {
-            type = "application/json"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, name)
-            putExtra(Intent.EXTRA_TITLE, name)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-    return Intent.createChooser(intent, null).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-}
 
 @Composable
 internal fun GroupDetailsLocalDeleteControl(
@@ -748,7 +727,9 @@ internal fun GroupDetailsScreen(
                     val file = controller.exportConversationTranscriptFile(context.cacheDir) ?: return@launchMutation
                     pendingTranscriptShareFile = file
                     try {
-                        if (!controller.ownsRetainedForegroundPresentation) throw CancellationException("transcript owner changed")
+                        if (!controller.ownsRetainedForegroundPresentation) {
+                            throw CancellationException("transcript owner changed")
+                        }
                         transcriptShareLauncher.launch(conversationTranscriptShareIntent(context, file))
                         shareSheetLaunched = true
                     } catch (_: ActivityNotFoundException) {

@@ -33,7 +33,8 @@ class SharedPlaintextWipeCoverageTest {
         runBlocking {
             val context = RecordingRevocations(application)
             val owned = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix("alice") + "message_1.pdf")
-            val transcript = share(ConversationTranscriptExport.CacheDirName, sharedPlaintextPrefix("alice") + "export.json")
+            val transcript =
+                share(ConversationTranscriptExport.CacheDirName, sharedPlaintextPrefix("alice") + "export.json")
             val legacy = share(MediaCacheDirs.SHARED, "document_old.pdf")
             val other = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix("bob") + "message_2.pdf")
             val profileCard = share(MediaCacheDirs.SHARED, "profile_card_1.png")

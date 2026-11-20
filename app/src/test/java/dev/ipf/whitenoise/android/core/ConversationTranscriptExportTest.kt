@@ -312,7 +312,8 @@ class ConversationTranscriptExportTest {
                 )
 
             assertEquals("transcripts", file.parentFile?.name)
-            assertTrue(file.name.substringAfter("_", "").substringAfter("_").startsWith("whitenoise-transcript-abababab-2023-11-14T22-13-20Z"))
+            val displayName = file.name.substringAfter("_").substringAfter("_")
+            assertTrue(displayName.startsWith("whitenoise-transcript-abababab-2023-11-14T22-13-20Z"))
             assertTrue(file.name.endsWith(".json"))
             assertEquals("{\"private\":true}\n", file.readText())
             assertFalse(file.canExecute())

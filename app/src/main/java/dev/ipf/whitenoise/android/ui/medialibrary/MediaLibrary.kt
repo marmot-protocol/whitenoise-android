@@ -981,7 +981,9 @@ internal fun FileLibraryRow(
                                             accountRef = checkNotNull(controller.conversationAccountRef),
                                             row = sharedRow,
                                             chooserTitle = shareChooserTitle,
-                                            currentRow = { if (controller.ownsRetainedForegroundPresentation) currentRow else null },
+                                            currentRow = {
+                                                currentRow.takeIf { controller.ownsRetainedForegroundPresentation }
+                                            },
                                         ) {
                                             attachmentSource(
                                                 controller,
@@ -1010,11 +1012,7 @@ internal fun FileLibraryRow(
 
 private fun SharedMediaRow.attachmentKey() = messageIdHex to attachmentIndex
 
-/**
- * Shares a Files-tab row's whole verified file through the outbound share sheet under its own name. The file is
- * staged from [source], so a file of any size is streamed rather than read into memory under the preview budget.
- * The share is dropped once [currentRow] shows another attachment than [row].
- */
+/** Streams a verified file under its original name while [currentRow] still identifies [row]. */
 internal suspend fun shareLibraryFile(
     context: Context,
     accountRef: String,

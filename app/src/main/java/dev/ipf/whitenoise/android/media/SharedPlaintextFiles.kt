@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 private const val OWNED_PREFIX = "account_"
 private const val MAX_SHARE_EXTENSION_LENGTH = 12
+private const val UNSIGNED_BYTE_MASK = 0xff
 private val sharedPlaintextGeneration = AtomicLong()
 private val sharedPlaintextMutex = Mutex()
 
@@ -23,13 +24,14 @@ private val sharedPlaintextMutex = Mutex()
 internal fun sharedPlaintextPrefix(accountRef: String): String {
     require(accountRef.isNotBlank())
     val digest = MessageDigest.getInstance("SHA-256").digest(accountRef.toByteArray())
-    return OWNED_PREFIX + digest.joinToString("") { "%02x".format(it.toInt() and 0xff) } + "_"
+    return OWNED_PREFIX + digest.joinToString("") { "%02x".format(it.toInt() and UNSIGNED_BYTE_MASK) } + "_"
 }
 
 /** Keeps staging names below the filesystem limit while FileProvider supplies the original display name. */
 internal fun sharedPlaintextSuffix(displayName: String): String =
     displayName.substringAfterLast('.', "").takeIf { extension ->
-        extension.length in 1..MAX_SHARE_EXTENSION_LENGTH && extension.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' }
+        extension.length in 1..MAX_SHARE_EXTENSION_LENGTH &&
+            extension.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' }
     }?.let { ".$it" } ?: ".bin"
 
 /** Capture before loading share bytes, so a wipe can retire writes waiting on decryption or downloads. */
@@ -71,7 +73,10 @@ internal suspend fun wipeSharedPlaintext(
                 .forEach { file ->
                     runCatching {
                         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                        context.revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                        context.revokeUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                        )
                     }.onFailure { onFailure(name, it) }
                     runCatching {
                         check(file.delete() || !file.exists()) { "could not delete shared plaintext" }

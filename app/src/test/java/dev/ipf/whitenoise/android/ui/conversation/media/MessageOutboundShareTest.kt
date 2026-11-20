@@ -130,7 +130,10 @@ class MessageOutboundShareTest {
                 )
             val expected = mapOf(0 to "pdf bytes".encodeToByteArray(), 1 to "notes".encodeToByteArray())
 
-            val staged = stageMessageShareStreams(context, "account", sources) { plaintext(expected.getValue(it.attachmentIndex)) }
+            val staged =
+                stageMessageShareStreams(context, "account", sources) {
+                    plaintext(expected.getValue(it.attachmentIndex))
+                }
             val streams = staged.streams
 
             assertEquals(2, streams.size)
@@ -173,7 +176,9 @@ class MessageOutboundShareTest {
                     plaintext("bytes ${source.attachmentIndex}".encodeToByteArray())
                 }.streams
             val retainedStreams =
-                stageMessageShareStreams(context, "account", retained) { plaintext("voice".encodeToByteArray()) }.streams
+                stageMessageShareStreams(context, "account", retained) {
+                    plaintext("voice".encodeToByteArray())
+                }.streams
 
             assertEquals(listOf("story.pdf", "story.pdf"), confirmedStreams.map { displayName(it.uri) })
             assertEquals(listOf("voice note.m4a"), retainedStreams.map { displayName(it.uri) })
@@ -310,7 +315,9 @@ class MessageOutboundShareTest {
                 )
 
             val staged =
-                stageMessageShareStreams(context, "account", sources) { AttachmentPlaintext.Lease(DiskByteCacheLease(lease)) }
+                stageMessageShareStreams(context, "account", sources) {
+                    AttachmentPlaintext.Lease(DiskByteCacheLease(lease))
+                }
 
             assertEquals(videoBytes, sharedFiles().single().length())
             assertEquals("clip.mp4", displayName(staged.streams.single().uri))
@@ -334,7 +341,9 @@ class MessageOutboundShareTest {
                 )
 
             val staged =
-                stageMessageShareStreams(context, "account", sources) { AttachmentPlaintext.Lease(DiskByteCacheLease(lease)) }
+                stageMessageShareStreams(context, "account", sources) {
+                    AttachmentPlaintext.Lease(DiskByteCacheLease(lease))
+                }
 
             assertEquals(inode, Files.getAttribute(sharedFiles().single().toPath(), "unix:ino"))
             staged.deletePlaintext()
@@ -369,7 +378,10 @@ class MessageOutboundShareTest {
                     override fun close() = Unit
                 }
 
-            val share = launch(Dispatchers.Default) { stageMessageShareStreams(context, "account", sources) { endless } }
+            val share =
+                launch(Dispatchers.Default) {
+                    stageMessageShareStreams(context, "account", sources) { endless }
+                }
             firstChunk.await()
             share.cancelAndJoin()
 

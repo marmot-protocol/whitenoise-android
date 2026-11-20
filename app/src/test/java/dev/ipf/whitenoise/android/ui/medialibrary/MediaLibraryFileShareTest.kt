@@ -67,7 +67,13 @@ class MediaLibraryFileShareTest {
             registerShareTarget(PDF)
             val bytes = "retained upload bytes".encodeToByteArray()
 
-            shareLibraryFile(context, "account", row("draft.pdf", PDF, mine = true), "Share", currentRow = ::currentRow) {
+            shareLibraryFile(
+                context,
+                "account",
+                row("draft.pdf", PDF, mine = true),
+                "Share",
+                currentRow = ::currentRow,
+            ) {
                 AttachmentPlaintext.Bytes(bytes)
             }
 
