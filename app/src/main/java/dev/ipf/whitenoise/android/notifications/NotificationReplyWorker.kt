@@ -264,7 +264,7 @@ class NotificationReplyWorker(
                 notificationWarning(TAG, "reply lock wait expired") {
                     "group=${action.target.groupIdHex.take(8)}"
                 }
-                surfaceReplyFailure(action)
+                surfaceReplyFailure(action, R.string.notification_action_unlock_required)
                 Result.failure().also { retryStore.clear(retryKey) }
             }
         }

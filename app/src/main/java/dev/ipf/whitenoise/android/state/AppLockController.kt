@@ -49,7 +49,7 @@ internal class AppLockController(
     var screenVisible by mutableStateOf(false)
         private set
 
-    /** Notification workers may run before any lock UI exists. Evaluate the in-process grace period on Main. */
+    /** Notification admission re-evaluates the monotonic deadline from the runtime's IO dispatcher. */
     val notificationActionsAllowed: Boolean
         get() =
             notificationActionsAllowed(
@@ -57,7 +57,7 @@ internal class AppLockController(
                 requireUnlock = required,
                 credentialAvailable = credentialAvailable,
                 authenticatedSessionAvailable =
-                    appInForeground() ||
+                    (notificationForegroundEvaluated && appInForeground()) ||
                         notificationBackgroundGraceAllows(
                             notificationBackgroundedAt,
                             SystemClock.elapsedRealtime(),
@@ -65,7 +65,8 @@ internal class AppLockController(
                         ),
             )
 
-    private var notificationBackgroundedAt: Long? = null
+    @Volatile private var notificationBackgroundedAt: Long? = null
+    @Volatile private var notificationForegroundEvaluated = false
     var unlockError by mutableStateOf<AppText?>(null)
         private set
 
@@ -147,7 +148,9 @@ internal class AppLockController(
     fun onAppForegrounded(nowMillis: Long = System.currentTimeMillis()) {
         ttsBoundaryJob?.cancel()
         ttsBoundaryJob = null
+        notificationBackgroundedAt = null
         maybeShowForForeground(nowMillis)
+        notificationForegroundEvaluated = true
     }
 
     fun maybeShowForForeground(nowMillis: Long = System.currentTimeMillis()) {
@@ -167,6 +170,7 @@ internal class AppLockController(
 
     /** Start the away-time grace period only for an authenticated, credentialed background transition. */
     fun onAppBackgrounded(nowMillis: Long = System.currentTimeMillis()) {
+        notificationForegroundEvaluated = false
         sessions.clearForegroundReturn()
         notificationBackgroundedAt = null
         refreshCredentialAvailability()

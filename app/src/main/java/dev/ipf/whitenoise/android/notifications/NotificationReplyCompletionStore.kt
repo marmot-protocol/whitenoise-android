@@ -87,6 +87,21 @@ internal class NotificationReplyCompletionStore(
         }
     }
 
+    /** Clears this unstarted attempt while retaining recovery boundaries needed by earlier replies. */
+    fun retireUnsentAttempt(
+        key: String,
+        boundary: NotificationReplyRecoveryBoundary,
+    ): Boolean =
+        synchronized(STATE_LOCK) {
+            val state = recoveryState(key) ?: return@synchronized false
+            if (!hasStarted(key) || state.boundary != boundary || state.committedMessageIdHex != null) {
+                return@synchronized false
+            }
+            val saved = preferences.edit().remove(startedStorageKey(key)).commit()
+            if (saved) pruneUnneededRecoveryStates()
+            saved
+        }
+
     fun markCommittedMessage(
         key: String,
         messageIdHex: String,

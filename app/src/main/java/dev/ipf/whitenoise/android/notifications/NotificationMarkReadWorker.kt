@@ -10,7 +10,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
-import dev.ipf.whitenoise.android.state.markNotificationMessageRead
+import dev.ipf.whitenoise.android.state.markNotificationMessageReadIfAllowed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -47,7 +47,7 @@ class NotificationMarkReadWorker(
                 withContext(Dispatchers.Main.immediate) {
                     application.appState.ensureNotificationRuntimeStarted()
                     if (!application.appState.appLock.notificationActionsAllowed) return@withContext null
-                    application.appState.markNotificationMessageRead(
+                    application.appState.markNotificationMessageReadIfAllowed(
                         accountRef = action.target.accountRef,
                         groupIdHex = action.target.groupIdHex,
                         messageIdHex = action.target.messageIdHex.orEmpty(),

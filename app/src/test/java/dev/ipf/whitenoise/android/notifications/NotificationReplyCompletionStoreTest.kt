@@ -47,6 +47,24 @@ class NotificationReplyCompletionStoreTest {
         )
     }
 
+    /** Lock denial retires only the exact unsent attempt and leaves earlier recovery fences usable. */
+    @Test
+    fun lockDeniedAttemptClearsStartedMarkerAndRetainsEarlierFence() {
+        val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
+        val first = boundary(10uL, "earlier")
+        val denied = boundary(20uL, "denied")
+        assertEquals(first, store.markStarted("first", "group", first))
+        assertEquals(denied, store.markStarted("denied", "group", denied))
+        assertFalse(store.retireUnsentAttempt("denied", first))
+
+        assertTrue(store.retireUnsentAttempt("denied", denied))
+
+        assertEquals(NotificationReplyRecoveryLookup.NotStarted, store.recoveryLookup("denied"))
+        assertEquals(denied, store.recoverySnapshot("first")?.nextAttemptBoundary)
+        assertTrue(store.markCommittedMessage("first", "c".repeat(64)))
+        assertFalse(store.retireUnsentAttempt("first", first))
+    }
+
     @Test
     fun mixedCaseBoundaryAndCommitIdsPersistAsLowercase() {
         val store = NotificationReplyCompletionStore(FakeSharedPreferences(), nowMillis = { 1_000L })
