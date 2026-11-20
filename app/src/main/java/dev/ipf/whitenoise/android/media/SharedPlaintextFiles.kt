@@ -28,11 +28,13 @@ internal fun sharedPlaintextPrefix(accountRef: String): String {
 }
 
 /** Keeps staging names below the filesystem limit while FileProvider supplies the original display name. */
-internal fun sharedPlaintextSuffix(displayName: String): String =
-    displayName.substringAfterLast('.', "").takeIf { extension ->
+internal fun sharedPlaintextSuffix(displayName: String): String {
+    val extension = displayName.substringAfterLast('.', "")
+    val safeExtension =
         extension.length in 1..MAX_SHARE_EXTENSION_LENGTH &&
             extension.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' }
-    }?.let { ".$it" } ?: ".bin"
+    return if (safeExtension) ".$extension" else ".bin"
+}
 
 /** Capture before loading share bytes, so a wipe can retire writes waiting on decryption or downloads. */
 internal fun captureSharedPlaintextWrite(): Long = sharedPlaintextGeneration.get()

@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.content.ActivityNotFoundException
-import android.content.Context
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
