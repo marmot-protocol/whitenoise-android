@@ -82,6 +82,81 @@ class AccountKeysExportDeliveryTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    /** Raw export waits for a fresh challenge and ignores success after its consent is dismissed. */
+    @Test
+    fun rawExportWaitsForAuthenticationInItsOwnDialog() {
+        var pending: (() -> Unit)? = null
+        val exports = mutableListOf<KeyExportDestination>()
+        val ui = ProfileKeysUiState().apply { openRawExport() }
+        val authenticate = RawKeyExportAuthentication { pending = it }
+        val export = authenticate.gateExport(ui, { true }) { _, destination -> exports += destination }
+
+        export(false, KeyExportDestination.Share)
+        assertTrue(exports.isEmpty())
+        ui.cancelExport()
+        ui.openRawExport()
+        checkNotNull(pending).invoke()
+        assertTrue(exports.isEmpty())
+
+        export(false, KeyExportDestination.File)
+        checkNotNull(pending).invoke()
+        assertEquals(listOf(KeyExportDestination.File), exports)
+    }
+
+    /** The actual save action cannot read the key or open a destination before authentication. */
+    @Test
+    fun rawSaveWaitsForTheScreenAuthenticationCallback() {
+        var pending: (() -> Unit)? = null
+        val fixture = render(authenticator = RawKeyExportAuthentication { pending = it })
+
+        beginExport(encrypted = false)
+
+        composeRule.runOnIdle {
+            assertEquals(0, fixture.native.rawCalls.get())
+            assertEquals(0, fixture.picker.launchCount)
+            checkNotNull(pending).invoke()
+        }
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
+        assertEquals(1, fixture.native.rawCalls.get())
+    }
+
+    /** A late result loses authority immediately when the dialog begins its exit. */
+    @Test
+    fun dismissalStartRejectsAuthenticationBeforeTheDialogDisappears() {
+        var pending: (() -> Unit)? = null
+        var delivered = false
+        val ui = ProfileKeysUiState().apply { openRawExport() }
+        val authentication = RawKeyExportAuthentication { pending = it }
+        val export = authentication.gateExport(ui, { true }) { _, _ -> delivered = true }
+
+        export(false, KeyExportDestination.Share)
+        ui.cancelExportPreparation()
+        assertTrue(ui.rawExportDialog)
+        checkNotNull(pending).invoke()
+
+        assertFalse(delivered)
+    }
+
+    /** Copy and reveal require an authentication result and lose ownership on stop. */
+    @Test
+    fun plaintextAccessRejectsAResultAfterTheScreenStops() {
+        var pending: (() -> Unit)? = null
+        var delivered = false
+        val ui = ProfileKeysUiState()
+        val authentication = RawKeyExportAuthentication { pending = it }
+        val action = { authentication.authorize(ui, { true }) { delivered = true } }
+
+        action()
+        assertFalse(delivered)
+        ui.stopSensitiveOperations()
+        checkNotNull(pending).invoke()
+        assertFalse(delivered)
+
+        action()
+        checkNotNull(pending).invoke()
+        assertTrue(delivered)
+    }
+
     /** Opening the file picker stops the screen, but an authorized raw export still writes on an idle return. */
     @Test
     fun stoppedRawPickerRetainsItsAuthorizedExport() {
@@ -556,6 +631,7 @@ class AccountKeysExportDeliveryTest {
         deferRaw: Boolean = false,
         deferEncrypted: Boolean = false,
         failFirstEncryption: Boolean = false,
+        authenticator: RawKeyExportAuthentication = RawKeyExportAuthentication { authenticated -> authenticated() },
     ): Fixture {
         val native = NativeExports(deferRaw, deferEncrypted, failFirstEncryption).also { currentNative = it }
         val appState =
@@ -575,7 +651,11 @@ class AccountKeysExportDeliveryTest {
                 LocalLifecycleOwner provides owner,
             ) {
                 WhiteNoiseTheme {
-                    AccountKeysScreen(appState = appState, onBack = {})
+                    AccountKeysScreen(
+                        appState = appState,
+                        onBack = {},
+                        rawExportAuthenticator = authenticator,
+                    )
                 }
             }
         }

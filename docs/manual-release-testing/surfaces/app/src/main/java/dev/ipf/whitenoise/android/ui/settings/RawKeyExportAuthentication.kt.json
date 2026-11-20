@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RawKeyExportAuthentication.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Android device-authentication prompt for raw key export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RawKeyExportAuthentication.kt",
+        "anchor": "R.string.raw_key_export_auth_title",
+        "test_ids": [
+          "ACC-010"
+        ]
+      },
+      {
+        "surface": "Raw export requires an enrolled device credential",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RawKeyExportAuthentication.kt",
+        "anchor": "R.string.toast_app_lock_screen_lock_required",
+        "test_ids": [
+          "ACC-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

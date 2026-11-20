@@ -2,6 +2,8 @@
 
 Android client for White Noise, backed by the Marmot bindings.
 
+Help [translate White Noise](docs/translating.md), starting with one screen or flow.
+
 ## Project Shape
 
 The Kotlin/Jetpack Compose app is a minimal display and Android platform layer.

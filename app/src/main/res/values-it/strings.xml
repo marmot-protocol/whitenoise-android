@@ -980,6 +980,7 @@
     <string name="hide_private_key">Nascondi chiave privata</string>
     <string name="show_private_key">Mostra chiave privata</string>
     <string name="copy_private_key">Copia chiave privata</string>
+    <string name="raw_key_export_auth_title">Autenticati per accedere alla tua chiave privata</string>
     <string name="export">Esporta</string>
     <string name="export_encrypted_private_key">Esporta chiave privata cifrata</string>
     <string name="keep_your_private_key_safe">Tieni al sicuro la tua chiave privata</string>
@@ -2248,6 +2249,7 @@
     <string name="onboarding_signing_in">Accesso…</string>
     <string name="onboarding_choose_profile">Scegli profilo</string>
     <string name="onboarding_enter_private_key">Inserisci la chiave privata</string>
+    <string name="signup_generated_name_hint">La registrazione inizia con un nome casuale. Tienilo, tira i dadi per averne un altro o scrivi il tuo.</string>
     <string name="signup_about_prompt">Raccontaci di te</string>
     <string name="signup_preparing_photo">Preparazione della foto…</string>
     <string name="signup_publishing_profile">Pubblicazione del profilo…</string>

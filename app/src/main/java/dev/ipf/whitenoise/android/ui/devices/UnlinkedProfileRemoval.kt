@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.removeUnlinkedAccount
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.settings.runAccountWipeMutation
 
 internal const val UNLINKED_PROFILE_REMOVAL_TAG = "unlinked_profile.removal"
 internal const val UNLINKED_PROFILE_REMOVAL_CONFIRM_TAG = "unlinked_profile.removal.confirm"
@@ -62,8 +63,17 @@ internal fun UnlinkedProfileRemovalHost(
     UnlinkedProfileRemovalDialog(
         onRemove = {
             UnlinkedProfileRemoval.close()
+            // The wipe takes the profile in view down and puts it back, so it runs behind the same progress and the
+            // same disabled screens as removing the profile in view.
+            appState.wipeInProgress = true
             appState.launchMutation {
-                if (!appState.removeUnlinkedAccount(label)) appState.present(R.string.unlinked_account_remove_failed)
+                runAccountWipeMutation(
+                    onUnconfirmed = { appState.present(R.string.toast_wipe_outcome_unconfirmed, copyable = true) },
+                    onFinished = { appState.wipeInProgress = false },
+                ) {
+                    val removed = appState.removeUnlinkedAccount(label)
+                    if (!removed) appState.present(R.string.unlinked_account_remove_failed)
+                }
             }
         },
         onCancel = UnlinkedProfileRemoval::close,

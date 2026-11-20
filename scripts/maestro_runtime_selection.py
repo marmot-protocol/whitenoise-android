@@ -3,9 +3,9 @@
 import json
 import sys
 try:
-    from scripts.maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD, case_selection
+    from scripts.maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD, case_selection, uses_fixture_credential
 except ModuleNotFoundError:
-    from maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD, case_selection
+    from maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD, case_selection, uses_fixture_credential
 
 
 def selection(value):
@@ -52,7 +52,7 @@ def feedback_priority(partition):
 def validate_credential_platform(value, api):
     """Reject unsupported PIN campaigns before requesting the APK producer or any emulator."""
     chosen = selection(value)
-    if api != '34' and any(case['suite'] in chosen and case['postcondition'].startswith('app-lock-credential-')
+    if api != '34' and any(case['suite'] in chosen and uses_fixture_credential(case)
                           for case in CASES.values()):
         raise ValueError('Synthetic device-credential cases initially require API34')
 

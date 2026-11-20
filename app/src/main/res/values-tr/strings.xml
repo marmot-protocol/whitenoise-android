@@ -978,6 +978,7 @@
     <string name="hide_private_key">Özel anahtarı gizle</string>
     <string name="show_private_key">Özel anahtarı göster</string>
     <string name="copy_private_key">Özel Anahtarı Kopyala</string>
+    <string name="raw_key_export_auth_title">Özel anahtarınıza erişmek için kimliğinizi doğrulayın</string>
     <string name="export">İhracat</string>
     <string name="export_encrypted_private_key">Şifrelenmiş Özel Anahtarı Dışa Aktar</string>
     <string name="keep_your_private_key_safe">Özel Anahtarınızı Güvende Tutun</string>
@@ -2241,6 +2242,7 @@
     <string name="onboarding_signing_in">Giriş yapılıyor…</string>
     <string name="onboarding_choose_profile">Profil seç</string>
     <string name="onboarding_enter_private_key">Özel anahtarı girin</string>
+    <string name="signup_generated_name_hint">Kayıt rastgele bir adla başlar. Bu adı koruyabilir, başka bir ad için zar atabilir veya kendi adınızı yazabilirsiniz.</string>
     <string name="signup_about_prompt">Kendinizden bahsedin</string>
     <string name="signup_preparing_photo">Fotoğraf hazırlanıyor…</string>
     <string name="signup_publishing_profile">Profil yayınlanıyor…</string>

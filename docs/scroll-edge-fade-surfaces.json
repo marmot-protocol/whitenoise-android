@@ -1702,13 +1702,26 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
       "calls": {
-        "SettingsList": 2,
         "verticalScroll": 1
       },
       "family": "settings",
-      "policy": "Relay lists retain fades; the Add Relay keyboard form retains ordinary scrolling pending its own real-IME geometry validation.",
+      "policy": "The Add Relay keyboard form retains ordinary scrolling pending its own real-IME geometry validation.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+      "calls": {
+        "SettingsList": 2
+      },
+      "family": "settings",
+      "policy": "Relay lists retain fades.",
       "test_ids": [
         "SCR-001",
         "SCR-002",

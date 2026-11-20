@@ -824,9 +824,7 @@ internal fun WhiteNoiseApp(
                         }
                         // Sign Out & Wipe chrome (#350) lives above the phase
                         // router but below the lock privacy boundary.
-                        if (appState.wipeInProgress) {
-                            WipeProgressSheet()
-                        }
+                        if (appState.wipeInProgress) WipeProgressSheet()
                         appState.pendingWipeReport?.let { report ->
                             WipeOutcomeSheet(
                                 report = report,
@@ -843,6 +841,7 @@ internal fun WhiteNoiseApp(
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
     }
+    TtsPlaybackTrustWarningHost(appState)
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(
             offlineSpeechToText = dictationState.usesOfflineSpeechToText,

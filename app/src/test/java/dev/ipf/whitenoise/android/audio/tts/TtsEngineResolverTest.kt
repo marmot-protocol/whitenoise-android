@@ -422,12 +422,14 @@ class TtsEngineResolverTest {
             assertNotNull(result.handle)
             assertEquals(EngineTrust.Unknown, result.handle?.trust)
             assertEquals("com.google.android.tts", result.handle?.enginePackage)
+            assertEquals(true, result.handle?.connectedPackageVerified)
             result.handle?.release()
             Unit
         }
 
+    /** A verified package matching the requested local engine retains local trust. */
     @Test
-    fun explicitLocalEngineRequestUsesUnverifiedHandleTrustEvenWhenConnectedMatches() =
+    fun explicitLocalEngineRequestUsesLocalTrustWhenConnectedMatches() =
         runBlocking {
             val factory = ControllableTtsFactory()
             val resolver =
@@ -436,24 +438,25 @@ class TtsEngineResolverTest {
                     ttsFactory = factory,
                     engineCatalog =
                         FakeTtsEngineCatalog(
-                            engines = listOf(engineInfo("com.github.olga_yakovleva.rhvoice.android", "RHVoice")),
-                            defaultEngine = "com.github.olga_yakovleva.rhvoice.android",
+                            engines = listOf(engineInfo("app.grapheneos.speechservices", "GrapheneOS")),
+                            defaultEngine = "app.grapheneos.speechservices",
                             connectedEngineForRequest = { requested ->
-                                requested ?: "com.github.olga_yakovleva.rhvoice.android"
+                                requested ?: "app.grapheneos.speechservices"
                             },
                         ),
                 )
 
             val deferred =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    resolver.resolve("com.github.olga_yakovleva.rhvoice.android")
+                    resolver.resolve("app.grapheneos.speechservices")
                 }
             factory.completeInit(TextToSpeech.SUCCESS)
             val result = deferred.await()
 
             assertNotNull(result.handle)
-            assertEquals(EngineTrust.Unknown, result.handle?.trust)
-            assertEquals("com.github.olga_yakovleva.rhvoice.android", result.handle?.enginePackage)
+            assertEquals(EngineTrust.Local, result.handle?.trust)
+            assertEquals(true, result.handle?.connectedPackageVerified)
+            assertEquals("app.grapheneos.speechservices", result.handle?.enginePackage)
             result.handle?.release()
             Unit
         }
@@ -470,36 +473,35 @@ class TtsEngineResolverTest {
     }
 
     @Test
-    fun defaultBootstrapWithUnverifiableIdentityFailsClosedToUnknownTrust() =
+    fun defaultBootstrapRequiresEveryFallbackToBeKnownLocal() =
         runBlocking {
-            val factory = ControllableTtsFactory()
             val localDefault = "com.github.olga_yakovleva.rhvoice.android"
-            val unknownFallback = "com.google.android.tts"
-            val resolver =
-                TtsEngineResolver(
-                    context,
-                    ttsFactory = factory,
-                    engineCatalog =
-                        FakeTtsEngineCatalog(
-                            engines =
-                                listOf(
-                                    engineInfo(localDefault, "RHVoice"),
-                                    engineInfo(unknownFallback, "Google"),
-                                ),
-                            defaultEngine = localDefault,
-                            connectedEngineForRequest = { null },
-                        ),
+            val fallbackTrust =
+                mapOf(
+                    "com.google.android.tts" to EngineTrust.Unknown,
+                    "app.grapheneos.speechservices" to EngineTrust.Local,
                 )
-
-            val deferred = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
-            factory.completeInit(TextToSpeech.SUCCESS)
-            val result = deferred.await()
-
-            assertNotNull(result.handle)
-            assertEquals(localDefault, result.handle?.enginePackage)
-            assertEquals(EngineTrust.Unknown, result.handle?.trust)
-            result.handle?.release()
-            Unit
+            for ((fallback, trust) in fallbackTrust) {
+                val factory = ControllableTtsFactory()
+                val resolver =
+                    TtsEngineResolver(
+                        context,
+                        ttsFactory = factory,
+                        engineCatalog =
+                            FakeTtsEngineCatalog(
+                                engines = listOf(engineInfo(localDefault, "RHVoice"), engineInfo(fallback, "Fallback")),
+                                defaultEngine = localDefault,
+                                connectedEngineForRequest = { null },
+                            ),
+                    )
+                val deferred = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
+                factory.completeInit(TextToSpeech.SUCCESS)
+                val handle = requireNotNull(deferred.await().handle)
+                assertEquals(localDefault, handle.enginePackage)
+                assertEquals(trust, handle.trust)
+                assertFalse(handle.connectedPackageVerified)
+                handle.release()
+            }
         }
 
     /** The resolver's own deadline during construction releases its candidate and returns quietly. */
@@ -688,6 +690,8 @@ class TtsEngineResolverTest {
     private class FakeTtsEngineCatalog(
         private val engines: List<TextToSpeech.EngineInfo>,
         private val defaultEngine: String? = null,
+        // The fake reports a verified connection so trust classification (RHVoice -> Local) can be exercised;
+        // the real Android catalog returns null (see the AndroidTtsEngineCatalog test), i.e. unverified.
         private val connectedEngineForRequest: (String?) -> String? = { requested ->
             if (requested == null) defaultEngine else null
         },
@@ -751,6 +755,8 @@ class TtsEngineResolverTest {
     ) : TextToSpeech(context, {}) {
         var shutdownCount = 0
             private set
+
+        override fun getVoices(): MutableSet<Voice> = mutableSetOf()
 
         override fun shutdown() {
             shutdownCount += 1

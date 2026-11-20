@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- assertNotVisible: Encrypted Private Key
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: UP
+- assertVisible: Private key hidden
