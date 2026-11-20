@@ -138,12 +138,6 @@ enum class SignOutCompletion {
     SignedOutLocalCleanupIncomplete,
 }
 
-/** Carries the native wipe verdict and the user-facing report including Android cleanup. */
-internal data class AccountWipeCompletion(
-    val native: WipeOutcomeFfi,
-    val report: WipeReport,
-)
-
 /**
  * Map the engine sign-out outcome to the completion the UI toasts about.
  * Callers reach this mapper only after native signed-out status is confirmed, so a null
