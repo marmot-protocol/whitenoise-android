@@ -170,8 +170,28 @@ class TranslationWorklistTest(unittest.TestCase):
         self.write_located_counts('<item quantity="one">Один чат в %2$s</item><item quantity="other">%1$d чатов в %2$s</item>')
         self.assertEqual(self.scan()[3], [])
 
+    def test_plural_forms_keep_required_argument_when_source_widths_differ(self):
+        self.write("main/values/counts.xml", '<plurals name="count"><item quantity="one">One chat in %2$s</item>'
+                   '<item quantity="other">%1$d chats in %2$20s</item></plurals>')
+        self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат</item>'
+                   '<item quantity="other">%1$d чатов</item></plurals>')
+        self.assertIn("format arguments differ", self.scan()[3][0])
+        self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат в %2$20s</item>'
+                   '<item quantity="other">%1$d чатов в %2$s</item></plurals>')
+        self.assertEqual(self.scan()[3], [])
+
+    def test_plural_forms_exempt_only_the_count_among_integer_arguments(self):
+        self.write("main/values/counts.xml", '<plurals name="count"><item quantity="one">%1$d chat in %2$d rooms</item>'
+                   '<item quantity="other">%1$d chats in %2$d rooms</item></plurals>')
+        self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат</item>'
+                   '<item quantity="other">%1$d чатов</item></plurals>')
+        self.assertIn("format arguments differ", self.scan()[3][0])
+        self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат в %2$d комнатах</item>'
+                   '<item quantity="other">%1$d чатов в %2$d комнатах</item></plurals>')
+        self.assertEqual(self.scan()[3], [])
+
     def test_plural_markup_ignores_wrapped_count_but_not_other_tags(self):
-        ns = 'xmlns:xliff="urn:oasis:names:tc:xliff:document:1.0"'
+        ns = 'xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2"'
         wrapped = '<xliff:g id="n">%1$d</xliff:g>'
         self.write("main/values/counts.xml", f'<plurals name="count" {ns}><item quantity="one">One chat</item>'
                    f'<item quantity="other">{wrapped} chats</item></plurals>')
@@ -185,6 +205,10 @@ class TranslationWorklistTest(unittest.TestCase):
         self.assertEqual(self.scan()[3], [])
         self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат</item>'
                    '<item quantity="other"><b>%1$d</b> чатов</item></plurals>')
+        self.assertIn("markup tags differ", self.scan()[3][0])
+        foreign = 'xmlns:x="urn:example"'
+        self.write("preview/values-ru/counts.xml", f'<plurals name="count" {foreign}><item quantity="one">Один чат</item>'
+                   '<item quantity="other"><x:g>%1$d</x:g> чатов</item></plurals>')
         self.assertIn("markup tags differ", self.scan()[3][0])
 
     def test_default_base_summary_lists_new_key_absent_from_every_locale(self):

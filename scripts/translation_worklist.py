@@ -86,12 +86,15 @@ def arguments(node, *, strict=False):
     return explicit
 
 
+XLIFF_G = "{urn:oasis:names:tc:xliff:document:1.2}g"
+
+
 def markup(node, *, ignore_wrapped_arguments=False):
     """Count child tags; optionally skip xliff:g wrappers around format arguments."""
     return Counter(
         child.tag for child in node.iter()
         if child is not node
-        and not (ignore_wrapped_arguments and child.tag.endswith("}g") and arguments(child))
+        and not (ignore_wrapped_arguments and child.tag == XLIFF_G and arguments(child))
     )
 
 
@@ -124,9 +127,11 @@ def check_entry(source, target):
         pairs = [(source_items.get(item.get("quantity"), source_items["other"]), item) for item in translated]
         # Languages differ on which forms spell out the count, so allow any English form's arguments.
         plural_arguments = set().union(*(arguments(item) for item in original))
-        # Arguments in every English form must survive, except the count, which may be spelled out.
-        required_arguments = set.intersection(*(arguments(item) for item in original)) if len(original) else set()
-        required_arguments = {argument for argument in required_arguments if argument[3] not in {"d", "i"}}
+        # Argument indices in every English form must survive, except the count, which may be spelled out.
+        source_arguments = [arguments(item) for item in original]
+        required_indices = set.intersection(*({argument[0] for argument in found} for found in source_arguments))
+        integers = sorted(argument[0] for found in source_arguments for argument in found if argument[3] in {"d", "i"})
+        required_indices -= set(integers[:1])
     elif kind == "string-array":
         if len(original) != len(translated) or any(item.tag != "item" for item in translated):
             return "array items differ from the source"
@@ -147,7 +152,7 @@ def check_entry(source, target):
             except ValueError as error:
                 return str(error)
             if kind == "plurals":
-                ok = required_arguments <= actual <= expected
+                ok = required_indices <= {argument[0] for argument in actual} and actual <= expected
             else:
                 ok = actual == expected
             if not ok:
