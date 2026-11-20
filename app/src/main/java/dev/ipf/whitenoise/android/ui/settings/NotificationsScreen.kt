@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.notifications.openNotificationBatterySettings
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.ui.group.notificationChannelIcon
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -90,8 +91,9 @@ private fun NotificationPermissionPrompt(appState: WhiteNoiseAppState) {
 }
 
 /**
- * Notifications overview: the preview switch and links to the sound, delivery and Android settings pages.
- * Detailed controls live on the child pages so this screen stays short.
+ * Notifications overview: the preview switch and links to notification profiles and the sound, delivery and
+ * Android settings pages. Detailed controls live on the child pages so this screen stays short; profiles open
+ * in place, as Chat folders does, so no Settings route is needed.
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -104,7 +106,13 @@ internal fun NotificationsScreen(
     onOpenDelivery: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    var profilesOpen by rememberSaveable { mutableStateOf(false) }
+    if (profilesOpen) {
+        NotificationProfilesScreen(appState, onBack = { profilesOpen = false })
+        return
+    }
     NotificationStateRefresh(appState)
+    val activeProfile = rememberActiveNotificationProfile(appState.notificationProfiles)
     val deliveryValue =
         stringResource(
             when (appState.notificationDeliveryMode()) {
@@ -132,6 +140,19 @@ internal fun NotificationsScreen(
                     destination = SettingsDetail.Notifications,
                     surface = "notification-options",
                 ) {
+                    row("profiles") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.notification_profiles_title),
+                            value =
+                                activeProfile?.let { notificationProfileActiveLabel(it) }
+                                    ?: stringResource(R.string.notification_profiles_value_off),
+                            onClick = { profilesOpen = true },
+                            modifier = Modifier.testTag("notifications.profiles"),
+                            explanation = stringResource(R.string.explanation_privacy_notif_profiles),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_notifications_paused) },
+                        )
+                    }
                     row("sounds") { rowContext ->
                         SettingsLink(
                             context = rowContext,
