@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Message notification small icon is the enlarged White Noise logo",
+        "surface": "Message notification small icon is the enlarged White Noise logo with a heavier outline that stays crisp in the status bar",
         "source": "app/src/main/res/drawable/ic_stat_whitenoise.xml",
         "anchor": "android:fillType=\"evenOdd\"",
         "test_ids": [

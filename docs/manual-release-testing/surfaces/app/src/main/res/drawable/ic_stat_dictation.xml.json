@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Dictation notification small icon is the White Noise logo with a microphone",
+        "surface": "Dictation notification small icon is the heavier-outlined White Noise logo with a microphone",
         "source": "app/src/main/res/drawable/ic_stat_dictation.xml",
         "anchor": "<clip-path",
         "test_ids": [
