@@ -594,7 +594,7 @@ internal fun WhiteNoiseApp(
             LocalPendingCameraCaptureFiles provides mainShellStateHolder.pendingCameraCaptureFiles,
             LocalTopNoticeHost provides topNoticeHost,
             LocalCustomEmoji provides rememberCustomEmojiStore(context).emoji,
-            LocalHiddenBuiltinEmojiSets provides rememberBuiltinEmojiSetChoices(context).hidden,
+            LocalHiddenBuiltinEmojiSets provides rememberBuiltinEmojiSetChoices(context).pickerHidden,
             LocalInAppLinkHandler provides inAppLinkHandler,
             LocalExplanationHost provides explanationHost,
         ) {

@@ -44,6 +44,19 @@ class BuiltinEmojiSetChoicesTest {
         assertEquals(setOf(BuiltinEmojiSet.Marmot), restarted.hidden)
     }
 
+    /** A removed set cannot appear in the picker while the stored choice is still being read. */
+    @Test
+    fun pickerHidesEverySetUntilLoaded() {
+        val first = BuiltinEmojiSetChoices(context)
+        runBlocking { first.load() }
+        first.setHidden(BuiltinEmojiSet.Marmot, hide = true)
+
+        val restarted = BuiltinEmojiSetChoices(context)
+        assertEquals(BuiltinEmojiSet.entries.toSet(), restarted.pickerHidden)
+        runBlocking { restarted.load() }
+        assertEquals(setOf(BuiltinEmojiSet.Marmot), restarted.pickerHidden)
+    }
+
     /** An id from a retired or future set is skipped without dropping the known ones beside it. */
     @Test
     fun unknownStoredIdsAreIgnored() {

@@ -54,6 +54,10 @@ internal class BuiltinEmojiSetChoices(
     var hidden: Set<BuiltinEmojiSet> by mutableStateOf(emptySet())
         private set
 
+    /** The sets the picker and suggestions leave out: all of them until the stored choice is read. */
+    val pickerHidden: Set<BuiltinEmojiSet>
+        get() = if (loaded) hidden else BuiltinEmojiSet.entries.toSet()
+
     /** Reads the stored choice once per process. */
     suspend fun load() {
         if (loaded) {
