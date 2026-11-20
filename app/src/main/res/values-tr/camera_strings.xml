@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In-app camera opened by the composer's Camera action. -->
+    <string name="camera_close">Kamerayı kapat</string>
+    <string name="camera_mode_photo">Fotoğraf</string>
+    <string name="camera_mode_video">Video</string>
+    <string name="camera_take_photo">Fotoğraf çek</string>
+    <string name="camera_start_recording">Kaydı başlat</string>
+    <string name="camera_stop_recording">Kaydı durdur</string>
+    <string name="camera_switch">Kamerayı değiştir</string>
+    <string name="camera_video_without_sound">Mikrofon erişimi kapalı, bu yüzden videolar sessiz kaydedilir.</string>
+    <string name="camera_capture_failed">Kaydedilemedi. Tekrar dene.</string>
+</resources>

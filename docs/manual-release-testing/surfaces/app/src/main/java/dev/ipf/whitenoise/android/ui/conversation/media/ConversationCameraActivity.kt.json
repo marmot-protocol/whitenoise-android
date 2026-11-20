@@ -1,0 +1,41 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationCameraScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt",
+        "anchor": "fun ConversationCameraScreen(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "KeepScreenOnWhile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt",
+        "anchor": "fun KeepScreenOnWhile(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt",
+        "anchor": "R.string.camera_unavailable",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_capture_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraActivity.kt",
+        "anchor": "R.string.camera_capture_failed",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

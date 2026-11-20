@@ -167,6 +167,11 @@
         </activity>
         <activity android:name=".widget.ConversationWidgetTapActivity" android:exported="false" />
         <activity
+            android:name=".ui.conversation.media.ConversationCameraActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden"
+            android:theme="@style/Theme.WhiteNoise.Dark" />
+        <activity
             android:name=".MainActivity"
             android:enableOnBackInvokedCallback="true"
             android:exported="true"

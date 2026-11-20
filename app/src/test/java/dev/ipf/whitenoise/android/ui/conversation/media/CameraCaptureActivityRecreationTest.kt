@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
@@ -14,7 +13,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
-import androidx.core.content.IntentCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
@@ -172,10 +170,9 @@ class CameraCaptureActivityRecreationTest {
         composeRule.waitForIdle()
         scenario.onActivity { activity ->
             val started = checkNotNull(shadowOf(activity).nextStartedActivityForResult)
-            assertEquals(MediaStore.ACTION_IMAGE_CAPTURE, started.intent.action)
+            assertEquals(ConversationCameraActivity::class.java.name, started.intent.component?.className)
             requestCode = started.requestCode
-            output =
-                checkNotNull(IntentCompat.getParcelableExtra(started.intent, MediaStore.EXTRA_OUTPUT, Uri::class.java))
+            output = checkNotNull(CaptureConversationMedia.outputs(started.intent)).photo
         }
         context.contentResolver.openOutputStream(output)!!.use { it.write(photoBytes) }
     }
@@ -185,7 +182,7 @@ class CameraCaptureActivityRecreationTest {
         scenario.onActivity { activity ->
             assertTrue(
                 "the registry must still map the camera request code",
-                activity.activityResultRegistry.dispatchResult(requestCode, Activity.RESULT_OK, Intent()),
+                activity.activityResultRegistry.dispatchResult(requestCode, Activity.RESULT_OK, photoResult()),
             )
         }
         composeRule.waitForIdle()
@@ -217,11 +214,14 @@ class CameraCaptureActivityRecreationTest {
     /** A second platform delivery of the same result cannot add another slot. */
     private fun assertDuplicateIgnored() {
         scenario.onActivity { activity ->
-            activity.activityResultRegistry.dispatchResult(requestCode, Activity.RESULT_OK, Intent())
+            activity.activityResultRegistry.dispatchResult(requestCode, Activity.RESULT_OK, photoResult())
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(listOf(existing, output), visible) }
     }
+
+    /** The result the in-app camera returns after writing a photo. */
+    private fun photoResult(): Intent = CaptureConversationMedia.result(CameraCaptureKind.Photo)
 }
 
 private const val MAX_SLOTS = 10
