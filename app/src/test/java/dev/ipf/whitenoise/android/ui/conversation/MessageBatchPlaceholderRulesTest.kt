@@ -52,7 +52,9 @@ class MessageBatchPlaceholderRulesTest {
         val again = reconcileBatchSelections(offscreen, emptyMap(), setOf("live"), emptySet())
         assertEquals(placeholder, again.getValue("live"))
         val rolledBack = reconcileBatchSelections(again, emptyMap(), emptySet(), emptySet())
-        assertEquals(live, rolledBack.getValue("live"))
+        assertEquals(visiblePlaceholder, rolledBack.getValue("live"))
+        val visibleAgain = reconcileBatchSelections(rolledBack, mapOf("live" to live), emptySet(), emptySet())
+        assertEquals(live, visibleAgain.getValue("live"))
         assertTrue(rolledBack.getValue("live").action.canDeleteForEveryone)
     }
 
@@ -68,15 +70,17 @@ class MessageBatchPlaceholderRulesTest {
                 invalidVisibleMessageIds = emptySet(),
             )
         assertEquals(visiblePlaceholder, onScreen.getValue("live"))
-        // The row scrolls out of the window, then its tombstone rolls back.
+        // An off-screen row requires live projection evidence before restoring its actions.
         val rolledBack = reconcileBatchSelections(onScreen, emptyMap(), emptySet(), emptySet())
-        assertEquals(live, rolledBack.getValue("live"))
+        assertEquals(visiblePlaceholder, rolledBack.getValue("live"))
+        val visibleAgain = reconcileBatchSelections(rolledBack, mapOf("live" to live), emptySet(), emptySet())
+        assertEquals(live, visibleAgain.getValue("live"))
     }
 
     @Test
     fun confirmedProjectionPlaceholderStaysLocalOnlyOffscreen() {
         val gone = testBatchSelection("gone", recordedAt = 100uL, timelineOrder = 1uL)
-        val confirmed = gone.asPlaceholder().copy(live = null)
+        val confirmed = gone.asPlaceholder()
         val retained = reconcileBatchSelections(mapOf("gone" to confirmed), emptyMap(), emptySet(), emptySet())
         assertTrue(retained.getValue("gone").action.deleted)
         assertFalse(retained.getValue("gone").action.canDeleteForEveryone)

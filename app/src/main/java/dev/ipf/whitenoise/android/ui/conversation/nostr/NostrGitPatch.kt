@@ -2,7 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 
-private val patchSubjectPrefix = Regex("^(\\[[^\\]]*]\\s*)+")
+private val patchSubjectPrefix = Regex("""^\[(?:RFC\s+)?PATCH(?:\s+[^\]]*)?]\s*""", RegexOption.IGNORE_CASE)
+private val patchHeaderSeparator = Regex("""\r\n\r\n|\n\n|\r\r""")
 
 /** The format-patch `Subject:` header of a kind 1617 patch, without its `[PATCH n/m]` tag. */
 internal fun NostrEvent.patchSubject(): String? {
@@ -19,6 +20,6 @@ internal fun NostrEvent.patchSubject(): String? {
 
 /** A format-patch message without its mail headers, so the preview starts at the commit message. */
 internal fun NostrEvent.patchMessageBody(): String? {
-    val body = content.substringAfter("\n\n", "")
+    val body = patchHeaderSeparator.split(content, limit = 2).getOrNull(1) ?: return null
     return body.takeIf { patchSubject() != null && it.isNotBlank() }
 }

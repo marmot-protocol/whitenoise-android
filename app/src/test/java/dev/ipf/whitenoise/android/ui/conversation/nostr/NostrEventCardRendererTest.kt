@@ -110,10 +110,10 @@ class NostrEventCardRendererTest {
                 id,
                 kind = 1617,
                 content =
-                    "From 1234 Mon Sep 17 00:00:00 2001\nSubject: [PATCH 1/2] Fix parser\n" +
-                        " crash\n\nExplain it.\n---\n diff",
+                    "From 1234 Mon Sep 17 00:00:00 2001\r\nSubject: [PATCH 1/2] [parser] Fix parser\r\n" +
+                        " crash\r\n\r\nExplain it.\n---\n diff",
             ).toCardModel()
-        assertEquals("Fix parser crash", formatted.title)
+        assertEquals("[parser] Fix parser crash", formatted.title)
         assertEquals("Explain it.\n---\n diff", formatted.summary)
         assertEquals(NostrEventCardKind.Generic, event(id, kind = 1111).toCardModel().kind)
         val malformed = event(id, kind = 1111, tags = listOf(listOf("K", "1618"), listOf("E", "wrong"))).toCardModel()

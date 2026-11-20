@@ -55,11 +55,6 @@ internal data class BatchMessageSelection(
     val record: AppMessageRecordFfi,
     val status: MessageStatus,
     val timelineOrder: ULong,
-    /**
-     * The live selection a locally tombstoned snapshot was derived from, restored when the tombstone rolls back
-     * while the row is outside the loaded window. Null for rows the projection already confirms as deleted.
-     */
-    val live: BatchMessageSelection? = null,
 )
 
 internal data class BatchDeleteBreakdown(
@@ -212,14 +207,13 @@ internal fun reconcileBatchSelections(
                 messageId in pendingTimelineRemovedMessageIds || messageId in invalidVisibleMessageIds -> Unit
                 messageId in selectableVisible -> put(messageId, selectableVisible.getValue(messageId))
                 messageId in deletedMessageIds -> put(messageId, snapshot.asPlaceholder())
-                else -> put(messageId, snapshot.live ?: snapshot)
+                else -> put(messageId, snapshot)
             }
         }
     }
 
 internal fun BatchMessageSelection.asPlaceholder(): BatchMessageSelection =
     copy(
-        live = live ?: takeUnless { action.deleted },
         action =
             action.copy(
                 copyableText = null,

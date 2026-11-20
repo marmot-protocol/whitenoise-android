@@ -148,6 +148,7 @@ class DeletedMessageLocalRemovalTest {
         placeholder().performTouchInput { longClick() }
         composeRule.onNodeWithText(string(R.string.select), substring = false).performClick()
         composeRule.onNode(isSelected()).assertIsDisplayed().performClick()
+        composeRule.onNode(isSelected()).assertDoesNotExist()
         placeholder().assertIsDisplayed()
     }
 

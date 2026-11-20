@@ -66,7 +66,7 @@ private fun selectableMessageProjection(
             record = record,
             status = item.status,
             timelineOrder = item.timelineOrder,
-        ).asPlaceholder().copy(live = null) // Projection tombstones are confirmed, so nothing live is restorable.
+        ).asPlaceholder()
     } else {
         val live = liveSelectableMessage(item, controller, eligibilityNowSeconds)
         if (deleted) live.asPlaceholder() else live

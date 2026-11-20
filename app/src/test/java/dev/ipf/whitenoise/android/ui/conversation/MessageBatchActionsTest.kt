@@ -229,11 +229,9 @@ class MessageBatchActionsTest {
         assertTrue(placeholder.action.deleted)
         assertFalse(placeholder.action.canDeleteForEveryone)
         assertEquals(null, placeholder.action.copyableText)
-        // A selection the projection confirmed as deleted has no live item to restore.
-        val confirmed = placeholder.copy(live = null)
         assertEquals(
-            confirmed,
-            reconcileBatchSelections(mapOf("c" to confirmed), emptyMap(), emptySet(), emptySet())["c"],
+            placeholder,
+            reconcileBatchSelections(mapOf("c" to placeholder), emptyMap(), emptySet(), emptySet())["c"],
         )
     }
 

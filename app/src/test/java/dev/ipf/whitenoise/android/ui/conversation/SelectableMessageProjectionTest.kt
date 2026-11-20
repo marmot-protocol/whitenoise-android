@@ -111,7 +111,6 @@ class SelectableMessageProjectionTest {
             val selection = selections.getValue(id)
             assertTrue(selection.action.deleted)
             assertFalse(selection.action.canDeleteForEveryone)
-            assertNull(selection.live)
         }
         val operations =
             batchDeleteAttempts(selections.values.toList(), BatchDeleteScope.EVERYONE).map { it.operation }
