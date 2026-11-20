@@ -9,11 +9,12 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
-import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
-import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.audio.tts.TtsVoiceKey
+import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -89,6 +90,47 @@ class WhiteNoiseAppStateReaderSpeechTest {
             assertTrue(appState.ownsCurrentAccountSpeech())
             appState.stopSpeaking()
         }
+
+    @Test
+    fun onlyAReplacementThatReachesTheQueueRevokesPriorOwnership() {
+        val appState = testAppState()
+        val delegate = FakeSessionEngine()
+        var rejectSpeech = false
+        var rejectedSubmissions = 0
+        val engine =
+            object : TtsSpeechEngine by delegate {
+                override fun speak(
+                    text: String,
+                    utteranceId: String,
+                ): Int {
+                    if (!rejectSpeech) return delegate.speak(text, utteranceId)
+                    rejectedSubmissions++
+                    return TextToSpeech.ERROR
+                }
+
+                override fun speak(
+                    text: String,
+                    utteranceId: String,
+                    volume: Float,
+                ): Int = speak(text, utteranceId)
+            }
+        appState.ttsController.attachEngine(engine)
+        val entries = listOf(TtsSpeakableEntry("s", "Sender", "Private speech."))
+        assertTrue(appState.speakAloudAutoRead("group-a", entries, Locale.US))
+        val previous = appState.ttsController.state.value
+
+        assertFalse(appState.speakAloud(emptyList(), Locale.US))
+        assertEquals(previous, appState.ttsController.state.value)
+        assertTrue(appState.ownsTtsAutoReadSession("group-a"))
+        assertTrue(appState.ownsCurrentAccountSpeech())
+
+        rejectSpeech = true
+        assertFalse(appState.speakAloud(entries, Locale.US))
+        assertTrue(rejectedSubmissions > 0)
+        assertTrue(appState.ttsController.state.value is TtsState.Error)
+        assertFalse(appState.ownsTtsAutoReadSession("group-a"))
+        assertFalse(appState.ownsCurrentAccountSpeech())
+    }
 
     /** A reader revoked before preparation leaves an existing manual queue and its ownership untouched. */
     @Test

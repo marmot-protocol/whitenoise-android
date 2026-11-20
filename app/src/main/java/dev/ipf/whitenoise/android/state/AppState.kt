@@ -1061,14 +1061,16 @@ class WhiteNoiseAppState private constructor(
         locale: java.util.Locale,
         startSentenceIndex: Int = 0,
     ): Boolean {
-        if (ttsEngineNeedsAcknowledgment() || !ttsController.speak(entries, locale, startSentenceIndex)) return false
-
-        // A controller rejection leaves the prior queue playing with its current owner.
-        // Only a successful start replaces auto-read ownership.
-        ttsSpeechAccountRef = activeAccountRef
-        ttsAutoReadSessionKey = null
-        ttsHistorySession.onSessionCleared()
-        attachmentSpeechDestination.value = null
+        synchronized(ttsController) {
+            if (ttsEngineNeedsAcknowledgment()) return false
+            val previousGeneration = ttsController.state.value.messageProgressGeneration
+            val started = ttsController.speak(entries, locale, startSentenceIndex)
+            if (started || ttsController.state.value.messageProgressGeneration != previousGeneration) {
+                clearTtsPlaybackOwnership()
+            }
+            if (!started) return false
+            ttsSpeechAccountRef = activeAccountRef
+        }
 
         // Stop private speech if its foreground service fails to provide a visible stop control.
         val foregroundStarted = TtsPlaybackForegroundService.start(appContext)
