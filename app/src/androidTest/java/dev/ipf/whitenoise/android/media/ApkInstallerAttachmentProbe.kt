@@ -524,14 +524,13 @@ internal object ApkInstallerAttachmentProbe {
     private suspend fun removePublishedCopies(
         context: Context,
         accountRef: String,
-    ) =
-        withContext(Dispatchers.IO) {
-            val shared = File(context.cacheDir, MediaCacheDirs.SHARED)
-            val prefix = sharedPlaintextPrefix(accountRef) + PUBLISHED_PREFIX
-            shared.listFiles { file -> file.name.startsWith(prefix) }?.forEach { file ->
-                check(file.delete()) { "could not remove a published copy before readback" }
-            }
+    ) = withContext(Dispatchers.IO) {
+        val shared = File(context.cacheDir, MediaCacheDirs.SHARED)
+        val prefix = sharedPlaintextPrefix(accountRef) + PUBLISHED_PREFIX
+        shared.listFiles { file -> file.name.startsWith(prefix) }?.forEach { file ->
+            check(file.delete()) { "could not remove a published copy before readback" }
         }
+    }
 
     /**
      * Publishes the completed download exactly as the installer handoff does, never a partial file. [onResolve] runs
