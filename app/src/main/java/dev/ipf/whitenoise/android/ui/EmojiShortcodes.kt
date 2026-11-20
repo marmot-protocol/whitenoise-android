@@ -125,6 +125,7 @@ internal object EmojiShortcodes {
     @Suppress("MagicNumber")
     private val artworkRegions: Map<Int, IntRect> =
         buildMap {
+            /** A [side]-pixel square crop whose top-left corner is ([x], [y]). */
             fun square(
                 x: Int,
                 y: Int,

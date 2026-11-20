@@ -20,6 +20,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ShortcodeComposer
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
@@ -38,14 +39,19 @@ private val EmojiSuggestionGlyphSize = 28.dp
 /** Stable test tag for one suggestion. */
 internal fun emojiSuggestionTestTag(index: Int): String = "composer.emoji_suggestion.$index"
 
-/** User-defined aliases retain priority while bundled families compete with Unicode name matches. */
+/**
+ * User-defined aliases retain priority while bundled families compete with Unicode name matches.
+ * Removed pre-installed sets are left out before ranking, so they never take a slot.
+ */
 internal fun emojiSuggestions(
     entries: List<EmojiEntry>,
     customShortcodes: List<String>,
     query: String,
+    hiddenSets: Set<BuiltinEmojiSet> = emptySet(),
 ): List<String> {
     val custom = customShortcodes.filterNot { it in EmojiShortcodes.builtins }
-    val named = EmojiData.search(entries, query, MAX_EMOJI_SUGGESTIONS).map { it.emoji }
+    val visible = entries.filterNot { hiddenSets.hides(it.emoji) }
+    val named = EmojiData.search(visible, query, MAX_EMOJI_SUGGESTIONS).map { it.emoji }
     return (ShortcodeComposer.matchingShortcodes(custom, query) + named).distinct().take(MAX_EMOJI_SUGGESTIONS)
 }
 
@@ -68,7 +74,7 @@ internal fun EmojiShortcodeSuggestions(
     val context = LocalContext.current
     val custom = LocalCustomEmoji.current
     val hiddenSets = LocalHiddenBuiltinEmojiSets.current
-    val suggestions by produceState(emptyList<String>(), active?.query, custom) {
+    val suggestions by produceState(emptyList<String>(), active?.query, custom, hiddenSets) {
         val query = active?.query
         if (query == null) {
             value = emptyList()
@@ -77,14 +83,13 @@ internal fun EmojiShortcodeSuggestions(
         val entries = withContext(Dispatchers.IO) { EmojiData.load(context) }
         value =
             withContext(Dispatchers.Default) {
-                emojiSuggestions(entries, custom.composerShortcodes, query)
+                emojiSuggestions(entries, custom.composerShortcodes, query, hiddenSets)
             }
     }
     val visibleSuggestions =
         suggestions.filter {
             !EmojiShortcodes.isShortcode(it) ||
-                it in custom.composerShortcodes ||
-                (it in EmojiShortcodes.builtins && !hiddenSets.hides(it))
+                (!hiddenSets.hides(it) && (it in custom.composerShortcodes || it in EmojiShortcodes.builtins))
         }
     if (active == null || visibleSuggestions.isEmpty()) {
         return

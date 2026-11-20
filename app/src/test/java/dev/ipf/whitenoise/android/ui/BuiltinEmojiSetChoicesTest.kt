@@ -43,4 +43,17 @@ class BuiltinEmojiSetChoicesTest {
         runBlocking { restarted.load() }
         assertEquals(setOf(BuiltinEmojiSet.Marmot), restarted.hidden)
     }
+
+    /** An id from a retired or future set is skipped without dropping the known ones beside it. */
+    @Test
+    fun unknownStoredIdsAreIgnored() {
+        context
+            .getSharedPreferences("whitenoise_ui", Context.MODE_PRIVATE)
+            .edit()
+            .putString("hidden_builtin_emoji_sets", "set.retired\nset.marmot")
+            .commit()
+        val choices = BuiltinEmojiSetChoices(context)
+        runBlocking { choices.load() }
+        assertEquals(setOf(BuiltinEmojiSet.Marmot), choices.hidden)
+    }
 }

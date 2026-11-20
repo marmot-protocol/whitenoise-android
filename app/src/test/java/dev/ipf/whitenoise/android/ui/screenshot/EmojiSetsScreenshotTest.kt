@@ -69,6 +69,28 @@ class EmojiSetsScreenshotTest {
     /** The pre-installed rows mirrored with large text. */
     @Test fun browserBuiltinRtlLarge() = builtinBrowser("browser_builtin_rtl_large", rtl = true)
 
+    /** A search with no matches says so; the pre-installed rows return once the search is cleared. */
+    @Test fun emptySearchHidesBuiltinRows() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val choices = BuiltinEmojiSetChoices(context)
+        runBlocking { choices.load() }
+        setTheme(dark = false, rtl = false) {
+            EmojiSetsContent(
+                state = EmojiSetsState(searched = true),
+                onBack = {},
+                onSearch = {},
+                onShow = {},
+                onLoadArtwork = {},
+                onInstall = {},
+                onCancel = {},
+                onRemove = {},
+                builtinSets = choices,
+            )
+        }
+        composeRule.onNodeWithText(context.getString(R.string.emoji_sets_empty)).assertExists()
+        composeRule.onNodeWithTag(builtinEmojiSetRowTestTag(BuiltinEmojiSet.Marmot)).assertDoesNotExist()
+    }
+
     /** Unreachable relays show their notice instead of "no sets", with Refresh in the top bar (#3882). */
     @Test fun browserDiscoveryIncompleteDark() {
         failedBrowser("discovery_incomplete_dark", EmojiSetNotice.DiscoveryIncomplete, dark = true)

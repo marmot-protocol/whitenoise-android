@@ -87,6 +87,7 @@ internal class BuiltinEmojiSetChoices(
         const val HiddenKey = "hidden_builtin_emoji_sets"
         const val Separator = "\n"
 
+        /** The stored hidden sets; ids from unknown or retired sets are ignored. */
         fun readHidden(context: Context): Set<BuiltinEmojiSet> {
             val ids =
                 context
@@ -98,6 +99,7 @@ internal class BuiltinEmojiSetChoices(
             return BuiltinEmojiSet.entries.filterTo(mutableSetOf()) { it.id in ids }
         }
 
+        /** The app-wide UI preference file that holds the choice. */
         fun Context.preferences() = applicationContext.getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
     }
 }

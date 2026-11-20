@@ -58,6 +58,7 @@ internal fun LazyListScope.builtinEmojiSetRows(
     }
 }
 
+/** The set's representative emoji, drawn in place of a generic row icon. */
 @Suppress("FunctionNaming")
 @Composable
 private fun BuiltinEmojiSetIcon(set: BuiltinEmojiSet) {

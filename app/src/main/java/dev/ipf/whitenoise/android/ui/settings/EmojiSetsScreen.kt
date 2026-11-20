@@ -204,20 +204,23 @@ private fun EmojiSetBrowser(
     builtinSets: BuiltinEmojiSetChoices?,
 ) {
     val loading = state.busy || state.discovering
+    // Search results replace the library, so the pre-installed rows return when the search is cleared.
+    val listedBuiltins = builtinSets.takeIf { !state.searched }
     SettingsList {
         item { EmojiSetQuery(field, busy = loading, onSearch = onSearch) }
         item { EmojiSetStatus(state, syncing = state.discovering) }
         // A failed or partial discovery shows only its notice, never the "no sets" message (#3882).
-        if (!loading && state.showsNoSets(builtinsListed = builtinSets != null)) {
+        if (!loading && state.showsNoSets(builtinsListed = listedBuiltins != null)) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
         // Installed sets, then relay results, under the sticker browser's headings (#3882).
         val (installed, discovered) = state.sets.partition { it.installed != null }
-        emojiSetSection(R.string.emoji_sets_section_installed, installed, state.busy, onShow, builtinSets)
+        emojiSetSection(R.string.emoji_sets_section_installed, installed, state.busy, onShow, listedBuiltins)
         emojiSetSection(R.string.emoji_sets_section_discover, discovered, state.busy, onShow)
     }
 }
 
+/** Whether to say nothing matched: no rows at all, and no failed discovery notice that explains why. */
 private fun EmojiSetsState.showsNoSets(builtinsListed: Boolean): Boolean {
     val discoveryFailed = notice == EmojiSetNotice.Error || notice == EmojiSetNotice.DiscoveryIncomplete
     return sets.isEmpty() && !builtinsListed && !discoveryFailed
@@ -472,4 +475,5 @@ private fun EmojiSetStatus(
     state.installedWithSkips?.let { SettingsExplainer(pluralStringResource(R.plurals.emoji_sets_skipped, it, it)) }
 }
 
+/** The set's title, falling back to its identifier and then its coordinate when unnamed. */
 internal fun EmojiSetFfi.displayTitle(): String = title?.takeIf { it.isNotBlank() } ?: identifier.ifBlank { coordinate }

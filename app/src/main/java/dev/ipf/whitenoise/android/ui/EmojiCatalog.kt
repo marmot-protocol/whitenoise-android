@@ -120,6 +120,7 @@ internal fun emojiSearchLayout(
     return listOfNotNull(custom) + builtin + installed + categories
 }
 
+/** [section] narrowed to shortcodes containing [query], or null when none match or the query is blank. */
 private fun shortcodeMatches(
     section: EmojiSection,
     query: String,
