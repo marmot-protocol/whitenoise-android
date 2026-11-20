@@ -55,13 +55,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /**
  * A previously resolved card is complete on its first frame and a background refresh never moves it or the rows
@@ -75,6 +78,18 @@ class NostrEventPreviewTransitionScreenshotTest {
     val composeRule = createComposeRule()
 
     private var session by mutableStateOf<TransitionSession?>(null)
+
+    private val originalZone = TimeZone.getDefault()
+
+    @Before
+    fun setTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(originalZone)
+    }
 
     /**
      * For Note, Article, Video, Release, File and Generic cards in light, dark, AMOLED, large-font, narrow and RTL

@@ -55,7 +55,7 @@ class NostrGitReaderTest {
 
         composeRule.onNodeWithText(string(R.string.nostr_git_open_url, link)).performClick()
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertIsDisplayed()
-        composeRule.onNodeWithText("example.org").assertIsDisplayed()
+        composeRule.onNodeWithText("https://example.org").assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.cancel)).performClick()
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
     }
