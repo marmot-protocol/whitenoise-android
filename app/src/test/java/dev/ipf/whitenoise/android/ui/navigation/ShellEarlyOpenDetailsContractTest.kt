@@ -29,6 +29,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -190,6 +191,7 @@ class ShellEarlyOpenDetailsContractTest {
         awaitCondition("the switch never landed") { appState.activeAccountRef == TARGET_ACCOUNT && transcriptShown() }
         repeat(SETTLE_PUMPS) { pump() }
         val settledController = appState.attachedConversationControllers().single()
+        val settledOpenRequestId = holder.selectedChatOpenContext.value.notificationOpenRequestId
 
         composeRule.runOnIdle {
             inboundRequestId.longValue = REPEAT_REQUEST_ID
@@ -199,6 +201,9 @@ class ShellEarlyOpenDetailsContractTest {
         repeat(SETTLE_PUMPS) { pump() }
         assertTrue(routeCarries(REPEAT_REQUEST_ID))
 
+        val relanded = holder.selectedChatOpenContext.value
+        assertTrue("a re-land uses a fresh open request", relanded.notificationOpenRequestId > settledOpenRequestId)
+        assertNull("a settled re-land carries no pinned account", relanded.pinnedAccountRef)
         assertTrue(transcriptShown())
         assertEquals(SHARED_GROUP, holder.selectedChat.value?.id)
         assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)

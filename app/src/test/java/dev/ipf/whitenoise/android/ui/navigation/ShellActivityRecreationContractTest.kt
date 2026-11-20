@@ -3,7 +3,10 @@ package dev.ipf.whitenoise.android.ui.navigation
 import android.os.Looper
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -13,10 +16,15 @@ import androidx.test.espresso.Espresso
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.state.AppPhase
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
+import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.timelinePage
+import dev.ipf.whitenoise.android.state.timelineRecord
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -43,7 +51,11 @@ class ShellActivityRecreationContractTest {
      */
     @Test
     fun activityRecreationKeepsChatDetailsOpenOnTheSameController() {
-        val fixture = ReturnFixture()
+        val message =
+            timelineRecord("ab".repeat(32), 1uL)
+                .copy(groupIdHex = ConversationTimelineTestIds.GROUP_ID, plaintext = CONVERSATION_MESSAGE)
+        val script = ScriptedConversationTimelineSubscription(timelinePage(message))
+        val fixture = ReturnFixture(timelineScripts = listOf(script))
         val seededBootstrap = CompletableDeferred<Unit>()
         seedReadyStartup(fixture.appState, seededBootstrap)
         ContractShellTestApplication.fixtureAppState = fixture.appState
@@ -68,8 +80,10 @@ class ShellActivityRecreationContractTest {
             composeRule.onNodeWithTag("chat.row.${fixture.target.groupIdHex}").performClick()
             awaitCondition { process.selectedChat.value?.id == fixture.target.groupIdHex }
             awaitCondition { composeRule.onAllNodes(conversationHeader()).fetchSemanticsNodes().isNotEmpty() }
+            awaitCondition { messageShown() }
             composeRule.onNode(conversationHeader()).performClick()
             awaitCondition { detailsShown() }
+            assertFalse("details must cover the transcript", messageShown())
             val opened = fixture.appState.attachedConversationControllers().single()
 
             scenario.recreate()
@@ -85,6 +99,9 @@ class ShellActivityRecreationContractTest {
             Espresso.pressBack()
             awaitCondition { !detailsShown() }
             assertEquals(fixture.target.groupIdHex, process.selectedChat.value?.id)
+            awaitCondition { messageShown() }
+            composeRule.onNode(hasText(CONVERSATION_MESSAGE, substring = true)).assertIsDisplayed()
+            composeRule.onNode(hasSetTextAction()).assertIsDisplayed()
         }
     }
 
@@ -109,6 +126,12 @@ class ShellActivityRecreationContractTest {
         return rows.fetchSemanticsNodes().isNotEmpty()
     }
 
+    /** True while the conversation's one message is composed. */
+    private fun messageShown(): Boolean {
+        val carriers = composeRule.onAllNodes(hasText(CONVERSATION_MESSAGE, substring = true))
+        return carriers.fetchSemanticsNodes().isNotEmpty()
+    }
+
     /** True while the chat details list is composed. */
     private fun detailsShown(): Boolean = composeRule.onAllNodesWithTag(DETAILS_TAG).fetchSemanticsNodes().isNotEmpty()
 
@@ -126,6 +149,7 @@ class ShellActivityRecreationContractTest {
 
     private companion object {
         const val DETAILS_TAG = "chat_info.list"
+        const val CONVERSATION_MESSAGE = "recreated conversation only message"
         const val WAIT_MILLIS = 10_000L
     }
 }
