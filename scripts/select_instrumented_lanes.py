@@ -40,6 +40,10 @@ FIXTURE_ONLY = (
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/IncomingAttachmentBackgroundDownloadAndroidTest.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptFixtureSupport.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptNetworkDiagnostics.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformInterruptedAttachmentProbe.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeLedger.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeHostDiagnostics.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptSchedulingDiagnostics.kt',
 )
 
 # Production and build inputs the fixture exercises alongside other device tests.

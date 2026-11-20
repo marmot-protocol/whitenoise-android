@@ -78,7 +78,7 @@ internal class PlatformResumeHostDiagnostics(
             .put("has_active_network", state.hasActiveNetwork())
             .put("has_validated_internet", state.hasValidatedInternet())
             .put(
-                "account_list_changed",
+                "account_list_generation_changed",
                 old?.let { it.accountListGeneration != current.accountListGeneration }
                     ?: JSONObject.NULL,
             ).put("bootstrap_completed", readResumeField(state, "bootstrapCompleted") as Boolean)
@@ -96,12 +96,14 @@ internal class PlatformResumeHostDiagnostics(
             val applied = (readResumeField(permissions, "applied") as StateFlow<*>).value
             val accounts = applied?.let { readResumeField(it, "accounts") as Map<*, *> }
             val allowed = accounts?.get(account) as? AttachmentAutomaticPermissionFfi
+            val appliedRevision =
+                if (allowed == null) null else readResumeField(requireNotNull(applied), "revision") as Long
             JSONObject()
                 .put("available", true)
                 .put("observed_permission_revision", revision)
                 // Absence is unclassified: changed network evaluations also clear the coalescing key.
                 .put("network_key_matches_revision", keyRevision?.let { it == revision } ?: JSONObject.NULL)
-                .put("applied_revision", permissions.appliedRevision(account) ?: JSONObject.NULL)
+                .put("applied_revision", appliedRevision ?: JSONObject.NULL)
                 .put("documents_allowed", allowed?.files ?: JSONObject.NULL)
         }
     }
