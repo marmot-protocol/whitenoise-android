@@ -126,7 +126,8 @@ class AccountKeysExportDeliveryTest {
         var pending: (() -> Unit)? = null
         var delivered = false
         val ui = ProfileKeysUiState()
-        val action = RawKeyExportAuthentication { pending = it }.authorizedAction(ui, { true }) { delivered = true }
+        val authentication = RawKeyExportAuthentication { pending = it }
+        val action = { authentication.authorize(ui, { true }) { delivered = true } }
 
         action()
         assertFalse(delivered)

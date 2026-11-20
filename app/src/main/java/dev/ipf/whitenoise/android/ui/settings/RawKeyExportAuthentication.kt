@@ -115,18 +115,18 @@ internal fun RawKeyExportAuthentication.gateExport(
         if (encrypted) {
             beginExport(true, destination)
         } else {
-            authorizedAction(ui, { ui.rawExportDialog && ui.exportIdle && canDeliverSecret() }) {
+            authorize(ui, { ui.rawExportDialog && ui.exportIdle && canDeliverSecret() }) {
                 beginExport(false, destination)
-            }.invoke()
+            }
         }
     }
 
 /** Applies the same one-shot ownership check before every plaintext key disclosure. */
-internal fun RawKeyExportAuthentication.authorizedAction(
+internal fun RawKeyExportAuthentication.authorize(
     ui: ProfileKeysUiState,
     canDeliver: () -> Boolean,
     onAuthenticated: () -> Unit,
-): () -> Unit = {
+) {
     if (canDeliver()) {
         val consent = ui.rawKeyConsent
         request {

@@ -334,7 +334,7 @@ internal fun AccountKeysScreen(
                 if (ui.revealRequested) {
                     ui.hidePrivateKey()
                 } else {
-                    rawAuthentication.authorizedAction(ui, ::canDeliverSecret) {
+                    rawAuthentication.authorize(ui, ::canDeliverSecret) {
                         ui.revealRequested = true
                         ui.revealOperation.start(
                             scope = scope,
@@ -345,21 +345,23 @@ internal fun AccountKeysScreen(
                                 if (secret == null) ui.revealRequested = false
                             },
                         )
-                    }.invoke()
+                    }
                 }
             },
-            onCopyPrivate = rawAuthentication.authorizedAction(ui, ::canDeliverSecret) {
-                ui.copyOperation.start(
-                    scope = scope,
-                    canDeliver = ::canDeliverSecret,
-                    load = { ui.privateKey ?: appState.exportActiveAccountNsec() },
-                    onResult = { secret ->
-                        if (secret != null) {
-                            copySensitiveToClipboard(context, privateKeyLabel, secret)
-                            ui.copiedKey = CopiedProfileKey.Private
-                        }
-                    },
-                )
+            onCopyPrivate = {
+                rawAuthentication.authorize(ui, ::canDeliverSecret) {
+                    ui.copyOperation.start(
+                        scope = scope,
+                        canDeliver = ::canDeliverSecret,
+                        load = { ui.privateKey ?: appState.exportActiveAccountNsec() },
+                        onResult = { secret ->
+                            if (secret != null) {
+                                copySensitiveToClipboard(context, privateKeyLabel, secret)
+                                ui.copiedKey = CopiedProfileKey.Private
+                            }
+                        },
+                    )
+                }
             },
             onExportEncrypted = { ui.passwordDialog = true },
             onExportRaw = ui::openRawExport,
