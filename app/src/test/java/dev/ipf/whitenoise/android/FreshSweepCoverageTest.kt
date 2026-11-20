@@ -80,7 +80,9 @@ class FreshSweepCoverageTest {
     fun selectableMessageProjectionsSnapshotTextFromTheirRealInputs() {
         val source = source("ui/conversation/ConversationSelectableMessages.kt")
         val projection =
-            source.functionBody("projectSelectableMessages") + source.functionBody("selectableMessageProjection")
+            source.functionBody("projectSelectableMessages") +
+                source.functionBody("selectableMessageProjection") +
+                source.functionBody("liveSelectableMessage")
 
         assertTrue("each message must be projected", "selectableMessageProjection(item, controller" in projection)
         assertTrue("projected deletions must come from the controller", "controller.deletedMessageIds" in projection)

@@ -2733,4 +2733,18 @@
     <string name="document_pdf_page">Página %1$d de %2$d</string>
     <string name="document_zoom_reset">Ampliar / repor</string>
     <string name="composer_preview_attachment">Pré-visualizar anexo</string>
+    <string name="nostr_git_repository">Repositório Git</string>
+    <string name="nostr_git_refs">Estado do repositório Git</string>
+    <string name="nostr_git_patch">Patch do Git</string>
+    <string name="nostr_git_pr">Solicitação de merge do Git</string>
+    <string name="nostr_git_update">Atualização da solicitação de merge do Git</string>
+    <string name="nostr_git_issue">Problema do Git</string>
+    <string name="nostr_git_open">Estado do Git · Aberto</string>
+    <string name="nostr_git_applied">Estado do Git · Aplicado, mesclado ou resolvido</string>
+    <string name="nostr_git_closed">Estado do Git · Fechado</string>
+    <string name="nostr_git_draft">Estado do Git · Rascunho</string>
+    <string name="nostr_git_services">Serviços do Git</string>
+    <string name="nostr_git_comment">Comentário do Git</string>
+    <string name="nostr_git_copy_url">Copiar URL: %1$s</string>
+    <string name="nostr_git_open_url">Abrir URL: %1$s</string>
 </resources>

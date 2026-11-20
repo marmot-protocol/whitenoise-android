@@ -6,11 +6,10 @@ internal fun String.safeField(): String = sanitizedText().takeCodePoints(MAX_FIE
 
 internal fun String.safeExcerpt(): String = sanitizedText().takeCodePoints(MAX_EXCERPT_CODE_POINTS)
 
-internal fun String.safeReaderBody(): String =
-    ProfileSanitizer
-        .stripUnsafe(this)
-        .trim()
-        .takeCodePoints(MAX_READER_BODY_CODE_POINTS)
+internal fun String.safeReaderBody(preserveWhitespace: Boolean = false): String {
+    val sanitized = ProfileSanitizer.stripUnsafe(this)
+    return (if (preserveWhitespace) sanitized else sanitized.trim()).takeCodePoints(MAX_READER_BODY_CODE_POINTS)
+}
 
 private fun String.sanitizedText(): String =
     filterNot { it == '\u0000' || (it.isISOControl() && !it.isWhitespace()) }

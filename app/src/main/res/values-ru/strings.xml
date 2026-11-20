@@ -2818,4 +2818,18 @@
     <string name="document_pdf_page">Страница %1$d из %2$d</string>
     <string name="document_zoom_reset">Масштаб / сброс</string>
     <string name="composer_preview_attachment">Предпросмотр вложения</string>
+    <string name="nostr_git_repository">Репозиторий Git</string>
+    <string name="nostr_git_refs">Состояние репозитория Git</string>
+    <string name="nostr_git_patch">Патч Git</string>
+    <string name="nostr_git_pr">Запрос на слияние Git</string>
+    <string name="nostr_git_update">Обновление запроса на слияние Git</string>
+    <string name="nostr_git_issue">Задача Git</string>
+    <string name="nostr_git_open">Статус Git · Открыто</string>
+    <string name="nostr_git_applied">Статус Git · Применено, слито или решено</string>
+    <string name="nostr_git_closed">Статус Git · Закрыто</string>
+    <string name="nostr_git_draft">Статус Git · Черновик</string>
+    <string name="nostr_git_services">Службы Git</string>
+    <string name="nostr_git_comment">Комментарий Git</string>
+    <string name="nostr_git_copy_url">Копировать URL: %1$s</string>
+    <string name="nostr_git_open_url">Открыть URL: %1$s</string>
 </resources>

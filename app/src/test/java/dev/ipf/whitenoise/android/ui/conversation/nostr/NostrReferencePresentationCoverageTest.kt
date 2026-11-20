@@ -25,7 +25,6 @@ import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.hexString
 import dev.ipf.whitenoise.android.core.nip19
@@ -62,15 +61,6 @@ import java.util.concurrent.ConcurrentLinkedQueue
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class NostrReferencePresentationCoverageTest {
-    /** The card can reuse local pixels, but must never hand the author's URL to a view that loads it. */
-    @Test
-    fun eventHeaderUsesOnlyCachedAvatarPixels() {
-        val source =
-            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt")
-        assertTrue("picture = AvatarImageLoader.peek(card.authorMetadata?.pictureUrl)" in source)
-        assertFalse("pictureUrl = card.authorMetadata?.pictureUrl" in source)
-    }
-
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -80,9 +70,9 @@ class NostrReferencePresentationCoverageTest {
     @After
     fun closeScope() = scope.cancel()
 
-    /** Rendering a card uses initials or existing pixels and never invokes its image fetcher. */
+    /** Rendering the compact author label never invokes the avatar fetcher, even if cached pixels exist. */
     @Test
-    fun eventAvatarRemainsCacheOnlyThroughColdAndWarmComposition() {
+    fun eventAuthorLabelDoesNotFetchAnAvatarThroughColdAndWarmComposition() {
         val url = "https://example.com/fixture-event-author.png"
         val positiveControl = "https://example.com/fixture-profile-control.png"
         val requests = ConcurrentLinkedQueue<String>()
@@ -108,7 +98,7 @@ class NostrReferencePresentationCoverageTest {
                     }
                 }
             }
-            composeRule.onNodeWithText("A").assertIsDisplayed()
+            composeRule.onNodeWithText("Ada Example").assertIsDisplayed()
             assertFalse(AvatarImageLoader.isInFlightForTest(url))
             assertTrue(requests.isEmpty())
 

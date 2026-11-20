@@ -291,12 +291,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Checks the complete measured row against the usable lazy-list viewport. */
-private fun LazyListLayoutInfo.isItemFullyVisible(index: Int): Boolean {
-    val item = visibleItemsInfo.firstOrNull { it.index == index } ?: return false
-    return item.offset >= viewportStartOffset && item.offset + item.size <= viewportEndOffset
-}
-
 /** Captures only the bounded state needed to decide whether startup backfill can progress. */
 private fun ConversationController.initialTimelineBackfillSnapshot() =
     ConversationInitialTimelineBackfillSnapshot(
@@ -986,6 +980,7 @@ internal fun ConversationScreen(
             // so a promotion/demotion or roster verification is reflected.
             controller.isSelfAdmin,
             controller.canSendMessages,
+            controller.group.pendingConfirmation,
             selectionMediaCacheRevision,
             eligibilityNowSeconds,
         ) {
@@ -1203,7 +1198,8 @@ internal fun ConversationScreen(
             reconcileBatchSelections(
                 selected = selectedMessages,
                 selectableVisible = selectableMessages,
-                deletedMessageIds = controller.deletedMessageIds + pendingTimelineRemovals,
+                deletedMessageIds = controller.deletedMessageIds,
+                pendingTimelineRemovedMessageIds = pendingTimelineRemovals,
                 invalidVisibleMessageIds = invalidVisibleMessageIds,
             )
         selectedMessages.keys

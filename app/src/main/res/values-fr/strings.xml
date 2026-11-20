@@ -2733,4 +2733,18 @@
     <string name="document_pdf_page">Page %1$d sur %2$d</string>
     <string name="document_zoom_reset">Zoom / réinitialiser</string>
     <string name="composer_preview_attachment">Aperçu de la pièce jointe</string>
+    <string name="nostr_git_repository">Dépôt Git</string>
+    <string name="nostr_git_refs">État du dépôt Git</string>
+    <string name="nostr_git_patch">Correctif Git</string>
+    <string name="nostr_git_pr">Demande de fusion Git</string>
+    <string name="nostr_git_update">Mise à jour de demande de fusion Git</string>
+    <string name="nostr_git_issue">Ticket Git</string>
+    <string name="nostr_git_open">Statut Git · Ouvert</string>
+    <string name="nostr_git_applied">Statut Git · Appliqué, fusionné ou résolu</string>
+    <string name="nostr_git_closed">Statut Git · Fermé</string>
+    <string name="nostr_git_draft">Statut Git · Brouillon</string>
+    <string name="nostr_git_services">Services Git</string>
+    <string name="nostr_git_comment">Commentaire Git</string>
+    <string name="nostr_git_copy_url">Copier l’URL : %1$s</string>
+    <string name="nostr_git_open_url">Ouvrir l’URL : %1$s</string>
 </resources>

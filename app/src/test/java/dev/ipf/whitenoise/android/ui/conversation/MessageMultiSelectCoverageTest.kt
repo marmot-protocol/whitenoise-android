@@ -143,7 +143,7 @@ class MessageMultiSelectCoverageTest {
         assertTrue(source.contains("messageBubbleSelectionGutterWidth"))
         assertTrue(source.contains("if (mine) Spacer(Modifier.weight(1f))"))
         assertTrue(!source.contains(".matchParentSize()"))
-        assertTrue(source.contains("canSelect = !deleted && !actionsReadOnly && batchSelectable"))
+        assertTrue(source.contains("canSelect = !actionsReadOnly && batchSelectable"))
     }
 
     /** Every action-menu entry point is gated on selection mode and resets the long-press anchor before opening. */

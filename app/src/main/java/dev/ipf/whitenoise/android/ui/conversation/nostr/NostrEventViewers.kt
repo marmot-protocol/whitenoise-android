@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -63,12 +64,15 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.WebLinkConfirmation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
+import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
+import dev.ipf.whitenoise.android.ui.openMarkdownLink
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import kotlinx.coroutines.launch
 
@@ -239,7 +243,11 @@ private fun NostrEventReaderBody(
 ) {
     val blocks =
         preparation?.blocks ?: remember(document) {
-            document?.takeIf(::nostrReaderCanFormat)?.let(::nostrReaderBlocks).orEmpty()
+            document
+                ?.takeUnless { card.literalReaderBody }
+                ?.takeIf(::nostrReaderCanFormat)
+                ?.let(::nostrReaderBlocks)
+                .orEmpty()
         }
     val textChunks =
         preparation?.textChunks ?: remember(card.readerBody, card.summary) {
@@ -279,7 +287,11 @@ private fun NostrEventReaderBody(
             }
         } else {
             itemsIndexed(textChunks) { _, chunk ->
-                EmojiLabel(chunk, style = MaterialTheme.typography.bodyLarge)
+                val style = MaterialTheme.typography.bodyLarge
+                EmojiLabel(
+                    chunk,
+                    style = if (card.literalReaderBody) style.copy(fontFamily = FontFamily.Monospace) else style,
+                )
             }
         }
     }
@@ -307,6 +319,34 @@ private fun NostrEventReaderContext(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         card.metadata.forEach { detail -> EmojiLabel(detail, style = MaterialTheme.typography.bodyMedium) }
+        if (card.gitLinks.isNotEmpty()) {
+            val clipboard = LocalClipboard.current
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            var pendingOpenLink by remember { mutableStateOf<String?>(null) }
+            pendingOpenLink?.let { link ->
+                WebLinkConfirmation(
+                    url = link,
+                    onDismiss = { pendingOpenLink = null },
+                    onConfirm = {
+                        pendingOpenLink = null
+                        openMarkdownLink(context, link)
+                    },
+                )
+            }
+            card.gitLinks.forEach { link ->
+                TextButton(
+                    onClick = { scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(link, link))) } },
+                ) {
+                    Text(stringResource(R.string.nostr_git_copy_url, link))
+                }
+                if (Uri.parse(link).scheme.equals("https", ignoreCase = true) && isOpenableMarkdownLink(link)) {
+                    TextButton(onClick = { pendingOpenLink = link }) {
+                        Text(stringResource(R.string.nostr_git_open_url, link))
+                    }
+                }
+            }
+        }
         if (onPlayVideo != null) {
             videoUrls.forEach { url ->
                 val (playModifier, play) =
