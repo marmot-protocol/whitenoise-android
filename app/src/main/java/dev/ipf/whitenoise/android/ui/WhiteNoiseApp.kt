@@ -826,9 +826,7 @@ internal fun WhiteNoiseApp(
                         }
                         // Sign Out & Wipe chrome (#350) lives above the phase
                         // router but below the lock privacy boundary.
-                        if (appState.wipeInProgress) {
-                            WipeProgressSheet()
-                        }
+                        if (appState.wipeInProgress) WipeProgressSheet()
                         appState.pendingWipeReport?.let { report ->
                             WipeOutcomeSheet(
                                 report = report,
