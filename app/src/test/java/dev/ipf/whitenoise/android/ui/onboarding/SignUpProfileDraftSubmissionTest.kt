@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -282,8 +283,8 @@ class SignUpProfileDraftSubmissionTest {
         val hint = context.getString(R.string.signup_generated_name_hint)
         composeRule.onNodeWithTag("explanation.sheet").assertDoesNotExist()
         composeRule.onNodeWithTag("onboarding.sign_up.suggest_name").performTouchInput { longClick() }
-        composeRule.onNodeWithTag("explanation.sheet").assertExists()
-        composeRule.onNodeWithText(hint).assertExists()
+        composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
+        composeRule.onNodeWithText(hint).assertIsDisplayed()
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
         composeRule.runOnIdle {
             assertEquals(listOf<String?>(null), requests)

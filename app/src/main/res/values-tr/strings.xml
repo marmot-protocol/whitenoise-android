@@ -2236,7 +2236,7 @@
     <string name="onboarding_signing_in">Giriş yapılıyor…</string>
     <string name="onboarding_choose_profile">Profil seç</string>
     <string name="onboarding_enter_private_key">Özel anahtarı girin</string>
-    <string name="signup_generated_name_hint">Kayıt rastgele bir adla başlar. Başka bir ad için zar atabilir veya kendi adını yazabilirsin.</string>
+    <string name="signup_generated_name_hint">Kayıt rastgele bir adla başlar. Başka bir ad için zar atabilir veya kendi adınızı yazabilirsiniz.</string>
     <string name="signup_about_prompt">Kendinizden bahsedin</string>
     <string name="signup_preparing_photo">Fotoğraf hazırlanıyor…</string>
     <string name="signup_publishing_profile">Profil yayınlanıyor…</string>
