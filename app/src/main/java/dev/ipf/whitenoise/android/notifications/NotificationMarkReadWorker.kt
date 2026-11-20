@@ -4,12 +4,14 @@ import android.content.Context
 import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.markNotificationMessageReadIfAllowed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -56,14 +58,16 @@ class NotificationMarkReadWorker(
             if (markedRead == null) return lockedMarkReadResult(retryStore, retryKey)
             if (!markedRead) return markReadFailureResult(retryStore, retryKey)
 
-            LocalNotificationPresenter(applicationContext).dismissActionNotificationAndOlderSiblings(
-                notificationTag = action.notificationTag,
-                notificationId = action.notificationId,
-                actedMessageIdHex = action.target.messageIdHex,
-                accountRef = action.target.accountRef,
-                groupIdHex = action.target.groupIdHex,
-                sinceMs = dismissBaselineMs,
-            )
+            if (inputData.getBoolean(DISMISS_CARD_KEY, true)) {
+                LocalNotificationPresenter(applicationContext).dismissActionNotificationAndOlderSiblings(
+                    notificationTag = action.notificationTag,
+                    notificationId = action.notificationId,
+                    actedMessageIdHex = action.target.messageIdHex,
+                    accountRef = action.target.accountRef,
+                    groupIdHex = action.target.groupIdHex,
+                    sinceMs = dismissBaselineMs,
+                )
+            }
             Result.success().also { retryStore.clear(retryKey) }
         } catch (cancel: CancellationException) {
             throw cancel
@@ -98,20 +102,23 @@ class NotificationMarkReadWorker(
 
     companion object {
         private const val TAG = "DMMarkReadWorker"
+        private const val DISMISS_CARD_KEY = "dismiss_card"
         private const val MAX_ATTEMPTS = 3
         private const val BACKOFF_DELAY_SECONDS = 30L
 
+        /** Keeps repeated actions durable, with a distinct key for a cursor-only update after sending. */
         suspend fun enqueue(
             context: Context,
             action: NotificationAction,
+            dismissCard: Boolean = true,
         ): Boolean =
             try {
                 WorkManager
                     .getInstance(context.applicationContext)
                     .enqueueUniqueWork(
-                        notificationMarkReadWorkName(action),
+                        notificationMarkReadWorkName(action, dismissCard),
                         ExistingWorkPolicy.KEEP,
-                        notificationMarkReadRequest(action),
+                        notificationMarkReadRequest(action, dismissCard),
                     ).await()
                 true
             } catch (cancel: CancellationException) {
@@ -123,7 +130,11 @@ class NotificationMarkReadWorker(
 
         internal fun shouldRetryAfterFailure(runAttemptCount: Int): Boolean = runAttemptCount < MAX_ATTEMPTS - 1
 
-        internal fun notificationMarkReadWorkName(action: NotificationAction): String {
+        /** Separates explicit card dismissal from cursor-only cleanup for the same message. */
+        internal fun notificationMarkReadWorkName(
+            action: NotificationAction,
+            dismissCard: Boolean = true,
+        ): String {
             val canonical =
                 listOf(
                     action.target.accountRef,
@@ -131,19 +142,52 @@ class NotificationMarkReadWorker(
                     action.target.messageIdHex.orEmpty(),
                 ).joinToString("\u0000")
             val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
-            return "notification_mark_read_" +
-                buildString(digest.size * 2) {
-                    digest.forEach { byte -> append("%02x".format(byte.toInt() and 0xff)) }
-                }
+            val suffix = if (dismissCard) "" else "_cursor"
+            return buildString {
+                append("notification_mark_read_")
+                digest.forEach { byte -> append("%02x".format(byte.toInt() and 0xff)) }
+                append(suffix)
+            }
         }
 
-        internal fun notificationMarkReadRequest(action: NotificationAction) =
+        /** Records whether this action owns card dismissal along with its read cursor. */
+        internal fun notificationMarkReadRequest(
+            action: NotificationAction,
+            dismissCard: Boolean = true,
+        ) =
             OneTimeWorkRequestBuilder<NotificationMarkReadWorker>()
-                .setInputData(NotificationActionWorkData.encode(action))
+                .setInputData(
+                    Data
+                        .Builder()
+                        .putAll(NotificationActionWorkData.encode(action))
+                        .putBoolean(DISMISS_CARD_KEY, dismissCard)
+                        .build(),
+                )
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
                     BACKOFF_DELAY_SECONDS,
                     TimeUnit.SECONDS,
                 ).build()
     }
+}
+
+/** Defers a denied read independently after a reply or reaction has already been accepted. */
+internal suspend fun markReadAfterNotificationSend(
+    context: Context,
+    appState: WhiteNoiseAppState,
+    action: NotificationAction,
+): Boolean {
+    val markedRead =
+        withContext(Dispatchers.Main.immediate) {
+            appState.markNotificationMessageReadIfAllowed(
+                accountRef = action.target.accountRef,
+                groupIdHex = action.target.groupIdHex,
+                messageIdHex = action.target.messageIdHex.orEmpty(),
+            )
+        }
+    return markedRead ?: NotificationMarkReadWorker.enqueue(
+        context,
+        action.copy(kind = NotificationActionKind.MARK_READ),
+        dismissCard = false,
+    )
 }

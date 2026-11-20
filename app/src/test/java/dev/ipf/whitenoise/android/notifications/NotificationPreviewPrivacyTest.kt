@@ -498,6 +498,27 @@ class NotificationPreviewPrivacyTest {
         }
     }
 
+    /** A Name-only card becomes local-only as soon as outgoing reply history is posted. */
+    @Test
+    fun completingANameOnlyReplyKeepsTheReplyHistoryOnTheOriginatingDevice() =
+        runBlocking {
+            assertTrue(
+                NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.NAME_ONLY, scrub = { true }),
+            )
+            val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
+            presenter.ensureChannels()
+            assertTrue(presenter.show(update(), shortNpub = { "Private sender" }))
+            val original = manager.activeNotifications.single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
+
+            assertFalse(original.notification.flags and Notification.FLAG_LOCAL_ONLY != 0)
+            assertTrue(presenter.markDirectReplyHandled(original.tag, original.id, "Local reply"))
+
+            val completed = manager.activeNotifications.single { it.tag == original.tag }.notification
+            assertTrue(completed.flags and Notification.FLAG_LOCAL_ONLY != 0)
+            val history = completed.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)
+            assertEquals(listOf("Local reply"), history?.map(CharSequence::toString))
+        }
+
     /** Name-only cards keep who wrote, but neither the message nor the reacted-to text reaches the tray. */
     @Test
     fun nameOnlyKeepsSenderAndHidesMessageText() {

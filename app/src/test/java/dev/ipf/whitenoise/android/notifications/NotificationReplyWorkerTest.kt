@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.work.Data
 import androidx.work.ListenableWorker.Result
 import androidx.work.NetworkType
+import androidx.work.WorkManager
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
@@ -154,6 +155,11 @@ class NotificationReplyWorkerTest {
             assertTrue(store.isCompleted(completionKey))
             assertEquals(0, fixture.sendTextCalls.get())
             assertEquals(0, fixture.markReadCalls.get())
+
+            val read = replyAction().copy(kind = NotificationActionKind.MARK_READ)
+            val workName = NotificationMarkReadWorker.notificationMarkReadWorkName(read, dismissCard = false)
+            val queued = WorkManager.getInstance(realContext).getWorkInfosForUniqueWork(workName).get()
+            assertEquals(1, queued.size)
         }
 
     /** Once the read-only probe rules out acceptance, expiration clears the active receipt. */

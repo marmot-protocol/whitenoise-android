@@ -16,7 +16,6 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.markNotificationMessageRead
 import dev.ipf.whitenoise.android.state.sendNotificationReply
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -358,27 +357,12 @@ class NotificationReplyWorker(
         return Result.failure()
     }
 
+    /** Marks the source read, deferring the read if App Lock closed after MDK accepted the reply. */
     private suspend fun markReadAfterReply(
         application: WhiteNoiseApplication,
         action: NotificationAction,
     ) {
-        val result =
-            try {
-                withContext(Dispatchers.Main.immediate) {
-                    application.appState.markNotificationMessageRead(
-                        accountRef = action.target.accountRef,
-                        groupIdHex = action.target.groupIdHex,
-                        messageIdHex = action.target.messageIdHex.orEmpty(),
-                    )
-                }
-            } catch (throwable: Throwable) {
-                if (throwable is CancellationException) throw throwable
-                notificationWarning(TAG, "reply sent but mark-read failed", throwable) {
-                    "group=${action.target.groupIdHex.take(8)} message=${action.target.messageIdHex.orEmpty().take(8)}"
-                }
-                null
-            }
-        if (result == false) {
+        if (!markReadAfterNotificationSend(applicationContext, application.appState, action)) {
             notificationWarning(TAG, "reply sent but mark-read failed") {
                 "group=${action.target.groupIdHex.take(8)} message=${action.target.messageIdHex.orEmpty().take(8)}"
             }

@@ -18,7 +18,6 @@ import androidx.work.await
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
-import dev.ipf.whitenoise.android.state.markNotificationMessageRead
 import dev.ipf.whitenoise.android.state.sendNotificationReaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -199,15 +198,7 @@ class NotificationReactionWorker(
                 }
             }.onFailure { Log.w(TAG, "notification_reaction_recent_emoji_failed") }
             runCatching {
-                withContext(Dispatchers.Main.immediate) {
-                    application.appState.markNotificationMessageRead(
-                        accountRef = input.action.target.accountRef,
-                        groupIdHex = input.action.target.groupIdHex,
-                        messageIdHex =
-                            input.action.target.messageIdHex
-                                .orEmpty(),
-                    )
-                }
+                markReadAfterNotificationSend(applicationContext, application.appState, input.action)
             }.onFailure { Log.w(TAG, "notification_reaction_mark_read_failed") }
             runCatching {
                 // Receiver cleanup normally removes the card immediately. This
