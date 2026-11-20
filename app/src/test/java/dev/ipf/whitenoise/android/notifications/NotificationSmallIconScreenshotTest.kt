@@ -61,8 +61,8 @@ class NotificationSmallIconScreenshotTest {
     @Test
     fun messageMarkOutlineIsHeavyEnoughForTheStatusBar() {
         val mark = render(R.drawable.ic_stat_whitenoise, MEASURE_SIZE_PX, Color.WHITE)
-        val topStroke = (0 until OUTLINE_PROBE_SPAN_PX).sumOf { Color.alpha(mark.getPixel(OUTLINE_PROBE_PX, it)) } / 255f
-        val leftStroke = (0 until OUTLINE_PROBE_SPAN_PX).sumOf { Color.alpha(mark.getPixel(it, OUTLINE_PROBE_PX)) } / 255f
+        val topStroke = coveredPixels { mark.getPixel(OUTLINE_PROBE_PX, it) }
+        val leftStroke = coveredPixels { mark.getPixel(it, OUTLINE_PROBE_PX) }
         for ((edge, width) in listOf("Top" to topStroke, "Left" to leftStroke)) {
             assertTrue("$edge outline is $width px, under $MIN_OUTLINE_PX px", width >= MIN_OUTLINE_PX)
         }
@@ -122,6 +122,10 @@ class NotificationSmallIconScreenshotTest {
         drawable.setBounds(0, 0, size, size)
         return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { drawable.draw(Canvas(it)) }
     }
+
+    /** Sums alpha over the first [OUTLINE_PROBE_SPAN_PX] pixels of a probe line, in whole pixels. */
+    private fun coveredPixels(pixelAt: (Int) -> Int): Float =
+        (0 until OUTLINE_PROBE_SPAN_PX).sumOf { Color.alpha(pixelAt(it)) } / 255f
 
     private fun alphaBounds(bitmap: Bitmap): PixelBounds {
         var left = bitmap.width
