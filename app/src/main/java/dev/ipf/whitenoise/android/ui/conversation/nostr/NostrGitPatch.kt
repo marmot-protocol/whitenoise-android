@@ -2,7 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 
-private val patchSubjectPrefix = Regex("""^\[(?:RFC\s+)?PATCH(?:\s+[^\]]*)?]\s*""", RegexOption.IGNORE_CASE)
+private val patchSubjectPrefix = Regex("""^\[(?:RFC\s+)?PATCH(?:\s[^\]]*)?]\s*""", RegexOption.IGNORE_CASE)
 private val patchHeaderSeparator = Regex("""\r\n\r\n|\n\n|\r\r""")
 
 /** The format-patch `Subject:` header of a kind 1617 patch, without its `[PATCH n/m]` tag. */
