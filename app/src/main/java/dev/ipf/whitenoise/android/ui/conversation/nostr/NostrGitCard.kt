@@ -167,7 +167,8 @@ internal fun gitPreviewField(value: String): String? {
     val prefix = "$KIND_GIT_REPOSITORY:"
     val repo =
         value.takeIf { it.startsWith(prefix) }?.removePrefix(prefix)?.let { address ->
-            address.substringAfter(':', "").takeIf { it.isNotBlank() && gitEventId.matches(address.substringBefore(':')) }
+            val pubkey = address.substringBefore(':')
+            address.substringAfter(':', "").takeIf { it.isNotBlank() && gitEventId.matches(pubkey) }
         }
     return repo ?: value
 }

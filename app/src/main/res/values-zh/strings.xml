@@ -2670,4 +2670,18 @@
     <string name="document_pdf_page">第 %1$d 页，共 %2$d 页</string>
     <string name="document_zoom_reset">缩放 / 重置</string>
     <string name="composer_preview_attachment">预览附件</string>
+    <string name="nostr_git_repository">Git 仓库</string>
+    <string name="nostr_git_refs">Git 仓库状态</string>
+    <string name="nostr_git_patch">Git 补丁</string>
+    <string name="nostr_git_pr">Git 拉取请求</string>
+    <string name="nostr_git_update">Git 拉取请求更新</string>
+    <string name="nostr_git_issue">Git 议题</string>
+    <string name="nostr_git_open">Git 状态 · 已打开</string>
+    <string name="nostr_git_applied">Git 状态 · 已应用、合并或解决</string>
+    <string name="nostr_git_closed">Git 状态 · 已关闭</string>
+    <string name="nostr_git_draft">Git 状态 · 草稿</string>
+    <string name="nostr_git_services">Git 服务</string>
+    <string name="nostr_git_comment">Git 评论</string>
+    <string name="nostr_git_copy_url">复制网址：%1$s</string>
+    <string name="nostr_git_open_url">打开网址：%1$s</string>
 </resources>

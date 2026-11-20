@@ -2709,4 +2709,18 @@
     <string name="document_pdf_page">Sayfa %1$d / %2$d</string>
     <string name="document_zoom_reset">Yakınlaştır / sıfırla</string>
     <string name="composer_preview_attachment">Eki önizle</string>
+    <string name="nostr_git_repository">Git deposu</string>
+    <string name="nostr_git_refs">Git deposu durumu</string>
+    <string name="nostr_git_patch">Git yaması</string>
+    <string name="nostr_git_pr">Git birleştirme isteği</string>
+    <string name="nostr_git_update">Git birleştirme isteği güncellemesi</string>
+    <string name="nostr_git_issue">Git sorunu</string>
+    <string name="nostr_git_open">Git durumu · Açık</string>
+    <string name="nostr_git_applied">Git durumu · Uygulandı, birleştirildi veya çözüldü</string>
+    <string name="nostr_git_closed">Git durumu · Kapalı</string>
+    <string name="nostr_git_draft">Git durumu · Taslak</string>
+    <string name="nostr_git_services">Git hizmetleri</string>
+    <string name="nostr_git_comment">Git yorumu</string>
+    <string name="nostr_git_copy_url">URL’yi kopyala: %1$s</string>
+    <string name="nostr_git_open_url">URL’yi aç: %1$s</string>
 </resources>

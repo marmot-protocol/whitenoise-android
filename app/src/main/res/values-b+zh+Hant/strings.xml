@@ -2670,4 +2670,18 @@
     <string name="document_pdf_page">第 %1$d 頁，共 %2$d 頁</string>
     <string name="document_zoom_reset">縮放 / 重設</string>
     <string name="composer_preview_attachment">預覽附件</string>
+    <string name="nostr_git_repository">Git 儲存庫</string>
+    <string name="nostr_git_refs">Git 儲存庫狀態</string>
+    <string name="nostr_git_patch">Git 修補檔</string>
+    <string name="nostr_git_pr">Git 提取要求</string>
+    <string name="nostr_git_update">Git 提取要求更新</string>
+    <string name="nostr_git_issue">Git 議題</string>
+    <string name="nostr_git_open">Git 狀態 · 已開啟</string>
+    <string name="nostr_git_applied">Git 狀態 · 已套用、合併或解決</string>
+    <string name="nostr_git_closed">Git 狀態 · 已關閉</string>
+    <string name="nostr_git_draft">Git 狀態 · 草稿</string>
+    <string name="nostr_git_services">Git 服務</string>
+    <string name="nostr_git_comment">Git 留言</string>
+    <string name="nostr_git_copy_url">複製網址：%1$s</string>
+    <string name="nostr_git_open_url">開啟網址：%1$s</string>
 </resources>
