@@ -30,7 +30,8 @@ private const val REPLY_LOG_GROUP_LENGTH = 8
 
 /**
  * Sends one notification reply exactly once, reporting an earlier attempt that already committed instead of
- * resending it, and refusing a reply over the outgoing limit before anything is sent.
+ * resending it, and refusing a reply over the outgoing limit before anything is sent. A locked worker can
+ * set [allowNewSend] to false to recover a prior attempt without admitting a new send.
  */
 internal suspend fun WhiteNoiseAppState.sendNotificationReply(
     accountRef: String,
@@ -40,6 +41,7 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReply(
     completionStore: NotificationReplyCompletionStore,
     completionKey: String,
     recoveryScope: String,
+    allowNewSend: Boolean = true,
 ): NotificationReplySendOutcome {
     val account = accountRef.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
     val group = groupIdHex.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
@@ -76,6 +78,9 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReply(
                         return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
                     NotificationReplyCommitProbe.NotCommitted -> Unit
                 }
+            }
+            if (!allowNewSend) {
+                return@withGroupCommitLock NotificationReplySendOutcome.BlockedByAppLock
             }
             // A reply queued before the limit existed may be over it. Refuse it only now, once the
             // probe above has ruled out an earlier attempt that already committed it.

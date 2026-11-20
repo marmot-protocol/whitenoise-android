@@ -35,6 +35,14 @@
         "test_ids": [
           "SEC-002"
         ]
+      },
+      {
+        "surface": "Locked reply whose earlier acceptance could not be resolved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReplyWorker.kt",
+        "anchor": "R.string.delivery_not_confirmed",
+        "test_ids": [
+          "SEC-002"
+        ]
       }
     ]
   },

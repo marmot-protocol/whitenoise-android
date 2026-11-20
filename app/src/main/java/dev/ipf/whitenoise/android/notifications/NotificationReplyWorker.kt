@@ -15,6 +15,7 @@ import androidx.work.await
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.markNotificationMessageRead
 import dev.ipf.whitenoise.android.state.sendNotificationReply
 import kotlinx.coroutines.CancellationException
@@ -77,7 +78,10 @@ class NotificationReplyWorker(
         // WorkManager keeps this id stable across retries and assigns a new one
         // to every separately enqueued reply, even when the text is identical.
         val completionKey = notificationReplyCompletionKey(id)
-        if (completionStore.isCompleted(completionKey)) {
+        val committedMessageId = completionStore.startedRecoveryState(completionKey)?.committedMessageIdHex
+        val accepted = committedMessageId?.let(ConversationController.HEX_MESSAGE_ID::matches) == true
+        if (completionStore.isCompleted(completionKey) || accepted) {
+            if (accepted) withContext(Dispatchers.IO) { completionStore.markCompleted(completionKey) }
             return completedReplyResult(application, action, reply).also { retryStore.clear(retryKey) }
         }
         when (completionStore.abandonedOutcome(completionKey)) {
@@ -95,8 +99,10 @@ class NotificationReplyWorker(
             withContext(Dispatchers.Main.immediate) {
                 application.appState.appLock.notificationActionsAllowed
             }
-        if (!actionsAllowed) return lockedReplyResult(action, containsLegacyPlaintext, retryStore, retryKey)
-        if (retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS) {
+        if (!actionsAllowed && !completionStore.hasStarted(completionKey)) {
+            return lockedReplyResult(action, containsLegacyPlaintext, retryStore, retryKey)
+        }
+        if (actionsAllowed && retryStore.operationFailureCount(retryKey) >= MAX_SEND_ATTEMPTS) {
             return finalizeReplyFailure(action, containsLegacyPlaintext, completionStore, completionKey, retryStore, retryKey)
         }
 
@@ -114,8 +120,18 @@ class NotificationReplyWorker(
                         completionStore = completionStore,
                         completionKey = completionKey,
                         recoveryScope = notificationReplyRecoveryScope(action.target.accountRef, action.target.groupIdHex),
+                        allowNewSend = actionsAllowed,
                     )
                 }
+            if (!actionsAllowed && sendOutcome == NotificationReplySendOutcome.RetryableFailure) {
+                return lockedReplyResult(
+                    action,
+                    containsLegacyPlaintext,
+                    retryStore,
+                    retryKey,
+                    priorAcceptanceUnknown = true,
+                )
+            }
             when (sendOutcome) {
                 NotificationReplySendOutcome.Sent,
                 NotificationReplySendOutcome.AcceptedPending,
@@ -150,7 +166,18 @@ class NotificationReplyWorker(
             throw cancel
         } catch (throwable: Throwable) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply worker failed group=${action.target.groupIdHex.take(8)}", throwable)
-            replyFailureResult(action, containsLegacyPlaintext, completionStore, completionKey, retryStore, retryKey)
+            if (!actionsAllowed) {
+                lockedReplyResult(action, containsLegacyPlaintext, retryStore, retryKey, priorAcceptanceUnknown = true)
+            } else {
+                replyFailureResult(
+                    action,
+                    containsLegacyPlaintext,
+                    completionStore,
+                    completionKey,
+                    retryStore,
+                    retryKey,
+                )
+            }
         }
     }
 
@@ -247,27 +274,36 @@ class NotificationReplyWorker(
         )
     }
 
-    /** Defers encrypted work while locked without consuming the send-attempt budget. */
+    /** Defers encrypted work while locked and retires a terminal receipt only after resolving prior acceptance. */
     private suspend fun lockedReplyResult(
         action: NotificationAction,
         containsLegacyPlaintext: Boolean,
         retryStore: NotificationActionRetryStore,
         retryKey: String,
-    ): Result =
-        when {
-            containsLegacyPlaintext -> Result.failure().also { retryStore.clear(retryKey) }
-            retryStore.shouldDeferForLock(
-                retryKey,
-                NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS,
-            ) -> Result.retry()
-            else -> {
-                notificationWarning(TAG, "reply lock wait expired") {
-                    "group=${action.target.groupIdHex.take(8)}"
-                }
-                surfaceReplyFailure(action, R.string.notification_action_unlock_required)
-                Result.failure().also { retryStore.clear(retryKey) }
-            }
+        priorAcceptanceUnknown: Boolean = false,
+    ): Result {
+        if (
+            !containsLegacyPlaintext &&
+            retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)
+        ) {
+            return Result.retry()
         }
+        if (priorAcceptanceUnknown) {
+            retryStore.clear(retryKey)
+            surfaceReplyFailure(action, R.string.delivery_not_confirmed)
+            return Result.failure()
+        }
+        return finalizeReplyFailure(
+            action = action,
+            containsLegacyPlaintext = containsLegacyPlaintext,
+            completionStore = NotificationReplyCompletionStore.create(applicationContext),
+            completionKey = notificationReplyCompletionKey(id),
+            retryStore = retryStore,
+            retryKey = retryKey,
+            failureReason = "app lock prevented send",
+            notice = R.string.notification_action_unlock_required,
+        )
+    }
 
     /** Records the reply as abandoned, then restores the card with [notice] so the user can try again. */
     private suspend fun finalizeReplyFailure(
@@ -281,12 +317,12 @@ class NotificationReplyWorker(
         @StringRes notice: Int = R.string.toast_send_failed,
     ): Result {
         // Only persist the abandon marker once we're actually giving up (off the
-        // worker thread); if it can't be recorded, retry so recovery state isn't lost.
+        // worker thread); if it can't be recorded, retry encrypted work to preserve crash recovery.
         val persisted =
             withContext(Dispatchers.IO) {
                 completionStore.markAbandoned(completionKey, NotificationReplyAbandonedOutcome.Failure)
             }
-        if (!persisted) return Result.retry()
+        if (!persisted && !containsLegacyPlaintext) return Result.retry()
         val reason = failureReason ?: if (containsLegacyPlaintext) "legacy plaintext cannot be retained" else "retry limit reached"
         notificationWarning(TAG, "reply failed ($reason) attempts=${retryStore.operationFailureCount(retryKey)}") {
             "group=${action.target.groupIdHex.take(8)}"
