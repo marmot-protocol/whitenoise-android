@@ -228,16 +228,6 @@
         ]
       },
       {
-        "surface": "R.string.toast_couldnt_export_transcript",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_export_transcript",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.string.toast_couldnt_leave_chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_couldnt_leave_chat",

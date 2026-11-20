@@ -98,6 +98,7 @@ import dev.ipf.whitenoise.android.state.conversationNotifyMode
 import dev.ipf.whitenoise.android.state.conversationVibrationPattern
 import dev.ipf.whitenoise.android.state.disbandGroup
 import dev.ipf.whitenoise.android.state.enableGroupDisbanding
+import dev.ipf.whitenoise.android.state.exportConversationTranscriptFile
 import dev.ipf.whitenoise.android.state.folderMemberIds
 import dev.ipf.whitenoise.android.state.inviteMembers
 import dev.ipf.whitenoise.android.state.inviteProfileToGroups
@@ -739,7 +740,6 @@ internal fun GroupDetailsScreen(
             )
         }
 
-        /** Exports the transcript through the native save flow. */
         fun exportTranscript() {
             if (transcriptExportInFlight || transcriptSave.busy) return
             transcriptExportInFlight = true
