@@ -107,7 +107,7 @@ class DeletedMessageLocalRemovalTest {
 
         placeholder().performTouchInput { longClick() }
 
-        openPlaceholderDeleteConfirmation()
+        composeRule.openPlaceholderDeleteConfirmation(::string)
         assertDeleteConfirmationWithoutMenu()
         composeRule.onNodeWithText(string(R.string.delete_for_everyone)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.delete_for_me)).performClick()
@@ -138,7 +138,7 @@ class DeletedMessageLocalRemovalTest {
             .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick))
             .performSemanticsAction(SemanticsActions.OnLongClick)
 
-        openPlaceholderDeleteConfirmation()
+        composeRule.openPlaceholderDeleteConfirmation(::string)
         assertDeleteConfirmationWithoutMenu()
     }
 
@@ -243,7 +243,7 @@ class DeletedMessageLocalRemovalTest {
         val surface = render(failCommits = false)
         placeholder().performTouchInput { longClick() }
 
-        openPlaceholderDeleteConfirmation()
+        composeRule.openPlaceholderDeleteConfirmation(::string)
         composeRule.onNodeWithText(string(R.string.cancel)).performClick()
 
         placeholder().assertIsDisplayed()
@@ -257,7 +257,7 @@ class DeletedMessageLocalRemovalTest {
         val surface = render(failCommits = true)
         placeholder().performTouchInput { longClick() }
 
-        openPlaceholderDeleteConfirmation()
+        composeRule.openPlaceholderDeleteConfirmation(::string)
         val deleteForMe = composeRule.onNodeWithText(string(R.string.delete_for_me))
         deleteForMe.performClick()
         composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
@@ -315,16 +315,6 @@ class DeletedMessageLocalRemovalTest {
             assertEquals(listOf(MESSAGE_ID), otherController.timeline.map { it.record.messageIdHex })
             assertEquals(0, runtimeOpens.get())
         }
-
-    /** The placeholder's code body offers no Copy or Select text: the menu is exactly Select and Delete for me. */
-    private fun openPlaceholderDeleteConfirmation() {
-        composeRule.onNodeWithText(string(R.string.select), substring = false).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.delete_for_me), substring = false).assertIsDisplayed()
-        PLACEHOLDER_ABSENT_MENU_LABELS.forEach { label ->
-            composeRule.onNodeWithText(string(label), substring = false).assertDoesNotExist()
-        }
-        composeRule.onNodeWithText(string(R.string.delete_for_me), substring = false).performClick()
-    }
 
     private fun assertDeleteConfirmationWithoutMenu() {
         composeRule.onNodeWithText(string(R.string.delete_message_title), substring = false).assertIsDisplayed()
@@ -814,7 +804,6 @@ class DeletedMessageLocalRemovalTest {
         val GROUP_ID = "04" + "00".repeat(31)
         val MESSAGE_ID = "05" + "00".repeat(31)
         const val LIVE_BODY = "secret body retained in protocol storage"
-        const val CODE_BODY = "secret code retained in protocol storage\n\n```\nval secret = 1\n```"
         const val ASYNC_TIMEOUT_MILLIS = 20_000L
         const val SCREENSHOT_TAG = "message-bubble.admin-removal"
         const val SCREENSHOT_PATH = "src/test/snapshots/message_bubble_admin_removal_light.png"

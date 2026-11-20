@@ -7378,9 +7378,9 @@
         ]
       },
       {
-        "surface": "NostrEventCardModel.primaryAction",
+        "surface": "NostrEventCardModel.openDescription",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
-        "anchor": "fun NostrEventCardModel.primaryAction(",
+        "anchor": "fun NostrEventCardModel.openDescription(",
         "test_ids": [
           "RDR-001"
         ]

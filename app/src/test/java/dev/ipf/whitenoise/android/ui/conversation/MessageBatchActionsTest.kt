@@ -231,7 +231,10 @@ class MessageBatchActionsTest {
         assertEquals(null, placeholder.action.copyableText)
         // A selection the projection confirmed as deleted has no live item to restore.
         val confirmed = placeholder.copy(live = null)
-        assertEquals(confirmed, reconcileBatchSelections(mapOf("c" to confirmed), emptyMap(), emptySet(), emptySet())["c"])
+        assertEquals(
+            confirmed,
+            reconcileBatchSelections(mapOf("c" to confirmed), emptyMap(), emptySet(), emptySet())["c"],
+        )
     }
 
     @Test
@@ -283,7 +286,12 @@ class MessageBatchActionsTest {
         runBlocking {
             val live = selection("live", recordedAt = 100uL, timelineOrder = 1uL, canDeleteForEveryone = true)
             val placeholder =
-                selection("deleted", recordedAt = 200uL, timelineOrder = 2uL, canDeleteForEveryone = true).asPlaceholder()
+                selection(
+                    "deleted",
+                    recordedAt = 200uL,
+                    timelineOrder = 2uL,
+                    canDeleteForEveryone = true,
+                ).asPlaceholder()
             val selections = listOf(live, placeholder)
             for (scope in BatchDeleteScope.entries) {
                 val protocolDeletes = mutableListOf<String>()

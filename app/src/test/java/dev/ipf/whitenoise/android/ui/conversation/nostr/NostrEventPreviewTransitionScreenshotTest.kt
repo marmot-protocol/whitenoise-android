@@ -359,18 +359,19 @@ private fun card(kind: NostrEventCardKind): NostrEventCardModel =
             } else {
                 "A readable ${kind.name.lowercase()} summary with enough words to fill several preview lines."
             },
-        metadata =
-            when (kind) {
-                NostrEventCardKind.Note -> emptyList()
-                NostrEventCardKind.Git -> listOf("30617:${"b".repeat(64)}:parser", "fix-event-parsing")
-                NostrEventCardKind.Video -> listOf("3:42", "1920x1080")
-                NostrEventCardKind.Release -> listOf("v0.17.0")
-                NostrEventCardKind.File -> listOf("application/pdf", "2.4 MB")
-                else -> emptyList()
-            },
+        metadata = fixtureMetadata(kind),
         readerBody = "The complete ${kind.name.lowercase()} body.",
         mediaUrl = "https://cdn.example/video.mp4".takeIf { kind == NostrEventCardKind.Video },
     )
+
+private fun fixtureMetadata(kind: NostrEventCardKind): List<String> =
+    when (kind) {
+        NostrEventCardKind.Git -> listOf("30617:${"b".repeat(64)}:parser", "fix-event-parsing")
+        NostrEventCardKind.Video -> listOf("3:42", "1920x1080")
+        NostrEventCardKind.Release -> listOf("v0.17.0")
+        NostrEventCardKind.File -> listOf("application/pdf", "2.4 MB")
+        else -> emptyList()
+    }
 
 /** A one-paragraph Markdown document holding [text], standing in for MDK's parser. */
 private fun document(text: String): MarkdownDocumentFfi =

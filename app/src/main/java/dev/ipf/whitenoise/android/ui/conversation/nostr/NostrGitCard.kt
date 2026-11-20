@@ -164,14 +164,9 @@ private fun NostrEvent.gitCommentRoot(): String? {
 /** Repository addresses carry a public key between the kind and repository name. */
 internal fun gitPreviewField(value: String): String? {
     if (gitEventId.matches(value) || gitObjectId.matches(value)) return null
-    val parts = value.split(':', limit = 3)
-    return if (parts.size == 3 &&
-        parts[0].toIntOrNull() == KIND_GIT_REPOSITORY &&
-        gitEventId.matches(parts[1]) &&
-        parts[2].isNotBlank()
-    ) {
-        parts[2]
-    } else {
-        value
-    }
+    val prefix = "$KIND_GIT_REPOSITORY:"
+    if (!value.startsWith(prefix)) return value
+    val address = value.removePrefix(prefix)
+    val repo = address.substringAfter(':', "")
+    return repo.takeIf { it.isNotBlank() && gitEventId.matches(address.substringBefore(':')) } ?: value
 }

@@ -160,7 +160,10 @@ internal class ConversationPlaceholderDragDeleteTest {
         }
     }
 
-    private fun string(resource: Int): String = ApplicationProvider.getApplicationContext<android.app.Application>().getString(resource)
+    private fun string(resource: Int): String {
+        val application = ApplicationProvider.getApplicationContext<android.app.Application>()
+        return application.getString(resource)
+    }
 
     private companion object {
         const val HOST_TAG = "placeholder-drag-delete-host"
