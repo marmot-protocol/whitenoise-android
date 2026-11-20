@@ -2633,14 +2633,7 @@ internal fun ChatsScreen(
                         )
                     }
                 },
-                notice = {
-                    historyNotices?.takeIf { showHistoryNotice }?.let { owner ->
-                        AccountHistoryNoticeBanner(
-                            dismissing = owner.dismissing,
-                            onDismiss = { appState.launchMutation { owner.dismissAll() } },
-                        )
-                    }
-                },
+                notice = { ChatListPersistentNotices(appState, historyNotices, showHistoryNotice) },
             ) {
                 val unreadOwnerAvailable =
                     appState.activeAccountRef != null &&
