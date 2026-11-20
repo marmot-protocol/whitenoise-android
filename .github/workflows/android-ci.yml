@@ -269,7 +269,7 @@ jobs:
           fi
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           status=0
-          python3 scripts/translation_worklist.py "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          python3 scripts/translation_worklist.py "${args[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
 

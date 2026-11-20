@@ -1,9 +1,11 @@
 from pathlib import Path
 from unittest import mock
 from tempfile import TemporaryDirectory
+import contextlib
+import io
 import unittest
 
-from scripts.translation_worklist import MAIN, scan, source_changes, worklist_order
+from scripts.translation_worklist import MAIN, main, scan, source_changes, worklist_order
 
 
 class TranslationWorklistTest(unittest.TestCase):
@@ -149,3 +151,55 @@ class TranslationWorklistTest(unittest.TestCase):
         source, required, _, _ = scan(self.root / "main", self.root / "preview", rules)
         ordered = [name for name, _ in sorted(source.items(), key=lambda pair: worklist_order(pair, required, rules))]
         self.assertEqual(ordered, ["sign_in", "invite", "invite_why", "hint"])
+
+    def write_located_counts(self, items, source_one="One chat in %2$s"):
+        self.write(
+            "main/values/counts.xml",
+            f'<plurals name="count"><item quantity="one">{source_one}</item>'
+            '<item quantity="other">%1$d chats in %2$s</item></plurals>',
+        )
+        self.write("preview/values-ru/counts.xml", f'<plurals name="count">{items}</plurals>')
+
+    def test_plural_forms_must_keep_required_non_count_arguments(self):
+        self.write_located_counts('<item quantity="one">Чат в %2$s</item><item quantity="other">%1$d чатов</item>')
+        self.assertIn("format arguments differ", self.scan()[3][0])
+        self.write_located_counts('<item quantity="one">Чат</item><item quantity="other">Чатов в %2$s</item>')
+        self.assertIn("format arguments differ", self.scan()[3][0])
+
+    def test_plural_forms_may_spell_out_count_but_keep_other_arguments(self):
+        self.write_located_counts('<item quantity="one">Один чат в %2$s</item><item quantity="other">%1$d чатов в %2$s</item>')
+        self.assertEqual(self.scan()[3], [])
+
+    def test_plural_markup_ignores_wrapped_count_but_not_other_tags(self):
+        ns = 'xmlns:xliff="urn:oasis:names:tc:xliff:document:1.0"'
+        wrapped = '<xliff:g id="n">%1$d</xliff:g>'
+        self.write("main/values/counts.xml", f'<plurals name="count" {ns}><item quantity="one">One chat</item>'
+                   f'<item quantity="other">{wrapped} chats</item></plurals>')
+        self.write("preview/values-ru/counts.xml", f'<plurals name="count" {ns}><item quantity="one">Один чат</item>'
+                   '<item quantity="other">%1$d чатов</item></plurals>')
+        self.assertEqual(self.scan()[3], [])
+        self.write("main/values/counts.xml", '<plurals name="count"><item quantity="one">One chat</item>'
+                   '<item quantity="other">%1$d chats</item></plurals>')
+        self.write("preview/values-ru/counts.xml", f'<plurals name="count" {ns}><item quantity="one">{wrapped} чат</item>'
+                   f'<item quantity="other">{wrapped} чатов</item></plurals>')
+        self.assertEqual(self.scan()[3], [])
+        self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат</item>'
+                   '<item quantity="other"><b>%1$d</b> чатов</item></plurals>')
+        self.assertIn("markup tags differ", self.scan()[3][0])
+
+    def test_default_base_summary_lists_new_key_absent_from_every_locale(self):
+        self.write("main/values/new.xml", '<string name="fresh">Fresh</string>')
+        self.write("preview/values-fr/account.xml", '<string name="sign_in">Connexion : %1$s</string>')
+        (self.root / "docs").mkdir()
+        (self.root / "docs/translation-priorities.json").write_text('{"Sign-in": ["sign_in"]}')
+        base = b"<resources></resources>"
+        out = io.StringIO()
+        with mock.patch("scripts.translation_worklist.ROOT", self.root), \
+                mock.patch("scripts.translation_worklist.MAIN", Path("main")), \
+                mock.patch("scripts.translation_worklist.PREVIEW", Path("preview")), \
+                mock.patch("scripts.translation_worklist.base_resources", return_value=["main/values/new.xml"]), \
+                mock.patch("scripts.translation_worklist.subprocess.check_output", return_value=base), \
+                mock.patch("sys.argv", ["translation_worklist.py", "--base", "origin/master"]), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            main()
+        self.assertIn("new.xml/fresh (in: none; needs translation: fr)", out.getvalue())

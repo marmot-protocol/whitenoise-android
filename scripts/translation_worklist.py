@@ -86,8 +86,13 @@ def arguments(node, *, strict=False):
     return explicit
 
 
-def markup(node):
-    return Counter(child.tag for child in node.iter() if child is not node)
+def markup(node, *, ignore_wrapped_arguments=False):
+    """Count child tags; optionally skip xliff:g wrappers around format arguments."""
+    return Counter(
+        child.tag for child in node.iter()
+        if child is not node
+        and not (ignore_wrapped_arguments and child.tag.endswith("}g") and arguments(child))
+    )
 
 
 def plural_problem(node):
@@ -119,6 +124,9 @@ def check_entry(source, target):
         pairs = [(source_items.get(item.get("quantity"), source_items["other"]), item) for item in translated]
         # Languages differ on which forms spell out the count, so allow any English form's arguments.
         plural_arguments = set().union(*(arguments(item) for item in original))
+        # Arguments in every English form must survive, except the count, which may be spelled out.
+        required_arguments = set.intersection(*(arguments(item) for item in original)) if len(original) else set()
+        required_arguments = {argument for argument in required_arguments if argument[3] not in {"d", "i"}}
     elif kind == "string-array":
         if len(original) != len(translated) or any(item.tag != "item" for item in translated):
             return "array items differ from the source"
@@ -128,7 +136,9 @@ def check_entry(source, target):
     for before, after in pairs:
         if not "".join(after.itertext()).strip():
             return "empty translation"
-        if markup(before) != markup(after):
+        if markup(before, ignore_wrapped_arguments=kind == "plurals") != markup(
+            after, ignore_wrapped_arguments=kind == "plurals"
+        ):
             return "markup tags differ from the source"
         if original.get("formatted") != "false":
             expected = plural_arguments if kind == "plurals" else arguments(before)
@@ -136,7 +146,11 @@ def check_entry(source, target):
                 actual = arguments(after, strict=bool(expected) or bool(arguments(after)))
             except ValueError as error:
                 return str(error)
-            if not actual <= expected if kind == "plurals" else actual != expected:
+            if kind == "plurals":
+                ok = required_arguments <= actual <= expected
+            else:
+                ok = actual == expected
+            if not ok:
                 return "format arguments differ from the source"
     return None
 
@@ -277,9 +291,12 @@ def main():
             missing = len(required.keys() - localized.keys())
             print(f"{tag}: {missing} launch keys missing")
         for name in sorted(changed):
-            affected = [tag for tag, localized in catalogs.items() if name in localized]
-            if affected:
-                print(f"English source changed: {source[name].file.name}/{name} ({', '.join(affected)})")
+            has = [tag for tag, localized in catalogs.items() if name in localized]
+            lacks = [tag for tag in catalogs if tag not in has]
+            print(
+                f"English source changed: {source[name].file.name}/{name} "
+                f"(in: {', '.join(has) or 'none'}; needs translation: {', '.join(lacks) or 'none'})"
+            )
     for error in errors:
         print(error, file=sys.stderr)
     return bool(errors)
