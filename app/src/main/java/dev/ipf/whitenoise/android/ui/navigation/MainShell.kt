@@ -76,9 +76,9 @@ import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalRetainedGroupAvatarPixels
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
+import dev.ipf.whitenoise.android.ui.common.LocalVerticalWindowFold
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
-import dev.ipf.whitenoise.android.ui.common.LocalVerticalWindowFold
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.common.rememberRetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
