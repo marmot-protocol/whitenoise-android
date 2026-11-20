@@ -428,6 +428,18 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+      "symbol": "ColumnScope.NotificationProfileQuickSheetContent",
+      "bindings": [],
+      "remaining": "Maestro flow: with a saved profile, open the chat-list profile button and assert the profile choices and For 1 hour / Until I turn it off rows (NTF-051)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+      "symbol": "NotificationProfileQuickSheet",
+      "bindings": [],
+      "remaining": "Maestro flow: open the quick sheet from the chat-list profile button and from the active banner; turn a profile on and off (NTF-051)."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
       "symbol": "ContactPickerScreen",
       "bindings": [
@@ -3846,6 +3858,48 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+      "symbol": "DayPicker",
+      "bindings": [],
+      "remaining": "Maestro flow: toggle weekday cells in the profile editor and assert the no-days error and schedule summary (NTF-049)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+      "symbol": "NotificationProfileTimeDialog",
+      "bindings": [],
+      "remaining": "Maestro flow: open Starts and Ends in the profile editor, change the time and assert the next-day hint (NTF-049, NTF-052)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "AllowedChatsPicker",
+      "bindings": [],
+      "remaining": "Maestro flow: choose allowed chats from the picker and assert the editor count for the active account (NTF-050, NTF-053)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "NotificationProfileDeleteDialog",
+      "bindings": [],
+      "remaining": "Maestro flow: delete a saved profile, cancel once, then confirm and assert it is gone from the list (NTF-049)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "NotificationProfileDiscardDialog",
+      "bindings": [],
+      "remaining": "Maestro flow: edit a profile, press Back, assert Keep editing and Discard (NTF-049)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "NotificationProfileEditScreen",
+      "bindings": [],
+      "remaining": "Maestro flow: create a profile with a schedule, save and reopen it, and assert name, mentions switch and schedule survive (NTF-049)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfilesScreen.kt",
+      "symbol": "NotificationProfilesScreen",
+      "bindings": [],
+      "remaining": "Maestro flow: open Settings > Notifications > Notification profiles, assert the empty state and Create profile, then the saved list (NTF-049)."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
