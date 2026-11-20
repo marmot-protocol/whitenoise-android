@@ -1,0 +1,263 @@
+package dev.ipf.whitenoise.android.notifications
+
+import android.content.Context
+import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
+import java.time.DayOfWeek
+import java.time.ZoneId
+import java.util.Locale
+
+/**
+ * Device-local notification profiles (#3601): names, schedules and allowed chat ids, with the user's latest
+ * manual on/off choice. Holds no protocol data. Reads are in memory so the notification gate can consult it
+ * synchronously; every write commits durably before publishing and returns false on failure.
+ */
+@Suppress("TooManyFunctions")
+internal class NotificationProfilePreferences(
+    context: Context,
+    private val preferences: SharedPreferences =
+        context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
+    private val mutationLock = Any()
+    private val _state = MutableStateFlow(read())
+    val state: StateFlow<NotificationProfilesState> = _state.asStateFlow()
+
+    /** The profile in force now, if any. */
+    fun active(
+        nowMs: Long = clock(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): ActiveNotificationProfile? = activeNotificationProfile(_state.value, nowMs, zone)
+
+    /**
+     * Inserts or replaces [profile] by id; call off the main thread. Rejects a blank name, an enabled invalid
+     * schedule or an eleventh profile. Saving ends any pause so an edited schedule applies at once.
+     */
+    fun save(profile: NotificationProfile): Boolean =
+        mutate { current ->
+            val name = normalizedNotificationProfileName(profile.name)
+            val schedule = profile.schedule
+            val isNew = current.profiles.none { it.id == profile.id }
+            val invalid =
+                name.isEmpty() ||
+                    (schedule != null && schedule.enabled && !schedule.isValid) ||
+                    (isNew && current.profiles.size >= MAX_NOTIFICATION_PROFILES)
+            if (invalid) return@mutate null
+            val saved =
+                profile.copy(
+                    name = name,
+                    allowedChats = profile.allowedChats.map(::normalizedChat).toSet(),
+                )
+            val others = current.profiles.map { if (it.id == saved.id) saved else it }
+            val profiles = if (isNew) current.profiles + saved else others
+            current.copy(
+                profiles = profiles,
+                manual = current.manual.takeUnless { it is NotificationProfileManual.Paused },
+            )
+        }
+
+    /** Removes [profileId] and any manual choice that names it; call off the main thread. */
+    fun delete(profileId: String): Boolean =
+        mutate { current ->
+            if (current.profiles.none { it.id == profileId }) return@mutate null
+            val manual = current.manual.takeUnless { it is NotificationProfileManual.On && it.profileId == profileId }
+            current.copy(profiles = current.profiles.filterNot { it.id == profileId }, manual = manual)
+        }
+
+    /** Turns [profileId] on until [untilMs], or until turned off when null; call off the main thread. */
+    fun turnOn(
+        profileId: String,
+        untilMs: Long?,
+        nowMs: Long = clock(),
+    ): Boolean =
+        mutate { current ->
+            val valid = current.profiles.any { it.id == profileId } && (untilMs == null || untilMs > nowMs)
+            if (!valid) return@mutate null
+            current.copy(manual = NotificationProfileManual.On(profileId, untilMs))
+        }
+
+    /**
+     * Turns profiles off now; call off the main thread. Inside an open scheduled window the schedules pause
+     * until the latest open window ends, so the next window still starts on time.
+     */
+    fun turnOff(
+        nowMs: Long = clock(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): Boolean =
+        mutate { current ->
+            val openUntil =
+                current.profiles
+                    .mapNotNull { profile -> profile.schedule?.let { scheduleWindowContaining(it, nowMs, zone) } }
+                    .maxOfOrNull { it.endMs }
+            current.copy(manual = openUntil?.let(NotificationProfileManual::Paused))
+        }
+
+    /**
+     * Drops allowed chats of local accounts that no longer exist; profiles themselves stay. Publishes at once
+     * with best-effort asynchronous persistence, like the other account-retention hooks.
+     */
+    fun retainAccounts(accountRefs: Collection<String>) {
+        val retained = accountRefs.toSet()
+        synchronized(mutationLock) {
+            val current = _state.value
+            val profiles =
+                current.profiles.map { profile ->
+                    profile.copy(allowedChats = profile.allowedChats.filterTo(HashSet()) { it.accountRef in retained })
+                }
+            val updated = current.copy(profiles = profiles)
+            if (updated == current) return
+            preferences.edit().putString(STATE_KEY, encode(updated).toString()).apply()
+            _state.value = updated
+        }
+    }
+
+    /** Applies [change] to the current state and commits it; a null result rejects the change. */
+    private fun mutate(change: (NotificationProfilesState) -> NotificationProfilesState?): Boolean =
+        synchronized(mutationLock) {
+            val current = _state.value
+            val updated = change(current)?.withoutExpiredManual(clock()) ?: return@synchronized false
+            val committed =
+                runCatching {
+                    preferences.edit().putString(STATE_KEY, encode(updated).toString()).commit()
+                }.getOrDefault(false)
+            if (committed) {
+                _state.value = updated
+            } else {
+                // commit can change SharedPreferences memory before its disk write fails.
+                runCatching { preferences.edit().putString(STATE_KEY, encode(current).toString()).apply() }
+            }
+            committed
+        }
+
+    private fun read(): NotificationProfilesState =
+        runCatching { preferences.getString(STATE_KEY, null)?.let { decode(JSONObject(it)) } }
+            .getOrNull() ?: NotificationProfilesState()
+
+    companion object {
+        const val PREFERENCES_NAME = "whitenoise.notification_profiles"
+        private const val STATE_KEY = "state.v1"
+    }
+}
+
+private fun normalizedChat(chat: NotificationProfileChat): NotificationProfileChat {
+    val groupIdHex = chat.groupIdHex.trim().lowercase(Locale.ROOT)
+    return chat.copy(groupIdHex = groupIdHex)
+}
+
+private fun NotificationProfilesState.withoutExpiredManual(nowMs: Long): NotificationProfilesState {
+    val live =
+        when (val choice = manual) {
+            is NotificationProfileManual.On -> {
+                val unexpired = choice.untilMs == null || choice.untilMs > nowMs
+                choice.takeIf { unexpired && profiles.any { it.id == choice.profileId } }
+            }
+            is NotificationProfileManual.Paused -> choice.takeIf { it.untilMs > nowMs }
+            null -> null
+        }
+    return if (live == manual) this else copy(manual = live)
+}
+
+private fun encode(state: NotificationProfilesState): JSONObject =
+    JSONObject()
+        .put("profiles", JSONArray(state.profiles.map(::encodeProfile)))
+        .apply {
+            when (val manual = state.manual) {
+                is NotificationProfileManual.On ->
+                    put(
+                        "manual",
+                        JSONObject().put("type", "on").put("profileId", manual.profileId).apply {
+                            manual.untilMs?.let { put("untilMs", it) }
+                        },
+                    )
+                is NotificationProfileManual.Paused ->
+                    put("manual", JSONObject().put("type", "paused").put("untilMs", manual.untilMs))
+                null -> Unit
+            }
+        }
+
+private fun encodeProfile(profile: NotificationProfile): JSONObject =
+    JSONObject()
+        .put("id", profile.id)
+        .put("name", profile.name)
+        .put(
+            "allowedChats",
+            JSONArray(
+                profile.allowedChats.map { chat ->
+                    JSONObject().put("accountRef", chat.accountRef).put("groupIdHex", chat.groupIdHex)
+                },
+            ),
+        ).put("allowMentions", profile.allowMentions)
+        .put("createdAtMs", profile.createdAtMs)
+        .apply {
+            profile.schedule?.let { schedule ->
+                put(
+                    "schedule",
+                    JSONObject()
+                        .put("enabled", schedule.enabled)
+                        .put("start", schedule.startMinuteOfDay)
+                        .put("end", schedule.endMinuteOfDay)
+                        .put("days", JSONArray(schedule.days.sorted().map { it.value })),
+                )
+            }
+        }
+
+private fun decode(json: JSONObject): NotificationProfilesState {
+    val array = json.optJSONArray("profiles") ?: JSONArray()
+    val profiles =
+        (0 until array.length())
+            .mapNotNull { array.optJSONObject(it)?.let(::decodeProfile) }
+            .distinctBy { it.id }
+            .take(MAX_NOTIFICATION_PROFILES)
+    return NotificationProfilesState(profiles, json.optJSONObject("manual")?.let(::decodeManual))
+}
+
+private fun decodeManual(choice: JSONObject): NotificationProfileManual? {
+    val untilMs = if (choice.has("untilMs")) choice.getLong("untilMs") else null
+    val profileId = choice.optString("profileId").takeIf { it.isNotEmpty() }
+    return when (choice.optString("type")) {
+        "on" -> profileId?.let { NotificationProfileManual.On(it, untilMs) }
+        "paused" -> untilMs?.let(NotificationProfileManual::Paused)
+        else -> null
+    }
+}
+
+private fun decodeProfile(json: JSONObject): NotificationProfile? {
+    val id = json.optString("id")
+    val name = normalizedNotificationProfileName(json.optString("name"))
+    if (id.isEmpty() || name.isEmpty()) return null
+    return NotificationProfile(
+        id = id,
+        name = name,
+        allowedChats = decodeChats(json.optJSONArray("allowedChats") ?: JSONArray()),
+        allowMentions = json.optBoolean("allowMentions", true),
+        schedule = json.optJSONObject("schedule")?.let(::decodeSchedule),
+        createdAtMs = json.optLong("createdAtMs", 0L),
+    )
+}
+
+private fun decodeChats(array: JSONArray): Set<NotificationProfileChat> =
+    (0 until array.length())
+        .mapNotNull { index ->
+            array.optJSONObject(index)?.let { chat ->
+                NotificationProfileChat(chat.optString("accountRef"), chat.optString("groupIdHex"))
+            }
+        }.filter { it.accountRef.isNotEmpty() && it.groupIdHex.isNotEmpty() }
+        .map(::normalizedChat)
+        .toSet()
+
+private fun decodeSchedule(json: JSONObject): NotificationProfileSchedule {
+    val days = json.optJSONArray("days") ?: JSONArray()
+    return NotificationProfileSchedule(
+        enabled = json.optBoolean("enabled", false),
+        startMinuteOfDay = json.optInt("start", -1),
+        endMinuteOfDay = json.optInt("end", -1),
+        days = (0 until days.length()).mapNotNull { dayOfWeek(days.optInt(it)) }.toSet(),
+    )
+}
+
+/** ISO day number (Monday 1 to Sunday 7), or null when out of range. */
+private fun dayOfWeek(value: Int): DayOfWeek? = DayOfWeek.entries.firstOrNull { it.value == value }
