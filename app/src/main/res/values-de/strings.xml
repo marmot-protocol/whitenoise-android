@@ -1455,6 +1455,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d Einladungsschlüssel entfernt</string>
     <string name="wipe_outcome_local_wipe_done">Lokale Daten gelöscht</string>
     <string name="wipe_outcome_local_wipe_incomplete">Lokale Daten nur unvollständig gelöscht</string>
+    <string name="wipe_media_cleanup_failed">Einige lokale Mediendateien oder Freigabeberechtigungen konnten nicht entfernt werden.</string>
     <string name="export_nsec">nsec exportieren</string>
     <string name="share_secret_key">Geheimschlüssel teilen</string>
     <string name="signed_out">Abgemeldet</string>

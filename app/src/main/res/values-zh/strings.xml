@@ -1431,6 +1431,7 @@
     <string name="wipe_outcome_key_packages_deleted">已移除 %1$d 个邀请密钥</string>
     <string name="wipe_outcome_local_wipe_done">本地数据已清除</string>
     <string name="wipe_outcome_local_wipe_incomplete">本地数据未完全清除</string>
+    <string name="wipe_media_cleanup_failed">部分本地媒体文件无法删除，或部分共享权限无法撤销。</string>
     <string name="export_nsec">导出 nsec</string>
     <string name="share_secret_key">分享密钥</string>
     <string name="signed_out">已退出</string>
