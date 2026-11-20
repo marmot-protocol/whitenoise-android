@@ -110,7 +110,8 @@ class NostrEventCardRendererTest {
                 id,
                 kind = 1617,
                 content =
-                    "From 1234 Mon Sep 17 00:00:00 2001\nSubject: [PATCH 1/2] Fix parser\n crash\n\nExplain it.\n---\n diff",
+                    "From 1234 Mon Sep 17 00:00:00 2001\nSubject: [PATCH 1/2] Fix parser\n" +
+                        " crash\n\nExplain it.\n---\n diff",
             ).toCardModel()
         assertEquals("Fix parser crash", formatted.title)
         assertEquals("Explain it.\n---\n diff", formatted.summary)

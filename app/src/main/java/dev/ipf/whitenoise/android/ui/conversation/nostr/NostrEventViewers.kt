@@ -65,13 +65,13 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.WebLinkConfirmation
-import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
+import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import kotlinx.coroutines.launch
 

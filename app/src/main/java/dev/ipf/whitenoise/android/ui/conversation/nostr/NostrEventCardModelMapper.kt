@@ -86,25 +86,6 @@ private fun NostrEvent.cardSummary(
         tagSummary ?: patchBody?.safeExcerpt() ?: content.safeExcerpt()
     }
 
-private val patchSubjectPrefix = Regex("^(\\[[^\\]]*]\\s*)+")
-
-/** The format-patch `Subject:` header of a kind 1617 patch, without its `[PATCH n/m]` tag. */
-private fun NostrEvent.patchSubject(): String? {
-    if (kind != KIND_GIT_PATCH) return null
-    val header = content.lineSequence().takeWhile(String::isNotBlank).toList()
-    val start = header.indexOfFirst { it.startsWith("Subject:", ignoreCase = true) }
-    if (start < 0) return null
-    val folded = header.drop(start + 1).takeWhile { it.firstOrNull()?.isWhitespace() == true }
-    val subject = (listOf(header[start].substringAfter(':')) + folded).joinToString(" ") { it.trim() }
-    return subject.replace(patchSubjectPrefix, "").safeField().takeIf(String::isNotBlank)
-}
-
-/** A format-patch message without its mail headers, so the preview starts at the commit message. */
-private fun NostrEvent.patchMessageBody(): String? {
-    if (kind != KIND_GIT_PATCH || patchSubject() == null) return null
-    return content.substringAfter("\n\n", "").takeIf(String::isNotBlank)
-}
-
 /** Kind-specific details shown under a card, never a second date beside the one in its header. */
 private fun NostrEvent.cardMetadata(
     cardKind: NostrEventCardKind,

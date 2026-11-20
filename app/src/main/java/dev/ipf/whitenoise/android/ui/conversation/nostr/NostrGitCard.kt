@@ -18,8 +18,14 @@ internal const val KIND_GIT_COMMENT = 1_111
 private const val MAX_GIT_REFS = 8
 private const val MAX_GIT_LINKS = 8
 private const val MAX_GIT_LINK_LENGTH = 512
+private const val GIT_ROOT_MARKER_INDEX = 3
+private const val GIT_COORDINATE_PARTS = 3
 
-internal fun NostrEvent.isGitCard(): Boolean = if (kind == KIND_GIT_COMMENT) gitCommentRoot() != null else gitKindLabel(kind) != null
+internal fun NostrEvent.isGitCard(): Boolean =
+    when (kind) {
+        KIND_GIT_COMMENT -> gitCommentRoot() != null
+        else -> gitKindLabel(kind) != null
+    }
 
 internal fun gitCardLabel(kind: Int): Int = gitKindLabel(kind) ?: R.string.nostr_git_comment
 
@@ -52,16 +58,10 @@ internal fun NostrEvent.gitCardMetadata(): List<String> =
                     .forEach { add("${it[0].safeField()} · ${it[1].safeField()}") }
             }
             KIND_GIT_PATCH -> firstSafeTag("commit")?.let { add("commit $it") }
-            KIND_GIT_PULL_REQUEST, KIND_GIT_PULL_REQUEST_UPDATE ->
-                listOfNotNull(
-                    firstSafeTag("branch-name")?.let { "branch $it" },
-                    firstSafeTag("c")?.let { "commit $it" },
-                    firstSafeTag("merge-base")?.let { "merge-base $it" },
-                    firstSafeTag(if (kind == KIND_GIT_PULL_REQUEST_UPDATE) "E" else "e"),
-                ).let(::addAll)
+            KIND_GIT_PULL_REQUEST, KIND_GIT_PULL_REQUEST_UPDATE -> addAll(gitPullRequestMetadata())
             in KIND_GIT_OPEN..KIND_GIT_DRAFT ->
                 tags
-                    .firstOrNull { it.firstOrNull() == "e" && it.getOrNull(3) == "root" }
+                    .firstOrNull { it.firstOrNull() == "e" && it.getOrNull(GIT_ROOT_MARKER_INDEX) == "root" }
                     ?.getOrNull(1)
                     ?.safeField()
                     ?.takeIf(String::isNotBlank)
@@ -73,13 +73,24 @@ internal fun NostrEvent.gitCardMetadata(): List<String> =
         }
     }
 
+private fun NostrEvent.gitPullRequestMetadata(): List<String> =
+    listOfNotNull(
+        firstSafeTag("branch-name")?.let { "branch $it" },
+        firstSafeTag("c")?.let { "commit $it" },
+        firstSafeTag("merge-base")?.let { "merge-base $it" },
+        firstSafeTag(if (kind == KIND_GIT_PULL_REQUEST_UPDATE) "E" else "e"),
+    )
+
 /** The repository identifier of a `30617:<pubkey>:<d>` coordinate, or the value itself when it has another shape. */
 private fun gitRepositoryName(coordinate: String): String {
-    val parts = coordinate.split(':', limit = 3)
-    return if (parts.size == 3 && parts[2].isNotBlank()) parts[2] else coordinate
+    val parts = coordinate.split(':', limit = GIT_COORDINATE_PARTS)
+    return if (parts.size == GIT_COORDINATE_PARTS && parts[2].isNotBlank()) parts[2] else coordinate
 }
 
-/** Exact advertised URLs for the reader's Copy and confirmed Open actions. Rendering never opens them or starts a Git operation. */
+/**
+ * Exact advertised URLs for the reader's Copy and confirmed Open actions.
+ * Rendering never opens them or starts a Git operation.
+ */
 internal fun NostrEvent.gitCardLinks(): List<String> {
     val allowedTags =
         when (kind) {
