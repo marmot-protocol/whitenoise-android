@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.KeptAttachmentKind
 import dev.ipf.whitenoise.android.ui.conversation.KeptAttachmentPresentation
-import dev.ipf.whitenoise.android.ui.icons.filled.Image
 
 /** Bounded collapsed metadata, with every attachment available in the expanded scrolling card. */
 @Composable
