@@ -17,13 +17,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.LocalVerticalWindowFold
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
+import dev.ipf.whitenoise.android.ui.common.VerticalWindowFold
 import dev.ipf.whitenoise.android.ui.common.WindowHeightClass
+import dev.ipf.whitenoise.android.ui.common.WindowLayout
+import dev.ipf.whitenoise.android.ui.common.WindowWidthClass
+import kotlin.math.abs
 
 /** Width of the chat list when it sits beside the conversation. */
 internal val TwoPaneListWidth = 360.dp
@@ -42,6 +49,15 @@ internal const val SHORT_WINDOW_LIST_FRACTION = 0.5f
  */
 internal val ShortWindowListMaxWidth = 480.dp
 
+/**
+ * Whether the chat list stays beside the conversation: on expanded-width windows, and on a foldable
+ * held half open like a book, where each side of the fold holds one pane.
+ */
+internal fun listBesideConversation(
+    layout: WindowLayout,
+    fold: VerticalWindowFold?,
+): Boolean = layout.widthClass == WindowWidthClass.Expanded || fold != null
+
 internal const val TWO_PANE_LIST_TAG = "two_pane_list"
 internal const val CONVERSATION_PANE_PLACEHOLDER_TAG = "conversation_pane_placeholder"
 
@@ -54,6 +70,9 @@ internal const val CONVERSATION_PANE_PLACEHOLDER_TAG = "conversation_pane_placeh
  * the list at [TwoPaneListWidth], which would leave a phone held horizontally with a narrow list
  * beside a very wide conversation.
  *
+ * When a [VerticalWindowFold] separates the window, the list fills the start side of the fold and
+ * the conversation the end side, so neither pane is drawn across the hinge.
+ *
  * Side by side, each pane touches only one outer edge, so a camera cutout or navigation bar on the
  * other edge must not pad it: the list drops the end-side inset and the conversation the start-side.
  */
@@ -64,6 +83,8 @@ internal fun TwoPaneChatFrame(
     conversationPane: @Composable () -> Unit,
 ) {
     val shortWindow = LocalWindowLayout.current.heightClass == WindowHeightClass.Compact
+    val fold = LocalVerticalWindowFold.current
+    val windowWidthPx = LocalWindowInfo.current.containerSize.width
     Layout(
         modifier = Modifier.fillMaxSize(),
         content = {
@@ -97,19 +118,29 @@ internal fun TwoPaneChatFrame(
         val (list, divider, conversation) = measurables
         val dividerPlaceable = divider.measure(Constraints(minHeight = height, maxHeight = height))
         val space = (width - dividerPlaceable.width).coerceAtLeast(0)
+        // Fold bounds are in window coordinates, so they only apply while the frame spans the window.
+        val foldSplit =
+            fold?.takeIf { abs(width - windowWidthPx) <= 1 }?.let {
+                val left = it.left.roundToPx()
+                val right = it.right.roundToPx()
+                // Measured from the start edge: in right-to-left layouts the list sits right of the fold.
+                if (layoutDirection == LayoutDirection.Ltr) left to right else (width - right) to (width - left)
+            }
         // Truncating gives an odd leftover pixel to the conversation.
         val listWidth =
-            if (shortWindow) {
-                minOf((space * SHORT_WINDOW_LIST_FRACTION).toInt(), ShortWindowListMaxWidth.roundToPx())
-            } else {
-                TwoPaneListWidth.roundToPx()
-            }.coerceAtMost(space)
+            when {
+                foldSplit != null -> foldSplit.first
+                shortWindow -> minOf((space * SHORT_WINDOW_LIST_FRACTION).toInt(), ShortWindowListMaxWidth.roundToPx())
+                else -> TwoPaneListWidth.roundToPx()
+            }.coerceIn(0, space)
+        // A hinge with a physical gap leaves the gap empty; a seamless fold keeps the divider on it.
+        val conversationStart = maxOf(foldSplit?.second ?: 0, listWidth + dividerPlaceable.width).coerceAtMost(width)
         val listPlaceable = list.measure(Constraints.fixed(listWidth, height))
-        val conversationPlaceable = conversation.measure(Constraints.fixed(space - listWidth, height))
+        val conversationPlaceable = conversation.measure(Constraints.fixed(width - conversationStart, height))
         layout(width, height) {
             listPlaceable.placeRelative(0, 0)
             dividerPlaceable.placeRelative(listWidth, 0)
-            conversationPlaceable.placeRelative(listWidth + dividerPlaceable.width, 0)
+            conversationPlaceable.placeRelative(conversationStart, 0)
         }
     }
 }

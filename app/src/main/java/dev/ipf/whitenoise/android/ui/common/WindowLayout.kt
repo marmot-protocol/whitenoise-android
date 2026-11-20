@@ -67,7 +67,7 @@ private val ExpandedHeightBreakpoint = 900.dp
 internal val LocalWindowLayout = staticCompositionLocalOf { WindowLayout.CompactPortrait }
 
 /**
- * Provides the activity window's [WindowLayout] to [content].
+ * Provides the activity window's [WindowLayout] and [VerticalWindowFold] to [content].
  *
  * Call this once, at the activity root. Dialogs and popups have their own
  * window, so reading the window size inside one would describe the dialog;
@@ -78,5 +78,9 @@ internal val LocalWindowLayout = staticCompositionLocalOf { WindowLayout.Compact
 internal fun ProvideWindowLayout(content: @Composable () -> Unit) {
     val windowSize = LocalWindowInfo.current.containerDpSize
     val layout = remember(windowSize) { WindowLayout.fromSize(windowSize) }
-    CompositionLocalProvider(LocalWindowLayout provides layout, content = content)
+    CompositionLocalProvider(
+        LocalWindowLayout provides layout,
+        LocalVerticalWindowFold provides rememberVerticalWindowFold(),
+        content = content,
+    )
 }
