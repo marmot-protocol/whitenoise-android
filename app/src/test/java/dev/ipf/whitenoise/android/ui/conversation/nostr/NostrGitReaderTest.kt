@@ -48,6 +48,18 @@ class NostrGitReaderTest {
         composeRule.runOnIdle { assertEquals(listOf(clone), writes) }
     }
 
+    @Test
+    fun httpsRepositoryLinkRequiresConfirmationAndCanBeCancelled() {
+        val link = "https://example.org/parser"
+        setReader(event(kind = 30617, tags = listOf(listOf("d", "parser"), listOf("web", link))), mutableListOf())
+
+        composeRule.onNodeWithText(string(R.string.nostr_git_open_url, link)).performClick()
+        composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertIsDisplayed()
+        composeRule.onNodeWithText("example.org").assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.cancel)).performClick()
+        composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
+    }
+
     private fun setReader(
         event: NostrEvent,
         writes: MutableList<String>,
@@ -99,6 +111,6 @@ class NostrGitReaderTest {
 
     private fun string(
         resId: Int,
-        arg: String,
-    ): String = ApplicationProvider.getApplicationContext<Context>().getString(resId, arg)
+        vararg args: String,
+    ): String = ApplicationProvider.getApplicationContext<Context>().getString(resId, *args)
 }

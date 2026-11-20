@@ -72,6 +72,7 @@ import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
 import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
+import dev.ipf.whitenoise.android.ui.openMarkdownLink
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import kotlinx.coroutines.launch
 
@@ -329,7 +330,7 @@ private fun NostrEventReaderContext(
                     onDismiss = { pendingOpenLink = null },
                     onConfirm = {
                         pendingOpenLink = null
-                        openNostrEvent(context, link)
+                        openMarkdownLink(context, link)
                     },
                 )
             }
