@@ -281,29 +281,29 @@ class NotificationReplyWorker(
         retryStore: NotificationActionRetryStore,
         retryKey: String,
         priorAcceptanceUnknown: Boolean = false,
-    ): Result {
-        if (
-            !containsLegacyPlaintext &&
-            retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)
-        ) {
-            return Result.retry()
+    ): Result =
+        when {
+            !containsLegacyPlaintext && retryStore.shouldDeferForLock(
+                retryKey,
+                NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS,
+            ) -> Result.retry()
+            priorAcceptanceUnknown -> {
+                retryStore.clear(retryKey)
+                surfaceReplyFailure(action, R.string.delivery_not_confirmed)
+                Result.failure()
+            }
+            else ->
+                finalizeReplyFailure(
+                    action = action,
+                    containsLegacyPlaintext = containsLegacyPlaintext,
+                    completionStore = NotificationReplyCompletionStore.create(applicationContext),
+                    completionKey = notificationReplyCompletionKey(id),
+                    retryStore = retryStore,
+                    retryKey = retryKey,
+                    failureReason = "app lock prevented send",
+                    notice = R.string.notification_action_unlock_required,
+                )
         }
-        if (priorAcceptanceUnknown) {
-            retryStore.clear(retryKey)
-            surfaceReplyFailure(action, R.string.delivery_not_confirmed)
-            return Result.failure()
-        }
-        return finalizeReplyFailure(
-            action = action,
-            containsLegacyPlaintext = containsLegacyPlaintext,
-            completionStore = NotificationReplyCompletionStore.create(applicationContext),
-            completionKey = notificationReplyCompletionKey(id),
-            retryStore = retryStore,
-            retryKey = retryKey,
-            failureReason = "app lock prevented send",
-            notice = R.string.notification_action_unlock_required,
-        )
-    }
 
     /** Records the reply as abandoned, then restores the card with [notice] so the user can try again. */
     private suspend fun finalizeReplyFailure(
