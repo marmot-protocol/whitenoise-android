@@ -2,11 +2,12 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -112,7 +113,8 @@ class NostrReferencePresentationCoverageTest {
             assertTrue(requests.isEmpty())
 
             composeRule.runOnIdle {
-                AvatarImageLoader.putCached(url, ImageBitmap(8, 8))
+                val image = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).asImageBitmap()
+                AvatarImageLoader.putCached(url, image)
                 warm.value = true
             }
             composeRule.onNodeWithText("Ada Example").assertIsDisplayed()
