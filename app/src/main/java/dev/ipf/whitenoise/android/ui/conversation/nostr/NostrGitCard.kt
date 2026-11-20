@@ -165,8 +165,9 @@ private fun NostrEvent.gitCommentRoot(): String? {
 internal fun gitPreviewField(value: String): String? {
     if (gitEventId.matches(value) || gitObjectId.matches(value)) return null
     val prefix = "$KIND_GIT_REPOSITORY:"
-    if (!value.startsWith(prefix)) return value
-    val address = value.removePrefix(prefix)
-    val repo = address.substringAfter(':', "")
-    return repo.takeIf { it.isNotBlank() && gitEventId.matches(address.substringBefore(':')) } ?: value
+    val repo =
+        value.takeIf { it.startsWith(prefix) }?.removePrefix(prefix)?.let { address ->
+            address.substringAfter(':', "").takeIf { it.isNotBlank() && gitEventId.matches(address.substringBefore(':')) }
+        }
+    return repo ?: value
 }

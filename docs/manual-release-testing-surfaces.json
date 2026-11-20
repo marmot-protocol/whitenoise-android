@@ -7378,6 +7378,14 @@
         ]
       },
       {
+        "surface": "R.string.nostr_event_read_article",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
+        "anchor": "R.string.nostr_event_read_article",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
         "surface": "NostrEventCardModel.openDescription",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
         "anchor": "fun NostrEventCardModel.openDescription(",
