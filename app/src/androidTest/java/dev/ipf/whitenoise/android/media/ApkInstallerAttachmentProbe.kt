@@ -526,7 +526,7 @@ internal object ApkInstallerAttachmentProbe {
         accountRef: String,
     ) = withContext(Dispatchers.IO) {
         val shared = File(context.cacheDir, MediaCacheDirs.SHARED)
-        val prefix = sharedPlaintextPrefix(accountRef) + PUBLISHED_PREFIX
+        val prefix = sharedPlaintextPrefix(context, accountRef) + PUBLISHED_PREFIX
         shared.listFiles { file -> file.name.startsWith(prefix) }?.forEach { file ->
             check(file.delete()) { "could not remove a published copy before readback" }
         }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -32,18 +33,19 @@ class SharedPlaintextWipeCoverageTest {
     fun removesOnlyOwnedAndLegacyPrivateCopies() =
         runBlocking {
             val context = RecordingRevocations(application)
-            val owned = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix("alice") + "message_1.pdf")
+            val owned = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, "alice") + "message_1.pdf")
             val transcript =
-                share(ConversationTranscriptExport.CacheDirName, sharedPlaintextPrefix("alice") + "export.json")
+                share(ConversationTranscriptExport.CacheDirName, sharedPlaintextPrefix(application, "alice") + "export.json")
             val legacy = share(MediaCacheDirs.SHARED, "document_old.pdf")
-            val other = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix("bob") + "message_2.pdf")
+            val oldScoped = share(MediaCacheDirs.SHARED, legacySharedPlaintextPrefix("alice") + "share_fixture.pdf")
+            val other = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, "bob") + "message_2.pdf")
             val profileCard = share(MediaCacheDirs.SHARED, "profile_card_1.png")
             val staleWriter = captureSharedPlaintextWrite()
 
             wipeSharedPlaintext(context, "alice") { _, error -> throw AssertionError(error) }
 
-            assertEquals(setOf(owned.name, transcript.name, legacy.name), context.revoked.toSet())
-            assertTrue(listOf(owned, transcript, legacy).none(File::exists))
+            assertEquals(setOf(owned.name, transcript.name, legacy.name, oldScoped.name), context.revoked.toSet())
+            assertTrue(listOf(owned, transcript, legacy, oldScoped).none(File::exists))
             assertTrue(listOf(other, profileCard).all(File::exists))
             val stale = runCatching { withSharedPlaintextWrite<Unit>(staleWriter) { error("stale writer ran") } }
             assertTrue(stale.exceptionOrNull() is CancellationException)
@@ -51,17 +53,38 @@ class SharedPlaintextWipeCoverageTest {
 
     /** Even if Android refuses a grant revocation, remove the app's bytes and preserve the failure for the report. */
     @Test
-    fun revocationFailureStillDeletesPlaintext() =
+    fun revocationFailureStillDeletesPlaintextAndRetriesTheGrant() =
         runBlocking {
             val context = RecordingRevocations(application, fail = true)
-            val owned = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix("alice") + "share_1.mp4")
+            val owned = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, "alice") + "share_1.mp4")
             val failures = mutableListOf<String>()
 
             wipeSharedPlaintext(context, "alice") { name, _ -> failures += name }
 
             assertEquals(listOf(MediaCacheDirs.SHARED), failures)
             assertFalse(owned.exists())
+            val recovered = RecordingRevocations(application)
+            recoverSharedPlaintextWipes(recovered) { _, error -> throw AssertionError(error) }
+            assertEquals(listOf(owned.name), recovered.revoked)
+            recoverSharedPlaintextWipes(recovered) { _, error -> throw AssertionError(error) }
+            assertEquals(listOf(owned.name), recovered.revoked)
         }
+
+    /** A filename prefix is stable within an install but differs for another install or account. */
+    @Test
+    fun prefixesCannotBeDerivedFromTheAccountRefAlone() {
+        val otherKeyDir = File(application.cacheDir, "different-share-key").apply { mkdirs() }
+        val otherInstall =
+            object : ContextWrapper(application) {
+                override fun getNoBackupFilesDir(): File = otherKeyDir
+            }
+        val prefix = sharedPlaintextPrefix(application, "alice")
+
+        assertEquals(prefix, sharedPlaintextPrefix(ContextWrapper(application), "alice"))
+        assertNotEquals(prefix, sharedPlaintextPrefix(application, "bob"))
+        assertNotEquals(prefix, sharedPlaintextPrefix(otherInstall, "alice"))
+        assertNotEquals(prefix, legacySharedPlaintextPrefix("alice"))
+    }
 
     /** Live ownership protects the journal until native teardown, and a failed cleanup can be retried. */
     @Test
@@ -69,7 +92,7 @@ class SharedPlaintextWipeCoverageTest {
         runBlocking {
             val context = RecordingRevocations(application)
             val account = "interrupted"
-            val blocked = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(account) + "document_fixture.pdf")
+            val blocked = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, account) + "document_fixture.pdf")
             assertTrue(blocked.delete())
             assertTrue(blocked.mkdir())
             val child = File(blocked, "child").apply { writeText("test") }
@@ -94,7 +117,7 @@ class SharedPlaintextWipeCoverageTest {
         runBlocking {
             val context = RecordingRevocations(application)
             val account = "retained"
-            val file = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(account) + "document_fixture.pdf")
+            val file = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, account) + "document_fixture.pdf")
             assertTrue(recordSharedPlaintextWipe(context, account))
             assertTrue(discardSharedPlaintextWipe(context, account))
 

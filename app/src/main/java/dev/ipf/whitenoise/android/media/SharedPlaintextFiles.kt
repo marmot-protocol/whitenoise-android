@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
 import android.content.Context
-import android.content.Intent
-import androidx.core.content.FileProvider
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -11,25 +9,14 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicLong
 
-internal const val ACCOUNT_SHARE_PREFIX = "account_"
 private const val MAX_SHARE_EXTENSION_LENGTH = 12
-private const val UNSIGNED_BYTE_MASK = 0xff
 private val sharedPlaintextGeneration = AtomicLong()
 private val sharedPlaintextMutex = Mutex()
 private val pendingLiveWipes = mutableSetOf<String>()
-private const val WIPE_PREFERENCES = "shared_plaintext_wipe"
+internal const val WIPE_PREFERENCES = "shared_plaintext_wipe"
 private const val PENDING_WIPES = "pending_account_prefixes"
-
-/** Keeps shared files in one bounded cache while omitting raw account identifiers from the paths. */
-internal fun sharedPlaintextPrefix(accountRef: String): String {
-    require(accountRef.isNotBlank())
-    val digest = MessageDigest.getInstance("SHA-256").digest(accountRef.toByteArray())
-    val owner = digest.joinToString("") { "%02x".format(it.toInt() and UNSIGNED_BYTE_MASK) }
-    return "$ACCOUNT_SHARE_PREFIX${owner}_"
-}
 
 /** Keeps staging names below the filesystem limit while FileProvider supplies the original display name. */
 internal fun sharedPlaintextSuffix(displayName: String): String {
@@ -62,11 +49,11 @@ internal suspend fun recordSharedPlaintextWipe(
 ): Boolean =
     withContext(Dispatchers.IO) {
         sharedPlaintextMutex.withLock {
-            val prefix = sharedPlaintextPrefix(accountRef)
+            val prefixes = setOf(sharedPlaintextPrefix(context, accountRef), legacySharedPlaintextPrefix(accountRef))
             val preferences = context.getSharedPreferences(WIPE_PREFERENCES, Context.MODE_PRIVATE)
-            val pending = preferences.getStringSet(PENDING_WIPES, emptySet()).orEmpty() + prefix
+            val pending = preferences.getStringSet(PENDING_WIPES, emptySet()).orEmpty() + prefixes
             val saved = preferences.edit().putStringSet(PENDING_WIPES, pending).commit()
-            if (saved) pendingLiveWipes += prefix
+            if (saved) pendingLiveWipes += prefixes
             saved
         }
     }
@@ -78,9 +65,9 @@ internal suspend fun discardSharedPlaintextWipe(
 ): Boolean =
     withContext(Dispatchers.IO) {
         sharedPlaintextMutex.withLock {
-            val prefix = sharedPlaintextPrefix(accountRef)
-            val discarded = removePendingWipe(context, prefix)
-            if (discarded) pendingLiveWipes -= prefix
+            val prefixes = setOf(sharedPlaintextPrefix(context, accountRef), legacySharedPlaintextPrefix(accountRef))
+            val discarded = removePendingWipe(context, prefixes)
+            if (discarded) pendingLiveWipes -= prefixes
             discarded
         }
     }
@@ -93,7 +80,8 @@ internal suspend fun recoverSharedPlaintextWipes(
     sharedPlaintextMutex.withLock {
         val preferences = context.getSharedPreferences(WIPE_PREFERENCES, Context.MODE_PRIVATE)
         val pending = preferences.getStringSet(PENDING_WIPES, emptySet()).orEmpty() - pendingLiveWipes
-        pending.forEach { prefix -> finishSharedPlaintextWipe(context, prefix, onFailure) }
+        retrySharedPlaintextGrantRevocations(context, onFailure)
+        if (pending.isNotEmpty()) finishSharedPlaintextWipe(context, pending, onFailure)
     }
 }
 
@@ -104,11 +92,11 @@ internal suspend fun wipeSharedPlaintext(
     onFailure: (String, Throwable) -> Unit,
 ) {
     sharedPlaintextMutex.withLock {
-        val prefix = sharedPlaintextPrefix(accountRef)
+        val prefixes = setOf(sharedPlaintextPrefix(context, accountRef), legacySharedPlaintextPrefix(accountRef))
         try {
-            finishSharedPlaintextWipe(context, prefix, onFailure)
+            finishSharedPlaintextWipe(context, prefixes, onFailure)
         } finally {
-            pendingLiveWipes -= prefix
+            pendingLiveWipes -= prefixes
         }
     }
 }
@@ -116,16 +104,16 @@ internal suspend fun wipeSharedPlaintext(
 /** Retains the durable cleanup record when a file cannot be inspected, revoked, or deleted. */
 private fun finishSharedPlaintextWipe(
     context: Context,
-    prefix: String,
+    prefixes: Set<String>,
     onFailure: (String, Throwable) -> Unit,
 ) {
     sharedPlaintextGeneration.incrementAndGet()
     var failed = false
-    deleteSharedPlaintext(context, prefix) { area, error ->
+    deleteSharedPlaintext(context, prefixes) { area, error ->
         failed = true
         onFailure(area, error)
     }
-    if (!failed && !removePendingWipe(context, prefix)) {
+    if (!failed && !removePendingWipe(context, prefixes)) {
         onFailure(WIPE_PREFERENCES, IOException("could not record shared plaintext cleanup"))
     }
 }
@@ -133,17 +121,18 @@ private fun finishSharedPlaintextWipe(
 /** Updates the durable cleanup set while holding the share mutex. */
 private fun removePendingWipe(
     context: Context,
-    prefix: String,
+    prefixes: Set<String>,
 ): Boolean {
     val preferences = context.getSharedPreferences(WIPE_PREFERENCES, Context.MODE_PRIVATE)
     val pending = preferences.getStringSet(PENDING_WIPES, emptySet()).orEmpty()
-    return prefix !in pending || preferences.edit().putStringSet(PENDING_WIPES, pending - prefix).commit()
+    val remaining = pending - prefixes
+    return remaining == pending || preferences.edit().putStringSet(PENDING_WIPES, remaining).commit()
 }
 
 /** Lists both private share roots and attempts every matching file even after an individual failure. */
 private fun deleteSharedPlaintext(
     context: Context,
-    prefix: String,
+    prefixes: Set<String>,
     onFailure: (String, Throwable) -> Unit,
 ) {
     for (name in listOf(MediaCacheDirs.SHARED, ConversationTranscriptExport.CacheDirName)) {
@@ -159,17 +148,11 @@ private fun deleteSharedPlaintext(
         val matching =
             entries.filter { file ->
                 // Legacy private shares have no prefix. Public profile cards also use the shared root.
-                file.name.startsWith(prefix) ||
+                prefixes.any { file.name.startsWith(it) } ||
                     (!file.name.startsWith(ACCOUNT_SHARE_PREFIX) && !file.name.startsWith("profile_card_"))
             }
         matching.forEach { file ->
-            runCatching {
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                context.revokeUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                )
-            }.onFailure { onFailure(name, it) }
+            revokeSharedPlaintextGrant(context, file, name, onFailure)
             runCatching {
                 check(file.delete() || !file.exists()) { "could not delete shared plaintext" }
             }.onFailure { onFailure(name, it) }

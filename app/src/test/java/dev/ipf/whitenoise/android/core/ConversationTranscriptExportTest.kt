@@ -305,14 +305,15 @@ class ConversationTranscriptExportTest {
             val file =
                 ConversationTranscriptExport.writeTemporaryFile(
                     cacheDir = root,
-                    accountRef = "account",
+                    filePrefix = "account_alice_",
                     data = data,
                     groupIdHex = "ab".repeat(32),
                     exportedAt = Instant.parse("2023-11-14T22:13:20Z"),
                 )
 
             assertEquals("transcripts", file.parentFile?.name)
-            val displayName = file.name.substringAfter("_").substringAfter("_")
+            assertTrue(file.name.startsWith("account_alice_"))
+            val displayName = file.name.removePrefix("account_alice_")
             assertTrue(displayName.startsWith("whitenoise-transcript-abababab-2023-11-14T22-13-20Z"))
             assertTrue(file.name.endsWith(".json"))
             assertEquals("{\"private\":true}\n", file.readText())
@@ -335,15 +336,17 @@ class ConversationTranscriptExportTest {
             val first =
                 ConversationTranscriptExport.writeTemporaryFile(
                     cacheDir = root,
-                    accountRef = "account",
+                    filePrefix = "account_alice_",
                     data = "{\"old\":true}\n".toByteArray(StandardCharsets.UTF_8),
                     groupIdHex = "ab".repeat(32),
                     exportedAt = Instant.parse("2023-11-14T22:13:20Z"),
                 )
+            val legacy = java.io.File(first.parentFile, "whitenoise-transcript-legacy.json").apply { writeText("{}") }
+            val other = java.io.File(first.parentFile, "account_bob_transcript.json").apply { writeText("{}") }
             val second =
                 ConversationTranscriptExport.writeTemporaryFile(
                     cacheDir = root,
-                    accountRef = "account",
+                    filePrefix = "account_alice_",
                     data = "{\"new\":true}\n".toByteArray(StandardCharsets.UTF_8),
                     groupIdHex = "cd".repeat(32),
                     exportedAt = Instant.parse("2023-11-15T22:13:20Z"),
@@ -351,7 +354,9 @@ class ConversationTranscriptExportTest {
 
             assertFalse("earlier transcript should be reaped", first.exists())
             assertTrue(second.exists())
-            assertEquals(listOf(second.name), second.parentFile?.listFiles()?.map { it.name })
+            assertFalse("legacy plaintext should be reaped", legacy.exists())
+            assertTrue("another account's transcript must survive", other.exists())
+            assertEquals(setOf(second.name, other.name), second.parentFile?.listFiles()?.map { it.name }?.toSet())
         } finally {
             root.deleteRecursively()
         }

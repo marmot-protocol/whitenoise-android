@@ -185,7 +185,7 @@ class MessageOutboundShareTest {
             assertEquals(2, confirmedStreams.map { it.uri }.distinct().size)
             val cacheNames = sharedFiles().map(File::getName)
             assertEquals(3, cacheNames.distinct().size)
-            assertTrue(cacheNames.all { it.startsWith(sharedPlaintextPrefix("account") + "message_") })
+            assertTrue(cacheNames.all { it.startsWith(sharedPlaintextPrefix(context, "account") + "message_") })
             (confirmedStreams + retainedStreams).forEach { stream ->
                 assertFalse(displayName(stream.uri).startsWith("message_"))
             }

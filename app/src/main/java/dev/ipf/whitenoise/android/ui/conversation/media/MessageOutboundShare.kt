@@ -313,7 +313,7 @@ private suspend fun stageShareFile(
         val expectedBytes = plaintext.size
         val file =
             File.createTempFile(
-                "${sharedPlaintextPrefix(accountRef)}message_",
+                "${sharedPlaintextPrefix(context, accountRef)}message_",
                 sharedPlaintextSuffix(safeName),
                 directory,
             )

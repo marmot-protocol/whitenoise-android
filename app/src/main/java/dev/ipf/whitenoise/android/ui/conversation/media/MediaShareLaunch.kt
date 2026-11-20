@@ -42,7 +42,7 @@ internal suspend fun shareVideo(
                     val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
                     val file =
                         java.io.File.createTempFile(
-                            "${sharedPlaintextPrefix(accountRef)}share_",
+                            "${sharedPlaintextPrefix(context, accountRef)}share_",
                             sharedPlaintextSuffix(MediaPipeline.safeDisplayName(fileName)),
                             dir,
                         )

@@ -150,7 +150,7 @@ private fun documentAttachmentCacheFile(
     val extension = documentAttachmentExtension(reference.fileName, reference.mediaType)
     return java.io.File(
         java.io.File(context.cacheDir, MediaCacheDirs.SHARED),
-        "${sharedPlaintextPrefix(accountRef)}document_$digest.$extension",
+        "${sharedPlaintextPrefix(context, accountRef)}document_$digest.$extension",
     )
 }
 

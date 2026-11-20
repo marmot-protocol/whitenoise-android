@@ -8,7 +8,6 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.whitenoise.android.media.ACCOUNT_SHARE_PREFIX
-import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
 import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
@@ -127,26 +126,28 @@ object ConversationTranscriptExport {
             .listFiles()
             .orEmpty()
             .count { file ->
-                val ownedOrLegacy = file.name.startsWith(filePrefix) || !file.name.startsWith(ACCOUNT_SHARE_PREFIX)
+                val ownedOrLegacy = !file.name.startsWith(ACCOUNT_SHARE_PREFIX) ||
+                    (filePrefix.isNotEmpty() && file.name.startsWith(filePrefix))
                 file.isFile && ownedOrLegacy && runCatching { file.delete() }.getOrDefault(false)
             }
 
+    /** Stages a transcript under the caller’s private ownership prefix. */
     fun writeTemporaryFile(
         cacheDir: File,
-        accountRef: String,
+        filePrefix: String,
         data: ByteArray,
         groupIdHex: String,
         exportedAt: Instant = Instant.now(),
     ): File {
+        require(filePrefix.startsWith(ACCOUNT_SHARE_PREFIX))
         val dir = File(cacheDir, CacheDirName).apply { mkdirs() }
         // Reap any earlier decrypted transcript before writing a new one. The
         // exports are serialized behind a modal share sheet, so a leftover file
         // here is a prior export's orphan, never one being actively shared.
         // (No deleteOnExit fallback: its JVM shutdown hook effectively never
         // runs on a process-killed Android app, so it left cleartext behind.)
-        val prefix = sharedPlaintextPrefix(accountRef)
-        sweepStaleTranscripts(dir, prefix)
-        val file = File.createTempFile(prefix + fileNamePrefix(groupIdHex, exportedAt), ".json", dir)
+        sweepStaleTranscripts(dir, filePrefix)
+        val file = File.createTempFile(filePrefix + fileNamePrefix(groupIdHex, exportedAt), ".json", dir)
         file.writeBytes(data)
         file.setExecutable(false, false)
         return file
