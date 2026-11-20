@@ -126,9 +126,9 @@ object ConversationTranscriptExport {
             .listFiles()
             .orEmpty()
             .count { file ->
-                val ownedOrLegacy = !file.name.startsWith(ACCOUNT_SHARE_PREFIX) ||
-                    (filePrefix.isNotEmpty() && file.name.startsWith(filePrefix))
-                file.isFile && ownedOrLegacy && runCatching { file.delete() }.getOrDefault(false)
+                val owned = filePrefix.isNotEmpty() && file.name.startsWith(filePrefix)
+                val legacy = !file.name.startsWith(ACCOUNT_SHARE_PREFIX)
+                file.isFile && (owned || legacy) && runCatching { file.delete() }.getOrDefault(false)
             }
 
     /** Stages a transcript under the caller’s private ownership prefix. */
