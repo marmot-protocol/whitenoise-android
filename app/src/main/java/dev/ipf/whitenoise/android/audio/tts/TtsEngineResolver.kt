@@ -42,6 +42,7 @@ data class TtsEngineHandle(
     val enginePackage: String,
     val trust: EngineTrust,
     val voiceResolution: TtsVoiceResolution = TtsVoiceResolution.Empty,
+    val connectedPackageVerified: Boolean = false,
 ) {
     /** Shuts down the framework engine when this resolved handle is replaced. */
     fun release() {
@@ -296,7 +297,10 @@ class TtsEngineResolver(
                 handle = null,
             )
         }
-        val trust = resolveHandleTrust(requestedEnginePackage, verifiedPackage, activePackage)
+        // If every possible fallback is local, the connection is local even without its package identity.
+        val trust =
+            verifiedPackage?.let(::classify)
+                ?: if (engines.all { it.trust == EngineTrust.Local }) EngineTrust.Local else EngineTrust.Unknown
         return TtsResolutionResult(
             status = status,
             engines = engines,
@@ -307,21 +311,10 @@ class TtsEngineResolver(
                     enginePackage = activePackage,
                     trust = trust,
                     voiceResolution = voiceResolution,
+                    connectedPackageVerified = verifiedPackage != null,
                 ),
         )
     }
-
-    /** Trusts only a framework-verified default; explicit selections remain unknown. */
-    private fun resolveHandleTrust(
-        requestedEnginePackage: String?,
-        verifiedPackage: String?,
-        activePackage: String,
-    ): EngineTrust =
-        when {
-            requestedEnginePackage != null -> EngineTrust.Unknown
-            verifiedPackage != null -> classify(verifiedPackage)
-            else -> EngineTrust.Unknown
-        }
 
     /** Applies a valid saved voice or the deterministic installed offline fallback. */
     private fun configureResolvedEngine(
@@ -332,8 +325,9 @@ class TtsEngineResolver(
         if (tts.setAudioAttributes(speechAudioAttributes) != TextToSpeech.SUCCESS) return null
         val configuredLocales = appContext.resources.configuration.locales
         val locale = if (configuredLocales.isEmpty) Locale.getDefault() else configuredLocales[0]
-        val voices = tts.voices.orEmpty().toList()
-        return applyResolvedVoice(tts, enginePackage, locale, voices, requestedVoice)
+        return tts.voices?.let { voices ->
+            applyResolvedVoice(enginePackage, locale, voices, requestedVoice, tts::setVoice) { tts.voice }
+        }
     }
 
     /** Normalizes framework engine metadata into a stable, label-sorted catalog. */
@@ -380,7 +374,7 @@ class TtsEngineResolver(
             voices: Collection<Voice>,
         ): List<Voice> =
             voices
-                .filter { it.isOfflineInstalledFor(locale) }
+                .filter { it.isOfflineFor(locale) }
                 .sortedWith(
                     compareByDescending<Voice> { it.quality }
                         .thenBy { it.name }
@@ -422,7 +416,7 @@ class TtsEngineResolver(
                     ?.takeIf { exact -> keyCounts[exact] == 1 }
                     ?.let { exact ->
                         sameLanguage.singleOrNull { voice ->
-                            voice.toVoiceKey(enginePackage) == exact && voice.isOfflineInstalledFor(locale)
+                            voice.toVoiceKey(enginePackage) == exact && voice.isOfflineFor(locale)
                         }
                     }
             return TtsVoiceResolution(
@@ -436,22 +430,23 @@ class TtsEngineResolver(
 
         /** Resolves, applies, and reports one deterministic installed offline voice. */
         internal fun applyResolvedVoice(
-            tts: TextToSpeech,
             enginePackage: String,
             locale: Locale,
             voices: Collection<Voice>,
             requestedKey: TtsVoiceKey?,
+            setVoice: (Voice) -> Int,
+            currentVoice: () -> Voice?,
         ): TtsVoiceResolution {
             val resolution = resolveVoiceSelection(enginePackage, locale, voices, requestedKey)
             val preferred = resolution.preferredVoice
             val appliedVoice =
-                preferred?.takeIf { tts.setVoice(it) == TextToSpeech.SUCCESS }
+                preferred?.takeIf { setVoice(it) == TextToSpeech.SUCCESS }
                     ?: offlineVoiceCandidates(locale, voices)
                         .asSequence()
                         .filterNot { it == preferred }
-                        .firstOrNull { tts.setVoice(it) == TextToSpeech.SUCCESS }
+                        .firstOrNull { setVoice(it) == TextToSpeech.SUCCESS }
             val effective =
-                (appliedVoice ?: tts.voice?.takeIf { it.isOfflineInstalledFor(locale) })
+                (appliedVoice ?: currentVoice()?.takeIf { it.isOfflineFor(locale) })
                     ?.toVoiceKey(enginePackage)
             return resolution.copy(effectiveKey = effective)
         }
@@ -460,11 +455,7 @@ class TtsEngineResolver(
         private fun Voice.toVoiceKey(enginePackage: String) = TtsVoiceKey(enginePackage, name, locale.toLanguageTag())
 
         /** Enforces language, installation, and network invariants together. */
-        private fun Voice.isOfflineInstalledFor(locale: Locale): Boolean =
-            name.isNotBlank() &&
-                this.locale.matchesLanguage(locale) &&
-                !isNetworkConnectionRequired &&
-                !features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
+        private fun Voice.isOfflineFor(target: Locale): Boolean = locale.matchesLanguage(target) && isInstalledOffline()
 
         /** Matches equivalent ISO-639-1 and ISO-639-2 language codes without trusting malformed locale data. */
         private fun Locale.matchesLanguage(other: Locale): Boolean =
@@ -483,3 +474,9 @@ class TtsEngineResolver(
         const val TTS_INIT_TIMEOUT_MS = 30_000L
     }
 }
+
+/** Rejects network voices and voices Android is still downloading before any text is submitted. */
+internal fun Voice.isInstalledOffline(): Boolean =
+    name.isNotBlank() &&
+        !isNetworkConnectionRequired &&
+        !features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)

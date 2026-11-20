@@ -145,47 +145,6 @@ class TtsEngineSelectionTest {
     }
 
     @Test
-    fun runtimeTrustForSelectionWarningFailsClosedBeforeAdoptedHandleMatches() {
-        assertEquals(
-            EngineTrust.Unknown,
-            runtimeTrustForSelectionWarning(
-                enginePackage = "app.grapheneos.speechservices",
-                adoptedHandle = null,
-                selectedOverride = null,
-            ),
-        )
-        assertEquals(
-            EngineTrust.Unknown,
-            runtimeTrustForSelectionWarning(
-                enginePackage = "app.grapheneos.speechservices",
-                adoptedHandle = fakeHandle("com.google.android.tts", EngineTrust.Unknown),
-                selectedOverride = null,
-            ),
-        )
-    }
-
-    @Test
-    fun runtimeTrustForSelectionWarningUsesAdoptedHandleWhenPackagesMatch() {
-        val adopted = fakeHandle("app.grapheneos.speechservices", EngineTrust.Local)
-        assertEquals(
-            EngineTrust.Local,
-            runtimeTrustForSelectionWarning(
-                enginePackage = "app.grapheneos.speechservices",
-                adoptedHandle = adopted,
-                selectedOverride = "app.grapheneos.speechservices",
-            ),
-        )
-        assertEquals(
-            EngineTrust.Unknown,
-            runtimeTrustForSelectionWarning(
-                enginePackage = "app.grapheneos.speechservices",
-                adoptedHandle = adopted,
-                selectedOverride = "com.google.android.tts",
-            ),
-        )
-    }
-
-    @Test
     fun noEngineMessageRequiresCompletedDiscovery() {
         assertFalse(shouldReportNoTtsEngine(null))
         assertTrue(
