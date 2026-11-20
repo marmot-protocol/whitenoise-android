@@ -76,16 +76,21 @@ internal fun ConversationDictationController.clearRecognitionGeneration(
     cancel: Boolean,
     onAudioCaptureFinished: () -> Unit = {},
 ) {
+    val providerEnded = generation.providerEnded
     val session = generation.retire()
     if (session == null) {
         onAudioCaptureFinished()
         return
     }
+    val callerAudio = runCatching(session::usesCallerAudioCapture).getOrDefault(false)
     if (cancel) {
         runCatching { session.cancel(onAudioCaptureFinished) }
             .onFailure { onAudioCaptureFinished() }
     }
     runCatching { session.destroy(onAudioCaptureFinished) }
         .onFailure { onAudioCaptureFinished() }
-    restart.noteTeardown(elapsedRealtime())
+    restart.noteTeardown(
+        elapsedRealtime(),
+        providerEndedSession = state.sessionId.takeIf { !cancel && providerEnded && callerAudio },
+    )
 }

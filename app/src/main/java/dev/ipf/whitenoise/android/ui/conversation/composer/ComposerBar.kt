@@ -172,16 +172,6 @@ internal fun composerBottomClusterModifier(
 }
 
 /**
- * A focus request emits its own focus callback. Ignore that callback while a
- * pane-to-IME handoff is already running so it cannot start a second keyboard
- * request and a second transcript re-anchor.
- */
-internal fun shouldStartComposerKeyboardRestore(
-    paneOpen: Boolean,
-    keyboardRestorePending: Boolean,
-): Boolean = paneOpen && !keyboardRestorePending
-
-/**
  * Starting a reply grows the bottom input cluster by inserting the preview card.
  * Re-anchor only on the null -> non-null edge; recompositions while the same
  * reply is active must not keep stealing scroll while the user types (#1109).
@@ -339,6 +329,7 @@ internal fun ComposerBar(
     onShareContact: (() -> Unit)? = null,
     onCreatePoll: (() -> Unit)? = null,
     onOpenStickers: (() -> Unit)? = null,
+    onSearchGifs: (() -> Unit)? = null,
     // Rail actions of the inline emoji keyboard; each button is hidden while its callback is null.
     onBrowseEmojiSets: (() -> Unit)? = null,
     onOpenEmojiSettings: (() -> Unit)? = null,
@@ -1212,7 +1203,8 @@ internal fun ComposerBar(
                                 size.height,
                                 automaticComposerHeightPx.toInt().coerceAtLeast(0),
                             )
-                        }.padding(horizontal = 16.dp, vertical = ComposerOuterVerticalPadding),
+                        }.padding(horizontal = 16.dp, vertical = ComposerOuterVerticalPadding)
+                        .composerExplanationEdge(),
                 fillEditorHeight = composerExpansion.mode != ComposerExpansionMode.Automatic,
                 minimumEditorHeight = with(density) { minimumManualComposerHeightPx.toDp() } - 12.dp,
             ) {
@@ -1497,8 +1489,9 @@ internal fun ComposerBar(
                 // Unpinned text actions stay reachable from the Plus menu.
                 val hiddenMenuShortcuts =
                     hiddenAttachments + (composerMenuTextShortcuts intersect available) - selectedShortcuts.toSet()
+                val hasMoreActions = hiddenMenuShortcuts.isNotEmpty() || onSearchGifs != null
                 val liveShortcuts =
-                    selectedShortcuts.filter { it != ComposerShortcut.More || hiddenMenuShortcuts.isNotEmpty() }
+                    selectedShortcuts.filter { it != ComposerShortcut.More || hasMoreActions }
                 var idleToolbar by remember(draftKey, draftAccountRef, draftGroupIdHex) {
                     mutableStateOf(settings to liveShortcuts)
                 }
@@ -1647,7 +1640,6 @@ internal fun ComposerBar(
                         Modifier
                             .fillMaxWidth()
                             .onGloballyPositioned { toolbarParentBounds = it.boundsInWindow() }
-                            .composerExplanationEdge()
                             .onSizeChanged { toolbarParentSize = it }
                             .then(dictationHoldGesture(dictationHold, startHeldDictation)),
                 ) {
@@ -1775,6 +1767,7 @@ internal fun ComposerBar(
                                     onPickFromGallery
                                         ?.takeIf { ComposerShortcut.Gallery in hiddenAttachments }
                                         ?.let(::guardedAttachmentAction),
+                                onSearchGifs = onSearchGifs?.let(::guardedAttachmentAction),
                                 onFiles =
                                     onPickDocument
                                         ?.takeIf { ComposerShortcut.Files in hiddenAttachments }

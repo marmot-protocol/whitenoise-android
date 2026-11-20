@@ -428,6 +428,16 @@
     <string name="media_attachment">媒體附件</string>
     <string name="generic_message">訊息</string>
     <string name="giphy_media_preview">來自 GIPHY 的 GIF</string>
+    <string name="giphy_search_title">搜尋 GIF</string>
+    <string name="giphy_search_hint">搜尋 GIPHY</string>
+    <string name="giphy_search_privacy">GIPHY 會收到您的搜尋內容、語言設定和 IP 位址。收件人的手機可能會自動從 GIPHY 載入 GIF，並分享其 IP 位址。</string>
+    <string name="giphy_search_powered_by_prefix">內容提供者</string>
+    <string name="giphy_search_powered_by">由 GIPHY 提供</string>
+    <string name="giphy_search_empty">找不到 GIF</string>
+    <string name="giphy_search_failed">無法在 GIPHY 中搜尋</string>
+    <string name="giphy_preview_loading">正在載入預覽</string>
+    <string name="giphy_preview_unavailable">無法預覽</string>
+    <string name="giphy_send_result">傳送 GIF：%1$s</string>
     <string name="waiting_for_stream">正在等待串流...</string>
     <string name="stream_failed_format">串流失敗：%1$s</string>
     <string name="copy_text">複製文字</string>
@@ -963,6 +973,7 @@
     <string name="hide_private_key">隱藏私鑰</string>
     <string name="show_private_key">顯示私鑰</string>
     <string name="copy_private_key">複製私鑰</string>
+    <string name="raw_key_export_auth_title">請驗證身分以存取私密金鑰</string>
     <string name="export">匯出</string>
     <string name="export_encrypted_private_key">匯出加密私鑰</string>
     <string name="keep_your_private_key_safe">妥善保管你的私鑰</string>
@@ -1641,6 +1652,8 @@
     <string name="emoji_sets_installed">已安裝</string>
     <string name="emoji_sets_section_installed">已安裝</string>
     <string name="emoji_sets_section_discover">探索</string>
+    <string name="emoji_sets_builtin_shown">預先安裝 · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">已從選擇器中隱藏。訊息中仍會顯示。</string>
     <string name="emoji_sets_update_available">有可用更新</string>
     <string name="emoji_sets_load_image">載入預覽圖片</string>
     <string name="emoji_sets_image_privacy">載入預覽或安裝表情包會向其圖片伺服器透露你的 IP 位址。</string>
@@ -2205,6 +2218,7 @@
     <string name="onboarding_signing_in">正在登入…</string>
     <string name="onboarding_choose_profile">選擇個人資料</string>
     <string name="onboarding_enter_private_key">輸入私密金鑰</string>
+    <string name="signup_generated_name_hint">註冊時會提供一個隨機名字。你可以保留它、擲骰子換一個，或輸入自己的名字。</string>
     <string name="signup_about_prompt">介紹一下自己</string>
     <string name="signup_preparing_photo">正在準備照片…</string>
     <string name="signup_publishing_profile">正在發布個人資料…</string>

@@ -441,6 +441,16 @@
     <string name="media_attachment">Medienanhang</string>
     <string name="generic_message">Nachricht</string>
     <string name="giphy_media_preview">GIF über GIPHY</string>
+    <string name="giphy_search_title">GIFs suchen</string>
+    <string name="giphy_search_hint">GIPHY durchsuchen</string>
+    <string name="giphy_search_privacy">GIPHY erhält deine Suche, Spracheinstellung und IP-Adresse. Die Telefone der Empfänger können GIFs automatisch von GIPHY laden und dabei ihre IP-Adresse teilen.</string>
+    <string name="giphy_search_powered_by_prefix">Bereitgestellt von</string>
+    <string name="giphy_search_powered_by">Bereitgestellt von GIPHY</string>
+    <string name="giphy_search_empty">Keine GIFs gefunden</string>
+    <string name="giphy_search_failed">GIPHY konnte nicht durchsucht werden</string>
+    <string name="giphy_preview_loading">Vorschau wird geladen</string>
+    <string name="giphy_preview_unavailable">Vorschau nicht verfügbar</string>
+    <string name="giphy_send_result">GIF senden: %1$s</string>
     <string name="waiting_for_stream">Warte auf Stream...</string>
     <string name="stream_failed_format">Stream fehlgeschlagen: %1$s</string>
     <string name="copy_text">Text kopieren</string>
@@ -978,6 +988,7 @@
     <string name="hide_private_key">Privaten Schlüssel verbergen</string>
     <string name="show_private_key">Privaten Schlüssel anzeigen</string>
     <string name="copy_private_key">Privaten Schlüssel kopieren</string>
+    <string name="raw_key_export_auth_title">Bestätige deine Identität für den Zugriff auf deinen privaten Schlüssel</string>
     <string name="export">Exportieren</string>
     <string name="export_encrypted_private_key">Verschlüsselten privaten Schlüssel exportieren</string>
     <string name="keep_your_private_key_safe">Bewahre deinen privaten Schlüssel sicher auf</string>
@@ -1669,6 +1680,8 @@
     <string name="emoji_sets_installed">Installiert</string>
     <string name="emoji_sets_section_installed">Installiert</string>
     <string name="emoji_sets_section_discover">Entdecken</string>
+    <string name="emoji_sets_builtin_shown">Vorinstalliert · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">In der Auswahl ausgeblendet. Wird in Nachrichten weiter angezeigt.</string>
     <string name="emoji_sets_update_available">Update verfügbar</string>
     <string name="emoji_sets_load_image">Vorschaubild laden</string>
     <string name="emoji_sets_image_privacy">Beim Laden einer Vorschau oder Installieren eines Sets sehen dessen Bild-Hosts deine IP-Adresse.</string>
@@ -2256,6 +2269,7 @@
     <string name="onboarding_signing_in">Anmeldung…</string>
     <string name="onboarding_choose_profile">Profil auswählen</string>
     <string name="onboarding_enter_private_key">Privaten Schlüssel eingeben</string>
+    <string name="signup_generated_name_hint">Bei der Registrierung erscheint zuerst ein Zufallsname. Behalte ihn, würfle erneut oder gib deinen eigenen Namen ein.</string>
     <string name="signup_about_prompt">Erzähle etwas über dich</string>
     <string name="signup_preparing_photo">Foto wird vorbereitet…</string>
     <string name="signup_publishing_profile">Profil wird veröffentlicht…</string>

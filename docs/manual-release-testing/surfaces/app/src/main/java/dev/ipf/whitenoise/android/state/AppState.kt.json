@@ -43,6 +43,14 @@
         "test_ids": [
           "ACC-014"
         ]
+      },
+      {
+        "surface": "Read-aloud external engine consent and dismissal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun confirmTtsPlaybackTrust(",
+        "test_ids": [
+          "TTS-003"
+        ]
       }
     ],
     "notification_content_contracts": [

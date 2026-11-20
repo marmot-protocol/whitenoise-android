@@ -11,14 +11,14 @@ try:
     from scripts.maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation, fixture_account_count
     from scripts.maestro_runtime_selection import matrix_selection
     from scripts.maestro_environment import qualify
-    from scripts.maestro_credential import qualify_credential
+    from scripts.maestro_credential import qualify_credential, restored_record
     from scripts.maestro_screen_coverage import flow_assertions, executed_screens, screen_bindings
     from scripts.maestro_suite import CASES as OFFLINE
 except ModuleNotFoundError:
     from maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation, fixture_account_count
     from maestro_runtime_selection import matrix_selection
     from maestro_environment import qualify
-    from maestro_credential import qualify_credential
+    from maestro_credential import qualify_credential, restored_record
     from maestro_screen_coverage import flow_assertions, executed_screens, screen_bindings
     from maestro_suite import CASES as OFFLINE
 
@@ -132,9 +132,10 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'] == 'global-library-empty'
                         and read_json(leaf / 'verified.json').get('globalLibraryVerified') is not True):
                     raise ValueError('Actual empty native attachment timelines were not verified')
-                if (CASES[name]['postcondition'].startswith('private-key-copy-')
-                        and read_json(leaf / 'verified.json').get('privateKeyCopyVerified') is not True):
-                    raise ValueError('Actual private-key clipboard sensitivity and cleanup were not verified')
+                if CASES[name]['postcondition'].startswith('private-key-copy-'):
+                    if read_json(leaf / 'verified.json').get('privateKeyCopyVerified') is not True:
+                        raise ValueError('Actual private-key clipboard sensitivity and cleanup were not verified')
+                    restored_record(read_json(leaf / 'credential-restored.json'), generation)
                 if (CASES[name]['postcondition'].startswith('public-key-copy-')
                         and read_json(leaf / 'verified.json').get('publicKeyCopyVerified') is not True):
                     raise ValueError('Actual public-key clipboard and cleanup were not verified')

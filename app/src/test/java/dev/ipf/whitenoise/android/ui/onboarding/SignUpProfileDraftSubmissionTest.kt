@@ -10,14 +10,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -27,6 +30,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.ExplanationHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -265,9 +269,22 @@ class SignUpProfileDraftSubmissionTest {
             val scope = rememberCoroutineScope()
             controller = remember { idleSignUpController(scope) }
             WhiteNoiseTheme {
-                SignUpScreen(controller, { true }, { excluding -> "Quiet Otter".also { requests += excluding } }, {})
+                ExplanationHost {
+                    SignUpScreen(
+                        controller,
+                        { true },
+                        { excluding -> "Quiet Otter".also { requests += excluding } },
+                        {},
+                    )
+                }
             }
         }
+        composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
+        val hint = context.getString(R.string.signup_generated_name_hint)
+        composeRule.onNodeWithTag("explanation.sheet").assertDoesNotExist()
+        composeRule.onNodeWithTag("onboarding.sign_up.suggest_name").performTouchInput { longClick() }
+        composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
+        composeRule.onNodeWithText(hint).assertIsDisplayed()
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
         composeRule.runOnIdle {
             assertEquals(listOf<String?>(null), requests)

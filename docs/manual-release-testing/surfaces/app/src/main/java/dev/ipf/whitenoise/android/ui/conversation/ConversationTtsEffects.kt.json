@@ -9,6 +9,7 @@
         "anchor": "fun ConversationTtsAutoReadEffects(",
         "test_ids": [
           "TTS-001",
+          "TTS-003",
           "TTS-004"
         ]
       },

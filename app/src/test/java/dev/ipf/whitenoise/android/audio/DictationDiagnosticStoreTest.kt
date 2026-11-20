@@ -22,6 +22,43 @@ class DictationDiagnosticStoreTest {
     @get:Rule val folder = TemporaryFolder()
 
     @Test
+    fun schemaRetainsFinishTimingDurationsAndDropsUnknownFields() {
+        val parsed =
+            requireNotNull(
+                DictationDiagnosticSchema.parse(
+                    "event=finish_timing action=send tap_to_capture_closed_ms=12 tap_to_last_result_ms=640 " +
+                        "tap_to_delivered_ms=700 generations_after_tap=2 retries_after_tap=1 settle_wait_ms=50 " +
+                        "audio_ms=4300 session=3",
+                ),
+            )
+        assertEquals(
+            mapOf(
+                "event" to "finish_timing",
+                "action" to "send",
+                "tap_to_capture_closed_ms" to 12L,
+                "tap_to_last_result_ms" to 640L,
+                "tap_to_delivered_ms" to 700L,
+                "generations_after_tap" to 2L,
+                "retries_after_tap" to 1L,
+                "settle_wait_ms" to 50L,
+                "audio_ms" to 4300L,
+                "session" to 3L,
+            ),
+            parsed.fields,
+        )
+        assertEquals(0L, parsed.filteredFields)
+        assertEquals("paste", event("event=finish_timing action=paste")["action"])
+        val dropped =
+            requireNotNull(
+                DictationDiagnosticSchema.parse(
+                    "event=finish_timing action=PRIVATE tap_to_delivered_ms=x transcript=hi",
+                ),
+            )
+        assertEquals(mapOf("event" to "finish_timing"), dropped.fields)
+        assertEquals(3L, dropped.filteredFields)
+    }
+
+    @Test
     fun schemaDropsContentIdentifiersAndFreeFormValues() {
         val fields =
             requireNotNull(
@@ -88,12 +125,13 @@ class DictationDiagnosticStoreTest {
                 "event=app_record_audio_permission granted=true" to
                     mapOf("granted" to true),
             )
-        listOf("result", "permission", "provider_disconnected", "no_speech_advanced").forEach { reason ->
-            val parsed =
-                requireNotNull(DictationDiagnosticSchema.parse("event=recognizer_restart_scheduled reason=$reason"))
-            assertEquals(reason, parsed.fields["reason"])
-            assertEquals(0L, parsed.filteredFields)
-        }
+        listOf("result", "permission", "provider_disconnected", "no_speech_advanced", "short_settle_disconnect")
+            .forEach { reason ->
+                val parsed =
+                    requireNotNull(DictationDiagnosticSchema.parse("event=recognizer_restart_scheduled reason=$reason"))
+                assertEquals(reason, parsed.fields["reason"])
+                assertEquals(0L, parsed.filteredFields)
+            }
         assertEquals("local", event("event=target_validation source=local")["source"])
         examples.forEach { (event, expected) ->
             val parsed = requireNotNull(DictationDiagnosticSchema.parse(event))

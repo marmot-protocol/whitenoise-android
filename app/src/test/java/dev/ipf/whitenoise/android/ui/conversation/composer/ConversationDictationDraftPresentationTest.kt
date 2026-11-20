@@ -493,7 +493,7 @@ class ConversationDictationDraftPresentationTest {
                 markDisclosureAccepted = {},
                 elapsedRealtime = { elapsedMillis },
                 scheduleTimeout = { delay, callback ->
-                    if (delay == 500L) restarts += callback
+                    if (delay == 500L || delay == 50L) restarts += callback
                     ConversationDictationTimeoutHandle { restarts.remove(callback) }
                 },
                 targetValidationScope =

@@ -152,6 +152,26 @@ class AndroidTtsSpeechEngineTest {
         assertSame(offline, tts.voice)
     }
 
+    /** A healthy engine can reject a preferred voice while accepting another installed offline voice. */
+    @Test
+    fun normalVoiceRejectionDoesNotRetireTheConnection() {
+        val selected = voice("Selected", Locale.US, 500)
+        val fallback = voice("Fallback", Locale.UK, 300)
+        val tts = VoiceSelectingTextToSpeech(selected, setOf(selected, fallback), rejectedVoices = setOf(selected))
+        var retirements = 0
+        val engine =
+            AndroidTtsSpeechEngine(
+                tts,
+                enginePackage = "engine.a",
+                selectedVoice = { TtsVoiceKey("engine.a", "Selected", "en-US") },
+                onConnectionUncertain = { retirements++ },
+            )
+
+        assertEquals(TextToSpeech.LANG_AVAILABLE, engine.setLanguage(Locale.US))
+        assertSame(fallback, tts.voice)
+        assertEquals(0, retirements)
+    }
+
     /** Refuses a language whose engine exposes only network speech. */
     @Test
     fun networkOnlyLanguageIsRejectedBeforeSpeechSubmission() {
@@ -191,6 +211,68 @@ class AndroidTtsSpeechEngineTest {
         assertNull(resolution?.effectiveKey)
     }
 
+    /** A required installed voice must still be available after language selection. */
+    @Test
+    fun offlinePlaybackRejectsAnEmptyCatalogAfterLanguageSelection() {
+        val engine =
+            AndroidTtsSpeechEngine(
+                textToSpeech = EmptyCatalogTextToSpeech(),
+                enginePackage = "engine.a",
+                requireOfflineVoice = true,
+            )
+
+        assertEquals(TextToSpeech.LANG_NOT_SUPPORTED, engine.setLanguage(Locale.FRANCE))
+        assertEquals(TextToSpeech.ERROR, engine.speak("Private text", "start"))
+        assertEquals(TextToSpeech.ERROR, engine.speak("Private text", "mix", volume = 0.5f))
+    }
+
+    /** A failed framework call retires authorization for all later chunks on that adapter. */
+    @Test
+    fun frameworkFailureRetiresTheConnectionEvenWhenTheSameObjectRecovers() {
+        val tts = CapturingTextToSpeech(RuntimeEnvironment.getApplication())
+        var retirements = 0
+        val engine = AndroidTtsSpeechEngine(tts, onConnectionUncertain = { retirements++ })
+        tts.speakResult = TextToSpeech.ERROR
+        assertEquals(TextToSpeech.ERROR, engine.speak("First chunk", "first"))
+
+        tts.speakResult = TextToSpeech.SUCCESS
+        assertEquals(TextToSpeech.ERROR, engine.speak("Later chunk", "later"))
+        assertEquals("first", tts.lastUtteranceId)
+        assertEquals(1, retirements)
+    }
+
+    /** A saved offline preference still applies when an engine stops exposing a voice catalog. */
+    @Test
+    fun savedOfflinePreferenceCannotBeLostWithAnEmptyCatalog() {
+        val engine =
+            AndroidTtsSpeechEngine(
+                textToSpeech = EmptyCatalogTextToSpeech(),
+                enginePackage = "engine.a",
+                selectedVoice = { TtsVoiceKey("engine.a", "Saved", "en-US") },
+            )
+
+        assertEquals(TextToSpeech.LANG_NOT_SUPPORTED, engine.setLanguage(Locale.US))
+        assertEquals(TextToSpeech.ERROR, engine.speak("Fixture text", "saved"))
+    }
+
+    /** The installed requirement also applies when Android advertises a non-network voice that is downloading. */
+    @Test
+    fun voiceMarkedNotInstalledCannotReceiveSpeech() {
+        val voice =
+            Voice(
+                "Downloading",
+                Locale.US,
+                300,
+                100,
+                false,
+                setOf(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED),
+            )
+        val tts = VoiceSelectingTextToSpeech(voice, setOf(voice))
+        val engine = AndroidTtsSpeechEngine(tts, enginePackage = "engine.a", requireOfflineVoice = true)
+
+        assertEquals(TextToSpeech.ERROR, engine.speak("Fixture text", "unavailable"))
+    }
+
     /** Builds a listener that records each lifecycle callback in order. */
     private fun listener(calls: MutableList<String>) =
         androidTtsProgressListener(
@@ -212,6 +294,7 @@ class AndroidTtsSpeechEngineTest {
     private class VoiceSelectingTextToSpeech(
         initialVoice: Voice,
         private val availableVoices: Set<Voice>,
+        private val rejectedVoices: Set<Voice> = emptySet(),
     ) : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
         private var activeVoice = initialVoice
 
@@ -226,7 +309,7 @@ class AndroidTtsSpeechEngineTest {
 
         /** Accepts only catalog voices so fallback failures remain observable. */
         override fun setVoice(voice: Voice?): Int {
-            if (voice == null || voice !in availableVoices) return TextToSpeech.ERROR
+            if (voice == null || voice !in availableVoices || voice in rejectedVoices) return TextToSpeech.ERROR
             activeVoice = voice
             return TextToSpeech.SUCCESS
         }
@@ -248,6 +331,7 @@ class AndroidTtsSpeechEngineTest {
             private set
         var lastUtteranceId: String? = null
             private set
+        var speakResult: Int = TextToSpeech.SUCCESS
 
         override fun setOnUtteranceProgressListener(listener: UtteranceProgressListener?): Int {
             this.listener = listener
@@ -263,7 +347,7 @@ class AndroidTtsSpeechEngineTest {
         ): Int {
             lastParams = params
             lastUtteranceId = utteranceId
-            return TextToSpeech.SUCCESS
+            return speakResult
         }
     }
 }

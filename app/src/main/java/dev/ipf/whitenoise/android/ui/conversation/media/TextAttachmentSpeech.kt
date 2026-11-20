@@ -32,9 +32,9 @@ internal suspend fun WhiteNoiseAppState.speakTextAttachment(
                 attachmentIndex = attachmentIndex,
             )
         }
-    if (!actions.isCurrent()) return
     val preparedHit = hit?.let { preparedHitFromRenderedHit(entry, it) }
-    if (hit != null && preparedHit == null) return
+    if (!actions.isCurrent() || (hit != null && preparedHit == null)) return
+    if (entry.text.isNotBlank() && !confirmTtsPlaybackTrust(actions::isCurrent)) return
     val started =
         entry.text.isNotBlank() &&
             speakAloudPrepared(

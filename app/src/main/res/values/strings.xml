@@ -1013,6 +1013,7 @@
     <string name="wipe_outcome_local_wipe_done">Local data wiped</string>
     <string name="wipe_outcome_local_wipe_incomplete">Local data wipe incomplete</string>
     <string name="export_nsec">Export Private Key</string>
+    <string name="raw_key_export_auth_title">Authenticate to access your private key</string>
     <string name="share_secret_key">Share secret key</string>
     <string name="signed_out">Signed out</string>
     <string name="toast_couldnt_sign_in_account">Couldn\'t sign in to account</string>
@@ -1961,6 +1962,8 @@
     <string name="emoji_sets_installed">Installed</string>
     <string name="emoji_sets_section_installed">Installed</string>
     <string name="emoji_sets_section_discover">Discover</string>
+    <string name="emoji_sets_builtin_shown">Pre-installed · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Hidden from picker. Still shows in messages.</string>
     <string name="emoji_sets_update_available">Update available</string>
     <string name="emoji_sets_load_image">Load preview image</string>
     <string name="emoji_sets_image_privacy">Loading a preview or installing a set shares your IP address with its image hosts.</string>
@@ -2422,6 +2425,7 @@
     <string name="onboarding_signing_in">Signing in…</string>
     <string name="onboarding_choose_profile">Choose profile</string>
     <string name="onboarding_enter_private_key">Enter private key</string>
+    <string name="signup_generated_name_hint">Sign Up starts with a random name. Keep it, roll the dice for another, or type your own.</string>
     <string name="signup_about_prompt">Tell people about yourself</string>
     <string name="signup_preparing_photo">Preparing photo…</string>
     <string name="signup_publishing_profile">Publishing profile…</string>
@@ -2540,6 +2544,16 @@
     <string name="collapse_message">Collapse Message</string>
     <string name="go_to_message">Go to Message</string>
     <string name="gif" translatable="false">GIF</string>
+    <string name="giphy_search_title">Search GIFs</string>
+    <string name="giphy_search_hint">Search GIPHY</string>
+    <string name="giphy_search_privacy">GIPHY receives your search, language setting, and IP address. Recipients’ phones may automatically load GIFs from GIPHY, sharing their IP address.</string>
+    <string name="giphy_search_powered_by_prefix">Powered by</string>
+    <string name="giphy_search_powered_by">Powered by GIPHY</string>
+    <string name="giphy_search_empty">No GIFs found</string>
+    <string name="giphy_search_failed">Couldn’t search GIPHY</string>
+    <string name="giphy_preview_loading">Loading preview</string>
+    <string name="giphy_preview_unavailable">Preview unavailable</string>
+    <string name="giphy_send_result">Send GIF: %1$s</string>
     <string name="preview_media">Preview</string>
     <string name="cancel_media_changes">Cancel Media Changes</string>
     <string name="media_included">Included</string>

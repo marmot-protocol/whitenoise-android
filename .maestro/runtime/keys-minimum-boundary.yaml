@@ -24,5 +24,4 @@ name: keys-minimum-boundary
     id: "profile_keys.export_file"
     enabled: true
 - tapOn: "Cancel"
-- assertVisible: "Private key hidden"
-- assertNotVisible: "Encrypted Private Key"
+- runFlow: ../fixtures/assert-private-key-hidden-after-backup.yaml

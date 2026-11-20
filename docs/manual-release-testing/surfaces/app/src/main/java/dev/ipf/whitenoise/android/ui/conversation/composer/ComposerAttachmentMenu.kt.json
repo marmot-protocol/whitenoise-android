@@ -44,6 +44,14 @@
         "test_ids": [
           "CON-048"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+        "surface": "Search GIFs composer action",
+        "anchor": "fun composerGiphyItem(",
+        "test_ids": [
+          "MED-057"
+        ]
       }
     ],
     "settings_controls": [
@@ -110,6 +118,22 @@
         "anchor": "R.string.explanation_composer_customize",
         "test_ids": [
           "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+        "surface": "string:giphy_search_title",
+        "anchor": "R.string.giphy_search_title",
+        "test_ids": [
+          "MED-057"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+        "surface": "string:giphy_search_privacy",
+        "anchor": "R.string.giphy_search_privacy",
+        "test_ids": [
+          "MED-057"
         ]
       }
     ],
