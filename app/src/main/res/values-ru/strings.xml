@@ -469,7 +469,7 @@
     <string name="giphy_media_preview">GIF через GIPHY</string>
     <string name="giphy_search_title">Поиск GIF</string>
     <string name="giphy_search_hint">Поиск в GIPHY</string>
-    <string name="giphy_search_privacy">GIPHY получает ваш поисковый запрос и IP-адрес. Телефоны получателей могут автоматически загружать GIF из GIPHY, передавая свой IP-адрес.</string>
+    <string name="giphy_search_privacy">GIPHY получает ваш поисковый запрос, язык и IP-адрес. Телефоны получателей могут автоматически загружать GIF из GIPHY, передавая свой IP-адрес.</string>
     <string name="giphy_search_powered_by_prefix">Предоставлено</string>
     <string name="giphy_search_powered_by">Предоставлено GIPHY</string>
     <string name="giphy_search_empty">GIF не найдены</string>

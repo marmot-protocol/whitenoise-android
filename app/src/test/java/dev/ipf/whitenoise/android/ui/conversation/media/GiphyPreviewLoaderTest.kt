@@ -114,6 +114,7 @@ class GiphyPreviewLoaderTest {
         return drawable
     }
 
+    /** Produces a tiny solid frame so capture tests can distinguish worker updates by their pixels. */
     private fun pixels(color: Int): Bitmap {
         val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(color)

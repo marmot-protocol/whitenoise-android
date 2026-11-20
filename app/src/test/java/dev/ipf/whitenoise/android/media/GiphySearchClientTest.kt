@@ -8,6 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import java.net.URI
 import java.net.URLDecoder
+import java.util.Base64
 
 class GiphySearchClientTest {
     /** Search inputs stay in their own encoded parameters, and blank or oversized inputs skip the request. */
@@ -57,6 +58,42 @@ class GiphySearchClientTest {
         assertEquals(url, result.media.url)
         assertEquals(url, requireNotNull(result.media.imageRequest()).url)
         assertEquals("$url\nvia GIPHY", result.media.wireText())
+    }
+
+    /** The current search-context path must never link a recipient's download to the sender's search. */
+    @Test
+    fun stripsEncodedSearchContextFromProviderPath() {
+        val context =
+            Base64
+                .getUrlEncoder()
+                .withoutPadding()
+                .encodeToString("cid=sender-id&ep=v1_gifs_search&rid=giphy.gif&ct=g".toByteArray())
+        for (host in listOf("media.giphy.com", "media2.giphy.com", "i.giphy.com")) {
+            val url = "https://$host/media/Cat123/200.gif"
+            val tracked = "https://$host/media/v1.$context/Cat123/200.gif?cid=sender-id#provider-fragment"
+            val item = JSONObject().put("images", JSONObject().put("original", rendition(tracked)))
+            val result = requireNotNull(decodeGiphySearchResults(response(item))).single()
+            assertEquals(url, result.media.url)
+            assertEquals(url, requireNotNull(result.media.imageRequest()).url)
+            assertEquals("$url\nvia GIPHY", result.media.wireText())
+            assertEquals(result.media, RemoteGiphyMedia.parse(result.media.wireText()))
+        }
+    }
+
+    /** Unknown or encoded path layouts are rejected instead of accidentally retaining tracking segments. */
+    @Test
+    fun rejectsAmbiguousProviderPaths() {
+        for (path in listOf(
+            "v1.sender-token/giphy.gif",
+            "v2.sender-token/cat/giphy.gif",
+            "v1.sender-token/cat/extra/giphy.gif",
+            "cat%2Fsender-token/giphy.gif",
+            "cat/giphy%2Egif",
+        )) {
+            val item =
+                JSONObject().put("images", JSONObject().put("original", rendition("https://media.giphy.com/media/$path")))
+            assertEquals(emptyList<GiphySearchResult>(), decodeGiphySearchResults(response(item)))
+        }
     }
 
     /** A smaller GIF is both previewed and sent when the original exceeds the preferred download budget. */

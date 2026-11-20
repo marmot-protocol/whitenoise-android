@@ -23,6 +23,7 @@ internal fun rememberConversationGiphyPicker(
     var open by remember(attachmentOrigin) { mutableStateOf(false) }
     val available =
         composerGate == ComposerGate.COMPOSER &&
+            controller.ownsRetainedForegroundPresentation &&
             controller.canSendMessages &&
             controller.editingMessageId == null &&
             presentationAvailable

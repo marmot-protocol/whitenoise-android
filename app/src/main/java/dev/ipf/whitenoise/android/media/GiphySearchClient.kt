@@ -136,9 +136,7 @@ private fun boundedGiphyRendition(
     rendition: JSONObject,
     originalFrames: Int?,
 ): GiphyRendition? {
-    val providerUrl = rendition.optString("url", "")
-    if (!RemoteGiphyMedia.isAllowedMediaUrl(providerUrl)) return null
-    val url = providerUrl.substringBefore('?').substringBefore('#')
+    val url = canonicalGiphyRenditionUrl(rendition.optString("url", "")) ?: return null
     val path = URI(url).path.orEmpty().lowercase(Locale.ROOT)
     val width = rendition.optInt("width")
     val height = rendition.optInt("height")
@@ -152,4 +150,15 @@ private fun boundedGiphyRendition(
     val size = rendition.optInt("size")
     val fitsMedia = path.endsWith(".gif") && size in 1..GIPHY_MAX_MEDIA_BYTES
     return if (fitsMedia && fitsCanvas && fitsWork) GiphyRendition(url, pixels, size) else null
+}
+
+/** Drops search context from both provider path formats before a URL reaches previews or recipients. */
+private fun canonicalGiphyRenditionUrl(providerUrl: String): String? {
+    if (!RemoteGiphyMedia.isAllowedMediaUrl(providerUrl)) return null
+    val uri = URI(providerUrl)
+    val renditionPath =
+        Regex("^/media/(?:v1\\.[^/]+/)?([A-Za-z0-9]+)/([A-Za-z0-9_.-]+\\.gif)$", RegexOption.IGNORE_CASE)
+            .matchEntire(uri.rawPath.orEmpty()) ?: return null
+    val (id, filename) = renditionPath.destructured
+    return "https://${uri.host.lowercase(Locale.ROOT)}/media/$id/$filename"
 }

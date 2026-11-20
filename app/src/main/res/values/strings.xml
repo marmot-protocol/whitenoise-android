@@ -2545,7 +2545,7 @@
     <string name="gif" translatable="false">GIF</string>
     <string name="giphy_search_title">Search GIFs</string>
     <string name="giphy_search_hint">Search GIPHY</string>
-    <string name="giphy_search_privacy">GIPHY receives your search and IP address. Recipients’ phones may automatically load GIFs from GIPHY, sharing their IP address.</string>
+    <string name="giphy_search_privacy">GIPHY receives your search, language setting, and IP address. Recipients’ phones may automatically load GIFs from GIPHY, sharing their IP address.</string>
     <string name="giphy_search_powered_by_prefix">Powered by</string>
     <string name="giphy_search_powered_by">Powered by GIPHY</string>
     <string name="giphy_search_empty">No GIFs found</string>

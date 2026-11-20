@@ -443,7 +443,7 @@
     <string name="giphy_media_preview">GIF über GIPHY</string>
     <string name="giphy_search_title">GIFs suchen</string>
     <string name="giphy_search_hint">GIPHY durchsuchen</string>
-    <string name="giphy_search_privacy">GIPHY erhält deine Suche und IP-Adresse. Die Telefone der Empfänger können GIFs automatisch von GIPHY laden und dabei ihre IP-Adresse teilen.</string>
+    <string name="giphy_search_privacy">GIPHY erhält deine Suche, Spracheinstellung und IP-Adresse. Die Telefone der Empfänger können GIFs automatisch von GIPHY laden und dabei ihre IP-Adresse teilen.</string>
     <string name="giphy_search_powered_by_prefix">Bereitgestellt von</string>
     <string name="giphy_search_powered_by">Bereitgestellt von GIPHY</string>
     <string name="giphy_search_empty">Keine GIFs gefunden</string>

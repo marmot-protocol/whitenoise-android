@@ -58,7 +58,7 @@ class GiphySearchSheetScreenshotTest {
         composeRule.onNodeWithContentDescription("Powered by GIPHY").assertIsDisplayed()
         composeRule
             .onNodeWithText(
-                "GIPHY receives your search and IP address. " +
+                "GIPHY receives your search, language setting, and IP address. " +
                     "Recipients’ phones may automatically load GIFs from GIPHY, sharing their IP address.",
             ).assertIsDisplayed()
         val second = composeRule.onNodeWithText("Sleepy cat")
@@ -85,6 +85,7 @@ class GiphySearchSheetScreenshotTest {
         composeRule.runOnIdle { assertEquals(true, retried) }
     }
 
+    /** Renders controlled search and preview states with the requested theme, direction, and text scale. */
     private fun render(
         state: GiphySearchState,
         darkRtl: Boolean = false,
