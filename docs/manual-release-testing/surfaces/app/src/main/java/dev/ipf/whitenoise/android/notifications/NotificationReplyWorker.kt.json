@@ -27,6 +27,14 @@
         "test_ids": [
           "SEC-002"
         ]
+      },
+      {
+        "surface": "Notification action lock feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReplyWorker.kt",
+        "anchor": "R.string.notification_action_unlock_required",
+        "test_ids": [
+          "SEC-002"
+        ]
       }
     ]
   },

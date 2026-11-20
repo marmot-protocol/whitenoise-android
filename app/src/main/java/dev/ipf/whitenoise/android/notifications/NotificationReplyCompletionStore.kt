@@ -44,6 +44,12 @@ internal class NotificationReplyCompletionStore(
 
     fun recoverySnapshot(key: String): NotificationReplyRecoverySnapshot? = (recoveryLookup(key) as? NotificationReplyRecoveryLookup.Ready)?.snapshot
 
+    /** Computes the send window without creating a durable receipt for work that has not reached native. */
+    fun plannedBoundary(
+        scope: String,
+        proposed: NotificationReplyRecoveryBoundary,
+    ): NotificationReplyRecoveryBoundary? = synchronized(STATE_LOCK) { strictlyLaterBoundary(scope, proposed) }
+
     fun markStarted(
         key: String,
         scope: String,

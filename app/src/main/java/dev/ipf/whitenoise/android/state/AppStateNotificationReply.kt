@@ -85,32 +85,37 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReply(
             // second. Wait for the next second before asking MDK to build the
             // event so its random event id cannot sort below the lower bound.
             val recoveryBoundary = notificationReplyRecoveryBoundary(System.currentTimeMillis())
-            val persistedBoundary =
+            val plannedBoundary =
                 withContext(Dispatchers.IO) {
-                    completionStore.markStarted(completionKey, recoveryScope, recoveryBoundary)
-                }
-            if (persistedBoundary == null) return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
-            while (!notificationReplySendWindowReady(persistedBoundary, System.currentTimeMillis())) {
+                    completionStore.plannedBoundary(recoveryScope, recoveryBoundary)
+                } ?: return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
+            while (!notificationReplySendWindowReady(plannedBoundary, System.currentTimeMillis())) {
                 currentCoroutineContext().ensureActive()
                 delay(NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS)
             }
 
-            var unsentAttemptRetired = false
+            var refusal = NotificationReplySendOutcome.BlockedByAppLock
             val summary =
                 marmotIo(MarmotTraceSection.TEXT_SEND) {
-                    if (!appLock.notificationActionsAllowed) {
-                        unsentAttemptRetired = completionStore.retireUnsentAttempt(completionKey, persistedBoundary)
+                    if (!appLock.notificationActionsAllowed) return@marmotIo null
+                    val persisted = completionStore.markStarted(completionKey, recoveryScope, plannedBoundary)
+                    if (persisted == null) {
+                        refusal = NotificationReplySendOutcome.RetryableFailure
+                        return@marmotIo null
+                    }
+                    val inWindow = notificationReplySendWindowReady(persisted, System.currentTimeMillis())
+                    if (!inWindow || !appLock.notificationActionsAllowed) {
+                        refusal =
+                            when {
+                                !completionStore.retireUnsentAttempt(completionKey, persisted) ->
+                                    NotificationReplySendOutcome.NonRetryableFailure
+                                !inWindow -> NotificationReplySendOutcome.RetryableFailure
+                                else -> NotificationReplySendOutcome.BlockedByAppLock
+                            }
                         return@marmotIo null
                     }
                     sendText(account, group, body)
-                }
-            if (summary == null) {
-                return@withGroupCommitLock if (unsentAttemptRetired) {
-                    NotificationReplySendOutcome.BlockedByAppLock
-                } else {
-                    NotificationReplySendOutcome.NonRetryableFailure
-                }
-            }
+                } ?: return@withGroupCommitLock refusal
             // MDK assigns the app-event id before deciding whether this call
             // can publish it immediately. Persist it before returning either
             // outcome: after a process death, it is our durable proof that an
