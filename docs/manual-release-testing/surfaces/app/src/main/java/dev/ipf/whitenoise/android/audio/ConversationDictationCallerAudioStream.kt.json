@@ -35,6 +35,14 @@
           "DIC-002",
           "DIC-009"
         ]
+      },
+      {
+        "surface": "A provider terminal callback ends an unfinished feed at once and requeues its exact chunk",
+        "anchor": "fun endFeedAfterProviderTerminal(callback: () -> Unit) {",
+        "test_ids": [
+          "DIC-018"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudioStream.kt"
       }
     ]
   },
