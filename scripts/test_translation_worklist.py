@@ -190,6 +190,16 @@ class TranslationWorklistTest(unittest.TestCase):
                    '<item quantity="other">%1$d чатов в %2$d комнатах</item></plurals>')
         self.assertEqual(self.scan()[3], [])
 
+    def test_plural_forms_keep_arguments_of_their_matching_english_form(self):
+        self.write("main/values/counts.xml", '<plurals name="count"><item quantity="one">One chat</item>'
+                   '<item quantity="other">%1$d chats in %2$s</item></plurals>')
+        self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат</item>'
+                   '<item quantity="few">%1$d чата в %2$s</item><item quantity="other">%1$d чатов</item></plurals>')
+        self.assertIn("format arguments differ", self.scan()[3][0])
+        self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="one">Один чат</item>'
+                   '<item quantity="few">%1$d чата в %2$s</item><item quantity="other">%1$d чатов в %2$s</item></plurals>')
+        self.assertEqual(self.scan()[3], [])
+
     def test_unformatted_plurals_with_literal_percent_sequences_are_checked(self):
         self.write("main/values/counts.xml", '<plurals name="count" formatted="false">'
                    '<item quantity="one">%&lt;d chat</item><item quantity="other">%1$d chats</item></plurals>')

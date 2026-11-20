@@ -127,14 +127,12 @@ def check_entry(source, target):
         pairs = [(source_items.get(item.get("quantity"), source_items["other"]), item) for item in translated]
         # Languages differ on which forms spell out the count, so allow any English form's arguments.
         plural_arguments = set().union(*(arguments(item) for item in original))
-        # Argument indices in every English form must survive, except the count, which may be spelled out.
-        source_arguments = [arguments(item) for item in original]
-        required_indices = set.intersection(*({argument[0] for argument in found} for found in source_arguments))
+        # Each form keeps its matching English form's arguments, except the count, which may be spelled out.
         integers = [
-            argument[0] for found in source_arguments for argument in found
+            argument[0] for item in original for argument in arguments(item)
             if argument[3] in {"d", "i"} and argument[0] is not None
         ]
-        required_indices.discard(min(integers, default=None))
+        optional_indices = {None, min(integers, default=None)}
     elif kind == "string-array":
         if len(original) != len(translated) or any(item.tag != "item" for item in translated):
             return "array items differ from the source"
@@ -155,7 +153,8 @@ def check_entry(source, target):
             except ValueError as error:
                 return str(error)
             if kind == "plurals":
-                ok = required_indices <= {argument[0] for argument in actual} and actual <= expected
+                required = {argument[0] for argument in arguments(before)} - optional_indices
+                ok = required <= {argument[0] for argument in actual} and actual <= expected
             else:
                 ok = actual == expected
             if not ok:
