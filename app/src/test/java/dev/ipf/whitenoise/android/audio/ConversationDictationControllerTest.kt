@@ -210,7 +210,7 @@ class ConversationDictationControllerTest {
         f.drafts[other] = TextFieldValue("")
         f.platform.pendingCallerAudio = true
         f.controller.requestStart(ACCOUNT, other.second, TextFieldValue(""))
-        f.scheduler.runDelay(50L)
+        f.scheduler.runDelay(500L)
         f.controller.paste()
         exhaustFinalNoMatch(f)
         assertTrue(f.controller.hasParkedComposerAudio(ACCOUNT, other.second))
@@ -295,7 +295,7 @@ class ConversationDictationControllerTest {
         assertEquals("", f.drafts.getValue(key()).text)
         allowWrite = true
         f.controller.requestFreshComposerStart(ACCOUNT, GROUP, TextFieldValue(""), null)
-        f.scheduler.runDelay(50L)
+        f.scheduler.runDelay(500L)
         assertEquals("first", f.drafts.getValue(key()).text)
         assertEquals(
             "first",
@@ -362,7 +362,7 @@ class ConversationDictationControllerTest {
                     f.controller.composerAccess(ACCOUNT, other.second).phase,
                 )
                 f.controller.requestComposerStart(ACCOUNT, other.second, f.drafts.getValue(other), null)
-                f.scheduler.runDelay(50L)
+                f.scheduler.runDelay(500L)
                 val replacement = f.controller.state
                 assertEquals(other.second, replacement.target?.groupIdHex)
                 assertTrue(f.controller.hasDurableSession)
@@ -400,7 +400,7 @@ class ConversationDictationControllerTest {
         val other = ACCOUNT to "other-chat"
         f.drafts[other] = TextFieldValue("")
         assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
-        f.scheduler.runDelay(50L)
+        f.scheduler.runDelay(500L)
         val replacement = f.controller.state
         assertTrue(f.controller.foregroundMicrophoneRequired)
         close()
@@ -478,7 +478,7 @@ class ConversationDictationControllerTest {
             f.drafts[ACCOUNT to group] = TextFieldValue("")
             f.platform.pendingCallerAudio = true
             assertTrue(f.controller.requestStart(ACCOUNT, group, TextFieldValue("")))
-            if (index > 0) f.scheduler.runDelay(50L)
+            if (index > 0) f.scheduler.runDelay(500L)
             f.controller.paste()
             f.platform.session.callerAudioFinalChunk = true
             exhaustFinalNoMatch(f)
@@ -533,7 +533,7 @@ class ConversationDictationControllerTest {
             val other = ACCOUNT to "other-group"
             f.drafts[other] = TextFieldValue("")
             assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
-            f.scheduler.runDelay(50L)
+            f.scheduler.runDelay(500L)
             val active = f.controller.state.sessionId
             assertFalse(f.controller.keepComposerAudioForLater(access))
             f.controller.retryComposerAudio(access)
@@ -568,7 +568,7 @@ class ConversationDictationControllerTest {
             val other = ACCOUNT to "removed-group"
             f.drafts[other] = TextFieldValue("")
             assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
-            f.scheduler.runDelay(50L)
+            f.scheduler.runDelay(500L)
             f.controller.onTargetRemoved(ACCOUNT, other.second)
             assertTrue(f.controller.state is ConversationDictationState.Idle)
             assertTrue(f.controller.canRetryComposerAudio(kept))
@@ -609,7 +609,7 @@ class ConversationDictationControllerTest {
         f.drafts[other] = TextFieldValue("")
         f.platform.pendingCallerAudio = true
         assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
-        f.scheduler.runDelay(50L)
+        f.scheduler.runDelay(500L)
         f.controller.paste()
         f.platform.allowAudioParking = false
         f.platform.session.callerAudioFinalChunk = true
@@ -4690,7 +4690,7 @@ class ConversationDictationControllerTest {
             .providerError(ConversationDictationFailure.NoSpeech)
 
         assertEquals(1, fixture.platform.sessions.size)
-        fixture.scheduler.runDelay(50L)
+        fixture.scheduler.runDelay(500L)
         assertEquals(2, fixture.platform.sessions.size)
         assertEquals(
             1,

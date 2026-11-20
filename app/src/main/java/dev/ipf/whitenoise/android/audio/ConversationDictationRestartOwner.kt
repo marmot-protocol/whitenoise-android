@@ -9,8 +9,7 @@ internal class ConversationDictationRestartOwner {
     private var timeout: ConversationDictationTimeoutHandle? = null
     var lastTeardownAtElapsedMillis: Long? = null
         private set
-    var teardownSettleMillis = conversationDictationTeardownSettleMillis(providerEnded = false)
-        private set
+    private var teardownProviderEnded = false
     private var shortSettleDisabled = false
     private var shortSettleGeneration = false
     private var consecutiveNoSpeech = 0
@@ -50,11 +49,17 @@ internal class ConversationDictationRestartOwner {
         providerEnded: Boolean,
     ) {
         lastTeardownAtElapsedMillis = now
-        teardownSettleMillis = settleMillis(providerEnded)
+        teardownProviderEnded = providerEnded
     }
 
-    /** The short settle applies only after a provider terminal and until a short-settle disconnect. */
-    fun settleMillis(providerEnded: Boolean): Long = conversationDictationTeardownSettleMillis(providerEnded && !shortSettleDisabled)
+    /** Settle before replacing the last torn-down recognizer, decided when the replacement is due. */
+    fun teardownSettleMillis(finishing: Boolean): Long = settleMillis(teardownProviderEnded, finishing)
+
+    /** The short settle applies only to a finish drain after a provider terminal, until a short-settle disconnect. */
+    fun settleMillis(
+        providerEnded: Boolean,
+        finishing: Boolean,
+    ): Long = conversationDictationTeardownSettleMillis(providerEnded && finishing && !shortSettleDisabled)
 
     /** Marks a generation that started before the full restart delay had passed since the last teardown. */
     fun noteGenerationStart(now: Long) {

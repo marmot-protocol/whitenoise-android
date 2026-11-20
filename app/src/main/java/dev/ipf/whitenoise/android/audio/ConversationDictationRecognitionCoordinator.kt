@@ -67,14 +67,17 @@ internal class ConversationDictationRecognitionCoordinator {
         retry = null
     }
 
-    /** A changed request version does not grant fresh attempts to the same unresolved input. */
+    /**
+     * A changed request version does not grant fresh attempts to the same unresolved input.
+     * A failure before any chunk was claimed charges the held retry, whose chunk is still queued next.
+     */
     fun recordFailure(
         chunkId: Long?,
         version: String?,
         capacity: Boolean,
     ): Int {
-        val current = retry?.takeIf { it.chunkId == chunkId } ?: Retry(chunkId, version).also { retry = it }
-        if (current.version != version) {
+        val current = retry?.takeIf { chunkId == null || it.chunkId == chunkId } ?: Retry(chunkId, version).also { retry = it }
+        if (chunkId != null && current.version != version) {
             // A changed byte request keeps its semantic failure budget but starts fresh capacity pacing.
             current.version = version
             current.capacityAttempts = 0

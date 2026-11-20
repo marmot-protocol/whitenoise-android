@@ -254,7 +254,8 @@ internal fun ConversationDictationController.startRecognition(
                 val elapsedMillis = elapsedRealtime() - generationStartedAtElapsedMillis
                 if (recycleIdleCallerAudioGeneration(sessionId, target, error, elapsedMillis)) return
                 if (providerEnded) generation.markProviderEnded()
-                val shortSettleDisconnect = restart.takeShortSettleDisconnect(error)
+                // Only the provider's own disconnect can mean its previous instance had not unbound yet.
+                val shortSettleDisconnect = providerEnded && restart.takeShortSettleDisconnect(error)
                 unresolvedRecognitionFailure = failure
                 val currentSession = generation.session
                 if (error.isEmptyRecognition && dropSilentFinalTail(sessionId, target, currentSession, failure)) {
@@ -352,7 +353,7 @@ internal fun ConversationDictationController.deferRecognitionUntilTeardownSettle
     sessionId: Long,
     target: ConversationDictationTarget,
 ): Boolean {
-    val settleMillis = restart.teardownSettleMillis
+    val settleMillis = restart.teardownSettleMillis(finishing = finishRequested)
     val releasedAt = restart.lastTeardownAtElapsedMillis ?: (elapsedRealtime() - settleMillis)
     val delayMillis = (settleMillis - (elapsedRealtime() - releasedAt)).coerceAtLeast(0L)
     if (delayMillis == 0L) return false

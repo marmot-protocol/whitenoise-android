@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.os.Looper
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.audio.ConversationDictationControllerTest.Companion.ACCOUNT
 import dev.ipf.whitenoise.android.audio.ConversationDictationControllerTest.Companion.GROUP
@@ -9,6 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
 
@@ -137,6 +139,36 @@ class ConversationDictationTeardownSettleTest {
         assertEquals(1, fixture.platform.sessions.size)
         fixture.scheduler.advanceBy(1L)
         assertEquals(2, fixture.platform.sessions.size)
+    }
+
+    /** A silent chunk with more audio queued behind it while listening still waits the full settle. */
+    @Test
+    fun confirmedSilenceWithQueuedAudioWhileListeningKeepsFullRestart() {
+        val fixture = callerAudioFixture()
+        val silent = fixture.platform.sessions.single()
+        silent.callerAudioHasSpeech = false
+        silent.providerError(ConversationDictationFailure.NoSpeech)
+
+        assertEquals(0, fixture.scheduler.liveTaskCount(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS))
+        fixture.scheduler.advanceBy(ConversationDictationController.GENERATION_RESTART_DELAY_MILLIS - 1L)
+        assertEquals(1, fixture.platform.sessions.size)
+        fixture.scheduler.advanceBy(1L)
+        assertEquals(2, fixture.platform.sessions.size)
+    }
+
+    /** A local pipe failure after a short settle is charged normally instead of spending the disconnect fallback. */
+    @Test
+    fun pipeFailureAfterShortSettleKeepsItsRetryCost() {
+        val fixture = callerAudioFixture()
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS)
+        assertEquals(2, fixture.platform.sessions.size)
+        val report = mainThreadDictationCallerAudioFailure(fixture.platform.listener) { true }
+        report(ConversationDictationCallerAudioFailure.PipeFailed)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertEquals(1, fixture.controller.recognition.failureAttempts)
     }
 
     /** A disconnect right after a short settle costs no retry attempt and restores the full settle afterwards. */
