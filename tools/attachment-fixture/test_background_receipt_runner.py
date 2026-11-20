@@ -109,8 +109,8 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
             [{"phase": "background-receipt-stage", "stage": "network_policy_start"}], [],
         )["passed"])
 
-    def test_setup_timeout_without_frames_retains_closed_metrics_and_fails_the_attempt(self):
-        """Network boundaries and policy waits survive report writing while the original timeout still fails."""
+    def test_timeouts_retain_closed_metrics_without_qualifying_the_attempt(self):
+        """Policy and scheduler facts survive report writing while the original timeout still fails."""
         diagnostics = [
             {
                 "phase": "background-receipt-policy-timeout", "case": "NetworkHeld", "stage": stage,
@@ -126,7 +126,16 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
                 "wifi_snapshot_confirmed", "wifi_validation_start", "wifi_validation_complete",
                 "policy_update_start", "policy_update_complete",
             )
-        ]
+        ] + [{
+            "phase": "background-receipt-stall", "native_states": "[PAUSED]", "work_states": "[[ENQUEUED]]",
+            "scheduling": {
+                "platform_snapshot_available": True, "device_idle": False, "power_save": False,
+                "background_restricted": False,
+                "work": [{"state": "ENQUEUED", "run_attempt_count": 3, "stop_reason": 3,
+                          "eligible_in_ms": 90000, "network_requirement": "CONNECTED",
+                          "storage_not_low_required": True, "system_job_count": 1, "pending_reasons": [10]}],
+            },
+        }]
         for diagnostic in diagnostics:
             instrument_output = (
                 "INSTRUMENTATION_STATUS: controlled_attachment_json=" + json.dumps(diagnostic) + "\n"
@@ -146,7 +155,8 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
                     return "30\n"
                 return "arm64-v8a\n"
 
-            with self.subTest(stage=diagnostic["stage"]), tempfile.TemporaryDirectory() as directory, \
+            with self.subTest(stage=diagnostic.get("stage", diagnostic["phase"])), \
+                    tempfile.TemporaryDirectory() as directory, \
                     mock.patch.object(runner, "adb_command", side_effect=adb), \
                     mock.patch.object(runner, "FixtureServer", return_value=server), \
                     mock.patch.object(runner, "FixtureRelay", return_value=relay), \
