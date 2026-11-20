@@ -9,8 +9,10 @@ import dev.ipf.marmotkit.WipeOutcomeFfi
  * The screen can also be open while another account is active, to add a profile. The wipe puts back whichever
  * account was in view when it fails, or none, so a failed removal never activates the account being removed.
  */
-internal suspend fun WhiteNoiseAppState.removeUnlinkedAccount(label: String): Boolean =
-    removeUnlinkedAccountForOutcome(label)?.localCleanup?.completed == true
+internal suspend fun WhiteNoiseAppState.removeUnlinkedAccount(label: String): Boolean {
+    val outcome = removeUnlinkedAccountForOutcome(label)
+    return outcome?.localCleanup?.completed == true
+}
 
 /**
  * The same removal with MDK's whole outcome, for a caller that reports each cleanup stage. Null when the wipe could

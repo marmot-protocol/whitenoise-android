@@ -31,8 +31,10 @@ internal const val INVITE_DECLINE_ALL_DEVICES_CANCEL_TAG = "invite.decline.allDe
  * device of the account, so it does whenever [devices] lists one besides this device. A roster that could not be
  * read is null and asks nothing, because the question would then claim devices nobody confirmed.
  */
-internal fun declineReachesOtherDevices(devices: List<LinkedDeviceFfi>?): Boolean =
-    devices != null && linkedDeviceRoster(devices).hasOtherDevices
+internal fun declineReachesOtherDevices(devices: List<LinkedDeviceFfi>?): Boolean {
+    if (devices == null) return false
+    return linkedDeviceRoster(devices).hasOtherDevices
+}
 
 /**
  * Hands [content] the Decline action for the invitation in view. With no other linked device it declines at once.
