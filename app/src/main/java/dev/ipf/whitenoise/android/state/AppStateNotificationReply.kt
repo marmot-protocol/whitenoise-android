@@ -41,7 +41,7 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReply(
     completionStore: NotificationReplyCompletionStore,
     completionKey: String,
     recoveryScope: String,
-    refusalAfterRecovery: () -> NotificationReplySendOutcome? = { null },
+    refusalAfterRecovery: () -> NotificationReplySendOutcome?,
 ): NotificationReplySendOutcome {
     val account = accountRef.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
     val group = groupIdHex.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
