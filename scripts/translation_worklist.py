@@ -130,8 +130,11 @@ def check_entry(source, target):
         # Argument indices in every English form must survive, except the count, which may be spelled out.
         source_arguments = [arguments(item) for item in original]
         required_indices = set.intersection(*({argument[0] for argument in found} for found in source_arguments))
-        integers = sorted(argument[0] for found in source_arguments for argument in found if argument[3] in {"d", "i"})
-        required_indices -= set(integers[:1])
+        integers = [
+            argument[0] for found in source_arguments for argument in found
+            if argument[3] in {"d", "i"} and argument[0] is not None
+        ]
+        required_indices.discard(min(integers, default=None))
     elif kind == "string-array":
         if len(original) != len(translated) or any(item.tag != "item" for item in translated):
             return "array items differ from the source"

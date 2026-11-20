@@ -190,6 +190,13 @@ class TranslationWorklistTest(unittest.TestCase):
                    '<item quantity="other">%1$d чатов в %2$d комнатах</item></plurals>')
         self.assertEqual(self.scan()[3], [])
 
+    def test_unformatted_plurals_with_literal_percent_sequences_are_checked(self):
+        self.write("main/values/counts.xml", '<plurals name="count" formatted="false">'
+                   '<item quantity="one">%&lt;d chat</item><item quantity="other">%1$d chats</item></plurals>')
+        self.write("preview/values-ru/counts.xml", '<plurals name="count" formatted="false">'
+                   '<item quantity="one">%&lt;d чат</item><item quantity="other">%1$d чатов</item></plurals>')
+        self.assertEqual(self.scan()[3], [])
+
     def test_plural_markup_ignores_wrapped_count_but_not_other_tags(self):
         ns = 'xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2"'
         wrapped = '<xliff:g id="n">%1$d</xliff:g>'
