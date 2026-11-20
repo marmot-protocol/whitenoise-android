@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
 import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
+import dev.ipf.whitenoise.android.media.legacySharedPlaintextPrefix
 import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
 import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +47,11 @@ internal suspend fun ConversationController.exportConversationTranscriptFile(cac
         withSharedPlaintextWrite(writePermit) {
             ConversationTranscriptExport.writeTemporaryFile(
                 cacheDir = cacheDir,
-                filePrefix = sharedPlaintextPrefix(appState.appContext, account),
+                prefixes =
+                    ConversationTranscriptExport.FilePrefixes(
+                        current = sharedPlaintextPrefix(appState.appContext, account),
+                        preview = legacySharedPlaintextPrefix(account),
+                    ),
                 data = data,
                 groupIdHex = group.groupIdHex,
                 exportedAt = exportedAt,

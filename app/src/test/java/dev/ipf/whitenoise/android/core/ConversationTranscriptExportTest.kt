@@ -15,6 +15,7 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionEmojiFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUserReactionFfi
+import dev.ipf.whitenoise.android.media.legacySharedPlaintextPrefix
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -22,10 +23,17 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 
 class ConversationTranscriptExportTest {
+    private val alicePrefixes =
+        ConversationTranscriptExport.FilePrefixes(
+            current = "account_alice_",
+            preview = legacySharedPlaintextPrefix("alice"),
+        )
+
     @Test
     fun documentEncodesTimelineMetadataInChronologicalOrder() {
         val groupId = "aa".repeat(32)
@@ -305,7 +313,7 @@ class ConversationTranscriptExportTest {
             val file =
                 ConversationTranscriptExport.writeTemporaryFile(
                     cacheDir = root,
-                    filePrefix = "account_alice_",
+                    prefixes = alicePrefixes,
                     data = data,
                     groupIdHex = "ab".repeat(32),
                     exportedAt = Instant.parse("2023-11-14T22:13:20Z"),
@@ -336,17 +344,21 @@ class ConversationTranscriptExportTest {
             val first =
                 ConversationTranscriptExport.writeTemporaryFile(
                     cacheDir = root,
-                    filePrefix = "account_alice_",
+                    prefixes = alicePrefixes,
                     data = "{\"old\":true}\n".toByteArray(StandardCharsets.UTF_8),
                     groupIdHex = "ab".repeat(32),
                     exportedAt = Instant.parse("2023-11-14T22:13:20Z"),
                 )
-            val legacy = java.io.File(first.parentFile, "whitenoise-transcript-legacy.json").apply { writeText("{}") }
-            val other = java.io.File(first.parentFile, "account_bob_transcript.json").apply { writeText("{}") }
+            val directory = checkNotNull(first.parentFile)
+            val unscoped = File(directory, "whitenoise-transcript-legacy.json").apply { writeText("{}") }
+            val alicePreview = File(directory, alicePrefixes.preview + "transcript.json").apply { writeText("{}") }
+            val bobCurrent = File(directory, "account_bob_transcript.json").apply { writeText("{}") }
+            val bobPreview =
+                File(directory, legacySharedPlaintextPrefix("bob") + "transcript.json").apply { writeText("{}") }
             val second =
                 ConversationTranscriptExport.writeTemporaryFile(
                     cacheDir = root,
-                    filePrefix = "account_alice_",
+                    prefixes = alicePrefixes,
                     data = "{\"new\":true}\n".toByteArray(StandardCharsets.UTF_8),
                     groupIdHex = "cd".repeat(32),
                     exportedAt = Instant.parse("2023-11-15T22:13:20Z"),
@@ -354,15 +366,15 @@ class ConversationTranscriptExportTest {
 
             assertFalse("earlier transcript should be reaped", first.exists())
             assertTrue(second.exists())
-            assertFalse("legacy plaintext should be reaped", legacy.exists())
-            assertTrue("another account's transcript must survive", other.exists())
+            assertFalse("unscoped plaintext should be reaped", unscoped.exists())
+            assertFalse("the old preview transcript should be reaped", alicePreview.exists())
             val names =
-                checkNotNull(second.parentFile)
+                directory
                     .listFiles()
                     .orEmpty()
                     .map { it.name }
                     .toSet()
-            assertEquals(setOf(second.name, other.name), names)
+            assertEquals(setOf(second.name, bobCurrent.name, bobPreview.name), names)
         } finally {
             root.deleteRecursively()
         }
@@ -375,13 +387,13 @@ class ConversationTranscriptExportTest {
                 .createTempDirectory("wn-transcript-sweep-")
                 .toFile()
         try {
-            java.io.File(dir, "whitenoise-transcript-a.json").writeText("{}")
-            java.io.File(dir, "whitenoise-transcript-b.json").writeText("{}")
+            File(dir, "whitenoise-transcript-a.json").writeText("{}")
+            File(dir, "whitenoise-transcript-b.json").writeText("{}")
 
             assertEquals(2, ConversationTranscriptExport.sweepStaleTranscripts(dir))
             assertEquals(emptyList<String>(), dir.listFiles()?.map { it.name })
             // A missing directory is a no-op, not a crash.
-            assertEquals(0, ConversationTranscriptExport.sweepStaleTranscripts(java.io.File(dir, "missing")))
+            assertEquals(0, ConversationTranscriptExport.sweepStaleTranscripts(File(dir, "missing")))
         } finally {
             dir.deleteRecursively()
         }
