@@ -883,6 +883,7 @@
     <string name="toast_send_emoji_limit">Diese Nachricht enthält zu viele eigene Emoji und wurde deshalb nicht gesendet. Entferne einige und versuche es erneut.</string>
     <string name="toast_chat_still_loading">Dieser Chat wird noch geladen. Versuche es gleich noch einmal.</string>
     <string name="toast_send_membership_verifying">Deine Gruppenmitgliedschaft wird überprüft — deine Nachricht wurde nicht gesendet. Sie bleibt im Eingabefeld; versuche es gleich erneut.</string>
+    <string name="notification_action_unlock_required">Entsperre White Noise und versuche es erneut.</string>
     <string name="toast_reaction_failed">Reaktion fehlgeschlagen</string>
     <string name="toast_couldnt_delete_message">Nachricht konnte nicht gelöscht werden. Bitte erneut versuchen.</string>
     <string name="toast_couldnt_edit_message">Nachricht konnte nicht bearbeitet werden</string>

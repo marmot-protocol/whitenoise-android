@@ -46,6 +46,9 @@ internal enum class NotificationReplyCommitProbe {
 }
 
 internal enum class NotificationReplySendOutcome {
+    /** The lock became active before MDK accepted the reply. */
+    BlockedByAppLock,
+
     Sent,
 
     /** MDK durably accepted the reply but has not published its event yet. */

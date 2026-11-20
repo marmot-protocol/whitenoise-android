@@ -921,6 +921,7 @@
     <string name="toast_send_emoji_limit">В сообщении слишком много своих эмодзи, поэтому оно не отправлено. Уберите часть и повторите попытку.</string>
     <string name="toast_chat_still_loading">Этот чат ещё загружается. Повторите попытку чуть позже.</string>
     <string name="toast_send_membership_verifying">Проверяем ваше участие в группе — сообщение не отправлено. Оно сохранено в поле ввода; повторите попытку через мгновение.</string>
+    <string name="notification_action_unlock_required">Разблокируйте White Noise и попробуйте снова.</string>
     <string name="toast_reaction_failed">Реакция не удалась</string>
     <string name="toast_couldnt_delete_message">Не удалось удалить сообщение. Попробуйте снова.</string>
     <string name="toast_couldnt_edit_message">Не удалось изменить сообщение</string>

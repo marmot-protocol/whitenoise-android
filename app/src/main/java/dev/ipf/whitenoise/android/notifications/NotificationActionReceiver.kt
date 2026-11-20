@@ -93,9 +93,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 application.appState.appLock.notificationActionsAllowed
             }
         if (!notificationActionsAllowed) {
-            notificationWarning("DMNotifyAction", "notification reply blocked by app lock") {
-                "group=${action.target.groupIdHex.take(8)}"
-            }
+            surfaceNotificationReplyFailure(appContext, action, R.string.notification_action_unlock_required)
             return
         }
         val reply =
@@ -169,8 +167,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     Toast.makeText(appContext, R.string.toast_reaction_failed, Toast.LENGTH_LONG).show()
                 }
             NotificationReactionSubmissionOutcome.BlockedByAppLock ->
-                notificationWarning("DMNotifyAction", "notification reaction blocked by app lock") {
-                    "group=${action.target.groupIdHex.take(LOGGED_GROUP_ID_PREFIX)}"
+                withContext(Dispatchers.Main.immediate) {
+                    Toast.makeText(appContext, R.string.notification_action_unlock_required, Toast.LENGTH_LONG).show()
                 }
             NotificationReactionSubmissionOutcome.Rejected,
             NotificationReactionSubmissionOutcome.Submitted,
