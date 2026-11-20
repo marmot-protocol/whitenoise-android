@@ -24,7 +24,7 @@ name: keys-back-clears
     id: "profile_keys.export_file"
     enabled: true
 - back
-- assertVisible: "Private key hidden"
+- runFlow: ../fixtures/assert-private-key-hidden-after-backup.yaml
 - runFlow: ../fixtures/open-encrypted-key-editor.yaml
 - assertVisible: "Encrypted Private Key"
 - assertVisible:
