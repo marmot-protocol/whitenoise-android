@@ -135,6 +135,7 @@ internal object PlatformResumeLedger {
         reportRecoverySetup(events, initial)
     }
 
+    /** Keeps failed setup acquisitions visible without qualifying them as the measured stop/resume pair. */
     private fun reportRecoverySetup(
         events: List<JSONObject>,
         initial: Long,
@@ -163,5 +164,4 @@ internal object PlatformResumeLedger {
                 ).put("performance_qualified", false),
         )
     }
-
 }
