@@ -328,6 +328,7 @@ internal fun ChatListTopBar(
                             )
                         }
                     } else {
+                        NotificationProfileQuickAction(appState)
                         AppUpdateIconButton(
                             info = updateInfo,
                             selfUpdateEnabled = selfUpdateEnabled,

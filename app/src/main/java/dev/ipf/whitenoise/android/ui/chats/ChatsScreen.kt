@@ -1085,7 +1085,7 @@ internal fun ChatsScreen(
             visibleItems.map(::visibleRowId)
         }
     val historyNotices = rememberAccountHistoryNotices(appState)
-    val showHistoryNotice = !searchActive && !browsingAttachments && historyNotices?.notices?.isNotEmpty() == true
+    val showChatListNotices = !searchActive && !browsingAttachments
     val leadingChatListItemCount =
         if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
     val visiblePinnedOrder =
@@ -2633,7 +2633,7 @@ internal fun ChatsScreen(
                         )
                     }
                 },
-                notice = { ChatListPersistentNotices(appState, historyNotices, showHistoryNotice) },
+                notice = { ChatListPersistentNotices(appState, historyNotices, showChatListNotices) },
             ) {
                 val unreadOwnerAvailable =
                     appState.activeAccountRef != null &&
