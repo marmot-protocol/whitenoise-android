@@ -54,6 +54,16 @@
         ]
       },
       {
+        "surface": "Linked devices: R.string.device_move_finish_linking",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_finish_linking",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
         "surface": "Linked devices: R.string.device_move_made",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
         "anchor": "R.string.device_move_made",

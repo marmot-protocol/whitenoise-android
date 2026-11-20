@@ -52,6 +52,14 @@
         ]
       },
       {
+        "surface": "Linked devices: R.string.linked_devices_linked_by",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_linked_by",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
         "surface": "Linked devices: R.string.linked_devices_linked_on",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
         "anchor": "R.string.linked_devices_linked_on",
