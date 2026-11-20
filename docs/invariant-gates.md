@@ -106,8 +106,6 @@ table sorted by gate name.
   test, and name the replacement gate in the description when the invariant
   survives. Never remove a row to make a failing gate pass.
 
-The [preview resolver shell contract](../.github/scripts/test-pr-preview-contract.sh) checks matching commit pins, rejects moved or partial pins, and covers legacy manual dispatch.
-
 ## Registry
 
 <!-- invariant-gates:start -->

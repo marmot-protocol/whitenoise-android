@@ -76,7 +76,10 @@ jobs:
             if [[ -n "$EXPECTED_HEAD" || -n "$EXPECTED_WORKFLOW_SHA" ]]; then
               [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
               [[ "$EXPECTED_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
-              [[ "$GITHUB_SHA" == "$EXPECTED_WORKFLOW_SHA" ]]
+              if [[ "$GITHUB_SHA" != "$EXPECTED_WORKFLOW_SHA" ]]; then
+                echo "::error::Preview workflow revision moved. Review the current default-branch revision before requesting again."
+                exit 1
+              fi
             fi
             pr_number=$REQUESTED_PR_NUMBER
             read -r state head_sha head_repository < <(
@@ -84,8 +87,9 @@ jobs:
                 --jq '[.state, .head.sha, .head.repo.full_name] | @tsv'
             )
             [[ "$state" == open ]]
-            if [[ -n "$EXPECTED_HEAD" ]]; then
-              [[ "$head_sha" == "$EXPECTED_HEAD" ]]
+            if [[ -n "$EXPECTED_HEAD" && "$head_sha" != "$EXPECTED_HEAD" ]]; then
+              echo "::error::PR head moved. Review the current PR head before requesting again."
+              exit 1
             fi
           fi
           [[ "$head_repository" == "$GITHUB_REPOSITORY" ]]
