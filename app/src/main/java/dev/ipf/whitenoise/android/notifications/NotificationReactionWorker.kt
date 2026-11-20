@@ -261,7 +261,10 @@ class NotificationReactionWorker(
         return Result.failure()
     }
 
-    private suspend fun surfaceReactionFailure(@StringRes message: Int) {
+    /** Shows the failure reason on the main thread after the worker clears its retry state. */
+    private suspend fun surfaceReactionFailure(
+        @StringRes message: Int,
+    ) {
         withContext(NonCancellable + Dispatchers.Main.immediate) {
             Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
         }
