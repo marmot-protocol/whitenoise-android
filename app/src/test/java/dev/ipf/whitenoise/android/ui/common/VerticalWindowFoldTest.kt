@@ -14,7 +14,7 @@ import org.robolectric.annotation.Config
 /** Which folds split the window into two panes (#3685). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class WindowFoldTest {
+class VerticalWindowFoldTest {
     private val density = Density(2f)
 
     /** A book-style foldable held half open splits the window at the hinge, in dp from the left. */
@@ -53,9 +53,8 @@ class WindowFoldTest {
         val narrowStart = MinWindowFoldSideWidth.value.toInt() * 2 - 2
 
         assertNull(separatingVerticalFold(listOf(fold(narrowStart, narrowStart, true)), WINDOW_PX, density))
-        assertNull(
-            separatingVerticalFold(listOf(fold(WINDOW_PX - narrowStart, WINDOW_PX - narrowStart, true)), WINDOW_PX, density),
-        )
+        val narrowEnd = WINDOW_PX - narrowStart
+        assertNull(separatingVerticalFold(listOf(fold(narrowEnd, narrowEnd, true)), WINDOW_PX, density))
     }
 
     private fun fold(
