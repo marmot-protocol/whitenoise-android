@@ -1042,7 +1042,8 @@ class WhiteNoiseAppState private constructor(
     private var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
     private val ttsAutoReadContinuation by lazy { createTtsAutoReadContinuation(this) }
 
-    // Manual speech has no auto-read key. Its decrypted text must stop when its account is removed.
+    // Manual speech deliberately has no auto-read session key, but it still
+    // owns decrypted text that must stop when its account is removed.
     private var ttsSpeechAccountRef: String? = null
     internal val attachmentSpeechDestination =
         MutableStateFlow<dev.ipf.whitenoise.android.audio.AttachmentSpeechDestination?>(null)
