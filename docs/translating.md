@@ -6,8 +6,8 @@ interface. Translating messages inside a chat uses a separate language catalog.
 
 ## Pick a language and a flow
 
-Use the Android resource qualifier for your locale. Japanese uses `values-ja`. For regional and script
-variants, see `values-pt-rBR` and `values-b+zh+Hant`. Look for an existing locale before starting a new one.
+Use the Android resource qualifier for your locale. Japanese uses `values-ja`. Regional and script
+variants use qualifiers such as `values-pt-rBR` and `values-b+zh+Hant`. Look for an existing locale before starting a new one.
 
 From the repository root, run this with Python 3.10 or later:
 
@@ -56,9 +56,11 @@ Run `python3 scripts/translation_worklist.py` to check the resource files. You
 can add `--base origin/master` to see new or changed English keys and their
 affected locales. A changed source entry calls for a review of its meaning.
 Name the locale and screens in your PR. List the checks you ran and flag wording that needs a fluent reviewer.
+Screenshot tests render in English, so a PR that edits a shipped locale under
+`app/src/main/res/` should include `Visual changes: none` in its description.
 
 For a new locale, ask for the stable PR preview. Set the preview app's language
-to **Follow device**, then put your target language first in Android's language
+to **System default**, then put your target language first in Android's language
 settings. Reopen the affected screens and check the translated actions and errors.
 Confirm unfinished screens can fall back. Restore the device language after
 testing. Preview qualification follows the [CI request policy](ci-request-policy.md).
@@ -75,7 +77,7 @@ are useful for layout checks before translated text is available.
 Shipped locales currently require full key coverage. Move the reviewed locale
 into `app/src/main/res/` and add its tag and native language name to
 [the language picker](../app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt)
-in the same PR. Check the release resources and picker, Follow device, persistence
+in the same PR. Check the release resources and picker, System default, persistence
 after restart, and the branded app-name overlays for debug and staging. Release
 and store listing translations are separate from the app resource files.
 

@@ -218,6 +218,14 @@ def scan(main, preview, rules, previously_shipped=()):
     return source, required, catalogs, errors
 
 
+def worklist_order(pair, required, rules):
+    """Sort launch keys by the flow order in the priorities file, then by tier and file."""
+    name, entry = pair
+    flows = list(rules)
+    flow = flows.index(required[name]) if name in required else len(flows)
+    return name not in required, entry.file.name.startswith("explanation"), flow, entry.file.name, name
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--locale", help="Android qualifier after values-, such as ja or b+zh+Hant")
@@ -236,10 +244,7 @@ def main():
         if not LOCALE.fullmatch(f"values-{args.locale}"):
             parser.error("use an Android locale qualifier, for example ja or b+zh+Hant")
         localized = catalogs.get(args.locale, {})
-        for name, entry in sorted(source.items(), key=lambda pair: (
-            pair[0] not in required, pair[1].file.name.startswith("explanation"), required.get(pair[0], ""),
-            pair[1].file.name, pair[0],
-        )):
+        for name, entry in sorted(source.items(), key=lambda pair: worklist_order(pair, required, rules)):
             if entry.translatable and (name not in localized or name in changed):
                 tier = "1 launch" if name in required else (
                     "3 supplemental" if entry.file.name.startswith("explanation") else "2 next"

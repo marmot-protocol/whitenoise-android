@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.translation_worklist import scan
+from scripts.translation_worklist import scan, worklist_order
 
 
 class TranslationWorklistTest(unittest.TestCase):
@@ -97,3 +97,10 @@ class TranslationWorklistTest(unittest.TestCase):
                     f'<string name="sign_in">Connexion : %1$s %{index}$&lt;s</string>',
                 )
                 self.assertIn("invalid argument index", self.scan()[3][0])
+
+    def test_launch_keys_follow_priority_file_order(self):
+        self.write("main/values/strings.xml", '<string name="sign_in">Sign in</string><string name="invite">Invite</string>')
+        rules = {"Sign-in": ["sign_in"], "Invites": ["invite"]}
+        source, required, _, _ = scan(self.root / "main", self.root / "preview", rules)
+        ordered = [name for name, _ in sorted(source.items(), key=lambda pair: worklist_order(pair, required, rules))]
+        self.assertEqual(ordered, ["sign_in", "invite", "hint"])
