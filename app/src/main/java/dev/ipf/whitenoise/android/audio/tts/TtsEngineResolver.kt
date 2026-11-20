@@ -372,7 +372,7 @@ class TtsEngineResolver(
             voices: Collection<Voice>,
         ): List<Voice> =
             voices
-                .filter { it.isOfflineInstalledFor(locale) }
+                .filter { it.isOfflineFor(locale) }
                 .sortedWith(
                     compareByDescending<Voice> { it.quality }
                         .thenBy { it.name }
@@ -414,7 +414,7 @@ class TtsEngineResolver(
                     ?.takeIf { exact -> keyCounts[exact] == 1 }
                     ?.let { exact ->
                         sameLanguage.singleOrNull { voice ->
-                            voice.toVoiceKey(enginePackage) == exact && voice.isOfflineInstalledFor(locale)
+                            voice.toVoiceKey(enginePackage) == exact && voice.isOfflineFor(locale)
                         }
                     }
             return TtsVoiceResolution(
@@ -444,7 +444,7 @@ class TtsEngineResolver(
                         .filterNot { it == preferred }
                         .firstOrNull { setVoice(it) == TextToSpeech.SUCCESS }
             val effective =
-                (appliedVoice ?: currentVoice()?.takeIf { it.isOfflineInstalledFor(locale) })
+                (appliedVoice ?: currentVoice()?.takeIf { it.isOfflineFor(locale) })
                     ?.toVoiceKey(enginePackage)
             return resolution.copy(effectiveKey = effective)
         }
@@ -453,8 +453,7 @@ class TtsEngineResolver(
         private fun Voice.toVoiceKey(enginePackage: String) = TtsVoiceKey(enginePackage, name, locale.toLanguageTag())
 
         /** Enforces language, installation, and network invariants together. */
-        private fun Voice.isOfflineInstalledFor(locale: Locale): Boolean =
-            this.locale.matchesLanguage(locale) && isInstalledOffline()
+        private fun Voice.isOfflineFor(target: Locale): Boolean = locale.matchesLanguage(target) && isInstalledOffline()
 
         /** Matches equivalent ISO-639-1 and ISO-639-2 language codes without trusting malformed locale data. */
         private fun Locale.matchesLanguage(other: Locale): Boolean =
@@ -476,5 +475,6 @@ class TtsEngineResolver(
 
 /** Rejects network voices and voices Android is still downloading before any text is submitted. */
 internal fun Voice.isInstalledOffline(): Boolean =
-    name.isNotBlank() && !isNetworkConnectionRequired &&
+    name.isNotBlank() &&
+        !isNetworkConnectionRequired &&
         !features.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)
