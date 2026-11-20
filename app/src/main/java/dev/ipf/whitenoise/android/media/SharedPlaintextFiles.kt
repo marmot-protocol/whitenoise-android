@@ -157,7 +157,11 @@ private fun deleteSharedPlaintext(
                 }
             }.onFailure { onFailure(name, it) }.getOrNull() ?: continue
         entries
-            .filter { belongsToWipedAccount(it.name, prefix) }
+            .filter { file ->
+                // Legacy private shares have no prefix. Public profile cards also use the shared root.
+                file.name.startsWith(prefix) ||
+                    (!file.name.startsWith(ACCOUNT_SHARE_PREFIX) && !file.name.startsWith("profile_card_"))
+            }
             .forEach { file ->
                 runCatching {
                     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
@@ -172,11 +176,3 @@ private fun deleteSharedPlaintext(
             }
     }
 }
-
-/** Old releases stored private shares without ownership. Public profile cards share the same cache. */
-private fun belongsToWipedAccount(
-    name: String,
-    accountPrefix: String,
-): Boolean =
-    name.startsWith(accountPrefix) ||
-        (!name.startsWith(ACCOUNT_SHARE_PREFIX) && !name.startsWith("profile_card_"))
