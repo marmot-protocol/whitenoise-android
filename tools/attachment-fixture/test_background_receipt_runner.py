@@ -129,7 +129,8 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
         ] + [{
             "phase": "background-receipt-stall", "native_states": "[PAUSED]", "work_states": "[[ENQUEUED]]",
             "scheduling": {
-                "platform_snapshot_available": True, "device_idle": False, "power_save": False,
+                "snapshot_available": True, "platform_snapshot_available": True,
+                "device_idle": False, "power_save": False,
                 "background_restricted": False,
                 "work": [{"state": "ENQUEUED", "run_attempt_count": 3, "stop_reason": 3,
                           "eligible_in_ms": 90000, "network_requirement": "CONNECTED",

@@ -16,6 +16,17 @@ private const val MAX_SCHEDULING_ROWS = 12
 internal fun backgroundReceiptSchedulingDiagnostics(
     context: Context,
     work: List<WorkInfo>,
+): JSONObject =
+    try {
+        schedulingSnapshot(context, work)
+    } catch (_: RuntimeException) {
+        JSONObject().put("snapshot_available", false)
+    }
+
+/** Builds closed scheduling facts; the caller keeps the original failure if a diagnostic read fails. */
+private fun schedulingSnapshot(
+    context: Context,
+    work: List<WorkInfo>,
 ): JSONObject {
     val scheduler = context.getSystemService(JobScheduler::class.java)
     val jobs = pendingJobs(scheduler)
@@ -23,6 +34,7 @@ internal fun backgroundReceiptSchedulingDiagnostics(
     val activity = context.getSystemService(ActivityManager::class.java)
     val now = System.currentTimeMillis()
     return JSONObject()
+        .put("snapshot_available", true)
         .put("platform_snapshot_available", jobs != null)
         .put("device_idle", power?.isDeviceIdleMode ?: JSONObject.NULL)
         .put("power_save", power?.isPowerSaveMode ?: JSONObject.NULL)
@@ -43,7 +55,7 @@ internal fun backgroundReceiptSchedulingDiagnostics(
                     JSONObject()
                         .put("state", info.state.name)
                         .put("run_attempt_count", info.runAttemptCount)
-                        .put("stop_reason", info.stopReason)
+                        .put("stop_reason", if (Build.VERSION.SDK_INT >= 31) info.stopReason else JSONObject.NULL)
                         .put("eligible_in_ms", if (next == Long.MAX_VALUE) JSONObject.NULL else next - now)
                         .put("network_requirement", info.constraints.requiredNetworkType.name)
                         .put("storage_not_low_required", info.constraints.requiresStorageNotLow())
