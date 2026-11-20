@@ -41,25 +41,25 @@ class MessageBatchPlaceholderRulesTest {
     )
 
     @Test
-    fun offscreenSelectionRegainsLiveActionsWhenItsDeletionRollsBack() {
+    fun offscreenSelectionRequiresLiveProjectionAfterDeletionRollback() {
         val live = testBatchSelection("live", recordedAt = 100uL, timelineOrder = 1uL, canDeleteForEveryone = true)
         val offscreen = reconcileBatchSelections(mapOf("live" to live), emptyMap(), setOf("live"), emptySet())
         val placeholder = offscreen.getValue("live")
         assertTrue(placeholder.action.deleted)
         assertFalse(placeholder.action.canDeleteForEveryone)
         assertEquals(null, placeholder.action.copyableText)
-        // Repeated reconciliation while the tombstone stands keeps the same live item.
+        // Repeated reconciliation while the tombstone stands preserves the placeholder.
         val again = reconcileBatchSelections(offscreen, emptyMap(), setOf("live"), emptySet())
         assertEquals(placeholder, again.getValue("live"))
         val rolledBack = reconcileBatchSelections(again, emptyMap(), emptySet(), emptySet())
-        assertEquals(visiblePlaceholder, rolledBack.getValue("live"))
+        assertEquals(placeholder, rolledBack.getValue("live"))
         val visibleAgain = reconcileBatchSelections(rolledBack, mapOf("live" to live), emptySet(), emptySet())
         assertEquals(live, visibleAgain.getValue("live"))
-        assertTrue(rolledBack.getValue("live").action.canDeleteForEveryone)
+        assertTrue(visibleAgain.getValue("live").action.canDeleteForEveryone)
     }
 
     @Test
-    fun onScreenPlaceholderKeepsItsLiveItemAcrossChainedReconciliation() {
+    fun onScreenPlaceholderStaysDeletedAcrossOffscreenReconciliation() {
         val live = testBatchSelection("live", recordedAt = 100uL, timelineOrder = 1uL, canDeleteForEveryone = true)
         val visiblePlaceholder = live.asPlaceholder()
         val onScreen =
