@@ -896,6 +896,34 @@ class ConversationSendOptimisticPublicationTest {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationSendVariantsRevealTest {
+    /** A GIF picker send preserves the draft's reply, which the following text send still references. */
+    @Test
+    fun pickerSendRetainsThePendingReplyForTheDraft() =
+        runBlocking {
+            val replies = mutableListOf<String?>()
+            val appState = testAppState()
+            val controller =
+                controller(appState, textPublisher = { reply, _, _, _ ->
+                    replies += reply
+                    sentSummary(replies.size.toString().padStart(64, '0'))
+                })
+            try {
+                controller.send("original")
+                val target = controller.timeline.single().record
+                controller.replyingTo = target
+                appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("kept draft"), textChanged = true)
+                controller.send("https://media.giphy.com/media/cat/giphy.gif\nvia GIPHY", consumeReply = false)
+                assertEquals(listOf<String?>(null, null), replies)
+                assertEquals(target, controller.replyingTo)
+                assertEquals("kept draft", appState.draftFor(ACCOUNT_REF, GROUP_ID))
+                controller.send("the reply")
+                assertEquals(target.messageIdHex, replies.last())
+                assertEquals(null, controller.replyingTo)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     /** A reply uses the same accepted-send owner and snaps rather than gliding across older history. */
     @Test
     fun acceptedReplyFromHistorySnapsToItsPublishedTail() =
