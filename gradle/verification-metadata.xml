@@ -4246,6 +4246,17 @@
             <sha256 value="d0d50db0756194a6d49a66ad8dafd17b24b4c5fbd8379375056e2eb9bdfeaf22" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.window" name="window-core-jvm" version="1.5.0">
+         <artifact name="window-core-jvm-1.5.0.jar">
+            <sha256 value="c3bef837bbeb9caeb9ac2570ee015f6fa02cd80cdfa30a2e360f9671e60737e0" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="window-core-jvm-1.5.0.module">
+            <sha256 value="9ebdef127cace4bae5ba825fcfda9e5c0a1a6df96dc2057819de5795617da715" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="window-core-jvm-1.5.0.pom">
+            <sha256 value="16b093bad3040a7dba23f9ac700220b038b0aa817a9da7710dfac4f5cdbce4a3" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.window" name="window-core" version="1.5.0">
          <artifact name="window-core-1.5.0.module">
             <sha256 value="595604f055a12508ec3c774f2d90c5e56414ba6246c754172d9c95c8a00ec04f" origin="Independent official supplier audit" />
