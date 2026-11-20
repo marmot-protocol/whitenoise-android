@@ -1061,16 +1061,18 @@ class WhiteNoiseAppState private constructor(
         locale: java.util.Locale,
         startSentenceIndex: Int = 0,
     ): Boolean {
-        synchronized(ttsController) {
-            if (ttsEngineNeedsAcknowledgment()) return false
-            val previousGeneration = ttsController.state.value.messageProgressGeneration
-            val started = ttsController.speak(entries, locale, startSentenceIndex)
-            if (started || ttsController.state.value.messageProgressGeneration != previousGeneration) {
-                clearTtsPlaybackOwnership()
+        val started =
+            synchronized(ttsController) {
+                val previousGeneration = ttsController.state.value.messageProgressGeneration
+                val accepted =
+                    !ttsEngineNeedsAcknowledgment() && ttsController.speak(entries, locale, startSentenceIndex)
+                if (accepted || ttsController.state.value.messageProgressGeneration != previousGeneration) {
+                    clearTtsPlaybackOwnership()
+                }
+                if (accepted) ttsSpeechAccountRef = activeAccountRef
+                accepted
             }
-            if (!started) return false
-            ttsSpeechAccountRef = activeAccountRef
-        }
+        if (!started) return false
 
         // Stop private speech if its foreground service fails to provide a visible stop control.
         val foregroundStarted = TtsPlaybackForegroundService.start(appContext)
