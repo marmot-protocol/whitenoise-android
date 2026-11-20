@@ -2243,7 +2243,7 @@
     <string name="onboarding_signing_in">Iniciando sesión…</string>
     <string name="onboarding_choose_profile">Elegir perfil</string>
     <string name="onboarding_enter_private_key">Introduce la clave privada</string>
-    <string name="signup_generated_name_hint">Al registrarte verás un nombre al azar. Tira los dados para obtener otro o escribe el tuyo.</string>
+    <string name="signup_generated_name_hint">Al registrarte verás un nombre al azar. Puedes conservarlo, tirar los dados para obtener otro o escribir el tuyo.</string>
     <string name="signup_about_prompt">Cuéntanos sobre ti</string>
     <string name="signup_preparing_photo">Preparando foto…</string>
     <string name="signup_publishing_profile">Publicando perfil…</string>

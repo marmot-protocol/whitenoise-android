@@ -2243,7 +2243,7 @@
     <string name="onboarding_signing_in">Connexion…</string>
     <string name="onboarding_choose_profile">Choisir un profil</string>
     <string name="onboarding_enter_private_key">Saisissez la clé privée</string>
-    <string name="signup_generated_name_hint">Un nom aléatoire est proposé à l’inscription. Relancez les dés pour en obtenir un autre ou saisissez le vôtre.</string>
+    <string name="signup_generated_name_hint">Un nom aléatoire est proposé à l’inscription. Gardez-le, relancez les dés pour en obtenir un autre ou saisissez le vôtre.</string>
     <string name="signup_about_prompt">Présentez-vous</string>
     <string name="signup_preparing_photo">Préparation de la photo…</string>
     <string name="signup_publishing_profile">Publication du profil…</string>

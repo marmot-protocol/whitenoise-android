@@ -2204,7 +2204,7 @@
     <string name="onboarding_signing_in">正在登入…</string>
     <string name="onboarding_choose_profile">選擇個人資料</string>
     <string name="onboarding_enter_private_key">輸入私密金鑰</string>
-    <string name="signup_generated_name_hint">註冊時會提供一個隨機名字。你可以擲骰子換一個，或輸入自己的名字。</string>
+    <string name="signup_generated_name_hint">註冊時會提供一個隨機名字。你可以保留它、擲骰子換一個，或輸入自己的名字。</string>
     <string name="signup_about_prompt">介紹一下自己</string>
     <string name="signup_preparing_photo">正在準備照片…</string>
     <string name="signup_publishing_profile">正在發布個人資料…</string>
