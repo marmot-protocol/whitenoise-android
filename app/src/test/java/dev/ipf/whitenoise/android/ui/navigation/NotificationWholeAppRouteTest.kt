@@ -6,6 +6,7 @@ import android.view.ViewTreeObserver
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -20,6 +21,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationScenario
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.setAppLockScreenVisibleForTest
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatListWindowHandle
@@ -248,6 +250,39 @@ class NotificationWholeAppRouteTest {
         assertTrue("the reader is told the account is gone", harness.app.toast != null)
     }
 
+    /**
+     * A lock that shows before the conversation's first frame takes the shell off screen even though the route
+     * owns it, and that unmount is not what ends the priority window: the same window is still held under the
+     * lock and after it, and only the conversation's first frame releases it.
+     */
+    @Test
+    fun aLockBeforeTheFirstFrameUnmountsTheShellAndKeepsThePriorityWindow() {
+        val harness = Harness(holdTimeline = true)
+        harness.mount()
+        harness.awaitCondition("the conversation never opened behind the held timeline") {
+            harness.handled.get() && harness.shell.selectedChat.value != null && harness.shellComposed()
+        }
+        val held = harness.heldWindow()
+        assertTrue("the priority window is held until the first frame", held != null)
+
+        composeRule.runOnIdle { harness.app.setAppLockScreenVisibleForTest(true) }
+        harness.awaitCondition("the lock screen never showed") { harness.lockScreenShown() }
+        repeat(SETTLE_FRAMES) { harness.pumpFrame() }
+        assertFalse("the route may not keep the shell composed under the lock", harness.shellComposed())
+        assertTrue("unmounting the shell must not release the window", harness.heldWindow() === held)
+
+        composeRule.runOnIdle { harness.app.setAppLockScreenVisibleForTest(false) }
+        harness.awaitCondition("the shell never returned after the lock") { harness.shellComposed() }
+        assertTrue("the remount keeps the same window", harness.heldWindow() === held)
+        assertFalse(harness.transcriptVisible())
+
+        harness.releaseTimeline()
+        harness.awaitCondition("the conversation never reached its first frame after the lock") {
+            harness.transcriptVisible() && harness.heldWindow() == null
+        }
+        assertEquals(NotificationScenario.TARGET_ACCOUNT_REF, harness.app.activeAccountRef)
+    }
+
     /** One mounted app: a two-account runtime, a gated engine and the production root around it. */
     private inner class Harness(
         preloadFinishesFirst: Boolean = true,
@@ -449,6 +484,21 @@ class NotificationWholeAppRouteTest {
                 },
                 openChats = { _, _ -> NoGroupRecords },
             )
+
+        /** The first-frame priority window the shell holder is holding, or null once it is released. */
+        fun heldWindow() = shell.notificationFirstFrame.gate
+
+        /** Lets the held conversation timeline answer. */
+        fun releaseTimeline() = timelineGate.countDown()
+
+        /** True while the conversation's own Back button is composed, which only the mounted shell draws. */
+        fun shellComposed(): Boolean {
+            val back = hasContentDescription(context.getString(R.string.back))
+            return composeRule.onAllNodes(back).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        /** True while the root draws the lock screen. */
+        fun lockScreenShown(): Boolean = composeRule.onAllNodesWithTag("app.lock").fetchSemanticsNodes().isNotEmpty()
 
         /** Releases the held bind and the shell holder, and ends the seeded bootstrap attempt. */
         fun close() {

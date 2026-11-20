@@ -35,8 +35,10 @@ import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatListWindowHandle
 import dev.ipf.whitenoise.android.state.ChatsSubscriptionHandle
+import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
+import dev.ipf.whitenoise.android.state.ScriptedConversationGroupStateSubscription
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -338,6 +340,13 @@ internal class ReturnFixture(
     private val unreadTarget: Boolean = false,
     additionalAccounts: List<AccountSummaryFfi> = emptyList(),
     customizeRow: (Int, ChatListRowFfi) -> ChatListRowFfi = { _, row -> row },
+    /** One script per conversation open, in open order; the default opens a single ready conversation. */
+    timelineScripts: List<ScriptedConversationTimelineSubscription> =
+        listOf(ScriptedConversationTimelineSubscription(emptyTimelinePage())),
+    /** Gives every row its own group, so a second open cannot reuse the first conversation's warm timeline. */
+    private val distinctGroupsPerRow: Boolean = false,
+    /** Runs before the nth timeline open answers; a test suspends here to keep that conversation preparing. */
+    private val beforeTimelineOpen: suspend (Int) -> Unit = {},
 ) {
     val unreadSnapshotReads = AtomicInteger()
     val avatarReads = AtomicInteger()
@@ -359,14 +368,27 @@ internal class ReturnFixture(
         }
     val target = rows.last()
     val activeWindow = ReturnWindow(ChatListViewFfi.CHATS, rows, avatarAssetForRow)
-    private val timelines =
-        ScriptedConversationLiveSubscriptions(
-            listOf(ScriptedConversationTimelineSubscription(emptyTimelinePage())),
-            conversationTimelineTestGroup(),
-        )
+    private val timelineOpens = AtomicInteger()
+    private val liveSubscriptions =
+        if (distinctGroupsPerRow) {
+            ConversationLiveSubscriptions(
+                openTimeline = { _, _, _ ->
+                    val index = timelineOpens.getAndIncrement()
+                    beforeTimelineOpen(index)
+                    timelineScripts[index]
+                },
+                openGroupState = { _, groupIdHex ->
+                    ScriptedConversationGroupStateSubscription(
+                        conversationTimelineTestGroup().copy(groupIdHex = groupIdHex),
+                    )
+                },
+            )
+        } else {
+            ScriptedConversationLiveSubscriptions(timelineScripts, conversationTimelineTestGroup()).subscriptions
+        }
     val appState: WhiteNoiseAppState =
         conversationTimelineTestAppState(
-            timelines.subscriptions,
+            liveSubscriptions,
             additionalAccounts = additionalAccounts,
         ).also { state ->
             WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }.set(
@@ -412,7 +434,7 @@ internal class ReturnFixture(
                             true,
                         ),
                     )
-                "groupDetails" -> groupDetails()
+                "groupDetails" -> groupDetails(args?.getOrNull(1) as? String)
                 "chatListRow" -> rows.first { it.groupIdHex == args?.getOrNull(1) }
                 "readAvatarAssets" -> {
                     avatarReads.incrementAndGet()
@@ -441,14 +463,21 @@ internal class ReturnFixture(
             else -> error("Unexpected return-fixture call: $name")
         }
 
+    /** Answers the fixed test group unless rows were given their own groups. */
+    private fun groupDetails(requestedGroupIdHex: String?): GroupDetailsFfi {
+        val groupIdHex =
+            requestedGroupIdHex?.takeIf { distinctGroupsPerRow } ?: ConversationTimelineTestIds.GROUP_ID
+        return groupDetailsFor(groupIdHex)
+    }
+
     /** Keeps the mounted destination on its consented, authoritative empty timeline. */
-    private fun groupDetails() =
+    private fun groupDetailsFor(groupIdHex: String) =
         GroupDetailsFfi(
-            group = conversationTimelineTestGroup(),
+            group = conversationTimelineTestGroup().copy(groupIdHex = groupIdHex),
             members = emptyList(),
             mlsState =
                 AppGroupMlsStateFfi(
-                    groupIdHex = ConversationTimelineTestIds.GROUP_ID,
+                    groupIdHex = groupIdHex,
                     protocolProfile = AppProtocolProfileFfi.CURRENT,
                     lifecycleState = GroupLifecycleStateFfi.STABLE,
                     epoch = 0uL,
