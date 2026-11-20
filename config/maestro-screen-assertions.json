@@ -6843,6 +6843,13 @@
       "second_device": ["ACC-025"]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+      "symbol": "UnlinkedProfileRemovalDialog",
+      "bindings": [],
+      "remaining": "This question appears only for a saved profile that another device of the same account removed, which the single-emulator runner cannot provide. Its text and both answers are covered by JVM tests and manual SET-066; add a direct assertion when the runner can drive two installations of one account.",
+      "second_device": ["SET-066"]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedAccountPrompt.kt",
       "symbol": "UnlinkedAccountPrompt",
       "bindings": [],
