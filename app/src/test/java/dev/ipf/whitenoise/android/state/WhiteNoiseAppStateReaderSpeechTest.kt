@@ -375,7 +375,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
             }
         }
 
-    /** Stored package approval cannot authorize an unverified Android connection or its replacement. */
+    /** Both AppState playback entry points reject an unverified connection until it receives its own consent. */
     @Test
     fun unverifiedReplacementRequiresConsentDespiteSavedPackageApproval() =
         runBlocking {
@@ -407,6 +407,10 @@ class WhiteNoiseAppStateReaderSpeechTest {
                     .setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
                 appState.acknowledgeTtsTrustWarning(packageName)
                 attach(original)
+                assertFalse(appState.speakAloud(entries, Locale.US))
+                assertFalse(appState.speakAloudPrepared(entries, Locale.US))
+                assertEquals(0, original.utterances)
+
                 val accepted = async(start = CoroutineStart.UNDISPATCHED) { startSpeech() }
                 assertEquals(0, original.utterances)
                 val originalRequest = requireNotNull(appState.ttsPlaybackTrust.pending)
