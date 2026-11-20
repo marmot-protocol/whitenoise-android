@@ -103,6 +103,23 @@ class AccountKeysExportDeliveryTest {
         assertEquals(listOf(KeyExportDestination.File), exports)
     }
 
+    /** The actual save action cannot read the key or open a destination before authentication. */
+    @Test
+    fun rawSaveWaitsForTheScreenAuthenticationCallback() {
+        var pending: (() -> Unit)? = null
+        val fixture = render(authenticator = RawKeyExportAuthentication { pending = it })
+
+        beginExport(encrypted = false)
+
+        composeRule.runOnIdle {
+            assertEquals(0, fixture.native.rawCalls.get())
+            assertEquals(0, fixture.picker.launchCount)
+            checkNotNull(pending).invoke()
+        }
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
+        assertEquals(1, fixture.native.rawCalls.get())
+    }
+
     /** A late result loses authority immediately when the dialog begins its exit. */
     @Test
     fun dismissalStartRejectsAuthenticationBeforeTheDialogDisappears() {
@@ -614,6 +631,7 @@ class AccountKeysExportDeliveryTest {
         deferRaw: Boolean = false,
         deferEncrypted: Boolean = false,
         failFirstEncryption: Boolean = false,
+        authenticator: RawKeyExportAuthentication = RawKeyExportAuthentication { authenticated -> authenticated() },
     ): Fixture {
         val native = NativeExports(deferRaw, deferEncrypted, failFirstEncryption).also { currentNative = it }
         val appState =
@@ -636,7 +654,7 @@ class AccountKeysExportDeliveryTest {
                     AccountKeysScreen(
                         appState = appState,
                         onBack = {},
-                        rawExportAuthenticator = RawKeyExportAuthentication { authenticated -> authenticated() },
+                        rawExportAuthenticator = authenticator,
                     )
                 }
             }

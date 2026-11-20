@@ -13,14 +13,16 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isAppLockCredentialAvailable
 import dev.ipf.whitenoise.android.ui.findActivity
 
-/** A fresh, one-shot challenge for the selected raw export destination. */
+/** A fresh, one-shot challenge for a raw private-key action. */
 internal fun interface RawKeyExportAuthentication {
+    /** Runs the action after Android accepts the current credential challenge. */
     fun request(onAuthenticated: () -> Unit)
 
     /** Invalidates the result before dismissing a pending challenge. */
     fun cancel() = Unit
 }
 
+/** Cancels any outstanding challenge when the account owner or screen leaves composition. */
 @Composable
 internal fun rememberRawKeyExportAuthentication(
     owner: ProfileKeysUiState,

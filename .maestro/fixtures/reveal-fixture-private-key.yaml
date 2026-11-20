@@ -6,5 +6,6 @@ appId: dev.ipf.whitenoise.android.maestrolab
     direction: DOWN
 - assertVisible: Private key hidden
 - tapOn: Show private key
+- runFlow: enter-device-pin.yaml
 - assertVisible: Private key revealed.*
 - assertVisible: Hide private key
