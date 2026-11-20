@@ -297,8 +297,10 @@ class TtsEngineResolver(
                 handle = null,
             )
         }
-        // A requested or default package alone is not evidence of a successful bind.
-        val trust = verifiedPackage?.let(::classify) ?: EngineTrust.Unknown
+        // If every possible fallback is local, the connection is local even without its package identity.
+        val trust =
+            verifiedPackage?.let(::classify)
+                ?: if (engines.all { it.trust == EngineTrust.Local }) EngineTrust.Local else EngineTrust.Unknown
         return TtsResolutionResult(
             status = status,
             engines = engines,

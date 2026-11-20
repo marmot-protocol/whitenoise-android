@@ -505,6 +505,40 @@ class TtsEngineResolverTest {
             Unit
         }
 
+    @Test
+    fun defaultBootstrapTrustsADeviceWithOnlyKnownLocalEngines() =
+        runBlocking {
+            val factory = ControllableTtsFactory()
+            val localDefault = "com.github.olga_yakovleva.rhvoice.android"
+            val localFallback = "app.grapheneos.speechservices"
+            val resolver =
+                TtsEngineResolver(
+                    context,
+                    ttsFactory = factory,
+                    engineCatalog =
+                        FakeTtsEngineCatalog(
+                            engines =
+                                listOf(
+                                    engineInfo(localDefault, "RHVoice"),
+                                    engineInfo(localFallback, "GrapheneOS"),
+                                ),
+                            defaultEngine = localDefault,
+                            connectedEngineForRequest = { null },
+                        ),
+                )
+
+            val deferred = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
+            factory.completeInit(TextToSpeech.SUCCESS)
+            val result = deferred.await()
+
+            assertNotNull(result.handle)
+            assertEquals(localDefault, result.handle?.enginePackage)
+            assertEquals(EngineTrust.Local, result.handle?.trust)
+            assertEquals(false, result.handle?.connectedPackageVerified)
+            result.handle?.release()
+            Unit
+        }
+
     /** The resolver's own deadline during construction releases its candidate and returns quietly. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test

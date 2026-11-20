@@ -41,9 +41,11 @@ internal class TtsPlaybackTrustConsent(
     /** Reports whether the attached connection can receive text without a new prompt. */
     fun needsAcknowledgment(): Boolean = attachedHandle()?.let(::needsAcknowledgment) == true
 
-    /** Uses package trust only when Android has verified the connected package. */
+    /** Skips consent for local connections and uses saved approval only for a verified package. */
     private fun needsAcknowledgment(handle: TtsEngineHandle): Boolean =
-        if (handle.connectedPackageVerified) {
+        if (handle.trust == EngineTrust.Local) {
+            false
+        } else if (handle.connectedPackageVerified) {
             requiresTtsTrustWarning(handle.enginePackage, handle.trust, appState.ttsWarningPreferences)
         } else {
             // Approval covers one connection within one account session; any account switch revokes it.

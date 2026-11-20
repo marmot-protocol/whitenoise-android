@@ -434,7 +434,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
 
                 attach(replacement, verified = true)
                 assertTrue(appState.confirmTtsPlaybackTrust { true })
-                attach(replacement, trust = EngineTrust.Local, verified = true, enginePackage = "test.local.reader")
+                attach(replacement, trust = EngineTrust.Local, enginePackage = "test.local.reader")
                 assertTrue(appState.confirmTtsPlaybackTrust { true })
             } finally {
                 appState.publishTtsResolution(null)
