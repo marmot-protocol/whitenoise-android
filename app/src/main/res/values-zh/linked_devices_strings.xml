@@ -164,6 +164,7 @@
     <string name="unlinked_account_remove_detail">你的另一台设备已取消此设备的关联，因此该账户无法在此登录。移除只会删除此设备上的聊天和数据，你的其他设备会保留全部内容。之后请重新登录以关联此设备。</string>
     <string name="unlinked_account_remove_confirm">从此设备移除</string>
     <string name="unlinked_account_remove_failed">无法将该账户从此设备移除。请重试。</string>
+    <string name="unlinked_account_removed">已将该账户从此设备移除</string>
     <string name="chats_arriving_title">此设备已关联</string>
     <string name="chats_arriving_detail">此账户已有的聊天会由你的其他设备添加到这里，通常在一两分钟内。如果还没有聊天，请发起一个。</string>
     <string name="linked_devices_linked_by">由 %1$s 关联</string>

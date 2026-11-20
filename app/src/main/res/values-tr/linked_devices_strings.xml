@@ -164,6 +164,7 @@
     <string name="unlinked_account_remove_detail">Başka bir cihazınız bu cihazın bağlantısını kaldırdı, bu yüzden bu hesap burada oturum açamaz. Kaldırmak, hesabın sohbetlerini ve verilerini yalnızca bu cihazdan siler. Diğer cihazlarınızda her şey kalır. Ardından bu cihazı bağlamak için yeniden oturum açın.</string>
     <string name="unlinked_account_remove_confirm">Bu cihazdan kaldır</string>
     <string name="unlinked_account_remove_failed">Hesap bu cihazdan kaldırılamadı. Yeniden deneyin.</string>
+    <string name="unlinked_account_removed">Hesap bu cihazdan kaldırıldı</string>
     <string name="chats_arriving_title">Bu cihaz bağlandı</string>
     <string name="chats_arriving_detail">Bu hesabın mevcut sohbetleri diğer cihazlarınız tarafından buraya eklenir, genellikle bir iki dakika içinde. Henüz sohbet yoksa bir tane başlatın.</string>
     <string name="linked_devices_linked_by">%1$s tarafından bağlandı</string>

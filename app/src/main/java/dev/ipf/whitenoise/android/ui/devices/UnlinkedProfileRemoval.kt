@@ -12,9 +12,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.removeUnlinkedAccount
+import dev.ipf.whitenoise.android.state.removeUnlinkedAccountForOutcome
+import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.settings.runAccountWipeMutation
 
@@ -71,13 +73,28 @@ internal fun UnlinkedProfileRemovalHost(
                     onUnconfirmed = { appState.present(R.string.toast_wipe_outcome_unconfirmed, copyable = true) },
                     onFinished = { appState.wipeInProgress = false },
                 ) {
-                    val removed = appState.removeUnlinkedAccount(label)
-                    if (!removed) appState.present(R.string.unlinked_account_remove_failed)
+                    reportUnlinkedProfileRemoval(appState, appState.removeUnlinkedAccountForOutcome(label))
                 }
             }
         },
         onCancel = UnlinkedProfileRemoval::close,
     )
+}
+
+/**
+ * Says how the removal went, as removing the profile in view does: a short confirmation when every stage finished,
+ * the list of unfinished stages when some did not, and a failure when the wipe never started.
+ */
+private fun reportUnlinkedProfileRemoval(
+    appState: WhiteNoiseAppState,
+    outcome: WipeOutcomeFfi?,
+) {
+    val report = outcome?.let(::wipeReport)
+    when {
+        report == null -> appState.present(R.string.unlinked_account_remove_failed)
+        report.clean -> appState.presentTransient(R.string.unlinked_account_removed)
+        else -> appState.pendingWipeReport = report
+    }
 }
 
 /** The question itself: what removing deletes, with the removal as its confirming action. */

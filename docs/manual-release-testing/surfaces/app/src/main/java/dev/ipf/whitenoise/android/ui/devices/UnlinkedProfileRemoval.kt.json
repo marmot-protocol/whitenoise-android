@@ -66,6 +66,14 @@
         "test_ids": [
           "SET-066"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.unlinked_account_removed",
+        "test_ids": [
+          "SET-066"
+        ]
       }
     ]
   },

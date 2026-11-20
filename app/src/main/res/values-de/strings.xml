@@ -904,6 +904,8 @@
     <string name="invite_decline_step_down_title">Zurücktreten und ablehnen?</string>
     <string name="invite_decline_step_down_message">Mit dieser Einladung bist du Admin. Um abzulehnen, trittst du zuerst als Admin zurück, und die Mitglieder der Gruppe sehen, dass du zurückgetreten bist.</string>
     <string name="invite_decline_step_down_confirm">Zurücktreten und ablehnen</string>
+    <string name="invite_decline_all_devices_title">Auf allen deinen Geräten ablehnen?</string>
+    <string name="invite_decline_all_devices_message">Wenn du ablehnst, verlässt dieses Konto den Chat auf allen verknüpften Geräten. Um zurückzukehren, brauchst du eine neue Einladung.</string>
     <string name="toast_chat_archived">Chat archiviert</string>
     <string name="toast_chat_restored">Chat wiederhergestellt</string>
     <string name="toast_couldnt_update_chat">Chat konnte nicht aktualisiert werden</string>

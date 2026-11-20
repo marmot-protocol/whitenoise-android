@@ -904,6 +904,8 @@
     <string name="invite_decline_step_down_title">Yöneticilikten çekilip reddedilsin mi?</string>
     <string name="invite_decline_step_down_message">Bu davet sizi yönetici yapıyor. Reddetmek için önce yöneticilikten çekileceksiniz ve grup üyeleri bunu görecek.</string>
     <string name="invite_decline_step_down_confirm">Çekil ve reddet</string>
+    <string name="invite_decline_all_devices_title">Tüm cihazlarınızda reddedilsin mi?</string>
+    <string name="invite_decline_all_devices_message">Reddederseniz bu hesap, bağlı tüm cihazlarda sohbetten çıkar. Geri dönmek için yeni bir davet gerekir.</string>
     <string name="toast_chat_archived">Sohbet arşivlendi</string>
     <string name="toast_chat_restored">Sohbet geri yüklendi</string>
     <string name="toast_couldnt_update_chat">Sohbet güncellenemedi</string>

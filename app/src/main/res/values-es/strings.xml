@@ -906,6 +906,8 @@
     <string name="invite_decline_step_down_title">¿Dejar de ser admin y rechazar?</string>
     <string name="invite_decline_step_down_message">Esta invitación te hace admin. Para rechazarla, primero dejarás de ser admin y los miembros del grupo lo verán.</string>
     <string name="invite_decline_step_down_confirm">Dejar de ser admin y rechazar</string>
+    <string name="invite_decline_all_devices_title">¿Rechazar en todos tus dispositivos?</string>
+    <string name="invite_decline_all_devices_message">Al rechazar, esta cuenta sale del chat en todos los dispositivos vinculados. Necesitarás una nueva invitación para volver.</string>
     <string name="toast_chat_archived">Chat archivado</string>
     <string name="toast_chat_restored">Chat restaurado</string>
     <string name="toast_couldnt_update_chat">No se pudo actualizar el chat</string>

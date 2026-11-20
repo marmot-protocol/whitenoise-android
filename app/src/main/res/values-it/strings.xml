@@ -906,6 +906,8 @@
     <string name="invite_decline_step_down_title">Rinunciare al ruolo admin e rifiutare?</string>
     <string name="invite_decline_step_down_message">Questo invito ti rende admin. Per rifiutarlo, rinuncerai prima al ruolo admin e i membri del gruppo lo vedranno.</string>
     <string name="invite_decline_step_down_confirm">Rinuncia e rifiuta</string>
+    <string name="invite_decline_all_devices_title">Rifiutare su tutti i tuoi dispositivi?</string>
+    <string name="invite_decline_all_devices_message">Rifiutando, questo account esce dalla chat su tutti i dispositivi collegati. Per tornare ti servirà un nuovo invito.</string>
     <string name="toast_chat_archived">Chat archiviata</string>
     <string name="toast_chat_restored">Chat ripristinata</string>
     <string name="toast_couldnt_update_chat">Impossibile aggiornare la chat</string>

@@ -6861,6 +6861,13 @@
       "second_device": ["ACC-025"]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+      "symbol": "InviteDeclineAllDevicesDialog",
+      "bindings": [],
+      "remaining": "This question appears only when an invitation is declined on an account with a second linked device, which the single-emulator runner cannot provide. Its text and both answers are covered by JVM tests and manual SET-068; add a direct assertion when the runner can drive two installations of one account.",
+      "second_device": ["SET-068"]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
       "symbol": "UnlinkedProfileRemovalDialog",
       "bindings": [],

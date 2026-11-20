@@ -164,6 +164,7 @@
     <string name="unlinked_account_remove_detail">Ein anderes deiner Geräte hat dieses Gerät getrennt, daher kann sich dieses Konto hier nicht anmelden. Beim Entfernen werden seine Chats und Daten nur von diesem Gerät gelöscht. Deine anderen Geräte behalten alles. Melde dich danach erneut an, um dieses Gerät zu verknüpfen.</string>
     <string name="unlinked_account_remove_confirm">Von diesem Gerät entfernen</string>
     <string name="unlinked_account_remove_failed">Das Konto konnte nicht von diesem Gerät entfernt werden. Versuche es erneut.</string>
+    <string name="unlinked_account_removed">Konto von diesem Gerät entfernt</string>
     <string name="chats_arriving_title">Dieses Gerät ist verknüpft</string>
     <string name="chats_arriving_detail">Chats, die dieses Konto schon hat, werden von deinen anderen Geräten hier hinzugefügt, meist innerhalb von ein bis zwei Minuten. Wenn es noch keine gibt, starte einen.</string>
     <string name="linked_devices_linked_by">Verknüpft von %1$s</string>

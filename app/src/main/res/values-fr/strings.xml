@@ -906,6 +906,8 @@
     <string name="invite_decline_step_down_title">Quitter le rôle admin et refuser ?</string>
     <string name="invite_decline_step_down_message">Cette invitation fait de vous un admin. Pour la refuser, vous quitterez d’abord le rôle admin, et les membres du groupe le verront.</string>
     <string name="invite_decline_step_down_confirm">Quitter le rôle admin et refuser</string>
+    <string name="invite_decline_all_devices_title">Refuser sur tous vos appareils ?</string>
+    <string name="invite_decline_all_devices_message">En refusant, ce compte quitte la discussion sur tous les appareils associés. Il vous faudra une nouvelle invitation pour revenir.</string>
     <string name="toast_chat_archived">Discussion archivée</string>
     <string name="toast_chat_restored">Chat restauré</string>
     <string name="toast_couldnt_update_chat">Impossible de mettre à jour la discussion</string>
