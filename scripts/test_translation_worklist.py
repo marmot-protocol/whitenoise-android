@@ -1,8 +1,9 @@
 from pathlib import Path
+from unittest import mock
 from tempfile import TemporaryDirectory
 import unittest
 
-from scripts.translation_worklist import scan, worklist_order
+from scripts.translation_worklist import MAIN, scan, source_changes, worklist_order
 
 
 class TranslationWorklistTest(unittest.TestCase):
@@ -98,9 +99,53 @@ class TranslationWorklistTest(unittest.TestCase):
                 )
                 self.assertIn("invalid argument index", self.scan()[3][0])
 
+    def write_counts(self, locale, items):
+        self.write(
+            "main/values/counts.xml",
+            '<plurals name="count"><item quantity="one">One chat</item>'
+            '<item quantity="other">%1$d chats</item></plurals>',
+        )
+        self.write(f"preview/values-{locale}/counts.xml", f'<plurals name="count">{items}</plurals>')
+
+    def test_plural_forms_may_spell_out_or_include_the_count(self):
+        self.write_counts(
+            "ar",
+            '<item quantity="zero">لا محادثات</item><item quantity="two">محادثتان</item>'
+            '<item quantity="other">%1$d محادثة</item>',
+        )
+        self.assertEqual(self.scan()[3], [])
+        self.write_counts("ru", '<item quantity="one">%1$d чат</item><item quantity="other">%1$d чатов</item>')
+        self.assertEqual(self.scan()[3], [])
+
+    def test_plural_forms_reject_unknown_arguments(self):
+        self.write_counts("ru", '<item quantity="one">%1$s чат</item><item quantity="other">%1$d чатов</item>')
+        self.assertIn("format arguments differ", self.scan()[3][0])
+
+    def test_malformed_english_plurals_are_reported_with_file_and_key(self):
+        for items in ('<item quantity="one">One</item>', '<item quantity="few">A</item><item quantity="other">B</item><item quantity="few">C</item>', '<item quantity="some">A</item><item quantity="other">B</item>'):
+            with self.subTest(items=items):
+                self.write("main/values/counts.xml", f'<plurals name="count">{items}</plurals>')
+                self.write("preview/values-ru/counts.xml", '<plurals name="count"><item quantity="other">%1$d</item></plurals>')
+                errors = self.scan()[3]
+                self.assertEqual(len(errors), 1)
+                self.assertIn("counts.xml: count: expected unique Android plural quantities", errors[0])
+
+    def test_typed_item_alias_is_the_same_resource(self):
+        self.write("main/values/alias.xml", '<item name="title" type="string">Title</item>')
+        self.write("preview/values-fr/alias.xml", '<string name="title">Titre</string>')
+        source, _, _, errors = self.scan()
+        self.assertEqual(errors, [])
+        base = b'<resources><string name="title">Title</string></resources>'
+        paths = [str(MAIN / "values/alias.xml")]
+        with mock.patch("scripts.translation_worklist.subprocess.check_output", return_value=base):
+            self.assertNotIn("title", source_changes("base", paths, source))
+        with mock.patch("scripts.translation_worklist.subprocess.check_output", return_value=base.replace(b"Title", b"Old")):
+            self.assertIn("title", source_changes("base", paths, source))
+
     def test_launch_keys_follow_priority_file_order(self):
         self.write("main/values/strings.xml", '<string name="sign_in">Sign in</string><string name="invite">Invite</string>')
-        rules = {"Sign-in": ["sign_in"], "Invites": ["invite"]}
+        self.write("main/values/explanation_invite.xml", '<string name="invite_why">Why</string>')
+        rules = {"Sign-in": ["sign_in"], "Invites": ["invite", "invite_why"]}
         source, required, _, _ = scan(self.root / "main", self.root / "preview", rules)
         ordered = [name for name, _ in sorted(source.items(), key=lambda pair: worklist_order(pair, required, rules))]
-        self.assertEqual(ordered, ["sign_in", "invite", "hint"])
+        self.assertEqual(ordered, ["sign_in", "invite", "invite_why", "hint"])

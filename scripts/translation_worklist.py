@@ -31,6 +31,11 @@ class Entry:
         return self.node.get("translatable") != "false"
 
 
+def resource_type(node):
+    """Return the Android resource type, including typed <item> aliases."""
+    return node.get("type") if node.tag == "item" else node.tag
+
+
 def entries(paths):
     result = {}
     for path in sorted(paths):
@@ -38,8 +43,7 @@ def entries(paths):
         if root.tag != "resources":
             raise ValueError(f"{path}: expected <resources>")
         for node in root:
-            kind = node.get("type") if node.tag == "item" else node.tag
-            if kind not in TYPES:
+            if resource_type(node) not in TYPES:
                 continue
             name = node.get("name")
             if not name or name in result:
@@ -86,26 +90,36 @@ def markup(node):
     return Counter(child.tag for child in node.iter() if child is not node)
 
 
+def plural_problem(node):
+    quantities = [item.get("quantity") for item in node]
+    if (
+        resource_type(node) == "plurals"
+        and ("other" not in quantities
+             or len(set(quantities)) != len(quantities)
+             or set(quantities) - QUANTITIES
+             or any(item.tag != "item" for item in node))
+    ):
+        return "expected unique Android plural quantities, including other"
+    return None
+
+
 def check_entry(source, target):
     original, translated = source.node, target.node
+    kind = resource_type(original)
     if not source.translatable:
         return "source is marked non-translatable"
-    if original.tag != translated.tag:
-        return f"expected <{original.tag}>, found <{translated.tag}>"
+    if kind != resource_type(translated):
+        return f"expected {kind}, found {resource_type(translated)}"
     if original.get("formatted", "true") != translated.get("formatted", "true"):
         return "formatted attribute differs from the source"
-    if translated.tag == "plurals":
-        quantities = [item.get("quantity") for item in translated]
-        if (
-            "other" not in quantities
-            or len(set(quantities)) != len(quantities)
-            or set(quantities) - QUANTITIES
-            or any(item.tag != "item" for item in translated)
-        ):
-            return "expected unique Android plural quantities, including other"
+    if kind == "plurals":
+        if problem := plural_problem(translated):
+            return problem
         source_items = {item.get("quantity"): item for item in original}
         pairs = [(source_items.get(item.get("quantity"), source_items["other"]), item) for item in translated]
-    elif translated.tag == "string-array":
+        # Languages differ on which forms spell out the count, so allow any English form's arguments.
+        plural_arguments = set().union(*(arguments(item) for item in original))
+    elif kind == "string-array":
         if len(original) != len(translated) or any(item.tag != "item" for item in translated):
             return "array items differ from the source"
         pairs = zip(original, translated)
@@ -117,16 +131,12 @@ def check_entry(source, target):
         if markup(before) != markup(after):
             return "markup tags differ from the source"
         if original.get("formatted") != "false":
-            expected = arguments(before)
+            expected = plural_arguments if kind == "plurals" else arguments(before)
             try:
                 actual = arguments(after, strict=bool(expected) or bool(arguments(after)))
             except ValueError as error:
                 return str(error)
-            # A singular form can spell out the count, such as "one attachment".
-            if translated.tag == "plurals" and after.get("quantity") == "one" and len(expected) == 1:
-                if expected == {(1, "", "", "d")} and not actual:
-                    continue
-            if expected != actual:
+            if not actual <= expected if kind == "plurals" else actual != expected:
                 return "format arguments differ from the source"
     return None
 
@@ -155,6 +165,12 @@ def content(node):
     return node.tag, node.attrib, node.text, [(content(child), child.tail) for child in node]
 
 
+def signature(node):
+    """Identify a resource by type and content, ignoring typed-alias spelling."""
+    attributes = {key: value for key, value in node.attrib.items() if key != "type"}
+    return resource_type(node), attributes, node.text, [(content(child), child.tail) for child in node]
+
+
 def base_resources(base):
     return subprocess.check_output(
         ["git", "ls-tree", "-r", "--name-only", base, "--", str(MAIN)],
@@ -177,13 +193,13 @@ def source_changes(base, paths, source):
             continue
         contents = subprocess.check_output(["git", "show", f"{base}:{path}"], cwd=ROOT)
         for node in ET.fromstring(contents):
-            if node.tag in TYPES:
+            if resource_type(node) in TYPES:
                 previous[node.get("name")] = node
     return {
         name
         for name, entry in source.items()
         if entry.translatable and (
-            name not in previous or content(previous[name]) != content(entry.node)
+            name not in previous or signature(previous[name]) != signature(entry.node)
         )
     }
 
@@ -191,9 +207,11 @@ def source_changes(base, paths, source):
 def scan(main, preview, rules, previously_shipped=()):
     source = entries((main / "values").glob("*.xml"))
     required = priorities(source, rules)
+    broken = {name: plural_problem(entry.node) for name, entry in source.items() if plural_problem(entry.node)}
     catalogs = {}
     present = shipped_locales(str(file) for file in main.glob("values-*/*.xml"))
-    errors = [
+    errors = [f"{source[name].file}: {name}: {problem}" for name, problem in broken.items()]
+    errors += [
         f"{main / directory}: shipped locale was removed from the main resources"
         for directory in sorted(set(previously_shipped) - present)
     ]
@@ -208,7 +226,10 @@ def scan(main, preview, rules, previously_shipped=()):
                 continue
             catalogs[tag] = localized
             for name, target in localized.items():
-                problem = check_entry(source[name], target) if name in source else "unknown resource"
+                problem = (
+                    None if name in broken
+                    else check_entry(source[name], target) if name in source else "unknown resource"
+                )
                 if problem:
                     errors.append(f"{target.file}: {name}: {problem}")
             if root == main:
@@ -219,11 +240,11 @@ def scan(main, preview, rules, previously_shipped=()):
 
 
 def worklist_order(pair, required, rules):
-    """Sort launch keys by the flow order in the priorities file, then by tier and file."""
+    """Sort launch keys by priorities-file flow order, then explanation files and file name."""
     name, entry = pair
     flows = list(rules)
     flow = flows.index(required[name]) if name in required else len(flows)
-    return name not in required, entry.file.name.startswith("explanation"), flow, entry.file.name, name
+    return name not in required, flow, entry.file.name.startswith("explanation"), entry.file.name, name
 
 
 def main():
