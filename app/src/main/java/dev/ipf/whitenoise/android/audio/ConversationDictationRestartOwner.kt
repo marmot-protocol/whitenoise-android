@@ -11,6 +11,8 @@ internal class ConversationDictationRestartOwner {
     private var disconnectRetries = 0
     private var permissionRetryUsed = false
 
+    val shortSettle = ConversationDictationShortSettle()
+
     val pending: Boolean get() = reserved
 
     fun reserve(): Long {
@@ -39,8 +41,12 @@ internal class ConversationDictationRestartOwner {
         restartId += 1L
     }
 
-    fun noteTeardown(now: Long) {
+    fun noteTeardown(
+        now: Long,
+        providerEndedSession: Long?,
+    ) {
         lastTeardownAtElapsedMillis = now
+        shortSettle.noteTeardown(providerEndedSession)
     }
 
     fun noteNoSpeech(

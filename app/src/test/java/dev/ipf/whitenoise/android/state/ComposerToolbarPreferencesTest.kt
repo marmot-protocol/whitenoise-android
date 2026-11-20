@@ -19,6 +19,8 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 @OptIn(ExperimentalCoroutinesApi::class)
 class ComposerToolbarPreferencesTest {
+    private val jumps = listOf(ComposerShortcut.JumpTop, ComposerShortcut.JumpBottom)
+
     /** Fresh preferences and Reset use the compact groups, with the voice launcher sharing Send's slot. */
     @Test
     fun freshDefaultsAndResetPersistCompactPhysicalGroups() =
@@ -31,8 +33,8 @@ class ComposerToolbarPreferencesTest {
                         ComposerShortcut.SendingIdentity,
                         ComposerShortcut.More,
                         ComposerShortcut.Emoji,
-                    ),
-                    rightShortcuts = setOf(ComposerShortcut.VoiceNote),
+                    ) + jumps,
+                    rightShortcuts = setOf(ComposerShortcut.VoiceNote) + jumps,
                 )
             assertEquals(expected, owner.value)
             assertEquals(ComposerVoicePlacement.Send, owner.value.voicePlacement)
@@ -63,7 +65,7 @@ class ComposerToolbarPreferencesTest {
                 ComposerShortcut.VoiceNote,
                 ComposerShortcut.Emoji,
                 ComposerShortcut.Paste,
-            ),
+            ) + jumps,
             saved.shortcuts,
         )
         assertEquals(ComposerToolbarLayout.AlwaysExpanded, saved.layout)
@@ -72,7 +74,7 @@ class ComposerToolbarPreferencesTest {
             saved.onSide(ComposerShortcutSide.Left),
         )
         assertEquals(
-            listOf(ComposerShortcut.More, ComposerShortcut.Emoji, ComposerShortcut.Paste),
+            listOf(ComposerShortcut.More, ComposerShortcut.Emoji, ComposerShortcut.Paste) + jumps,
             saved.onSide(ComposerShortcutSide.Right),
         )
         assertEquals(saved, ComposerToolbarSettings.decode(saved.encode()))
@@ -140,7 +142,7 @@ class ComposerToolbarPreferencesTest {
             )
         assertEquals(settings, ComposerToolbarSettings.decode(settings.encode()))
         assertEquals(
-            listOf(ComposerShortcut.More),
+            listOf(ComposerShortcut.More) + jumps,
             ComposerToolbarSettings
                 .decode(
                     """{"version":1,"shortcuts":[],"layout":"automatic"}""",
@@ -154,7 +156,11 @@ class ComposerToolbarPreferencesTest {
             ComposerToolbarSettings.decode(
                 """{"version":1,"shortcuts":["camera","future","camera","paste"],"layout":"future"}""",
             )
-        assertEquals(listOf(ComposerShortcut.More, ComposerShortcut.Camera, ComposerShortcut.Paste), settings.shortcuts)
+        // The draft jumps come from the version-4 migration, not from the stored IDs.
+        assertEquals(
+            listOf(ComposerShortcut.More, ComposerShortcut.Camera, ComposerShortcut.Paste) + jumps,
+            settings.shortcuts,
+        )
         assertEquals(ComposerToolbarLayout.Automatic, settings.layout)
     }
 
@@ -167,7 +173,7 @@ class ComposerToolbarPreferencesTest {
             """{"version":2,"shortcuts":[]}""",
             """{"version":1,"shortcuts":[false]}""",
             """{"version":1,"shortcuts":"camera"}""",
-            """{"version":4,"shortcuts":[],"rightShortcuts":[],"voiceOnSend":true}""",
+            """{"version":5,"shortcuts":[],"rightShortcuts":[],"voiceOnSend":true}""",
         ).forEach { encoded ->
             assertEquals(ComposerToolbarSettings(), ComposerToolbarSettings.decode(encoded))
         }
@@ -198,7 +204,7 @@ class ComposerToolbarPreferencesTest {
                 ComposerShortcut.Emoji,
                 ComposerShortcut.Dictation,
                 ComposerShortcut.VoiceNote,
-            ),
+            ) + jumps,
             migrated.onSide(ComposerShortcutSide.Right),
         )
         val changed =
@@ -206,6 +212,31 @@ class ComposerToolbarPreferencesTest {
                 .withSide(ComposerShortcut.Camera, ComposerShortcutSide.Right)
                 .withSide(ComposerShortcut.Paste, ComposerShortcutSide.Left)
         assertEquals(changed, ComposerToolbarSettings.decode(changed.encode()))
+    }
+
+    /** Older records gain the draft jumps once; a newer record keeps a user's removal or moved side. */
+    @Test
+    fun draftJumpsMigrateOnceAndKeepLaterChoices() {
+        val v3 =
+            ComposerToolbarSettings.decode(
+                """{"version":3,"shortcuts":["more","camera","paste"],"layout":"automatic",""" +
+                    """"rightShortcuts":["paste"]}""",
+            )
+        assertEquals(listOf(ComposerShortcut.Paste) + jumps, v3.onSide(ComposerShortcutSide.Right))
+        assertEquals(listOf(ComposerShortcut.More, ComposerShortcut.Camera), v3.onSide(ComposerShortcutSide.Left))
+
+        val removed = v3.without(ComposerShortcut.JumpTop).without(ComposerShortcut.JumpBottom)
+        assertEquals(removed, ComposerToolbarSettings.decode(removed.encode()))
+        assertFalse(jumps.any { it in ComposerToolbarSettings.decode(removed.encode()).shortcuts })
+
+        val movedLeft = v3.insertOnSide(ComposerShortcut.JumpBottom, ComposerShortcutSide.Left, 0)
+        val decoded = ComposerToolbarSettings.decode(movedLeft.encode())
+        assertEquals(movedLeft, decoded)
+        assertEquals(ComposerShortcut.JumpBottom, decoded.onSide(ComposerShortcutSide.Left).first())
+        assertEquals(
+            listOf(ComposerShortcut.Paste, ComposerShortcut.JumpTop),
+            decoded.onSide(ComposerShortcutSide.Right),
+        )
     }
 
     @Test

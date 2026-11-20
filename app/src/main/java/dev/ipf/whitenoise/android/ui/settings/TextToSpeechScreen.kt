@@ -31,11 +31,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
-import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceOption
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceUnavailableReason
-import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
 import dev.ipf.whitenoise.android.audio.tts.shouldReportNoTtsEngine
 import dev.ipf.whitenoise.android.state.TtsMediaMixVolume
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
@@ -78,7 +76,6 @@ internal fun TextToSpeechScreen(
     var refreshToken by remember { mutableIntStateOf(0) }
     var picker by rememberSaveable { mutableStateOf<SpeechSetting?>(null) }
     var customRateOpen by rememberSaveable { mutableStateOf(false) }
-    var pendingEngineWarning by remember { mutableStateOf<Pair<Any, String>?>(null) }
     var settingsFailed by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
@@ -261,17 +258,7 @@ internal fun TextToSpeechScreen(
                             )
                         SpeechChoice(engine.label, engine.packageName == resolvedPackage, trust) {
                             picker = null
-                            val warn =
-                                requiresTtsTrustWarning(
-                                    engine.packageName,
-                                    appState.runtimeTrustForTtsSelectionWarning(engine.packageName),
-                                    appState.ttsWarningPreferences,
-                                )
-                            if (warn) {
-                                pendingEngineWarning = Any() to engine.packageName
-                            } else {
-                                appState.selectTtsEngine(engine.packageName)
-                            }
+                            appState.selectTtsEngine(engine.packageName)
                         }
                     },
                 onDismiss = { picker = null },
@@ -347,19 +334,6 @@ internal fun TextToSpeechScreen(
                 appState.setTtsRateOverride(it)
                 customRateOpen = false
             },
-        )
-    }
-    pendingEngineWarning?.let { request ->
-        TtsTrustWarningDialog(
-            ownerKey = request.first,
-            onProceed = {
-                if (pendingEngineWarning === request) {
-                    appState.acknowledgeTtsTrustWarning(request.second)
-                    pendingEngineWarning = null
-                    appState.selectTtsEngine(request.second)
-                }
-            },
-            onDismiss = { if (pendingEngineWarning === request) pendingEngineWarning = null },
         )
     }
 }

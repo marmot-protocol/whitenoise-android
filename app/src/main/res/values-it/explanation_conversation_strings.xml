@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Apre i dettagli di questa chat, come i membri e le impostazioni.</string>
     <string name="explanation_conversation_jump_to_mention">Scorre fino al prossimo messaggio non letto in cui sei menzionato.</string>
     <string name="explanation_composer_draft_top">Riporta la bozza alla prima riga. Il testo non cambia.</string>
+    <string name="explanation_composer_draft_bottom">Porta la bozza all\'ultima riga. Il testo non cambia.</string>
     <string name="explanation_emoji_search">Cerca le emoji per nome.</string>
     <string name="explanation_emoji_configure">Apre le impostazioni dove scegli le emoji per le reazioni rapide.</string>
 

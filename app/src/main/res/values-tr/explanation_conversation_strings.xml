@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Üyeler ve ayarlar gibi bu sohbetin ayrıntılarını açar.</string>
     <string name="explanation_conversation_jump_to_mention">Sizden bahseden bir sonraki okunmamış mesaja kaydırır.</string>
     <string name="explanation_composer_draft_top">Taslağı ilk satıra kaydırır. Metin değişmez.</string>
+    <string name="explanation_composer_draft_bottom">Taslağı son satıra kaydırır. Metin değişmez.</string>
     <string name="explanation_emoji_search">Emojileri adına göre arar.</string>
     <string name="explanation_emoji_configure">Hızlı tepki emojilerinizi seçtiğiniz ayarları açar.</string>
 

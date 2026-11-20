@@ -279,6 +279,7 @@
     <string name="chat_row_draft_prefix">Bozza: </string>
     <string name="jump_to_newest">Vai al più recente</string>
     <string name="scroll_to_top">Scorri verso l\'alto</string>
+    <string name="scroll_to_bottom">Scorri verso il basso</string>
     <string name="discard_failed_message">Elimina messaggio non riuscito</string>
     <string name="message_discard_still_sending">Questo messaggio è ancora in fase di invio. Riprova tra poco.</string>
     <string name="reply_target_not_sent">Il messaggio a cui stai rispondendo non è ancora stato inviato. Attendi che venga inviato, o tocca «Riprova» sul messaggio se l’invio non è riuscito, poi invia la risposta.</string>
@@ -442,6 +443,16 @@
     <string name="media_attachment">Allegato multimediale</string>
     <string name="generic_message">Messaggio</string>
     <string name="giphy_media_preview">GIF tramite GIPHY</string>
+    <string name="giphy_search_title">Cerca GIF</string>
+    <string name="giphy_search_hint">Cerca su GIPHY</string>
+    <string name="giphy_search_privacy">GIPHY riceve la tua ricerca, la lingua impostata e il tuo indirizzo IP. I telefoni dei destinatari possono caricare automaticamente le GIF da GIPHY, condividendo il loro indirizzo IP.</string>
+    <string name="giphy_search_powered_by_prefix">Fornito da</string>
+    <string name="giphy_search_powered_by">Fornito da GIPHY</string>
+    <string name="giphy_search_empty">Nessuna GIF trovata</string>
+    <string name="giphy_search_failed">Impossibile cercare su GIPHY</string>
+    <string name="giphy_preview_loading">Caricamento anteprima</string>
+    <string name="giphy_preview_unavailable">Anteprima non disponibile</string>
+    <string name="giphy_send_result">Invia GIF: %1$s</string>
     <string name="waiting_for_stream">In attesa dello stream...</string>
     <string name="stream_failed_format">Stream non riuscito: %1$s</string>
     <string name="copy_text">Copia testo</string>
@@ -874,6 +885,7 @@
     <string name="toast_send_emoji_limit">Questo messaggio ha troppe emoji personalizzate, quindi non è stato inviato. Rimuovine alcune e riprova.</string>
     <string name="toast_chat_still_loading">Questa chat si sta ancora caricando. Riprova tra un attimo.</string>
     <string name="toast_send_membership_verifying">Verifica dell’appartenenza al gruppo — il messaggio non è stato inviato. È rimasto nella casella; riprova tra un istante.</string>
+    <string name="notification_action_unlock_required">Sblocca White Noise e riprova.</string>
     <string name="toast_reaction_failed">La reazione è fallita</string>
     <string name="toast_couldnt_delete_message">Eliminazione del messaggio fallita. Riprova.</string>
     <string name="toast_couldnt_edit_message">Impossibile modificare il messaggio</string>
@@ -979,6 +991,7 @@
     <string name="hide_private_key">Nascondi chiave privata</string>
     <string name="show_private_key">Mostra chiave privata</string>
     <string name="copy_private_key">Copia chiave privata</string>
+    <string name="raw_key_export_auth_title">Autenticati per accedere alla tua chiave privata</string>
     <string name="export">Esporta</string>
     <string name="export_encrypted_private_key">Esporta chiave privata cifrata</string>
     <string name="keep_your_private_key_safe">Tieni al sicuro la tua chiave privata</string>
@@ -1672,6 +1685,8 @@
     <string name="emoji_sets_installed">Installato</string>
     <string name="emoji_sets_section_installed">Installati</string>
     <string name="emoji_sets_section_discover">Scopri</string>
+    <string name="emoji_sets_builtin_shown">Preinstallato · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Nascosto nel selettore. Resta visibile nei messaggi.</string>
     <string name="emoji_sets_update_available">Aggiornamento disponibile</string>
     <string name="emoji_sets_load_image">Carica immagine di anteprima</string>
     <string name="emoji_sets_image_privacy">Caricare un’anteprima o installare un set condivide il tuo indirizzo IP con i suoi host di immagini.</string>
@@ -2243,6 +2258,7 @@
     <string name="onboarding_signing_in">Accesso…</string>
     <string name="onboarding_choose_profile">Scegli profilo</string>
     <string name="onboarding_enter_private_key">Inserisci la chiave privata</string>
+    <string name="signup_generated_name_hint">La registrazione inizia con un nome casuale. Tienilo, tira i dadi per averne un altro o scrivi il tuo.</string>
     <string name="signup_about_prompt">Raccontaci di te</string>
     <string name="signup_preparing_photo">Preparazione della foto…</string>
     <string name="signup_publishing_profile">Pubblicazione del profilo…</string>

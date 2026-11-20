@@ -49,18 +49,3 @@ internal fun adoptTtsEngineSelection(
 internal fun ttsDiscoveryComplete(resolution: TtsResolutionResult?): Boolean = resolution != null
 
 internal fun shouldReportNoTtsEngine(resolution: TtsResolutionResult?): Boolean = ttsDiscoveryComplete(resolution) && resolution?.hasUsableEngine != true
-
-internal fun runtimeTrustForSelectionWarning(
-    enginePackage: String,
-    adoptedHandle: TtsEngineHandle?,
-    selectedOverride: String?,
-): EngineTrust =
-    if (
-        adoptedHandle != null &&
-        adoptedHandle.enginePackage == enginePackage &&
-        selectedOverride == enginePackage
-    ) {
-        adoptedHandle.trust
-    } else {
-        EngineTrust.Unknown
-    }

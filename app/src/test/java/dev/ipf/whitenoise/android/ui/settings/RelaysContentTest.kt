@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
 import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -212,16 +213,44 @@ class RelaysContentTest {
         composeRule.onNodeWithTag("relay.add.submit").assertIsNotEnabled()
     }
 
-    /** Restore default relays is disabled while both lists already equal the defaults. */
+    /**
+     * Restore default relays is disabled once NIP-65 holds White Noise's account relays and Inbox its messaging
+     * relays, whatever MarmotKit reports as `defaultRelays`, and offered again when either list differs.
+     */
     @Test
     fun restoreIsDisabledAtDefaults() {
-        val lists = relayLists(nip65 = listOf(A), inbox = listOf(A), defaults = listOf(A))
+        val lists =
+            relayLists(nip65 = MarmotClient.accountRelays, inbox = MarmotClient.bootstrapRelays, defaults = listOf(A))
         assertTrue(lists.usesDefaultRelays())
-        assertFalse(relayLists(nip65 = listOf(B), inbox = listOf(A), defaults = listOf(A)).usesDefaultRelays())
+        assertFalse(
+            relayLists(nip65 = MarmotClient.bootstrapRelays, inbox = MarmotClient.bootstrapRelays).usesDefaultRelays(),
+        )
+        assertFalse(
+            relayLists(nip65 = MarmotClient.accountRelays, inbox = MarmotClient.accountRelays).usesDefaultRelays(),
+        )
         render(lists)
         composeRule.onNodeWithTag("relays.restore").performScrollTo().assertIsNotEnabled()
         composeRule.onNodeWithText(app.getString(R.string.relay_defaults_in_use)).assertExists()
         composeRule.onAllNodesWithText(app.getString(R.string.relay_list_published)).assertCountEquals(2)
+    }
+
+    /** An entry the defaults lack still offers Restore, even one that does not normalize, since Restore removes it. */
+    @Test
+    fun restoreIsOfferedWhenADefaultListAlsoHoldsAnUnusableEntry() {
+        val lists = relayLists(nip65 = MarmotClient.accountRelays + LEGACY, inbox = MarmotClient.bootstrapRelays)
+        assertFalse(lists.usesDefaultRelays())
+        render(lists)
+        composeRule.onNodeWithTag("relays.restore").performScrollTo().assertIsEnabled()
+    }
+
+    /** Lists that share one relay MarmotKit reports as the account's default are not White Noise's defaults. */
+    @Test
+    fun restoreIsOfferedWhenBothListsHoldTheAccountsOwnRelay() {
+        val lists = relayLists(nip65 = listOf(A), inbox = listOf(A), defaults = listOf(A))
+        assertFalse(lists.usesDefaultRelays())
+        render(lists)
+        composeRule.onNodeWithTag("relays.restore").performScrollTo().assertIsEnabled()
+        composeRule.onNodeWithText(app.getString(R.string.relay_restore_help)).assertExists()
     }
 
     /** Publication disables every path to an edit, including opening a relay's role switches. */

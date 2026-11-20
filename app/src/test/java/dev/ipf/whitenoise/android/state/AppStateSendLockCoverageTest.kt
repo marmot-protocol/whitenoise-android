@@ -80,26 +80,30 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /** The gate sits inside the IO bridge and precedes each native mutation. */
     @Test
-    fun notificationReplyLocksSend() {
-        val body = appStateFunctionBody("sendNotificationReply", notificationReplySource())
-
-        assertTrue(
-            "notification quick replies must serialize sendText through the per-group commit lock",
-            Regex(
-                """withGroupCommitLock\s*\(\s*account\s*,\s*group\s*\).*""" +
-                    """marmotIo\s*\(MarmotTraceSection\.TEXT_SEND\)\s*\{\s*sendText""" +
-                    """\s*\(\s*account\s*,\s*group\s*,\s*body\s*\)\s*\}""",
-                RegexOption.DOT_MATCHES_ALL,
-            ).containsMatchIn(body),
-        )
+    fun notificationMutationsCheckAppLockAtNativeAdmission() {
+        val source = notificationReplySource()
+        val reply = appStateFunctionBody("sendNotificationReply", source)
+        assertTrue(reply.indexOf("withGroupCommitLock(account, group)") in 0 until reply.indexOf("marmotIo("))
+        val mutations =
+            listOf(
+                reply to "sendText(account, group, body)",
+                appStateFunctionBody("sendNotificationReaction", source) to "reactToMessage(",
+                appStateFunctionBody("markNotificationMessageReadIfAllowed", source) to "markTimelineMessageRead(",
+            )
+        mutations.forEach { (body, nativeCall) ->
+            val gate = body.indexOf("appLock.notificationActionsAllowed")
+            val ioBridge = Regex("""\bmarmotIo\s*[(\{]""").find(body)?.range?.first ?: -1
+            assertTrue(ioBridge in 0 until gate)
+            assertTrue(gate in 0 until body.indexOf(nativeCall))
+        }
     }
 
     @Test
     fun acceptedPendingNotificationReplyPersistsItsCanonicalIdBeforeReturning() {
         val body = appStateFunctionBody("sendNotificationReply", notificationReplySource())
-        val sendIndex =
-            body.indexOf("val summary = marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, group, body) }")
+        val sendIndex = body.indexOf("sendText(account, group, body)")
         val persistIndex = body.indexOf("completionStore.markCommittedMessage", startIndex = sendIndex)
         val acceptedPendingIndex = body.indexOf("NotificationReplySendOutcome.AcceptedPending", startIndex = sendIndex)
 
@@ -110,10 +114,19 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /** A cold worker has no foreground transition. Grace expires at the configured boundary. */
     @Test
-    fun notificationActionsAreBlockedWhileAppLockScreenIsVisible() {
-        assertTrue(notificationActionsAllowed(appLockScreenVisible = false))
-        assertFalse(notificationActionsAllowed(appLockScreenVisible = true))
+    fun notificationActionsRequireAnAuthenticatedSession() {
+        assertTrue(notificationBackgroundGraceAllows(1L, 60_000L, AppLockDelay.OneMinute))
+        assertFalse(notificationBackgroundGraceAllows(1L, 60_001L, AppLockDelay.OneMinute))
+        assertFalse(notificationBackgroundGraceAllows(null, 60_001L, AppLockDelay.OneMinute))
+        assertFalse(notificationBackgroundGraceAllows(2L, 1L, AppLockDelay.OneMinute))
+        assertFalse(notificationBackgroundGraceAllows(1L, 1L, AppLockDelay.Immediately))
+        assertTrue(notificationActionsAllowed(false, true, true, true))
+        assertFalse(notificationActionsAllowed(false, true, true, false))
+        assertFalse(notificationActionsAllowed(true, true, true, true))
+        assertFalse(notificationActionsAllowed(false, true, false, true))
+        assertTrue(notificationActionsAllowed(false, false, false, false))
     }
 
     @Test

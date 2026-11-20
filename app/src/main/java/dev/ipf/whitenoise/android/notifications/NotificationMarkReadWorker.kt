@@ -4,13 +4,16 @@ import android.content.Context
 import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
-import dev.ipf.whitenoise.android.state.markNotificationMessageRead
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.markNotificationMessageReadIfAllowed
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -30,18 +33,11 @@ class NotificationMarkReadWorker(
                 .decode(inputData)
                 ?.takeIf { it.kind == NotificationActionKind.MARK_READ }
                 ?: return Result.failure().also { retryStore.clear(retryKey) }
-        if (!application.appState.appLock.notificationActionsAllowed) {
-            notificationWarning(TAG, "mark-read deferred by app lock") {
-                "group=${action.target.groupIdHex.take(8)}"
+        val actionsAllowed =
+            withContext(Dispatchers.Main.immediate) {
+                application.appState.appLock.notificationActionsAllowed
             }
-            if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
-                return Result.retry()
-            }
-            notificationWarning(TAG, "mark-read lock wait expired") {
-                "group=${action.target.groupIdHex.take(8)}"
-            }
-            return Result.failure().also { retryStore.clear(retryKey) }
-        }
+        if (!actionsAllowed) return lockedMarkReadResult(retryStore, retryKey)
         if (retryStore.operationFailureCount(retryKey) >= MAX_ATTEMPTS) {
             return Result.failure().also { retryStore.clear(retryKey) }
         }
@@ -53,22 +49,26 @@ class NotificationMarkReadWorker(
             val markedRead =
                 withContext(Dispatchers.Main.immediate) {
                     application.appState.ensureNotificationRuntimeStarted()
-                    application.appState.markNotificationMessageRead(
+                    if (!application.appState.appLock.notificationActionsAllowed) return@withContext null
+                    application.appState.markNotificationMessageReadIfAllowed(
                         accountRef = action.target.accountRef,
                         groupIdHex = action.target.groupIdHex,
                         messageIdHex = action.target.messageIdHex.orEmpty(),
                     )
                 }
+            if (markedRead == null) return lockedMarkReadResult(retryStore, retryKey)
             if (!markedRead) return markReadFailureResult(retryStore, retryKey)
 
-            LocalNotificationPresenter(applicationContext).dismissActionNotificationAndOlderSiblings(
-                notificationTag = action.notificationTag,
-                notificationId = action.notificationId,
-                actedMessageIdHex = action.target.messageIdHex,
-                accountRef = action.target.accountRef,
-                groupIdHex = action.target.groupIdHex,
-                sinceMs = dismissBaselineMs,
-            )
+            if (inputData.getBoolean(DISMISS_CARD_KEY, true)) {
+                LocalNotificationPresenter(applicationContext).dismissActionNotificationAndOlderSiblings(
+                    notificationTag = action.notificationTag,
+                    notificationId = action.notificationId,
+                    actedMessageIdHex = action.target.messageIdHex,
+                    accountRef = action.target.accountRef,
+                    groupIdHex = action.target.groupIdHex,
+                    sinceMs = dismissBaselineMs,
+                )
+            }
             Result.success().also { retryStore.clear(retryKey) }
         } catch (cancel: CancellationException) {
             throw cancel
@@ -78,6 +78,17 @@ class NotificationMarkReadWorker(
             }
             markReadFailureResult(retryStore, retryKey)
         }
+    }
+
+    /** Uses the independent lock-wait budget when the action cannot reach the runtime. */
+    private fun lockedMarkReadResult(
+        retryStore: NotificationActionRetryStore,
+        retryKey: String,
+    ): Result {
+        if (retryStore.shouldDeferForLock(retryKey, NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS)) {
+            return Result.retry()
+        }
+        return Result.failure().also { retryStore.clear(retryKey) }
     }
 
     private fun markReadFailureResult(
@@ -92,20 +103,23 @@ class NotificationMarkReadWorker(
 
     companion object {
         private const val TAG = "DMMarkReadWorker"
+        private const val DISMISS_CARD_KEY = "dismiss_card"
         private const val MAX_ATTEMPTS = 3
         private const val BACKOFF_DELAY_SECONDS = 30L
 
+        /** Keeps repeated actions durable, with a distinct key for a cursor-only update after sending. */
         suspend fun enqueue(
             context: Context,
             action: NotificationAction,
+            dismissCard: Boolean = true,
         ): Boolean =
             try {
                 WorkManager
                     .getInstance(context.applicationContext)
                     .enqueueUniqueWork(
-                        notificationMarkReadWorkName(action),
+                        notificationMarkReadWorkName(action, dismissCard),
                         ExistingWorkPolicy.KEEP,
-                        notificationMarkReadRequest(action),
+                        notificationMarkReadRequest(action, dismissCard),
                     ).await()
                 true
             } catch (cancel: CancellationException) {
@@ -117,7 +131,11 @@ class NotificationMarkReadWorker(
 
         internal fun shouldRetryAfterFailure(runAttemptCount: Int): Boolean = runAttemptCount < MAX_ATTEMPTS - 1
 
-        internal fun notificationMarkReadWorkName(action: NotificationAction): String {
+        /** Separates explicit card dismissal from cursor-only cleanup for the same message. */
+        internal fun notificationMarkReadWorkName(
+            action: NotificationAction,
+            dismissCard: Boolean = true,
+        ): String {
             val canonical =
                 listOf(
                     action.target.accountRef,
@@ -125,19 +143,53 @@ class NotificationMarkReadWorker(
                     action.target.messageIdHex.orEmpty(),
                 ).joinToString("\u0000")
             val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray())
-            return "notification_mark_read_" +
-                buildString(digest.size * 2) {
-                    digest.forEach { byte -> append("%02x".format(byte.toInt() and 0xff)) }
-                }
+            val suffix = if (dismissCard) "" else "_cursor"
+            return buildString {
+                append("notification_mark_read_")
+                digest.forEach { byte -> append("%02x".format(byte.toInt() and 0xff)) }
+                append(suffix)
+            }
         }
 
-        internal fun notificationMarkReadRequest(action: NotificationAction) =
-            OneTimeWorkRequestBuilder<NotificationMarkReadWorker>()
-                .setInputData(NotificationActionWorkData.encode(action))
+        /** Records whether this action owns card dismissal along with its read cursor. */
+        internal fun notificationMarkReadRequest(
+            action: NotificationAction,
+            dismissCard: Boolean = true,
+        ): OneTimeWorkRequest {
+            val input =
+                Data
+                    .Builder()
+                    .putAll(NotificationActionWorkData.encode(action))
+                    .putBoolean(DISMISS_CARD_KEY, dismissCard)
+                    .build()
+            return OneTimeWorkRequestBuilder<NotificationMarkReadWorker>()
+                .setInputData(input)
                 .setBackoffCriteria(
                     BackoffPolicy.EXPONENTIAL,
                     BACKOFF_DELAY_SECONDS,
                     TimeUnit.SECONDS,
                 ).build()
+        }
     }
+}
+
+/** Defers a denied read independently after a reply or reaction has already been accepted. */
+internal suspend fun markReadAfterNotificationSend(
+    context: Context,
+    appState: WhiteNoiseAppState,
+    action: NotificationAction,
+): Boolean {
+    val markedRead =
+        withContext(Dispatchers.Main.immediate) {
+            appState.markNotificationMessageReadIfAllowed(
+                accountRef = action.target.accountRef,
+                groupIdHex = action.target.groupIdHex,
+                messageIdHex = action.target.messageIdHex.orEmpty(),
+            )
+        }
+    return markedRead ?: NotificationMarkReadWorker.enqueue(
+        context,
+        action.copy(kind = NotificationActionKind.MARK_READ),
+        dismissCard = false,
+    )
 }

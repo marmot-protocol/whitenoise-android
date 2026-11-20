@@ -585,7 +585,6 @@ internal fun WhiteNoiseApp(
         }
     }
 
-    val customEmojiStore = rememberCustomEmojiStore(context)
     val explanationHost = rememberExplanationHostState()
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
     // whole app UI so every descendant text field requests incognito mode from
@@ -594,9 +593,10 @@ internal fun WhiteNoiseApp(
         CompositionLocalProvider(
             LocalPendingCameraCaptureFiles provides mainShellStateHolder.pendingCameraCaptureFiles,
             LocalTopNoticeHost provides topNoticeHost,
-            LocalCustomEmoji provides customEmojiStore.emoji,
+            LocalCustomEmoji provides rememberCustomEmojiStore(context).emoji,
+            LocalHiddenBuiltinEmojiSets provides rememberBuiltinEmojiSetChoices(context).pickerHidden,
             LocalInAppLinkHandler provides inAppLinkHandler,
-            LocalExplanationHost provides explanationHost.show,
+            LocalExplanationHost provides explanationHost,
         ) {
             // Holding a control explains it; the lock drops any open explanation.
             ExplanationSheetHost(explanationHost, visible = !appState.appLock.screenVisible)
@@ -826,9 +826,7 @@ internal fun WhiteNoiseApp(
                         }
                         // Sign Out & Wipe chrome (#350) lives above the phase
                         // router but below the lock privacy boundary.
-                        if (appState.wipeInProgress) {
-                            WipeProgressSheet()
-                        }
+                        if (appState.wipeInProgress) WipeProgressSheet()
                         appState.pendingWipeReport?.let { report ->
                             WipeOutcomeSheet(
                                 report = report,
@@ -843,6 +841,7 @@ internal fun WhiteNoiseApp(
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
     }
+    TtsPlaybackTrustWarningHost(appState)
     // A refused group change waits for the user's answer wherever it was started, even after its screen closed, but
     // only while its account and runtime are current: after a switch it is withdrawn as Wait, never shown to another.
     val groupChangeQuestion = appState.groupChangeConfirmations.pending

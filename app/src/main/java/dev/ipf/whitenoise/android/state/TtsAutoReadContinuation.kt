@@ -84,6 +84,7 @@ internal fun createTtsAutoReadContinuation(appState: WhiteNoiseAppState): TtsAut
             ): Boolean =
                 appState.activeAccountRef == account &&
                     appState.ownsTtsAutoReadSession(group) &&
+                    !appState.ttsEngineNeedsAcknowledgment() &&
                     controller.state.value.sessionId == session
 
             override val appendDeferred: Boolean

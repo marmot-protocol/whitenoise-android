@@ -10,7 +10,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.onGloballyPositioned
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
 
@@ -71,7 +71,10 @@ internal val LocalDictationLauncherOrigin = staticCompositionLocalOf<DictationLa
 /** Read-only shell presentation geometry/clock; no input, draft, audio or session ownership. */
 internal val LocalDictationControlHandoff = staticCompositionLocalOf<MeasuredControlHandoff?> { null }
 
-/** Measures the actual launcher target without cloning its glyph, action, focus or session. */
+/**
+ * Measures the actual launcher target without cloning its glyph, action, focus or session. Global positioning also
+ * follows ancestor scrolls, so the hold hit test never uses a stale rect.
+ */
 @Composable
 internal fun Modifier.dictationLauncherOrigin(): Modifier {
     val origin = LocalDictationLauncherOrigin.current
@@ -81,5 +84,5 @@ internal fun Modifier.dictationLauncherOrigin(): Modifier {
         if (!current) origin?.remove(token)
         onDispose { origin?.remove(token) }
     }
-    return if (current) onPlaced { origin?.report(token, it.boundsInWindow()) } else this
+    return if (current) onGloballyPositioned { origin?.report(token, it.boundsInWindow()) } else this
 }

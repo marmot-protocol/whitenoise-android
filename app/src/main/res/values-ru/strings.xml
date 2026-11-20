@@ -303,6 +303,7 @@
     <string name="chat_row_draft_prefix">Черновик: </string>
     <string name="jump_to_newest">К новым</string>
     <string name="scroll_to_top">Прокрутить вверх</string>
+    <string name="scroll_to_bottom">Прокрутить вниз</string>
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
     <string name="message_discard_still_sending">Это сообщение ещё отправляется. Повторите попытку чуть позже.</string>
     <string name="reply_target_not_sent">Сообщение, на которое вы отвечаете, ещё не отправлено. Дождитесь отправки или нажмите на нём «Повторить», если отправить не удалось, а затем отправьте ответ.</string>
@@ -466,6 +467,16 @@
     <string name="media_attachment">Медиавложение</string>
     <string name="generic_message">Сообщение</string>
     <string name="giphy_media_preview">GIF через GIPHY</string>
+    <string name="giphy_search_title">Поиск GIF</string>
+    <string name="giphy_search_hint">Поиск в GIPHY</string>
+    <string name="giphy_search_privacy">GIPHY получает ваш поисковый запрос, язык и IP-адрес. Телефоны получателей могут автоматически загружать GIF из GIPHY, передавая свой IP-адрес.</string>
+    <string name="giphy_search_powered_by_prefix">Предоставлено</string>
+    <string name="giphy_search_powered_by">Предоставлено GIPHY</string>
+    <string name="giphy_search_empty">GIF не найдены</string>
+    <string name="giphy_search_failed">Не удалось выполнить поиск в GIPHY</string>
+    <string name="giphy_preview_loading">Загрузка предпросмотра</string>
+    <string name="giphy_preview_unavailable">Предпросмотр недоступен</string>
+    <string name="giphy_send_result">Отправить GIF: %1$s</string>
     <string name="waiting_for_stream">Ожидание потока...</string>
     <string name="stream_failed_format">Ошибка потока: %1$s</string>
     <string name="copy_text">Копировать текст</string>
@@ -910,6 +921,7 @@
     <string name="toast_send_emoji_limit">В сообщении слишком много своих эмодзи, поэтому оно не отправлено. Уберите часть и повторите попытку.</string>
     <string name="toast_chat_still_loading">Этот чат ещё загружается. Повторите попытку чуть позже.</string>
     <string name="toast_send_membership_verifying">Проверяем ваше участие в группе — сообщение не отправлено. Оно сохранено в поле ввода; повторите попытку через мгновение.</string>
+    <string name="notification_action_unlock_required">Разблокируйте White Noise и попробуйте снова.</string>
     <string name="toast_reaction_failed">Реакция не удалась</string>
     <string name="toast_couldnt_delete_message">Не удалось удалить сообщение. Попробуйте снова.</string>
     <string name="toast_couldnt_edit_message">Не удалось изменить сообщение</string>
@@ -1017,6 +1029,7 @@
     <string name="hide_private_key">Скрыть закрытый ключ</string>
     <string name="show_private_key">Показать закрытый ключ</string>
     <string name="copy_private_key">Скопировать закрытый ключ</string>
+    <string name="raw_key_export_auth_title">Подтвердите личность для доступа к закрытому ключу</string>
     <string name="export">Экспорт</string>
     <string name="export_encrypted_private_key">Экспорт зашифрованного закрытого ключа</string>
     <string name="keep_your_private_key_safe">Храните свой закрытый ключ в безопасности</string>
@@ -1734,6 +1747,8 @@
     <string name="emoji_sets_installed">Установлен</string>
     <string name="emoji_sets_section_installed">Установленные</string>
     <string name="emoji_sets_section_discover">Обзор</string>
+    <string name="emoji_sets_builtin_shown">Предустановлен · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Скрыт из выбора. По-прежнему виден в сообщениях.</string>
     <string name="emoji_sets_update_available">Доступно обновление</string>
     <string name="emoji_sets_load_image">Загрузить изображение</string>
     <string name="emoji_sets_image_privacy">При загрузке превью или установке набора ваш IP-адрес увидят серверы его изображений.</string>
@@ -2312,6 +2327,7 @@
     <string name="onboarding_signing_in">Вход…</string>
     <string name="onboarding_choose_profile">Выберите профиль</string>
     <string name="onboarding_enter_private_key">Введите закрытый ключ</string>
+    <string name="signup_generated_name_hint">При регистрации предлагается случайное имя. Оставьте его, бросьте кубик, чтобы получить другое, или введите своё.</string>
     <string name="signup_about_prompt">Расскажите о себе</string>
     <string name="signup_preparing_photo">Подготовка фото…</string>
     <string name="signup_publishing_profile">Публикация профиля…</string>

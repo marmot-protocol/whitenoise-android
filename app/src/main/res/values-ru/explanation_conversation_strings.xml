@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Открывает сведения об этом чате, например участников и настройки.</string>
     <string name="explanation_conversation_jump_to_mention">Прокручивает к следующему непрочитанному сообщению, где вас упомянули.</string>
     <string name="explanation_composer_draft_top">Прокручивает черновик к первой строке. Текст не меняется.</string>
+    <string name="explanation_composer_draft_bottom">Прокручивает черновик к последней строке. Текст не меняется.</string>
     <string name="explanation_emoji_search">Ищет эмодзи по названию.</string>
     <string name="explanation_emoji_configure">Открывает настройки, где выбираются эмодзи для быстрых реакций.</string>
 

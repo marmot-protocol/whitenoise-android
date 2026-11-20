@@ -91,9 +91,6 @@ internal suspend fun awaitBootstrapAttempt(
 /** Returns a trimmed non-empty value or null for absent and blank configuration. */
 internal fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
 
-/** Blocks notification mutations whenever the app-lock surface is protecting local state. */
-internal fun notificationActionsAllowed(appLockScreenVisible: Boolean): Boolean = !appLockScreenVisible
-
 /** Builds the account-scoped key used by cached group-member snapshots. */
 internal fun groupMemberSnapshotKey(
     accountRef: String?,

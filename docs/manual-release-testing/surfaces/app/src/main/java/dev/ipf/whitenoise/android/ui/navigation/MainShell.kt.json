@@ -128,6 +128,14 @@
         "test_ids": [
           "CHL-017"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "surface": "A reopened conversation starts from the account's current chat-list row, not a stale list copy",
+        "anchor": "initialChatListRow = conversationEntryChatListRow(openChat, chatsController, accountRef)",
+        "test_ids": [
+          "CON-002"
+        ]
       }
     ]
   },

@@ -31,6 +31,7 @@ private const val REPLY_LOG_GROUP_LENGTH = 8
 /**
  * Sends one notification reply exactly once, reporting an earlier attempt that already committed instead of
  * resending it, and refusing a reply over the outgoing limit before anything is sent.
+ * [refusalAfterRecovery] lets the worker apply its current admission requirements once the recovery read finishes.
  */
 internal suspend fun WhiteNoiseAppState.sendNotificationReply(
     accountRef: String,
@@ -40,6 +41,7 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReply(
     completionStore: NotificationReplyCompletionStore,
     completionKey: String,
     recoveryScope: String,
+    refusalAfterRecovery: () -> NotificationReplySendOutcome?,
 ): NotificationReplySendOutcome {
     val account = accountRef.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
     val group = groupIdHex.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
@@ -77,6 +79,7 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReply(
                     NotificationReplyCommitProbe.NotCommitted -> Unit
                 }
             }
+            refusalAfterRecovery()?.let { return@withGroupCommitLock it }
             // A reply queued before the limit existed may be over it. Refuse it only now, once the
             // probe above has ruled out an earlier attempt that already committed it.
             if (exceedsOutgoingMessageLimit(body)) return@withGroupCommitLock NotificationReplySendOutcome.TooLong
@@ -85,17 +88,37 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReply(
             // second. Wait for the next second before asking MDK to build the
             // event so its random event id cannot sort below the lower bound.
             val recoveryBoundary = notificationReplyRecoveryBoundary(System.currentTimeMillis())
-            val persistedBoundary =
+            val plannedBoundary =
                 withContext(Dispatchers.IO) {
-                    completionStore.markStarted(completionKey, recoveryScope, recoveryBoundary)
-                }
-            if (persistedBoundary == null) return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
-            while (!notificationReplySendWindowReady(persistedBoundary, System.currentTimeMillis())) {
+                    completionStore.plannedBoundary(recoveryScope, recoveryBoundary)
+                } ?: return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
+            while (!notificationReplySendWindowReady(plannedBoundary, System.currentTimeMillis())) {
                 currentCoroutineContext().ensureActive()
                 delay(NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS)
             }
 
-            val summary = marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, group, body) }
+            var refusal = NotificationReplySendOutcome.BlockedByAppLock
+            val summary =
+                marmotIo(MarmotTraceSection.TEXT_SEND) {
+                    if (!appLock.notificationActionsAllowed) return@marmotIo null
+                    val persisted = completionStore.markStarted(completionKey, recoveryScope, plannedBoundary)
+                    if (persisted == null) {
+                        refusal = NotificationReplySendOutcome.RetryableFailure
+                        return@marmotIo null
+                    }
+                    val inWindow = notificationReplySendWindowReady(persisted, System.currentTimeMillis())
+                    if (!inWindow || !appLock.notificationActionsAllowed) {
+                        refusal =
+                            when {
+                                !completionStore.retireUnsentAttempt(completionKey, persisted) ->
+                                    NotificationReplySendOutcome.NonRetryableFailure
+                                !inWindow -> NotificationReplySendOutcome.RetryableFailure
+                                else -> NotificationReplySendOutcome.BlockedByAppLock
+                            }
+                        return@marmotIo null
+                    }
+                    sendText(account, group, body)
+                } ?: return@withGroupCommitLock refusal
             // MDK assigns the app-event id before deciding whether this call
             // can publish it immediately. Persist it before returning either
             // outcome: after a process death, it is our durable proof that an
@@ -142,8 +165,9 @@ internal suspend fun WhiteNoiseAppState.sendNotificationReaction(
         withGroupCommitLock(accountRef, groupIdHex) {
             val summary =
                 marmotIo(MarmotTraceSection.MESSAGE_REACT) {
+                    if (!appLock.notificationActionsAllowed) return@marmotIo null
                     reactToMessage(accountRef, groupIdHex, messageIdHex, emoji)
-                }
+                } ?: return@withGroupCommitLock NotificationReactionSendOutcome.BlockedByAppLock
             notificationReactionOutcome(summary.acceptDisposition)
         }
     }.onFailure {
@@ -214,22 +238,39 @@ private suspend fun WhiteNoiseAppState.notificationReplyCommitState(
     }.getOrDefault(NotificationReplyCommitProbe.Indeterminate)
 }
 
+/** Records read state only when the notification mutation can reach the runtime. */
 suspend fun WhiteNoiseAppState.markNotificationMessageRead(
     accountRef: String,
     groupIdHex: String,
     messageIdHex: String,
-): Boolean {
-    val account = accountRef.takeIf { it.isNotBlank() } ?: return false
-    val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
-    val message = messageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
+): Boolean = markNotificationMessageReadIfAllowed(accountRef, groupIdHex, messageIdHex) == true
+
+/** Null means the runtime-side lock check denied admission and the worker may defer. */
+internal suspend fun WhiteNoiseAppState.markNotificationMessageReadIfAllowed(
+    accountRef: String,
+    groupIdHex: String,
+    messageIdHex: String,
+): Boolean? {
+    if (accountRef.isBlank() || groupIdHex.isBlank() || !ConversationController.HEX_MESSAGE_ID.matches(messageIdHex)) {
+        return false
+    }
     return runCatchingCancellable {
-        // markTimelineMessageRead advances the persisted cursor monotonically;
-        // an old notification tap must not move the read marker backwards.
-        val row = marmotIo { markTimelineMessageRead(account, group, message) }
-        if (!applyChatListRowFromMarkRead(account, row)) {
-            reconcileAccountUnreadAfterNotificationMarkRead(account, cursorAdvanced = row != null)
+        // The native cursor advances monotonically; an old tap cannot move it backwards.
+        val result =
+            marmotIo {
+                if (appLock.notificationActionsAllowed) {
+                    Result.success(markTimelineMessageRead(accountRef, groupIdHex, messageIdHex))
+                } else {
+                    null
+                }
+            }
+        result?.let { admitted ->
+            val row = admitted.getOrThrow()
+            if (!applyChatListRowFromMarkRead(accountRef, row)) {
+                reconcileAccountUnreadAfterNotificationMarkRead(accountRef, cursorAdvanced = row != null)
+            }
+            true
         }
-        true
     }.onFailure {
         if (BuildConfig.DEBUG) Log.w("DMAppState", "notification mark read failed", it)
     }.getOrDefault(false)

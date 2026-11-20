@@ -527,18 +527,21 @@ internal fun ConversationScreen(
         remember(controller, notificationOpenRequestId) {
             controller to notificationOpenRequestId
         }
-    val projectedUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
-    val entryProjectionAvailable = chat.projection != null
+    // The controller row is seeded from the live chat-list row; the open item can predate newer messages.
+    val entryRow =
+        rememberConversationEntryRow(entryUnreadSessionIdentity) { controller.latestChatListRow ?: chat.projection }
+    val entryProjectionAvailable = entryRow != null
+    val projectedUnreadCount = (entryRow?.unreadCount ?: 0uL).coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     val entryUnreadSnapshot =
         rememberConversationEntryUnreadSnapshot(
             controllerIdentity = entryUnreadSessionIdentity,
             projectionUnread = projectedUnreadCount,
-            projectionFirstUnreadMessageId = chat.projection?.firstUnreadMessageIdHex,
+            projectionFirstUnreadMessageId = entryRow?.firstUnreadMessageIdHex,
             projectionAvailable = entryProjectionAvailable,
             // A one-row chat-list seed cannot establish the authoritative unread
             // boundary. Freeze only after MDK's first real page replaces it.
             timeline = if (controller.initialTimelineSeedActive) emptyList() else controller.timeline,
-            readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+            readAnchorMessageId = entryRow?.lastReadMessageIdHex,
         )
     val entryUnreadCount = entryUnreadSnapshot.count
     val entryFirstUnreadMessageId = entryUnreadSnapshot.firstUnreadMessageId
@@ -1297,7 +1300,6 @@ internal fun ConversationScreen(
         controller.canSendMessages &&
             controller.editingMessageId == null &&
             controller.replyingTo == null
-
     val timelineUnderlayEnabled =
         composerGate == ComposerGate.COMPOSER &&
             !selectionMode &&
@@ -1873,9 +1875,8 @@ internal fun ConversationScreen(
             onRejected = { appState.presentAttachmentAdmission(context, acceptedCount = 0, offeredCount = 1) },
         )
 
-    // TakePicture needs no permission of its own, but because CAMERA is declared
-    // in the manifest (for the QR scanner) some OEMs require the runtime grant
-    // before launching the capture intent — request it first if missing.
+    // The in-app camera opens the device camera itself through CameraX, so it
+    // needs the CAMERA runtime grant — request it first if missing.
     val cameraPermissionLauncher =
         rememberOriginGuardedResultLauncher(
             ActivityResultContracts.RequestPermission(),
@@ -3129,7 +3130,7 @@ internal fun ConversationScreen(
             unreadCountDivergenceReport(
                 projectionUnread = projectedUnreadCount,
                 timeline = controller.timeline,
-                readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+                readAnchorMessageId = entryRow?.lastReadMessageIdHex,
             )?.let { report ->
                 logUnreadCountDivergence("DMConversation", report)
             }
@@ -4494,6 +4495,14 @@ internal fun ConversationScreen(
                             } else {
                                 null
                             },
+                        onSearchGifs =
+                            rememberConversationGiphyPicker(
+                                controller,
+                                attachmentOrigin,
+                                composerGate = composerGate,
+                                presentationAvailable = !transcriptRoutedAway && !freezeRoutePresentation,
+                                onAccepted = ::revealSentMessage,
+                            ),
                         onOpenEmojiSettings =
                             if (draftAccountRef != null && draftAccountRef == appState.activeAccountRef) {
                                 { emojiLibraryPages = listOf(ConversationEmojiLibraryPage.Settings) }

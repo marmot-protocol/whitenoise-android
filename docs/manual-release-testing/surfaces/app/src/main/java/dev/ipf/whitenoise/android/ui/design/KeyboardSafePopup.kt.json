@@ -23,6 +23,16 @@
           "SET-024"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/KeyboardSafePopup.kt",
+        "surface": "A composer explanation keeps its bottom at the composer's top edge",
+        "anchor": "internal class AboveWindowYPopupPositionProvider(",
+        "test_ids": [
+          "CON-048"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

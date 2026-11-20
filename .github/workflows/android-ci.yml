@@ -257,6 +257,27 @@ jobs:
       - name: Test DEX method budget reporting
         run: python3 -m unittest scripts/test_dex_method_budget.py
 
+      - name: Check Android translation resources
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 -m unittest scripts.test_translation_worklist
+          # The pull request merge commit's first parent is the current base; the event base SHA can be older.
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            BASE_SHA=$(git rev-parse HEAD^1)
+          fi
+          args=()
+          if [[ -n "$BASE_SHA" ]]; then
+            args+=(--base "$BASE_SHA")
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          python3 -u scripts/translation_worklist.py "${args[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
       - name: Test analytics, invite-localization, media-latency and tooling-test wiring
         run: python3 -m unittest scripts.test_invite_failure_localization scripts.test_media_latency_report scripts.test_product_analytics_config scripts.test_tooling_tests_are_wired
 

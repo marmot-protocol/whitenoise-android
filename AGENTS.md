@@ -76,6 +76,7 @@ Follow [code structure](docs/code-structure.md) and the ownership maps for the
 
 ## Task guides
 
+- [Translations](docs/translating.md): priorities, resource checks, preview locales and release promotion.
 - [Issue/Project triage](.agents/issue-triage.md): follow live Project 7 steering before metadata writes.
 - [MarmotKit adoption](docs/updating-marmotkit.md): artifact pins and API compatibility.
 - [Performance](docs/performance.md) and [analytics](docs/product-analytics.md): measurement and MDK/host boundaries.

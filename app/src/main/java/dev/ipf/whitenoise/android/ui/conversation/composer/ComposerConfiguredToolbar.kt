@@ -73,6 +73,15 @@ internal fun composerToolbarCompactWidth(
 }
 
 /**
+ * Whether [actionCount] actions all keep a visible full-pitch target in a compact row's [room] for actions.
+ * Draft jumps are admitted to a compact row only then, so they never take a core tool's slot.
+ */
+internal fun composerCompactRowFits(
+    room: Float,
+    actionCount: Int,
+): Boolean = room >= actionCount * COMPOSER_SHORTCUT_TARGET_DP + COMPOSER_TOOLBAR_GUTTER_DP
+
+/**
  * Splits the expanded toolbar row between the start and end groups. The end group sits beside Send, so it
  * receives whole target columns sized to its actions and never more; the start group absorbs the spare width.
  * Returns the end group's width; the start group's width is `room - result` when it has actions.
@@ -163,7 +172,7 @@ internal fun ComposerConfiguredToolbar(
     content: @Composable (ComposerShortcut, Modifier) -> Unit,
 ) {
     val scroll = rememberScrollState()
-    val focusTarget = bindings.shortcuts.firstOrNull { it != ComposerShortcut.VoiceNote }
+    val focusTarget = bindings.shortcuts.firstOrNull { it.takesDefaultFocus }
     val latestVoiceBounds by rememberUpdatedState(bindings.onVoiceBounds)
     DisposableEffect(Unit) { onDispose { latestVoiceBounds(null) } }
     val slots: @Composable () -> Unit = {
@@ -230,7 +239,7 @@ private fun composerVoiceBoundsModifier(
         Modifier
     }
 
-/** Holding a configured slot explains it; voice note keeps hold-to-record but TalkBack can still explain it. */
+/** Holding a slot explains it; voice note and dictation keep their hold gestures, TalkBack still explains them. */
 @Composable
 private fun Modifier.explainComposerShortcut(
     shortcut: ComposerShortcut,
@@ -240,7 +249,7 @@ private fun Modifier.explainComposerShortcut(
     return explainOnLongPress(
         explanation = shortcut.explanation(),
         enabled = customizable,
-        holdToExplain = shortcut != ComposerShortcut.VoiceNote,
+        holdToExplain = shortcut != ComposerShortcut.VoiceNote && shortcut != ComposerShortcut.Dictation,
         additionalActions =
             if (customizable) composerCustomizeAccessibilityActions(bindings.onCustomize) else emptyList(),
     )

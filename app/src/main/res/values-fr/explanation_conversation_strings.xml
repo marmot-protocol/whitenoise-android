@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Ouvre les détails de cette conversation, comme ses membres et ses réglages.</string>
     <string name="explanation_conversation_jump_to_mention">Fait défiler jusqu\'au prochain message non lu qui vous mentionne.</string>
     <string name="explanation_composer_draft_top">Ramène le brouillon à sa première ligne. Le texte n\'est pas modifié.</string>
+    <string name="explanation_composer_draft_bottom">Fait défiler le brouillon jusqu\'à sa dernière ligne. Le texte n\'est pas modifié.</string>
     <string name="explanation_emoji_search">Recherche un emoji par son nom.</string>
     <string name="explanation_emoji_configure">Ouvre les réglages où vous choisissez vos emojis de réaction rapide.</string>
 

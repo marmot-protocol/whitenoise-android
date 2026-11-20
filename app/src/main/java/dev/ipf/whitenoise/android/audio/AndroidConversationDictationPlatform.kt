@@ -562,20 +562,20 @@ private class AndroidConversationDictationRecognitionSession(
     /** Requests a final result when no capture acknowledgement is required. */
     override fun stop() = stop {}
 
-    /** Delivers a terminal provider callback only after caller-owned audio has fully closed. */
+    /** Delivers a terminal callback after caller audio closes, queued behind any PipeFailed already posted. */
     private fun deliverAfterCallerAudioCloses(delivery: () -> Unit) {
         if (!callerAudioCapturing) {
             reportCaptureFinished()
             callerAudioCompletionBarrier.deliverImmediately(delivery)
             return
         }
-        val source = callerAudio
-        if (source == null) {
-            // Defensive only: callerAudioCapturing can become true only when this immutable stream starts.
-            callerAudioCompletionBarrier.deliverImmediately(delivery)
-            return
-        }
-        callerAudioCompletionBarrier.deliver(source::onFeedClosed, source::onCaptureClosed, delivery)
+        // Defensive only: callerAudioCapturing can become true only when this immutable stream starts.
+        val source = callerAudio ?: return callerAudioCompletionBarrier.deliverImmediately(delivery)
+        callerAudioCompletionBarrier.deliver(
+            { continuation -> source.endFeedAfterProviderTerminal { mainHandler.post(continuation) } },
+            source::onCaptureClosed,
+            delivery,
+        )
     }
 
     /** Serializes terminal callback decisions with UI actions on Android's main thread. */

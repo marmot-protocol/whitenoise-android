@@ -6,6 +6,8 @@ The side-by-side `dev.ipf.whitenoise.android.preview.pr<PR>` isolated channel is
 
 The preview uses the `preview` environment and `play` distribution. Preview builds therefore omit Zapstore self-update behavior, production telemetry credentials, and production/staging package identities. The launcher label and purple preview icon distinguish them; Settings/About includes the PR number and head SHA in the version name.
 
+For a reviewed candidate, follow the [pinned dispatch command](ci-request-policy.md#request-preview-apks-when-needed).
+
 ## Security boundary
 
 `android-pr-apk.yml` runs PR-controlled Gradle code without repository secrets and uploads unsigned, one-day candidate artifacts. It also uploads a separate one-day optimizer-diagnostic artifact for each built channel containing the checksummed R8 mapping and provenance bound to the same head and unsigned APK digest; the privileged publisher never downloads or processes those diagnostics. `android-pr-preview-publish.yml` runs only the copy stored on the default branch after that workflow succeeds. It confirms the PR is still open at the same internal-repository head SHA, validates checksums, provenance, ZIP shape, a 67,108,848-byte raw APK ceiling, a 512 MiB expanded-size ceiling, package ID, version, PR/SHA version name, and ARM64 contents, then signs the APK as untrusted data without executing it. It verifies the dedicated certificate fingerprint before publishing to Blossom and updating the PR description with install links at the bottom.

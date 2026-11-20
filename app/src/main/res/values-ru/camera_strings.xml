@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In-app camera opened by the composer's Camera action. -->
+    <string name="camera_close">Закрыть камеру</string>
+    <string name="camera_mode_photo">Фото</string>
+    <string name="camera_mode_video">Видео</string>
+    <string name="camera_take_photo">Сделать снимок</string>
+    <string name="camera_start_recording">Начать запись</string>
+    <string name="camera_stop_recording">Остановить запись</string>
+    <string name="camera_switch">Сменить камеру</string>
+    <string name="camera_video_without_sound">Доступ к микрофону выключен, поэтому видео записывается без звука.</string>
+    <string name="camera_capture_failed">Не удалось сохранить. Попробуйте ещё раз.</string>
+</resources>

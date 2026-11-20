@@ -1430,14 +1430,13 @@ class NotificationDeliveryModeRecoveryTest {
         },
     )
 
+    /** Pumps the main looper while waiting for the fixture to publish a real service start request. */
     private suspend fun awaitStart(
         fixture: NotificationBootstrapTestFixture,
         platform: RecordingNativePushFallbackPlatform,
     ) {
         fixture.runWithMainLooperPumping {
-            withTimeout(2_000L) {
-                while (platform.starts.isEmpty()) yield()
-            }
+            withTimeout(10_000L) { platform.awaitFirstStart() }
         }
     }
 

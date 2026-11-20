@@ -158,3 +158,41 @@ check_source_pr '' '[{"number":42,"merged_at":"2026-11-12","merge_commit_sha":"b
 check_source_pr '' '[{"number":42,"merged_at":"2026-11-12","merge_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"number":43,"merged_at":"2026-11-12","merge_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]'
 check_source_pr '' '[]' 1
 check_source_pr '' 'invalid JSON'
+
+# Run the actual resolver with fake PR reads. Refused requests must export no source.
+resolver=$(awk '
+  /^      - name: Resolve exact current internal PR head$/ { step=1; next }
+  step && /^      - name:/ { exit }
+  step && /^        run: \|$/ { script=1; next }
+  script && /^          / { print substr($0, 11) }
+' "$build")
+[[ $resolver == 'set -euo pipefail'* ]]
+export EVENT_NAME=workflow_dispatch REQUESTED_PR_NUMBER=42
+export GITHUB_REPOSITORY=marmot-protocol/whitenoise-android
+export GITHUB_SHA=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+export PR_HEAD=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+export GITHUB_OUTPUT="$fixture/resolver.output" GITHUB_ENV="$fixture/resolver.env"
+gh() {
+  [[ $* == "api repos/$GITHUB_REPOSITORY/pulls/$REQUESTED_PR_NUMBER --jq "* ]] || return 1
+  printf 'open\t%s\t%s\n' "$PR_HEAD" "$GITHUB_REPOSITORY"
+}
+export -f gh
+
+check_resolver() {
+  local label=$1 expected=$2
+  rm -f -- "$GITHUB_OUTPUT" "$GITHUB_ENV"
+  if EXPECTED_HEAD=$3 EXPECTED_WORKFLOW_SHA=$4 bash -c "$resolver"; then
+    [[ $expected == accept ]] || { printf 'Resolver accepted %s\n' "$label" >&2; return 1; }
+    [[ $(cat "$GITHUB_OUTPUT") == "$(printf 'pr_number=42\nhead_sha=%s' "$PR_HEAD")" ]]
+  else
+    [[ $expected == refuse ]] || { printf 'Resolver refused %s\n' "$label" >&2; return 1; }
+    [[ ! -e $GITHUB_OUTPUT && ! -e $GITHUB_ENV ]]
+  fi
+}
+
+check_resolver 'matching pins' accept "$PR_HEAD" "$GITHUB_SHA"
+check_resolver 'legacy dispatch' accept '' ''
+check_resolver 'moved PR head' refuse "$GITHUB_SHA" "$GITHUB_SHA"
+check_resolver 'moved workflow' refuse "$PR_HEAD" "$PR_HEAD"
+check_resolver 'head only' refuse "$PR_HEAD" ''
+check_resolver 'workflow only' refuse '' "$GITHUB_SHA"

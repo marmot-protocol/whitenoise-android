@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.design
 
-import android.os.Build
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
@@ -80,7 +79,7 @@ internal fun AnimatedDropdownMenu(
     val surface = rememberPopupSurfaceMotion(expanded, onDismissRequest)
     if (surface.visible) {
         if (keyboardPreserving) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (platformBackCallbacksEnabled()) {
                 KeyboardSafePopupPlatformBackHandler(
                     priority = OnBackInvokedDispatcher.PRIORITY_OVERLAY,
                     backRegistration = backRegistration,

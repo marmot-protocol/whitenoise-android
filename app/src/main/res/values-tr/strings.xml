@@ -277,6 +277,7 @@
     <string name="chat_row_draft_prefix">Taslak: </string>
     <string name="jump_to_newest">En yeniye atla</string>
     <string name="scroll_to_top">Başa kaydır</string>
+    <string name="scroll_to_bottom">Sona kaydır</string>
     <string name="discard_failed_message">Başarısız mesajı sil</string>
     <string name="message_discard_still_sending">Bu mesaj hâlâ gönderiliyor. Birazdan tekrar deneyin.</string>
     <string name="reply_target_not_sent">Yanıtladığınız mesaj henüz gönderilmedi. Gönderilmesini bekleyin veya gönderilemediyse mesajda Tekrar dene’ye dokunun, ardından yanıtınızı gönderin.</string>
@@ -440,6 +441,16 @@
     <string name="media_attachment">Medya eki</string>
     <string name="generic_message">Mesaj</string>
     <string name="giphy_media_preview">GIPHY üzerinden GIF</string>
+    <string name="giphy_search_title">GIF ara</string>
+    <string name="giphy_search_hint">GIPHY’de ara</string>
+    <string name="giphy_search_privacy">GIPHY aramanızı, dil ayarınızı ve IP adresinizi alır. Alıcıların telefonları GIF’leri GIPHY’den otomatik olarak yükleyerek IP adreslerini paylaşabilir.</string>
+    <string name="giphy_search_powered_by_prefix">Sağlayan</string>
+    <string name="giphy_search_powered_by">GIPHY tarafından sağlanır</string>
+    <string name="giphy_search_empty">GIF bulunamadı</string>
+    <string name="giphy_search_failed">GIPHY’de arama yapılamadı</string>
+    <string name="giphy_preview_loading">Önizleme yükleniyor</string>
+    <string name="giphy_preview_unavailable">Önizleme kullanılamıyor</string>
+    <string name="giphy_send_result">GIF gönder: %1$s</string>
     <string name="waiting_for_stream">Akış bekleniyor...</string>
     <string name="stream_failed_format">Akış başarısız: %1$s</string>
     <string name="copy_text">Metni kopyala</string>
@@ -872,6 +883,7 @@
     <string name="toast_send_emoji_limit">Bu mesajda çok fazla özel emoji var, bu yüzden gönderilmedi. Bazılarını kaldırıp tekrar dene.</string>
     <string name="toast_chat_still_loading">Bu sohbet hâlâ yükleniyor. Birazdan yeniden deneyin.</string>
     <string name="toast_send_membership_verifying">Grup üyeliğin doğrulanıyor — mesajın gönderilmedi. Metin kutusunda saklandı; birazdan tekrar dene.</string>
+    <string name="notification_action_unlock_required">White Noise kilidini açıp tekrar deneyin.</string>
     <string name="toast_reaction_failed">Tepki başarısız oldu</string>
     <string name="toast_couldnt_delete_message">Mesaj silinemedi. Lütfen tekrar deneyin.</string>
     <string name="toast_couldnt_edit_message">Mesaj düzenlenemedi</string>
@@ -977,6 +989,7 @@
     <string name="hide_private_key">Özel anahtarı gizle</string>
     <string name="show_private_key">Özel anahtarı göster</string>
     <string name="copy_private_key">Özel Anahtarı Kopyala</string>
+    <string name="raw_key_export_auth_title">Özel anahtarınıza erişmek için kimliğinizi doğrulayın</string>
     <string name="export">İhracat</string>
     <string name="export_encrypted_private_key">Şifrelenmiş Özel Anahtarı Dışa Aktar</string>
     <string name="keep_your_private_key_safe">Özel Anahtarınızı Güvende Tutun</string>
@@ -1657,6 +1670,8 @@
     <string name="emoji_sets_installed">Yüklendi</string>
     <string name="emoji_sets_section_installed">Yüklü</string>
     <string name="emoji_sets_section_discover">Keşfet</string>
+    <string name="emoji_sets_builtin_shown">Önceden yüklü · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Seçicide gizli. Mesajlarda görünmeye devam eder.</string>
     <string name="emoji_sets_update_available">Güncelleme var</string>
     <string name="emoji_sets_load_image">Önizleme görselini yükle</string>
     <string name="emoji_sets_image_privacy">Önizleme yüklemek veya set kurmak, IP adresinizi setin görsel sunucularıyla paylaşır.</string>
@@ -2236,6 +2251,7 @@
     <string name="onboarding_signing_in">Giriş yapılıyor…</string>
     <string name="onboarding_choose_profile">Profil seç</string>
     <string name="onboarding_enter_private_key">Özel anahtarı girin</string>
+    <string name="signup_generated_name_hint">Kayıt rastgele bir adla başlar. Bu adı koruyabilir, başka bir ad için zar atabilir veya kendi adınızı yazabilirsiniz.</string>
     <string name="signup_about_prompt">Kendinizden bahsedin</string>
     <string name="signup_preparing_photo">Fotoğraf hazırlanıyor…</string>
     <string name="signup_publishing_profile">Profil yayınlanıyor…</string>

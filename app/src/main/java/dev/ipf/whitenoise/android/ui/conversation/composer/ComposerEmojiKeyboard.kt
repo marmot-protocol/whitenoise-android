@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiCategory
+import dev.ipf.whitenoise.android.ui.EmojiPickerTab
 import dev.ipf.whitenoise.android.ui.EmojiSection
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Backspace
@@ -69,10 +71,10 @@ internal fun ComposerEmojiKeyboard(
     gridState: LazyGridState,
     rowState: LazyListState,
     categoryState: LazyListState,
-    activeCategory: EmojiCategory?,
+    activeCategory: EmojiPickerTab?,
     selectionEnabled: Boolean,
     onPick: (String) -> Unit,
-    onCategory: (EmojiCategory) -> Unit,
+    onCategory: (EmojiPickerTab) -> Unit,
     onBackspace: (() -> Unit)?,
     onSearchActiveChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -130,11 +132,11 @@ internal fun ComposerEmojiKeyboard(
 @Suppress("LongParameterList")
 @Composable
 internal fun ComposerEmojiRail(
-    categories: List<EmojiCategory>,
-    selected: EmojiCategory?,
+    categories: List<EmojiPickerTab>,
+    selected: EmojiPickerTab?,
     state: LazyListState,
     onSearch: () -> Unit,
-    onCategory: (EmojiCategory) -> Unit,
+    onCategory: (EmojiPickerTab) -> Unit,
     onBackspace: (() -> Unit)?,
     modifier: Modifier = Modifier,
     onBrowseSets: (() -> Unit)? = null,
@@ -197,7 +199,7 @@ internal fun ComposerEmojiRail(
 
 @Composable
 private fun ComposerEmojiRailToggle(
-    category: EmojiCategory,
+    category: EmojiPickerTab,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -218,10 +220,16 @@ private fun ComposerEmojiRailToggle(
                 .semantics { this.selected = selected }
                 .testTag(emojiPickerCategoryTestTag(category)),
     ) {
-        Icon(
-            painter = painterResource(category.iconRes),
-            contentDescription = stringResource(category.titleRes),
-            modifier = Modifier.size(ComposerEmojiRailIconSize),
-        )
+        EmojiPickerTabIcon(category, ComposerEmojiRailIconSize, LocalContentColor.current)
     }
 }
+
+/**
+ * A focus request emits its own focus callback. Ignore that callback while a
+ * pane-to-IME handoff is already running so it cannot start a second keyboard
+ * request and a second transcript re-anchor.
+ */
+internal fun shouldStartComposerKeyboardRestore(
+    paneOpen: Boolean,
+    keyboardRestorePending: Boolean,
+): Boolean = paneOpen && !keyboardRestorePending

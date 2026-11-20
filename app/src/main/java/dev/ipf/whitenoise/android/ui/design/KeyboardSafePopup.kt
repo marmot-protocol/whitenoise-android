@@ -4,6 +4,7 @@ import android.os.Build
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
+import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -39,9 +40,10 @@ import androidx.compose.ui.window.PopupProperties
 // explicitly here, without re-focusing (which would collapse the IME again):
 //   1. Back dismissal — Popup's dismissOnBackPress is a no-op while the popup is
 //      non-focusable, so a Back press would fall through to the IME/activity
-//      instead of closing the overlay. A host-window overlay-priority callback
-//      closes it before the IME's default-priority callback. Preview/test hosts
-//      without a platform dispatcher fall back to BackHandler.
+//      instead of closing the overlay. Where the platform delivers the app's
+//      callbacks (platformBackCallbacksEnabled), a host-window overlay-priority
+//      callback closes it before the IME's default-priority callback. Elsewhere,
+//      and in preview/test hosts without a platform dispatcher, BackHandler does.
 //   2. Outside-tap click-through — events outside a non-focusable popup are
 //      delivered to the windows beneath it, so a dismiss tap would also activate
 //      the underlying chat content (open a profile, a link, the media viewer,
@@ -93,6 +95,27 @@ internal object BottomAnchoredPopupPositionProvider : PopupPositionProvider {
 }
 
 /**
+ * Bottom-anchors popup content at [bottomY], a host-window y such as the composer's top edge, centered like
+ * [BottomAnchoredPopupPositionProvider]. A [bottomY] below the visible frame, as when the keyboard has just covered
+ * it, falls back to the frame's bottom. Callers bound the content's height, so its top is never pushed off screen.
+ */
+internal class AboveWindowYPopupPositionProvider(
+    private val bottomY: Int,
+) : PopupPositionProvider {
+    /** Centers the content and ends it at [bottomY], or at the visible frame's bottom if that is higher. */
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val x = (windowSize.width - popupContentSize.width) / 2
+        val y = minOf(bottomY, windowSize.height) - popupContentSize.height
+        return IntOffset(x, y)
+    }
+}
+
+/**
  * Registers [callback] at [priority] and returns its unregistration, letting a host route the overlay's
  * Back callback through its own seam instead of the view's [OnBackInvokedDispatcher].
  */
@@ -101,7 +124,7 @@ internal typealias KeyboardSafePopupBackRegistration = (priority: Int, callback:
 /**
  * Shows [content] in a non-focusable popup above a full-window scrim that consumes outside taps as a
  * pure dismissal. [modifier] sizes the zero-content anchor the position provider receives, and
- * [backRegistration] replaces the platform dispatcher as the single Back owner on Android 13+.
+ * [backRegistration] replaces the platform dispatcher as the single Back owner where [platformBackCallbacksEnabled].
  */
 @Composable
 internal fun KeyboardSafePopup(
@@ -120,7 +143,7 @@ internal fun KeyboardSafePopup(
     Box(modifier) {
         // Keep both nonfocusable windows and the scrim until the exit is drawn.
         if (!surface.visible) return@Box
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (platformBackCallbacksEnabled()) {
             KeyboardSafePopupPlatformBackHandler(
                 priority = OnBackInvokedDispatcher.PRIORITY_OVERLAY,
                 backRegistration = backRegistration,
@@ -170,6 +193,14 @@ internal fun KeyboardSafePopup(
         }
     }
 }
+
+/**
+ * Whether the platform delivers the app's own [OnBackInvokedCallback]s. MainActivity opts in with the activity-level
+ * `android:enableOnBackInvokedCallback`, which Android honours from 14. Android 13 reads only the application-level
+ * flag, so it drops those callbacks and sends Back to the activity, where [BackHandler] receives it.
+ */
+@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+internal fun platformBackCallbacksEnabled(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
 /** Registers one overlay Back callback — through [backRegistration] when given, else the view's dispatcher. */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)

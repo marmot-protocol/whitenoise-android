@@ -279,6 +279,7 @@
     <string name="chat_row_draft_prefix">Brouillon : </string>
     <string name="jump_to_newest">Aller au plus récent</string>
     <string name="scroll_to_top">Faire défiler vers le haut</string>
+    <string name="scroll_to_bottom">Faire défiler vers le bas</string>
     <string name="discard_failed_message">Supprimer le message échoué</string>
     <string name="message_discard_still_sending">Ce message est encore en cours d’envoi. Réessayez dans un instant.</string>
     <string name="reply_target_not_sent">Le message auquel vous répondez n’a pas encore été envoyé. Attendez son envoi, ou touchez « Réessayer » sur ce message en cas d’échec, puis envoyez votre réponse.</string>
@@ -442,6 +443,16 @@
     <string name="media_attachment">Pièce jointe multimédia</string>
     <string name="generic_message">Message</string>
     <string name="giphy_media_preview">GIF fourni par GIPHY</string>
+    <string name="giphy_search_title">Rechercher des GIF</string>
+    <string name="giphy_search_hint">Rechercher sur GIPHY</string>
+    <string name="giphy_search_privacy">GIPHY reçoit votre recherche, votre langue et votre adresse IP. Les téléphones des destinataires peuvent charger automatiquement les GIF depuis GIPHY et partager leur adresse IP.</string>
+    <string name="giphy_search_powered_by_prefix">Fourni par</string>
+    <string name="giphy_search_powered_by">Fourni par GIPHY</string>
+    <string name="giphy_search_empty">Aucun GIF trouvé</string>
+    <string name="giphy_search_failed">Impossible de rechercher sur GIPHY</string>
+    <string name="giphy_preview_loading">Chargement de l’aperçu</string>
+    <string name="giphy_preview_unavailable">Aperçu indisponible</string>
+    <string name="giphy_send_result">Envoyer le GIF : %1$s</string>
     <string name="waiting_for_stream">En attente du flux...</string>
     <string name="stream_failed_format">Échec du flux : %1$s</string>
     <string name="copy_text">Copier le texte</string>
@@ -874,6 +885,7 @@
     <string name="toast_send_emoji_limit">Ce message contient trop d\'emoji personnalisés, il n\'a donc pas été envoyé. Retirez-en quelques-uns et réessayez.</string>
     <string name="toast_chat_still_loading">Cette discussion est encore en cours de chargement. Réessayez dans un instant.</string>
     <string name="toast_send_membership_verifying">Vérification de votre appartenance au groupe — votre message n’a pas été envoyé. Il est conservé dans le champ ; réessayez dans un instant.</string>
+    <string name="notification_action_unlock_required">Déverrouillez White Noise et réessayez.</string>
     <string name="toast_reaction_failed">La réaction a échoué</string>
     <string name="toast_couldnt_delete_message">Échec de la suppression du message. Veuillez réessayer.</string>
     <string name="toast_couldnt_edit_message">Impossible de modifier le message</string>
@@ -979,6 +991,7 @@
     <string name="hide_private_key">Masquer la clé privée</string>
     <string name="show_private_key">Afficher la clé privée</string>
     <string name="copy_private_key">Copier la clé privée</string>
+    <string name="raw_key_export_auth_title">Authentifiez-vous pour accéder à votre clé privée</string>
     <string name="export">Exporter</string>
     <string name="export_encrypted_private_key">Exporter la clé privée chiffrée</string>
     <string name="keep_your_private_key_safe">Gardez votre clé privée en sécurité</string>
@@ -1672,6 +1685,8 @@
     <string name="emoji_sets_installed">Installé</string>
     <string name="emoji_sets_section_installed">Installés</string>
     <string name="emoji_sets_section_discover">Découvrir</string>
+    <string name="emoji_sets_builtin_shown">Préinstallé · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Masqué dans le sélecteur. Toujours visible dans les messages.</string>
     <string name="emoji_sets_update_available">Mise à jour disponible</string>
     <string name="emoji_sets_load_image">Charger l’image d’aperçu</string>
     <string name="emoji_sets_image_privacy">Charger un aperçu ou installer un ensemble partage votre adresse IP avec ses hébergeurs d’images.</string>
@@ -2243,6 +2258,7 @@
     <string name="onboarding_signing_in">Connexion…</string>
     <string name="onboarding_choose_profile">Choisir un profil</string>
     <string name="onboarding_enter_private_key">Saisissez la clé privée</string>
+    <string name="signup_generated_name_hint">Un nom aléatoire est proposé à l’inscription. Gardez-le, relancez les dés pour en obtenir un autre ou saisissez le vôtre.</string>
     <string name="signup_about_prompt">Présentez-vous</string>
     <string name="signup_preparing_photo">Préparation de la photo…</string>
     <string name="signup_publishing_profile">Publication du profil…</string>

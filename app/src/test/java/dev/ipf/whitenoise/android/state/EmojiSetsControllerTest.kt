@@ -299,6 +299,17 @@ class EmojiSetsControllerTest {
             assertEquals(listOf(backend.set), controller.state.sets)
         }
 
+    /** The state says when its rows are search results, so the browser can hide the full-library rows. */
+    @Test
+    fun searchResultsAreMarkedUntilTheSearchIsCleared() =
+        runTest {
+            val controller = EmojiSetsController(FakeEmojiSetsBackend()) {}
+            controller.discover("forest")
+            assertTrue(controller.state.searched)
+            controller.discover(" ")
+            assertFalse(controller.state.searched)
+        }
+
     /** An incomplete or failed opening sync reports itself in the list, after any open preview closes. */
     @Test
     fun backgroundSyncNoticeNeverCoversAPreview() =

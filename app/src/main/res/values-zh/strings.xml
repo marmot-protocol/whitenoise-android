@@ -264,6 +264,7 @@
     <string name="chat_row_draft_prefix">草稿：</string>
     <string name="jump_to_newest">跳到最新</string>
     <string name="scroll_to_top">滚动到顶部</string>
+    <string name="scroll_to_bottom">滚动到底部</string>
     <string name="discard_failed_message">丢弃发送失败的消息</string>
     <string name="message_discard_still_sending">此消息仍在发送中。请稍后再试。</string>
     <string name="reply_target_not_sent">你回复的消息尚未发送。请等待它发送完成；如果发送失败，请在该消息上点按“重试”，然后再发送你的回复。</string>
@@ -427,6 +428,16 @@
     <string name="media_attachment">媒体附件</string>
     <string name="generic_message">消息</string>
     <string name="giphy_media_preview">来自 GIPHY 的 GIF</string>
+    <string name="giphy_search_title">搜索 GIF</string>
+    <string name="giphy_search_hint">搜索 GIPHY</string>
+    <string name="giphy_search_privacy">GIPHY 会接收你的搜索内容、语言设置和 IP 地址。收件人的手机可能会自动从 GIPHY 加载 GIF，并分享其 IP 地址。</string>
+    <string name="giphy_search_powered_by_prefix">内容提供方</string>
+    <string name="giphy_search_powered_by">由 GIPHY 提供</string>
+    <string name="giphy_search_empty">未找到 GIF</string>
+    <string name="giphy_search_failed">无法在 GIPHY 中搜索</string>
+    <string name="giphy_preview_loading">正在加载预览</string>
+    <string name="giphy_preview_unavailable">无法预览</string>
+    <string name="giphy_send_result">发送 GIF：%1$s</string>
     <string name="waiting_for_stream">正在等待流...</string>
     <string name="stream_failed_format">流失败：%1$s</string>
     <string name="copy_text">复制文本</string>
@@ -857,6 +868,7 @@
     <string name="toast_send_emoji_limit">此消息的自定义表情太多，因此未发出。请移除一些后重试。</string>
     <string name="toast_chat_still_loading">此聊天仍在加载中，稍后再试。</string>
     <string name="toast_send_membership_verifying">正在确认群组成员身份 — 消息未发送。文字已保留在输入框中，请稍后重试。</string>
+    <string name="notification_action_unlock_required">请解锁 White Noise 后重试。</string>
     <string name="toast_reaction_failed">反应失败</string>
     <string name="toast_couldnt_delete_message">删除消息失败。请重试。</string>
     <string name="toast_couldnt_edit_message">无法编辑消息</string>
@@ -962,6 +974,7 @@
     <string name="hide_private_key">隐藏私钥</string>
     <string name="show_private_key">显示私钥</string>
     <string name="copy_private_key">复制私钥</string>
+    <string name="raw_key_export_auth_title">请验证身份以访问私钥</string>
     <string name="export">导出</string>
     <string name="export_encrypted_private_key">导出加密私钥</string>
     <string name="keep_your_private_key_safe">妥善保管你的私钥</string>
@@ -1640,6 +1653,8 @@
     <string name="emoji_sets_installed">已安装</string>
     <string name="emoji_sets_section_installed">已安装</string>
     <string name="emoji_sets_section_discover">发现</string>
+    <string name="emoji_sets_builtin_shown">预装 · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">已从选择器中隐藏。消息中仍会显示。</string>
     <string name="emoji_sets_update_available">有可用更新</string>
     <string name="emoji_sets_load_image">加载预览图片</string>
     <string name="emoji_sets_image_privacy">加载预览或安装表情包会向其图片服务器暴露你的 IP 地址。</string>
@@ -2203,6 +2218,7 @@
     <string name="onboarding_signing_in">正在登录…</string>
     <string name="onboarding_choose_profile">选择个人资料</string>
     <string name="onboarding_enter_private_key">输入私钥</string>
+    <string name="signup_generated_name_hint">注册时会提供一个随机名字。你可以保留它、掷骰子换一个，或输入自己的名字。</string>
     <string name="signup_about_prompt">介绍一下自己</string>
     <string name="signup_preparing_photo">正在准备照片…</string>
     <string name="signup_publishing_profile">正在发布个人资料…</string>

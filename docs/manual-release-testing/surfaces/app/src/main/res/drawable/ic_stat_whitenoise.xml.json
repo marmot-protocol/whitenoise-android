@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/res/drawable/ic_stat_whitenoise.xml",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Message notification small icon is the enlarged White Noise logo",
+        "source": "app/src/main/res/drawable/ic_stat_whitenoise.xml",
+        "anchor": "android:fillType=\"evenOdd\"",
+        "test_ids": [
+          "NTF-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

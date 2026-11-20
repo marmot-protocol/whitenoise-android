@@ -1,0 +1,129 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationCameraContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "fun ConversationCameraContent(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "CameraTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "fun CameraTopBar(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "CameraBottomControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "fun CameraBottomControls(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "NoSoundNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "fun NoSoundNotice(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "CameraModeSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "fun CameraModeSwitch(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "ShutterButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "fun ShutterButton(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "RecordingTimer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "fun RecordingTimer(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "R.string.camera_close",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_mode_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "R.string.camera_mode_photo",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_mode_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "R.string.camera_mode_video",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_take_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "R.string.camera_take_photo",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_start_recording",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "R.string.camera_start_recording",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_stop_recording",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "R.string.camera_stop_recording",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_switch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "R.string.camera_switch",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:camera_video_without_sound",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationCameraScreen.kt",
+        "anchor": "R.string.camera_video_without_sound",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

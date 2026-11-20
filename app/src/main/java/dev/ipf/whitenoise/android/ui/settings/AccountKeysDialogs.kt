@@ -49,11 +49,15 @@ internal fun ProfileKeysDialogs(
     onExport: (encrypted: Boolean, destination: KeyExportDestination) -> Unit,
     onCopyBackup: () -> Unit,
     onExportBackup: () -> Unit,
+    cancelRawAuthentication: () -> Unit,
 ) {
     if (ui.rawExportDialog && canExport) {
         WhiteNoiseAlertDialog(
             onDismissRequest = ui::cancelExport,
-            onDismissStart = ui::cancelExportPreparation,
+            onDismissStart = {
+                ui.cancelExportPreparation()
+                cancelRawAuthentication()
+            },
             title = { Text(stringResource(R.string.keep_your_private_key_safe)) },
             text = {
                 Text(

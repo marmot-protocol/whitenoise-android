@@ -10,5 +10,6 @@ appId: dev.ipf.whitenoise.android.maestrolab
       text: Copy Private Key
     direction: DOWN
 - tapOn: Copy Private Key
+- runFlow: enter-device-pin.yaml
 # Only native verification reads the generated secret; UI evidence never selects or prints it.
 - assertVisible: Private key hidden
