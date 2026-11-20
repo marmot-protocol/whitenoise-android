@@ -976,7 +976,7 @@ class WhiteNoiseAppState private constructor(
 
     @Volatile
     private var bootstrapCompleted = false
-    private val ttsRefreshMutex = Mutex()
+    internal val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
     private val auditUploadConsent = AuditUploadConsent(preferences)
     val auditUploadConsentRequired: Boolean get() = auditUploadConsent.requiresChoice

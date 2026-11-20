@@ -27,7 +27,8 @@ internal class AndroidTtsSpeechEngine(
     override fun setLanguage(locale: Locale): Int {
         if (retired.get()) return TextToSpeech.LANG_NOT_SUPPORTED
         val status = textToSpeech.setLanguage(locale)
-        if (status < TextToSpeech.LANG_AVAILABLE) return retire(status)
+        if (status == TextToSpeech.LANG_NOT_SUPPORTED) return retire(status)
+        if (status < TextToSpeech.LANG_AVAILABLE) return status
         effectiveLocale = locale
         if (enginePackage.isEmpty()) return status
         val voices = textToSpeech.voices ?: return retire(TextToSpeech.LANG_NOT_SUPPORTED)
@@ -65,7 +66,7 @@ internal class AndroidTtsSpeechEngine(
     private fun selectFrameworkVoice(voice: Voice): Int {
         if (retired.get()) return TextToSpeech.ERROR
         val status = textToSpeech.setVoice(voice)
-        return if (status == TextToSpeech.SUCCESS) status else retire(status)
+        return if (status == TextToSpeech.LANG_NOT_SUPPORTED) retire(status) else status
     }
 
     /** Null cannot distinguish an unavailable voice from framework IPC failure. */
@@ -134,14 +135,16 @@ internal class AndroidTtsSpeechEngine(
         text: String,
         utteranceId: String,
         params: Bundle?,
-    ): Int {
-        if (retired.get()) return TextToSpeech.ERROR
-        if ((enforceOfflineVoice || selectedVoice() != null) && currentFrameworkVoice()?.isInstalledOffline() != true) {
-            return TextToSpeech.ERROR
+    ): Int =
+        when {
+            retired.get() -> TextToSpeech.ERROR
+            (enforceOfflineVoice || selectedVoice() != null) && currentFrameworkVoice()?.isInstalledOffline() != true ->
+                TextToSpeech.ERROR
+            else -> {
+                val status = textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
+                if (status == TextToSpeech.SUCCESS) status else retire(status)
+            }
         }
-        val status = textToSpeech.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
-        return if (status == TextToSpeech.SUCCESS) status else retire(status)
-    }
 
     /** Stops framework synthesis for the active queue. */
     override fun stop() {

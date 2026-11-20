@@ -323,8 +323,9 @@ class TtsEngineResolver(
         if (tts.setAudioAttributes(speechAudioAttributes) != TextToSpeech.SUCCESS) return null
         val configuredLocales = appContext.resources.configuration.locales
         val locale = if (configuredLocales.isEmpty) Locale.getDefault() else configuredLocales[0]
-        val voices = tts.voices ?: return null
-        return applyResolvedVoice(enginePackage, locale, voices, requestedVoice, tts::setVoice) { tts.voice }
+        return tts.voices?.let { voices ->
+            applyResolvedVoice(enginePackage, locale, voices, requestedVoice, tts::setVoice) { tts.voice }
+        }
     }
 
     /** Normalizes framework engine metadata into a stable, label-sorted catalog. */

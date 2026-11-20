@@ -152,6 +152,26 @@ class AndroidTtsSpeechEngineTest {
         assertSame(offline, tts.voice)
     }
 
+    /** A healthy engine can reject a preferred voice while accepting another installed offline voice. */
+    @Test
+    fun normalVoiceRejectionDoesNotRetireTheConnection() {
+        val selected = voice("Selected", Locale.US, 500)
+        val fallback = voice("Fallback", Locale.UK, 300)
+        val tts = VoiceSelectingTextToSpeech(selected, setOf(selected, fallback), rejectedVoices = setOf(selected))
+        var retirements = 0
+        val engine =
+            AndroidTtsSpeechEngine(
+                tts,
+                enginePackage = "engine.a",
+                selectedVoice = { TtsVoiceKey("engine.a", "Selected", "en-US") },
+                onConnectionUncertain = { retirements++ },
+            )
+
+        assertEquals(TextToSpeech.LANG_AVAILABLE, engine.setLanguage(Locale.US))
+        assertSame(fallback, tts.voice)
+        assertEquals(0, retirements)
+    }
+
     /** Refuses a language whose engine exposes only network speech. */
     @Test
     fun networkOnlyLanguageIsRejectedBeforeSpeechSubmission() {
@@ -274,6 +294,7 @@ class AndroidTtsSpeechEngineTest {
     private class VoiceSelectingTextToSpeech(
         initialVoice: Voice,
         private val availableVoices: Set<Voice>,
+        private val rejectedVoices: Set<Voice> = emptySet(),
     ) : TextToSpeech(RuntimeEnvironment.getApplication(), {}) {
         private var activeVoice = initialVoice
 
@@ -288,7 +309,7 @@ class AndroidTtsSpeechEngineTest {
 
         /** Accepts only catalog voices so fallback failures remain observable. */
         override fun setVoice(voice: Voice?): Int {
-            if (voice == null || voice !in availableVoices) return TextToSpeech.ERROR
+            if (voice == null || voice !in availableVoices || voice in rejectedVoices) return TextToSpeech.ERROR
             activeVoice = voice
             return TextToSpeech.SUCCESS
         }
