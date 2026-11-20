@@ -177,6 +177,70 @@ class ComposerCompactResizeTargetsTest {
         assertEquals(0, resizeStarts)
     }
 
+    /** At double font a compact row keeps its core tools and leaves the jumps out at the draft's bottom. */
+    @Test
+    fun doubleFontCompactRowKeepsCoreToolsAtBottomLtr() = verifyCompactJumpsExcluded(LayoutDirection.Ltr, atTop = false)
+
+    /** At double font a compact row keeps its core tools and leaves the jumps out at the draft's top. */
+    @Test
+    fun doubleFontCompactRowKeepsCoreToolsAtTopLtr() = verifyCompactJumpsExcluded(LayoutDirection.Ltr, atTop = true)
+
+    /** Right-to-left double font keeps the core tools and leaves the jumps out at the draft's bottom. */
+    @Test
+    fun doubleFontCompactRowKeepsCoreToolsAtBottomRtl() = verifyCompactJumpsExcluded(LayoutDirection.Rtl, atTop = false)
+
+    /** Right-to-left double font keeps the core tools and leaves the jumps out at the draft's top. */
+    @Test
+    fun doubleFontCompactRowKeepsCoreToolsAtTopRtl() = verifyCompactJumpsExcluded(LayoutDirection.Rtl, atTop = true)
+
+    /** A compact row with room for every action at full pitch admits the jump for the edge it can reach. */
+    @Test
+    fun compactRowWithRoomShowsTheTopJump() {
+        val settings =
+            ComposerToolbarSettings(
+                shortcuts = listOf(ComposerShortcut.JumpTop, ComposerShortcut.JumpBottom),
+                rightShortcuts = setOf(ComposerShortcut.JumpTop, ComposerShortcut.JumpBottom),
+            )
+        render(onAction = {}, onResize = {}, onDelta = {}, toolbar = settings)
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_BOTTOM_TAG).assertDoesNotExist()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/composer_compact_draft_jump_fits.png")
+    }
+
+    /** Renders a crowded compact row at double font and checks the jumps never take a core tool's slot. */
+    private fun verifyCompactJumpsExcluded(
+        direction: LayoutDirection,
+        atTop: Boolean,
+    ) {
+        val settings =
+            ComposerToolbarSettings(
+                shortcuts =
+                    listOf(
+                        ComposerShortcut.Camera,
+                        ComposerShortcut.Gallery,
+                        ComposerShortcut.Files,
+                        ComposerShortcut.Emoji,
+                        ComposerShortcut.JumpTop,
+                        ComposerShortcut.JumpBottom,
+                    ),
+                rightShortcuts = setOf(ComposerShortcut.JumpTop, ComposerShortcut.JumpBottom),
+            )
+        render({}, {}, {}, toolbar = settings, direction = direction, fontScale = 2f, caretAtStart = atTop)
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        if (atTop) assertEquals(0f, scroll(), 0f) else assertTrue(scroll() > 0f)
+        composeRule.onNodeWithContentDescription(context.getString(R.string.attachment_camera)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker)).assertIsDisplayed()
+        for (tag in listOf(COMPOSER_DRAFT_TOP_TAG, COMPOSER_DRAFT_BOTTOM_TAG)) {
+            composeRule.onNodeWithTag(tag).assertDoesNotExist()
+        }
+        val edge = if (atTop) "top" else "bottom"
+        val name = "composer_compact_draft_jumps_double_font_${direction.name.lowercase()}_$edge"
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
+
     /** Places the compact editor below a focusable transcript to exercise shared input boundaries. */
     private fun render(
         onAction: () -> Unit,
@@ -184,12 +248,15 @@ class ComposerCompactResizeTargetsTest {
         onDelta: (Float) -> Unit,
         toolbar: ComposerToolbarSettings? = null,
         direction: LayoutDirection = LayoutDirection.Ltr,
+        fontScale: Float = 1f,
+        caretAtStart: Boolean = false,
     ) {
         val draft = (1..40).joinToString("\n") { "Synthetic compact line $it" }
+        val caret = if (caretAtStart) 0 else draft.length
         composeRule.setContent {
             composerEntryFocus = remember { FocusRequester() }
             inputModeManager = LocalInputModeManager.current
-            WhiteNoiseTheme {
+            WhiteNoiseTheme(fontScale = fontScale) {
                 Surface(Modifier.width(360.dp).height(96.dp)) {
                     Column {
                         Box(
@@ -203,7 +270,7 @@ class ComposerCompactResizeTargetsTest {
                             ComposerPill(
                                 actionColors = accountActionColors(appState = null),
                                 modifier = Modifier.height(48.dp).focusRequester(composerEntryFocus),
-                                textFieldValue = TextFieldValue(draft, TextRange(draft.length)),
+                                textFieldValue = TextFieldValue(draft, TextRange(caret)),
                                 composerFocus = remember { FocusRequester() },
                                 emojiPickerOpen = false,
                                 onValueChange = {},

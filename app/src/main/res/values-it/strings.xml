@@ -279,6 +279,7 @@
     <string name="chat_row_draft_prefix">Bozza: </string>
     <string name="jump_to_newest">Vai al più recente</string>
     <string name="scroll_to_top">Scorri verso l\'alto</string>
+    <string name="scroll_to_bottom">Scorri verso il basso</string>
     <string name="discard_failed_message">Elimina messaggio non riuscito</string>
     <string name="message_discard_still_sending">Questo messaggio è ancora in fase di invio. Riprova tra poco.</string>
     <string name="reply_target_not_sent">Il messaggio a cui stai rispondendo non è ancora stato inviato. Attendi che venga inviato, o tocca «Riprova» sul messaggio se l’invio non è riuscito, poi invia la risposta.</string>

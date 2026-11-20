@@ -100,14 +100,6 @@
         ]
       },
       {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
-        "surface": "Holding the draft scroll-to-top pill explains it",
-        "anchor": "R.string.explanation_composer_draft_top",
-        "test_ids": [
-          "CON-049"
-        ]
-      },
-      {
         "surface": "Empty composer blank-surface tap",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": ".composerBlankSurfaceTap(",
@@ -117,22 +109,6 @@
       }
     ],
     "source_coverage": [
-      {
-        "surface": "Composer compact draft navigation icon",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
-        "anchor": "R.drawable.ic_jump_to_edge",
-        "test_ids": [
-          "CON-017"
-        ]
-      },
-      {
-        "surface": "Composer draft top navigation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
-        "anchor": "R.string.scroll_to_top",
-        "test_ids": [
-          "CON-017"
-        ]
-      },
       {
         "surface": "R.string.attach_options",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",

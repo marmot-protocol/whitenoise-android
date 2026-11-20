@@ -142,7 +142,6 @@ import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
-import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
@@ -175,7 +174,6 @@ internal const val COMPOSER_RESIZE_ACCESSIBILITY_TAG = "composer-resize-accessib
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
 internal const val COMPOSER_EDITOR_VIEWPORT_TAG = "composer-editor-viewport"
-internal const val COMPOSER_DRAFT_TOP_TAG = "composer-draft-top"
 
 private val EditingEditorStartInset = 14.dp
 private val ExpandedEditorEndInset = 14.dp
@@ -695,8 +693,15 @@ internal fun ComposerPill(
         } else {
             primaryTrailingWidth
         }
+    val sendAccessoryWidth = if (sendAccessoryContent != null) 66.dp else 0.dp
+    val compactProtectedWidth = toolbarGeometryPrimaryWidth + minimumDictationWidth + sendAccessoryWidth + 4.dp
+    var draftJumpsAdmitted by remember(scrollOwnerKey) { mutableStateOf(false) }
+    val compactToolRoom = (navigationSurfaceWidth - compactProtectedWidth - compactMinimumTextWidth).value
+    val draftJumpsFit =
+        !multilineControlsSuppressed || composerCompactRowFits(compactToolRoom, toolbar?.shortcuts?.size ?: 0)
+    val admittedToolbar = toolbar?.withDraftJumps(toolbarPreview || draftJumpsAdmitted && draftJumpsFit)
     val toolbarSeparateRow =
-        toolbar?.let {
+        admittedToolbar?.let {
             composerToolbarRequiresSeparateRow(
                 navigationSurfaceWidth.value,
                 it.shortcuts.size,
@@ -713,18 +718,18 @@ internal fun ComposerPill(
             ComposerShortcutSide.Left
         }
     val leadingToolbar =
-        toolbar?.let { bindings ->
+        admittedToolbar?.let { bindings ->
             bindings.copy(shortcuts = bindings.shortcuts.filter { bindings.settings.side(it) == physicalStart })
         }
     val trailingToolbar =
-        toolbar?.let { bindings ->
+        admittedToolbar?.let { bindings ->
             bindings.copy(shortcuts = bindings.shortcuts.filter { bindings.settings.side(it) != physicalStart })
         }
     val groupRoom =
         (navigationSurfaceWidth - toolbarGeometryPrimaryWidth - minimumDictationWidth - ComposerToolbarGutter)
             .coerceAtLeast(ComposerShortcutPitch)
     val defaultFocusOnLeadingToolbar =
-        leadingToolbar?.shortcuts?.any { it != ComposerShortcut.VoiceNote } == true
+        leadingToolbar?.shortcuts?.any { it.takesDefaultFocus } == true
     val leadingCount = leadingToolbar?.shortcuts?.size ?: 0
     val trailingCount = trailingToolbar?.shortcuts?.size ?: 0
     // The end group hugs Send with exactly its own columns; the start group takes the spare width.
@@ -753,10 +758,7 @@ internal fun ComposerPill(
                     composerToolbarCompactWidth(
                         navigationSurfaceWidth.value,
                         leadingCount,
-                        (
-                            toolbarGeometryPrimaryWidth + minimumDictationWidth + rightConfiguredWidth +
-                                if (sendAccessoryContent != null) 66.dp else 0.dp
-                        ).value + 4f,
+                        (compactProtectedWidth + rightConfiguredWidth).value,
                         compactMinimumTextWidth.value,
                     ).dp + ComposerToolbarGutter
                 else -> ComposerShortcutPitch * leadingCount + ComposerToolbarGutter
@@ -768,7 +770,7 @@ internal fun ComposerPill(
         leadingControlsWidth
     val navigationRoom =
         navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth - toolbarGeometryPrimaryWidth -
-            minimumDictationWidth - (if (sendAccessoryContent != null) 66.dp else 0.dp)
+            minimumDictationWidth - sendAccessoryWidth
     // Navigation uses only leftover room after the dictation minimum; reserving it cannot reduce
     // the capped dictation width. Keep this measurement independent of navigation admission.
     val availableDictationWidth =
@@ -1067,14 +1069,15 @@ internal fun ComposerPill(
     var draftTopGeometrySettled by draftTopGeometryState
     // A compact-height row cannot afford another toolbar above it; preserve its editor and core tools.
     val showDraftTop =
-        textFieldValue.text.isNotEmpty() &&
+        toolbar == null &&
+            textFieldValue.text.isNotEmpty() &&
             !geometryTransitionActive &&
             textHeightGeometrySettled &&
             draftTopGeometrySettled &&
             draftStartOffscreen &&
             (
                 !multilineControlsSuppressed ||
-                    navigationRoom >= if (toolbar != null) compactMinimumTextWidth + 44.dp else 40.dp
+                    navigationRoom >= 40.dp
             )
     val topOnSeparateRow = showDraftTop && inputContentVisible && navigationRoom < 40.dp
     val draftTopWidth = if (showDraftTop && inputContentVisible) 40.dp else 0.dp
@@ -1230,6 +1233,19 @@ internal fun ComposerPill(
             draftTopGeometrySettled = true
         }
     }
+    val draftJumpLayoutSettled = draftTopGeometrySettled && textHeightGeometrySettled && !geometryTransitionActive
+    LaunchedEffect(
+        scrollOwnerKey,
+        textFieldValue.text.isEmpty(),
+        draftJumpLayoutSettled,
+        composerScrollState.maxValue > 0,
+    ) {
+        if (textFieldValue.text.isEmpty()) {
+            draftJumpsAdmitted = false
+        } else if (draftJumpLayoutSettled) {
+            draftJumpsAdmitted = composerScrollState.maxValue > 0
+        }
+    }
     val toggleDescription =
         stringResource(
             if (expansionMode == ComposerExpansionMode.FullScreen) {
@@ -1249,35 +1265,14 @@ internal fun ComposerPill(
         } else {
             Modifier.fillMaxHeight()
         }
-    val draftTopAction: @Composable () -> Unit = {
-        ComposerToolbarTargets {
-            IconButton(
-                onClick = {
-                    editorScrollJob?.cancel()
-                    readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
-                    editorScrollJob = editorScrollScope.launch { composerScrollState.scrollTo(0) }
-                },
-                modifier =
-                    Modifier
-                        .width(draftTopWidth)
-                        .height(48.dp)
-                        .testTag(COMPOSER_DRAFT_TOP_TAG)
-                        .explainOnLongPress(
-                            composerExplanation(
-                                R.string.scroll_to_top,
-                                R.string.explanation_composer_draft_top,
-                            ),
-                        ),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_jump_to_edge),
-                    contentDescription = stringResource(R.string.scroll_to_top),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-        }
+    val jumpDraft: (Boolean) -> Unit = { toEnd ->
+        editorScrollJob?.cancel()
+        readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
+        editorScrollJob =
+            editorScrollScope.launch { composerScrollState.scrollTo(if (toEnd) composerScrollState.maxValue else 0) }
     }
+    val draftJumps = remember(composerScrollState) { ComposerDraftJumps(composerScrollState) }
+    val draftTopAction: @Composable () -> Unit = { ComposerLegacyDraftTop(draftTopWidth) { jumpDraft(false) } }
 
     /** Applies the one-line/three-line hysteresis to the measured editor line count. */
 
@@ -1329,7 +1324,7 @@ internal fun ComposerPill(
                             voiceReviewContent == null
                         ) {
                             if (configuredActionsSuppressed ||
-                                (toolbar != null && toolbar.shortcuts.none { it != ComposerShortcut.VoiceNote })
+                                (toolbar != null && toolbar.shortcuts.none { it.takesDefaultFocus })
                             ) {
                                 composerFocus.requestFocus()
                             } else {
@@ -1825,6 +1820,8 @@ internal fun ComposerPill(
                                                     toolbar.enabled &&
                                                     (!toolbar.transactionActive || shortcut == ComposerShortcut.Paste),
                                             preview = toolbarPreview,
+                                            draftJumps = draftJumps,
+                                            onDraftJump = jumpDraft,
                                             pasteKey =
                                                 listOf(
                                                     scrollOwnerKey,
@@ -1989,6 +1986,8 @@ internal fun ComposerPill(
                                                         shortcut == ComposerShortcut.Paste
                                                 ),
                                         preview = toolbarPreview,
+                                        draftJumps = draftJumps,
+                                        onDraftJump = jumpDraft,
                                         pasteKey =
                                             listOf(
                                                 scrollOwnerKey,

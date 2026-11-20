@@ -279,6 +279,7 @@
     <string name="chat_row_draft_prefix">Rascunho: </string>
     <string name="jump_to_newest">Ir para a mais recente</string>
     <string name="scroll_to_top">Rolar para o topo</string>
+    <string name="scroll_to_bottom">Rolar para o fim</string>
     <string name="discard_failed_message">Descartar mensagem com falha</string>
     <string name="message_discard_still_sending">Esta mensagem ainda está sendo enviada. Tente novamente em instantes.</string>
     <string name="reply_target_not_sent">A mensagem à qual você está respondendo ainda não foi enviada. Aguarde o envio, ou toque em «Tentar novamente» nela se o envio falhar, e depois envie sua resposta.</string>
