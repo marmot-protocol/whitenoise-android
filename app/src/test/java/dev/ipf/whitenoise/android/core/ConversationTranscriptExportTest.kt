@@ -305,13 +305,14 @@ class ConversationTranscriptExportTest {
             val file =
                 ConversationTranscriptExport.writeTemporaryFile(
                     cacheDir = root,
+                    accountRef = "account",
                     data = data,
                     groupIdHex = "ab".repeat(32),
                     exportedAt = Instant.parse("2023-11-14T22:13:20Z"),
                 )
 
             assertEquals("transcripts", file.parentFile?.name)
-            assertTrue(file.name.startsWith("whitenoise-transcript-abababab-2023-11-14T22-13-20Z"))
+            assertTrue(file.name.substringAfter("_", "").substringAfter("_").startsWith("whitenoise-transcript-abababab-2023-11-14T22-13-20Z"))
             assertTrue(file.name.endsWith(".json"))
             assertEquals("{\"private\":true}\n", file.readText())
             assertFalse(file.canExecute())
@@ -333,6 +334,7 @@ class ConversationTranscriptExportTest {
             val first =
                 ConversationTranscriptExport.writeTemporaryFile(
                     cacheDir = root,
+                    accountRef = "account",
                     data = "{\"old\":true}\n".toByteArray(StandardCharsets.UTF_8),
                     groupIdHex = "ab".repeat(32),
                     exportedAt = Instant.parse("2023-11-14T22:13:20Z"),
@@ -340,6 +342,7 @@ class ConversationTranscriptExportTest {
             val second =
                 ConversationTranscriptExport.writeTemporaryFile(
                     cacheDir = root,
+                    accountRef = "account",
                     data = "{\"new\":true}\n".toByteArray(StandardCharsets.UTF_8),
                     groupIdHex = "cd".repeat(32),
                     exportedAt = Instant.parse("2023-11-15T22:13:20Z"),

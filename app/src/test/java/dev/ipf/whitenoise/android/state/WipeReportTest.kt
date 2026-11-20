@@ -58,6 +58,15 @@ class WipeReportTest {
         assertTrue(report.stages.none { it.hasIssues })
     }
 
+    /** Host cleanup failures keep a successful native wipe from surfacing as fully clean. */
+    @Test
+    fun failedMediaCleanupAppearsInTheLocalDataStage() {
+        val mediaFailure = WipeFailureItem(null, "Local media cleanup failed")
+        val report = wipeReport(outcome(), mediaFailure)
+        assertFalse(report.clean)
+        assertEquals(listOf(mediaFailure), report.stages.single { it.stage == WipeStage.WipingLocalData }.failures)
+    }
+
     @Test
     fun sumsIssuesAcrossAllStages() {
         val report =

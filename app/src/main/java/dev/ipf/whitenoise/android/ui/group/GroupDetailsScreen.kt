@@ -136,7 +136,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
-import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Check
@@ -172,25 +171,25 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.Locale
 
+/** Shares the exported transcript under its readable filename with a temporary read grant. */
 internal fun conversationTranscriptShareIntent(
     context: Context,
     file: java.io.File,
 ): Intent {
-    val uri = fileProviderUri(context, file)
+    val name = file.name.replaceFirst(Regex("^account_[0-9a-f]{64}_"), "")
+    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file, name)
     val intent =
         Intent(Intent.ACTION_SEND).apply {
             type = "application/json"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, file.name)
-            putExtra(Intent.EXTRA_TITLE, file.name)
+            putExtra(Intent.EXTRA_SUBJECT, name)
+            putExtra(Intent.EXTRA_TITLE, name)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     return Intent.createChooser(intent, null).apply {
@@ -749,10 +748,9 @@ internal fun GroupDetailsScreen(
                     val file = controller.exportConversationTranscriptFile(context.cacheDir) ?: return@launchMutation
                     pendingTranscriptShareFile = file
                     try {
-                        withContext(Dispatchers.Main) {
-                            transcriptShareLauncher.launch(conversationTranscriptShareIntent(context, file))
-                            shareSheetLaunched = true
-                        }
+                        if (!controller.ownsRetainedForegroundPresentation) throw CancellationException("transcript owner changed")
+                        transcriptShareLauncher.launch(conversationTranscriptShareIntent(context, file))
+                        shareSheetLaunched = true
                     } catch (_: ActivityNotFoundException) {
                         pendingTranscriptShareFile = null
                         file.delete()

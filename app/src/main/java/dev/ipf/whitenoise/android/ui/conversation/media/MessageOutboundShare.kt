@@ -13,6 +13,10 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
+import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
+import dev.ipf.whitenoise.android.media.sharedPlaintextSuffix
+import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
 import dev.ipf.whitenoise.android.share.OutboundShareStream
 import dev.ipf.whitenoise.android.share.launchOutboundShare
 import dev.ipf.whitenoise.android.share.outboundShareChooser
@@ -119,7 +123,7 @@ internal suspend fun shareMessageExternally(
         )
     outboundShareChooser(context, shareProbe, chooserTitle)
     val staged =
-        stageMessageShareStreams(context, sources) { source ->
+        stageMessageShareStreams(context, checkNotNull(controller.conversationAccountRef), sources) { source ->
             when (source) {
                 is MessageShareAttachmentSource.Confirmed ->
                     // An explicit Share stages the whole verified file, streamed from MDK's source so a large one is
@@ -139,6 +143,7 @@ internal suspend fun shareMessageExternally(
             }
         }
     launchStagedMessageShare(staged) { streams ->
+        if (!controller.ownsRetainedForegroundPresentation) throw CancellationException("shared message owner changed")
         launchOutboundShare(context, outboundShareIntent(text, streams), chooserTitle)
     }
 }
@@ -151,6 +156,7 @@ internal suspend fun shareMessageExternally(
  */
 internal suspend fun shareAttachmentExternally(
     context: Context,
+    accountRef: String,
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     chooserTitle: String,
@@ -170,7 +176,7 @@ internal suspend fun shareAttachmentExternally(
         )
     outboundShareChooser(context, probe, chooserTitle)
     val source = MessageShareAttachmentSource.Confirmed(attachmentIndex, reference)
-    val staged = stageMessageShareStreams(context, listOf(source)) { plaintext() }
+    val staged = stageMessageShareStreams(context, accountRef, listOf(source)) { plaintext() }
     launchStagedMessageShare(staged) { streams ->
         if (!isCurrent()) throw CancellationException("shared attachment owner changed")
         launchOutboundShare(context, outboundShareIntent(null, streams), chooserTitle)
@@ -243,10 +249,12 @@ internal suspend fun launchStagedMessageShare(
  */
 internal suspend fun stageMessageShareStreams(
     context: Context,
+    accountRef: String,
     sources: List<MessageShareAttachmentSource>,
     resolveSource: suspend (MessageShareAttachmentSource) -> AttachmentPlaintext,
 ): StagedMessageShareStreams {
     if (sources.isEmpty()) return StagedMessageShareStreams(emptyList(), emptyList())
+    val writePermit = captureSharedPlaintextWrite()
     val protectedFiles = mutableListOf<File>()
     var totalBytes = 0L
     try {
@@ -258,10 +266,10 @@ internal suspend fun stageMessageShareStreams(
                 // still closes it. A file lease stats its size and deletes itself on close, so both stay off the
                 // main thread, and the close runs exactly once even when the share is cancelled.
                 try {
-                    withContext(Dispatchers.IO) {
+                    withSharedPlaintextWrite(writePermit) {
                         currentCoroutineContext().ensureActive()
                         totalBytes = boundedShareTotal(totalBytes, plaintext.size)
-                        stageShareFile(context, source, plaintext, protectedFiles)
+                        stageShareFile(context, accountRef, source, plaintext, protectedFiles)
                     }
                 } finally {
                     withContext(NonCancellable + Dispatchers.IO) { plaintext.close() }
@@ -292,6 +300,7 @@ internal suspend fun stageMessageShareStreams(
  */
 private suspend fun stageShareFile(
     context: Context,
+    accountRef: String,
     source: MessageShareAttachmentSource,
     plaintext: AttachmentPlaintext,
     protectedFiles: MutableList<File>,
@@ -302,7 +311,7 @@ private suspend fun stageShareFile(
         check(directory.isDirectory) { "Unable to create outbound share cache" }
         val safeName = safeOutboundFileName(source.fileName)
         val expectedBytes = plaintext.size
-        val file = File.createTempFile("message_", "_$safeName", directory)
+        val file = File.createTempFile("${sharedPlaintextPrefix(accountRef)}message_", sharedPlaintextSuffix(safeName), directory)
         try {
             AttachmentPlaintextCache.requireEntryWithinLimit(file, expectedBytes)
             AttachmentPlaintextCache.protectPublicationFile(file)

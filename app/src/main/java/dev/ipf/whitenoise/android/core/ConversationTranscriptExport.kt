@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
 import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
@@ -117,14 +118,18 @@ object ConversationTranscriptExport {
      * export instead of waiting on a later age-based startup sweep. Returns the
      * number of files removed. Best-effort: unreadable/locked entries are skipped.
      */
-    fun sweepStaleTranscripts(transcriptsDir: File): Int =
+    fun sweepStaleTranscripts(
+        transcriptsDir: File,
+        filePrefix: String = "",
+    ): Int =
         transcriptsDir
             .listFiles()
             .orEmpty()
-            .count { it.isFile && runCatching { it.delete() }.getOrDefault(false) }
+            .count { it.isFile && it.name.startsWith(filePrefix) && runCatching { it.delete() }.getOrDefault(false) }
 
     fun writeTemporaryFile(
         cacheDir: File,
+        accountRef: String,
         data: ByteArray,
         groupIdHex: String,
         exportedAt: Instant = Instant.now(),
@@ -135,8 +140,9 @@ object ConversationTranscriptExport {
         // here is a prior export's orphan, never one being actively shared.
         // (No deleteOnExit fallback: its JVM shutdown hook effectively never
         // runs on a process-killed Android app, so it left cleartext behind.)
-        sweepStaleTranscripts(dir)
-        val file = File.createTempFile(fileNamePrefix(groupIdHex, exportedAt), ".json", dir)
+        val prefix = sharedPlaintextPrefix(accountRef)
+        sweepStaleTranscripts(dir, prefix)
+        val file = File.createTempFile(prefix + fileNamePrefix(groupIdHex, exportedAt), ".json", dir)
         file.writeBytes(data)
         file.setExecutable(false, false)
         return file

@@ -976,14 +976,12 @@ internal fun FileLibraryRow(
                                 scope.launch {
                                     val sharedRow = row
                                     runCatchingCancellable {
-                                        // Streams the whole verified file to the share sheet, whatever its size, as
-                                        // Open and Save do. Leaving the screen cancels this scope, and a row rebound
-                                        // to another attachment opens no share sheet.
                                         shareLibraryFile(
                                             context = context,
+                                            accountRef = checkNotNull(controller.conversationAccountRef),
                                             row = sharedRow,
                                             chooserTitle = shareChooserTitle,
-                                            currentRow = { currentRow },
+                                            currentRow = { if (controller.ownsRetainedForegroundPresentation) currentRow else null },
                                         ) {
                                             attachmentSource(
                                                 controller,
@@ -1019,16 +1017,18 @@ private fun SharedMediaRow.attachmentKey() = messageIdHex to attachmentIndex
  */
 internal suspend fun shareLibraryFile(
     context: Context,
+    accountRef: String,
     row: SharedMediaRow,
     chooserTitle: String,
-    currentRow: () -> SharedMediaRow,
+    currentRow: () -> SharedMediaRow?,
     source: suspend () -> AttachmentPlaintext,
 ) = shareAttachmentExternally(
     context = context,
+    accountRef = accountRef,
     attachmentIndex = row.attachmentIndex,
     reference = row.reference,
     chooserTitle = chooserTitle,
-    isCurrent = { currentRow().attachmentKey() == row.attachmentKey() },
+    isCurrent = { currentRow()?.attachmentKey() == row.attachmentKey() },
     plaintext = source,
 )
 

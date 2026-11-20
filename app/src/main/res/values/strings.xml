@@ -1018,6 +1018,7 @@
     <string name="toast_couldnt_sign_in_account">Couldn\'t sign in to account</string>
     <string name="toast_couldnt_export_nsec">Couldn\'t export secret key</string>
     <string name="wipe">Wipe</string>
+    <string name="wipe_media_cleanup_failed">Some local media files or sharing permissions could not be removed.</string>
     <string name="toast_signed_out_and_wiped">Account wiped from this device</string>
     <string name="toast_couldnt_wipe_account">Couldn\'t wipe account</string>
     <string name="encrypted_backup_strength_too_short">Too short</string>

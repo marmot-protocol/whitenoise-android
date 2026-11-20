@@ -53,11 +53,20 @@ data class WipeReport(
     val clean: Boolean get() = issueCount == 0
 }
 
+/** Carries the native wipe verdict and the user-facing report including Android cleanup. */
+internal data class AccountWipeCompletion(
+    val native: WipeOutcomeFfi,
+    val report: WipeReport,
+)
+
 /**
  * Map the engine's [WipeOutcomeFfi] to the [WipeReport] UI model. Stages map
  * 1:1 to the outcome struct fields, in engine execution order.
  */
-internal fun wipeReport(outcome: WipeOutcomeFfi): WipeReport =
+internal fun wipeReport(
+    outcome: WipeOutcomeFfi,
+    mediaFailure: WipeFailureItem? = null,
+): WipeReport =
     WipeReport(
         stages =
             listOf(
@@ -81,16 +90,17 @@ internal fun wipeReport(outcome: WipeOutcomeFfi): WipeReport =
                     stage = WipeStage.WipingLocalData,
                     completedCount = null,
                     failures =
-                        if (outcome.localCleanup.completed) {
-                            emptyList()
-                        } else {
-                            listOf(
-                                WipeFailureItem(
-                                    subject = null,
-                                    reason = DiagnosticFormatter.redactError(outcome.localCleanup.reason.orEmpty()),
-                                ),
-                            )
-                        },
+                        listOfNotNull(mediaFailure) +
+                            if (outcome.localCleanup.completed) {
+                                emptyList()
+                            } else {
+                                listOf(
+                                    WipeFailureItem(
+                                        subject = null,
+                                        reason = DiagnosticFormatter.redactError(outcome.localCleanup.reason.orEmpty()),
+                                    ),
+                                )
+                            },
                 ),
             ),
     )
@@ -127,6 +137,12 @@ enum class SignOutCompletion {
      */
     SignedOutLocalCleanupIncomplete,
 }
+
+/** Carries the native wipe verdict and the user-facing report including Android cleanup. */
+internal data class AccountWipeCompletion(
+    val native: WipeOutcomeFfi,
+    val report: WipeReport,
+)
 
 /**
  * Map the engine sign-out outcome to the completion the UI toasts about.

@@ -1,45 +1,36 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
+import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
+import dev.ipf.whitenoise.android.media.wipeSharedPlaintext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 /**
- * Wipe the device-side decrypted-media footprint that outlives the
- * in-memory caches: the L2 disk cache (cacheDir/decrypted-media) and the
- * decrypted voice/video plaintext and unsent pasted media that the
- * conversation UI materializes under cacheDir. Used at sign-out, when we
- * treat that footprint as ending with the session. Re-opening a chat after
- * the next sign-in re-downloads from Blossom.
- *
- * Suspends so the sign-out flow can await completion rather than racing a
- * fast re-sign-in against an unfinished wipe. `shared_media` is left to its
- * age-based janitor on purpose: those files can back a live external
- * "open with"/share reader and deleting them out from under it would break
- * an in-progress share.
+ * Wipes the session plaintext caches. Only a destructive wipe also ends FileProvider access to
+ * previously shared files, so ordinary sign-out and leaving a chat preserve active external readers.
  */
-internal suspend fun WhiteNoiseAppState.wipeDecryptedMediaFromDisk() {
-    withContext(Dispatchers.IO) {
+internal suspend fun WhiteNoiseAppState.wipeDecryptedMediaFromDisk(wipedAccountRef: String? = null): Boolean =
+    withContext(NonCancellable + Dispatchers.IO) {
+        var failed = false
+        val onFailure: (String, Throwable) -> Unit = { area, failure ->
+            failed = true
+            appStateDebug { "$area cleanup failed: ${failure.javaClass.simpleName}" }
+        }
         AttachmentCachePublication.onWipeStarted()
         try {
-            // Each target holds decrypted plaintext, so wipe them independently
-            // and best-effort: a failure in one (IO error, locked file) must not
-            // skip the others, and a swallowed failure should still be visible.
-            runCatchingCancellable { clearMediaDiskCaches() }
-                .onFailure {
-                    appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
-                }
-            dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext(appContext.cacheDir) { name, failure ->
-                appStateDebug { "$name plaintext wipe failed: ${failure.readableMessage()}" }
-            }
-            // The single pending-forward entry can hold the wiped account's
-            // message plaintext; a destructive wipe drops it unconditionally.
-            runCatchingCancellable { forwardRequestPersistence.clear() }
-                .onFailure {
-                    appStateDebug { "pending forward request wipe failed: ${it.readableMessage()}" }
-                }
+            runCatching { clearMediaDiskCaches() }.onFailure { onFailure("disk media cache", it) }
+            wipeSessionAttachmentPlaintext(appContext.cacheDir, onFailure)
+            if (wipedAccountRef != null) wipeSharedPlaintext(appContext, wipedAccountRef, onFailure)
+            runCatching { forwardRequestPersistence.clear() }.onFailure { onFailure("pending forward request", it) }
         } finally {
             AttachmentCachePublication.onWipeFinished()
         }
+        failed
     }
-}
+
+/** Maps host cleanup failure to the local-data stage without exposing paths or platform exception text. */
+internal fun WhiteNoiseAppState.localMediaFailure(failed: Boolean): WipeFailureItem? =
+    if (failed) WipeFailureItem(null, appContext.getString(R.string.wipe_media_cleanup_failed)) else null

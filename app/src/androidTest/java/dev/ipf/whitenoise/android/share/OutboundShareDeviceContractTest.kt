@@ -120,7 +120,7 @@ class OutboundShareDeviceContractTest {
         val neighbor = File(directory, "unshared-neighbor.txt").apply { writeText("not shared") }
         try {
             val staged =
-                stageMessageShareStreams(context, sources) { source ->
+                stageMessageShareStreams(context, "account", sources) { source ->
                     AttachmentPlaintext.Bytes(checkNotNull(attachments[source.attachmentIndex].inMemoryBytes))
                 }
             try {
@@ -395,11 +395,11 @@ class OutboundShareDeviceContractTest {
             val staged = mutableListOf<StagedMessageShareStreams>()
             try {
                 staged +=
-                    stageMessageShareStreams(context, confirmed) { source ->
+                    stageMessageShareStreams(context, "account", confirmed) { source ->
                         AttachmentPlaintext.Bytes("sent ${source.attachmentIndex}".encodeToByteArray())
                     }
                 staged +=
-                    stageMessageShareStreams(context, retained) {
+                    stageMessageShareStreams(context, "account", retained) {
                         AttachmentPlaintext.Bytes("voice".encodeToByteArray())
                     }
                 val streams = staged.flatMap { it.streams }

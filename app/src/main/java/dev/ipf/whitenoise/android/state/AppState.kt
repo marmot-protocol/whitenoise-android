@@ -44,7 +44,6 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.RuntimePolicyHooks
@@ -5625,15 +5624,10 @@ class WhiteNoiseAppState private constructor(
         stopTtsForRemovedAccount(account)
     }
 
-    /**
-     * Destructive sign-out: leave MLS groups, delete relay KeyPackages, and
-     * wipe all local state for the active account via Marmot's
-     * [dev.ipf.marmotkit.Marmot.signOutAndWipe]. Returns the structured
-     * outcome so the UI can surface partial failures.
-     */
+    /** Leaves groups, deletes relay KeyPackages and reports native and Android cleanup outcomes. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
-    suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
+    internal suspend fun signOutAndWipeActiveAccount(): AccountWipeCompletion? {
         val requested = activeAccountRef ?: return null
         val runtime = marmotRuntime
         val epoch = runtimeGeneration
@@ -5647,7 +5641,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun signOutAndWipeActiveAccountLocked(wipedRef: String): WipeOutcomeFfi? {
+    private suspend fun signOutAndWipeActiveAccountLocked(wipedRef: String): AccountWipeCompletion? {
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(wipedRef) {
@@ -5663,7 +5657,7 @@ class WhiteNoiseAppState private constructor(
 
     /** The caller holds launcher revocation through cleanup; completed native ownership is published first. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
-    private suspend fun finishRevokedAccountWipe(wipedRef: String): WipeOutcomeFfi? {
+    private suspend fun finishRevokedAccountWipe(wipedRef: String): AccountWipeCompletion? {
         val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
@@ -5704,8 +5698,9 @@ class WhiteNoiseAppState private constructor(
                     "signOutAndWipe kept active account=${wipedRef.take(8)} because engine cleanup did not complete"
                 }
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
-                return outcome
+                return AccountWipeCompletion(outcome, wipeReport(outcome))
             }
+            val mediaWipeFailed = wipeDecryptedMediaFromDisk(wipedRef)
             chatMutePreferences.removeAccount(wipedRef)
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             attachmentCollections.forgetAccount(wipedRef)
@@ -5736,7 +5731,6 @@ class WhiteNoiseAppState private constructor(
                     appStateDebug { "local alert preference cleanup will retry during account retention" }
                 }
             }
-            wipeDecryptedMediaFromDisk()
             if (!clearHiddenMessagesForAccount(wipedRef)) {
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
             }
@@ -5798,7 +5792,7 @@ class WhiteNoiseAppState private constructor(
             notificationNetworkRecovery.resumeIfPending()
             refreshLocalNotificationSettings()
             diagnostics.refresh(marmot())
-            return outcome
+            return AccountWipeCompletion(outcome, wipeReport(outcome, localMediaFailure(mediaWipeFailed)))
         } finally {
             // Backstop: the suppression bracket must not outlive this call
             // whatever throws above — a latched flag would silently disable

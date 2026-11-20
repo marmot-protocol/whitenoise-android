@@ -5,15 +5,20 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.core.ConversationTranscriptTimelineReader
+import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
+import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.time.Instant
 
-/** Exports the current conversation to a local transcript file. */
-internal suspend fun ConversationController.exportConversationTranscriptFile(cacheDir: java.io.File): java.io.File? {
-    val account = conversationAccountRef ?: return null
+/** Exports a transcript to a temporary file owned by the originating account. */
+internal suspend fun ConversationController.exportConversationTranscriptFile(cacheDir: File): File? {
+    val account = conversationAccountRef?.takeIf { ownsRetainedForegroundPresentation } ?: return null
     // One timestamp for the whole export so the JSON `exported_at` and the
     // file name stamp match instead of drifting across two now() reads.
-    val exportedAt = java.time.Instant.now()
+    val exportedAt = Instant.now()
+    val writePermit = captureSharedPlaintextWrite()
     return runCatchingCancellable {
         val messages =
             withContext(Dispatchers.Default) {
@@ -37,9 +42,10 @@ internal suspend fun ConversationController.exportConversationTranscriptFile(cac
                 val document = ConversationTranscriptExport.makeDocument(group, messages, exportedAt)
                 ConversationTranscriptExport.encodeJson(document)
             }
-        withContext(Dispatchers.IO) {
+        withSharedPlaintextWrite(writePermit) {
             ConversationTranscriptExport.writeTemporaryFile(
                 cacheDir = cacheDir,
+                accountRef = account,
                 data = data,
                 groupIdHex = group.groupIdHex,
                 exportedAt = exportedAt,

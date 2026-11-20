@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.media.wipeSharedPlaintext
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -31,12 +32,12 @@ class DocumentAttachmentArtifactTest {
             val reference = reference()
 
             val first =
-                materializeDocumentAttachment(context, "ab".repeat(32), 0, reference) {
+                materializeDocumentAttachment(context, "account", "ab".repeat(32), 0, reference) {
                     loads += 1
                     payload
                 }
             val second =
-                materializeDocumentAttachment(context, "ab".repeat(32), 0, reference) {
+                materializeDocumentAttachment(context, "account", "ab".repeat(32), 0, reference) {
                     error("a reusable artifact must not resolve the attachment again")
                 }
 
@@ -56,17 +57,33 @@ class DocumentAttachmentArtifactTest {
                 )
 
             val first =
-                materializeDocumentAttachment(context, "ab".repeat(32), 0, reference) {
+                materializeDocumentAttachment(context, "account", "ab".repeat(32), 0, reference) {
                     byteArrayOf(1)
                 }
             val second =
-                materializeDocumentAttachment(context, "cd".repeat(32), 0, reference) {
+                materializeDocumentAttachment(context, "account", "cd".repeat(32), 0, reference) {
                     byteArrayOf(2)
                 }
 
             assertTrue(first != second)
             assertArrayEquals(byteArrayOf(1), first.readBytes())
             assertArrayEquals(byteArrayOf(2), second.readBytes())
+        }
+
+    /** A grant surviving eviction cannot point at a later copy staged after the account wipe. */
+    @Test
+    fun evictedDocumentIsRestagedUnderADifferentUriAfterWipe() =
+        runBlocking {
+            val messageId = "ab".repeat(32)
+            val reference = reference()
+            val earlier = materializeDocumentAttachment(context, "account", messageId, 0, reference) { byteArrayOf(1) }
+            assertTrue(earlier.delete())
+
+            wipeSharedPlaintext(context, "account") { _, error -> throw AssertionError(error) }
+
+            val restaged = materializeDocumentAttachment(context, "account", messageId, 0, reference) { byteArrayOf(1) }
+            assertTrue(restaged != earlier)
+            assertArrayEquals(byteArrayOf(1), restaged.readBytes())
         }
 
     private fun reference() =
