@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.state.addAccountRelay
 import dev.ipf.whitenoise.android.state.canRemoveRelay
 import dev.ipf.whitenoise.android.state.loadAccountRelayLists
 import dev.ipf.whitenoise.android.state.publishMissingRelayLists
+import dev.ipf.whitenoise.android.state.refreshAccountRelayLists
 import dev.ipf.whitenoise.android.state.relayAddressAttention
 import dev.ipf.whitenoise.android.state.removeAccountRelay
 import dev.ipf.whitenoise.android.state.restoreDefaultAccountRelays
@@ -168,7 +169,7 @@ internal fun RelaysScreen(
         onOpenRelay = { selectedUrl = it },
         onAdd = { addSheet = true },
         onRefresh = {
-            runPublication(RelayPublicationOperation.Refresh) { account?.let { appState.loadAccountRelayLists(it) } }
+            runPublication(RelayPublicationOperation.Refresh) { account?.let { appState.refreshAccountRelayLists(it) } }
         },
         onPublishMissing = {
             runPublication(RelayPublicationOperation.PublishMissing) { appState.publishMissingRelayLists(account) }

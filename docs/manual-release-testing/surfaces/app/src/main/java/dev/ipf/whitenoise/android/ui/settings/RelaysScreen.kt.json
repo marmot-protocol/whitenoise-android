@@ -461,6 +461,14 @@
         "test_ids": [
           "SET-056"
         ]
+      },
+      {
+        "surface": "Relays Refresh status: relay fetch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "appState.refreshAccountRelayLists(",
+        "test_ids": [
+          "SYS-001"
+        ]
       }
     ]
   },
