@@ -107,6 +107,14 @@
         "test_ids": [
           "SET-051"
         ]
+      },
+      {
+        "surface": "Per-set sections in the composer picker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+        "anchor": "LocalHiddenBuiltinEmojiSets",
+        "test_ids": [
+          "SET-059"
+        ]
       }
     ]
   },

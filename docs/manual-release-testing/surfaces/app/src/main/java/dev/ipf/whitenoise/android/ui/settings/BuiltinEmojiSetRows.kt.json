@@ -1,0 +1,52 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BuiltinEmojiSetRows.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BuiltinEmojiSetIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BuiltinEmojiSetRows.kt",
+        "anchor": "fun BuiltinEmojiSetIcon(",
+        "test_ids": [
+          "SET-059"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Pre-installed emoji set switch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BuiltinEmojiSetRows.kt",
+        "anchor": "fun LazyListScope.builtinEmojiSetRows(",
+        "test_ids": [
+          "SET-059"
+        ]
+      },
+      {
+        "surface": "string:emoji_sets_builtin_shown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BuiltinEmojiSetRows.kt",
+        "anchor": "R.string.emoji_sets_builtin_shown",
+        "test_ids": [
+          "SET-059"
+        ]
+      },
+      {
+        "surface": "string:emoji_sets_builtin_hidden",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BuiltinEmojiSetRows.kt",
+        "anchor": "R.string.emoji_sets_builtin_hidden",
+        "test_ids": [
+          "SET-059"
+        ]
+      },
+      {
+        "surface": "Holding a pre-installed set explains it",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BuiltinEmojiSetRows.kt",
+        "anchor": "R.string.explanation_organize_emoji_builtin_set",
+        "test_ids": [
+          "SET-057",
+          "SET-059"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

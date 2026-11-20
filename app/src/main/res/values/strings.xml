@@ -1961,6 +1961,8 @@
     <string name="emoji_sets_installed">Installed</string>
     <string name="emoji_sets_section_installed">Installed</string>
     <string name="emoji_sets_section_discover">Discover</string>
+    <string name="emoji_sets_builtin_shown">Pre-installed · %1$s</string>
+    <string name="emoji_sets_builtin_hidden">Hidden from picker. Still shows in messages.</string>
     <string name="emoji_sets_update_available">Update available</string>
     <string name="emoji_sets_load_image">Load preview image</string>
     <string name="emoji_sets_image_privacy">Loading a preview or installing a set shares your IP address with its image hosts.</string>

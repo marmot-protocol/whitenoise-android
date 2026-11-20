@@ -19,22 +19,24 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.installedEmojiFixture
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSet
 import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary
 import dev.ipf.whitenoise.android.ui.CustomEmoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.InstalledEmojiPicker
+import dev.ipf.whitenoise.android.ui.InstalledEmojiSetTab
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.RecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -88,10 +90,13 @@ class EmojiPickerRecentsBehaviorTest {
             }
         }
         waitForBrowseGrid()
+        showSmileys()
         composeRule.onNodeWithText("😀").performClick()
         composeRule.waitForIdle()
 
         assertEquals(listOf("😀", "👍", "😂", "🎉"), owner.recents)
+        // The category rail follows Smileys, so scroll the grid back to Recent at its top.
+        composeRule.onNodeWithTag(EMOJI_PICKER_GRID_TEST_TAG).performScrollToIndex(0)
         composeRule.onNodeWithText(string(R.string.emoji_category_recent)).assertIsDisplayed()
     }
 
@@ -286,8 +291,9 @@ class EmojiPickerRecentsBehaviorTest {
             }
         }
         waitForBrowseGrid()
-        composeRule.onNodeWithContentDescription(string(R.string.emoji_name_marmot)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.white_noise)).performClick()
+        // Set tabs and set sections share these names, so pick from the Recent section by position.
+        composeRule.onNodeWithTag(emojiPickerItemTestTag(EmojiCategory.Recent, 0)).performClick()
+        composeRule.onNodeWithTag(emojiPickerItemTestTag(EmojiCategory.Recent, 1)).performClick()
         assertEquals(listOf(":marmot:", ":wn:"), picked)
         assertEquals(picked, used)
         composeRule
@@ -315,11 +321,9 @@ class EmojiPickerRecentsBehaviorTest {
         }
         waitForBrowseGrid()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput(":marmot:")
-        val marmot = string(R.string.emoji_name_marmot)
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithContentDescription(marmot).fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithContentDescription(marmot).performClick()
+        val marmot = emojiPickerItemTestTag(BuiltinEmojiSet.Marmot, 0)
+        composeRule.waitUntil(5_000) { composeRule.onAllNodesWithTag(marmot).fetchSemanticsNodes().isNotEmpty() }
+        composeRule.onNodeWithTag(marmot).performClick()
         assertEquals(":marmot:", picked)
         assertEquals(emptyList<String>(), used)
         composeRule
@@ -422,7 +426,8 @@ class EmojiPickerRecentsBehaviorTest {
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithContentDescription("forest fox").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag(emojiPickerItemTestTag(EmojiCategory.Custom, 0)).performClick()
+        val forest = InstalledEmojiSetTab("forest", "Forest friends", code)
+        composeRule.onNodeWithTag(emojiPickerItemTestTag(forest, 0)).performClick()
         assertEquals(listOf(code), picked)
         assertTrue(reads.isNotEmpty())
         assertTrue(used.isEmpty())
@@ -431,6 +436,7 @@ class EmojiPickerRecentsBehaviorTest {
             installed.value = null
             recents.value = listOf(code)
         }
+        composeRule.onNodeWithTag(emojiPickerHeaderTestTag(forest)).assertDoesNotExist()
         composeRule.onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Custom)).assertDoesNotExist()
         composeRule.onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Recent)).assertDoesNotExist()
     }
@@ -446,11 +452,20 @@ class EmojiPickerRecentsBehaviorTest {
         composeRule.waitForIdle()
     }
 
-    /** Waits until the browse grid is composed. */
+    /** Waits until the catalog has loaded; set sections sit above Smileys, so its header may be off-screen. */
     private fun waitForBrowseGrid() {
         composeRule.waitUntil(5_000) {
-            isDisplayed(string(R.string.emoji_category_smileys_people)) && isDisplayed("😀")
+            composeRule
+                .onAllNodesWithTag(emojiPickerCategoryTestTag(EmojiCategory.SmileysAndPeople))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
+    }
+
+    /** Scrolls the browse grid to Smileys through its category tab. */
+    private fun showSmileys() {
+        composeRule.onNodeWithTag(emojiPickerCategoryTestTag(EmojiCategory.SmileysAndPeople)).performClick()
+        composeRule.waitUntil(5_000) { isDisplayed("😀") }
     }
 
     private fun isDisplayed(text: String): Boolean {

@@ -29,7 +29,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppFontScale
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiCategory
+import dev.ipf.whitenoise.android.ui.LocalHiddenBuiltinEmojiSets
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPaneHorizontalPadding
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
@@ -348,6 +350,8 @@ class EmojiPickerScreenshotTest {
                     LocalLayoutDirection provides layoutDirection,
                     // Search baselines keep the field focused; a steady caret keeps them deterministic.
                     LocalCursorBlinkEnabled provides false,
+                    // These grid baselines predate set sections; EmojiSetPickerScreenshotTest covers them.
+                    LocalHiddenBuiltinEmojiSets provides BuiltinEmojiSet.entries.toSet(),
                 ) {
                     ComposerEmojiPickerPane(
                         height = height,

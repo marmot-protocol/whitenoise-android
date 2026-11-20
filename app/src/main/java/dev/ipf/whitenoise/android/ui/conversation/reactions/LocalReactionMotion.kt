@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -39,7 +38,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -51,7 +49,6 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
@@ -116,34 +113,6 @@ internal fun reactionOverflowAlpha(progress: Float): Float {
 internal fun reactionFlightProgress(progress: Float): Float {
     val travel = (progress / REACTION_TRAVEL_FRACTION).coerceIn(0f, 1f)
     return FastOutSlowInEasing.transform(travel)
-}
-
-/** Matches Image's Fit behavior without stretching decoded rectangular artwork. */
-internal fun reactionArtworkFit(
-    intrinsic: Size,
-    container: Size,
-): Size =
-    if (intrinsic.isSpecified && intrinsic.width > 0f && intrinsic.height > 0f) {
-        val scale = ContentScale.Fit.computeScaleFactor(intrinsic, container)
-        Size(intrinsic.width * scale.scaleX, intrinsic.height * scale.scaleY)
-    } else {
-        container
-    }
-
-/** Image centers the fitted float drawing size using rounded integer alignment. */
-internal fun reactionArtworkFrame(
-    container: Rect,
-    intrinsic: Size,
-    direction: LayoutDirection,
-): Rect {
-    val fit = reactionArtworkFit(intrinsic, container.size)
-    val offset =
-        Alignment.Center.align(
-            IntSize(fit.width.roundToInt(), fit.height.roundToInt()),
-            IntSize(container.width.roundToInt(), container.height.roundToInt()),
-            direction,
-        )
-    return Rect(container.topLeft + Offset(offset.x.toFloat(), offset.y.toFloat()), fit)
 }
 
 /** Inline children use floored constraints and rounded placement within the actual text layout. */
@@ -375,7 +344,8 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
                         target.bounds.center - Offset(targetFontPx / 2f, targetFontPx / 2f),
                         Size(targetFontPx, targetFontPx),
                     )
-                val sourceFrame = reactionArtworkFrame(source, painter.intrinsicSize, direction)
+                val sourceArtwork = reactionGlyphArtwork(source, metrics.first, direction)
+                val sourceFrame = reactionArtworkFrame(sourceArtwork, painter.intrinsicSize, direction)
                 val targetFrame = reactionArtworkFrame(destination, painter.intrinsicSize, direction)
                 val frame = lerp(sourceFrame, targetFrame, travel).translate(-state.origin)
                 translate(frame.left, frame.top) {
