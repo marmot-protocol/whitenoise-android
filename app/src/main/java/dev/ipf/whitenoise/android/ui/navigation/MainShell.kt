@@ -75,7 +75,7 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalRetainedGroupAvatarPixels
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
-import dev.ipf.whitenoise.android.ui.common.WindowWidthClass
+import dev.ipf.whitenoise.android.ui.common.LocalVerticalWindowFold
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.common.rememberRetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScope
@@ -228,9 +228,10 @@ internal fun MainShell(
             mutableStateOf(SettingsHomeViewport.Top)
         }
     var selectedChat by shellStateHolder.selectedChat
-    // At expanded width the chat list stays beside the conversation (#3685). The selection above
-    // stays the single owner of which chat is open, so crossing the breakpoint never moves it.
-    val twoPane = LocalWindowLayout.current.widthClass == WindowWidthClass.Expanded
+    // At expanded width, or across a half-open fold, the chat list stays beside the conversation
+    // (#3685). The selection above stays the single owner of which chat is open, so crossing the
+    // breakpoint or folding never moves it.
+    val twoPane = listBesideConversation(LocalWindowLayout.current, LocalVerticalWindowFold.current)
     val currentTwoPane by rememberUpdatedState(twoPane)
     // Retain the complete outgoing route for the short back-slide. Account pin,
     // controller and decrypted seed are one ownership unit; retaining only the
