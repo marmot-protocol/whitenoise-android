@@ -81,7 +81,7 @@ internal fun WhiteNoiseAppState.isQueuedReactionQuoteCurrent(
         notificationContentInvalidations.removalVersion(update.accountRef) == firstPost.contentRemovalVersion
 
 /** Uses the receiver's stored chat classification even when its chat list is cold. */
-internal suspend fun WhiteNoiseAppState.isStoredDirectNotificationConversation(update: NotificationUpdateFfi): Boolean {
+internal suspend fun WhiteNoiseAppState.isStoredDirectChat(update: NotificationUpdateFfi): Boolean {
     val cachedKind = notificationChatListItem(update)?.projection?.conversationKind
     val kind =
         cachedKind?.takeUnless { it == ChatConversationKindFfi.UNKNOWN }

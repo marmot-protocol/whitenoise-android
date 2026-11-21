@@ -2084,9 +2084,7 @@ class WhiteNoiseAppState private constructor(
                 .orEmpty()
 
         /** Uses the receiver's chat row, including when its chat list is cold or another account is active. */
-        override suspend fun isDirectConversation(update: NotificationUpdateFfi): Boolean {
-            return isStoredDirectNotificationConversation(update)
-        }
+        override suspend fun isDirectConversation(update: NotificationUpdateFfi): Boolean = isStoredDirectChat(update)
 
         override suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind =
             resolveNotificationMediaKind(
