@@ -48,7 +48,8 @@ class GroupDepartureQuestionTest {
     fun aCoAdminLeavesWithOneNativeChange() =
         runBlocking {
             val state = appState(catchingUpRuntime(atomicLeave = true))
-            val result = state.leaveAsAdmin(checkNotNull(state.activeAccountRef), GROUP) { error("A separate demotion would strand the admin") }
+            val account = checkNotNull(state.activeAccountRef)
+            val result = state.leaveAsAdmin(account, GROUP) { error("Unexpected demotion") }
             assertTrue(result)
             val operations = listOf("groupManagementState", "leaveGroup")
             assertEquals(operations, calls.filter { it in operations })
@@ -59,10 +60,12 @@ class GroupDepartureQuestionTest {
     fun atomicLeaveAsksBeforeOverridingANativeCaution() =
         runBlocking {
             checkAtomicDecision(MarmotKitException.GroupCatchingUp(GROUP), "acknowledgeGroupCatchingUp", true)
-            checkAtomicDecision(MarmotKitException.GroupCommitUndelivered(GROUP), "acknowledgeGroupCommitUndelivered", true)
+            val undelivered = MarmotKitException.GroupCommitUndelivered(GROUP)
+            checkAtomicDecision(undelivered, "acknowledgeGroupCommitUndelivered", true)
             checkAtomicDecision(MarmotKitException.GroupCatchingUp(GROUP), "acknowledgeGroupCatchingUp", false)
         }
 
+    /** Exercise the real confirmation with a native refusal and check which operations follow the answer. */
     private suspend fun checkAtomicDecision(
         refusal: MarmotKitException,
         acknowledgement: String,
@@ -78,7 +81,7 @@ class GroupDepartureQuestionTest {
         try {
             awaitWithMainLooper { state.groupChangeConfirmations.pending != null }
             assertEquals(1, calls.count { it == "leaveGroup" })
-            state.groupChangeConfirmations.pending!!.answer(proceed)
+            checkNotNull(state.groupChangeConfirmations.pending).answer(proceed)
             awaitWithMainLooper { leave.isCompleted }
             assertEquals(!proceed, leave.isCancelled)
             if (proceed) assertTrue(leave.await())

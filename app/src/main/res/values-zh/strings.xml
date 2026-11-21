@@ -891,7 +891,7 @@
     <string name="invite_decline_step_down_message">此邀请让你成为管理员。要拒绝，你会先退出管理员身份，群组成员会看到你已退出。</string>
     <string name="invite_decline_step_down_confirm">退出管理员并拒绝</string>
     <string name="invite_decline_all_devices_title">在你的所有设备上拒绝？</string>
-    <string name="invite_decline_all_devices_message">拒绝后，此账号会在所有已关联的设备上退出该聊天。要回来需要新的邀请。</string>
+    <string name="invite_decline_all_devices_message">拒绝后，你会在所有关联设备上退出此聊天，即使你已经在其中一台设备上加入。要重新加入，需要新的邀请。</string>
     <string name="toast_chat_archived">聊天记录已存档</string>
     <string name="toast_chat_restored">聊天已恢复</string>
     <string name="toast_couldnt_update_chat">无法更新聊天</string>
@@ -2009,13 +2009,13 @@
     <string name="setup_continue_without_profile">不添加个人资料，继续</string>
     <string name="setup_review_suggested_changes">查看建议的更改</string>
     <string name="setup_chats_on_this_device">此设备上的聊天</string>
-    <string name="setup_device_none_found">我们没有发现来自其他应用或设备的消息密钥。</string>
-    <string name="setup_device_unchecked">我们无法确认此账号是否在其他应用或设备上收发消息。</string>
-    <string name="setup_device_found_on_date">我们发现此账号曾从其他应用或设备发布消息密钥，最近一次发布于 %1$s。</string>
-    <string name="setup_device_found">我们发现此账号曾从其他应用或设备发布消息密钥。</string>
+    <string name="setup_device_none_found">我们没有发现你在其他设备或应用上登录过的迹象。</string>
+    <string name="setup_device_unchecked">未能完成对其他登录记录的检查。</string>
+    <string name="setup_device_found_on_date">你似乎曾在其他设备或应用上登录过这个账号。</string>
+    <string name="setup_device_found">你似乎曾在其他设备或应用上登录过这个账号。</string>
     <string name="setup_device_separate_chats">此设备将拥有自己独立的聊天。另一个应用中的聊天会留在那里，不会显示在这里。</string>
     <string name="setup_device_new_chats_either_app">当有人与你开始新的聊天时，聊天可能出现在任一应用中。</string>
-    <string name="setup_device_separate_chats_if_other_app">如果你使用其他应用收发消息，此设备将拥有自己独立的聊天，那个应用中的聊天不会显示在这里。</string>
+    <string name="setup_device_separate_chats_if_other_app">其他应用里的聊天不会自动出现在这里。</string>
     <string name="setup_device_stage">设备使用</string>
     <string name="setup_approval_saved_pending">您的批准已保存。变更仍在等待中。</string>
     <string name="setup_profile_scope_help">这会更新您在其他 Nostr 应用程序中的个人资料。</string>

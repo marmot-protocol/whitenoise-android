@@ -908,7 +908,7 @@
     <string name="invite_decline_step_down_message">Questo invito ti rende admin. Per rifiutarlo, rinuncerai prima al ruolo admin e i membri del gruppo lo vedranno.</string>
     <string name="invite_decline_step_down_confirm">Rinuncia e rifiuta</string>
     <string name="invite_decline_all_devices_title">Rifiutare su tutti i tuoi dispositivi?</string>
-    <string name="invite_decline_all_devices_message">Rifiutando, questo account esce dalla chat su tutti i dispositivi collegati. Per tornare ti servirà un nuovo invito.</string>
+    <string name="invite_decline_all_devices_message">Se rifiuti, uscirai dalla chat su tutti i tuoi dispositivi collegati, anche se hai già partecipato da uno di essi. Per rientrare servirà un nuovo invito.</string>
     <string name="toast_chat_archived">Chat archiviata</string>
     <string name="toast_chat_restored">Chat ripristinata</string>
     <string name="toast_couldnt_update_chat">Impossibile aggiornare la chat</string>
@@ -2049,13 +2049,13 @@
     <string name="setup_continue_without_profile">Continua senza un profilo</string>
     <string name="setup_review_suggested_changes">Esamina le modifiche suggerite</string>
     <string name="setup_chats_on_this_device">Chat su questo dispositivo</string>
-    <string name="setup_device_none_found">Non abbiamo trovato chiavi di messaggistica di un’altra app o di un altro dispositivo.</string>
-    <string name="setup_device_unchecked">Non è stato possibile verificare se questo account usa un’altra app o un altro dispositivo per i messaggi.</string>
-    <string name="setup_device_found_on_date">Abbiamo trovato chiavi di messaggistica pubblicate da questo account da un’altra app o da un altro dispositivo, le più recenti il %1$s.</string>
-    <string name="setup_device_found">Abbiamo trovato chiavi di messaggistica pubblicate da questo account da un’altra app o da un altro dispositivo.</string>
+    <string name="setup_device_none_found">Non abbiamo trovato segni di un accesso su un altro dispositivo o in un’altra app.</string>
+    <string name="setup_device_unchecked">Non siamo riusciti a completare la verifica degli altri accessi.</string>
+    <string name="setup_device_found_on_date">Sembra che tu abbia già effettuato l’accesso a questo account su un altro dispositivo o in un’altra app.</string>
+    <string name="setup_device_found">Sembra che tu abbia già effettuato l’accesso a questo account su un altro dispositivo o in un’altra app.</string>
     <string name="setup_device_separate_chats">Questo dispositivo avrà chat proprie e separate. Le chat nell’altra app restano lì e non appariranno qui.</string>
     <string name="setup_device_new_chats_either_app">Quando qualcuno inizia una nuova chat con te, può arrivare in una delle due app.</string>
-    <string name="setup_device_separate_chats_if_other_app">Se usi un’altra app per i messaggi, questo dispositivo avrà chat proprie e separate, e le chat di quell’app non appariranno qui.</string>
+    <string name="setup_device_separate_chats_if_other_app">Se hai chat in un’altra app, non appariranno qui automaticamente.</string>
     <string name="setup_device_stage">Utilizzo del dispositivo</string>
     <string name="setup_approval_saved_pending">La tua approvazione è salvata. La modifica è ancora in sospeso.</string>
     <string name="setup_profile_scope_help">Questo aggiorna il tuo profilo in altre app Nostr.</string>

@@ -908,7 +908,7 @@
     <string name="invite_decline_step_down_message">Esta invitación te hace admin. Para rechazarla, primero dejarás de ser admin y los miembros del grupo lo verán.</string>
     <string name="invite_decline_step_down_confirm">Dejar de ser admin y rechazar</string>
     <string name="invite_decline_all_devices_title">¿Rechazar en todos tus dispositivos?</string>
-    <string name="invite_decline_all_devices_message">Al rechazar, esta cuenta sale del chat en todos los dispositivos vinculados. Necesitarás una nueva invitación para volver.</string>
+    <string name="invite_decline_all_devices_message">Si rechazas la invitación, saldrás del chat en todos tus dispositivos vinculados, aunque ya te hayas unido desde uno de ellos. Necesitarás otra invitación para volver.</string>
     <string name="toast_chat_archived">Chat archivado</string>
     <string name="toast_chat_restored">Chat restaurado</string>
     <string name="toast_couldnt_update_chat">No se pudo actualizar el chat</string>
@@ -2049,13 +2049,13 @@
     <string name="setup_continue_without_profile">Continuar sin perfil</string>
     <string name="setup_review_suggested_changes">Revisar los cambios sugeridos</string>
     <string name="setup_chats_on_this_device">Chats en este dispositivo</string>
-    <string name="setup_device_none_found">No encontramos claves de mensajería de otra app u otro dispositivo.</string>
-    <string name="setup_device_unchecked">No pudimos comprobar si esta cuenta usa otra app u otro dispositivo para mensajes.</string>
-    <string name="setup_device_found_on_date">Encontramos claves de mensajería que esta cuenta publicó desde otra app u otro dispositivo; las más recientes, el %1$s.</string>
-    <string name="setup_device_found">Encontramos claves de mensajería que esta cuenta publicó desde otra app u otro dispositivo.</string>
+    <string name="setup_device_none_found">No encontramos indicios de que hayas iniciado sesión en otro dispositivo u otra aplicación.</string>
+    <string name="setup_device_unchecked">No pudimos terminar de comprobar si hubo otros inicios de sesión.</string>
+    <string name="setup_device_found_on_date">Parece que ya has iniciado sesión en esta cuenta desde otro dispositivo u otra aplicación.</string>
+    <string name="setup_device_found">Parece que ya has iniciado sesión en esta cuenta desde otro dispositivo u otra aplicación.</string>
     <string name="setup_device_separate_chats">Este dispositivo tendrá sus propios chats, separados. Los chats de la otra app se quedan allí y no aparecerán aquí.</string>
     <string name="setup_device_new_chats_either_app">Cuando alguien inicie un chat nuevo contigo, puede llegar a cualquiera de las dos apps.</string>
-    <string name="setup_device_separate_chats_if_other_app">Si usas otra app para mensajes, este dispositivo tendrá sus propios chats, separados, y los chats de esa app no aparecerán aquí.</string>
+    <string name="setup_device_separate_chats_if_other_app">Si tienes chats en otra aplicación, no aparecerán aquí automáticamente.</string>
     <string name="setup_device_stage">Uso del dispositivo</string>
     <string name="setup_approval_saved_pending">Tu aprobación está guardada. El cambio sigue pendiente.</string>
     <string name="setup_profile_scope_help">Esto actualiza su perfil en otras aplicaciones de Nostr.</string>

@@ -101,8 +101,8 @@ class InviteDeclineAllDevicesDialogScreenshotTest {
         composeRule.onNodeWithText("Decline on all your devices?").assertIsDisplayed()
         composeRule
             .onNodeWithText(
-                "Declining takes this account out of the chat on every linked device. " +
-                    "You’ll need a new invitation to come back.",
+                "Declining removes you from this chat on all your linked devices, even if you already joined on one. " +
+                    "You’ll need a new invitation to rejoin.",
             ).assertIsDisplayed()
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/invite_decline_all_devices_$name.png")
 

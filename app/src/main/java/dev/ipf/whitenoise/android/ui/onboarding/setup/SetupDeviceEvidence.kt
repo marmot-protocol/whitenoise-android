@@ -5,9 +5,7 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingSingleDeviceNoticeFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
-import java.time.format.FormatStyle
 
 /** What MDK's device check found, which the "Chats on this device" step states before explaining what it means. */
 internal sealed interface SetupDeviceEvidence {
@@ -17,35 +15,18 @@ internal sealed interface SetupDeviceEvidence {
     /** The check could not tell whether this account uses another app or device for messaging. */
     data object Unchecked : SetupDeviceEvidence
 
-    /** Another installation published messaging keys, last at [latestPublishedAtSeconds] when that is known. */
-    data class OtherApps(
-        val latestPublishedAtSeconds: Long?,
-    ) : SetupDeviceEvidence
+    /** A record associated with the account was published outside this installation. */
+    data object OtherApps : SetupDeviceEvidence
 }
 
-/**
- * The evidence in MDK's device [notice], or null before MDK has checked. Relays supply the publication dates, so a
- * missing (zero) date and one after [nowSeconds] are skipped rather than shown.
- */
-internal fun setupDeviceEvidence(
-    notice: OnboardingSingleDeviceNoticeFfi?,
-    nowSeconds: Long,
-): SetupDeviceEvidence? =
+/** Classifies the sign-in evidence without treating a record’s publication time as the time of a sign-in. */
+internal fun setupDeviceEvidence(notice: OnboardingSingleDeviceNoticeFfi?): SetupDeviceEvidence? =
     when (notice?.discovery) {
         null -> null
         OnboardingDeviceDiscoveryFfi.NONE_FOUND -> SetupDeviceEvidence.NoneFound
         OnboardingDeviceDiscoveryFfi.UNKNOWN -> SetupDeviceEvidence.Unchecked
-        OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE -> {
-            val published = notice.otherPackages.map { it.publishedAt }.filter { it in 1uL..nowSeconds.toULong() }
-            SetupDeviceEvidence.OtherApps(published.maxOrNull()?.toLong())
-        }
+        OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE -> SetupDeviceEvidence.OtherApps
     }
-
-/** Whether the evidence names the day another installation last published, which MDK's own finding never does. */
-internal fun SetupDeviceEvidence?.namesPublicationDate(): Boolean {
-    val otherApps = this as? SetupDeviceEvidence.OtherApps
-    return otherApps?.latestPublishedAtSeconds != null
-}
 
 /**
  * What this sign-in means for the user's chats. Each sign-in is a separate installation with its own chats, so the
@@ -59,7 +40,7 @@ internal fun setupDeviceExplanation(
 ): List<Int> =
     when (evidence) {
         SetupDeviceEvidence.NoneFound -> emptyList()
-        is SetupDeviceEvidence.OtherApps ->
+        SetupDeviceEvidence.OtherApps ->
             if (linkedDevices) {
                 listOf(R.string.setup_device_link_next)
             } else {
@@ -68,20 +49,11 @@ internal fun setupDeviceExplanation(
         SetupDeviceEvidence.Unchecked, null -> listOf(R.string.setup_device_separate_chats_if_other_app)
     }
 
-/** The sentence stating [evidence], naming the latest publication as a long local date when one is known. */
+/** The sign-in finding shown for this discovery. */
 @Composable
 internal fun setupDeviceFinding(evidence: SetupDeviceEvidence): String =
     when (evidence) {
         SetupDeviceEvidence.NoneFound -> stringResource(R.string.setup_device_none_found)
         SetupDeviceEvidence.Unchecked -> stringResource(R.string.setup_device_unchecked)
-        is SetupDeviceEvidence.OtherApps ->
-            evidence.latestPublishedAtSeconds?.let {
-                stringResource(R.string.setup_device_found_on_date, longLocalDate(it))
-            } ?: stringResource(R.string.setup_device_found)
+        SetupDeviceEvidence.OtherApps -> stringResource(R.string.setup_device_found)
     }
-
-/** [epochSeconds] as the long date in the device's time zone and locale. */
-private fun longLocalDate(epochSeconds: Long): String {
-    val stamp = epochSeconds.toULong()
-    return IdentityFormatter.dateTime(stamp, dateStyle = FormatStyle.LONG, timeStyle = null)
-}

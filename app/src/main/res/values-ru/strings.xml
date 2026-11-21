@@ -944,7 +944,7 @@
     <string name="invite_decline_step_down_message">По этому приглашению вы админ. Чтобы отклонить его, вы сначала сложите права админа, и участники группы это увидят.</string>
     <string name="invite_decline_step_down_confirm">Сложить права и отклонить</string>
     <string name="invite_decline_all_devices_title">Отклонить на всех ваших устройствах?</string>
-    <string name="invite_decline_all_devices_message">Если отклонить, этот аккаунт выйдет из чата на всех связанных устройствах. Чтобы вернуться, понадобится новое приглашение.</string>
+    <string name="invite_decline_all_devices_message">Если вы отклоните приглашение, то покинете чат на всех привязанных устройствах, даже если уже вступили в него на одном из них. Для возвращения понадобится новое приглашение.</string>
     <string name="toast_chat_archived">Чат в архиве</string>
     <string name="toast_chat_restored">Чат восстановлен</string>
     <string name="toast_couldnt_update_chat">Не удалось обновить чат</string>
@@ -2118,13 +2118,13 @@
     <string name="setup_continue_without_profile">Продолжить без профиля</string>
     <string name="setup_review_suggested_changes">Просмотрите предлагаемые изменения</string>
     <string name="setup_chats_on_this_device">Чаты на этом устройстве</string>
-    <string name="setup_device_none_found">Мы не нашли ключи для сообщений из другого приложения или с другого устройства.</string>
-    <string name="setup_device_unchecked">Не удалось проверить, использует ли этот аккаунт другое приложение или устройство для сообщений.</string>
-    <string name="setup_device_found_on_date">Мы нашли ключи для сообщений, которые этот аккаунт опубликовал из другого приложения или с другого устройства, последние — %1$s.</string>
-    <string name="setup_device_found">Мы нашли ключи для сообщений, которые этот аккаунт опубликовал из другого приложения или с другого устройства.</string>
+    <string name="setup_device_none_found">Мы не нашли признаков того, что вы входили на другом устройстве или в другом приложении.</string>
+    <string name="setup_device_unchecked">Не удалось завершить проверку других входов.</string>
+    <string name="setup_device_found_on_date">Похоже, вы уже входили в этот аккаунт на другом устройстве или в другом приложении.</string>
+    <string name="setup_device_found">Похоже, вы уже входили в этот аккаунт на другом устройстве или в другом приложении.</string>
     <string name="setup_device_separate_chats">На этом устройстве будут свои, отдельные чаты. Чаты в другом приложении останутся там и здесь не появятся.</string>
     <string name="setup_device_new_chats_either_app">Когда кто-то начнёт с вами новый чат, он может прийти в любое из двух приложений.</string>
-    <string name="setup_device_separate_chats_if_other_app">Если вы пользуетесь другим приложением для сообщений, на этом устройстве будут свои, отдельные чаты, а чаты из того приложения здесь не появятся.</string>
+    <string name="setup_device_separate_chats_if_other_app">Чаты из другого приложения не появятся здесь автоматически.</string>
     <string name="setup_device_stage">Использование устройства</string>
     <string name="setup_approval_saved_pending">Ваше одобрение сохранено. Изменение все еще ожидается.</string>
     <string name="setup_profile_scope_help">Это обновит ваш профиль в других приложениях Nostr.</string>

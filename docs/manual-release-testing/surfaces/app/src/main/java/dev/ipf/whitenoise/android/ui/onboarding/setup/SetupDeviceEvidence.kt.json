@@ -44,14 +44,6 @@
         ]
       },
       {
-        "surface": "Device-step finding: found on a date",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
-        "anchor": "R.string.setup_device_found_on_date",
-        "test_ids": [
-          "ONB-018"
-        ]
-      },
-      {
         "surface": "Device-step finding: found",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
         "anchor": "R.string.setup_device_found",

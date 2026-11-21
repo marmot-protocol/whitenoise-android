@@ -1250,7 +1250,7 @@
     <string name="invite_decline_step_down_message">This invitation makes you an admin. To decline, you’ll step down as admin first, and the group’s members will see that you stepped down.</string>
     <string name="invite_decline_step_down_confirm">Step down and decline</string>
     <string name="invite_decline_all_devices_title">Decline on all your devices?</string>
-    <string name="invite_decline_all_devices_message">Declining takes this account out of the chat on every linked device. You’ll need a new invitation to come back.</string>
+    <string name="invite_decline_all_devices_message">Declining removes you from this chat on all your linked devices, even if you already joined on one. You’ll need a new invitation to rejoin.</string>
     <string name="toast_chat_archived">Chat archived</string>
     <string name="toast_chat_restored">Chat restored</string>
     <string name="toast_couldnt_update_chat">Couldn\'t update chat</string>
@@ -2243,13 +2243,13 @@
     <string name="setup_continue_without_profile">Continue without a profile</string>
     <string name="setup_review_suggested_changes">Review suggested changes</string>
     <string name="setup_chats_on_this_device">Chats on this device</string>
-    <string name="setup_device_none_found">We didn’t find messaging keys from another app or device.</string>
-    <string name="setup_device_unchecked">We couldn’t check whether this account uses another app or device for messaging.</string>
-    <string name="setup_device_found_on_date">We found messaging keys this account published from another app or device, most recently on %1$s.</string>
-    <string name="setup_device_found">We found messaging keys this account published from another app or device.</string>
+    <string name="setup_device_none_found">We didn’t find signs you’ve signed in on another device or in another app.</string>
+    <string name="setup_device_unchecked">We couldn’t finish checking for other sign-ins.</string>
+    <string name="setup_device_found_on_date">It looks like you’ve signed in to this account before, on another device or in another app.</string>
+    <string name="setup_device_found">It looks like you’ve signed in to this account before, on another device or in another app.</string>
     <string name="setup_device_separate_chats">This device will have its own separate chats. Chats in the other app stay there and won’t appear here.</string>
     <string name="setup_device_new_chats_either_app">When someone starts a new chat with you, it may arrive in either app.</string>
-    <string name="setup_device_separate_chats_if_other_app">If you use another app for messaging, this device will have its own separate chats, and chats in that app won’t appear here.</string>
+    <string name="setup_device_separate_chats_if_other_app">If you have chats in another app, they won’t appear here automatically.</string>
     <string name="setup_device_stage">Device use</string>
     <string name="setup_approval_saved_pending">Your approval is saved. The change is still pending.</string>
     <string name="setup_profile_scope_help">This updates your profile in other Nostr apps.</string>

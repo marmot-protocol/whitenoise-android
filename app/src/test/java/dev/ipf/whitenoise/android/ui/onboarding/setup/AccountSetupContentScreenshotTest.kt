@@ -409,7 +409,7 @@ class AccountSetupContentScreenshotTest {
             ),
         )
 
-    /** Names the day another installation last published messaging keys, then explains its separate chats. */
+    /** A record with a publication date shows the same undated sign-in finding. */
     @Test fun singleDeviceFoundOnDate() =
         capture(
             "device_found_on_date",
@@ -419,7 +419,6 @@ class AccountSetupContentScreenshotTest {
                         it.singleDeviceNotice =
                             setupDeviceNotice(
                                 OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE,
-                                // Noon UTC, so the day reads 15 March 2026 anywhere from UTC−11 to UTC+11.
                                 publishedAt = listOf(1_773_576_000uL),
                             )
                     },

@@ -13,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -290,12 +289,13 @@ private fun SetupDecisionContent(state: AccountSetupState) {
         SetupOperationNotice(snapshot, step)
         SetupStepFindings(state, snapshot, step)
         if (step.step == OnboardingStepFfi.SINGLE_DEVICE) {
-            val shownFindings = if (state.routineDeviceNotice) emptyList() else step.findings
-            SetupSingleDeviceNotice(snapshot.singleDeviceNotice, shownFindings)
+            SetupSingleDeviceNotice(snapshot.singleDeviceNotice)
         }
         snapshot.proposal?.takeIf { it.step == step.step }?.let { proposal ->
             if (OnboardingActionFfi.APPROVE_REPAIR !in step.actions) {
-                step.findings.distinct().forEach { SetupFindingContent(it) }
+                step.findings.distinct().forEach { finding ->
+                    SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(step.step, finding))
+                }
             }
             SetupProposalContent(proposal, step.findings)
         }
@@ -311,13 +311,6 @@ private fun SetupStepFindings(
     if (step.step == OnboardingStepFfi.PROFILE || snapshot.proposal?.step == step.step) return
     val directRemovalEndpoint = state.directRemovalEndpoint()
     val deviceStep = step.step == OnboardingStepFfi.SINGLE_DEVICE
-    // A dated device notice states the finding with its date, so MDK's row keeps only its endpoint and provenance.
-    val datedDeviceNotice =
-        deviceStep &&
-            remember(snapshot.singleDeviceNotice) {
-                setupDeviceEvidence(snapshot.singleDeviceNotice, System.currentTimeMillis() / 1_000L)
-                    .namesPublicationDate()
-            }
     step.findings
         .distinct()
         .filterNot { finding ->
@@ -328,8 +321,7 @@ private fun SetupStepFindings(
                     finding.endpoint == directRemovalEndpoint
             routineDeviceNotice || directRemovalFinding
         }.forEach { finding ->
-            val restatedByNotice = datedDeviceNotice && finding.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE
-            SetupFindingContent(finding, showTitle = !restatedByNotice)
+            SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(step.step, finding))
         }
 }
 
@@ -350,21 +342,20 @@ private fun SetupOperationNotice(
     }
 }
 
-/**
- * States what MDK's device check found, unless one of the [shownFindings] already says it without a date the notice
- * could add, then explains that this sign-in keeps its own chats apart from any other app.
- */
+/** Keep a record’s endpoint and diagnostic evidence when the device notice already states its finding. */
+internal fun OnboardingSnapshotFfi.deviceNoticeCovers(
+    step: OnboardingStepFfi?,
+    finding: OnboardingFindingFfi,
+): Boolean =
+    step == OnboardingStepFfi.SINGLE_DEVICE &&
+        finding.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE &&
+        setupDeviceEvidence(singleDeviceNotice) == SetupDeviceEvidence.OtherApps
+
+/** State the discovery once, then explain what the user can do with their other devices. */
 @Composable
-private fun SetupSingleDeviceNotice(
-    notice: OnboardingSingleDeviceNoticeFfi?,
-    shownFindings: List<OnboardingFindingFfi>,
-) {
-    val evidence = remember(notice) { setupDeviceEvidence(notice, System.currentTimeMillis() / 1_000L) }
-    val restated =
-        evidence is SetupDeviceEvidence.OtherApps &&
-            !evidence.namesPublicationDate() &&
-            shownFindings.any { it.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE }
-    evidence?.takeUnless { restated }?.let { SetupNotice(setupDeviceFinding(it)) }
+private fun SetupSingleDeviceNotice(notice: OnboardingSingleDeviceNoticeFfi?) {
+    val evidence = setupDeviceEvidence(notice)
+    evidence?.let { SetupNotice(setupDeviceFinding(it)) }
     setupDeviceExplanation(evidence).forEach { Text(stringResource(it)) }
 }
 

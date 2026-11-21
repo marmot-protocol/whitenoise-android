@@ -72,7 +72,7 @@ internal fun EmptyChats(
     onCreateOrigin: (Rect?) -> Unit = {},
 ) {
     val title = if (progress != null) R.string.chats_arriving_title else R.string.chat_rows_no_chats_title
-    val detail = progress?.let { linkChatProgressText(it) } ?: stringResource(R.string.chat_rows_no_chats_detail)
+    val detail = if (progress == null) R.string.chat_rows_no_chats_detail else R.string.chats_arriving_detail
     val (origin, create) =
         rememberMeasuredControlClick {
             onCreateOrigin(it)
@@ -80,7 +80,8 @@ internal fun EmptyChats(
         }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            WhiteNoiseEmptyState(title = stringResource(title), detail = detail)
+            WhiteNoiseEmptyState(title = stringResource(title), detail = stringResource(detail))
+            progress?.let { Text(linkChatProgressText(it)) }
             Button(onClick = create, modifier = Modifier.padding(horizontal = 24.dp).then(origin)) {
                 Text(stringResource(R.string.new_chat))
             }

@@ -17,6 +17,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.resumeWithException
 
 /** The offer to link a newly signed-in device follows what sign-in found and the user's answers, per account. */
 @RunWith(RobolectricTestRunner::class)
@@ -136,7 +139,10 @@ class DeviceLinkOffersTest {
                         "equals" -> proxy === args?.firstOrNull()
                         "cancelDeviceLink" -> {
                             calls += "cancel:${args?.firstOrNull()}"
-                            throw MarmotKitException.Runtime("device group refused: no_link_in_progress")
+                            val continuation = checkNotNull(args).last() as Continuation<*>
+                            val refusal = MarmotKitException.Runtime("device group refused: no_link_in_progress")
+                            continuation.resumeWithException(refusal)
+                            COROUTINE_SUSPENDED
                         }
                         "deviceLinkSnapshot" -> error("Reading can advance the pending Welcome")
                         else -> null

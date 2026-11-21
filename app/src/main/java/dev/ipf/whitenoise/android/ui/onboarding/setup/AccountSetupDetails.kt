@@ -209,7 +209,7 @@ internal fun SetupDetails(state: AccountSetupState) {
             Text(stringResource(R.string.setup_checks), style = MaterialTheme.typography.titleMedium)
             Text(state.accountLabel, style = MaterialTheme.typography.labelMedium)
             state.currentStep?.findings?.forEach { finding ->
-                SetupFindingContent(finding)
+                SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(state.currentStep?.step, finding))
             }
             SetupChecklist(snapshot)
         }
@@ -225,6 +225,7 @@ internal fun SetupFindingContent(
     finding: OnboardingFindingFfi,
     showTitle: Boolean = true,
 ) {
+    if (!showTitle && finding.endpoint.isNullOrBlank() && !finding.hasDiagnosticEvidence()) return
     Row(
         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
@@ -252,15 +253,16 @@ internal fun SetupFindingContent(
     }
 }
 
+/** A finding can carry provenance even when it has no endpoint or separate title. */
+private fun OnboardingFindingFfi.hasDiagnosticEvidence(): Boolean =
+    context != OnboardingFindingContextFfi.UNKNOWN ||
+        purpose != OnboardingCheckPurposeFfi.UNKNOWN ||
+        outcome != OnboardingCheckOutcomeFfi.UNKNOWN
+
 /** Preserves each native check's provenance; legacy unknown records do not acquire invented evidence. */
 @Composable
 internal fun SetupFindingEvidence(finding: OnboardingFindingFfi) {
-    if (finding.context == OnboardingFindingContextFfi.UNKNOWN &&
-        finding.purpose == OnboardingCheckPurposeFfi.UNKNOWN &&
-        finding.outcome == OnboardingCheckOutcomeFfi.UNKNOWN
-    ) {
-        return
-    }
+    if (!finding.hasDiagnosticEvidence()) return
     Text(
         stringResource(
             R.string.setup_finding_check,

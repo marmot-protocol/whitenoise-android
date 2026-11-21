@@ -48,6 +48,14 @@
         "test_ids": [
           "SET-061"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.chats_arriving_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chats_arriving_detail",
+        "test_ids": [
+          "SET-061"
+        ]
       }
     ],
     "settings_controls": [
