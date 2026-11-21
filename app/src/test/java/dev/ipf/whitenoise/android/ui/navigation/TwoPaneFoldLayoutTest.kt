@@ -18,13 +18,12 @@ import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.ui.common.LocalVerticalWindowFold
+import dev.ipf.whitenoise.android.ui.common.LocalWindowFolds
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
-import dev.ipf.whitenoise.android.ui.common.VerticalWindowFold
+import dev.ipf.whitenoise.android.ui.common.WindowFold
+import dev.ipf.whitenoise.android.ui.common.WindowFolds
 import dev.ipf.whitenoise.android.ui.common.WindowLayout
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,21 +37,10 @@ class TwoPaneFoldLayoutTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
-    /** Below the expanded width only a separating fold shows the list beside the conversation. */
-    @Test
-    fun aSeparatingFoldShowsTheListBesideTheConversationAtMediumWidth() {
-        val medium = WindowLayout.fromSize(WINDOW)
-        val expanded = WindowLayout.fromSize(DpSize(840.dp, 700.dp))
-
-        assertFalse(listBesideConversation(medium, fold = null))
-        assertTrue(listBesideConversation(medium, VerticalWindowFold(400.dp, 400.dp)))
-        assertTrue(listBesideConversation(expanded, fold = null))
-    }
-
     /** On a seamless fold the divider sits on the fold and each pane fills its own side. */
     @Test
     fun eachPaneFillsItsOwnSideOfTheFold() {
-        mountFrame(VerticalWindowFold(400.dp, 400.dp))
+        mountFrame(hinge(400.dp, 400.dp))
 
         assertPanes(list = 0.dp to 400.dp, conversation = 400.dp to 800.dp)
     }
@@ -60,7 +48,7 @@ class TwoPaneFoldLayoutTest {
     /** A hinge with a physical gap leaves the gap empty. */
     @Test
     fun neitherPaneIsDrawnUnderAHinge() {
-        mountFrame(VerticalWindowFold(390.dp, 410.dp))
+        mountFrame(hinge(390.dp, 410.dp))
 
         assertPanes(list = 0.dp to 390.dp, conversation = 410.dp to 800.dp)
     }
@@ -68,7 +56,7 @@ class TwoPaneFoldLayoutTest {
     /** Right to left, the list fills the right side of the fold, whatever its width. */
     @Test
     fun rightToLeftPutsTheListOnTheRightOfTheFold() {
-        mountFrame(VerticalWindowFold(340.dp, 340.dp), LayoutDirection.Rtl)
+        mountFrame(hinge(340.dp, 340.dp), LayoutDirection.Rtl)
 
         assertPanes(list = 340.dp to 800.dp, conversation = 0.dp to 340.dp)
     }
@@ -76,20 +64,25 @@ class TwoPaneFoldLayoutTest {
     /** Fold bounds are window coordinates; a frame inset from the window keeps the regular split. */
     @Test
     fun aFrameNarrowerThanTheWindowIgnoresTheFold() {
-        mountFrame(VerticalWindowFold(400.dp, 400.dp), frameWidth = 700.dp)
+        mountFrame(hinge(400.dp, 400.dp), frameWidth = 700.dp)
 
-        assertPanes(list = 0.dp to TwoPaneListWidth, conversation = TwoPaneListWidth to 700.dp)
+        assertPanes(list = 0.dp to 300.dp, conversation = 300.dp to 700.dp)
     }
 
+    private fun hinge(
+        start: Dp,
+        end: Dp,
+    ) = WindowFolds(upright = listOf(WindowFold(start, end, separating = true)))
+
     private fun mountFrame(
-        fold: VerticalWindowFold,
+        folds: WindowFolds,
         direction: LayoutDirection = LayoutDirection.Ltr,
         frameWidth: Dp? = null,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalWindowLayout provides WindowLayout.fromSize(WINDOW),
-                LocalVerticalWindowFold provides fold,
+                LocalWindowFolds provides folds,
                 LocalLayoutDirection provides direction,
             ) {
                 if (frameWidth == null) {
@@ -106,7 +99,7 @@ class TwoPaneFoldLayoutTest {
     @Composable
     private fun Frame() {
         TwoPaneChatFrame(
-            twoPane = listBesideConversation(LocalWindowLayout.current, LocalVerticalWindowFold.current),
+            twoPane = listBesideConversation(LocalWindowLayout.current, LocalWindowFolds.current),
             listPane = { Text("list") },
         ) {
             Box(Modifier.fillMaxSize().testTag(CONVERSATION_TAG))

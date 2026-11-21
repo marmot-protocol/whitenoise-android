@@ -30,6 +30,8 @@ internal data class WindowLayout(
     val widthClass: WindowWidthClass,
     val heightClass: WindowHeightClass,
     val isLandscape: Boolean,
+    /** Whether a [ListPaneMinWidth] list fits beside a [DetailPaneMinWidth] detail pane. */
+    val fitsTwoPanes: Boolean = false,
 ) {
     companion object {
         /** A portrait phone; the value seen by compositions that are not under [ProvideWindowLayout]. */
@@ -55,9 +57,19 @@ internal data class WindowLayout(
                         else -> WindowHeightClass.Expanded
                     },
                 isLandscape = size.width > size.height,
+                fitsTwoPanes = size.width >= TwoPaneMinWindowWidth,
             )
     }
 }
+
+/** Narrowest list pane that keeps list rows readable, about the width of a small phone. */
+internal val ListPaneMinWidth = 300.dp
+
+/** Narrowest detail pane, such as a conversation, that still reads like one on a phone. */
+internal val DetailPaneMinWidth = 360.dp
+
+/** Both minimum panes plus the 1dp divider between them. */
+internal val TwoPaneMinWindowWidth = ListPaneMinWidth + DetailPaneMinWidth + 1.dp
 
 private val MediumWidthBreakpoint = 600.dp
 private val ExpandedWidthBreakpoint = 840.dp
@@ -67,7 +79,7 @@ private val ExpandedHeightBreakpoint = 900.dp
 internal val LocalWindowLayout = staticCompositionLocalOf { WindowLayout.CompactPortrait }
 
 /**
- * Provides the activity window's [WindowLayout] and [VerticalWindowFold] to [content].
+ * Provides the activity window's [WindowLayout] and [WindowFolds] to [content].
  *
  * Call this once, at the activity root. Dialogs and popups have their own
  * window, so reading the window size inside one would describe the dialog;
@@ -80,7 +92,7 @@ internal fun ProvideWindowLayout(content: @Composable () -> Unit) {
     val layout = remember(windowSize) { WindowLayout.fromSize(windowSize) }
     CompositionLocalProvider(
         LocalWindowLayout provides layout,
-        LocalVerticalWindowFold provides rememberVerticalWindowFold(),
+        LocalWindowFolds provides rememberWindowFolds(),
         content = content,
     )
 }

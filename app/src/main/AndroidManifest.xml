@@ -175,7 +175,7 @@
             android:name=".MainActivity"
             android:enableOnBackInvokedCallback="true"
             android:exported="true"
-            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden"
+            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|density|keyboard|keyboardHidden|navigation"
             android:label="${appName}"
             android:launchMode="singleTask"
             android:theme="@style/Theme.WhiteNoise.Starting"
