@@ -36,7 +36,7 @@ import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
 
-/** Equal-width overview action with one accessible tonal target and a wrapping visual caption. */
+/** Equal-width overview action with one accessible tonal target and an optional visual caption. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun QuickInfoAction(
@@ -48,6 +48,7 @@ internal fun QuickInfoAction(
     enabled: Boolean = true,
     buttonModifier: Modifier = Modifier,
     explanation: Explanation? = null,
+    showCaption: Boolean = true,
 ) {
     Column(
         modifier = modifier,
@@ -66,12 +67,14 @@ internal fun QuickInfoAction(
         ) {
             Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(24.dp))
         }
-        Text(
-            text = label,
-            modifier = Modifier.clearAndSetSemantics {},
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelLarge,
-        )
+        if (showCaption) {
+            Text(
+                text = label,
+                modifier = Modifier.clearAndSetSemantics {},
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
     }
 }
 

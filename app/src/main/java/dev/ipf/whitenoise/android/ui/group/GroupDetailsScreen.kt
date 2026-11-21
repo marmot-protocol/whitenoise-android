@@ -1755,6 +1755,7 @@ internal fun GroupDetailsScreen(
                                 icon = R.drawable.ic_group_add,
                                 onClick = openAddMembers,
                                 enabled = canAdministerMembers && !mutationsBlocked,
+                                showCaption = false,
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -1764,6 +1765,7 @@ internal fun GroupDetailsScreen(
                             enabled = !muteControl.pending,
                             explanation = chatsExplanation(muteControl.labelRes, muteControl.explanationRes),
                             onClick = muteControl::toggle,
+                            showCaption = isDm,
                             modifier = Modifier.weight(1f),
                         )
                         QuickInfoAction(
@@ -1777,6 +1779,7 @@ internal fun GroupDetailsScreen(
                                     R.string.explanation_chat_info_disappearing,
                                 ),
                             onClick = { showDisappearingPicker = true },
+                            showCaption = isDm,
                             modifier = Modifier.weight(1f),
                         )
                         if (onOpenSearch != null) {
@@ -1784,6 +1787,7 @@ internal fun GroupDetailsScreen(
                                 label = stringResource(R.string.quick_action_search),
                                 icon = R.drawable.ic_search,
                                 onClick = onOpenSearch,
+                                showCaption = isDm,
                                 modifier = Modifier.weight(1f),
                             )
                         }

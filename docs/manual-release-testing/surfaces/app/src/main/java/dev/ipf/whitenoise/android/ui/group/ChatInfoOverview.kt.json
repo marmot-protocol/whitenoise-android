@@ -32,6 +32,14 @@
         ]
       },
       {
+        "surface": "Quick action captions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "if (showCaption)",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
         "surface": "Quick info actions can carry a hold explanation",
         "anchor": ".explainOnLongPress(explanation)",
