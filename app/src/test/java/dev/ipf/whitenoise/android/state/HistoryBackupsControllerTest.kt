@@ -385,7 +385,7 @@ class HistoryBackupsControllerTest {
 
         override suspend fun backupRestoreStatus(accountRef: String): BackupRestoreStatusFfi = restoreStatus
 
-        override suspend fun watchBackupRestore(accountRef: String): Nothing = throw MarmotKitException.Runtime("no watch")
+        override suspend fun watchBackupRestore(accountRef: String): Nothing = error("no watch")
 
         override suspend fun runDueBackupPass(accountRef: String): BackgroundBackupOutcomeFfi {
             passError?.let { throw it }
