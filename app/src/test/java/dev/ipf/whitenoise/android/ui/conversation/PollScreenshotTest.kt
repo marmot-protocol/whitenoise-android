@@ -156,7 +156,13 @@ class PollScreenshotTest {
     fun tallCreateDialogUsesAvailableHeight() {
         composeRule.setContent {
             CompositionLocalProvider(LocalSystemAnimationsEnabled provides false) {
-                WhiteNoiseTheme { PollCreateDialog({}, { _, _, _, _, _ -> }) }
+                WhiteNoiseTheme {
+                    PollCreateDialog(
+                        onDismiss = {},
+                        onSubmit = { _, _, _, _, _ -> },
+                        viewportInsets = WindowInsets(0, 0, 0, 0),
+                    )
+                }
             }
         }
         val form = composeRule.onNodeWithTag("poll.create.form").fetchSemanticsNode()
