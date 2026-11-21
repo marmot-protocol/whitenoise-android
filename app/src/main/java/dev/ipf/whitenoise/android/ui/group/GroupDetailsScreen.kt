@@ -411,6 +411,10 @@ internal fun GroupDetailsScreen(
                 memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
         val mutationOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, reviewRuntime)
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight || !mutationOwnerCurrent
+        val openAddMembers = {
+            addMemberAutoOpened = false
+            showAddMember = true
+        }
         val detailsOpenedAtMs = remember(controller.group.groupIdHex) { SystemClock.elapsedRealtime() }
         var administrationLatencyReported by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         LaunchedEffect(canAdministerMembers) {
@@ -1745,6 +1749,15 @@ internal fun GroupDetailsScreen(
                                 buttonModifier = profileLaunch.first,
                             )
                         }
+                        if (!isDm && canEdit) {
+                            QuickInfoAction(
+                                label = stringResource(R.string.add_member),
+                                icon = R.drawable.ic_group_add,
+                                onClick = openAddMembers,
+                                enabled = canAdministerMembers && !mutationsBlocked,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                         QuickInfoAction(
                             label = stringResource(muteControl.labelRes),
                             icon = muteControl.iconRes,
@@ -1865,17 +1878,9 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.add_member),
                                     routeKey = "add-members",
-                                    onClick = {
-                                        addMemberAutoOpened = false
-                                        showAddMember = true
-                                    },
+                                    onClick = openAddMembers,
                                     modifier = Modifier.testTag("chat_info.add_people"),
-                                    enabled =
-                                        memberAdministrationPresentable(
-                                            controller.memberRosterState,
-                                            controller.seededSelfMember,
-                                        ) &&
-                                            !mutationsBlocked,
+                                    enabled = canAdministerMembers && !mutationsBlocked,
                                     leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                                 )
                             }
