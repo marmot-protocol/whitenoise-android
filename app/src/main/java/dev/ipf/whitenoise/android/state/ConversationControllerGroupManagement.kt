@@ -41,7 +41,8 @@ suspend fun ConversationController.updateMessageRetention(disappearingMessageSec
                     if (BuildConfig.DEBUG) Log.w("DMConversation", "retention refresh failed", refreshError)
                     publishTimelineFromIndexes()
                 }
-            presentConversationTransient(R.string.toast_disappearing_messages_updated)
+            // No success banner: the header timer and the timeline's system row already show the new
+            // setting, and a banner here covered the chat header right after the sheet closed.
             true
         }.onFailure {
             recordMutationFailure(R.string.toast_couldnt_update_disappearing, "GROUP_RETENTION_UPDATE", it)

@@ -2171,58 +2171,33 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
-      "symbol": "DisappearingCustomDialog",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
+      "symbol": "DisappearingMessagesPickerSheet",
       "bindings": [
+        {
+          "case": "groups-retention-cancel",
+          "selector": {
+            "text": "Disappearing messages"
+          },
+          "scope": "chat-retention sheet dismissed with Back.",
+          "entry_assertion": {
+            "text": "Disappearing messages"
+          },
+          "opened_by": {
+            "text": "Disappearing"
+          }
+        },
         {
           "case": "presentation-group-ui-disappearing-custom",
           "selector": {
             "text": "Set"
           },
-          "scope": "custom retention number/unit picker opens through its app parent; Cancel retains original timer.",
+          "scope": "custom retention value/unit page opens inside the production sheet; Back and dismissal retain the original timer.",
           "entry_assertion": {
             "text": "Set"
           },
           "opened_by": {
             "text": "Custom time"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
-      "symbol": "DisappearingMessagesPickerDialog",
-      "bindings": [
-        {
-          "case": "groups-retention-cancel",
-          "selector": {
-            "text": "Disappearing messages"
-          },
-          "scope": "chat-retention picker and Cancel.",
-          "entry_assertion": {
-            "text": "Disappearing messages"
-          },
-          "opened_by": {
-            "text": "Disappearing"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerEditor.kt",
-      "symbol": "DisappearingTimerEditor",
-      "bindings": [
-        {
-          "case": "groups-retention-cancel",
-          "selector": {
-            "text": "Disappearing messages"
-          },
-          "scope": "chat details opens the shared timer editor's picker; Cancel keeps the original timer.",
-          "entry_assertion": {
-            "text": "Disappearing messages"
-          },
-          "opened_by": {
-            "text": "Disappearing"
           }
         }
       ]

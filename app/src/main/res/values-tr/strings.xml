@@ -1514,7 +1514,6 @@
     <string name="disappearing_1_day">1 gün</string>
     <string name="disappearing_90_days">3 ay</string>
     <string name="disappearing_custom">Özel süre</string>
-    <string name="disappearing_custom_value">Özel süre: %1$s</string>
     <string name="disappearing_days_format">%1$d gün</string>
     <string name="disappearing_hours_format">%1$d saat</string>
     <string name="disappearing_minutes_format">%1$d dakika</string>
@@ -1536,11 +1535,9 @@
         <item quantity="one">%d yıl</item>
         <item quantity="other">%d yıl</item>
     </plurals>
-    <string name="toast_disappearing_messages_updated">Kaybolan mesajlar güncellendi</string>
     <string name="toast_couldnt_update_disappearing">Kaybolan mesajlar güncellenemedi</string>
     <string name="save">Kaydet</string>
 
-    <string name="disappearing_confirm_title">Kaybolma zamanlayıcısı ayarlansın mı?</string>
     <string name="disappearing_confirm_message">%1$s değerinden eski mesajlar herkes için kalıcı olarak silinecek.</string>
     <string name="disappearing_confirm_button">Ayarla</string>
 

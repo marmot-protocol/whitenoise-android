@@ -51,7 +51,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
-import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
+import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerSheet
 import dev.ipf.whitenoise.android.ui.group.GroupEmojiImagePickerSheet
 import dev.ipf.whitenoise.android.ui.group.GroupImageFailureScope
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
@@ -658,13 +658,10 @@ private fun NewGroupSetupAccountScreen(
     )
 
     if (showRetentionPicker) {
-        DisappearingMessagesPickerDialog(
+        DisappearingMessagesPickerSheet(
             currentSecs = retentionSecs,
             onDismiss = { showRetentionPicker = false },
-            onPick = { secs ->
-                showRetentionPicker = false
-                if (detailsEditableNow()) retentionSecs = secs
-            },
+            onPick = { secs -> if (detailsEditableNow()) retentionSecs = secs },
         )
     }
 

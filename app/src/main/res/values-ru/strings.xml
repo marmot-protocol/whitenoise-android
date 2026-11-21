@@ -1583,7 +1583,6 @@
     <string name="disappearing_1_day">1 день</string>
     <string name="disappearing_90_days">3 месяца</string>
     <string name="disappearing_custom">Своё время</string>
-    <string name="disappearing_custom_value">Своё время: %1$s</string>
     <string name="disappearing_days_format">%1$d дн.</string>
     <string name="disappearing_hours_format">%1$d ч.</string>
     <string name="disappearing_minutes_format">%1$d мин.</string>
@@ -1611,11 +1610,9 @@
         <item quantity="many">%d лет</item>
         <item quantity="other">%d года</item>
     </plurals>
-    <string name="toast_disappearing_messages_updated">Исчезающие сообщения обновлены</string>
     <string name="toast_couldnt_update_disappearing">Не удалось обновить исчезающие сообщения</string>
     <string name="save">Сохранить</string>
 
-    <string name="disappearing_confirm_title">Установить таймер исчезновения?</string>
     <string name="disappearing_confirm_message">Сообщения старше %1$s будут безвозвратно удалены у всех.</string>
     <string name="disappearing_confirm_button">Установить</string>
 
