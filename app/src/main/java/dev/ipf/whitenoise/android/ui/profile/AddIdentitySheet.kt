@@ -24,6 +24,8 @@ import dev.ipf.whitenoise.android.ui.devices.UnlinkedProfileRemovalDialog
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
 import dev.ipf.whitenoise.android.ui.onboarding.SignInStep
 import dev.ipf.whitenoise.android.ui.onboarding.importIdentityErrorRes
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerFlow
 import dev.ipf.whitenoise.android.ui.onboarding.signInAfterRemovalConsent
 import dev.ipf.whitenoise.android.ui.onboarding.signInStepFor
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
@@ -59,6 +61,7 @@ internal fun AddIdentitySheet(
     val identity = session.key.text.toString()
     var removalRef by remember(session, identity) { mutableStateOf<String?>(null) }
     val amberSignerAvailable = remember(appState) { appState.isAmberSignerInstalled() }
+    var remoteSigner by remember(session) { mutableStateOf<RemoteSignerEntry?>(null) }
     DisposableEffect(session) { onDispose { session.dispose() } }
     LaunchedEffect(
         appState.activeAccountRef,
@@ -147,6 +150,15 @@ internal fun AddIdentitySheet(
                 decorFitsSystemWindows = false,
             ),
     ) {
+        remoteSigner?.let { entry ->
+            RemoteSignerFlow(
+                appState,
+                onClose = { remoteSigner = null },
+                onFinished = session::dismiss,
+                initialLink = entry.link,
+            )
+            return@MeasuredPlaybackDialog
+        }
         AddAccountSheetContent(
             amberSignerAvailable = amberSignerAvailable,
             inFlightAction = session.action,
@@ -170,6 +182,9 @@ internal fun AddIdentitySheet(
             privateKeyState = session.key,
             amberSignInStage = appState.amberSignInStage,
             onBack = this.dismiss,
+            onUseRemoteSigner = { link ->
+                if (session.action == OnboardingAction.Idle) remoteSigner = RemoteSignerEntry(link)
+            },
         )
         removalRef?.let { label ->
             UnlinkedProfileRemovalDialog(

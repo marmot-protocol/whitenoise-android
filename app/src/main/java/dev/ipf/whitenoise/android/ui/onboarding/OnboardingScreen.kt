@@ -20,6 +20,8 @@ import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.removeUnlinkedAccount
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import dev.ipf.whitenoise.android.ui.devices.UnlinkedProfileRemovalDialog
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerFlow
 import kotlinx.coroutines.launch
 
 // Single in-flight onboarding action so the two buttons can never both read as
@@ -48,6 +50,7 @@ internal fun OnboardingScreen(
     val privateKeyState = remember { TextFieldState() }
     val identity = privateKeyState.text.toString()
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
+    var remoteSigner by remember { mutableStateOf<RemoteSignerEntry?>(null) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     var recoveryConsentVisible by remember { mutableStateOf(false) }
     // The key an acknowledged recovery already ran for, cleared as soon as the
@@ -141,6 +144,18 @@ internal fun OnboardingScreen(
         )
     }
 
+    remoteSigner?.let { entry ->
+        RemoteSignerFlow(
+            appState,
+            onClose = { remoteSigner = null },
+            onFinished = {
+                privateKeyState.setTextAndPlaceCursorAtEnd("")
+                remoteSigner = null
+            },
+            initialLink = entry.link,
+        )
+        return
+    }
     val signUp = appState.profileSignUpForPresentation
     if (signUp != null) {
         SignUpScreen(
@@ -194,6 +209,9 @@ internal fun OnboardingScreen(
         amberSignInStage = appState.amberSignInStage,
         amberSignerAvailable = amberSignerAvailable,
         onLoginWithAmber = { startSignInAction(OnboardingAction.AmberLogin) },
+        onUseRemoteSigner = { link ->
+            if (inFlightAction == OnboardingAction.Idle) remoteSigner = RemoteSignerEntry(link)
+        },
         savedAccounts = savedAccounts,
         reactivatingAccountLabel = appState.retainedAccountReactivationRef,
         onContinueWithSavedAccount = appState::reactivateRetainedAccount,
