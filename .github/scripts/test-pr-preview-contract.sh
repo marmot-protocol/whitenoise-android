@@ -52,7 +52,7 @@ grep -Fq "github.event_name == 'workflow_dispatch' ||" "$build"
 grep -Fq 'github.event.pull_request.head.repo.full_name == github.repository' "$build"
 grep -Fq 'Resolve exact candidate provenance and current PR' "$workflow"
 grep -Fq 'stable_pr=$(provenance_value "$stable" pr_number)' "$workflow"
-reject 'isolated' "$workflow"
+grep -Fq -- '--name pr-preview-isolated' "$workflow"
 reject 'branches: [master]' "$build"
 grep -Fq 'Update PR description with preview links' "$workflow"
 grep -Fq '.github/scripts/update-pr-preview-links.js' "$workflow"
@@ -89,11 +89,10 @@ reject 'BLOSSOM_UPLOAD_NSEC' "$workflow"
 # before checkout with "not a git repository" and no preview links are posted.
 candidate_downloads=$(grep -Fc 'gh run download "$BUILD_RUN_ID"' "$workflow")
 scoped_candidate_downloads=$(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY"' "$workflow")
-[[ "$candidate_downloads" -eq 2 ]]
+[[ "$candidate_downloads" -eq 4 ]]
 [[ "$scoped_candidate_downloads" -eq "$candidate_downloads" ]]
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable' "$workflow") -eq 2 ]]
-# Only the stable channel is signed and linked by default; the isolated channel
-# is built solely by an explicit include_isolated dispatch for opt-in tests.
+# Stable remains the default; an explicitly requested isolated candidate is also signed and published.
 grep -Fq 'channel: ${{ fromJSON(inputs.include_isolated && '"'"'["stable","isolated"]'"'"' || '"'"'["stable"]'"'"') }}' "$build"
 grep -Fq 'include_isolated:' "$build"
 

@@ -30,7 +30,8 @@ reject_test_only() {
   done < <(grep -oE 'android:testOnly="[^"]*"' <<< "$manifest" | sed -E 's/^[^"]*"(.*)"$/\1/')
 }
 
-for channel in stable; do
+for channel in stable isolated; do
+  [[ "$channel" != isolated || -d "$root/$channel" ]] || continue
   dir="$root/$channel"
   test -d "$dir"
   (cd "$dir" && sha256sum --check SHA256SUMS)
@@ -54,7 +55,12 @@ for channel in stable; do
   expanded_bytes=$(zipinfo -l "${apks[0]}" | awk '$1 ~ /^[-dl]/ { total += $4 } END { print total + 0 }')
   [[ "$expanded_bytes" -le "$max_expanded_bytes" ]]
 
-  expected_package=dev.ipf.whitenoise.android.preview
+  if [[ "$channel" == stable ]]; then
+    expected_package=dev.ipf.whitenoise.android.preview
+  else
+    expected_package="dev.ipf.whitenoise.android.preview.pr${PR_NUMBER}"
+  fi
+
   actual_package=$(apkanalyzer manifest application-id "${apks[0]}")
   actual_version=$(apkanalyzer manifest version-code "${apks[0]}")
   actual_version_name=$(apkanalyzer manifest version-name "${apks[0]}")
