@@ -200,6 +200,7 @@ internal class ConversationDictationController internal constructor(
     internal fun conversationDictationDiagnostic(event: String) {
         DictationDiagnostics.record("$event session=${state.sessionId ?: 0L}")
     }
+
     internal val completionRevisions = mutableStateMapOf<ConversationDictationKey, Int>()
     internal val pendingSendRevisions = mutableStateMapOf<ConversationDictationKey, Int>()
     internal var nextSessionId = 0L
@@ -966,7 +967,6 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Cancels only when the target account is signed out or removed, not when it becomes inactive. */
     fun onAccountUnavailable(accountRef: String) {
         parkedRecoveries.keys.filter { it.accountRef.equals(accountRef, ignoreCase = true) }.forEach { key ->
             parkedRecoveries.remove(key)?.audio?.discard()
