@@ -106,10 +106,7 @@ internal suspend fun ChatsController.departResolvedChat(
         }
         GroupProjector.isAdminRef(group, attempt.activeAccountId) ->
             appState.leaveAsAdmin(attempt.account, attempt.groupId) { demoteAndLeaveChat(attempt) }
-        else -> {
-            appState.marmotIo { leaveGroup(attempt.account, attempt.groupId) }
-            true
-        }
+        else -> appState.leaveWithAdmission(attempt.account, attempt.groupId)
     }
 }
 

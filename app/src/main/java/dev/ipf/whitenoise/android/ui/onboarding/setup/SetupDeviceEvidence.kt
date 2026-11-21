@@ -2,8 +2,15 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import dev.ipf.marmotkit.OnboardingCheckOutcomeFfi
+import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
+import dev.ipf.marmotkit.OnboardingFindingContextFfi
+import dev.ipf.marmotkit.OnboardingFindingFfi
+import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingSingleDeviceNoticeFfi
+import dev.ipf.marmotkit.OnboardingSnapshotFfi
+import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 
@@ -57,3 +64,18 @@ internal fun setupDeviceFinding(evidence: SetupDeviceEvidence): String =
         SetupDeviceEvidence.Unchecked -> stringResource(R.string.setup_device_unchecked)
         SetupDeviceEvidence.OtherApps -> stringResource(R.string.setup_device_found)
     }
+
+/** Keep a record’s endpoint and diagnostic evidence when the device notice already states its finding. */
+internal fun OnboardingSnapshotFfi.deviceNoticeCovers(
+    step: OnboardingStepFfi?,
+    finding: OnboardingFindingFfi,
+): Boolean =
+    step == OnboardingStepFfi.SINGLE_DEVICE &&
+        finding.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE &&
+        setupDeviceEvidence(singleDeviceNotice) == SetupDeviceEvidence.OtherApps
+
+/** A finding can carry provenance even when it has no endpoint or separate title. */
+internal fun OnboardingFindingFfi.hasDiagnosticEvidence(): Boolean =
+    context != OnboardingFindingContextFfi.UNKNOWN ||
+        purpose != OnboardingCheckPurposeFfi.UNKNOWN ||
+        outcome != OnboardingCheckOutcomeFfi.UNKNOWN

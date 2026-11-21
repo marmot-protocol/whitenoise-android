@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +19,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isJoiningChats
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.devices.linkChatProgressText
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
@@ -79,7 +81,11 @@ internal fun EmptyChats(
             onCreate()
         }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.fadingVerticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             WhiteNoiseEmptyState(title = stringResource(title), detail = stringResource(detail))
             progress?.let { Text(linkChatProgressText(it)) }
             Button(onClick = create, modifier = Modifier.padding(horizontal = 24.dp).then(origin)) {

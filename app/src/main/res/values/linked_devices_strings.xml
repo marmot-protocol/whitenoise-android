@@ -173,4 +173,6 @@
     <string name="link_device_adding_chats">Adding to chats: %1$d of %2$d</string>
     <string name="unlinked_remove_sign_in">Remove and sign in</string>
     <string name="unlinked_remove_sign_in_detail">This device was unlinked. Delete this profile’s chats and data from this device and sign in with the key you entered? Your other devices keep their data.</string>
+    <string name="invite_decline_wait_for_sync">Wait for this chat to sync, then tap Decline again.</string>
+    <string name="invite_decline_check_delivery">Your last group change hasn’t reached every relay. Check this chat for a delivery warning before trying again.</string>
 </resources>

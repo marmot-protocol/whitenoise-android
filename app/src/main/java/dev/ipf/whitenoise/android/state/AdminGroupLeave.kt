@@ -1,9 +1,22 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.annotation.StringRes
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+
+/** MDK can promote a member before committing their leave, so every native leave can require consent. */
+internal suspend fun WhiteNoiseAppState.leaveWithAdmission(
+    account: String,
+    groupId: String,
+    @StringRes actionLabel: Int = R.string.leave_chat,
+): Boolean {
+    runGroupChange(account, groupId, actionLabel = actionLabel) {
+        marmotIo { leaveGroup(account, groupId) }
+    }
+    return true
+}
 
 /** Let MDK perform the atomic admin leave whenever the current account has that capability. */
 internal suspend fun WhiteNoiseAppState.leaveAsAdmin(
@@ -13,12 +26,7 @@ internal suspend fun WhiteNoiseAppState.leaveAsAdmin(
 ): Boolean {
     val management = marmotIo { groupManagementState(account, groupId) }
     return when {
-        management.canLeave -> {
-            runGroupChange(account, groupId, actionLabel = R.string.group_action_step_down_and_leave) {
-                marmotIo { leaveGroup(account, groupId) }
-            }
-            true
-        }
+        management.canLeave -> leaveWithAdmission(account, groupId, R.string.group_action_step_down_and_leave)
         management.requiresSelfDemoteBeforeLeave && !management.isLastAdmin -> {
             demoteAndLeave()
             true
@@ -49,10 +57,7 @@ internal suspend fun ConversationController.leaveWithRoster(
         }
         GroupProjector.isAdminRef(group, activeAccountIdHex) ->
             appState.leaveAsAdmin(account, group.groupIdHex) { demoteThenLeave(account, onDemoted) }
-        else -> {
-            appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-            true
-        }
+        else -> appState.leaveWithAdmission(account, group.groupIdHex)
     }
 
 /**

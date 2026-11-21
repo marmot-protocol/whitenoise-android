@@ -173,4 +173,6 @@
     <string name="link_device_adding_chats">Ajout aux discussions : %1$d sur %2$d</string>
     <string name="unlinked_remove_sign_in">Supprimer et se connecter</string>
     <string name="unlinked_remove_sign_in_detail">Cet appareil a été dissocié. Voulez-vous supprimer de cet appareil les discussions et les données de ce profil, puis vous connecter avec la clé saisie ? Vos autres appareils conserveront leurs données.</string>
+    <string name="invite_decline_wait_for_sync">Attendez que cette discussion soit synchronisée, puis appuyez de nouveau sur « Refuser ».</string>
+    <string name="invite_decline_check_delivery">Votre dernière modification du groupe n’est pas parvenue à tous les relais. Avant de réessayer, vérifiez si un avertissement de livraison apparaît dans cette discussion.</string>
 </resources>

@@ -173,4 +173,6 @@
     <string name="link_device_adding_chats">Sohbetlere ekleniyor: %1$d / %2$d</string>
     <string name="unlinked_remove_sign_in">Kaldır ve giriş yap</string>
     <string name="unlinked_remove_sign_in_detail">Bu cihazın bağlantısı kesildi. Bu profilin sohbetleri ve verileri bu cihazdan silinsin ve girdiğiniz anahtarla oturum açılsın mı? Diğer cihazlarınızdaki veriler korunur.</string>
+    <string name="invite_decline_wait_for_sync">Sohbet eşitlendikten sonra Reddet seçeneğine yeniden dokunun.</string>
+    <string name="invite_decline_check_delivery">Son grup değişikliği tüm aktarıcılara ulaşmadı. Yeniden denemeden önce bu sohbette teslimat uyarısı olup olmadığını kontrol edin.</string>
 </resources>

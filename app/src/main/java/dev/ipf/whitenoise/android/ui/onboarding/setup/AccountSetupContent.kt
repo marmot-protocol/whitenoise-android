@@ -342,15 +342,6 @@ private fun SetupOperationNotice(
     }
 }
 
-/** Keep a record’s endpoint and diagnostic evidence when the device notice already states its finding. */
-internal fun OnboardingSnapshotFfi.deviceNoticeCovers(
-    step: OnboardingStepFfi?,
-    finding: OnboardingFindingFfi,
-): Boolean =
-    step == OnboardingStepFfi.SINGLE_DEVICE &&
-        finding.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE &&
-        setupDeviceEvidence(singleDeviceNotice) == SetupDeviceEvidence.OtherApps
-
 /** State the discovery once, then explain what the user can do with their other devices. */
 @Composable
 private fun SetupSingleDeviceNotice(notice: OnboardingSingleDeviceNoticeFfi?) {

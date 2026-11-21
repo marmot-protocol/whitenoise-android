@@ -44,6 +44,14 @@
         "test_ids": [
           "GRP-034"
         ]
+      },
+      {
+        "surface": "Review leaving a chat after a role change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AdminGroupLeave.kt",
+        "anchor": "R.string.leave_chat",
+        "test_ids": [
+          "GRP-034"
+        ]
       }
     ]
   }

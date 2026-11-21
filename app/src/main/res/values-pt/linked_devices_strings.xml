@@ -173,4 +173,6 @@
     <string name="link_device_adding_chats">Adicionando às conversas: %1$d de %2$d</string>
     <string name="unlinked_remove_sign_in">Remover e entrar</string>
     <string name="unlinked_remove_sign_in_detail">Este dispositivo foi desvinculado. Quer apagar deste dispositivo as conversas e os dados deste perfil e entrar com a chave que você informou? Seus outros dispositivos mantêm os próprios dados.</string>
+    <string name="invite_decline_wait_for_sync">Aguarde a sincronização da conversa e toque em “Recusar” novamente.</string>
+    <string name="invite_decline_check_delivery">A última alteração no grupo não chegou a todos os relays. Antes de tentar de novo, verifique se há um aviso de entrega nesta conversa.</string>
 </resources>

@@ -19,7 +19,7 @@
     <string name="linked_devices_load_failed">无法加载已关联设备。显示的内容可能已过时。</string>
     <string name="linked_devices_loading">正在加载已关联设备…</string>
     <string name="explanation_linked_devices_hub">显示与此账户关联的设备。</string>
-    <string name="explanation_linked_device_row">“上次活跃”表示你的另一台设备上次看到这台设备运行的时间。它现在可能已离线。</string>
+    <string name="explanation_linked_device_row">“上次活动”表示你的另一台设备上次看到这台设备运行的时间。它现在可能已离线。</string>
     <string name="group_account_devices_enable">允许已关联设备</string>
     <string name="group_account_devices_enable_detail">允许每位成员自己的已关联设备无需管理员即可加入此聊天。此设置无法关闭。</string>
     <string name="group_account_devices_confirm_title">要在此聊天中允许已关联设备吗？</string>
@@ -173,4 +173,6 @@
     <string name="link_device_adding_chats">正在添加到聊天：%1$d/%2$d</string>
     <string name="unlinked_remove_sign_in">移除并登录</string>
     <string name="unlinked_remove_sign_in_detail">这台设备已解除关联。要从这台设备删除此个人资料的聊天和数据，并用刚才输入的密钥登录吗？其他设备的数据会保留。</string>
+    <string name="invite_decline_wait_for_sync">等待此聊天同步后，再次点按“拒绝”。</string>
+    <string name="invite_decline_check_delivery">你的上一次群组更改尚未送达所有中继。请先查看聊天中是否有投递警告，再重试。</string>
 </resources>

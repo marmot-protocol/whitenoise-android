@@ -65,18 +65,40 @@ class GroupDepartureQuestionTest {
             checkAtomicDecision(MarmotKitException.GroupCatchingUp(GROUP), "acknowledgeGroupCatchingUp", false)
         }
 
+    /** A snapshot that still lists the user as a member must respect MDK’s newer admin decision. */
+    @Test
+    fun aPromotedMemberCanWaitWithoutLeaving() =
+        runBlocking {
+            val catchingUp = MarmotKitException.GroupCatchingUp(GROUP)
+            checkAtomicDecision(catchingUp, "acknowledgeGroupCatchingUp", false) { state, owner ->
+                val controller =
+                    ConversationController(
+                        appState = state,
+                        initialGroup = conversationTimelineTestGroup().copy(admins = listOf(OTHER_ADMIN)),
+                        initialMemberSnapshot = GroupMemberSnapshot(roster()),
+                    )
+                controller.leaveWithRoster(owner, soleMember = false, activeAccountIdHex = SELF) {
+                    error("Unexpected demotion")
+                }
+            }
+            assertFalse("groupManagementState" in calls)
+        }
+
     /** Exercise the real confirmation with a native refusal and check which operations follow the answer. */
     private suspend fun checkAtomicDecision(
         refusal: MarmotKitException,
         acknowledgement: String,
         proceed: Boolean,
+        performLeave: suspend (WhiteNoiseAppState, String) -> Boolean = { state, owner ->
+            state.leaveAsAdmin(owner, GROUP) { error("Unexpected demotion") }
+        },
     ) {
         calls.clear()
         val state = appState(catchingUpRuntime(atomicLeave = true, refusal = refusal))
         val owner = checkNotNull(state.activeAccountRef)
         val leave =
             CoroutineScope(Job()).async(start = CoroutineStart.UNDISPATCHED) {
-                state.leaveAsAdmin(owner, GROUP) { error("Unexpected demotion") }
+                performLeave(state, owner)
             }
         try {
             awaitWithMainLooper { state.groupChangeConfirmations.pending != null }
@@ -85,8 +107,8 @@ class GroupDepartureQuestionTest {
             awaitWithMainLooper { leave.isCompleted }
             assertEquals(!proceed, leave.isCancelled)
             if (proceed) assertTrue(leave.await())
-            assertEquals(if (proceed) 1 else 0, calls.count { it == acknowledgement })
-            assertEquals(if (proceed) 2 else 1, calls.count { it == "leaveGroup" })
+            val expected = if (proceed) listOf("leaveGroup", acknowledgement, "leaveGroup") else listOf("leaveGroup")
+            assertEquals(expected, calls.filter { it == "leaveGroup" || it.startsWith("acknowledge") })
             assertFalse("selfDemoteAdminDetailed" in calls)
         } finally {
             leave.cancel()
@@ -312,32 +334,37 @@ class GroupDepartureQuestionTest {
             }
         }
 
-    /** Waiting on the step-down leaves the same invitation pending with its original role. */
+    /** A refused legacy step-down leaves the invitation pending for a fresh decision. */
     @Test
-    fun waitingOnAdminDeclineKeepsTheInvite() =
+    fun catchingUpDuringAdminDeclineKeepsTheInvite() =
         runBlocking {
             val invite =
                 conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
             val state = appState(inviteRuntime(invite, holdStepDown = true))
             val controller = ConversationController(appState = state, initialGroup = invite)
             assertFalse(controller.declineInvite())
-            val decline =
-                CoroutineScope(Job()).async(start = CoroutineStart.UNDISPATCHED) {
-                    controller.confirmInviteDeclineStepDown()
-                }
-            try {
-                awaitWithMainLooper { state.groupChangeConfirmations.pending != null }
-                checkNotNull(state.groupChangeConfirmations.pending).answer(proceed = false)
-                awaitWithMainLooper { decline.isCompleted }
-            } finally {
-                decline.cancel()
-                state.groupChangeConfirmations.pending?.answer(proceed = false)
-            }
-
-            assertTrue(decline.isCancelled)
+            assertFalse(controller.confirmInviteDeclineStepDown())
+            assertNull(state.groupChangeConfirmations.pending)
+            assertEquals(AppText.Resource(R.string.invite_decline_wait_for_sync), state.toast?.detail)
             assertEquals(1, calls.count { it == "declineGroupInvite" })
             assertTrue(controller.group.pendingConfirmation)
             assertTrue(SELF in controller.group.admins)
+        }
+
+    /** An atomic decline refused by MDK never carries this Welcome’s decision into a native retry. */
+    @Test
+    fun undeliveredDeclineNeedsANewTap() =
+        runBlocking {
+            val invite = conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(OTHER_ADMIN))
+            val refusal = MarmotKitException.GroupCommitUndelivered(GROUP)
+            val state = appState(inviteRuntime(invite, declineRefusal = refusal))
+            val controller = ConversationController(appState = state, initialGroup = invite)
+            assertFalse(controller.declineInvite())
+            assertTrue(controller.group.pendingConfirmation)
+            assertEquals(AppText.Resource(R.string.invite_decline_check_delivery), state.toast?.detail)
+            assertNull(state.groupChangeConfirmations.pending)
+            val decisions = calls.filter { it.startsWith("acknowledge") || it == "declineGroupInvite" }
+            assertEquals(listOf("declineGroupInvite"), decisions)
         }
 
     /** The test thread is Robolectric's main thread, so its looper runs between polls for main-thread steps. */
@@ -379,6 +406,7 @@ class GroupDepartureQuestionTest {
     private fun inviteRuntime(
         invite: AppGroupRecordFfi,
         holdStepDown: Boolean = false,
+        declineRefusal: MarmotKitException? = null,
         selfAdmin: Boolean = SELF in invite.admins,
         lastAdmin: Boolean = invite.admins == listOf(SELF),
     ): MarmotInterface {
@@ -397,7 +425,9 @@ class GroupDepartureQuestionTest {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "groupCommitDelivery" -> null
                 "declineGroupInvite" ->
-                    if (isAdmin) {
+                    if (declineRefusal != null) {
+                        failSuspendedNativeCall(arguments, declineRefusal)
+                    } else if (isAdmin) {
                         failSuspendedNativeCall(arguments, MarmotKitException.AdminCannotSelfRemove(GROUP))
                     } else {
                         GroupInviteDeclineResultFfi(
@@ -441,7 +471,7 @@ class GroupDepartureQuestionTest {
                         canLeave = atomicLeave,
                         requiresSelfDemoteBeforeLeave = !atomicLeave,
                     )
-                "acknowledgeGroupCatchingUp", "acknowledgeGroupCommitUndelivered" -> Unit
+                "acknowledgeGroupCatchingUp", "acknowledgeGroupCommitUndelivered" -> true
                 "leaveGroup" ->
                     if (refusal != null && calls.count { it == "leaveGroup" } == 1) {
                         failSuspendedNativeCall(arguments, refusal)

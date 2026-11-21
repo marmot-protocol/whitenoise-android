@@ -173,4 +173,6 @@
     <string name="link_device_adding_chats">Zu Chats hinzufügen: %1$d von %2$d</string>
     <string name="unlinked_remove_sign_in">Entfernen und anmelden</string>
     <string name="unlinked_remove_sign_in_detail">Die Verknüpfung dieses Geräts wurde aufgehoben. Möchtest du die Chats und Daten dieses Profils von diesem Gerät löschen und dich mit dem eingegebenen Schlüssel anmelden? Deine anderen Geräte behalten ihre Daten.</string>
+    <string name="invite_decline_wait_for_sync">Warte, bis dieser Chat synchronisiert ist, und tippe erneut auf „Ablehnen“.</string>
+    <string name="invite_decline_check_delivery">Deine letzte Gruppenänderung hat noch nicht alle Relays erreicht. Prüfe vor dem nächsten Versuch, ob dieser Chat eine Zustellwarnung anzeigt.</string>
 </resources>

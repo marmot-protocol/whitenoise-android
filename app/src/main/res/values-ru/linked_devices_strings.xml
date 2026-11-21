@@ -173,4 +173,6 @@
     <string name="link_device_adding_chats">Добавление в чаты: %1$d из %2$d</string>
     <string name="unlinked_remove_sign_in">Удалить и войти</string>
     <string name="unlinked_remove_sign_in_detail">Это устройство было отвязано. Удалить чаты и данные этого профиля с устройства и войти с введённым ключом? На других ваших устройствах данные сохранятся.</string>
+    <string name="invite_decline_wait_for_sync">Дождитесь синхронизации чата и снова нажмите «Отклонить».</string>
+    <string name="invite_decline_check_delivery">Последнее изменение группы поступило не на все ретрансляторы. Перед новой попыткой проверьте, есть ли в чате предупреждение о доставке.</string>
 </resources>

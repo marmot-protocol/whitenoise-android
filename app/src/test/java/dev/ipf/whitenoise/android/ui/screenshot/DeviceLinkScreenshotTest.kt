@@ -4,9 +4,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -36,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.devices.fixtureDevice
 import dev.ipf.whitenoise.android.ui.devices.newDeviceLinkStep
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -151,6 +156,20 @@ class DeviceLinkScreenshotTest {
     fun chatsArrivingLight() {
         show(Look()) { EmptyChats(onCreate = {}, progress = LinkChatProgressFfi("this", true, 12u, 5u)) }
         compose.onRoot().captureRoboImage("src/test/snapshots/device_link_chats_arriving_light.png")
+    }
+
+    /** New Chat stays reachable while a linked device waits for chats in a short window at double text size. */
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h240dp-mdpi")
+    fun chatsArrivingShortWindow() {
+        var created = false
+        show(Look(dark = true, rtl = true)) {
+            EmptyChats(onCreate = { created = true }, progress = LinkChatProgressFfi("this", true, 12u, 5u))
+        }
+        val button = compose.onNodeWithText("New Chat").performScrollTo().assertIsDisplayed()
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_chats_arriving_short_window.png")
+        button.performClick()
+        compose.runOnIdle { assertTrue(created) }
     }
 
     /** Replacing the unlinked profile requires explicit local deletion and sign-in consent. */

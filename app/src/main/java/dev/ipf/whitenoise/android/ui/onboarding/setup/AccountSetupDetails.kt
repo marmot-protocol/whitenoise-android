@@ -27,9 +27,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
-import dev.ipf.marmotkit.OnboardingCheckOutcomeFfi
-import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
-import dev.ipf.marmotkit.OnboardingFindingContextFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
@@ -252,12 +249,6 @@ internal fun SetupFindingContent(
         }
     }
 }
-
-/** A finding can carry provenance even when it has no endpoint or separate title. */
-private fun OnboardingFindingFfi.hasDiagnosticEvidence(): Boolean =
-    context != OnboardingFindingContextFfi.UNKNOWN ||
-        purpose != OnboardingCheckPurposeFfi.UNKNOWN ||
-        outcome != OnboardingCheckOutcomeFfi.UNKNOWN
 
 /** Preserves each native check's provenance; legacy unknown records do not acquire invented evidence. */
 @Composable
