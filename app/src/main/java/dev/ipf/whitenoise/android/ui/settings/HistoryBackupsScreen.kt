@@ -477,11 +477,13 @@ private fun SetupButtons(
     }
 }
 
+private const val RECOVERY_WORD_COUNT = 12
+
 /** MDK validates spelling and checksum. Keep incomplete entries on the form. */
 private fun hasTwelveRecoveryWords(text: CharSequence): Boolean =
     text.indices.count { index ->
         !text[index].isWhitespace() && (index == 0 || text[index - 1].isWhitespace())
-    } == 12
+    } == RECOVERY_WORD_COUNT
 
 /**
  * A field for recovery words. The password keyboard type asks the keyboard not to learn or suggest what is typed,

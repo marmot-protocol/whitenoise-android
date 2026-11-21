@@ -952,7 +952,6 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Clears only the runtime that failed and immediately fences its permission callbacks. */
     private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) return
         StartupDiagnostics.unbindNative(runtime.marmot)

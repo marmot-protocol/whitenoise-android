@@ -13,8 +13,9 @@ internal fun WhiteNoiseAppState.historyBackupsEligible(account: String? = active
  * late answers, once the account, the runtime or eligibility changes. Null when no runtime or eligible account exists.
  */
 internal fun WhiteNoiseAppState.historyBackupsController(scope: CoroutineScope): HistoryBackupsController? {
-    val account = activeAccountRef?.takeIf { historyBackupsEligible(it) } ?: return null
-    val runtime = captureHostPerformanceRuntimeOwner()?.runtime ?: return null
+    val account = activeAccountRef?.takeIf { historyBackupsEligible(it) }
+    val runtime = captureHostPerformanceRuntimeOwner()?.runtime
+    if (account == null || runtime == null) return null
     val generation = runtimeGeneration
     return HistoryBackupsController(
         marmot = runtime.marmot,
