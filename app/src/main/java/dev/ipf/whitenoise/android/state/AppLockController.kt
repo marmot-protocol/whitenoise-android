@@ -286,7 +286,7 @@ internal class AppLockController(
         }
     }
 
-    private companion object {
+    internal companion object {
         const val REQUIRE_APP_UNLOCK_KEY = "require_app_unlock"
         const val APP_LOCK_DELAY_KEY = "app_lock_delay"
     }

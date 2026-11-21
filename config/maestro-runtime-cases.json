@@ -68,6 +68,51 @@
       "assertions": "Notifications Delivery & battery page opens its delivery choices; Back returns to Notifications, then Settings and Chats.",
       "postcondition": "none"
     },
+    "notification-profiles-create-schedule": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-049",
+        "NTF-052"
+      ],
+      "assertions": "Create a named profile next to the starter profiles, turn on its schedule, confirm the start time dialog, clear Saturday and Sunday and save; the reopened editor keeps the weekday choices. Back from an unchanged editor asks nothing. No clock, time zone or delivery proof.",
+      "postcondition": "none"
+    },
+    "notification-profiles-allowed-chats": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-050",
+        "NTF-053"
+      ],
+      "assertions": "The editor names the active account, the allowed-chats picker selects the fixture group and the saved profile reopens with 1 chat; an unsaved deselection asks before discarding, Keep Editing keeps it and Discard restores the saved chat. No delivery or account-switch proof.",
+      "postcondition": "none"
+    },
+    "notification-profiles-delete": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-049",
+        "NTF-053",
+        "NTF-054"
+      ],
+      "assertions": "Fresh data lists the Sleep, Work and Focus starter profiles. Delete on Work asks first; Cancel keeps the editor and the profile, confirming removes Work while Sleep and Focus stay.",
+      "postcondition": "none"
+    },
+    "notification-profiles-emoji-people": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-055",
+        "NTF-057"
+      ],
+      "assertions": "On the Sleep starter profile the emoji badge offers Remove emoji, which clears it; tapping the empty badge opens the emoji picker. Allowed people opens the active account's people picker; choosing Maestro Bob shows 1 person, which survives save and reopen. No delivery proof.",
+      "postcondition": "none"
+    },
+    "notification-profiles-quick-sheet": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-051"
+      ],
+      "assertions": "Saving a profile adds the chat-list profile button, which opens the quick sheet; choosing the saved profile, For 1 hour shows the banner with an end time, the banner reopens the sheet and Turn off removes it; Until I turn it off shows the banner and the top-bar button turns it off. No relaunch, schedule-window or delivery proof.",
+      "postcondition": "none"
+    },
     "settings-read-aloud": {
       "suite": "settings",
       "manual_ids": [

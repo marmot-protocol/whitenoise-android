@@ -215,7 +215,7 @@ internal fun PollCreateForm(
                     emojiOwner = options.toList(),
                     onValueChange = { onOptionChange(index, it) },
                     label = { Text(stringResource(R.string.poll_option, index + 1)) },
-                    modifier = Modifier.weight(1f),
+                    containerModifier = Modifier.weight(1f),
                     singleLine = true,
                     enabled = enabled,
                 )

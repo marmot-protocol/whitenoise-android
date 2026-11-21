@@ -196,6 +196,22 @@
         "test_ids": [
           "MED-016"
         ]
+      },
+      {
+        "surface": "Notification profile Quick Settings tile",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": ".notifications.NotificationProfileTileService",
+        "test_ids": [
+          "NTF-058"
+        ]
+      },
+      {
+        "surface": "intent:android.service.quicksettings.action.QS_TILE_PREFERENCES",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.service.quicksettings.action.QS_TILE_PREFERENCES",
+        "test_ids": [
+          "NTF-058"
+        ]
       }
     ],
     "manifest_permissions": [
@@ -230,6 +246,14 @@
         "anchor": "android.permission.BIND_JOB_SERVICE",
         "test_ids": [
           "MED-022"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.BIND_QUICK_SETTINGS_TILE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.BIND_QUICK_SETTINGS_TILE",
+        "test_ids": [
+          "NTF-058"
         ]
       },
       {

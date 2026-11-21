@@ -1,0 +1,45 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: notification-profiles-allowed-chats
+---
+- runFlow: ../fixtures/open-new-notification-profile.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: ".*None.*"
+# Three signed-in fixture accounts: the editor names the account the chats belong to.
+- assertVisible: "Chats are chosen for .*"
+- tapOn:
+    id: "notification-profile.chats"
+- assertVisible:
+    id: "notification-profile.pickerSearch"
+- assertVisible: "Allowed chats"
+- tapOn: "Maestro group"
+- tapOn: "Done"
+- assertNotVisible:
+    id: "notification-profile.pickerSearch"
+- assertVisible: ".*1 chat.*"
+- tapOn:
+    id: "notification-profile.save"
+- assertVisible:
+    id: "notification-profiles.list"
+- tapOn: "Maestro sleep"
+- assertVisible: "Edit profile"
+- assertVisible: ".*1 chat.*"
+- tapOn:
+    id: "notification-profile.chats"
+- assertVisible:
+    id: "notification-profile.pickerSearch"
+- tapOn: "Maestro group"
+- tapOn: "Done"
+- assertVisible: ".*None.*"
+- back
+- assertVisible: "Discard changes[?]"
+- assertVisible: "Keep Editing"
+- tapOn: "Keep Editing"
+- assertNotVisible: "Discard changes[?]"
+- assertVisible: ".*None.*"
+- back
+- assertVisible: "Discard changes[?]"
+- tapOn: "Discard Changes"
+- assertVisible:
+    id: "notification-profiles.list"
+- tapOn: "Maestro sleep"
+- assertVisible: ".*1 chat.*"

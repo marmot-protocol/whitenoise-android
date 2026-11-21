@@ -115,7 +115,9 @@ class NotificationFirstPostContentWiringTest {
         val source = notificationContentSource()
         val process = source.functionBody("processNotificationUpdate")
         val resolve = source.functionBody("resolveNotificationFirstPost")
-        val eligibility = source.functionBody("isNotificationGenerationPostAllowed")
+        val eligibility =
+            appModuleSource("$STATE_DIR/AppStateNotificationPostEligibility.kt")
+                .functionBody("isNotificationGenerationPostAllowed")
 
         assertTrue(
             "typed receipt must capture both invalidation lifetimes before local resolution",

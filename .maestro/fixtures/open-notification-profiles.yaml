@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Fresh fixture data starts with the three switched-off starter profiles.
+- runFlow: runtime-ready.yaml
+- assertVisible: "Maestro group"
+# Starter profiles alone do not add the chat-list profile button.
+- assertNotVisible:
+    id: "chats.notificationProfileAction"
+- runFlow: open-settings.yaml
+- scrollUntilVisible:
+    element:
+      text: "Notifications"
+    direction: DOWN
+- tapOn: "Notifications"
+- scrollUntilVisible:
+    element:
+      id: "notifications.profiles"
+    direction: DOWN
+- tapOn:
+    id: "notifications.profiles"
+- assertVisible:
+    id: "notification-profiles.list"
+- assertVisible: "Sleep"
+- assertVisible: "Work"
+- assertVisible: "Focus"
+- assertNotVisible: "No profiles yet"

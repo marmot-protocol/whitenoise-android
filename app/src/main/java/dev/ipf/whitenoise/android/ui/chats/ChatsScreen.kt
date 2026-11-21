@@ -1083,7 +1083,7 @@ internal fun ChatsScreen(
             visibleItems.map(::visibleRowId)
         }
     val historyNotices = rememberAccountHistoryNotices(appState)
-    val showHistoryNotice = !searchActive && !browsingAttachments && historyNotices?.notices?.isNotEmpty() == true
+    val showChatListNotices = !searchActive && !browsingAttachments
     val leadingChatListItemCount =
         if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
     val visiblePinnedOrder =
@@ -2631,14 +2631,7 @@ internal fun ChatsScreen(
                         )
                     }
                 },
-                notice = {
-                    historyNotices?.takeIf { showHistoryNotice }?.let { owner ->
-                        AccountHistoryNoticeBanner(
-                            dismissing = owner.dismissing,
-                            onDismiss = { appState.launchMutation { owner.dismissAll() } },
-                        )
-                    }
-                },
+                notice = { ChatListPersistentNotices(appState, historyNotices, showChatListNotices) },
             ) {
                 val unreadOwnerAvailable =
                     appState.activeAccountRef != null &&

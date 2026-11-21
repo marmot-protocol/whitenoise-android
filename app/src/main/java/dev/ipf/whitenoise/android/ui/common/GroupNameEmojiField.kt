@@ -8,7 +8,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.TextFieldValue
 
-/** Shared group-name input chrome; picker ownership stays with each screen. */
+/**
+ * Shared group-name input chrome; picker ownership stays with each screen. The screen passes the same
+ * [emojiAnchor] to its picker sheet so the sheet opens underneath this field.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun GroupNameEmojiField(
@@ -19,7 +22,9 @@ internal fun GroupNameEmojiField(
     onEmojiPickerClick: () -> Unit,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    emojiAnchor: EmojiSheetFieldAnchor? = null,
 ) {
+    val openBelowField = rememberEmojiSheetOpener(emojiAnchor)
     TextField(
         value = value,
         onValueChange = onValueChange,
@@ -30,7 +35,7 @@ internal fun GroupNameEmojiField(
             TextEntryEmojiAction(
                 pickerOpen = emojiPickerOpen,
                 enabled = enabled,
-                onClick = onEmojiPickerClick,
+                onClick = { openBelowField(onEmojiPickerClick) },
             )
         },
         colors =
@@ -40,6 +45,6 @@ internal fun GroupNameEmojiField(
                 disabledContainerColor = Color.Transparent,
                 errorContainerColor = Color.Transparent,
             ),
-        modifier = modifier,
+        modifier = emojiAnchor?.let { modifier.emojiSheetFieldAnchor(it) } ?: modifier,
     )
 }

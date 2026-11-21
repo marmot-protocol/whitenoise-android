@@ -12,6 +12,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
@@ -20,12 +21,15 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.notifications.NotificationProfile
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.state.updateAccountUnreadCount
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_SEARCH_FILTERS_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
@@ -34,7 +38,9 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchChatFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterControlsRow
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSenderFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
+import dev.ipf.whitenoise.android.ui.chats.NOTIFICATION_PROFILE_QUICK_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -249,11 +255,44 @@ class ChatListTopBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/chat_list_top_bar_three_accounts_adjacent_unread_rtl.png")
     }
 
+    @Test
+    @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
+    fun profileQuickActionOffWithUpdate() {
+        renderProfileQuickAction(active = false)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_list_top_bar_profile_off.png")
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+    fun profileQuickActionOnWithUpdate() {
+        renderProfileQuickAction(active = true)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_list_top_bar_profile_on.png")
+    }
+
+    private fun renderProfileQuickAction(active: Boolean) {
+        val appState = testAppState(accountCount = 3)
+        val profile = NotificationProfile("screenshot-focus", "Focus", emptySet(), false, null, 0L)
+        check(appState.notificationProfiles.save(profile))
+        check(appState.notificationProfiles.setShowInChatList(true))
+        if (active) check(appState.notificationProfiles.turnOn(profile.id, untilMs = null))
+        render(
+            accountCount = 3,
+            dark = active,
+            amoled = false,
+            appState = appState,
+            updateInfo = AppUpdateInfo("2026.1.1", "2026.1.2", null, null, 1),
+        )
+        composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag("appUpdate.openSettings").assertIsDisplayed()
+    }
+
     private fun render(
         accountCount: Int,
         dark: Boolean,
         amoled: Boolean,
         connectivityState: ConnectivityBannerState = ConnectivityBannerState.Connecting,
+        appState: WhiteNoiseAppState? = null,
+        updateInfo: AppUpdateInfo? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
@@ -264,8 +303,11 @@ class ChatListTopBarScreenshotTest {
                                 .fillMaxWidth()
                                 .testTag(TAG),
                     ) {
+                        val state = appState ?: remember { testAppState(accountCount) }
                         ChatListTopBar(
-                            appState = remember { testAppState(accountCount) },
+                            appState = state,
+                            updateInfo = updateInfo ?: state.appUpdateInfo,
+                            selfUpdateEnabled = updateInfo != null || BuildConfig.SELF_UPDATE_ENABLED,
                             searchOpen = false,
                             searchQuery = "",
                             searchFocusRequester = remember { FocusRequester() },

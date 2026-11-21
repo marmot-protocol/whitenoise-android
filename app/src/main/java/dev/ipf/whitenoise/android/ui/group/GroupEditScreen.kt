@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.rememberEmojiSheetFieldAnchor
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
@@ -149,6 +150,7 @@ internal fun GroupEditScreen(
         val openedName = rememberSaveable(controller.group.groupIdHex) { controller.group.name }
         val openedDescription = rememberSaveable(controller.group.groupIdHex) { controller.group.description }
         var showEmojiPicker by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
+        val nameEmojiAnchor = rememberEmojiSheetFieldAnchor()
         var showImageSearch by remember { mutableStateOf(false) }
         var showGroupEmojiImagePicker by remember { mutableStateOf(false) }
         var avatarViewerOpen by remember { mutableStateOf(false) }
@@ -635,11 +637,10 @@ internal fun GroupEditScreen(
                         onValueChange = { name = it },
                         label = stringResource(R.string.group_name),
                         emojiPickerOpen = showEmojiPicker,
-                        onEmojiPickerClick = {
-                            if (nameEditable) showEmojiPicker = true
-                        },
+                        onEmojiPickerClick = { if (nameEditable) showEmojiPicker = true },
                         enabled = nameEditable,
                         modifier = Modifier.fillMaxWidth(),
+                        emojiAnchor = nameEmojiAnchor,
                     )
                     ProseTextField(
                         value = description,
@@ -738,9 +739,8 @@ internal fun GroupEditScreen(
                     if (nameEditable) name = insertEmojiAtSelection(name, emoji)
                 },
                 recentEmojis = recentEmojiRecentsOwner.recents,
-                onEmojiUsed = { emoji ->
-                    if (nameEditable) recentEmojiRecentsOwner.onEmojiUsed(emoji)
-                },
+                onEmojiUsed = { emoji -> if (nameEditable) recentEmojiRecentsOwner.onEmojiUsed(emoji) },
+                fieldAnchor = nameEmojiAnchor,
             )
         }
     }

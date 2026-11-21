@@ -1,0 +1,44 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: notification-profiles-emoji-people
+---
+- runFlow: ../fixtures/open-notification-profiles.yaml
+# The instrumentation host owns launch, reset and disposal.
+- tapOn: "Sleep"
+- assertVisible: "Edit profile"
+- assertVisible:
+    id: "notification-profile.emoji"
+- tapOn:
+    id: "notification-profile.emoji"
+- assertVisible: "Remove emoji"
+- tapOn: "Remove emoji"
+- assertNotVisible: "Remove emoji"
+- tapOn:
+    id: "notification-profile.emoji"
+- assertVisible:
+    id: "emoji.picker.grid"
+- back
+- assertVisible: "Edit profile"
+- scrollUntilVisible:
+    element:
+      id: "notification-profile.people"
+    direction: DOWN
+- tapOn:
+    id: "notification-profile.people"
+- assertVisible:
+    id: "notification-profile.peopleSearch"
+- assertVisible: "Allowed people"
+- tapOn: "Maestro Bob"
+- tapOn: "Done"
+- assertNotVisible:
+    id: "notification-profile.peopleSearch"
+- assertVisible: ".*1 person.*"
+- tapOn:
+    id: "notification-profile.save"
+- assertVisible:
+    id: "notification-profiles.list"
+- tapOn: "Sleep"
+- assertVisible: "Edit profile"
+- assertVisible: ".*1 person.*"
+- back
+- assertVisible:
+    id: "notification-profiles.list"

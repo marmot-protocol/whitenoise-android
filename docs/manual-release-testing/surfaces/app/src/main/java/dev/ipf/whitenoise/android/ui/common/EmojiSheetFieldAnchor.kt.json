@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/EmojiSheetFieldAnchor.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Emoji sheet opens below its text field",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/EmojiSheetFieldAnchor.kt",
+        "anchor": "fun emojiSheetPickerHeightBelowField(",
+        "test_ids": [
+          "PRO-010"
+        ]
+      },
+      {
+        "surface": "Text field scrolls up to make room for its emoji sheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/EmojiSheetFieldAnchor.kt",
+        "anchor": "fun rememberEmojiSheetOpener(",
+        "test_ids": [
+          "PRO-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

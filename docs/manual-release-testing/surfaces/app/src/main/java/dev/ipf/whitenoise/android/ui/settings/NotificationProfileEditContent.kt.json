@@ -1,0 +1,206 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DayPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "fun DayPicker(",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "DayToggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "fun DayToggle(",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "DeleteProfileGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "fun DeleteProfileGroup(",
+        "test_ids": [
+          "NTF-053"
+        ]
+      },
+      {
+        "surface": "NotificationProfileEditContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "fun NotificationProfileEditContent(",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "NotificationProfileTimeDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "fun NotificationProfileTimeDialog(",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "ProfileNameField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "fun ProfileNameField(",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "ScheduleError",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "fun ScheduleError(",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "ScheduleSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "fun ScheduleSection(",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_delete",
+        "test_ids": [
+          "NTF-053"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_edit_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_edit_title",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_name_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_name_label",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_name_placeholder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_name_placeholder",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_new_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_new_title",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_days",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_schedule_days",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_days_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_schedule_days_error",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_enable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_schedule_enable",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_end",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_schedule_end",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_end_next_day",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_schedule_end_next_day",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_same_time_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_schedule_same_time_error",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_schedule_section",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_start",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.notification_profile_schedule_start",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:ok",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.ok",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "NTF-049"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

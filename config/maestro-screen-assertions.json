@@ -428,6 +428,51 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+      "symbol": "ColumnScope.NotificationProfileQuickSheetContent",
+      "bindings": [
+        {
+          "case": "notification-profiles-quick-sheet",
+          "selector": {
+            "id": "notificationProfile.forHour"
+          },
+          "scope": "Inactive sheet body for one saved profile lists For 1 hour and Until I turn it off; For 1 hour applies and closes the sheet.",
+          "opened_by": {
+            "id": "chats.notificationProfileAction"
+          }
+        },
+        {
+          "case": "notification-profiles-quick-sheet",
+          "selector": {
+            "id": "notificationProfile.turnOff"
+          },
+          "scope": "Active sheet body opened from the chat-list banner offers Turn off, which removes the banner.",
+          "opened_by": {
+            "id": "chats.notificationProfileBanner"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+      "symbol": "NotificationProfileQuickSheet",
+      "bindings": [
+        {
+          "case": "notification-profiles-quick-sheet",
+          "selector": {
+            "id": "chats.notificationProfileSheet"
+          },
+          "scope": "Chat-list top-bar profile button opens the production quick sheet once a profile exists; each choice closes it.",
+          "entry_assertion": {
+            "id": "chats.notificationProfileSheet"
+          },
+          "opened_by": {
+            "id": "chats.notificationProfileAction"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
       "symbol": "ContactPickerScreen",
       "bindings": [
@@ -3843,6 +3888,171 @@
           },
           "opened_by": {
             "text": "Data & storage"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+      "symbol": "DayPicker",
+      "bindings": [
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "id": "notification-profile.day.SATURDAY",
+            "checked": false
+          },
+          "scope": "Seven-day row under a newly enabled schedule starts with every day; clearing Saturday and Sunday leaves weekdays checked and survives save and reopen.",
+          "opened_by": {
+            "id": "notification-profile.day.SATURDAY"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+      "symbol": "NotificationProfileTimeDialog",
+      "bindings": [
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "id": "notification-profile.time-confirm"
+          },
+          "scope": "Starts opens the Material time dialog for the default 22:00 start; OK closes it. No time change, clock-format or next-day proof.",
+          "entry_assertion": {
+            "id": "notification-profile.time-dialog"
+          },
+          "opened_by": {
+            "id": "notification-profile.start"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "AllowedChatsPicker",
+      "bindings": [
+        {
+          "case": "notification-profiles-allowed-chats",
+          "selector": {
+            "id": "notification-profile.pickerSearch"
+          },
+          "scope": "Allowed chats opens the active account's multi-select chat picker; selecting the fixture group and Done shows 1 chat in the editor.",
+          "opened_by": {
+            "id": "notification-profile.chats"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "AllowedPeoplePicker",
+      "bindings": [
+        {
+          "case": "notification-profiles-emoji-people",
+          "selector": {
+            "id": "notification-profile.peopleSearch"
+          },
+          "scope": "Allowed people opens the active account's multi-select people picker; selecting Maestro Bob and Done shows 1 person in the editor and survives save and reopen.",
+          "opened_by": {
+            "id": "notification-profile.people"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "NotificationProfileDeleteDialog",
+      "bindings": [
+        {
+          "case": "notification-profiles-delete",
+          "selector": {
+            "text": "Delete Work[?]"
+          },
+          "scope": "Delete profile on the Work starter profile asks with its name; Cancel keeps the editor and confirming removes it while Sleep and Focus stay.",
+          "entry_assertion": {
+            "id": "notification-profile.delete-dialog"
+          },
+          "opened_by": {
+            "id": "notification-profile.delete"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "NotificationProfileDiscardDialog",
+      "bindings": [
+        {
+          "case": "notification-profiles-allowed-chats",
+          "selector": {
+            "text": "Keep Editing"
+          },
+          "scope": "Back from an editor with an unsaved allowed-chat change asks before discarding; Keep Editing keeps the draft and Discard Changes restores the saved chat.",
+          "entry_assertion": {
+            "text": "Discard changes[?]"
+          },
+          "opened_by": {
+            "back": true
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "NotificationProfileEditScreen",
+      "bindings": [
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "id": "notification-profile.save",
+            "enabled": false
+          },
+          "scope": "New profile editor blocks Save for an empty name, enables it once named, and the saved profile reopens as Edit profile with its day choices.",
+          "opened_by": {
+            "id": "notification-profiles.create"
+          }
+        },
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "text": "Edit profile"
+          },
+          "scope": "Tapping a saved profile reopens the editor on its saved schedule."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEmojiButton.kt",
+      "symbol": "NotificationProfileEmojiButton",
+      "bindings": [
+        {
+          "case": "notification-profiles-emoji-people",
+          "selector": {
+            "text": "Remove emoji"
+          },
+          "scope": "The emoji badge of a profile with an emoji opens its Change/Remove menu; Remove emoji clears it and the empty badge then opens the emoji picker.",
+          "entry_assertion": {
+            "text": "Remove emoji"
+          },
+          "opened_by": {
+            "id": "notification-profile.emoji"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfilesScreen.kt",
+      "symbol": "NotificationProfilesScreen",
+      "bindings": [
+        {
+          "case": "notification-profiles-create-schedule",
+          "selector": {
+            "text": "Focus"
+          },
+          "scope": "Settings, Notifications, Notification profiles opens the list with the Sleep, Work and Focus starter profiles on fresh fixture data, not the empty state.",
+          "opened_by": {
+            "id": "notifications.profiles"
           }
         }
       ]

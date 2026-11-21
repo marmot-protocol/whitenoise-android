@@ -11,6 +11,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
+import dev.ipf.whitenoise.android.ui.common.EmojiSheetFieldAnchor
 
 /** An unsubmitted UI draft shared by member selection and setup; never an engine/group cache. */
 @Stable
@@ -26,6 +27,9 @@ internal class NewGroupDraft(
     var imageNeedsReselection by mutableStateOf(imageNeedsReselection)
     var retryGroupIdHex by mutableStateOf(retryGroupIdHex)
     var createRequestToken by mutableLongStateOf(0L)
+
+    /** Where the name field sits, so its emoji sheet opens underneath it; layout-only, never saved. */
+    val nameEmojiAnchor = EmojiSheetFieldAnchor()
 }
 
 /** Saves small authored fields/selection and canonical recovery ID, never prepared image bytes in a Bundle. */
