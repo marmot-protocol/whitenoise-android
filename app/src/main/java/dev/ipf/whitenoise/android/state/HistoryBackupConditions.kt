@@ -84,6 +84,7 @@ internal object HistoryBackupConditions {
      * Tells [marmot] the current facts and returns once MDK has them, skipping a repeat of its last report. False
      * when the report failed, so a caller about to run a pass knows MDK may still hold the closed default.
      */
+    @Suppress("TooGenericExceptionCaught")
     suspend fun reportNow(
         context: Context,
         marmot: MarmotInterface,

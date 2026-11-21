@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.BackupRestoreStatusFfi
 import dev.ipf.marmotkit.BackupRestoreSubscription
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +23,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.coroutineContext
 
 /** Where the account's history backups stand, as MDK last reported them. */
 internal sealed interface HistoryBackupStatus {
@@ -81,7 +81,8 @@ internal class RecoveryWordsSetup(
     /** The words are shown once: confirmation keeps only the positions, so they cannot be displayed again. */
     fun confirming(): RecoveryWordsSetup = RecoveryWordsSetup(emptyList(), confirmPositions, confirming = true)
 
-    override fun toString(): String = "RecoveryWordsSetup(words=[${words.size} redacted], confirmPositions=$confirmPositions, confirming=$confirming)"
+    override fun toString(): String =
+        "RecoveryWordsSetup(words=[${words.size} redacted], confirmPositions=$confirmPositions, confirming=$confirming)"
 }
 
 /** One restore's progress, reduced from MDK's aggregate status. */
@@ -108,7 +109,15 @@ internal data class HistoryRestoreProgress(
     }
 }
 
-internal enum class HistoryBackupAction { Refresh, BeginSetup, Confirm, CancelSetup, TurnOff, BeginRestore, CancelRestore }
+internal enum class HistoryBackupAction {
+    Refresh,
+    BeginSetup,
+    Confirm,
+    CancelSetup,
+    TurnOff,
+    BeginRestore,
+    CancelRestore,
+}
 
 /** One pending-words flow per MDK account at a time: begin, confirm and forget never interleave across screens. */
 private val setupMutex = Mutex()
@@ -151,6 +160,7 @@ internal fun historyBackupProblem(error: Throwable): HistoryBackupProblem =
  * Recovery words live only in [state] while their setup flow is open. [close] forgets them here and in MDK, so the
  * owner calls it when the screen leaves composition.
  */
+@Suppress("TooManyFunctions")
 @Stable
 internal class HistoryBackupsController(
     private val marmot: MarmotInterface,
@@ -238,10 +248,9 @@ internal class HistoryBackupsController(
                     coroutineContext.ensureActive()
                     val watch = checkNotNull(subscription)
                     watch.snapshot()?.takeIf { isCurrent() }?.let(::applyRestore)
-                    while (true) {
+                    while (isCurrent()) {
                         val next = watch.next() ?: break
-                        if (!isCurrent()) break
-                        applyRestore(next)
+                        if (isCurrent()) applyRestore(next)
                     }
                 } catch (error: CancellationException) {
                     throw error
@@ -259,7 +268,10 @@ internal class HistoryBackupsController(
         closed = true
         watchJob?.cancel()
         val current = mutableState.value
-        val pending = current.setup != null || current.running == HistoryBackupAction.BeginSetup || current.running == HistoryBackupAction.Confirm
+        val pending =
+            current.setup != null ||
+                current.running == HistoryBackupAction.BeginSetup ||
+                current.running == HistoryBackupAction.Confirm
         mutableState.update { it.copy(setup = null) }
         if (pending) forgetPendingWords()
     }
@@ -294,6 +306,7 @@ internal class HistoryBackupsController(
         return result
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private suspend fun reloadSettings() {
         val status =
             try {
@@ -323,6 +336,7 @@ internal class HistoryBackupsController(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun run(
         action: HistoryBackupAction,
         block: suspend () -> Unit,
@@ -340,7 +354,9 @@ internal class HistoryBackupsController(
                     mutableState.update {
                         it.copy(
                             problem = problem,
-                            status = if (problem == HistoryBackupProblem.Unavailable) HistoryBackupStatus.Unavailable else it.status,
+                            status =
+                                if (problem == HistoryBackupProblem.Unavailable) HistoryBackupStatus.Unavailable
+                                else it.status,
                             setup = if (problem == HistoryBackupProblem.SetupExpired) null else it.setup,
                         )
                     }

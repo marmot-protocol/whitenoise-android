@@ -326,7 +326,12 @@ private fun SettingsDetailRoute(
                 onOpenSupportChat = onOpenSupportChat,
                 onRelays = { onDetailChange(SettingsDetail.SupportRelays) },
             )
-        SettingsDetail.SupportRelays -> RelaysScreen(appState, onBack = onBack, destination = SettingsDetail.SupportRelays)
+        SettingsDetail.SupportRelays ->
+            RelaysScreen(
+                appState,
+                onBack = onBack,
+                destination = SettingsDetail.SupportRelays,
+            )
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = onBack)
         SettingsDetail.QuarantinedGroups -> {
             if (appState.developerMode) {
