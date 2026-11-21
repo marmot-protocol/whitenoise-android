@@ -305,18 +305,7 @@ class WhiteNoiseAppState private constructor(
             mutationsScope,
             onPhaseChange = { phase = it },
             awaitActivationReadiness = ::completeReceiverGatedStartup,
-        ) { runtime, account, isMountCurrent ->
-            if (!isMountCurrent()) throw CancellationException("Setup mount was replaced")
-            val reported = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
-            withAccountLifetime {
-                if (!isMountCurrent() || marmot() !== runtime) throw CancellationException("Setup mount was replaced")
-                val canonical = withContext(Dispatchers.IO) { runtime.accountIdHex(reported) }
-                check(canonical == account) { "signer account does not match setup" }
-                withContext(Dispatchers.IO) {
-                    runtime.registerExternalSigner(account, amberSigner.buildSigner(account))
-                }
-            }
-        }
+        ) { runtime, account, isMountCurrent -> reconnectSetupSigner(runtime, account, isMountCurrent) }
     }
 
     /** Process-owned, bounded composer geometry keyed by account and conversation. */
@@ -1361,7 +1350,10 @@ class WhiteNoiseAppState private constructor(
     /** Tests inject a scripted store; production seals push state in the Keystore-backed default. */
     private val pushTokenStore = pushTokenStoreOverride ?: PushTokenStore.create(appContext)
 
-    private val amberSigner = AmberSignerController(appContext)
+    internal val amberSigner = AmberSignerController(appContext)
+
+    /** Handles to this runtime's MDK-owned remote-signer sessions and their display status. */
+    internal val remoteSigners = RemoteSignerAccounts()
 
     /** Isolated sign-in tests replace only the signer round trip. */
     internal var amberPublicKeyRequest: () -> String = amberSigner::requestPublicKey
@@ -4516,7 +4508,7 @@ class WhiteNoiseAppState private constructor(
      * Pending setup keeps its route; only a completed activation receipt can announce an imported identity.
      * An import that started without a runtime fails its ownership check like any native call.
      */
-    private suspend fun activateImportedIdentity(
+    internal suspend fun activateImportedIdentity(
         summary: AccountSummaryFfi,
         expectedRuntime: MarmotInterface?,
         expectedEpoch: Int,
@@ -4663,24 +4655,6 @@ class WhiteNoiseAppState private constructor(
             }
         }
         return summary
-    }
-
-    /**
-     * Re-install the NIP-55 signer callback for every external-signing account
-     * after an engine (re)start. MDK persists only the account pubkey for these
-     * accounts, so the `ExternalAccountSignerFfi` must be re-registered before
-     * any signing happens. Best-effort per account: a failure (e.g. Amber
-     * uninstalled) is logged and leaves the account intact rather than aborting
-     * bootstrap; that account's signing will later surface a typed error.
-     */
-    private suspend fun reregisterExternalSigners() {
-        accounts.filter { it.externalSigning }.forEach { account ->
-            runCatchingCancellable {
-                marmotIo { registerExternalSigner(account.label, amberSigner.buildSigner(account.accountIdHex)) }
-            }.onFailure {
-                appStateDebug(it) { "external signer re-register failed for ${account.label.take(8)}: ${it.readableMessage()}" }
-            }
-        }
     }
 
     /** Publishes the newest engine account snapshot and rejects older list reads. */
