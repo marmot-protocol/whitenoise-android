@@ -265,6 +265,51 @@ class GroupDepartureQuestionTest {
             assertFalse("selfDemoteAdminDetailed" in calls)
         }
 
+    /** A late legacy demotion cannot restore the old Welcome over its replacement or decline the replacement. */
+    @Test
+    fun newerInvitationSurvivesAnInFlightStepDown() =
+        runBlocking {
+            val invite =
+                conversationTimelineTestGroup().copy(
+                    pendingConfirmation = true,
+                    admins = listOf(SELF, OTHER_ADMIN),
+                    viaWelcomeMessageIdHex = "f1".repeat(32),
+                )
+            val replacement = invite.copy(viaWelcomeMessageIdHex = "f2".repeat(32))
+            val demoted = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val native = inviteRuntime(invite)
+            val runtime =
+                object : MarmotInterface by native {
+                    override suspend fun selfDemoteAdminDetailed(
+                        accountRef: String,
+                        groupIdHex: String,
+                    ): GroupMutationResultFfi {
+                        val result = native.selfDemoteAdminDetailed(accountRef, groupIdHex)
+                        demoted.complete(Unit)
+                        release.await()
+                        return result
+                    }
+                }
+            val controller = ConversationController(appState = appState(runtime), initialGroup = invite)
+            assertFalse(controller.declineInvite())
+            val decline =
+                CoroutineScope(Job()).async(start = CoroutineStart.UNDISPATCHED) { controller.confirmInviteDeclineStepDown() }
+            try {
+                awaitWithMainLooper { demoted.isCompleted }
+                controller.applyGroupStateForTest(replacement)
+                release.complete(Unit)
+                awaitWithMainLooper { decline.isCompleted }
+                assertFalse(decline.await())
+                assertEquals(replacement.viaWelcomeMessageIdHex, controller.group.viaWelcomeMessageIdHex)
+                assertTrue(controller.group.pendingConfirmation)
+                assertEquals(1, calls.count { it == "declineGroupInvite" })
+            } finally {
+                release.complete(Unit)
+                decline.cancel()
+            }
+        }
+
     /**
      * A sole admin keeps the pending invite and gets the same guidance as Leave in one tap, without a question that
      * would promise a step-down MDK refuses.

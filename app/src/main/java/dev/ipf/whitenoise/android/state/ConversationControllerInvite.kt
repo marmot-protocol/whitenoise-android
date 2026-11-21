@@ -201,6 +201,7 @@ private suspend fun ConversationController.declinePendingInvite(
                             selfDemoteAdminDetailed(account, groupIdHex)
                         }
                     }
+                if (!stillPending()) return@withContext InviteDeclineOutcome.STALE
                 applyMutationDetails(account, demotion.details)
                 if (stillPending()) {
                     appState.marmotIo { declineGroupInvite(account, groupIdHex) }
