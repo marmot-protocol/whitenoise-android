@@ -132,7 +132,15 @@ internal class SettingsPageMorph {
             cancel()
             return false
         }
-        targetContours = closingTarget(native)
+        val destination = closingTarget(native)
+        if (sourceContours.isNotEmpty() && destination.isNullOrEmpty()) {
+            // A measured source cannot share its outline with a borderless destination.
+            if (opening) returnTargets.remove(target)
+            finish()
+            clearPictures()
+            return false
+        }
+        targetContours = destination
         updateCorrespondence()
         return true
     }

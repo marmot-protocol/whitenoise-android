@@ -52,7 +52,6 @@ import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
 import dev.ipf.whitenoise.android.ui.settings.SupportRelayState
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphAnchorOutline
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.settings.supportRelayState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -147,11 +146,7 @@ internal fun ChatsNewMessageFab(
     }
 }
 
-internal object ChatsPenMorphAnchor : dev.ipf.whitenoise.android.ui.settings.SettingsMorphAnchor
-
-/**
- * Composer-colored edit/warning button, with adaptive pane placement and matching composer chrome.
- */
+/** Composer-colored edit/warning button with adaptive pane placement. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatsNewMessageFabContent(
@@ -178,17 +173,7 @@ internal fun ChatsNewMessageFabContent(
                 .offset(y = if (missingRelays) 0.dp else 16.dp - ComposerOuterVerticalPadding)
                 .floatingDictationAnchor(followsComposerFab = !missingRelays)
                 .newMessagePenOrigin()
-                .then(
-                    if (!missingRelays) {
-                        Modifier.settingsMorphAnchorOutline(
-                            ChatsPenMorphAnchor,
-                            FloatingActionButtonDefaults.shape,
-                            MaterialTheme.colorScheme.outlineVariant,
-                        )
-                    } else {
-                        Modifier
-                    },
-                ).onGloballyPositioned { onBounds(it.settingsMorphBounds(view)) }
+                .onGloballyPositioned { onBounds(it.settingsMorphBounds(view)) }
                 .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
         val chrome =
             if (morphing || outline == null) modifier else modifier.border(outline, FloatingActionButtonDefaults.shape)

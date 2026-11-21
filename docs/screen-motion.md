@@ -4,7 +4,9 @@ Use the existing presentation owner for each surface. Launch geometry belongs to
 
 ## Full screens
 
-For retained Settings and detail routes, use `SettingsPageMorph` through `SettingsRouteMotion` or the existing `SettingsCardMorph` page mode. Pass the actual control bounds using `rememberMeasuredControlClick` or the existing measured Settings launcher. The route owner retains the origin for Back. A later unmeasured entry must retire the earlier origin. When the source has no outlined groups, such as the composer, every destination group grows from that control's bounds at full presence. Chat details and composer settings both grow from the composer outline and fold back into it.
+Use a short horizontal step for ordinary page navigation. Chats → Settings, the account selector’s Settings action and the update emblem all open the same page. The arriving screen moves as one surface at its native size, up to the same 48 dp used by the chat route. Back reverses the logical direction. RTL mirrors it. The Settings groups, avatar and New message pen keep their own shapes.
+
+Use a shared outline when the source actually supplies one. In AMOLED, the selected connected Settings group or the composer perimeter can continue into a measured destination. Pass the activated control bounds through the existing Settings launcher. A page with no registered source outline uses the ordinary page step, as do borderless themes. Keep the same route owner, timing and interruption rules for each input path.
 
 For native full-screen dialog windows, use `MeasuredPlaybackDialog`. It normalizes screen coordinates in the destination window and keeps the window mounted through user dismissal. Toolbar Back calls the surface `dismiss`; its completion removes the caller's route. Forced source/account removal remains immediate and cancels accepted terminal actions.
 
@@ -24,7 +26,7 @@ Preserve nonfocusable popup windows and IME ownership. The shared surface clock 
 
 ## Safety and verification
 
-Use `AppMotion` timing and easing tokens. Reduced motion settles without decorative delay. During page movement, reject touches that would land on displaced controls; exiting surfaces must not expose stale accessibility actions.
+Use the shared 280 ms opening and 230 ms closing curves in `AppMotion`. An interrupted page hands its last displayed translation to the replacement, which settles from that position on the new curve. Reduced motion settles without decorative delay. During page movement, reject touches that would land on displaced controls; exiting surfaces must not expose stale accessibility actions.
 
 Exclude chat-list and transcript pixels from reverse page pictures. Live screenshot protection clears retained pictures in every enclosing morph owner. A missing safe reverse frame settles the parent directly.
 

@@ -10,7 +10,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -74,7 +77,6 @@ internal class SettingsCardMorph(
      * on their own; going back, that group folds into the outline again.
      */
     var anchor: SettingsMorphAnchor? = null
-    var closingAnchor: SettingsMorphAnchor? = null
 
     /** Linear morph time from 0 to 1; read during draw so each frame follows the animation. */
     var time: () -> Float = { 1f }
@@ -92,7 +94,6 @@ internal class SettingsCardMorph(
 
     init {
         page?.anchorContour = { anchorContour }
-        page?.closingAnchorContour = { closingAnchor?.let(anchorOutlines::get) ?: anchorContour }
     }
 
     private val folding: Boolean get() = gather != null || (!fan && anchorBounds != null && cardTokens.isEmpty())
@@ -262,6 +263,10 @@ internal class SettingsCardMorph(
         if (!leavingOver) drawContent()
     }
 
+    /** A tap rectangle alone cannot supply an outline to share with a destination group. */
+    internal val hasSourceOutline: Boolean
+        get() = anchorContour != null || !page?.presentedContours(host, time()).isNullOrEmpty()
+
     internal fun beginPage(
         target: Any?,
         forward: Boolean,
@@ -386,34 +391,37 @@ internal fun <T> rememberSettingsCardMorphHost(
     forward: Boolean = true,
     captureContent: Boolean = true,
 ): Pair<Boolean, Modifier> {
+    if (morph == null) return false to rememberPageHandoff(target, ownerKey, forward, motion)
     // Native control borders do not opt borderless settings themes into contour motion.
     val animateContours = permitsContourMotion(morph, motion)
-    morph?.captureContent = captureContent
+    morph.captureContent = captureContent
     DisposableEffect(morph, ownerKey) {
-        val releaseChild = morph?.observeChildContours()
+        val releaseChild = morph.observeChildContours()
         onDispose {
-            releaseChild?.invoke()
-            morph?.finish()
-            morph?.page?.cancel()
+            releaseChild()
+            morph.finish()
+            morph.page?.cancel()
         }
     }
     // Runs while the new route composes, before the old route's cards have reported their removal.
     val morphing =
-        morph != null &&
-            remember(morph, ownerKey, target, animateContours) {
-                if (morph.page != null) {
-                    morph.beginPage(target, forward, animateContours)
-                } else {
-                    morph.begin(animateContours)
-                }
+        remember(morph, ownerKey, target, animateContours) {
+            if (morph.page != null) {
+                morph.beginPage(target, forward, animateContours && morph.hasSourceOutline)
+            } else {
+                morph.begin(animateContours)
             }
+        }
     val morphProgress = remember(morph, ownerKey, target, animateContours) { Animatable(if (morphing) 0f else 1f) }
+    var contourActive by remember(morphProgress) { mutableStateOf(morphing) }
     val clock: () -> Float = remember(morphProgress) { { morphProgress.value } }
-    morph?.time = clock
+    morph.time = clock
     LaunchedEffect(morphProgress) {
-        if (morphing && morph?.page != null) {
+        if (morphing && morph.page != null) {
             androidx.compose.runtime.withFrameNanos { }
-            if (morph.time !== clock || !morph.page.admitDestination()) {
+            if (morph.time !== clock) return@LaunchedEffect
+            if (!morph.page.admitDestination()) {
+                contourActive = false
                 morphProgress.snapTo(1f)
                 return@LaunchedEffect
             }
@@ -427,9 +435,9 @@ internal fun <T> rememberSettingsCardMorphHost(
             ),
         )
         // A cancelled old animation cannot retire a replacement transition.
-        if (morph != null && morph.time === clock) morph.finish()
+        if (morph.time === clock) morph.finish()
     }
-    if (morph == null) return false to Modifier
+    val handoff = rememberPageHandoff(target, ownerKey, forward, motion, contourActive)
     androidx.compose.runtime.SideEffect {
         morph.page?.pendingOrigin = null
         morph.page?.pendingEndpoint = null
@@ -441,8 +449,8 @@ internal fun <T> rememberSettingsCardMorphHost(
             outline = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outline else Color.Unspecified,
         )
     val view = LocalView.current
-    return morphing to
-        Modifier
+    return contourActive to
+        handoff
             .settingsCardMorphHost(morph, colors, view)
             .then(if (morph.blocksPointerInput) Modifier.clearAndSetSemantics {} else Modifier)
 }

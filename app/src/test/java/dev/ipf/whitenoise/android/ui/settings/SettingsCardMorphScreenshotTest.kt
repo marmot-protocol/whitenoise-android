@@ -24,8 +24,11 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -159,21 +162,23 @@ class SettingsCardMorphScreenshotTest {
             composeRule.onRoot().captureToImage()
         }
         advanceFrames(SETTINGS_CARD_MORPH_MILLIS / 6L)
+        val header = composeRule.onNodeWithTag("route.header", useUnmergedTree = true)
+        val earlyLeft = if (amoled) 0f else header.getUnclippedBoundsInRoot().left.value
         val early = captureTransitionFrame("settings_card_morph_early_$variant", amoled)
         advanceFrames(SETTINGS_CARD_MORPH_MILLIS / 4L)
+        val midLeft = if (amoled) 0f else header.getUnclippedBoundsInRoot().left.value
         val mid = captureTransitionFrame("settings_card_morph_mid_$variant", amoled)
         advanceFrames(SETTINGS_CARD_MORPH_MILLIS.toLong())
         assertFalse(requireNotNull(morph?.page).active)
         capture("settings_card_morph_settled_$variant")
         val settled = composeRule.onRoot().captureToImage()
-        assertNativeHeader(settled, early)
-        assertNativeHeader(settled, mid)
-        if (!amoled) {
-            assertTrue(
-                "Borderless entry must render its native body immediately",
-                early.asAndroidBitmap().sameAs(settled.asAndroidBitmap()),
-            )
-            assertTrue("Borderless body must stay settled", mid.asAndroidBitmap().sameAs(settled.asAndroidBitmap()))
+        if (amoled) {
+            assertNativeHeader(settled, early)
+            assertNativeHeader(settled, mid)
+        } else {
+            val rest = header.getUnclippedBoundsInRoot().left.value
+            assertTrue("Page travel approaches rest", abs(earlyLeft - rest) > abs(midLeft - rest))
+            assertFalse("The moving page differs from rest", mid.asAndroidBitmap().sameAs(settled.asAndroidBitmap()))
         }
     }
 
@@ -204,7 +209,7 @@ class SettingsCardMorphScreenshotTest {
                             SideEffect { morph = owner }
                             Route(
                                 target,
-                                Modifier.onGloballyPositioned { headerBounds = it.boundsInRoot() },
+                                Modifier.testTag("route.header").onGloballyPositioned { headerBounds = it.boundsInRoot() },
                                 onNavigate = { route.value = 1 },
                             )
                         }

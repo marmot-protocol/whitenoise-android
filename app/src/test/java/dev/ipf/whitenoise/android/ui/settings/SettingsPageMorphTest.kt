@@ -410,6 +410,7 @@ class SettingsPageMorphTest {
 
     @Test fun retargetAndReducedMotionKeepOnlyMeasuredContourState() {
         val page = departing()
+        reportGroup(page, Rect(16f, 120f, 344f, 300f))
         assertTrue(page.admitDestination())
         val frame = page.renderedContours(0.4f)
         assertTrue(page.begin("parent", false, true, host, 0.4f))

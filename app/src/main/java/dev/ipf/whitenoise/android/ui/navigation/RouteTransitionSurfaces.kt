@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
+import dev.ipf.whitenoise.android.ui.common.AppPageTravel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.NativePageBody
@@ -169,7 +170,7 @@ internal fun <T> ConversationRouteAnimatedContent(
     val nativeBodies = remember(transition) { androidx.compose.runtime.mutableStateMapOf<Any?, NativePageBody>() }
     val separatedChrome = LocalComposerFabHandoff.current?.morphSurface == true
     val nativePresentation = separatedChrome || containerMorph
-    val travelPx = with(LocalDensity.current) { CONVERSATION_ROUTE_LAYER_TRAVEL.toPx() }
+    val travelPx = with(LocalDensity.current) { AppPageTravel.toPx() }
     // One intrinsic progress value (list = 0, conversation = 1) is stable under
     // interruption. A Back during enter reverses from the exact rendered float
     // instead of creating a new target-relative 0 -> 1 animation that jumps.
@@ -485,4 +486,3 @@ private fun QuickAccountSwitchCue(
 internal const val QUICK_ACCOUNT_SWITCH_TRANSITION_MILLIS = 128
 internal const val QUICK_ACCOUNT_SWITCH_MAX_PRESENTATION_MILLIS = 180
 internal const val QUICK_ACCOUNT_SWITCH_CUE_TAG = "quick-account-switch-cue"
-internal val CONVERSATION_ROUTE_LAYER_TRAVEL = 48.dp

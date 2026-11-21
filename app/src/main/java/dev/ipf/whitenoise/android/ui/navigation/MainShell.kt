@@ -1771,9 +1771,6 @@ internal fun MainShell(
                             routingAppUpdate ||
                             pendingTtsDestinationNavigation != null,
                     contentVisible = !appState.appLock.screenVisible,
-                    topLevelBubble = true,
-                    cardMorph = true,
-                    closingAnchor = dev.ipf.whitenoise.android.ui.chats.ChatsPenMorphAnchor,
                 ) { animatedSection ->
                     when (animatedSection) {
                         MainSection.Chats -> {

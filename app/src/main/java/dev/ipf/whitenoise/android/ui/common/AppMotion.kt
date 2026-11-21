@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.ui.unit.dp
 
 /*
  * The app's one motion language. Surfaces that open (routes, Settings cards, search, media) arrive
@@ -23,3 +24,6 @@ internal val AppMotionOpenEasing: Easing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 /** Emphasized accelerate: starts gently and lands in its origin without lingering. */
 internal val AppMotionCloseEasing: Easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+
+/** Logical end-to-start travel for a page entering at its native size. */
+internal val AppPageTravel = 48.dp

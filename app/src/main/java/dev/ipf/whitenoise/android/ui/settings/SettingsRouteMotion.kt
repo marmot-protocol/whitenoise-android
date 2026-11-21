@@ -1,23 +1,13 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
@@ -35,19 +25,7 @@ internal fun settingsDetailDepth(detail: SettingsDetail?): Int {
     return 1 + settingsDetailDepth(settingsDetailParent(detail))
 }
 
-private class SettingsMotionHistory<T>(
-    var target: T,
-    var depth: Int,
-)
-
-/**
- * Slide the opaque destination's draw layer. The old route is disposed immediately: it cannot keep
- * Back handlers, editable state, focus, or protected pixels alive during an exit animation. The
- * only exception is closing top-level Settings, which briefly draws an inert picture of its last
- * frame (see [settingsBubbleMotion]); Chats is never captured. Keeping
- * the content call outside a route key preserves the existing screen/state ownership semantics.
- * First composition (including a direct privacy-sensitive route) is settled, never a delayed reveal.
- */
+/** Present one live destination. A measured, outlined route may supply its own contour transition. */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList")
 internal fun <T> SettingsRouteMotion(
@@ -57,9 +35,7 @@ internal fun <T> SettingsRouteMotion(
     suppressMotion: Boolean = false,
     contentVisible: Boolean = true,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
-    topLevelBubble: Boolean = false,
     cardMorph: Boolean = false,
-    closingAnchor: SettingsMorphAnchor? = null,
     content: @Composable (T) -> Unit,
 ) {
     if (!contentVisible) return
@@ -67,122 +43,27 @@ internal fun <T> SettingsRouteMotion(
     val morph =
         if (cardMorph) {
             remember(ownerKey, parent) {
-                SettingsCardMorph(fullScreen = true, parent = parent).apply { this.closingAnchor = closingAnchor }
+                SettingsCardMorph(fullScreen = true, parent = parent)
             }
         } else {
             null
         }
     val motion = animationsEnabled && !suppressMotion
-    val history = remember(ownerKey) { SettingsMotionHistory(target, depth) }
-    val previousDepth = remember(ownerKey, target) { history.depth }
-    val forward = depth >= previousDepth
-    SideEffect {
-        history.target = target
-        history.depth = depth
-    }
-    val (morphing, morphHost) =
+    val lastDepth = remember(ownerKey) { mutableIntStateOf(depth) }
+    val previousDepth = remember(ownerKey, target) { lastDepth.intValue }
+    val forward = settingsRouteDirection(previousDepth, depth) > 0
+    SideEffect { lastDepth.intValue = depth }
+    val (_, routeMotion) =
         rememberSettingsCardMorphHost(
             morph,
             target,
             ownerKey,
             motion,
             forward,
-            captureContent =
-                !topLevelBubble || depth > 0,
         )
-    Box(
-        Modifier.fillMaxSize().then(morphHost).then(
-            // The existing route clock owns block contraction and exclusive entry; unmeasured entries settle directly.
-            rememberRouteMotionModifier(
-                target = target,
-                depth = depth,
-                ownerKey = ownerKey,
-                suppressMotion = suppressMotion || morphing || morph?.page != null,
-                animationsEnabled = animationsEnabled,
-                topLevelBubble = topLevelBubble,
-            ),
-        ),
-    ) {
+    Box(Modifier.fillMaxSize().then(routeMotion)) {
         CompositionLocalProvider(LocalSettingsCardMorph provides morph) {
             content(target)
         }
     }
 }
-
-/** A single destination draw layer for route hosts with existing early-return rendering. */
-@Composable
-internal fun <T> rememberRouteMotionModifier(
-    target: T,
-    depth: Int,
-    ownerKey: Any?,
-    suppressMotion: Boolean = false,
-    animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
-    topLevelBubble: Boolean = false,
-): Modifier {
-    val history = remember(ownerKey) { SettingsMotionHistory(target, depth) }
-    val snapshot = remember(ownerKey) { SettingsCardSnapshot() }
-    val layoutDirection = LocalLayoutDirection.current
-    val previousDepth = remember(ownerKey, target) { history.depth }
-    val logicalDirection = settingsRouteDirection(previousDepth, depth)
-    val bubble = topLevelBubble && usesSettingsBubble(previousDepth, depth)
-    val direction = if (layoutDirection == LayoutDirection.Rtl) -logicalDirection else logicalDirection
-    val motion = animationsEnabled && !suppressMotion
-    val progress = remember(ownerKey, target, motion) { Animatable(if (motion && history.target != target) 0f else 1f) }
-    SideEffect {
-        history.target = target
-        history.depth = depth
-    }
-    LaunchedEffect(progress) {
-        runRouteMotion(progress, motion, opening = logicalDirection > 0)
-        // A kept Settings frame is only valid while top-level Settings stays shown.
-        if (depth != 1) snapshot.picture = null
-    }
-    val travel = with(LocalDensity.current) { 48.dp.toPx() }
-    // Draw the themed backplate outside the translated child layer. Moving a whole opaque page
-    // otherwise exposes the Activity window behind its vacated edge, including in AMOLED mode.
-    val backplate = MaterialTheme.colorScheme.background
-    if (bubble) {
-        return Modifier.settingsBubbleMotion(
-            opening = logicalDirection > 0,
-            progress = { progress.value },
-            animating = { motion && progress.value < 1f },
-            backplate = backplate,
-            snapshot = snapshot.takeIf { motion },
-        )
-    }
-    val recorder =
-        if (topLevelBubble && depth == 1 && motion) {
-            Modifier.recordSettingsCard(snapshot) { progress.value >= 1f }
-        } else {
-            Modifier
-        }
-    return recorder.settingsSlide(motion, { progress.value }, backplate, direction * travel)
-}
-
-private suspend fun runRouteMotion(
-    progress: Animatable<Float, *>,
-    motion: Boolean,
-    opening: Boolean,
-) {
-    if (motion) {
-        val millis = if (opening) SETTINGS_BUBBLE_OPEN_MILLIS else SETTINGS_BUBBLE_CLOSE_MILLIS
-        val easing = if (opening) SettingsBubbleOpenEasing else SettingsBubbleCloseEasing
-        progress.animateTo(1f, tween(millis, easing = easing))
-    } else {
-        progress.snapTo(1f)
-    }
-}
-
-/** Slides the page in from [travel] px while a themed backplate covers the vacated edge. */
-private fun Modifier.settingsSlide(
-    motion: Boolean,
-    progress: () -> Float,
-    backplate: Color,
-    travel: Float,
-): Modifier =
-    drawBehind {
-        if (motion && progress() < 1f) drawRect(backplate)
-    }.graphicsLayer {
-        val remaining = if (motion) 1f - progress() else 0f
-        translationX = travel * remaining
-    }

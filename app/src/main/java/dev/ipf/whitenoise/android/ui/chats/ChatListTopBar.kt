@@ -239,9 +239,6 @@ internal fun ChatListTopBar(
                             }
                         else -> {
                             val active = appState.activeAccount
-                            val (settingsOrigin, openSettings) =
-                                dev.ipf.whitenoise.android.ui.settings
-                                    .rememberSettingsRouteClick(onOpenSettings)
                             val avatarExplanation =
                                 if (appState.chatsAvatarOpensSelector()) {
                                     chatsExplanation(
@@ -279,7 +276,7 @@ internal fun ChatListTopBar(
                                             if (appState.chatsAvatarOpensSelector()) {
                                                 openSelector()
                                             } else {
-                                                openSettings()
+                                                onOpenSettings()
                                             }
                                         }
                                     },
@@ -287,7 +284,6 @@ internal fun ChatListTopBar(
                                         Modifier
                                             .padding(start = 8.dp)
                                             .testTag("chats.switchProfile")
-                                            .then(settingsOrigin)
                                             .explainOnLongPress(avatarExplanation),
                                     // Per-account dot: light only when the active account
                                     // itself has unread, same shared decision the other

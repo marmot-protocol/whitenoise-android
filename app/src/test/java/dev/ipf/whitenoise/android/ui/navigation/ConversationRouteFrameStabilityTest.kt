@@ -34,6 +34,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.AppPageTravel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -96,7 +97,7 @@ class ConversationRouteFrameStabilityTest {
             )
 
         assertContinuousReversalStep("source", sourceBefore, sourceAfter)
-        assertTrue(kotlin.math.abs(sourceAfter) <= CONVERSATION_ROUTE_LAYER_TRAVEL.value)
+        assertTrue(kotlin.math.abs(sourceAfter) <= AppPageTravel.value)
     }
 
     /** Reduced motion keeps both route layers fully opaque and untranslated. */
@@ -399,7 +400,7 @@ class ConversationRouteFrameStabilityTest {
         conversationRoute: Boolean,
         label: String,
     ) {
-        val travel = CONVERSATION_ROUTE_LAYER_TRAVEL.value
+        val travel = AppPageTravel.value
         val alphas =
             samples.bounds.map { bounds ->
                 val hiddenFraction = kotlin.math.abs(bounds.left.value) / travel
