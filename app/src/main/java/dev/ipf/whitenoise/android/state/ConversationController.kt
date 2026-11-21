@@ -81,7 +81,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
@@ -2977,20 +2976,7 @@ class ConversationController(
             runCatching {
                 val left =
                     appState.withGroupCommitLock(account, group.groupIdHex) {
-                        when {
-                            soleMember -> {
-                                appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
-                                true
-                            }
-                            GroupProjector.isAdminRef(group, activeAccountIdHex) ->
-                                appState.leaveAsAdmin(account, group.groupIdHex) {
-                                    demoteThenLeave(account) { demotedBeforeLeave = true }
-                                }
-                            else -> {
-                                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-                                true
-                            }
-                        }
+                        leaveWithRoster(account, soleMember, activeAccountIdHex) { demotedBeforeLeave = true }
                     }
                 if (!left) return@runCatching false
                 appState.removeComposerExpansionForGroup(account, group.groupIdHex)
