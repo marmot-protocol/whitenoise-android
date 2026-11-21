@@ -335,7 +335,8 @@ internal val LocalSettingsCardMorph = compositionLocalOf<SettingsCardMorph?> { n
 
 /**
  * Marks one Settings card (a row group or panel), or the [anchor] control a route grows from, as a
- * motion block; [anchorInset] trims an anchor's touch target to its visible control. Fullscreen routes register geometry only; their page owns the sole permitted
+ * motion block. [anchorInset] trims an anchor to its visible control. Fullscreen routes register
+ * geometry here and keep their sole permitted
  * picture. The non-page facade retains its existing card treatment. No effect outside a route host.
  */
 @Composable
@@ -402,6 +403,7 @@ private fun permitsContourMotion(
  * for the route layer. A null [morph] never morphs.
  */
 @Composable
+@Suppress("CyclomaticComplexMethod", "LongMethod")
 internal fun <T> rememberSettingsCardMorphHost(
     morph: SettingsCardMorph?,
     target: T,

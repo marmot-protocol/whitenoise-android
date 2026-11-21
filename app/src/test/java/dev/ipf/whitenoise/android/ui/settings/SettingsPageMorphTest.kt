@@ -288,7 +288,8 @@ class SettingsPageMorphTest {
         val key = start.single().key
         for (time in listOf(0.05f, 0.3f, 0.6f, 0.9f)) {
             val frame = page.renderedContours(time)
-            assertEquals(lerp(origin, first, AppMotionOpenEasing.transform(time)), frame.single { it.key == key }.bounds)
+            val expected = lerp(origin, first, AppMotionOpenEasing.transform(time))
+            assertEquals(expected, frame.single { it.key == key }.bounds)
             // Every other group stays at its native bounds; none grows out of a zero-size seed.
             assertTrue(frame.filter { it.key != key }.all { it.bounds == second })
         }

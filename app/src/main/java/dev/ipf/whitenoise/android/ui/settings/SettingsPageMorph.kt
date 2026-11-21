@@ -429,7 +429,7 @@ internal class SettingsPageMorph {
         return host.takeIf { active }
     }
 
-    @Suppress("LongMethod", "LongParameterList")
+    @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
     fun ContentDrawScope.draw(
         host: Rect,
         time: Float,
@@ -467,8 +467,9 @@ internal class SettingsPageMorph {
                 unoutlinedBodyMask.takeIf { showUnoutlinedBody },
                 showNativeBody,
             )
+        val enteringFromOrigin = entryOnly || entryStart > 0f
         val bodyAlpha =
-            if (!showNativeBody || borderlessEntry || entryOnly || entryStart > 0f) 1f else handoffAlpha(time, true)
+            if (!showNativeBody || borderlessEntry || enteringFromOrigin) 1f else handoffAlpha(time, true)
         if (bodyAlpha >= 1f) {
             clipPath(live) {
                 clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }

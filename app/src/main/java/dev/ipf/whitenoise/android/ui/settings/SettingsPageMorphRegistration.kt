@@ -35,13 +35,18 @@ import kotlin.math.ceil
 @Composable
 internal fun rememberSettingsRouteClick(
     onClick: () -> Unit,
-    originInset: Dp = 0.dp,
+) = rememberSettingsRouteClick(null, null, onClick)
+
+@Composable
+internal fun rememberSettingsRouteClick(
+    onClick: () -> Unit,
+    originInset: Dp,
 ) = rememberSettingsRouteClick(null, null, onClick, originInset)
 
 /** Capture the actual activating row, including its scrolled position, before navigation changes it. */
 @Composable
 // Reject missing route owners before installing the attached-origin callback.
-@Suppress("ReturnCount")
+@Suppress("ReturnCount", "CyclomaticComplexMethod")
 internal fun rememberSettingsRouteClick(
     context: SettingsRowContext?,
     routeKey: Any?,

@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.boundingRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.testTag
@@ -90,6 +91,7 @@ class SettingsTopLevelContainerMotionTest {
         assertEquals(0f, settingsContainerShapeAlpha(0f), 0f)
     }
 
+    @Suppress("LongMethod")
     private fun assertAvatarContainer(amoled: Boolean) {
         val section = mutableStateOf(0)
         var morph: SettingsCardMorph? = null

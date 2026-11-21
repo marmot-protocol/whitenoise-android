@@ -159,7 +159,8 @@ internal fun <T> rememberRouteMotionModifier(
     val opening = logicalDirection > 0
     val direction = if (layoutDirection == LayoutDirection.Rtl) -logicalDirection else logicalDirection
     val motion = animationsEnabled && !suppressMotion
-    val interrupted = remember(ownerKey, target) { history.progress?.let { bubble && history.containerLeg && it.value < 1f } == true }
+    val interrupted =
+        remember(ownerKey, target) { bubble && history.containerLeg && (history.progress?.value ?: 1f) < 1f }
     val progress =
         remember(ownerKey, target, motion) {
             val changed = motion && history.target != target

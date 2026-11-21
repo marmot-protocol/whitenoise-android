@@ -60,7 +60,8 @@ internal fun SettingsSearchResults(
             Modifier
                 .animateItem(
                     fadeInSpec = if (animationsEnabled && rank > 0) tween(SETTINGS_SEARCH_MEMBERSHIP_MILLIS) else null,
-                    placementSpec = if (animationsEnabled && rank > 0) tween(SETTINGS_SEARCH_PLACEMENT_MILLIS) else null,
+                    placementSpec =
+                        if (animationsEnabled && rank > 0) tween(SETTINGS_SEARCH_PLACEMENT_MILLIS) else null,
                     fadeOutSpec = null,
                 ).zIndex(-rank.toFloat())
         },

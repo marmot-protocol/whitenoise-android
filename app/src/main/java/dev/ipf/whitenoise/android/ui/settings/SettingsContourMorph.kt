@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.ui.geometry.CornerRadius
