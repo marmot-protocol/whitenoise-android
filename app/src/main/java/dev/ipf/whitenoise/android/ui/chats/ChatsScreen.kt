@@ -136,7 +136,6 @@ import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
@@ -161,6 +160,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
 
 /** Keeps TTS transport and account notices visible above every chat-list state. */
 @Suppress("FunctionNaming")

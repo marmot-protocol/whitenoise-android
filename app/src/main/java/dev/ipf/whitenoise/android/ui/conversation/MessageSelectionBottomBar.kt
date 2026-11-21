@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -36,12 +37,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardBlockedReasonLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Reply
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
-import dev.ipf.whitenoise.android.ui.icons.filled.Download
-import dev.ipf.whitenoise.android.ui.icons.filled.Info
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -171,7 +166,7 @@ private fun SelectionActionIconButton(
         onClick = activate,
         enabled = selectionActionEnabled(action, availability),
     ) {
-        Icon(selectionActionIcon(action), contentDescription = label)
+        Icon(painterResource(selectionActionIcon(action)), contentDescription = label)
     }
 }
 
@@ -212,13 +207,15 @@ private fun selectionActionLabel(action: MessageSelectionBarAction): String =
         MessageSelectionBarAction.Save -> stringResource(R.string.shared_media_save)
     }
 
-private fun selectionActionIcon(action: MessageSelectionBarAction) =
+/** Same drawables as the single-message action menu, so a batch action looks like its single-message twin. */
+@DrawableRes
+private fun selectionActionIcon(action: MessageSelectionBarAction): Int =
     when (action) {
-        MessageSelectionBarAction.Reply -> Icons.AutoMirrored.Filled.Reply
-        MessageSelectionBarAction.Info -> Icons.Default.Info
-        MessageSelectionBarAction.Copy -> Icons.Default.ContentCopy
-        MessageSelectionBarAction.Forward -> Icons.AutoMirrored.Filled.Forward
-        MessageSelectionBarAction.Save -> Icons.Default.Download
+        MessageSelectionBarAction.Reply -> R.drawable.ic_reply
+        MessageSelectionBarAction.Info -> R.drawable.ic_info
+        MessageSelectionBarAction.Copy -> R.drawable.ic_content_copy
+        MessageSelectionBarAction.Forward -> R.drawable.ic_forward
+        MessageSelectionBarAction.Save -> R.drawable.ic_download
     }
 
 private fun selectionActionEnabled(

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -111,6 +110,7 @@ import java.time.ZoneId
 import java.time.format.FormatStyle
 import java.util.Calendar
 import java.util.Locale
+import androidx.compose.foundation.lazy.grid.items as gridItems
 
 // Walk the loaded timeline once and project image/video tiles, newest first.
 // Projected rows provide typed media carrying the real source epoch; only

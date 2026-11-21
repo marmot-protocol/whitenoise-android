@@ -198,8 +198,10 @@ internal fun ReplyPreviewCard(
                 ?: when (mediaKind) {
                     dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo ->
                         ImageVector.vectorResource(R.drawable.ic_image)
-                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Video -> ImageVector.vectorResource(R.drawable.ic_videocam)
-                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice -> ImageVector.vectorResource(R.drawable.ic_voice_note)
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Video ->
+                        ImageVector.vectorResource(R.drawable.ic_videocam)
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice ->
+                        ImageVector.vectorResource(R.drawable.ic_voice_note)
                     dev.ipf.whitenoise.android.core.ReplyMediaKind.Document ->
                         ImageVector.vectorResource(R.drawable.ic_description)
                     dev.ipf.whitenoise.android.core.ReplyMediaKind.None -> null
