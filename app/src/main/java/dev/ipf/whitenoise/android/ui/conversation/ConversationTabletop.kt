@@ -28,15 +28,16 @@ internal data class ConversationTabletop(
     val hingeGap: Dp,
 )
 
+/** Reserves the lower half from the Scaffold bottom, which can sit above the window bottom. */
 internal fun conversationTabletop(
     tabletop: WindowFold?,
-    windowHeight: Dp,
+    scaffoldBottom: Dp,
 ): ConversationTabletop =
     if (tabletop == null) {
         ConversationTabletop(0.dp, 0.dp)
     } else {
         ConversationTabletop(
-            minHeight = (windowHeight - tabletop.start).coerceAtLeast(0.dp),
+            minHeight = (scaffoldBottom - tabletop.start).coerceAtLeast(0.dp),
             hingeGap = (tabletop.end - tabletop.start).coerceAtLeast(0.dp),
         )
     }
@@ -52,10 +53,11 @@ internal fun conversationTabletop(
 @Composable
 internal fun ConversationBottomBarFrame(
     routeMorph: SettingsCardMorph?,
+    bottomPadding: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     val windowHeight = LocalWindowInfo.current.containerDpSize.height
-    val reserve = conversationTabletop(LocalWindowFolds.current.tabletop, windowHeight)
+    val reserve = conversationTabletop(LocalWindowFolds.current.tabletop, windowHeight - bottomPadding)
     CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
         Box(
             Modifier.fillMaxWidth().heightIn(min = reserve.minHeight).padding(top = reserve.hingeGap),

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,7 @@ class ConversationTabletopTest {
     @Test
     fun composerMovesToTheHingeAndKeepsItsState() {
         val tabletop = mutableStateOf(true)
+        val frozenIme = mutableStateOf(0.dp)
         val identities = mutableListOf<Any>()
         var windowHeight = 0.dp
         composeRule.setContent {
@@ -62,9 +64,9 @@ class ConversationTabletopTest {
                     WindowFolds.None
                 }
             CompositionLocalProvider(LocalWindowFolds provides folds) {
-                Column(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().padding(bottom = frozenIme.value)) {
                     Box(Modifier.weight(1f).fillMaxWidth().testTag(MESSAGES))
-                    ConversationBottomBarFrame(routeMorph = null) {
+                    ConversationBottomBarFrame(routeMorph = null, bottomPadding = frozenIme.value) {
                         val identity = remember { Any() }
                         SideEffect { if (identities.lastOrNull() !== identity) identities += identity }
                         Box(Modifier.fillMaxWidth().height(COMPOSER_HEIGHT).testTag(COMPOSER))
@@ -78,6 +80,12 @@ class ConversationTabletopTest {
         assertDp(windowHeight / 2 - GAP, bottom(MESSAGES))
         assertDp(windowHeight / 2 + GAP, top(COMPOSER))
 
+        frozenIme.value = 280.dp
+        composeRule.waitForIdle()
+        assertDp(windowHeight / 2 - GAP, bottom(MESSAGES))
+        assertDp(windowHeight / 2 + GAP, top(COMPOSER))
+
+        frozenIme.value = 0.dp
         tabletop.value = false
         composeRule.waitForIdle()
         assertDp(windowHeight - COMPOSER_HEIGHT, top(COMPOSER))

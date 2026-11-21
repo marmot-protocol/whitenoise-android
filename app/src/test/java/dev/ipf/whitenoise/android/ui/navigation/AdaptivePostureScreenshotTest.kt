@@ -25,6 +25,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -44,13 +45,20 @@ class AdaptivePostureScreenshotTest {
     @Config(sdk = [36], qualifiers = "en-w673dp-h841dp-mdpi")
     fun unfoldedPortraitFoldable() = capture("posture_unfolded_portrait_foldable") { WindowFolds.None }
 
-    /** Golden: the same width held half open splits the panes at the hinge. */
+    /** Golden: the half-open book splits the panes at the hinge. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w800dp-h700dp-mdpi")
-    fun halfOpenBookFoldable() =
-        capture("posture_half_open_book") { size ->
-            WindowFolds(upright = listOf(WindowFold(size.width / 2, size.width / 2, separating = true)))
-        }
+    fun halfOpenBookFoldable() = capture("posture_half_open_book", folds = ::bookFold)
+
+    /** Golden: an RTL book layout puts the chat list to the right of the hinge. */
+    @Test
+    @Config(sdk = [36], qualifiers = "ar-rEG-ldrtl-w673dp-h841dp-mdpi")
+    fun halfOpenBookFoldableRtl() = capture("posture_half_open_book_rtl", darkTheme = true, folds = ::bookFold)
+
+    /** Golden: large text in the 300dp list and its adjacent conversation. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w673dp-h841dp-mdpi")
+    fun unfoldedPortraitFoldableLargeText() = captureLargeText("posture_unfolded_portrait_large_text")
 
     /** Golden: a flip phone held half open reads above the hinge and types below it. */
     @Test
@@ -69,6 +77,23 @@ class AdaptivePostureScreenshotTest {
     @Test
     @Config(sdk = [36], qualifiers = "en-w340dp-h360dp-mdpi")
     fun flipCoverScreenList() = capture("posture_flip_cover_list", openChat = false) { WindowFolds.None }
+
+    /** Golden: the cover-screen composer remains reachable at large text size. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w340dp-h360dp-mdpi")
+    fun flipCoverScreenChatLargeText() = captureLargeText("posture_flip_cover_chat_large_text")
+
+    private fun bookFold(size: DpSize): WindowFolds =
+        WindowFolds(upright = listOf(WindowFold(size.width / 2, size.width / 2, separating = true)))
+
+    private fun captureLargeText(name: String) {
+        RuntimeEnvironment.setFontScale(LARGE_FONT_SCALE)
+        try {
+            capture(name, darkTheme = true) { WindowFolds.None }
+        } finally {
+            RuntimeEnvironment.setFontScale(1f)
+        }
+    }
 
     private fun capture(
         name: String,
@@ -123,5 +148,9 @@ class AdaptivePostureScreenshotTest {
             condition()
         }
         composeRule.waitForIdle()
+    }
+
+    private companion object {
+        const val LARGE_FONT_SCALE = 1.3f
     }
 }
