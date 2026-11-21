@@ -38,8 +38,10 @@ internal fun isLocalContactAccount(
  * MDK's cached display name when it is a real name. Without a profile MDK falls back to the account label, which
  * is the raw public key for signer accounts; that is dropped so the short npub is shown instead.
  */
-internal fun mdkFallbackDisplayName(raw: String?): String? =
-    ProfileSanitizer.displayName(raw)?.takeUnless(IdentityFormatter::isNostrIdentityFallback)
+internal fun mdkFallbackDisplayName(raw: String?): String? {
+    val name = ProfileSanitizer.displayName(raw)
+    return name?.takeUnless(IdentityFormatter::isNostrIdentityFallback)
+}
 
 internal fun networkDisplayNameFallback(
     accountLabel: String?,
