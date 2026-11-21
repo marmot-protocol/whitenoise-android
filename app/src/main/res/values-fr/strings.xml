@@ -885,6 +885,7 @@
     <string name="toast_send_emoji_limit">Ce message contient trop d\'emoji personnalisés, il n\'a donc pas été envoyé. Retirez-en quelques-uns et réessayez.</string>
     <string name="toast_chat_still_loading">Cette discussion est encore en cours de chargement. Réessayez dans un instant.</string>
     <string name="toast_send_membership_verifying">Vérification de votre appartenance au groupe — votre message n’a pas été envoyé. Il est conservé dans le champ ; réessayez dans un instant.</string>
+    <string name="notification_action_unlock_required">Déverrouillez White Noise et réessayez.</string>
     <string name="toast_reaction_failed">La réaction a échoué</string>
     <string name="toast_couldnt_delete_message">Échec de la suppression du message. Veuillez réessayer.</string>
     <string name="toast_couldnt_edit_message">Impossible de modifier le message</string>
@@ -1470,6 +1471,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d clés d’invitation retirées</string>
     <string name="wipe_outcome_local_wipe_done">Données locales effacées</string>
     <string name="wipe_outcome_local_wipe_incomplete">Effacement des données locales incomplet</string>
+    <string name="wipe_media_cleanup_failed">Certains fichiers multimédias locaux ou certaines autorisations de partage n’ont pas pu être supprimés.</string>
     <string name="export_nsec">Exporter le nsec</string>
     <string name="share_secret_key">Partager la clé secrète</string>
     <string name="signed_out">Déconnecté</string>
@@ -2731,4 +2733,18 @@
     <string name="document_pdf_page">Page %1$d sur %2$d</string>
     <string name="document_zoom_reset">Zoom / réinitialiser</string>
     <string name="composer_preview_attachment">Aperçu de la pièce jointe</string>
+    <string name="nostr_git_repository">Dépôt Git</string>
+    <string name="nostr_git_refs">État du dépôt Git</string>
+    <string name="nostr_git_patch">Correctif Git</string>
+    <string name="nostr_git_pr">Demande de fusion Git</string>
+    <string name="nostr_git_update">Mise à jour de demande de fusion Git</string>
+    <string name="nostr_git_issue">Ticket Git</string>
+    <string name="nostr_git_open">Statut Git · Ouvert</string>
+    <string name="nostr_git_applied">Statut Git · Appliqué, fusionné ou résolu</string>
+    <string name="nostr_git_closed">Statut Git · Fermé</string>
+    <string name="nostr_git_draft">Statut Git · Brouillon</string>
+    <string name="nostr_git_services">Services Git</string>
+    <string name="nostr_git_comment">Commentaire Git</string>
+    <string name="nostr_git_copy_url">Copier l’URL : %1$s</string>
+    <string name="nostr_git_open_url">Ouvrir l’URL : %1$s</string>
 </resources>

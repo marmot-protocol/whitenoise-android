@@ -221,7 +221,7 @@ private fun setupActionIcon(action: OnboardingActionFfi): Int =
         OnboardingActionFfi.EDIT_PROFILE, OnboardingActionFfi.EDIT_FOLLOWS,
         -> R.drawable.ic_edit
         OnboardingActionFfi.CANCEL_REPAIR, OnboardingActionFfi.CANCEL_ONBOARDING -> R.drawable.ic_close
-        OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> R.drawable.ic_refresh
+        OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> R.drawable.ic_settings_backup_restore
         OnboardingActionFfi.CONTINUE_WITHOUT, OnboardingActionFfi.CONTINUE_ANYWAY -> R.drawable.ic_forward
         OnboardingActionFfi.APPROVE_REPAIR -> R.drawable.ic_check
     }

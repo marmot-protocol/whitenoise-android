@@ -103,12 +103,13 @@ internal object NotificationPreviewPreferences {
             NotificationPreviewToken(session, revision, mode.showsNames, mode.showsMessageText)
         }
 
+    /** Stamps the preview revision and keeps full message text on the posting device. */
     fun stamp(
         builder: NotificationCompat.Builder,
         token: NotificationPreviewToken,
         correction: Boolean,
     ) {
-        builder.addExtras(
+        builder.setLocalOnly(token.messageText).addExtras(
             Bundle().apply {
                 putString(EXTRA_SESSION, token.session)
                 putLong(EXTRA_REVISION, token.revision)

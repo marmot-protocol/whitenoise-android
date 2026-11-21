@@ -1,32 +1,26 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.IdentityFormatter
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.Article
-import dev.ipf.whitenoise.android.ui.icons.outlined.ChatBubbleOutline
-import dev.ipf.whitenoise.android.ui.icons.outlined.Description
-import dev.ipf.whitenoise.android.ui.icons.outlined.Fullscreen
-import dev.ipf.whitenoise.android.ui.icons.outlined.NewReleases
-import dev.ipf.whitenoise.android.ui.icons.outlined.PlayCircleOutline
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.FormatStyle
 
-internal fun NostrEventCardKind.icon(): ImageVector =
+@DrawableRes
+internal fun NostrEventCardKind.iconRes(eventKind: Int): Int =
     when (this) {
-        NostrEventCardKind.Note -> Icons.Outlined.ChatBubbleOutline
-        NostrEventCardKind.Article -> Icons.AutoMirrored.Outlined.Article
-        NostrEventCardKind.Video -> Icons.Outlined.PlayCircleOutline
-        NostrEventCardKind.Release -> Icons.Outlined.NewReleases
-        NostrEventCardKind.File,
-        NostrEventCardKind.Generic,
-        -> Icons.Outlined.Description
+        NostrEventCardKind.Note -> R.drawable.ic_chat
+        NostrEventCardKind.Article -> R.drawable.ic_menu_book
+        NostrEventCardKind.Video -> R.drawable.ic_videocam
+        NostrEventCardKind.Release -> R.drawable.ic_package_2
+        NostrEventCardKind.Git -> R.drawable.ic_code
+        NostrEventCardKind.File -> R.drawable.ic_description
+        NostrEventCardKind.Generic -> if (eventKind == KIND_IMAGE_EVENT) R.drawable.ic_image else R.drawable.ic_category
     }
 
 @Composable
@@ -37,6 +31,7 @@ internal fun NostrEventCardKind.label(eventKind: Int): String =
         NostrEventCardKind.Video -> stringResource(R.string.nostr_event_type_video)
         NostrEventCardKind.Release -> stringResource(R.string.nostr_event_type_release)
         NostrEventCardKind.File -> stringResource(R.string.nostr_event_type_file)
+        NostrEventCardKind.Git -> stringResource(gitCardLabel(eventKind))
         NostrEventCardKind.Generic ->
             if (eventKind == KIND_IMAGE_EVENT) {
                 stringResource(R.string.nostr_event_type_image)
@@ -75,22 +70,12 @@ internal fun eventDateLabel(createdAt: Long): String {
     }.getOrDefault("")
 }
 
-internal data class EventCardPrimaryAction(
-    val icon: ImageVector,
-    val description: String,
-)
-
 @Composable
-internal fun NostrEventCardModel.primaryAction(): EventCardPrimaryAction =
-    when {
-        kind == NostrEventCardKind.Article && !readerBody.isNullOrBlank() ->
-            EventCardPrimaryAction(
-                icon = Icons.AutoMirrored.Outlined.Article,
-                description = stringResource(R.string.nostr_event_read_article),
-            )
-        else ->
-            EventCardPrimaryAction(
-                icon = Icons.Outlined.Fullscreen,
-                description = stringResource(R.string.nostr_event_expand),
-            )
-    }
+internal fun NostrEventCardModel.openDescription(): String =
+    stringResource(
+        if (kind == NostrEventCardKind.Article && !readerBody.isNullOrBlank()) {
+            R.string.nostr_event_read_article
+        } else {
+            R.string.nostr_event_expand
+        },
+    )

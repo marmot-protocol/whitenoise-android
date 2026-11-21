@@ -66,8 +66,6 @@ import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -604,7 +602,7 @@ internal fun DiagnosticRow(
                     modifier = Modifier.weight(1f),
                 )
                 Icon(
-                    Icons.Default.ContentCopy,
+                    painterResource(R.drawable.ic_content_copy),
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,

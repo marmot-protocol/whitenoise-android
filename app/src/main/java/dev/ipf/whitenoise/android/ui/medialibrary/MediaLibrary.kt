@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -96,8 +97,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentExternally
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
 import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -926,7 +925,7 @@ internal fun FileLibraryRow(
             Box {
                 IconButton(onClick = { menuOpen = true }) {
                     Icon(
-                        Icons.Default.MoreVert,
+                        painterResource(R.drawable.ic_more_vert),
                         contentDescription = stringResource(R.string.shared_media_file_actions),
                     )
                 }
@@ -976,14 +975,14 @@ internal fun FileLibraryRow(
                                 scope.launch {
                                     val sharedRow = row
                                     runCatchingCancellable {
-                                        // Streams the whole verified file to the share sheet, whatever its size, as
-                                        // Open and Save do. Leaving the screen cancels this scope, and a row rebound
-                                        // to another attachment opens no share sheet.
                                         shareLibraryFile(
                                             context = context,
+                                            accountRef = checkNotNull(controller.conversationAccountRef),
                                             row = sharedRow,
                                             chooserTitle = shareChooserTitle,
-                                            currentRow = { currentRow },
+                                            currentRow = {
+                                                currentRow.takeIf { controller.ownsRetainedForegroundPresentation }
+                                            },
                                         ) {
                                             attachmentSource(
                                                 controller,
@@ -1012,23 +1011,21 @@ internal fun FileLibraryRow(
 
 private fun SharedMediaRow.attachmentKey() = messageIdHex to attachmentIndex
 
-/**
- * Shares a Files-tab row's whole verified file through the outbound share sheet under its own name. The file is
- * staged from [source], so a file of any size is streamed rather than read into memory under the preview budget.
- * The share is dropped once [currentRow] shows another attachment than [row].
- */
+/** Streams a verified file under its original name while [currentRow] still identifies [row]. */
 internal suspend fun shareLibraryFile(
     context: Context,
+    accountRef: String,
     row: SharedMediaRow,
     chooserTitle: String,
-    currentRow: () -> SharedMediaRow,
+    currentRow: () -> SharedMediaRow?,
     source: suspend () -> AttachmentPlaintext,
 ) = shareAttachmentExternally(
     context = context,
+    accountRef = accountRef,
     attachmentIndex = row.attachmentIndex,
     reference = row.reference,
     chooserTitle = chooserTitle,
-    isCurrent = { currentRow().attachmentKey() == row.attachmentKey() },
+    isCurrent = { currentRow()?.attachmentKey() == row.attachmentKey() },
     plaintext = source,
 )
 

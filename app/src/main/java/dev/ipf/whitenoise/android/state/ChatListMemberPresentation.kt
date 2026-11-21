@@ -6,9 +6,11 @@ import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.PresentationResolutionFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import java.util.Locale
 
 /** Display-only roster summary; never substitutes for the authoritative member snapshot. */
@@ -77,6 +79,30 @@ internal fun chatListDisplayGroup(
                 imageHashHex = null,
             )
         null -> projected
+    }
+}
+
+/**
+ * True when a dirty (`LAST_KNOWN`) presentation still selects a group picture that [row] no longer has. After a
+ * group picture changes, MDK keeps serving the previous selection, with its stored bytes ready, until its worker
+ * recomputes the row, so adopting it would draw the replaced picture. The row's own avatar fields already name
+ * the new one. A row without any avatar signal is a transient projection state and proves nothing.
+ */
+internal fun ConversationPresentationFfi.selectsSupersededGroupPicture(row: ChatListRowFfi): Boolean {
+    val rowImage = row.avatar
+    val rowUrl = ProfileSanitizer.protocolImageUrl(row.avatarUrl)
+    val hasRowPicture = rowImage != null || rowUrl != null
+    val dirtyGroupPicture =
+        resolution == PresentationResolutionFfi.LAST_KNOWN && avatarSource == PresentationSourceFfi.GROUP
+    if (!dirtyGroupPicture || !hasRowPicture) {
+        return false
+    }
+    return when (val selected = avatar) {
+        is SelectedAvatarFfi.EncryptedGroupImage ->
+            !selected.image.imageHashHex.equals(rowImage?.imageHashHex, ignoreCase = true)
+        is SelectedAvatarFfi.RemoteImage ->
+            rowImage != null || ProfileSanitizer.protocolImageUrl(selected.url) != rowUrl
+        is SelectedAvatarFfi.Placeholder -> false
     }
 }
 

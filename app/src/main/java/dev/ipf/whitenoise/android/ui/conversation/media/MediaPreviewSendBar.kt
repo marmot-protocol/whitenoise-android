@@ -70,7 +70,7 @@ internal fun MediaPreviewSendBar(
             ProseTextField(
                 value = caption,
                 onValueChange = { caption = it },
-                modifier = Modifier.weight(1f),
+                containerModifier = Modifier.weight(1f),
                 placeholder = { Text(stringResource(R.string.add_caption)) },
                 maxLines = 4,
                 enabled = !sending,

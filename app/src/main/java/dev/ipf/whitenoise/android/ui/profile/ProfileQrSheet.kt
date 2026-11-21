@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
@@ -53,10 +54,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Check
-import dev.ipf.whitenoise.android.ui.icons.filled.QrCode
-import dev.ipf.whitenoise.android.ui.icons.filled.QrCodeScanner
 import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
@@ -170,7 +167,7 @@ internal fun ProfileQrSheet(
                         copied = true
                     },
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_check), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         if (copied) {
@@ -201,7 +198,7 @@ internal fun ProfileQrSheet(
                         if (pictureShareInProgress) {
                             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.QrCode, contentDescription = null)
+                            Icon(painterResource(R.drawable.ic_settings_qr_code_2), contentDescription = null)
                         }
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.share))
@@ -274,7 +271,7 @@ internal fun ProfileQrSheet(
                         },
                         modifier = Modifier.weight(1f),
                     ) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                        Icon(painterResource(R.drawable.ic_qr_code_scanner), contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.scan))
                     }

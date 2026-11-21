@@ -883,6 +883,7 @@
     <string name="toast_send_emoji_limit">Bu mesajda çok fazla özel emoji var, bu yüzden gönderilmedi. Bazılarını kaldırıp tekrar dene.</string>
     <string name="toast_chat_still_loading">Bu sohbet hâlâ yükleniyor. Birazdan yeniden deneyin.</string>
     <string name="toast_send_membership_verifying">Grup üyeliğin doğrulanıyor — mesajın gönderilmedi. Metin kutusunda saklandı; birazdan tekrar dene.</string>
+    <string name="notification_action_unlock_required">White Noise kilidini açıp tekrar deneyin.</string>
     <string name="toast_reaction_failed">Tepki başarısız oldu</string>
     <string name="toast_couldnt_delete_message">Mesaj silinemedi. Lütfen tekrar deneyin.</string>
     <string name="toast_couldnt_edit_message">Mesaj düzenlenemedi</string>
@@ -1455,6 +1456,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d davet anahtarı kaldırıldı</string>
     <string name="wipe_outcome_local_wipe_done">Yerel veriler silindi</string>
     <string name="wipe_outcome_local_wipe_incomplete">Yerel veriler tamamen silinemedi</string>
+    <string name="wipe_media_cleanup_failed">Bazı yerel medya dosyaları silinemedi veya paylaşım izinleri kaldırılamadı.</string>
     <string name="export_nsec">nsec dışa aktar</string>
     <string name="share_secret_key">Gizli anahtarı paylaş</string>
     <string name="signed_out">Oturum kapalı</string>
@@ -2724,4 +2726,18 @@
     <string name="document_pdf_page">Sayfa %1$d / %2$d</string>
     <string name="document_zoom_reset">Yakınlaştır / sıfırla</string>
     <string name="composer_preview_attachment">Eki önizle</string>
+    <string name="nostr_git_repository">Git deposu</string>
+    <string name="nostr_git_refs">Git deposu durumu</string>
+    <string name="nostr_git_patch">Git yaması</string>
+    <string name="nostr_git_pr">Git birleştirme isteği</string>
+    <string name="nostr_git_update">Git birleştirme isteği güncellemesi</string>
+    <string name="nostr_git_issue">Git sorunu</string>
+    <string name="nostr_git_open">Git durumu · Açık</string>
+    <string name="nostr_git_applied">Git durumu · Uygulandı, birleştirildi veya çözüldü</string>
+    <string name="nostr_git_closed">Git durumu · Kapalı</string>
+    <string name="nostr_git_draft">Git durumu · Taslak</string>
+    <string name="nostr_git_services">Git hizmetleri</string>
+    <string name="nostr_git_comment">Git yorumu</string>
+    <string name="nostr_git_copy_url">URL’yi kopyala: %1$s</string>
+    <string name="nostr_git_open_url">URL’yi aç: %1$s</string>
 </resources>

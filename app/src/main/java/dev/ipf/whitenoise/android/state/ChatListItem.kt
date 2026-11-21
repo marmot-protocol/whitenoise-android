@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
@@ -75,7 +76,15 @@ internal fun chatListItemFromProjection(
     val resolvedMemberCount =
         selectedMemberCount
             ?: if (selectedPeer != null) DIRECT_CHAT_MEMBER_COUNT else presentation?.memberCount ?: 0
-    val displayGroup = chatListDisplayGroup(row, baseGroup, selectedPresentation, resolvedMemberCount)
+    // A replaced group picture still selected by a dirty presentation yields to the row's current picture.
+    val supersededPicture = selectedPresentation?.selectsSupersededGroupPicture(row) == true
+    val displayGroup =
+        chatListDisplayGroup(
+            row,
+            baseGroup,
+            selectedPresentation.takeUnless { supersededPicture },
+            resolvedMemberCount,
+        )
     return ChatListItem(
         group = displayGroup,
         latest = chatListLatestMessage(row),
@@ -89,10 +98,18 @@ internal fun chatListItemFromProjection(
         inviteConfirmationUnresolved =
             !displayGroup.selfMembership.isNonMember() &&
                 (group?.let { it.pendingConfirmation != row.pendingConfirmation } ?: row.pendingConfirmation),
-        selectedPresentation = selectedPresentation,
+        selectedPresentation =
+            if (supersededPicture) {
+                selectedPresentation?.copy(
+                    avatar = SelectedAvatarFfi.Placeholder(row.groupIdHex, PresentationSourceFfi.GROUP_FALLBACK),
+                    avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
+                )
+            } else {
+                selectedPresentation
+            },
         selectedAvatarAsset =
             adoptableSelectedAvatarAsset(
-                asset = selectedAvatarAsset,
+                asset = selectedAvatarAsset.takeUnless { supersededPicture },
                 avatarSource = selectedPresentation?.avatarSource,
                 group = displayGroup,
                 memberCount = resolvedMemberCount,

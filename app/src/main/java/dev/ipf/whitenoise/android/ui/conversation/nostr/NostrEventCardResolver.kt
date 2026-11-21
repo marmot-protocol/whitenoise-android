@@ -29,6 +29,7 @@ internal enum class NostrEventCardKind {
     Video,
     Release,
     File,
+    Git,
     Generic,
 }
 
@@ -48,7 +49,11 @@ internal data class NostrEventCardModel(
     val authorMetadata: NostrEventAuthorMetadata? = null,
     /** An article's signed publication time in Unix seconds, when its `published_at` tag holds a valid one. */
     val publishedAt: Long? = null,
+    val gitLinks: List<String> = emptyList(),
 )
+
+internal val NostrEventCardModel.literalReaderBody: Boolean
+    get() = kind == NostrEventCardKind.Git && (eventKind == 1617 || eventKind == 1111)
 
 /**
  * The one date a card or reader shows for this event (#3317): an article's publication time when it has a valid

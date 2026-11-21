@@ -883,6 +883,7 @@
     <string name="toast_send_emoji_limit">Diese Nachricht enthält zu viele eigene Emoji und wurde deshalb nicht gesendet. Entferne einige und versuche es erneut.</string>
     <string name="toast_chat_still_loading">Dieser Chat wird noch geladen. Versuche es gleich noch einmal.</string>
     <string name="toast_send_membership_verifying">Deine Gruppenmitgliedschaft wird überprüft — deine Nachricht wurde nicht gesendet. Sie bleibt im Eingabefeld; versuche es gleich erneut.</string>
+    <string name="notification_action_unlock_required">Entsperre White Noise und versuche es erneut.</string>
     <string name="toast_reaction_failed">Reaktion fehlgeschlagen</string>
     <string name="toast_couldnt_delete_message">Nachricht konnte nicht gelöscht werden. Bitte erneut versuchen.</string>
     <string name="toast_couldnt_edit_message">Nachricht konnte nicht bearbeitet werden</string>
@@ -1466,6 +1467,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d Einladungsschlüssel entfernt</string>
     <string name="wipe_outcome_local_wipe_done">Lokale Daten gelöscht</string>
     <string name="wipe_outcome_local_wipe_incomplete">Lokale Daten nur unvollständig gelöscht</string>
+    <string name="wipe_media_cleanup_failed">Einige lokale Mediendateien oder Freigabeberechtigungen konnten nicht entfernt werden.</string>
     <string name="export_nsec">nsec exportieren</string>
     <string name="share_secret_key">Geheimschlüssel teilen</string>
     <string name="signed_out">Abgemeldet</string>
@@ -2743,4 +2745,18 @@
     <string name="document_pdf_page">Seite %1$d von %2$d</string>
     <string name="document_zoom_reset">Vergrößern / zurücksetzen</string>
     <string name="composer_preview_attachment">Anhang ansehen</string>
+    <string name="nostr_git_repository">Git-Repository</string>
+    <string name="nostr_git_refs">Git-Repository-Status</string>
+    <string name="nostr_git_patch">Git-Patch</string>
+    <string name="nostr_git_pr">Git-Pull-Request</string>
+    <string name="nostr_git_update">Git-Pull-Request-Update</string>
+    <string name="nostr_git_issue">Git-Issue</string>
+    <string name="nostr_git_open">Git-Status · Offen</string>
+    <string name="nostr_git_applied">Git-Status · Angewendet, zusammengeführt oder gelöst</string>
+    <string name="nostr_git_closed">Git-Status · Geschlossen</string>
+    <string name="nostr_git_draft">Git-Status · Entwurf</string>
+    <string name="nostr_git_services">Git-Dienste</string>
+    <string name="nostr_git_comment">Git-Kommentar</string>
+    <string name="nostr_git_copy_url">URL kopieren: %1$s</string>
+    <string name="nostr_git_open_url">URL öffnen: %1$s</string>
 </resources>

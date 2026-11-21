@@ -868,6 +868,7 @@
     <string name="toast_send_emoji_limit">此訊息的自訂表情太多，因此未送出。請移除一些後再試一次。</string>
     <string name="toast_chat_still_loading">此聊天仍在載入中，稍後再試。</string>
     <string name="toast_send_membership_verifying">正在確認群組成員身分 — 訊息尚未送出。文字已保留在輸入框中，請稍後再試。</string>
+    <string name="notification_action_unlock_required">請解鎖 White Noise 後再試一次。</string>
     <string name="toast_reaction_failed">反應失敗</string>
     <string name="toast_couldnt_delete_message">刪除訊息失敗。請再試一次。</string>
     <string name="toast_couldnt_edit_message">無法編輯訊息</string>
@@ -1442,6 +1443,7 @@
     <string name="wipe_outcome_key_packages_deleted">已移除 %1$d 個邀請金鑰</string>
     <string name="wipe_outcome_local_wipe_done">本機資料已清除</string>
     <string name="wipe_outcome_local_wipe_incomplete">本機資料未完全清除</string>
+    <string name="wipe_media_cleanup_failed">部分本機媒體檔案無法刪除，或部分分享權限無法撤銷。</string>
     <string name="export_nsec">匯出 nsec</string>
     <string name="share_secret_key">分享金鑰</string>
     <string name="signed_out">已登出</string>
@@ -2685,4 +2687,18 @@
     <string name="document_pdf_page">第 %1$d 頁，共 %2$d 頁</string>
     <string name="document_zoom_reset">縮放 / 重設</string>
     <string name="composer_preview_attachment">預覽附件</string>
+    <string name="nostr_git_repository">Git 儲存庫</string>
+    <string name="nostr_git_refs">Git 儲存庫狀態</string>
+    <string name="nostr_git_patch">Git 修補檔</string>
+    <string name="nostr_git_pr">Git 提取要求</string>
+    <string name="nostr_git_update">Git 提取要求更新</string>
+    <string name="nostr_git_issue">Git 議題</string>
+    <string name="nostr_git_open">Git 狀態 · 已開啟</string>
+    <string name="nostr_git_applied">Git 狀態 · 已套用、合併或解決</string>
+    <string name="nostr_git_closed">Git 狀態 · 已關閉</string>
+    <string name="nostr_git_draft">Git 狀態 · 草稿</string>
+    <string name="nostr_git_services">Git 服務</string>
+    <string name="nostr_git_comment">Git 留言</string>
+    <string name="nostr_git_copy_url">複製網址：%1$s</string>
+    <string name="nostr_git_open_url">開啟網址：%1$s</string>
 </resources>

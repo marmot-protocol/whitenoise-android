@@ -168,11 +168,11 @@ internal fun WhiteNoiseAppState.removeMediaDiskCacheTags(tags: Set<String>) {
 }
 
 /** Removes originals before the final derivative fence, including when original cleanup throws. */
-internal fun WhiteNoiseAppState.clearMediaDiskCaches() {
+internal fun WhiteNoiseAppState.clearMediaDiskCaches(onFailure: (Throwable) -> Unit = {}) {
     try {
-        diskMediaCache.clear()
+        diskMediaCache.clear(onFailure)
     } finally {
-        displayThumbnails.clear()
+        displayThumbnails.clear(onFailure)
     }
 }
 

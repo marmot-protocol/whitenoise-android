@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.media.ACCOUNT_SHARE_PREFIX
 import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
@@ -109,34 +110,46 @@ object ConversationTranscriptExport {
 
     fun encodeJson(document: JSONObject): ByteArray = (document.toString(2) + "\n").toByteArray(StandardCharsets.UTF_8)
 
+    /** The current prefix is used for new files. The preview prefix is used for cleanup. */
+    data class FilePrefixes(
+        val current: String,
+        val preview: String,
+    ) {
+        init {
+            require(current.startsWith(ACCOUNT_SHARE_PREFIX) && preview.startsWith(ACCOUNT_SHARE_PREFIX))
+        }
+    }
+
     /**
-     * Delete any transcript files left in [transcriptsDir] from earlier exports.
-     * The share flow already deletes its file deterministically once the share
-     * sheet returns, so this only reaps an export orphaned by a process kill
-     * mid-share — bounding the decrypted-transcript cache to at most the current
-     * export instead of waiting on a later age-based startup sweep. Returns the
-     * number of files removed. Best-effort: unreadable/locked entries are skipped.
+     * Reaps abandoned transcripts for the exporting account and older unscoped exports.
+     * Returns the number of files removed. Unreadable entries are skipped.
      */
-    fun sweepStaleTranscripts(transcriptsDir: File): Int =
+    fun sweepStaleTranscripts(
+        transcriptsDir: File,
+        prefixes: FilePrefixes? = null,
+    ): Int =
         transcriptsDir
             .listFiles()
             .orEmpty()
-            .count { it.isFile && runCatching { it.delete() }.getOrDefault(false) }
+            .count { file ->
+                val unscoped = !file.name.startsWith(ACCOUNT_SHARE_PREFIX)
+                val owned =
+                    prefixes != null &&
+                        (file.name.startsWith(prefixes.current) || file.name.startsWith(prefixes.preview))
+                file.isFile && (unscoped || owned) && runCatching { file.delete() }.getOrDefault(false)
+            }
 
+    /** Reaps the account's abandoned exports and stages a transcript under its current private prefix. */
     fun writeTemporaryFile(
         cacheDir: File,
+        prefixes: FilePrefixes,
         data: ByteArray,
         groupIdHex: String,
         exportedAt: Instant = Instant.now(),
     ): File {
         val dir = File(cacheDir, CacheDirName).apply { mkdirs() }
-        // Reap any earlier decrypted transcript before writing a new one. The
-        // exports are serialized behind a modal share sheet, so a leftover file
-        // here is a prior export's orphan, never one being actively shared.
-        // (No deleteOnExit fallback: its JVM shutdown hook effectively never
-        // runs on a process-killed Android app, so it left cleartext behind.)
-        sweepStaleTranscripts(dir)
-        val file = File.createTempFile(fileNamePrefix(groupIdHex, exportedAt), ".json", dir)
+        sweepStaleTranscripts(dir, prefixes)
+        val file = File.createTempFile(prefixes.current + fileNamePrefix(groupIdHex, exportedAt), ".json", dir)
         file.writeBytes(data)
         file.setExecutable(false, false)
         return file

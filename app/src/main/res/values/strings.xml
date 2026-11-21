@@ -1019,6 +1019,7 @@
     <string name="toast_couldnt_sign_in_account">Couldn\'t sign in to account</string>
     <string name="toast_couldnt_export_nsec">Couldn\'t export secret key</string>
     <string name="wipe">Wipe</string>
+    <string name="wipe_media_cleanup_failed">Some local media files or sharing permissions could not be removed.</string>
     <string name="toast_signed_out_and_wiped">Account wiped from this device</string>
     <string name="toast_couldnt_wipe_account">Couldn\'t wipe account</string>
     <string name="encrypted_backup_strength_too_short">Too short</string>
@@ -1216,6 +1217,7 @@
     <string name="toast_profile_published">Profile published</string>
     <string name="toast_profile_published_detail">Your profile is now on %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
+    <string name="notification_action_unlock_required">Unlock White Noise and try again.</string>
     <string name="toast_send_failed">Send failed</string>
     <string name="toast_message_too_long">Message too long. Shorten your message, then send again.</string>
     <string name="toast_send_storage_full">Not enough storage to send. Free up space and try again.</string>
@@ -2909,4 +2911,18 @@
     <string name="document_pdf_page">Page %1$d of %2$d</string>
     <string name="document_zoom_reset">Zoom / reset</string>
     <string name="composer_preview_attachment">Preview attachment</string>
+    <string name="nostr_git_repository">Git repository</string>
+    <string name="nostr_git_refs">Git repository state</string>
+    <string name="nostr_git_patch">Git patch</string>
+    <string name="nostr_git_pr">Git pull request</string>
+    <string name="nostr_git_update">Git pull request update</string>
+    <string name="nostr_git_issue">Git issue</string>
+    <string name="nostr_git_open">Git status · Open</string>
+    <string name="nostr_git_applied">Git status · Applied, merged or resolved</string>
+    <string name="nostr_git_closed">Git status · Closed</string>
+    <string name="nostr_git_draft">Git status · Draft</string>
+    <string name="nostr_git_services">Git services</string>
+    <string name="nostr_git_comment">Git comment</string>
+    <string name="nostr_git_copy_url">Copy URL: %1$s</string>
+    <string name="nostr_git_open_url">Open URL: %1$s</string>
 </resources>

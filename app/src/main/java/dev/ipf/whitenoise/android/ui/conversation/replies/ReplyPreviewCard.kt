@@ -28,8 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -50,11 +52,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.safeAttachmentDisplayName
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Description
-import dev.ipf.whitenoise.android.ui.icons.filled.Image
-import dev.ipf.whitenoise.android.ui.icons.filled.Mic
-import dev.ipf.whitenoise.android.ui.icons.filled.Movie
 import dev.ipf.whitenoise.android.ui.previewTake
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 import dev.ipf.whitenoise.android.ui.resolveMentionsInPlaintext
@@ -199,10 +196,14 @@ internal fun ReplyPreviewCard(
         } else {
             attachmentPresentation?.let { fileIconFor(it.iconCategory) }
                 ?: when (mediaKind) {
-                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo -> Icons.Default.Image
-                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Video -> Icons.Default.Movie
-                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice -> Icons.Default.Mic
-                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Document -> Icons.Default.Description
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo ->
+                        ImageVector.vectorResource(R.drawable.ic_image)
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Video ->
+                        ImageVector.vectorResource(R.drawable.ic_videocam)
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice ->
+                        ImageVector.vectorResource(R.drawable.ic_voice_note)
+                    dev.ipf.whitenoise.android.core.ReplyMediaKind.Document ->
+                        ImageVector.vectorResource(R.drawable.ic_description)
                     dev.ipf.whitenoise.android.core.ReplyMediaKind.None -> null
                 }
         }

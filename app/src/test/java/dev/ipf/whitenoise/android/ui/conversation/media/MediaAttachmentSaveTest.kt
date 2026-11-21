@@ -395,7 +395,7 @@ class MediaAttachmentSaveTest {
             val capturing = CapturingLaunchContext(context())
             val source = videoSource()
             try {
-                val result = shareVideo(capturing, source, "clip.mp4", "", VIDEO_CHOOSER_TITLE)
+                val result = shareVideo(capturing, source, "clip.mp4", "", VIDEO_CHOOSER_TITLE, accountRef = "account")
 
                 assertTrue(result.exceptionOrNull()?.stackTraceToString(), result.isSuccess)
                 val chooser = capturing.launched.single()
@@ -435,8 +435,26 @@ class MediaAttachmentSaveTest {
             val capturing = CapturingLaunchContext(context())
             val source = videoSource()
             try {
-                assertTrue(shareVideo(capturing, source, "clip.webm", " Video/WebM ", VIDEO_CHOOSER_TITLE).isSuccess)
-                assertTrue(shareVideo(capturing, source, "clip.bin", "not a mime", VIDEO_CHOOSER_TITLE).isSuccess)
+                assertTrue(
+                    shareVideo(
+                        capturing,
+                        source,
+                        "clip.webm",
+                        " Video/WebM ",
+                        VIDEO_CHOOSER_TITLE,
+                        accountRef = "account",
+                    ).isSuccess,
+                )
+                assertTrue(
+                    shareVideo(
+                        capturing,
+                        source,
+                        "clip.bin",
+                        "not a mime",
+                        VIDEO_CHOOSER_TITLE,
+                        accountRef = "account",
+                    ).isSuccess,
+                )
 
                 val types =
                     capturing.launched.map { chooser ->
@@ -454,7 +472,15 @@ class MediaAttachmentSaveTest {
             val capturing = CapturingLaunchContext(context())
             val source = videoSource()
             try {
-                val result = shareVideo(capturing, source, "clip.mp4", "video/mp4", VIDEO_CHOOSER_TITLE)
+                val result =
+                    shareVideo(
+                        capturing,
+                        source,
+                        "clip.mp4",
+                        "video/mp4",
+                        VIDEO_CHOOSER_TITLE,
+                        accountRef = "account",
+                    )
 
                 assertTrue("${result.exceptionOrNull()}", result.exceptionOrNull() is ActivityNotFoundException)
                 assertTrue(capturing.launched.isEmpty())
@@ -475,7 +501,15 @@ class MediaAttachmentSaveTest {
                 }
             val source = videoSource()
             try {
-                val result = shareVideo(failingContext, source, "clip.mp4", "video/mp4", VIDEO_CHOOSER_TITLE)
+                val result =
+                    shareVideo(
+                        failingContext,
+                        source,
+                        "clip.mp4",
+                        "video/mp4",
+                        VIDEO_CHOOSER_TITLE,
+                        accountRef = "account",
+                    )
 
                 assertSame(failure, result.exceptionOrNull())
                 assertTrue(sharedMediaFiles().isEmpty())
@@ -497,7 +531,14 @@ class MediaAttachmentSaveTest {
             try {
                 val observed =
                     runCatching {
-                        shareVideo(cancellingContext, source, "clip.mp4", "video/mp4", VIDEO_CHOOSER_TITLE)
+                        shareVideo(
+                            cancellingContext,
+                            source,
+                            "clip.mp4",
+                            "video/mp4",
+                            VIDEO_CHOOSER_TITLE,
+                            accountRef = "account",
+                        )
                     }.exceptionOrNull()
 
                 assertSame(cancellation, observed)

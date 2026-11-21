@@ -80,7 +80,7 @@ class DisplayThumbnailInvalidationCoverageTest {
             mapOf(
                 "removeMediaDiskCacheEntry" to "remove(key)",
                 "removeMediaDiskCacheTags" to "removeByCiphertextTags(tags)",
-                "clearMediaDiskCaches" to "clear()",
+                "clearMediaDiskCaches" to "clear(onFailure)",
             )
         boundaries.forEach { (function, operation) ->
             val body = source.substringAfter("fun WhiteNoiseAppState.$function(").substringBefore("\n}")

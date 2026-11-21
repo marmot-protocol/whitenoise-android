@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -24,8 +25,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Person
 
 /**
  * A shared Nostr user — the actionable, identity-native counterpart to a phone
@@ -106,7 +105,7 @@ internal fun UserMessageBubble(
                 // would read as a name the sender never supplied.
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
                     Icon(
-                        Icons.Default.Person,
+                        painterResource(R.drawable.ic_person),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(10.dp).size(24.dp),

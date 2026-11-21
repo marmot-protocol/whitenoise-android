@@ -44,6 +44,12 @@ internal class NotificationReplyCompletionStore(
 
     fun recoverySnapshot(key: String): NotificationReplyRecoverySnapshot? = (recoveryLookup(key) as? NotificationReplyRecoveryLookup.Ready)?.snapshot
 
+    /** Computes the send window without creating a durable receipt for work that has not reached native. */
+    fun plannedBoundary(
+        scope: String,
+        proposed: NotificationReplyRecoveryBoundary,
+    ): NotificationReplyRecoveryBoundary? = synchronized(STATE_LOCK) { strictlyLaterBoundary(scope, proposed) }
+
     fun markStarted(
         key: String,
         scope: String,
@@ -86,6 +92,21 @@ internal class NotificationReplyCompletionStore(
             }
         }
     }
+
+    /** Clears this unstarted attempt while retaining recovery boundaries needed by earlier replies. */
+    fun retireUnsentAttempt(
+        key: String,
+        boundary: NotificationReplyRecoveryBoundary,
+    ): Boolean =
+        synchronized(STATE_LOCK) {
+            val state = recoveryState(key) ?: return@synchronized false
+            if (!hasStarted(key) || state.boundary != boundary || state.committedMessageIdHex != null) {
+                return@synchronized false
+            }
+            val saved = preferences.edit().remove(startedStorageKey(key)).commit()
+            if (saved) pruneUnneededRecoveryStates()
+            saved
+        }
 
     fun markCommittedMessage(
         key: String,

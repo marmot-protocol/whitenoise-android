@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.exportConversationTranscriptFile
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.conversation.media.discardInterruptedCreatedDocument
 import kotlinx.coroutines.CancellationException

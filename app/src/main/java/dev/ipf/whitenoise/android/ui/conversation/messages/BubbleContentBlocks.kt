@@ -36,6 +36,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
@@ -97,9 +98,6 @@ import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
 import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
 import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
@@ -557,7 +555,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                         modifier = Modifier.size(24.dp),
                     ) {
                         Icon(
-                            Icons.Default.Refresh,
+                            painterResource(R.drawable.ic_refresh),
                             contentDescription = stringResource(R.string.retry),
                             tint = timestampColor,
                             modifier = Modifier.size(16.dp),
@@ -570,7 +568,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     modifier = Modifier.size(24.dp),
                 ) {
                     Icon(
-                        Icons.Default.Close,
+                        painterResource(R.drawable.ic_close),
                         contentDescription = stringResource(R.string.discard_failed_message),
                         tint = timestampColor,
                         modifier = Modifier.size(16.dp),

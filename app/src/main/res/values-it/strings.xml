@@ -885,6 +885,7 @@
     <string name="toast_send_emoji_limit">Questo messaggio ha troppe emoji personalizzate, quindi non è stato inviato. Rimuovine alcune e riprova.</string>
     <string name="toast_chat_still_loading">Questa chat si sta ancora caricando. Riprova tra un attimo.</string>
     <string name="toast_send_membership_verifying">Verifica dell’appartenenza al gruppo — il messaggio non è stato inviato. È rimasto nella casella; riprova tra un istante.</string>
+    <string name="notification_action_unlock_required">Sblocca White Noise e riprova.</string>
     <string name="toast_reaction_failed">La reazione è fallita</string>
     <string name="toast_couldnt_delete_message">Eliminazione del messaggio fallita. Riprova.</string>
     <string name="toast_couldnt_edit_message">Impossibile modificare il messaggio</string>
@@ -1470,6 +1471,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d chiavi di invito rimosse</string>
     <string name="wipe_outcome_local_wipe_done">Dati locali cancellati</string>
     <string name="wipe_outcome_local_wipe_incomplete">Cancellazione dei dati locali incompleta</string>
+    <string name="wipe_media_cleanup_failed">Non è stato possibile rimuovere alcuni file multimediali locali o alcune autorizzazioni di condivisione.</string>
     <string name="export_nsec">Esporta nsec</string>
     <string name="share_secret_key">Condividi chiave segreta</string>
     <string name="signed_out">Disconnesso</string>
@@ -2731,4 +2733,18 @@
     <string name="document_pdf_page">Pagina %1$d di %2$d</string>
     <string name="document_zoom_reset">Zoom / ripristina</string>
     <string name="composer_preview_attachment">Anteprima allegato</string>
+    <string name="nostr_git_repository">Repository Git</string>
+    <string name="nostr_git_refs">Stato del repository Git</string>
+    <string name="nostr_git_patch">Patch Git</string>
+    <string name="nostr_git_pr">Pull request Git</string>
+    <string name="nostr_git_update">Aggiornamento della pull request Git</string>
+    <string name="nostr_git_issue">Segnalazione Git</string>
+    <string name="nostr_git_open">Stato Git · Aperto</string>
+    <string name="nostr_git_applied">Stato Git · Applicato, unito o risolto</string>
+    <string name="nostr_git_closed">Stato Git · Chiuso</string>
+    <string name="nostr_git_draft">Stato Git · Bozza</string>
+    <string name="nostr_git_services">Servizi Git</string>
+    <string name="nostr_git_comment">Commento Git</string>
+    <string name="nostr_git_copy_url">Copia URL: %1$s</string>
+    <string name="nostr_git_open_url">Apri URL: %1$s</string>
 </resources>

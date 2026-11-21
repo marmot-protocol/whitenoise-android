@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -43,9 +44,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Archive
-import dev.ipf.whitenoise.android.ui.icons.filled.Edit
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
@@ -160,7 +158,7 @@ internal fun GroupDetailsHeader(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Icon(
-                        Icons.Default.Edit,
+                        painterResource(R.drawable.ic_edit),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
@@ -218,7 +216,7 @@ internal fun GroupDetailsHeader(
                         onClick = {},
                         enabled = false,
                         label = { Text(stringResource(R.string.archive_chat)) },
-                        leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_archive), contentDescription = null) },
                     )
                 }
             }

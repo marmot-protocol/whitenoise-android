@@ -24,15 +24,13 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.NoticeTier
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /**
@@ -149,14 +147,17 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
                 action = {
                     IconButton(onClick = { clipboard.setText(AnnotatedString(copyText)) }) {
                         Icon(
-                            Icons.Default.ContentCopy,
+                            painterResource(R.drawable.ic_content_copy),
                             contentDescription = stringResource(R.string.copy),
                         )
                     }
                 },
                 dismissAction = {
                     IconButton(onClick = data::dismiss) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+                        Icon(
+                            painterResource(R.drawable.ic_close),
+                            contentDescription = stringResource(R.string.dismiss),
+                        )
                     }
                 },
             ) {

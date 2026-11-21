@@ -154,7 +154,7 @@ private val messageActionIconResources =
         MessageActionKind.Select to R.drawable.ic_check,
         MessageActionKind.SelectText to R.drawable.ic_text_fields,
         MessageActionKind.CopyText to R.drawable.ic_content_copy,
-        MessageActionKind.Speak to R.drawable.ic_volume_up,
+        MessageActionKind.Speak to R.drawable.ic_record_voice_over,
         MessageActionKind.SpeakCodeLiterally to R.drawable.ic_code,
         MessageActionKind.Translate to R.drawable.ic_translate,
         MessageActionKind.Forward to R.drawable.ic_forward,

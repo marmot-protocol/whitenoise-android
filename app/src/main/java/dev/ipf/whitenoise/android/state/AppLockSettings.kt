@@ -48,6 +48,21 @@ internal fun shouldRefreshAppLockDelayBaselineOnBackground(
     lockScreenVisible: Boolean,
 ): Boolean = requireUnlock && credentialAvailable && !lockScreenVisible
 
+/** Checks the monotonic grace period. A background-only process has no authenticated baseline. */
+internal fun notificationBackgroundGraceAllows(
+    backgroundedAt: Long?,
+    now: Long,
+    delay: AppLockDelay,
+): Boolean = backgroundedAt != null && now - backgroundedAt in 0L until delay.delayMillis
+
+/** A visible lock always wins; enabling App Lock requires an authenticated foreground session or grace. */
+internal fun notificationActionsAllowed(
+    appLockScreenVisible: Boolean,
+    requireUnlock: Boolean,
+    credentialAvailable: Boolean,
+    authenticatedSessionAvailable: Boolean,
+): Boolean = !appLockScreenVisible && (!requireUnlock || credentialAvailable && authenticatedSessionAvailable)
+
 internal fun shouldSecureAppLockWindowWhileBackgrounded(requireUnlock: Boolean): Boolean = requireUnlock
 
 internal fun shouldReattachAppUnlockPrompt(

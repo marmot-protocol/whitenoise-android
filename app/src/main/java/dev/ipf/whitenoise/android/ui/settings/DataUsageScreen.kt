@@ -79,9 +79,9 @@ private val MediaAutoDownloadType.iconRes: Int
     @DrawableRes get() =
         when (this) {
             MediaAutoDownloadType.Image -> R.drawable.ic_image
-            MediaAutoDownloadType.Audio -> R.drawable.ic_headphones
+            MediaAutoDownloadType.Audio -> R.drawable.ic_voice_note
             MediaAutoDownloadType.Video -> R.drawable.ic_videocam
-            MediaAutoDownloadType.Document -> R.drawable.ic_draft
+            MediaAutoDownloadType.Document -> R.drawable.ic_description
         }
 
 /**

@@ -2,13 +2,12 @@ package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Description
-import dev.ipf.whitenoise.android.ui.icons.filled.Download
 
 /** Presents the real Share and SAF Save actions with their independent native progress and shared admission. */
 @Suppress("FunctionNaming")
@@ -22,7 +21,7 @@ internal fun ConversationTranscriptActions(
     onSave: () -> Unit,
 ) {
     SettingsActionRow(
-        icon = Icons.Default.Description,
+        icon = ImageVector.vectorResource(R.drawable.ic_description),
         title = stringResource(R.string.export_conversation_transcript),
         modifier = Modifier.testTag("chat_info.share_transcript"),
         enabled = !shareInFlight && !saveInFlight && accountAvailable,
@@ -30,7 +29,7 @@ internal fun ConversationTranscriptActions(
         onClick = onShare,
     )
     SettingsActionRow(
-        icon = Icons.Default.Download,
+        icon = ImageVector.vectorResource(R.drawable.ic_download),
         title = stringResource(R.string.save_conversation_transcript),
         modifier = Modifier.testTag("chat_info.save_transcript"),
         enabled = !shareInFlight && !sharePending && !saveInFlight && accountAvailable,

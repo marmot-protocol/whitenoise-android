@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,8 +53,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.EmojiEmotions
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -205,7 +204,7 @@ internal fun GroupEmojiImagePickerSheet(
                             CircularProgressIndicator(modifier = Modifier.size(26.dp), strokeWidth = 2.dp)
                         else ->
                             Icon(
-                                Icons.Default.EmojiEmotions,
+                                painterResource(R.drawable.ic_emoji_smileys),
                                 contentDescription = null,
                                 modifier = Modifier.size(36.dp),
                             )

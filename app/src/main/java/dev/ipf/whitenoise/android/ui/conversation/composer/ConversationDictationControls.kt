@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -55,9 +56,6 @@ import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.settleControlMorph
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentPaste
 
 internal const val COMPOSER_DICTATION_STRIP_TAG = "composer-dictation-strip"
 internal const val COMPOSER_DICTATION_COMPACT_ACTIONS_TAG = "composer-dictation-compact-actions"
@@ -250,7 +248,7 @@ private fun ConversationDictationActiveActions(
                     ),
                 ),
     ) {
-        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
+        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.cancel))
     }
     ConversationDictationPasteAction(controller, facts)
     if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
@@ -331,7 +329,7 @@ private fun ConversationDictationPasteAction(
                 strokeWidth = 2.dp,
             )
         } else {
-            Icon(Icons.Default.ContentPaste, contentDescription = null)
+            Icon(painterResource(R.drawable.ic_content_paste), contentDescription = null)
         }
     }
 }
@@ -381,7 +379,7 @@ private fun ConversationDictationDismissAction(
         modifier = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget),
     ) {
         Icon(
-            Icons.Default.Close,
+            painterResource(R.drawable.ic_close),
             contentDescription = stringResource(label),
         )
     }

@@ -42,7 +42,7 @@ internal val ComposerShortcut.iconRes: Int
             ComposerShortcut.Paste -> R.drawable.ic_content_paste
             ComposerShortcut.Dictation -> R.drawable.ic_mic
             ComposerShortcut.Translate -> R.drawable.ic_translate
-            ComposerShortcut.VoiceNote -> R.drawable.ic_mic
+            ComposerShortcut.VoiceNote -> R.drawable.ic_voice_note
             ComposerShortcut.Camera -> R.drawable.ic_camera
             ComposerShortcut.Gallery -> R.drawable.ic_image
             ComposerShortcut.Files -> R.drawable.ic_folder

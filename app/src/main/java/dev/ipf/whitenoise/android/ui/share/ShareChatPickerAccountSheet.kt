@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -36,8 +37,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Check
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -157,7 +156,7 @@ private fun ShareChatPickerAccountItem(
         },
         trailingContent = {
             if (selected) {
-                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.selected))
+                Icon(painterResource(R.drawable.ic_check), contentDescription = stringResource(R.string.selected))
             }
         },
     )

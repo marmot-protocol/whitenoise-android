@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
+  "legacy_sha256": "3d9c7c99dd2ef9d1ed73624a9c81fb3906d26cdfeca9a5e25caac7e8f7e2ffe3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: ContactPreviewScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ContactFieldRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
+        "anchor": "fun ContactFieldRow(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "ContactPreviewScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
+        "anchor": "fun ContactPreviewScreen(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "Contact preview close button",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "Contact preview send button",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
+        "anchor": "R.string.send",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

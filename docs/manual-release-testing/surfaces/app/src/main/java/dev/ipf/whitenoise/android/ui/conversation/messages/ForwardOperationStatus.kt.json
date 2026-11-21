@@ -1,0 +1,89 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+  "legacy_sha256": "1b9276b45978eded05bb0fc42b5f0c11f05f8e287cdcad5be03b6a2d6300faf3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji prompt: ForwardOperationStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ForwardOperationActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "fun ForwardOperationActions(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "ForwardOperationDetailsSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "fun ForwardOperationDetailsSheet(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "ForwardOperationStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "fun ForwardOperationStatus(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "ForwardOperationStatusBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "fun ForwardOperationStatusBar(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "ForwardOperationStatusHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "fun ForwardOperationStatusHost(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "ForwardOperationStatusIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "fun ForwardOperationStatusIcon(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "ForwardOperationStatusRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "fun ForwardOperationStatusRow(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "Forward status dismiss button",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

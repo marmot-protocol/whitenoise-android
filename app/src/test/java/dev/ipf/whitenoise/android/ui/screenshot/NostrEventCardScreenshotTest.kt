@@ -244,6 +244,51 @@ class NostrEventCardScreenshotTest {
         capture("nostr_image_reader_light")
     }
 
+    @Test
+    fun gitCardLight() {
+        renderGitCard(darkTheme = false)
+        capture("nostr_git_card_light")
+    }
+
+    @Test
+    fun gitCardAmoledLargeRtl() {
+        renderGitCard(darkTheme = true, amoled = true, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        capture("nostr_git_card_amoled_large_rtl")
+    }
+
+    @Test
+    fun gitPatchReaderLight() {
+        renderExpandedEventReader(
+            kind = NostrEventCardKind.Git,
+            eventKind = 1617,
+            title = "Keep indentation in replies",
+            body = "diff --git a/replies.kt b/replies.kt\n-    body.trim()\n+    body.trimEnd()",
+        )
+        capture("nostr_git_patch_reader_light")
+    }
+
+    private fun renderGitCard(
+        darkTheme: Boolean,
+        amoled: Boolean = false,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ) {
+        render(darkTheme, amoled, fontScale, layoutDirection) {
+            EventBubble(
+                NostrEventCardState.Loaded(
+                    card(
+                        NostrEventCardKind.Git,
+                        1618,
+                        "Preserve indentation in replies",
+                        "Keep indentation when rendering the patch description.",
+                        listOf("parser", "Branch: preserve-indentation", "Commit: 1a2b3c4"),
+                    ),
+                ),
+                mine = false,
+            )
+        }
+    }
+
     /** Renders the full-screen reader for one event kind, which shows the event without its encoded reference. */
     private fun renderExpandedEventReader(
         kind: NostrEventCardKind,

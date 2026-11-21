@@ -1433,6 +1433,24 @@ class DiskByteCacheTest {
         assertEquals(0, dir.listFiles()?.size ?: 0)
     }
 
+    /** An undeletable indexed entry does not hide the failure or block deletion of its siblings. */
+    @Test
+    fun clearReportsAFileWhichRemainsAndContinues() {
+        val cache = DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024)
+        cache.put("a", ByteArray(30))
+        val blocked = dir.listFiles().orEmpty().single { it.name.endsWith(".enc") }
+        cache.put("b", ByteArray(30))
+        assertTrue(blocked.delete())
+        assertTrue(blocked.mkdir())
+        File(blocked, "child").writeText("nonempty")
+        val failures = mutableListOf<Throwable>()
+
+        cache.clear { failures += it }
+
+        assertEquals(1, failures.size)
+        assertEquals(listOf(blocked), dir.listFiles().orEmpty().toList())
+    }
+
     @Test
     fun clearBeforeHydrationSweepsOwnedFilesWithoutIndexScan() {
         DiskByteCache(dir, keyProvider = keyProvider, maxBytes = 1024).put("a", ByteArray(30))

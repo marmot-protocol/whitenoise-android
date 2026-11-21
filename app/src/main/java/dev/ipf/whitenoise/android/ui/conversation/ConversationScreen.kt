@@ -66,6 +66,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -77,8 +78,10 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -268,9 +271,6 @@ import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
 import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.group.rememberConversationMuteControl
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
@@ -290,12 +290,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
-
-/** Checks the complete measured row against the usable lazy-list viewport. */
-private fun LazyListLayoutInfo.isItemFullyVisible(index: Int): Boolean {
-    val item = visibleItemsInfo.firstOrNull { it.index == index } ?: return false
-    return item.offset >= viewportStartOffset && item.offset + item.size <= viewportEndOffset
-}
 
 /** Captures only the bounded state needed to decide whether startup backfill can progress. */
 private fun ConversationController.initialTimelineBackfillSnapshot() =
@@ -986,6 +980,7 @@ internal fun ConversationScreen(
             // so a promotion/demotion or roster verification is reflected.
             controller.isSelfAdmin,
             controller.canSendMessages,
+            controller.group.pendingConfirmation,
             selectionMediaCacheRevision,
             eligibilityNowSeconds,
         ) {
@@ -1203,7 +1198,8 @@ internal fun ConversationScreen(
             reconcileBatchSelections(
                 selected = selectedMessages,
                 selectableVisible = selectableMessages,
-                deletedMessageIds = controller.deletedMessageIds + pendingTimelineRemovals,
+                deletedMessageIds = controller.deletedMessageIds,
+                pendingTimelineRemovedMessageIds = pendingTimelineRemovals,
                 invalidVisibleMessageIds = invalidVisibleMessageIds,
             )
         selectedMessages.keys
@@ -5094,7 +5090,7 @@ internal fun ConversationScreen(
                                                 } else {
                                                     IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
                                                         Icon(
-                                                            Icons.Default.Refresh,
+                                                            painterResource(R.drawable.ic_refresh),
                                                             contentDescription = stringResource(R.string.refresh),
                                                         )
                                                     }
@@ -5504,7 +5500,7 @@ internal fun ConversationScreen(
                     shareUserSelection.clear()
                     picked.forEach { sendSharedUser(it) }
                 },
-                confirmIcon = Icons.AutoMirrored.Filled.Send,
+                confirmIcon = ImageVector.vectorResource(R.drawable.ic_arrow_upward),
                 confirmLabel = stringResource(R.string.send),
                 autoSelectResolvedIdentifier = true,
                 excludeAccountIdHexes = setOfNotNull(activeHex),

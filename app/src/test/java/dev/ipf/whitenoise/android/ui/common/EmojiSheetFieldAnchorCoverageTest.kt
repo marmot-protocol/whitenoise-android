@@ -40,7 +40,7 @@ class EmojiSheetFieldAnchorCoverageTest {
         assertTrue("anchor = emojiAnchor" in textField)
 
         val prose = appModuleSource("$COMMON/ProseTextField.kt").functionBody("ProseTextField")
-        assertTrue("modifier.emojiSheetFieldAnchor(emojiAnchor)" in prose)
+        assertTrue("containerModifier.emojiSheetFieldAnchor(emojiAnchor)" in prose)
         assertTrue("emojiOwner to onValueChange, emojiAnchor)" in prose)
 
         val groupName = appModuleSource("$COMMON/GroupNameEmojiField.kt").functionBody("GroupNameEmojiField")

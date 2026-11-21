@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.isTraversalGroup
@@ -63,8 +64,6 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -437,7 +436,7 @@ private fun ShareChatPickerFooter(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Icon(
-                Icons.AutoMirrored.Filled.Send,
+                painterResource(R.drawable.ic_arrow_upward),
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
             )

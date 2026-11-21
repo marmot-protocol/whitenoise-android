@@ -1,0 +1,54 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+  "legacy_sha256": "6f46857c094dabbaaa02121ded7448444083e48e06c2e388e9b691ea46370d15",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ShareChatPickerAccountItem",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+        "anchor": "fun ShareChatPickerAccountItem(",
+        "test_ids": [
+          "SYS-001"
+        ]
+      },
+      {
+        "surface": "ShareChatPickerAccountSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+        "anchor": "fun ShareChatPickerAccountSheet(",
+        "test_ids": [
+          "SYS-001"
+        ]
+      },
+      {
+        "surface": "ShareChatPickerAccountSheetContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+        "anchor": "fun ShareChatPickerAccountSheetContent(",
+        "test_ids": [
+          "SYS-001"
+        ]
+      },
+      {
+        "surface": "Selected sending account check",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+        "anchor": "R.string.selected",
+        "test_ids": [
+          "SYS-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: ShareChatPickerAccountSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
