@@ -40,39 +40,41 @@ internal class MountedContractApp(
         fixture: ReturnFixture = ReturnFixture(),
         exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
     ) {
-        val mounted = mutableStateOf(true)
-        val seededBootstrap = CompletableDeferred<Unit>()
-        seedReadyStartup(fixture.appState, seededBootstrap)
-        val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
-        val controller =
-            holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
-        fixture.appState.setAppInForeground(true)
-        composeRule.setContent {
-            if (mounted.value) {
-                CompositionLocalProvider(LocalWindowLayout provides WindowLayout.fromSize(SINGLE_PANE)) {
-                    WhiteNoiseTheme {
-                        WhiteNoiseApp(
-                            appState = fixture.appState,
-                            mainShellStateHolder = holder,
-                            warmResumeTraceToken = 1,
-                            warmResumeEpoch = 1,
-                        )
+        withGlobalSnapshotApply {
+            val mounted = mutableStateOf(true)
+            val seededBootstrap = CompletableDeferred<Unit>()
+            seedReadyStartup(fixture.appState, seededBootstrap)
+            val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
+            val controller =
+                holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
+            fixture.appState.setAppInForeground(true)
+            composeRule.setContent {
+                if (mounted.value) {
+                    CompositionLocalProvider(LocalWindowLayout provides WindowLayout.fromSize(SINGLE_PANE)) {
+                        WhiteNoiseTheme {
+                            WhiteNoiseApp(
+                                appState = fixture.appState,
+                                mainShellStateHolder = holder,
+                                warmResumeTraceToken = 1,
+                                warmResumeEpoch = 1,
+                            )
+                        }
                     }
                 }
             }
-        }
-        try {
-            awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
-            composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
-            composeRule.waitForIdle()
-            exercise(fixture, holder)
-        } finally {
-            composeRule.runOnIdle {
-                mounted.value = false
-                holder.release()
+            try {
+                awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
+                composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+                composeRule.waitForIdle()
+                exercise(fixture, holder)
+            } finally {
+                composeRule.runOnIdle {
+                    mounted.value = false
+                    holder.release()
+                }
+                composeRule.waitForIdle()
+                seededBootstrap.complete(Unit)
             }
-            composeRule.waitForIdle()
-            seededBootstrap.complete(Unit)
         }
     }
 

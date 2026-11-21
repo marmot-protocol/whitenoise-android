@@ -58,31 +58,33 @@ internal class MountedContractShell(
         savedState: SavedStateHandle = SavedStateHandle(),
         exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
     ) {
-        val mounted = mutableStateOf(true)
-        val holder = MainShellStateHolder(fixture.appState, savedState)
-        val controller =
-            holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
-        fixture.appState.setAppInForeground(true)
-        restoration.setContent {
-            if (mounted.value) {
-                CompositionLocalProvider(
-                    LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, SHELL_HEIGHT)),
-                ) {
-                    WhiteNoiseTheme { shell(holder) }
+        withGlobalSnapshotApply {
+            val mounted = mutableStateOf(true)
+            val holder = MainShellStateHolder(fixture.appState, savedState)
+            val controller =
+                holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
+            fixture.appState.setAppInForeground(true)
+            restoration.setContent {
+                if (mounted.value) {
+                    CompositionLocalProvider(
+                        LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, SHELL_HEIGHT)),
+                    ) {
+                        WhiteNoiseTheme { shell(holder) }
+                    }
                 }
             }
-        }
-        try {
-            awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
-            composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
-            composeRule.waitForIdle()
-            exercise(fixture, holder)
-        } finally {
-            composeRule.runOnIdle {
-                mounted.value = false
-                holder.release()
+            try {
+                awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
+                composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+                composeRule.waitForIdle()
+                exercise(fixture, holder)
+            } finally {
+                composeRule.runOnIdle {
+                    mounted.value = false
+                    holder.release()
+                }
+                composeRule.waitForIdle()
             }
-            composeRule.waitForIdle()
         }
     }
 
