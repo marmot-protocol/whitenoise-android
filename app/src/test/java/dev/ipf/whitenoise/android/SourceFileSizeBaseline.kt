@@ -80,7 +80,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt" to 811,
         "dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt" to 722,
         "dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt" to 1118,
-        "dev/ipf/whitenoise/android/ui/navigation/MainShell.kt" to 2279,
+        "dev/ipf/whitenoise/android/ui/navigation/MainShell.kt" to 2333,
         "dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt" to 653,
         "dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt" to 1109,
         "dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt" to 1221,

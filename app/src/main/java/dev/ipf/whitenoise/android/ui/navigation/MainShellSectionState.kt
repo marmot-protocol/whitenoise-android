@@ -37,6 +37,10 @@ internal class MainShellSectionState(
             savedState[SECTION_DETAIL_KEY] = detail.value
         }
 
+    /** Whether an account owns the section, without which master ignores every section write. */
+    val hasOwner: Boolean
+        get() = accountRef != null
+
     /** Bind before rendering; account changes and same-process runtime replacement clear the route. */
     fun bind(
         ownerAccountRef: String?,

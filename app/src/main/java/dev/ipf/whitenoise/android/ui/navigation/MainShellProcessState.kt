@@ -35,10 +35,17 @@ internal class MainShellProcessState(
     /** First-frame priority of the notification-routed conversation, which must outlive any shell unmount (#586). */
     val notificationFirstFrame = NotificationFirstFramePriority { appState.runtimeGeneration }
 
+    /** The future single route owner, fed in shadow mode from the same clearing paths and call sites. */
+    val shellNavigator = ShellNavigator()
+
     private var chatsEntry by mutableStateOf<RetainedChatsController?>(null)
     private var initialConnectionPresentationAvailable = true
     private val conversationControllers = linkedMapOf<ConversationControllerKey, ConversationController>()
     private var conversationMediaUploadEpoch = appState.mediaUploadSessionEpoch()
+
+    /** The account the retained route owner is bound to, which a conversation without a pinned account belongs to. */
+    val routeOwnerAccountRef: String?
+        get() = chatsEntry?.accountRef
 
     /**
      * Returns the retained controller for [accountRef] and [runtimeGeneration], or replaces it
@@ -60,6 +67,18 @@ internal class MainShellProcessState(
             selectedChat.value = retained.chat
             selectedChatOpenContext.value = retained.openContext
         }
+        shellNavigator.dispatch(
+            if (accountRef == null) {
+                ShellNavEvent.OwnerLost(runtimeGeneration)
+            } else {
+                ShellNavEvent.OwnerReplaced(
+                    previousAccountRef = current?.accountRef,
+                    previousRuntimeGeneration = current?.runtimeGeneration,
+                    accountRef = accountRef,
+                    runtimeGeneration = runtimeGeneration,
+                )
+            },
+        )
         val controller =
             ChatsController(
                 appState = appState,
@@ -185,6 +204,7 @@ internal class MainShellProcessState(
         notificationFirstFrame.release()
         clearConversationControllers()
         clearRetainedRoute()
+        shellNavigator.dispatch(ShellNavEvent.TaskRemoved)
     }
 
     /** Releases the first-frame priority, every retained controller and the retained route of this process state. */
@@ -192,6 +212,7 @@ internal class MainShellProcessState(
         notificationFirstFrame.release()
         clearConversationControllers()
         clearRetainedRoute()
+        shellNavigator.dispatch(ShellNavEvent.ShellReleased)
         val controller = chatsEntry?.controller
         chatsEntry = null
         appState.runtimeMirrors.blocks.stop()

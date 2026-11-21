@@ -300,6 +300,15 @@ internal fun MainShell(
             mutableStateOf(SettingsHomeViewport.Top)
         }
     var selectedChat by shellStateHolder.selectedChat
+
+    /** Sends one route intent to the shadow navigator, next to the hand-written writes that still own the route. */
+    fun shellNav(event: ShellNavEvent) = shellStateHolder.dispatchShellNav(event)
+
+    /** The route entry for [item] opened with [open], as the shadow navigator records it. */
+    fun routeOf(
+        item: ChatListItem,
+        open: ConversationOpenContext,
+    ) = shellStateHolder.conversationRoute(item, open)
     // At expanded width the chat list stays beside the conversation (#3685). The selection above
     // stays the single owner of which chat is open, so crossing the breakpoint never moves it.
     val twoPane = LocalWindowLayout.current.widthClass == WindowWidthClass.Expanded
@@ -322,6 +331,8 @@ internal fun MainShell(
     // notification tap advances the request id so an already-mounted
     // ConversationScreen re-runs its first-unread anchor.
     var selectedChatOpenContext by shellStateHolder.selectedChatOpenContext
+    // Catches any route write that reached the hand-written fields without a matching navigator event.
+    SideEffect { shellStateHolder.checkShellShadow("composition") }
     // True only when `selectedChat` was opened straight off a just-completed
     // New Chat / Create Group flow (issue #321), so ConversationScreen raises
     // the composer + keyboard once on entry. Plain `remember` (not
@@ -663,12 +674,14 @@ internal fun MainShell(
                             selectedChatOpenContext = ConversationOpenContext()
                             selectedChatJustCreated = false
                             selectedChatOpenedAsDmHint = false
+                            shellNav(ShellNavEvent.CloseConversation)
                         }
 
                         /** Revokes any selected conversation and open-time input state before returning to Chats. */
                         override fun fallBackToChatList() {
                             sectionName = MainSection.Chats.name
                             settingsDetailName = null
+                            shellNav(ShellNavEvent.ExitSettings)
                             closeConversationForAccountSwitch()
                         }
 
@@ -677,6 +690,11 @@ internal fun MainShell(
                             item: ChatListItem,
                             openContext: ConversationOpenContext,
                         ) {
+                            val routed = routeOf(item, openContext)
+                            val reLand =
+                                conversationRoot(shellStateHolder.shellNavigator.stack)
+                                    ?.let { it.accountRef == routed.accountRef && it.groupIdHex == routed.groupIdHex }
+                                    ?: false
                             sectionName = MainSection.Chats.name
                             settingsDetailName = null
                             settingsHomeViewport =
@@ -694,6 +712,13 @@ internal fun MainShell(
                             selectedChatOpenedAsDmHint = false
                             chatListReturnHeadSnap = resetChatListReturnHeadSnap()
                             selectedChat = item
+                            shellNav(
+                                if (reLand) {
+                                    ShellNavEvent.JumpWithin(openContext)
+                                } else {
+                                    ShellNavEvent.CommitNotificationRoute(routed)
+                                },
+                            )
                         }
 
                         /** Hands the acknowledgement to the Activity, which clears only a matching pending tap. */
@@ -719,6 +744,7 @@ internal fun MainShell(
         selectedChat = null
         selectedChatOpenContext = ConversationOpenContext()
         selectedChatJustCreated = false
+        shellNav(ShellNavEvent.ReturnToChats)
         notificationRoute.routing = false
         routingAppUpdate = false
         appState.showAppUpdateBannerFromNotification()
@@ -738,6 +764,7 @@ internal fun MainShell(
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
             selectedChat = item
+            shellNav(ShellNavEvent.JumpToConversation(routeOf(item, ConversationOpenContext())))
             true
         }
     }
@@ -950,7 +977,10 @@ internal fun MainShell(
         selectedChat?.projection,
     ) {
         val open = selectedChat ?: return@LaunchedEffect
-        reconcileProvisionalOpenChat(open, chatsController)?.let { selectedChat = it }
+        reconcileProvisionalOpenChat(open, chatsController)?.let {
+            selectedChat = it
+            shellNav(ShellNavEvent.ConversationRowReconciled(it.group.groupIdHex))
+        }
     }
 
     DisposableEffect(Unit) {
@@ -1014,6 +1044,10 @@ internal fun MainShell(
             settingsDetailName = null
             settingsHomeViewport =
                 reduceSettingsHomeViewport(settingsHomeViewport, SettingsHomeViewportEvent.ChangeAccount)
+        }
+        val switchedFrom = previousActiveAccountRef
+        if (switchedFrom != null && current != null && shouldResetNavOnAccountChange(switchedFrom, current)) {
+            shellNav(ShellNavEvent.AccountSwitched(switchedFrom, current, notificationRoute.earlyOpenRequestId))
         }
         previousActiveAccountRef = nextNavAccountRef(previousActiveAccountRef, current)
     }
@@ -1118,6 +1152,7 @@ internal fun MainShell(
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
             selectedChat = item
+            shellNav(ShellNavEvent.JumpToConversation(routeOf(item, selectedChatOpenContext)))
             clearPendingRequest()
         }
 
@@ -1145,6 +1180,7 @@ internal fun MainShell(
                 selectedChatJustCreated = false
                 selectedChatOpenedAsDmHint = false
                 chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+                shellNav(ShellNavEvent.CloseConversation)
                 appState.launchMutation {
                     appState.setActiveAccount(
                         label = step.accountRef,
@@ -1199,6 +1235,7 @@ internal fun MainShell(
         // open-time subtitle hint (#998).
         selectedChatOpenedAsDmHint = justCreated
         selectedChat = item
+        shellNav(ShellNavEvent.OpenConversation(routeOf(item, ConversationOpenContext())))
         appState.clearPresentedProfile()
     }
     val openGroupFromGroupCreateCompletion: (ChatListItem, Long, ChatListReturnHead?) -> Unit = {
@@ -1221,6 +1258,7 @@ internal fun MainShell(
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
             selectedChat = item
+            shellNav(ShellNavEvent.OpenConversation(routeOf(item, ConversationOpenContext())))
             appState.clearPresentedProfile()
         }
     }
@@ -1593,6 +1631,9 @@ internal fun MainShell(
                 )
             }
         selectedChat = request.item
+        shellNav(
+            ShellNavEvent.OpenConversation(routeOf(request.item, selectedChatOpenContext)),
+        )
         pendingConversationOpen = null
     }
     LaunchedEffect(
@@ -1758,6 +1799,7 @@ internal fun MainShell(
                 selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false
                 selectedChatOpenedAsDmHint = false
+                shellNav(ShellNavEvent.CloseConversation)
             }
 
             val routeTransition =
@@ -1904,6 +1946,7 @@ internal fun MainShell(
                                     supersedePendingGroupCreateOpen()
                                     sectionName = MainSection.Settings.name
                                     settingsDetailName = null
+                                    shellNav(ShellNavEvent.OpenSettings(null))
                                     settingsHomeViewport =
                                         reduceSettingsHomeViewport(
                                             settingsHomeViewport,
@@ -1954,6 +1997,7 @@ internal fun MainShell(
                                 onBackToChats = {
                                     sectionName = MainSection.Chats.name
                                     settingsDetailName = null
+                                    shellNav(ShellNavEvent.ExitSettings)
                                     settingsHomeViewport =
                                         reduceSettingsHomeViewport(
                                             settingsHomeViewport,
@@ -1971,6 +2015,7 @@ internal fun MainShell(
                                             SettingsHomeViewportEvent.OpenDiagnostics,
                                         )
                                     sectionName = MainSection.Diagnostics.name
+                                    shellNav(ShellNavEvent.OpenDiagnostics)
                                 },
                                 onOpenSupportChat = { item ->
                                     // Land in the conversation itself, not the chat list; no
@@ -1980,6 +2025,11 @@ internal fun MainShell(
                                     selectedChat = item
                                     sectionName = MainSection.Chats.name
                                     settingsDetailName = null
+                                    shellNav(
+                                        ShellNavEvent.JumpToConversation(
+                                            routeOf(item, selectedChatOpenContext),
+                                        ),
+                                    )
                                     settingsHomeViewport =
                                         reduceSettingsHomeViewport(
                                             settingsHomeViewport,
@@ -1987,7 +2037,10 @@ internal fun MainShell(
                                         )
                                 },
                                 detail = settingsDetail,
-                                onDetailChange = { settingsDetailName = it?.name },
+                                onDetailChange = {
+                                    settingsDetailName = it?.name
+                                    shellNav(ShellNavEvent.ChangeSettingsDetail(it))
+                                },
                                 homeViewport = settingsHomeViewport,
                                 onHomeViewportChange = { settingsHomeViewport = it },
                             )
@@ -1999,6 +2052,7 @@ internal fun MainShell(
                                     // detail (Developer) the user opened Diagnostics from, so
                                     // Settings re-enters that screen directly (#412).
                                     sectionName = MainSection.Settings.name
+                                    shellNav(ShellNavEvent.Back)
                                 },
                             )
                     }

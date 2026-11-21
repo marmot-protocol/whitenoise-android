@@ -94,6 +94,16 @@ internal class MainShellStateHolder(
     val conversationScrollSnapshots = processState.conversationScrollSnapshots
     val notificationFirstFrame = processState.notificationFirstFrame
 
+    /** The process-retained route owner running in shadow mode beside the fields above. */
+    val shellNavigator = processState.shellNavigator
+
+    /** The account the route owner is bound to, which an unpinned conversation belongs to. */
+    val routeOwnerAccountRef: String?
+        get() = processState.routeOwnerAccountRef
+
+    // This holder's saved section reaches the process-retained navigator once, at its first owner bind.
+    var shadowSectionRestored = false
+
     private var savedAccountRef: String? = savedStateHandle[SAVED_ACCOUNT_REF_KEY]
     private var savedGroupIdHex: String? = savedStateHandle[SAVED_GROUP_ID_KEY]
     private var savedRouteResolutionPending = savedGroupIdHex != null
@@ -191,8 +201,12 @@ internal class MainShellStateHolder(
         accountRef: String?,
         runtimeGeneration: Int,
     ): ChatsController {
+        val revision = shellNavigator.revision
         sectionState.bind(accountRef, runtimeGeneration)
-        return processState.chatsController(accountRef, runtimeGeneration)
+        val controller = processState.chatsController(accountRef, runtimeGeneration)
+        restoreShadowSectionOnce()
+        if (shellNavigator.revision != revision) checkShellShadow(shellNavigator.lastEventName)
+        return controller
     }
 
     /** Resolve a process-restored route only after the active account's local projection is authoritative. */
@@ -219,6 +233,10 @@ internal class MainShellStateHolder(
             selectedChatOpenedAsDmHint.value = false
             savedRouteResolutionPending = false
             if (selectedChat.value == null) clearSavedConversationRoute()
+            selectedChat.value?.let { restored ->
+                val route = conversationRoute(restored, ConversationOpenContext())
+                dispatchShellNav(ShellNavEvent.RestoreSavedConversation(route))
+            }
         }
     }
 
@@ -287,6 +305,7 @@ internal class MainShellStateHolder(
             phase == AppPhase.Onboarding || phase is AppPhase.Failed -> {
                 sectionState.clear()
                 processState.release()
+                checkShellShadow(shellNavigator.lastEventName)
             }
         }
         return firstUsefulFrameReady(
@@ -383,6 +402,7 @@ internal class MainShellStateHolder(
         composerExpansionStateSubscription.close()
         sectionState.clear()
         processState.release()
+        checkShellShadow(shellNavigator.lastEventName)
     }
 
     private fun clearSavedConversationRoute() {
