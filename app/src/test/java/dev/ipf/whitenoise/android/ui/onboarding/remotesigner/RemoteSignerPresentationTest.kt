@@ -110,7 +110,7 @@ class RemoteSignerPresentationTest {
         assertTrue(accounts.session(runtime, "a") === session)
         accounts.retainRuntime(Any())
         assertNull("a replaced runtime drops every handle", accounts.session("a"))
-        assertFalse(accounts.isRemote("b"))
+        assertNull(accounts.status("b"))
     }
 
     @Test

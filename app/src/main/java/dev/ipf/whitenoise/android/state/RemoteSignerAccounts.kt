@@ -27,9 +27,6 @@ internal class RemoteSignerAccounts {
     /** The last status read for [accountIdHex], or null when it is not a remote-signer account. */
     fun status(accountIdHex: String?): RemoteSignerAccountStatus? = accountIdHex?.let { published.value[it] }
 
-    /** Whether [accountIdHex] signs through a remote signer in this runtime. */
-    fun isRemote(accountIdHex: String?): Boolean = status(accountIdHex) != null
-
     @Synchronized
     fun session(accountIdHex: String?): Nip46SessionFfiInterface? = accountIdHex?.let { sessions[it] }
 

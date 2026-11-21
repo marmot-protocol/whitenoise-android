@@ -45,12 +45,13 @@ internal suspend fun WhiteNoiseAppState.reconnectSetupSigner(
         if (!isMountCurrent() || marmot() !== runtime) throw CancellationException("Setup mount was replaced")
     }
     requireMount()
-    if (remoteSigners.session(account) == null && remoteSigners.isRemote(account)) {
+    if (remoteSigners.session(runtime, account) == null && remoteSigners.status(account) != null) {
         resumeRemoteSigner(runtime, accountRefFor(account), account)
     }
-    val session = remoteSigners.session(account)
+    requireMount()
+    val session = remoteSigners.session(runtime, account)
     // An unresolved remote-signer account never falls back to Amber, which would replace its signer.
-    check(session != null || !remoteSigners.isRemote(account)) { "Remote signer session is unavailable" }
+    check(session != null || remoteSigners.status(account) == null) { "Remote signer session is unavailable" }
     if (session != null) {
         withAccountLifetime {
             requireMount()
