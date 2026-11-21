@@ -65,6 +65,10 @@ private fun reduceStackEvent(
 ): List<ShellRoute> =
     when (event) {
         ShellNavEvent.CloseConversation -> sectionOf(stack)
+        is ShellNavEvent.OpenChatDetailsScreen ->
+            conversationRoot(stack)?.let { sectionOf(stack) + it + ShellRoute.ChatDetailsScreen(event.destination) }
+                ?: stack
+        ShellNavEvent.CloseChatDetailsScreens -> sectionOf(stack) + listOfNotNull(conversationRoot(stack))
         ShellNavEvent.ReturnToChats -> CHATS_ROOT
         ShellNavEvent.Back -> popTop(stack)
         is ShellNavEvent.BackFrom -> reduceBackFrom(stack, event.pane)

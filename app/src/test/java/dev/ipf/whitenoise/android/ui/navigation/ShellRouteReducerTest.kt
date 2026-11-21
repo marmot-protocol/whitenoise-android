@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
+import dev.ipf.whitenoise.android.ui.group.ChatDetailsDestination
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -258,6 +259,53 @@ class ShellRouteReducerTest {
             reduce(withoutItem, ShellNavEvent.JumpWithin(fresh)),
         )
         assertEquals(withoutItem, reduce(withoutItem, ShellNavEvent.ConversationRowReconciled(GROUP_ONE)))
+    }
+
+    /**
+     * A chat-details screen sits above its conversation and replaces any open one. Back pops it, closing details
+     * drops it, and closing the conversation or reselecting another one takes it away.
+     */
+    @Test
+    fun aChatDetailsScreenLivesAboveItsConversation() {
+        val open = listOf(ShellRoute.Chats, conversationA)
+        val relays = reduce(open, ShellNavEvent.OpenChatDetailsScreen(ChatDetailsDestination.Relays))
+        assertEquals(open + ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays), relays)
+        val info = reduce(relays, ShellNavEvent.OpenChatDetailsScreen(ChatDetailsDestination.GroupInfo))
+        assertEquals(open + ShellRoute.ChatDetailsScreen(ChatDetailsDestination.GroupInfo), info)
+        assertEquals(open, reduce(info, ShellNavEvent.BackFrom(ShellPane.Content)))
+        assertEquals(open, reduce(info, ShellNavEvent.CloseChatDetailsScreens))
+        assertEquals(CHATS_ROOT, reduce(info, ShellNavEvent.CloseConversation))
+        val other = reduce(info, ShellNavEvent.OpenConversation(conversationB))
+        assertEquals(listOf(ShellRoute.Chats, conversationB), other)
+        assertEquals(CHATS_ROOT, reduce(CHATS_ROOT, ShellNavEvent.OpenChatDetailsScreen(ChatDetailsDestination.Relays)))
+    }
+
+    /** Re-landing in the same conversation keeps its chat-details screen, as the same chat stays selected. */
+    @Test
+    fun reLandingInTheSameConversationKeepsItsChatDetailsScreen() {
+        val screen = ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays)
+        val relays = listOf(ShellRoute.Chats, conversationA, screen)
+        val fresh = ConversationOpenContext(notificationOpenRequestId = 5L)
+        assertEquals(
+            listOf(ShellRoute.Chats, conversationA.copy(open = fresh), relays.last()),
+            reduce(relays, ShellNavEvent.JumpWithin(fresh)),
+        )
+    }
+
+    /** Contract 1 with a chat-details screen open: the matching landing keeps the conversation and drops the screen. */
+    @Test
+    fun aMatchingEarlyOpenLandingDropsTheChatDetailsScreen() {
+        val pinned = pinnedConversation(trace = EARLY_OPEN)
+        val stack = listOf(ShellRoute.Chats, pinned, ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays))
+        assertEquals(
+            listOf(ShellRoute.Chats, pinned),
+            reduce(stack, ShellNavEvent.AccountSwitched(ACCOUNT_A, ACCOUNT_B, EARLY_OPEN)),
+        )
+        assertEquals(
+            listOf(ShellRoute.Chats, pinned),
+            reduce(stack, ShellNavEvent.OwnerReplaced(ACCOUNT_A, RUNTIME, ACCOUNT_B, RUNTIME)),
+        )
+        assertEquals(CHATS_ROOT, reduce(stack, ShellNavEvent.OwnerLost(RUNTIME)))
     }
 
     /** Applies one event, so each test reads as a sequence of intents. */

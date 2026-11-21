@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.ui.group.ChatDetailsDestination
 
 /**
  * The only way to change the shell's route stack, which [ShellNavigator] owns. Each event names a user or system
@@ -8,7 +9,8 @@ import dev.ipf.whitenoise.android.state.ChatListItem
  *
  * Not carried by any event, because they are not route state: the Settings search origin and the header-photo
  * profile origin (screen-local `rememberSaveable` markers in the Settings screen that change where Back goes), the
- * just-created and DM-hint flags, conversation surface state such as Group Details itself, and every transition
+ * just-created and DM-hint flags, conversation surface state such as Group Details itself (its screens above the
+ * details list are entries, see [ShellRoute.ChatDetailsScreen]), and every transition
  * layer (pending open, exiting content, displaced controllers, routing overlays).
  */
 internal sealed interface ShellNavEvent {
@@ -49,6 +51,17 @@ internal sealed interface ShellNavEvent {
     data class RestoreSavedConversation(
         val conversation: ShellRoute.Conversation,
     ) : ShellNavEvent
+
+    /**
+     * A chat-details screen opens above the open conversation, replacing any open one. Without an open conversation
+     * nothing changes.
+     */
+    data class OpenChatDetailsScreen(
+        val destination: ChatDetailsDestination,
+    ) : ShellNavEvent
+
+    /** Chat details closed, so every screen it had open above the conversation goes with it. */
+    data object CloseChatDetailsScreens : ShellNavEvent
 
     /** The open conversation closes and whatever section lies below it shows again. */
     data object CloseConversation : ShellNavEvent

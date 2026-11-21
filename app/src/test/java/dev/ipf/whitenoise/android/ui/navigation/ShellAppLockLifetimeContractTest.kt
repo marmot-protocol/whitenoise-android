@@ -109,11 +109,15 @@ class ShellAppLockLifetimeContractTest {
     }
 
     /**
-     * A screen opened from chat details does not come back after the lock: unlocking shows chat details, one
-     * level up, over the same controller. Back from there returns to the conversation and then the chat list.
+     * Named lifetime change of checkpoint C (plan section 5, "Lifted screens"). On master a screen opened from chat
+     * details lived in composition-only state, so the lock's shell unmount dropped it and unlocking showed chat
+     * details one level up (`theChatRelayScreenIsDroppedByTheLockLeavingChatDetailsOpen`, checkpoint A). The relay
+     * screen is now an entry on the process-retained route stack, so it is kept across the lock like the
+     * conversation below it: unlocking shows the relay screen again over the same controller, and system Back still
+     * climbs one level at a time, to chat details, the conversation and the chat list.
      */
     @Test
-    fun theChatRelayScreenIsDroppedByTheLockLeavingChatDetailsOpen() {
+    fun theChatRelayScreenIsKeptByTheLockAsANamedLifetimeChange() {
         app.withMountedApp(messageFixture()) { fixture, holder ->
             app.openTarget(fixture, holder)
             app.awaitCondition { app.reads(CONVERSATION_MESSAGE) }
@@ -129,17 +133,21 @@ class ShellAppLockLifetimeContractTest {
             assertFalse(app.shown(DETAILS_TAG))
 
             app.unlock(fixture.appState)
-            assertFalse("the relay screen does not survive the lock", app.shown(GROUP_RELAYS_SCREEN_TAG))
-            assertTrue("chat details, its parent, is what returns", app.shown(DETAILS_TAG))
+            assertTrue("the relay screen is kept across the lock", app.shown(GROUP_RELAYS_SCREEN_TAG))
+            assertFalse(app.shown(DETAILS_TAG))
             assertSame(opened, fixture.appState.attachedConversationControllers().single())
 
             app.systemBack()
+            assertTrue("the first Back returns to chat details", app.shown(DETAILS_TAG))
+            assertFalse(app.shown(GROUP_RELAYS_SCREEN_TAG))
+
+            app.systemBack()
             assertFalse(app.shown(DETAILS_TAG))
-            assertTrue("the first Back returns to the conversation", app.reads(CONVERSATION_MESSAGE))
+            assertTrue("the second Back returns to the conversation", app.reads(CONVERSATION_MESSAGE))
             assertEquals(fixture.target.groupIdHex, holder.selectedChat.value?.id)
 
             app.systemBack()
-            assertNull("the second Back returns to the chat list", holder.selectedChat.value)
+            assertNull("the third Back returns to the chat list", holder.selectedChat.value)
             assertFalse(composeRule.activity.isFinishing)
         }
     }

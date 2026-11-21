@@ -1,12 +1,13 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.ui.group.ChatDetailsDestination
 import dev.ipf.whitenoise.android.ui.settings.settingsDetailParent
 
 /**
  * One entry of the shell's route stack. The stack's root is always [Chats]. Above it sit, in this order, the
  * Settings section (a chain of [Settings] entries from Settings home to the open detail, optionally topped by
- * [Diagnostics]) and at most one [Conversation].
+ * [Diagnostics]), at most one [Conversation] and, above it, at most one [ChatDetailsScreen] of that conversation.
  *
  * The order is canonical, not historical: master keeps the section and the selected conversation as two
  * independent fields, so a conversation opened while Settings is the section (beside the list at expanded width, or
@@ -35,6 +36,15 @@ internal sealed interface ShellRoute {
 
     /** The diagnostics screen, reached from a Settings screen it returns to. */
     data object Diagnostics : ShellRoute
+
+    /**
+     * A chat-details screen open above the conversation it belongs to, such as its relays. Process-retained with the
+     * stack: kept by Activity recreation and app lock, dropped by process death, an account change and every other
+     * route change that leaves the conversation.
+     */
+    data class ChatDetailsScreen(
+        val destination: ChatDetailsDestination,
+    ) : ShellRoute
 }
 
 /** The stack that holds only the chat list. */

@@ -88,6 +88,7 @@ import dev.ipf.whitenoise.android.ui.conversation.hasVisibleComposer
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
+import dev.ipf.whitenoise.android.ui.group.LocalChatDetailsSubScreens
 import dev.ipf.whitenoise.android.ui.icons.filled.Settings
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
@@ -2080,6 +2081,13 @@ internal fun MainShell(
                             CompositionLocalProvider(
                                 LocalTopNoticeScope provides
                                     ConversationNoticeDestination(content.accountRef, chat.group.groupIdHex),
+                                LocalChatDetailsSubScreens provides
+                                    rememberShellChatDetailsSubScreens(
+                                        shellStateHolder,
+                                        content.accountRef,
+                                        chat.group.groupIdHex,
+                                        content.surfaceState,
+                                    ),
                             ) {
                                 ConversationScreen(
                                     appState = appState,

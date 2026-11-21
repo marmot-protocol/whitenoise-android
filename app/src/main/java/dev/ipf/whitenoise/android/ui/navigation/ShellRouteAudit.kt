@@ -73,7 +73,8 @@ internal object ShellRouteAudit {
 
 /**
  * What is wrong with [stack]'s shape, or null: the chat list as the only root, a Settings chain exactly as its leaf
- * re-synthesizes it, Diagnostics only on top of that chain, at most one conversation, and nothing above it.
+ * re-synthesizes it, Diagnostics only on top of that chain, at most one conversation, and above it at most one of
+ * its chat-details screens.
  */
 internal fun shellRouteShapeProblem(stack: List<ShellRoute>): String? {
     val section = sectionOf(stack).drop(1)
@@ -86,7 +87,8 @@ internal fun shellRouteShapeProblem(stack: List<ShellRoute>): String? {
         stack.drop(1).any { it == ShellRoute.Chats } -> "the chat list above the root"
         section != expectedSection -> "the section is not the chain its leaf synthesizes"
         stack.count { it is ShellRoute.Conversation } > 1 -> "more than one conversation"
-        above.isNotEmpty() -> "an entry above the conversation"
+        above.any { it !is ShellRoute.ChatDetailsScreen } -> "a non-details entry above the conversation"
+        above.size > 1 -> "more than one chat-details screen"
         else -> null
     }
 }
@@ -98,6 +100,7 @@ internal fun routeShape(stack: List<ShellRoute>): String =
             ShellRoute.Chats -> "Chats"
             ShellRoute.Diagnostics -> "Diagnostics"
             is ShellRoute.Settings -> "Settings(${route.detail?.name ?: "home"})"
+            is ShellRoute.ChatDetailsScreen -> "ChatDetails(${route.destination.name})"
             is ShellRoute.Conversation ->
                 "Conversation(pinned=${route.open.pinnedAccountRef != null}, " +
                     "notification=${route.open.notificationOpenRequestId}, " +

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import dev.ipf.whitenoise.android.ui.group.ChatDetailsDestination
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -52,15 +53,20 @@ class ShellNavigatorModelTest {
             ?: conjuredConversationFailure(before, event, after)
             ?: savedSectionFailure(after)
 
-    /** Never empty, rooted at Chats, Chats only at the root, at most one conversation and only on top. */
+    /**
+     * Never empty, rooted at Chats, Chats only at the root, at most one conversation, and above it nothing but at
+     * most one of its chat-details screens, which never appear without it.
+     */
     private fun shapeFailure(after: List<ShellRoute>): String? {
         val conversations = after.count { it is ShellRoute.Conversation }
+        val above = conversationSegment(after).drop(1)
         return when {
             after.isEmpty() -> "empty stack"
             after.first() != ShellRoute.Chats -> "root is ${after.first()}"
             after.drop(1).any { it == ShellRoute.Chats } -> "Chats above the root"
             conversations > 1 -> "$conversations conversations"
-            conversations == 1 && after.last() !is ShellRoute.Conversation -> "conversation is not on top"
+            above.any { it !is ShellRoute.ChatDetailsScreen } || above.size > 1 -> "$above above the conversation"
+            sectionOf(after).any { it is ShellRoute.ChatDetailsScreen } -> "a chat-details screen without its chat"
             else -> null
         }
     }
@@ -120,7 +126,7 @@ class ShellNavigatorModelTest {
      * so a saved-state round trip through [ShellNavEvent.SectionRestored] gives the same stack back.
      */
     private fun savedSectionFailure(after: List<ShellRoute>): String? {
-        val section = after.filterNot { it is ShellRoute.Conversation }.drop(1)
+        val section = sectionOf(after).drop(1)
         val savedSection =
             when {
                 section.isEmpty() -> MainSection.Chats
@@ -160,7 +166,16 @@ class ShellNavigatorModelTest {
             5 -> ShellNavEvent.RestoreSavedConversation(randomConversation(random))
             6 -> ShellNavEvent.CloseConversation
             7 -> ShellNavEvent.ReturnToChats
-            else -> ShellNavEvent.Back
+            else -> randomBackOrDetailsEvent(random)
+        }
+
+    /** A Back, a pane Back, or a chat-details screen opening or closing above the conversation. */
+    private fun randomBackOrDetailsEvent(random: Random): ShellNavEvent =
+        when (random.nextInt(BACK_OR_DETAILS_KINDS)) {
+            0 -> ShellNavEvent.Back
+            1 -> ShellNavEvent.BackFrom(ShellPane.entries.random(random))
+            2 -> ShellNavEvent.CloseChatDetailsScreens
+            else -> ShellNavEvent.OpenChatDetailsScreen(ChatDetailsDestination.entries.random(random))
         }
 
     /** Draws one of the Settings or boundary events for [kind]. */
@@ -235,6 +250,7 @@ class ShellNavigatorModelTest {
         const val SECTION_KINDS_START = 9
         const val RUNTIMES = 2
         const val DETAIL_HOME_ODDS = 4
+        const val BACK_OR_DETAILS_KINDS = 5
         val ACCOUNTS = listOf("account-a", "account-b", "account-c")
         val GROUPS = listOf("aa01", "bb02")
         val REQUEST_IDS = listOf(0L, 1L, 2L, 3L)
