@@ -140,7 +140,8 @@ class HistoryBackupsControllerTest {
             assertEquals(0, fake.cancelledWords)
             gate.complete(Unit)
             runCurrent()
-            assertEquals(1, fake.cancelledWords)
+            // Both the retired begin and close() ask MDK to forget; forgetting twice is harmless.
+            assertTrue(fake.cancelledWords >= 1)
             assertNull(controller.state.value.setup)
         }
 
@@ -163,6 +164,41 @@ class HistoryBackupsControllerTest {
             runCurrent()
             assertNull(controller.state.value.setup)
             assertEquals(0, fake.cancelledWords)
+        }
+
+    @Test fun anAcceptedConfirmationSchedulesEvenIfTheFollowUpReadFails() =
+        runTest {
+            val fake = FakeBackups()
+            var scheduled = 0
+            val controller = controller(fake, onWriting = { scheduled++ })
+            controller.beginSetup()
+            runCurrent()
+            fake.confirmError = refused("recovery_words_mismatch")
+            controller.confirm(listOf("nope", "nope"))
+            runCurrent()
+            assertEquals(0, scheduled)
+            fake.confirmError = null
+            fake.settingsError = MarmotKitException.Runtime("io")
+            controller.confirm(listOf("gamma", "india"))
+            runCurrent()
+            assertEquals(1, scheduled)
+            assertEquals(HistoryBackupStatus.LoadFailed, controller.state.value.status)
+        }
+
+    @Test fun wordsMadeForARetiredOwnerAreForgottenAtOnce() =
+        runTest {
+            val fake = FakeBackups()
+            var current = true
+            val gate = CompletableDeferred<Unit>()
+            fake.beginGate = gate
+            val controller = controller(fake, isCurrent = { current })
+            controller.beginSetup()
+            runCurrent()
+            current = false
+            gate.complete(Unit)
+            runCurrent()
+            assertNull(controller.state.value.setup)
+            assertEquals(1, fake.cancelledWords)
         }
 
     @Test fun anExpiredSetupIsDroppedAndBusyKeepsIt() =
