@@ -254,6 +254,14 @@
       "assertions": "Private key remains concealed when opening and leaving Profile Keys; no reveal or clipboard export.",
       "postcondition": "none"
     },
+    "settings-linked-devices": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-060"
+      ],
+      "assertions": "Linked devices opens from Account for an account that has linked no device and says so; Back returns to Account without starting a link.",
+      "postcondition": "none"
+    },
     "navigation-profile-edit-cancel": {
       "suite": "navigation",
       "manual_ids": [
@@ -3645,7 +3653,7 @@
     "presentation-setup-profile":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Profile and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-profile","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-setup-relays":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Read and write relays and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-relays","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-setup-inbox":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Inbox relays and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-inbox","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
-    "presentation-setup-device":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Your chats stay here and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-device","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-setup-device":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Chats on this device and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-device","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-setup-follows":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Follow list and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-follows","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-setup-error":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Synthetic client failure renders the actual account setup recovery action; no native repair is claimed.","postcondition":"presentation-checked","presentation":"setup-error","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-selection-contact-all":{"suite":"presentation","manual_ids":["MED-001"],"assertions":"Actual production contact preview, field filtering and enabled state; verify exact selected contact callback without address book or dispatch.","postcondition":"presentation-checked","presentation":"selection-contact-all","presentation_actions":["contact-selected"],"layer":"production-presentation-ui"},

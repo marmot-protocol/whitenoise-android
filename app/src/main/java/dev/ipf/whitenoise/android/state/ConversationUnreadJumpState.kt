@@ -79,6 +79,5 @@ internal fun reconcileConversationUnreadJump(
 }
 
 private fun TimelineMessage.isUnreadJumpDestination(): Boolean =
-    record.direction == "received" &&
-        !isDerivedStateKind(record.kind) &&
+    isUnreadEligible() &&
         record.messageIdHex.isNotBlank()

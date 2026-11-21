@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.runtime.Composable
 import dev.ipf.whitenoise.android.state.AccountHistoryNotices
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.devices.DeviceLinkReminder
 
 /**
  * Persistent chat-list notices shown above the list body, below the temporary top notices: the active
- * notification profile (#3601), then any account history notice. Search and attachment browsing hide both.
+ * notification profile (#3601), then any account history notice, then the reminder to link this device. Search and
+ * attachment browsing hide all of them.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -23,4 +25,5 @@ internal fun ChatListPersistentNotices(
             onDismiss = { appState.launchMutation { owner.dismissAll() } },
         )
     }
+    DeviceLinkReminder(appState)
 }

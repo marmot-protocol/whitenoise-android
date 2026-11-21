@@ -223,11 +223,13 @@ object DiagnosticFormatter {
     /** Native refusals that wait on relays, delivery or catch-up rather than on the request itself. */
     private fun isConnectivityError(error: MarmotKitException?): Boolean =
         error is MarmotKitException.Publish ||
+            error is MarmotKitException.NoUsableRelay ||
             error is MarmotKitException.TransportClosed ||
             error is MarmotKitException.AccountCatchUp ||
             error is MarmotKitException.DirectoryLookupIncomplete ||
             error is MarmotKitException.GroupCatchingUp ||
             error is MarmotKitException.GroupCommitUndelivered ||
+            error is MarmotKitException.GroupCommitPending ||
             error is MarmotKitException.FollowListUnavailable ||
             error is MarmotKitException.BlockPublicationUncertain
 

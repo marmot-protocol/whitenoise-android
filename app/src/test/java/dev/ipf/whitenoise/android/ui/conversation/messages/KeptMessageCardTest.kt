@@ -177,6 +177,7 @@ class KeptMessageCardTest {
             id = "msg:$id",
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = id,
                     direction = "received",
                     groupIdHex = GROUP,

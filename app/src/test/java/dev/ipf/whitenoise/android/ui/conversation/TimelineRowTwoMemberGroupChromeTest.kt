@@ -280,6 +280,7 @@ class TimelineRowTwoMemberGroupChromeTest {
     private fun timelineMessage(): TimelineMessage {
         val record =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = MESSAGE_ID,
                 direction = "received",
                 groupIdHex = GROUP_ID,

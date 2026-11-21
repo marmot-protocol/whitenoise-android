@@ -27,6 +27,7 @@ internal fun timelineAppMessage(
     recordedAt: ULong = 1uL,
 ): AppMessageRecordFfi =
     AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = id,
         direction = "received",
         groupIdHex = "g",

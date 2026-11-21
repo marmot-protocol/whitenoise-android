@@ -36,6 +36,7 @@ class RecordedAtOverrideTest {
     /** Builds a sent message record recorded at the given time. */
     private fun record(recordedAt: ULong): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = "message-1",
             direction = "sent",
             groupIdHex = "group",

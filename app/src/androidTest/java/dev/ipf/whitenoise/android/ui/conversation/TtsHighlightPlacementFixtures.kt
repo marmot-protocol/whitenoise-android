@@ -79,6 +79,7 @@ internal object TtsHighlightPlacementFixtures {
         document: MarkdownDocumentFfi = plainTextDocument(plaintext),
     ) = AppMessageRecordFfi(
         messageIdHex = MESSAGE_ID,
+        invalidated = false,
         direction = "received",
         groupIdHex = GROUP_ID,
         sender = SENDER_ID,

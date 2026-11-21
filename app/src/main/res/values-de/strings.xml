@@ -905,6 +905,8 @@
     <string name="invite_decline_step_down_title">Zurücktreten und ablehnen?</string>
     <string name="invite_decline_step_down_message">Mit dieser Einladung bist du Admin. Um abzulehnen, trittst du zuerst als Admin zurück, und die Mitglieder der Gruppe sehen, dass du zurückgetreten bist.</string>
     <string name="invite_decline_step_down_confirm">Zurücktreten und ablehnen</string>
+    <string name="invite_decline_all_devices_title">Auf allen deinen Geräten ablehnen?</string>
+    <string name="invite_decline_all_devices_message">Wenn du ablehnst, verlässt du diesen Chat auf allen verknüpften Geräten, auch wenn du auf einem schon beigetreten bist. Um erneut beizutreten, brauchst du eine neue Einladung.</string>
     <string name="toast_chat_archived">Chat archiviert</string>
     <string name="toast_chat_restored">Chat wiederhergestellt</string>
     <string name="toast_couldnt_update_chat">Chat konnte nicht aktualisiert werden</string>
@@ -2059,13 +2061,13 @@
     <string name="setup_continue_without_profile">Ohne Profil fortfahren</string>
     <string name="setup_review_suggested_changes">Vorgeschlagene Änderungen prüfen</string>
     <string name="setup_chats_on_this_device">Chats auf diesem Gerät</string>
-    <string name="setup_device_none_found">Wir haben keine Nachrichtenschlüssel von einer anderen App oder einem anderen Gerät gefunden.</string>
-    <string name="setup_device_unchecked">Wir konnten nicht prüfen, ob dieses Konto für Nachrichten eine andere App oder ein anderes Gerät verwendet.</string>
-    <string name="setup_device_found_on_date">Wir haben Nachrichtenschlüssel gefunden, die dieses Konto von einer anderen App oder einem anderen Gerät veröffentlicht hat, zuletzt am %1$s.</string>
-    <string name="setup_device_found">Wir haben Nachrichtenschlüssel gefunden, die dieses Konto von einer anderen App oder einem anderen Gerät veröffentlicht hat.</string>
+    <string name="setup_device_none_found">Wir haben keine Hinweise auf eine Anmeldung auf einem anderen Gerät oder in einer anderen App gefunden.</string>
+    <string name="setup_device_unchecked">Wir konnten die Prüfung auf weitere Anmeldungen nicht abschließen.</string>
+    <string name="setup_device_found_on_date">Du hast dich mit diesem Konto offenbar schon einmal auf einem anderen Gerät oder in einer anderen App angemeldet.</string>
+    <string name="setup_device_found">Du hast dich mit diesem Konto offenbar schon einmal auf einem anderen Gerät oder in einer anderen App angemeldet.</string>
     <string name="setup_device_separate_chats">Dieses Gerät wird seine eigenen, getrennten Chats haben. Chats in der anderen App bleiben dort und werden hier nicht angezeigt.</string>
     <string name="setup_device_new_chats_either_app">Wenn jemand einen neuen Chat mit dir beginnt, kann er in jeder der beiden Apps ankommen.</string>
-    <string name="setup_device_separate_chats_if_other_app">Wenn du eine andere App für Nachrichten verwendest, wird dieses Gerät seine eigenen, getrennten Chats haben, und Chats in der anderen App werden hier nicht angezeigt.</string>
+    <string name="setup_device_separate_chats_if_other_app">Chats aus einer anderen App erscheinen hier nicht automatisch.</string>
     <string name="setup_device_stage">Gerätenutzung</string>
     <string name="setup_approval_saved_pending">Deine Zustimmung ist gespeichert. Die Änderung steht noch aus.</string>
     <string name="setup_profile_scope_help">Dadurch wird dein Profil in anderen Nostr-Apps aktualisiert.</string>
@@ -2111,6 +2113,7 @@
     <string name="setup_device_unknown">Es konnte nicht festgestellt werden, ob eine weitere Installation existiert. Fahre nur fort, wenn du dieses Gerät verwenden möchtest.</string>
     <string name="setup_profile_publish_help">Speichere dieses Profil in deinem Nostr-Konto.</string>
     <string name="setup_replacement_warning">Empfehlungen behalten alle vorhandenen Relay-Einträge bei, auch die hier nicht angezeigten. Eine eigene Liste entfernt ausgelassene Relays. Änderungen betreffen auch deine anderen Nostr-Apps.</string>
+    <string name="setup_repair_inconclusive_warning">Einige Quellen haben bei dieser Prüfung nicht geantwortet. Es könnte eine neuere Liste geben, die dieses Gerät nicht sehen konnte, und deine aktuellen Relays funktionieren in anderen Apps vielleicht weiterhin. Speichere nur, wenn du dieses Risiko akzeptierst.</string>
     <string name="setup_inbox_list">Posteingangs-Relays</string>
     <string name="setup_read_list">Lese-Relays</string>
     <string name="setup_write_list">Schreib-Relays</string>
@@ -2139,6 +2142,7 @@
     <string name="setup_action_continue_without">Nicht jetzt</string>
     <string name="setup_action_use_recommended_relays">Relay-Einrichtung korrigieren</string>
     <string name="setup_action_edit_relays">Relays prüfen</string>
+    <string name="setup_action_remove_unusable_relays">Nicht nutzbare Relays entfernen</string>
     <string name="setup_action_edit_profile">Profil bearbeiten</string>
     <string name="setup_action_edit_follows">Kontaktliste bearbeiten</string>
     <string name="setup_action_approve_repair">Änderungen speichern</string>

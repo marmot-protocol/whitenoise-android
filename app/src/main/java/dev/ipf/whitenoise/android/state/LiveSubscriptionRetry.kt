@@ -79,7 +79,7 @@ internal fun prepareDestructiveAccountWipeRuntimeState(state: DestructiveAccount
 
 internal fun restoreFailedDestructiveAccountWipeRuntimeState(
     state: DestructiveAccountWipeRuntimeState,
-    restoredAccountRef: String,
+    restoredAccountRef: String?,
 ): DestructiveAccountWipeRuntimeState =
     state.copy(
         activeAccountRef = restoredAccountRef,

@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.core.isSentFromThisDevice
 import dev.ipf.whitenoise.android.core.withAuthoritativeEdits
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -530,20 +531,12 @@ internal fun ConversationController.timelineMessageFromProjection(
         } else {
             actionRecord
         }.withRecordedAtOverride(localTimelineTimestampOverrides[record.messageIdHex])
+    val mine = MessageProjector.isMine(actionRecord, conversationAccountIdHex)
     return TimelineMessage(
         id = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}",
         record = displayRecord,
-        status =
-            when {
-                streamId != null -> MessageStatus.Streaming
-                MessageProjector.isMine(actionRecord, conversationAccountIdHex) ->
-                    if (record.sourceMessageIdHex == null && !record.recipientConfirmed) {
-                        MessageStatus.Pending
-                    } else {
-                        MessageStatus.Sent
-                    }
-                else -> MessageStatus.Received
-            },
+        fromOtherOwnDevice = mine && !actionRecord.isSentFromThisDevice(),
+        status = projectedMessageStatus(streaming = streamId != null, mine = mine, actionRecord, record),
         projected = record,
         timelineOrder = localTimelineOrderOverrides[record.messageIdHex] ?: 0uL,
         authoritativeOrder =

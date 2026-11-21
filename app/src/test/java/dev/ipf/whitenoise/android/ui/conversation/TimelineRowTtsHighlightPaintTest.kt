@@ -540,6 +540,7 @@ class TimelineRowTtsHighlightPaintTest {
     /** Builds the received rich-markdown record used for highlight paint checks. */
     private fun richRecord() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = MESSAGE_B,
             direction = "received",
             groupIdHex = GROUP_ID,
@@ -564,6 +565,7 @@ class TimelineRowTtsHighlightPaintTest {
      */
     private fun untokenizedRecord() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = MESSAGE_D,
             direction = "received",
             groupIdHex = GROUP_ID,

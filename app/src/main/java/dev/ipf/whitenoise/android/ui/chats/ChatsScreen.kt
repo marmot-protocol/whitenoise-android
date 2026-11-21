@@ -2810,7 +2810,7 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(onCreate = openNewMessageFlow, onCreateOrigin = { newChatFlowOrigin = it })
+                                EmptyChats(appState, onCreate = openNewMessageFlow) { newChatFlowOrigin = it }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }

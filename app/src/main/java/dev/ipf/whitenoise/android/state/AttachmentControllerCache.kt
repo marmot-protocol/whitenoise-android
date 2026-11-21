@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.core.isSentFromThisDevice
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -97,10 +98,12 @@ internal fun ConversationController.nativeAttachmentSourceId(messageIdHex: Strin
 /**
  * Whether [item]'s send is committed but not yet delivered, read from the row in hand so a bubble need not observe the
  * whole timeline. A peer reaction can confirm delivery without a known source event; that must stop the pending
- * presentation too. Native attachment lookups still require their own authoritative target.
+ * presentation too. Native attachment lookups still require their own authoritative target. Only a row this
+ * installation sent can be awaiting delivery; the account's rows from another device or imported history cannot.
  */
 internal fun ConversationController.awaitingDelivery(item: TimelineMessage): Boolean =
-    item.projected?.sourceMessageIdHex == null &&
+    item.record.isSentFromThisDevice() &&
+        item.projected?.sourceMessageIdHex == null &&
         item.projected?.recipientConfirmed != true &&
         timelineRecords[item.record.messageIdHex]?.sourceMessageIdHex == null &&
         timelineRecords[item.record.messageIdHex]?.recipientConfirmed != true

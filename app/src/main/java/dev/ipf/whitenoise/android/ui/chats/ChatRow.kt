@@ -211,7 +211,7 @@ internal fun ChatRow(
     val activeAccountIdHex = ownerAccountIdHex
     val rowHasUnread = item.effectiveHasUnread(activeAccountIdHex)
     val rowUnreadCount = item.effectiveUnreadCount(activeAccountIdHex)
-    val timestampAt = item.latestAt ?: 0uL
+    val timestampAt = item.previewTimestamp ?: 0uL
     val avatarAccount = chatListItemAvatarAccount(item)
     val openableDmAvatarAccount =
         avatarAccount
@@ -275,7 +275,7 @@ internal fun ChatRow(
             Modifier
         }
     val pinned = item.pinned()
-    val deliveryIndicator = item.projectedDeliveryIndicator()
+    val deliveryIndicator = item.projectedDeliveryIndicator(activeAccountIdHex)
     val actionColors = accountActionColors(appState, accountRef)
     ChatRowLayout(
         modifier =

@@ -81,7 +81,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
@@ -1064,14 +1063,14 @@ class ConversationController(
             copy = copy,
             conversationKind = latestConversationKind,
             soleSelfMember = GroupProjector.isSelfSoleMember(members, conversationAccountIdHex),
+            selfAccountIdHex = conversationAccountIdHex,
         )
     }
 
     val inviteAccount: String?
         get() {
             val me = conversationAccountIdHex
-            val other = GroupProjector.otherMemberAccount(members, me)
-            return GroupProjector.inviteAccount(group, other)
+            return GroupProjector.inviteAccount(group, GroupProjector.otherMemberAccount(members, me), me)
         }
 
     /**
@@ -1082,13 +1081,13 @@ class ConversationController(
      */
     val avatarAccount: String?
         get() {
-            val identity =
+            val peer =
                 conversationIdentityProjection(
                     members = members,
                     activeAccountIdHex = conversationAccountIdHex,
                     acceptedInvitePeerAccount = acceptedInvitePeerAccount,
                 )
-            return GroupProjector.avatarAccount(group, identity.otherMemberAccount, identity.memberCount)
+            return GroupProjector.avatarAccount(group, peer.otherMemberAccount, peer.memberCount, boundAccountIdHex)
         }
 
     /**
@@ -1843,8 +1842,7 @@ class ConversationController(
         }
         val replyTarget = replyTargetForSend(replyingTo?.messageIdHex?.takeIf { consumeReply }).getOrElse { return }
         val sendHostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEND)
-        val outboundVisibleAttempt =
-            appState.beginHostPerformance(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE)
+        val outboundVisibleAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE)
 
         // WNPerf assigns an opaque process-local operation id only while the
         // user has explicitly enabled the bounded diagnostic session.
@@ -1857,6 +1855,7 @@ class ConversationController(
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, group.disappearingMessageSecs)
         val optimistic =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = tempId,
                 direction = "sent",
                 groupIdHex = group.groupIdHex,
@@ -2974,17 +2973,11 @@ class ConversationController(
             }
             var demotedBeforeLeave = false
             runCatching {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    if (soleMember) {
-                        appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
-                    } else {
-                        if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, liveMemberCount)) {
-                            demoteThenLeave(account) { demotedBeforeLeave = true }
-                        } else {
-                            appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-                        }
+                val left =
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        leaveWithRoster(account, soleMember, activeAccountIdHex) { demotedBeforeLeave = true }
                     }
-                }
+                if (!left) return@runCatching false
                 appState.removeComposerExpansionForGroup(account, group.groupIdHex)
                 // Authoritative local self-leave: record it before the
                 // synchronous snapshot drop so any subsequent
@@ -3028,27 +3021,6 @@ class ConversationController(
                 false
             }
         }
-
-    /**
-     * Steps [account] down as admin, then leaves, asking first if MDK holds the step-down back. The question stays
-     * cancellable; once the step-down starts, it, [onDemoted] and the leave run to completion together.
-     */
-    private suspend fun demoteThenLeave(
-        account: String,
-        onDemoted: () -> Unit,
-    ) {
-        appState.runGroupChange(account, group.groupIdHex, actionLabel = R.string.group_action_step_down_and_leave) {
-            withContext(NonCancellable) {
-                val demoteResult =
-                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                        selfDemoteAdminDetailed(account, group.groupIdHex)
-                    }
-                onDemoted()
-                applyMutationDetails(account, demoteResult.details)
-                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-            }
-        }
-    }
 
     suspend fun dismissConversationNotifications() {
         val account = conversationAccountRef ?: return

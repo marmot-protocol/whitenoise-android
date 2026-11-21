@@ -75,20 +75,20 @@ private const val MAX_STARTUP_COPY_FIELDS = 7
 /**
  * The detail shown for [throwable]. An account update MDK withheld as too large for every relay's known limit (a
  * profile, relay list or KeyPackage) replaces the generic retry copy, because retrying cannot help; a caller's
- * specific detail is kept. Nothing was published, though a refused KeyPackage stays prepared locally.
+ * specific detail is kept. Nothing was published, though a refused KeyPackage stays prepared locally. An account
+ * whose other devices unlinked this one cannot sign in here again, so it is told to remove the account instead of
+ * to retry.
  */
 internal fun failureDetail(
     throwable: Throwable,
     detail: AppText,
 ): AppText =
-    if (
+    when {
+        throwable is MarmotKitException.AccountUnlinked -> AppText.Resource(R.string.error_account_unlinked)
         detail == AppText.Resource(R.string.error_try_again) &&
-        throwable is MarmotKitException.EventTooLarge &&
-        throwable.artifact == OversizedArtifactFfi.OTHER
-    ) {
-        AppText.Resource(R.string.error_update_too_large)
-    } else {
-        detail
+            throwable is MarmotKitException.EventTooLarge &&
+            throwable.artifact == OversizedArtifactFfi.OTHER -> AppText.Resource(R.string.error_update_too_large)
+        else -> detail
     }
 
 fun WhiteNoiseAppState.presentFailure(

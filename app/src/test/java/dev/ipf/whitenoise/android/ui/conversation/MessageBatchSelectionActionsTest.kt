@@ -47,6 +47,7 @@ class MessageBatchSelectionActionsTest {
         val noTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0))
         val poll =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = "poll",
                 direction = "received",
                 groupIdHex = "group",

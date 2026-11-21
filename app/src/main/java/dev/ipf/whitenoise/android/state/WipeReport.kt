@@ -48,8 +48,18 @@ data class WipeStageReport(
  */
 data class WipeReport(
     val stages: List<WipeStageReport>,
+    /**
+     * Chats this device did not leave itself because another of the account's devices takes it out of them. This
+     * is a handoff to those devices, not a receipt that it has left.
+     */
+    val chatsLeftToOtherDevices: Int = 0,
+    /**
+     * The account's other devices could not be asked to finish the sign-out, so they may still list this device
+     * until the user removes it from one of them. The user has to be told, so the wipe is not [clean].
+     */
+    val otherDevicesNotReached: Boolean = false,
 ) {
-    val issueCount: Int get() = stages.sumOf { it.failures.size }
+    val issueCount: Int get() = stages.sumOf { it.failures.size } + if (otherDevicesNotReached) 1 else 0
     val clean: Boolean get() = issueCount == 0
 }
 
@@ -103,6 +113,8 @@ internal fun wipeReport(
                             },
                 ),
             ),
+        chatsLeftToOtherDevices = outcome.groupsLeftToSiblings.toInt(),
+        otherDevicesNotReached = outcome.siblingsNotReached,
     )
 
 /**

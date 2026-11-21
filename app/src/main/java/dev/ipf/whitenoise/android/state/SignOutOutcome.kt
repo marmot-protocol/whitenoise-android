@@ -23,6 +23,18 @@ internal fun signOutOutcome(
 }
 
 /**
+ * The profile in view after [wipedRef] was wiped. Removing a profile that was not in view leaves the one that was
+ * ([inView]) where it is, as long as it is still signed in. Wiping the profile in view follows [signOutOutcome].
+ */
+internal fun nextActiveAfterWipe(
+    accounts: List<AccountSummaryFfi>,
+    wipedRef: String,
+    inView: String?,
+): String? =
+    accounts.firstOrNull { it.label == inView && it.label != wipedRef && it.isSignedInSigningAccount() }?.label
+        ?: signOutOutcome(accounts, wipedRef).nextActiveRef
+
+/**
  * Persisted account entries that can sign through either local key material or
  * an external signer such as Amber. This is identity/signing-method inventory,
  * not a liveness or signer-reachability check: a non-running external signer is

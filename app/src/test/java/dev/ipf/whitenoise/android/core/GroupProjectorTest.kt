@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -689,6 +690,37 @@ class GroupProjectorTest {
                 memberCount = 0,
             ),
         )
+    }
+
+    /** An invitation passed on by one of the account's own devices names the other member, never the account. */
+    @Test
+    fun inviteAccountSkipsAWelcomerThatIsTheAccountItself() {
+        val forwarded = group(name = "", pending = true, welcomer = "ME")
+
+        assertEquals("bob", GroupProjector.inviteAccount(forwarded, "bob", selfAccountIdHex = "me"))
+        assertNull(GroupProjector.inviteAccount(forwarded, otherMemberAccount = null, selfAccountIdHex = "me"))
+        assertNull(GroupProjector.avatarAccount(forwarded, null, memberCount = 3, selfAccountIdHex = "me"))
+        assertEquals("ME", GroupProjector.inviteAccount(forwarded, otherMemberAccount = "bob"))
+    }
+
+    /** A roster holding only the account's own devices offers the account as the other member, which is not named. */
+    @Test
+    fun inviteAccountNeverFallsBackToTheAccountItself() {
+        val forwarded = group(name = "", pending = true, welcomer = "me")
+
+        assertNull(GroupProjector.inviteAccount(forwarded, otherMemberAccount = "ME", selfAccountIdHex = "me"))
+    }
+
+    /** An unnamed pending chat passed on by the account's own device is titled after the other member. */
+    @Test
+    fun aForwardedInvitationIsTitledAfterTheOtherMember() {
+        val forwarded = group(name = "", pending = true, welcomer = "me")
+        val title = { self: String? ->
+            GroupProjector.displayTitle(forwarded, "bob", 2, memberTitle = { "name:$it" }, selfAccountIdHex = self)
+        }
+
+        assertTrue(title("me").contains("name:bob"))
+        assertTrue(title(null).contains("name:me"))
     }
 
     @Test

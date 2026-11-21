@@ -1,0 +1,97 @@
+package dev.ipf.whitenoise.android.state
+
+import dev.ipf.marmotkit.LinkChatProgressFfi
+import dev.ipf.marmotkit.LinkedDeviceFfi
+import dev.ipf.marmotkit.LinkedDeviceStatusFfi
+
+/**
+ * One of the account's own devices as a roster row shows it. Every field is MDK's; [lastActiveAtSeconds] is when a
+ * heartbeat last showed the device running, which is an observation and never a claim that it is online now.
+ */
+internal data class LinkedDeviceRow(
+    val slotIdHex: String,
+    val isThisDevice: Boolean,
+    val label: String,
+    val client: String,
+    val platform: String,
+    val linkedAtSeconds: Long,
+    val status: LinkedDeviceStatusFfi,
+    val lastActiveAtSeconds: Long?,
+    val inactive: Boolean,
+    val removalPending: Boolean,
+    val addToAllChats: Boolean = true,
+    val bringHistory: Boolean = false,
+    val keepWhileInactive: Boolean = false,
+    /** The name of the device that linked this one, blank when that device has none, null when MDK names no linker. */
+    val linkedByLabel: String? = null,
+    val chatProgress: LinkChatProgressFfi? = null,
+)
+
+/**
+ * The roster grouped for display: this device, the other devices newest link first, and the devices this user
+ * removed here whose removal the device group has not taken yet.
+ */
+internal data class LinkedDeviceRoster(
+    val thisDevice: LinkedDeviceRow?,
+    val others: List<LinkedDeviceRow>,
+    val removing: List<LinkedDeviceRow>,
+) {
+    /** Whether MDK listed no device at all, which is how an account that has not linked anything reads. */
+    val isEmpty: Boolean
+        get() = thisDevice == null && others.isEmpty() && removing.isEmpty()
+
+    /** Whether the account has any device besides this one, removal pending or not. */
+    val hasOtherDevices: Boolean
+        get() = others.isNotEmpty() || removing.isNotEmpty()
+
+    /** The row for [slotIdHex] as the roster now lists it, or null once the roster no longer does. */
+    fun device(slotIdHex: String): LinkedDeviceRow? {
+        val all = listOfNotNull(thisDevice) + others + removing
+        return all.firstOrNull { it.slotIdHex == slotIdHex }
+    }
+}
+
+/** Groups MDK's roster for display without adding, dropping or reinterpreting a device. */
+internal fun linkedDeviceRoster(devices: List<LinkedDeviceFfi>): LinkedDeviceRoster {
+    val labels = devices.associate { it.slotIdHex to it.label }
+    val rows = devices.map { it.toRow(linkedByLabel = it.linkedBySlotIdHex?.let(labels::get)) }
+    val siblings =
+        rows
+            .filterNot(LinkedDeviceRow::isThisDevice)
+            .sortedWith(compareByDescending(LinkedDeviceRow::linkedAtSeconds).thenBy(LinkedDeviceRow::slotIdHex))
+    return LinkedDeviceRoster(
+        thisDevice = rows.firstOrNull(LinkedDeviceRow::isThisDevice),
+        others = siblings.filterNot(LinkedDeviceRow::removalPending),
+        removing = siblings.filter(LinkedDeviceRow::removalPending),
+    )
+}
+
+private fun LinkedDeviceFfi.toRow(linkedByLabel: String?): LinkedDeviceRow =
+    LinkedDeviceRow(
+        slotIdHex = slotIdHex,
+        isThisDevice = isThisDevice,
+        label = label,
+        client = client,
+        platform = platform,
+        linkedAtSeconds = linkedAt.toLong(),
+        status = status,
+        lastActiveAtSeconds = lastActiveAt?.toLong(),
+        inactive = inactive,
+        removalPending = removalPending,
+        addToAllChats = addToAllChats,
+        bringHistory = bringHistory,
+        keepWhileInactive = keepWhileInactive,
+        linkedByLabel = linkedByLabel,
+    )
+
+/** A slot shows progress only while it has a consistent count of outstanding chats. */
+internal fun LinkChatProgressFfi.isJoiningChats(): Boolean = remaining > 0u && remaining <= total
+
+/** Attach MDK’s current inventory to the matching slot on either end of the link. */
+internal fun LinkedDeviceRoster.withChatProgress(progress: List<LinkChatProgressFfi>): LinkedDeviceRoster {
+    if (progress.isEmpty()) return this
+    val bySlot = progress.filter { it.isJoiningChats() }.associateBy { it.slotIdHex }
+
+    fun row(device: LinkedDeviceRow) = device.copy(chatProgress = bySlot[device.slotIdHex])
+    return LinkedDeviceRoster(thisDevice?.let(::row), others.map(::row), removing.map(::row))
+}

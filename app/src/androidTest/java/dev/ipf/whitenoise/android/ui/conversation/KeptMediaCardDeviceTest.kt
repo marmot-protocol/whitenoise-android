@@ -95,6 +95,7 @@ class KeptMediaCardDeviceTest {
             "msg:synthetic-message",
             AppMessageRecordFfi(
                 messageIdHex = "synthetic-message",
+                invalidated = false,
                 direction = "received",
                 groupIdHex = "synthetic-group",
                 sender = "synthetic-author",

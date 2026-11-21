@@ -907,6 +907,8 @@
     <string name="invite_decline_step_down_title">Deixar de ser administrador e recusar?</string>
     <string name="invite_decline_step_down_message">Este convite torna você administrador. Para recusar, você primeiro deixará de ser administrador, e os membros do grupo verão isso.</string>
     <string name="invite_decline_step_down_confirm">Deixar de ser administrador e recusar</string>
+    <string name="invite_decline_all_devices_title">Recusar em todos os seus dispositivos?</string>
+    <string name="invite_decline_all_devices_message">Se recusar, você sairá desta conversa em todos os seus dispositivos vinculados, mesmo que já tenha entrado por um deles. Para voltar, precisará de um novo convite.</string>
     <string name="toast_chat_archived">Bate-papo arquivado</string>
     <string name="toast_chat_restored">Bate-papo restaurado</string>
     <string name="toast_couldnt_update_chat">Não foi possível atualizar a conversa</string>
@@ -2047,13 +2049,13 @@
     <string name="setup_continue_without_profile">Continuar sem perfil</string>
     <string name="setup_review_suggested_changes">Revisar as alterações sugeridas</string>
     <string name="setup_chats_on_this_device">Conversas neste dispositivo</string>
-    <string name="setup_device_none_found">Não encontramos chaves de mensagens de outro app ou dispositivo.</string>
-    <string name="setup_device_unchecked">Não foi possível verificar se esta conta usa outro app ou outro dispositivo para mensagens.</string>
-    <string name="setup_device_found_on_date">Encontramos chaves de mensagens que esta conta publicou a partir de outro app ou dispositivo, as mais recentes em %1$s.</string>
-    <string name="setup_device_found">Encontramos chaves de mensagens que esta conta publicou a partir de outro app ou dispositivo.</string>
+    <string name="setup_device_none_found">Não encontramos sinais de que você tenha entrado em outro dispositivo ou aplicativo.</string>
+    <string name="setup_device_unchecked">Não conseguimos concluir a verificação de outros acessos.</string>
+    <string name="setup_device_found_on_date">Parece que você já entrou nesta conta em outro dispositivo ou aplicativo.</string>
+    <string name="setup_device_found">Parece que você já entrou nesta conta em outro dispositivo ou aplicativo.</string>
     <string name="setup_device_separate_chats">Este dispositivo terá suas próprias conversas, separadas. As conversas do outro app continuam lá e não aparecerão aqui.</string>
     <string name="setup_device_new_chats_either_app">Quando alguém iniciar uma nova conversa com você, ela pode chegar em qualquer um dos dois apps.</string>
-    <string name="setup_device_separate_chats_if_other_app">Se você usa outro app para mensagens, este dispositivo terá suas próprias conversas, separadas, e as conversas desse app não aparecerão aqui.</string>
+    <string name="setup_device_separate_chats_if_other_app">As conversas que você tem em outro aplicativo não aparecem aqui automaticamente.</string>
     <string name="setup_device_stage">Uso do dispositivo</string>
     <string name="setup_approval_saved_pending">Sua aprovação está salva. A mudança ainda está pendente.</string>
     <string name="setup_profile_scope_help">Isso atualiza seu perfil em outros aplicativos Nostr.</string>
@@ -2099,6 +2101,7 @@
     <string name="setup_device_unknown">Não foi possível determinar se existe outra instalação. Continue apenas se quiser usar este dispositivo.</string>
     <string name="setup_profile_publish_help">Salve este perfil na sua conta Nostr.</string>
     <string name="setup_replacement_warning">As recomendações mantêm todas as entradas de relays existentes, incluindo as que não aparecem aqui. Uma lista personalizada remove os relays omitidos. As alterações também afetam seus outros apps Nostr.</string>
+    <string name="setup_repair_inconclusive_warning">Algumas fontes não responderam a esta verificação. Pode existir uma lista mais recente que este dispositivo não conseguiu ver, e seus relays atuais talvez ainda funcionem em outros apps. Salve somente se aceitar esse risco.</string>
     <string name="setup_inbox_list">Relays da caixa de entrada</string>
     <string name="setup_read_list">Relays de leitura</string>
     <string name="setup_write_list">Relays de escrita</string>
@@ -2127,6 +2130,7 @@
     <string name="setup_action_continue_without">Agora não</string>
     <string name="setup_action_use_recommended_relays">Corrigir configuração dos relés</string>
     <string name="setup_action_edit_relays">Rever relés</string>
+    <string name="setup_action_remove_unusable_relays">Remover relays que não podem ser usados</string>
     <string name="setup_action_edit_profile">Editar perfil</string>
     <string name="setup_action_edit_follows">Editar pessoas seguidas</string>
     <string name="setup_action_approve_repair">Salvar alterações</string>

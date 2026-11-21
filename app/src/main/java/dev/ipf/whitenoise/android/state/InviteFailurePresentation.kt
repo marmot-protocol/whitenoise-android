@@ -148,7 +148,7 @@ internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
         is MarmotKitException.InvalidKeyPackageEvent -> false
         is MarmotKitException.MissingMemberInboxRoute -> false
         is MarmotKitException.InvalidIdentity -> false
-        is MarmotKitException.Publish -> true
+        is MarmotKitException.Publish, is MarmotKitException.NoUsableRelay -> true
         is MarmotKitException -> false
         else -> true
     }

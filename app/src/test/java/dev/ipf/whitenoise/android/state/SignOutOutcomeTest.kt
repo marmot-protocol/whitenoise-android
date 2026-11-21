@@ -23,6 +23,26 @@ class SignOutOutcomeTest {
             unlinked = false,
         )
 
+    /** Removing a profile that was not in view leaves the one that was in view, wherever it sits in the list. */
+    @Test
+    fun removingAnotherProfileKeepsTheOneInView() {
+        val left = listOf(account("alice"), account("bob"), account("carol"))
+
+        assertEquals("carol", nextActiveAfterWipe(left, wipedRef = "old", inView = "carol"))
+        assertEquals("bob", nextActiveAfterWipe(left, wipedRef = "old", inView = "bob"))
+    }
+
+    /** Wiping the profile in view, or one whose profile in view is gone or signed out, follows the sign-out rule. */
+    @Test
+    fun wipingTheProfileInViewMovesToARemainingOne() {
+        val left = listOf(account("alice"), account("bob", signedOut = true))
+
+        assertEquals("alice", nextActiveAfterWipe(left, wipedRef = "old", inView = "old"))
+        assertEquals("alice", nextActiveAfterWipe(left, wipedRef = "old", inView = "bob"))
+        assertEquals("alice", nextActiveAfterWipe(left, wipedRef = "old", inView = null))
+        assertNull(nextActiveAfterWipe(emptyList(), wipedRef = "old", inView = "old"))
+    }
+
     @Test
     fun switchesToARemainingAccountAndStaysReady() {
         val outcome = signOutOutcome(accounts = listOf(account("alice"), account("bob")), activeRef = "alice")

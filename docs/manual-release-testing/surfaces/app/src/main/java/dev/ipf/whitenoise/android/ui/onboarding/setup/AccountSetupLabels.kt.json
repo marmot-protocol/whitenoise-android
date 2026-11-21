@@ -407,6 +407,16 @@
           "ONB-017"
         ]
       }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "Account setup: R.string.setup_action_remove_unusable_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupLabels.kt",
+        "anchor": "R.string.setup_action_remove_unusable_relays",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

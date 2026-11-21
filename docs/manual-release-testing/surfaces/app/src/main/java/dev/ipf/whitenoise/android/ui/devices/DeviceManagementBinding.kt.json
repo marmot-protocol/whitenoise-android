@@ -1,0 +1,54 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.device_action_busy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
+        "anchor": "R.string.device_action_busy",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_action_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
+        "anchor": "R.string.device_action_failed",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_action_link_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
+        "anchor": "R.string.device_action_link_pending",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.sign_in_answer_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
+        "anchor": "R.string.sign_in_answer_failed",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "DeviceManagementFailureEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
+        "anchor": "fun DeviceManagementFailureEffect(",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

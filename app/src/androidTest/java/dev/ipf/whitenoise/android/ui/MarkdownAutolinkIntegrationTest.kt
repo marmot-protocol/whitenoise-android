@@ -112,6 +112,7 @@ class MarkdownAutolinkIntegrationTest {
         document: dev.ipf.marmotkit.MarkdownDocumentFfi,
     ) = AppMessageRecordFfi(
         messageIdHex = "temp",
+        invalidated = false,
         direction = "sent",
         groupIdHex = "group",
         sender = "alice",

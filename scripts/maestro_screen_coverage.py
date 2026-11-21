@@ -5,12 +5,16 @@ import functools
 import hashlib
 import json
 from pathlib import Path
+import re
 import yaml
 
 try:
     from scripts.maestro_modal_discovery import modal_owners
 except ModuleNotFoundError:
     from maestro_modal_discovery import modal_owners
+
+# A manual case's permanent ID, the only shape that may name a case file.
+MANUAL_CASE_ID = re.compile(r'[A-Z]{2,5}-\d{3}')
 
 
 def has_substitution(value):
@@ -130,6 +134,30 @@ def asserted_after(path, root, opener, selector):
     return entered_before(path, root, selector, selector, opener)
 
 
+def second_device_cases(root, row, key):
+    """The manual cases that stand in for a surface only a second device of the same account can open.
+
+    The runner drives one emulator, so such a surface cannot have a direct assertion. The exemption is explicit per
+    surface: it needs its own remaining work, no bindings, and existing manual cases that exercise it on two devices.
+    """
+    if 'second_device' not in row:
+        return []
+    manual_ids = row['second_device']
+    if (not isinstance(manual_ids, list) or not manual_ids or len(set(manual_ids)) != len(manual_ids)
+            or any(not isinstance(item, str) for item in manual_ids)):
+        raise ValueError(f'Second-device screen needs its manual cases: {key}')
+    if row.get('bindings') or not str(row.get('remaining', '')).strip():
+        raise ValueError(f'Second-device screen takes no assertions and needs its own remaining work: {key}')
+    malformed = [item for item in manual_ids if not MANUAL_CASE_ID.fullmatch(item)]
+    if malformed:
+        raise ValueError(f'Second-device screen names malformed manual cases: {key} {malformed}')
+    missing = [item for item in manual_ids
+               if not (root / 'docs/manual-release-testing/cases' / f'{item}.md').is_file()]
+    if missing:
+        raise ValueError(f'Second-device screen names unknown manual cases: {key} {missing}')
+    return manual_ids
+
+
 def screen_bindings(root, screens, cases):
     """Each named surface needs its own audited mapping or explicit remaining work."""
     document = json.loads((root / 'config/maestro-screen-assertions.json').read_text())
@@ -154,6 +182,7 @@ def screen_bindings(root, screens, cases):
             raise ValueError(f'Missing screen assertions: {key}')
         if not bindings and not str(row.get('remaining', '')).strip():
             raise ValueError(f'Unmapped screen needs specific remaining work: {key}')
+        second_device = second_device_cases(root, row, key)
         qualified, seen = [], set()
         for binding in bindings:
             case = binding.get('case')
@@ -182,7 +211,7 @@ def screen_bindings(root, screens, cases):
                     root / cases[case]['flow'], root, binding['opened_by'], selector):
                 raise ValueError(f'Screen assertion precedes its opening action: {key} {case}')
             qualified.append({**binding, 'flow_sha256': hashes})
-        result.append({**row, 'remaining': row.get('remaining', default_remaining),
+        result.append({**row, 'remaining': row.get('remaining', default_remaining), 'second_device': second_device,
                        'bindings': qualified, 'execution_verified': False})
     if found != expected:
         raise ValueError(f'New screen requires direct assertion audit: {sorted(expected - found)}')

@@ -905,6 +905,8 @@
     <string name="invite_decline_step_down_title">Yöneticilikten çekilip reddedilsin mi?</string>
     <string name="invite_decline_step_down_message">Bu davet sizi yönetici yapıyor. Reddetmek için önce yöneticilikten çekileceksiniz ve grup üyeleri bunu görecek.</string>
     <string name="invite_decline_step_down_confirm">Çekil ve reddet</string>
+    <string name="invite_decline_all_devices_title">Tüm cihazlarınızda reddedilsin mi?</string>
+    <string name="invite_decline_all_devices_message">Reddederseniz, cihazlarınızdan birinde sohbete katılmış olsanız bile tüm bağlı cihazlarınızda bu sohbetten çıkarsınız. Tekrar katılmak için yeni bir davet gerekir.</string>
     <string name="toast_chat_archived">Sohbet arşivlendi</string>
     <string name="toast_chat_restored">Sohbet geri yüklendi</string>
     <string name="toast_couldnt_update_chat">Sohbet güncellenemedi</string>
@@ -2040,13 +2042,13 @@
     <string name="setup_continue_without_profile">Profil olmadan devam et</string>
     <string name="setup_review_suggested_changes">Önerilen değişiklikleri inceleyin</string>
     <string name="setup_chats_on_this_device">Bu cihazdaki sohbetler</string>
-    <string name="setup_device_none_found">Başka bir uygulamadan veya cihazdan mesajlaşma anahtarı bulamadık.</string>
-    <string name="setup_device_unchecked">Bu hesabın mesajlaşma için başka bir uygulama veya cihaz kullanıp kullanmadığını kontrol edemedik.</string>
-    <string name="setup_device_found_on_date">Bu hesabın başka bir uygulamadan veya cihazdan yayımladığı mesajlaşma anahtarları bulduk. En yenileri %1$s tarihli.</string>
-    <string name="setup_device_found">Bu hesabın başka bir uygulamadan veya cihazdan yayımladığı mesajlaşma anahtarları bulduk.</string>
+    <string name="setup_device_none_found">Başka bir cihazda veya uygulamada oturum açtığınıza dair bir işaret bulamadık.</string>
+    <string name="setup_device_unchecked">Diğer oturum açma işlemlerini kontrol etmeyi tamamlayamadık.</string>
+    <string name="setup_device_found_on_date">Görünüşe göre bu hesapta daha önce başka bir cihazda veya uygulamada oturum açmışsınız.</string>
+    <string name="setup_device_found">Görünüşe göre bu hesapta daha önce başka bir cihazda veya uygulamada oturum açmışsınız.</string>
     <string name="setup_device_separate_chats">Bu cihazın kendi ayrı sohbetleri olacak. Diğer uygulamadaki sohbetler orada kalır ve burada görünmez.</string>
     <string name="setup_device_new_chats_either_app">Biri sizinle yeni bir sohbet başlattığında, sohbet iki uygulamadan herhangi birine gelebilir.</string>
-    <string name="setup_device_separate_chats_if_other_app">Mesajlaşma için başka bir uygulama kullanıyorsanız bu cihazın kendi ayrı sohbetleri olur ve o uygulamadaki sohbetler burada görünmez.</string>
+    <string name="setup_device_separate_chats_if_other_app">Başka bir uygulamadaki sohbetleriniz burada otomatik olarak görünmez.</string>
     <string name="setup_device_stage">Cihaz kullanımı</string>
     <string name="setup_approval_saved_pending">Onayınız kaydedildi. Değişiklik hâlâ beklemede.</string>
     <string name="setup_profile_scope_help">Bu, diğer Nostr uygulamalarındaki profilinizi günceller.</string>
@@ -2092,6 +2094,7 @@
     <string name="setup_device_unknown">Başka bir kurulum olup olmadığını belirleyemedik. Yalnızca bu cihazı kullanmak istiyorsanız devam edin.</string>
     <string name="setup_profile_publish_help">Bu profili Nostr hesabınıza kaydedin.</string>
     <string name="setup_replacement_warning">Öneriler, burada gösterilmeyenler dahil mevcut tüm aktarıcı kayıtlarını korur. Özel bir liste, dışarıda bırakılan aktarıcıları kaldırır. Değişiklikler diğer Nostr uygulamalarınızı da etkiler.</string>
+    <string name="setup_repair_inconclusive_warning">Bazı kaynaklar bu denetime yanıt vermedi. Bu cihazın göremediği daha yeni bir liste olabilir ve mevcut aktarıcılarınız diğer uygulamalarda hâlâ çalışıyor olabilir. Yalnızca bu riski kabul ediyorsanız kaydedin.</string>
     <string name="setup_inbox_list">Gelen kutusu röleleri</string>
     <string name="setup_read_list">Okuma röleleri</string>
     <string name="setup_write_list">Yazma röleleri</string>
@@ -2120,6 +2123,7 @@
     <string name="setup_action_continue_without">Şimdi değil</string>
     <string name="setup_action_use_recommended_relays">Aktarıcı kurulumunu düzelt</string>
     <string name="setup_action_edit_relays">Aktarıcıları incele</string>
+    <string name="setup_action_remove_unusable_relays">Kullanılamayan aktarıcıları kaldır</string>
     <string name="setup_action_edit_profile">Profili düzenle</string>
     <string name="setup_action_edit_follows">Takipleri düzenle</string>
     <string name="setup_action_approve_repair">Değişiklikleri kaydet</string>

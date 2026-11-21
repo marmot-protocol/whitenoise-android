@@ -109,33 +109,39 @@ internal fun AccountWipeFlow(
                 // wipeInProgress (not signOutInProgress) drives the
                 // app-root staged progress sheet (#350), which survives
                 // that nav reset.
-                appState.wipeInProgress = true
-                appState.launchMutation {
-                    runAccountWipeMutation(
-                        onUnconfirmed = { error ->
-                            Log.w("AccountWipe", "Wipe outcome could not be confirmed: ${error.javaClass.simpleName}")
-                            appState.present(R.string.toast_wipe_outcome_unconfirmed, copyable = true)
-                        },
-                        onFinished = { appState.wipeInProgress = false },
-                    ) {
-                        val report = appState.signOutAndWipeActiveAccount()?.report
-                        if (report == null) {
-                            // Total FFI failure: nothing was wiped and the
-                            // runtime state was restored — this one is
-                            // worth a bug report, so keep it copyable.
-                            appState.present(R.string.toast_couldnt_wipe_account, copyable = true)
-                        } else {
-                            if (report.clean) {
-                                appState.presentTransient(R.string.toast_signed_out_and_wiped)
-                            } else {
-                                // The app-root sheet lists native and Android cleanup failures.
-                                appState.pendingWipeReport = report
-                            }
-                        }
-                    }
-                }
+                launchAccountWipe(appState)
             },
         )
+    }
+}
+
+/**
+ * Signs the active account out and wipes it on the process-lifetime scope, showing the app-root staged progress and
+ * reporting the outcome. Used by the typed confirmation and by the prompt for an account another device unlinked.
+ */
+internal fun launchAccountWipe(appState: WhiteNoiseAppState) {
+    appState.wipeInProgress = true
+    appState.launchMutation {
+        runAccountWipeMutation(
+            onUnconfirmed = { error ->
+                Log.w("AccountWipe", "Wipe outcome could not be confirmed: ${error.javaClass.simpleName}")
+                appState.present(R.string.toast_wipe_outcome_unconfirmed, copyable = true)
+            },
+            onFinished = { appState.wipeInProgress = false },
+        ) {
+            val report = appState.signOutAndWipeActiveAccount()?.report
+            if (report == null) {
+                // Total FFI failure: nothing was wiped and the
+                // runtime state was restored — this one is
+                // worth a bug report, so keep it copyable.
+                appState.present(R.string.toast_couldnt_wipe_account, copyable = true)
+            } else if (report.clean) {
+                appState.presentTransient(R.string.toast_signed_out_and_wiped)
+            } else {
+                // The app-root sheet lists native and Android cleanup failures.
+                appState.pendingWipeReport = report
+            }
+        }
     }
 }
 

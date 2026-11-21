@@ -84,7 +84,7 @@ class AccountWipeMemberMuteRetentionTest {
                     ).also { wiped = true }
                 "listAccounts" -> {
                     listAccountsFailure?.let(::suspendFailure)
-                    if (wiped) remainingAccounts else listOf(localAccount(WIPED_ACCOUNT))
+                        ?: if (wiped) remainingAccounts else listOf(localAccount(WIPED_ACCOUNT))
                 }
                 "signInAccount" -> {
                     signInCalls++
@@ -108,13 +108,13 @@ class AccountWipeMemberMuteRetentionTest {
         ShortcutManagerCompat.removeAllDynamicShortcuts(context)
     }
 
-    private fun appState(): WhiteNoiseAppState =
+    private fun appState(active: String = WIPED_ACCOUNT): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore.forContext(context),
             accountIdHexResolver = { null },
             accounts = listOf(localAccount(WIPED_ACCOUNT), localAccount(SURVIVING_ACCOUNT)),
-            activeAccountRef = WIPED_ACCOUNT,
+            activeAccountRef = active,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
@@ -289,6 +289,19 @@ class AccountWipeMemberMuteRetentionTest {
                 profileChoice,
                 appState.profileNotificationOverrides.get(SURVIVING_ACCOUNT, author),
             )
+        }
+
+    /** A failed inventory read after removing an inactive profile must keep the other profile open. */
+    @Test
+    fun postWipeReadFailureRetainsTheUnrelatedActiveProfile() =
+        runBlocking {
+            val state = appState(active = SURVIVING_ACCOUNT)
+            listAccountsFailure = RuntimeException("inventory unavailable")
+            val completion = state.withAccountLifetime { state.signOutAndWipeActiveAccountLocked(WIPED_ACCOUNT) }
+            assertTrue(checkNotNull(completion).native.localCleanup.completed)
+            org.junit.Assert.assertEquals(SURVIVING_ACCOUNT, state.activeAccountRef)
+            org.junit.Assert.assertEquals(listOf(SURVIVING_ACCOUNT), state.accounts.map { it.label })
+            assertFalse(state.accountListLoaded)
         }
 
     private companion object {

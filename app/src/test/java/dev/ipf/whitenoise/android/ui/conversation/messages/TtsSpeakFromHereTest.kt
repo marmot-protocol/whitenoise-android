@@ -235,6 +235,7 @@ class TtsSpeakFromHereTest {
     /** Builds a received message from alice whose body is its own id. */
     private fun message(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "received",
             groupIdHex = "group",

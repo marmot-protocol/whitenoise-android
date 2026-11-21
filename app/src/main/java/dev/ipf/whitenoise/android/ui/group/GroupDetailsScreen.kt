@@ -86,17 +86,20 @@ import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.accountDevicesRevision
 import dev.ipf.whitenoise.android.state.acknowledgeDisbandFailure
 import dev.ipf.whitenoise.android.state.cancelBlockedLeave
 import dev.ipf.whitenoise.android.state.collapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.conversationNotifyMode
 import dev.ipf.whitenoise.android.state.conversationVibrationPattern
 import dev.ipf.whitenoise.android.state.disbandGroup
+import dev.ipf.whitenoise.android.state.enableAccountDevices
 import dev.ipf.whitenoise.android.state.enableGroupDisbanding
 import dev.ipf.whitenoise.android.state.exportConversationTranscriptFile
 import dev.ipf.whitenoise.android.state.folderMemberIds
@@ -105,7 +108,6 @@ import dev.ipf.whitenoise.android.state.inviteProfileToGroups
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.profileAddableGroupsState
-import dev.ipf.whitenoise.android.state.refreshManagementState
 import dev.ipf.whitenoise.android.state.removeMember
 import dev.ipf.whitenoise.android.state.setConversationVibrationPattern
 import dev.ipf.whitenoise.android.state.stepDownAsAdmin
@@ -356,6 +358,16 @@ internal fun GroupDetailsScreen(
         var disbandConfirmOpen by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateOf(false)
         }
+        var accountDevicesConfirmOpen by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf(false)
+        }
+        // Re-read after every group change, refusal or roster change: MDK's answer is advisory and can move either way.
+        val accountDevicesActivation =
+            rememberAccountDevicesActivation(
+                controller = controller,
+                enabled = linkedDevicesAvailable() && controller.isSelfMember,
+                revision = controller.accountDevicesRevision(),
+            )
         // #1131: when set, the transfer-admin picker is being used as the first step
         // of a sole-admin Leave (3+ members) — picking transfers admin then leaves,
         // rather than the standalone transfer-only action. Holds the group name for
@@ -2294,6 +2306,11 @@ internal fun GroupDetailsScreen(
                                         },
                                         onDisbandRequested = { disbandConfirmOpen = true },
                                     )
+                                    groupAccountDevicesRows(
+                                        activation = accountDevicesActivation,
+                                        enabled = !mutationsBlocked,
+                                        onEnableRequested = { accountDevicesConfirmOpen = true },
+                                    )
                                 }
                                 leaveRow()
                             }
@@ -2326,6 +2343,20 @@ internal fun GroupDetailsScreen(
                                         mutation = { controller.acknowledgeDisbandFailure() },
                                     )
                                 },
+                            )
+                        }
+                        if (accountDevicesConfirmOpen) {
+                            GroupAccountDevicesConfirmDialog(
+                                identity = ownIdentity,
+                                enabled = !mutationsBlocked && actingMemberHex != null,
+                                onConfirm = {
+                                    accountDevicesConfirmOpen = false
+                                    runGroupMutation(
+                                        action = GroupMutationAction.EnableAccountDevices,
+                                        mutation = { controller.enableAccountDevices() },
+                                    )
+                                },
+                                onDismiss = { accountDevicesConfirmOpen = false },
                             )
                         }
                         if (disbandConfirmOpen) {
@@ -2491,43 +2522,6 @@ private sealed class DetailsConfirm {
     data class LeaveSoleMember(
         val groupName: String,
     ) : DetailsConfirm()
-}
-
-private enum class GroupMutationAction {
-    SaveProfile,
-    InviteMember,
-    RemoveMember,
-    PromoteAdmin,
-    DemoteAdmin,
-    SelfDemoteAdmin,
-    TransferAdmin,
-    DisappearingMessages,
-    Archive,
-    Delete,
-    Reset,
-    Leave,
-    CancelLeave,
-    EnableDisbanding,
-    Disband,
-}
-
-private data class ActiveGroupMutation(
-    val action: GroupMutationAction,
-    val target: String? = null,
-)
-
-/** Visible details follow settled membership as well as metadata, without polling equal native records. */
-@Suppress("FunctionNaming") // Compose effect follows the same naming convention as other composables.
-@Composable
-internal fun GroupManagementSnapshotRefreshEffect(controller: ConversationController) {
-    LaunchedEffect(
-        controller,
-        controller.group,
-        controller.members,
-        controller.memberRosterState,
-    ) {
-        controller.refreshManagementState()
-    }
 }
 
 /** Each opening, including equal singleton actions, gets a fresh one-use presentation identity. */

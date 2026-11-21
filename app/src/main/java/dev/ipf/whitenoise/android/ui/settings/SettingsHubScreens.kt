@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,11 +10,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.quickAccountSwitching
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesScreen
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.ProfileReadiness
 import dev.ipf.whitenoise.android.ui.profile.rememberProfileReadiness
@@ -23,14 +26,25 @@ import dev.ipf.whitenoise.android.ui.profile.rememberProfileReadiness
  * stays short while every setting keeps one owner. Item keys follow the `search.<Screen>.<n>` anchors.
  */
 
-/** Account hub: the profile, its keys and the relays that carry it. */
+/**
+ * Account hub: the profile, its keys, the relays that carry it and, in builds with linked devices, the account's
+ * device roster, which opens in place and returns here on Back.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun AccountScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onOpenDetail: (SettingsDetail?) -> Unit,
+    linkedDevices: Boolean = linkedDevicesAvailable(),
 ) {
+    // Keyed by account so a roster opened for one profile never reopens over another.
+    var linkedDevicesOpen by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
+    if (linkedDevices && linkedDevicesOpen) {
+        BackHandler { linkedDevicesOpen = false }
+        LinkedDevicesScreen(appState, onBack = { linkedDevicesOpen = false })
+        return
+    }
     val readiness =
         rememberProfileReadiness(
             appState,
@@ -41,16 +55,26 @@ internal fun AccountScreen(
         )
     SettingsScaffold(title = stringResource(R.string.account), onBack = onBack) {
         SettingsList {
-            item(key = "search.Account.1") { AccountHubGroup(readiness, onOpenDetail) }
+            item(key = "search.Account.1") {
+                AccountHubGroup(
+                    readiness = readiness,
+                    onOpenLinkedDevices = if (linkedDevices) ({ linkedDevicesOpen = true }) else null,
+                    onOpenDetail = onOpenDetail,
+                )
+            }
         }
     }
 }
 
-/** The Account hub's connected group; the Profile row carries the live readiness summary. */
-@Suppress("FunctionNaming")
+/**
+ * The Account hub's connected group; the Profile row carries the live readiness summary. The Linked devices row is
+ * present only when [onOpenLinkedDevices] is given.
+ */
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun AccountHubGroup(
     readiness: ProfileReadiness,
+    onOpenLinkedDevices: (() -> Unit)? = null,
     onOpenDetail: (SettingsDetail?) -> Unit,
 ) {
     SettingsGroup(
@@ -88,6 +112,18 @@ internal fun AccountHubGroup(
                 onClick = { onOpenDetail(SettingsDetail.Relays) },
                 leading = { SettingsLeadingIcon(R.drawable.ic_settings_cell_tower) },
             )
+        }
+        if (onOpenLinkedDevices != null) {
+            row("linked_devices") { context ->
+                SettingsLink(
+                    context = context,
+                    title = stringResource(R.string.linked_devices),
+                    explanation = stringResource(R.string.explanation_linked_devices_hub),
+                    onClick = onOpenLinkedDevices,
+                    modifier = Modifier.testTag("settings.account.linked_devices"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_device) },
+                )
+            }
         }
     }
 }

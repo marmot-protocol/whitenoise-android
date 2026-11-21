@@ -120,6 +120,7 @@ class RetentionOptimisticMessageHandoffTest {
     /** Builds a sent text message record with the given id. */
     private fun message(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "sent",
             groupIdHex = "group",

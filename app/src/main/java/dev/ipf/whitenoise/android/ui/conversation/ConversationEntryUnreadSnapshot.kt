@@ -87,7 +87,7 @@ internal fun firstUnreadAfterReadAnchor(
         else ->
             timeline
                 .drop(anchorIndex + 1)
-                .firstOrNull { it.record.isUnreadEligible() }
+                .firstOrNull { it.isUnreadEligible() }
                 ?.record
                 ?.messageIdHex
                 ?.takeIf { it.isNotBlank() }
