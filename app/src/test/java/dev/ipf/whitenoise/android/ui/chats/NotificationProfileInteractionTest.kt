@@ -9,11 +9,13 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToKey
 import dev.ipf.whitenoise.android.notifications.NotificationProfile
 import dev.ipf.whitenoise.android.notifications.NotificationProfileSchedule
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notificationProfiles
+import dev.ipf.whitenoise.android.ui.settings.NOTIFICATION_PROFILE_EDIT_LIST_TAG
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditActions
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditContent
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditFormState
@@ -94,10 +96,11 @@ class NotificationProfileInteractionTest {
             "notification-profile.schedule",
             "notification-profile.start",
             "notification-profile.day.MONDAY",
-            "notification-profile.delete",
         ).forEach { tag ->
             composeRule.onNodeWithTag(tag, useUnmergedTree = true).performScrollTo().assertIsNotEnabled()
         }
+        composeRule.onNodeWithTag(NOTIFICATION_PROFILE_EDIT_LIST_TAG).performScrollToKey("delete")
+        composeRule.onNodeWithTag("notification-profile.delete", useUnmergedTree = true).assertIsNotEnabled()
     }
 
     @Test

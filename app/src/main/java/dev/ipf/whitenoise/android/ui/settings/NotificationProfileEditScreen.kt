@@ -33,6 +33,8 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
+import dev.ipf.whitenoise.android.ui.common.rememberEmojiSheetFieldAnchor
+import dev.ipf.whitenoise.android.ui.common.rememberEmojiSheetOpener
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import kotlinx.coroutines.Dispatchers
@@ -136,6 +138,8 @@ internal fun NotificationProfileEditScreen(
     var timeField by rememberSaveable { mutableStateOf<ProfileTimeField?>(null) }
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
     var peoplePickerOpen by rememberSaveable { mutableStateOf(false) }
+    val profileEmojiAnchor = rememberEmojiSheetFieldAnchor()
+    val openBelowName = rememberEmojiSheetOpener(profileEmojiAnchor)
     var emojiPickerOpen by rememberSaveable { mutableStateOf(false) }
     var discard by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
@@ -261,13 +265,14 @@ internal fun NotificationProfileEditScreen(
                 onEditEnd = { edit { timeField = ProfileTimeField.END } },
                 onToggleDay = { day -> edit { schedule = schedule.copy(days = schedule.days.toggled(day)) } },
                 onDelete = { edit { if (canMutate()) confirmDelete = true } },
-                onChooseEmoji = { edit { emojiPickerOpen = true } },
+                onChooseEmoji = { edit { openBelowName { edit { emojiPickerOpen = true } } } },
                 onRemoveEmoji = { edit { emoji = null } },
                 onOpenPeople = { edit { if (accountRef != null) peoplePickerOpen = true } },
                 onDirectMessagesChange = { edit { allowAllDms = it } },
                 onRepeatedChange = { edit { allowRepeated = it } },
                 onGroupChangesChange = { edit { allowGroupChanges = it } },
             ),
+        profileEmojiAnchor = profileEmojiAnchor,
     )
 
     timeField?.let { field ->
@@ -318,6 +323,7 @@ internal fun NotificationProfileEditScreen(
     if (emojiPickerOpen) {
         EmojiPickerSheet(
             onDismissRequest = { emojiPickerOpen = false },
+            fieldAnchor = profileEmojiAnchor,
             onEmojiPicked = { picked ->
                 emojiPickerOpen = false
                 edit { emoji = normalizedNotificationProfileEmoji(picked) }

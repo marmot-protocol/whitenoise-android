@@ -41,9 +41,11 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.MAX_NOTIFICATION_PROFILE_NAME_CODE_POINTS
 import dev.ipf.whitenoise.android.notifications.NotificationProfileSchedule
+import dev.ipf.whitenoise.android.ui.common.EmojiSheetFieldAnchor
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
+import dev.ipf.whitenoise.android.ui.common.emojiSheetFieldAnchor
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.time.DayOfWeek
 import java.time.format.TextStyle
@@ -110,6 +112,7 @@ private val ProfileNameLimit =
 internal fun NotificationProfileEditContent(
     state: NotificationProfileEditFormState,
     actions: NotificationProfileEditActions,
+    profileEmojiAnchor: EmojiSheetFieldAnchor? = null,
 ) {
     SettingsScaffold(
         title =
@@ -127,7 +130,7 @@ internal fun NotificationProfileEditContent(
         },
     ) {
         SettingsList(listTag = NOTIFICATION_PROFILE_EDIT_LIST_TAG) {
-            item(key = "name") { ProfileNameField(state, actions) }
+            item(key = "name") { ProfileNameField(state, actions, profileEmojiAnchor) }
             item(key = "allowed") { AllowedNotificationsSection(state, actions) }
             item(key = "schedule") { ScheduleSection(state.schedule, actions, enabled = !state.busy) }
             if (state.canDelete) {
@@ -142,6 +145,7 @@ internal fun NotificationProfileEditContent(
 private fun ProfileNameField(
     state: NotificationProfileEditFormState,
     actions: NotificationProfileEditActions,
+    profileEmojiAnchor: EmojiSheetFieldAnchor?,
 ) {
     Column(
         Modifier.fillMaxWidth().padding(
@@ -164,7 +168,11 @@ private fun ProfileNameField(
                 state = state.name,
                 enabled = !state.busy,
                 emojiAction = true,
-                modifier = Modifier.weight(1f).testTag("notification-profile.name"),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .testTag("notification-profile.name")
+                        .then(profileEmojiAnchor?.let { Modifier.emojiSheetFieldAnchor(it) } ?: Modifier),
                 label = { Text(stringResource(R.string.notification_profile_name_label)) },
                 placeholder = { Text(stringResource(R.string.notification_profile_name_placeholder)) },
                 inputTransformation = ProfileNameLimit,
