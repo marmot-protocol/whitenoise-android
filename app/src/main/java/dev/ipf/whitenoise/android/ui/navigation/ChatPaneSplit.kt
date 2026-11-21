@@ -79,6 +79,7 @@ internal fun Density.chatPaneSplit(
     return ChatPaneSplit(listWidth = listWidth, conversationStart = listWidth + dividerWidth)
 }
 
+/** Selects the separating hinge, or a flat crease that leaves usable space for both panes. */
 private fun Density.foldSplit(
     width: Int,
     dividerWidth: Int,
