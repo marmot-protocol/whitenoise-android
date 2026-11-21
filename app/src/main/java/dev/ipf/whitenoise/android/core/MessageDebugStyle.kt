@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.whitenoise.android.core.agent.AgentItemProjector
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -43,6 +44,7 @@ data class MessageDebugStyle(
  * ([GroupSystem]) always render as their one-line summary — even in developer
  * mode the raw MLS dump is tucked behind a per-row tap, never the default
  * (#857). [AgentOperation] always renders as an expandable tool-call chip.
+ * [AgentItem] renders a marmot-agents item (turn, tool, approval, question...) at its latest version.
  * [DebugRow] is reserved for the other non-user-visible signaling kinds
  * (reactions, deletes, agent-stream-start, unknown) when streaming debug is on;
  * [Bubble] is the ordinary chat bubble.
@@ -50,6 +52,7 @@ data class MessageDebugStyle(
 enum class TimelineRowKind {
     GroupSystem,
     AgentOperation,
+    AgentItem,
     DebugRow,
     Bubble,
 }
@@ -67,6 +70,7 @@ fun timelineRowKind(
     when {
         MessageProjector.isGroupSystem(record) -> TimelineRowKind.GroupSystem
         MessageProjector.isAgentOperation(record) -> TimelineRowKind.AgentOperation
+        AgentItemProjector.isAgentItem(record) -> TimelineRowKind.AgentItem
         MessageProjector.isPollKind(record.kind) -> TimelineRowKind.Bubble
         streamingDebugEnabled && !MessageDebugClassifier.debugStyle(record).isUserVisibleBubble ->
             TimelineRowKind.DebugRow

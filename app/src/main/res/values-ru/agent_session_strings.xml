@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="agent_request_failed">Не удалось отправить агенту</string>
+    <string name="agent_turn_working">Работает</string>
+    <string name="agent_turn_worked_for">Работал %1$s</string>
+    <string name="agent_turn_finished">Готово</string>
+    <string name="agent_turn_failed">Не завершено</string>
+    <string name="agent_turn_stopped">Остановлено</string>
+    <string name="agent_turn_stop">Стоп</string>
+    <string name="agent_turn_stop_description">Остановить %1$s</string>
+    <string name="agent_turn_stopping">Останавливается…</string>
+    <string name="agent_duration_seconds">%1$d с</string>
+    <string name="agent_duration_minutes">%1$d мин %2$d с</string>
+    <string name="agent_duration_hours">%1$d ч %2$d мин</string>
+    <string name="agent_tool_exit_code">Код выхода %1$d</string>
+    <string name="agent_item_running">Выполняется</string>
+    <string name="agent_tool_cwd">В %1$s</string>
+    <string name="agent_tool_output_cut">Вывод сокращён. Полная длина: %1$d символов.</string>
+    <string name="agent_tool_input">Входные данные</string>
+    <string name="agent_tool_output">Вывод</string>
+    <string name="agent_approval_answered">Ответ: %1$s</string>
+    <string name="agent_approval_declined">Отклонено</string>
+    <string name="agent_approval_expired">Больше не нужно</string>
+    <string name="agent_request_sent">Отправлено. Ждём %1$s.</string>
+    <string name="agent_question_send">Отправить ответ</string>
+    <string name="agent_question_single_choice">Выберите один вариант</string>
+    <string name="agent_question_multiple_choice">Выберите любые варианты</string>
+    <string name="agent_question_text_hint">Ваш ответ</string>
+    <string name="agent_question_reply_in_chat">Ответьте в чате.</string>
+    <string name="agent_question_secret">Этот ответ личный. Введите его на компьютере агента.</string>
+    <string name="agent_question_answered">Ответ: %1$s</string>
+    <string name="agent_question_closed">Вопрос закрыт</string>
+    <string name="agent_plan_title">План</string>
+    <string name="agent_plan_step_done">Готово: %1$s</string>
+    <string name="agent_plan_step_running">Выполняется: %1$s</string>
+    <string name="agent_plan_step_pending">Предстоит: %1$s</string>
+    <string name="agent_session_started">%1$s начал новый сеанс</string>
+    <string name="agent_session_model">Модель %1$s</string>
+    <string name="agent_refused_not_allowed">Вам нельзя делать это для этого агента</string>
+    <string name="agent_refused_busy">Агент был занят</string>
+    <plurals name="agent_tool_diffs_cut">
+        <item quantity="one">Пропущен ещё %1$d файл</item>
+        <item quantity="few">Пропущено ещё %1$d файла</item>
+        <item quantity="many">Пропущено ещё %1$d файлов</item>
+        <item quantity="other">Пропущено ещё %1$d файла</item>
+    </plurals>
+</resources>

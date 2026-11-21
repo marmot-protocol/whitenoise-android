@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shown when an answer or a Stop request could not be sent to an AI agent in a chat. -->
+    <string name="agent_request_failed">Couldn\'t send to the agent</string>
+    <!-- Status line while an AI agent works on a request in a chat. -->
+    <string name="agent_turn_working">Working</string>
+    <!-- Status line after an AI agent finished a request. %1$s is a duration such as "1m 12s". -->
+    <string name="agent_turn_worked_for">Worked for %1$s</string>
+    <!-- Status line after an AI agent finished a request, when no duration is known. -->
+    <string name="agent_turn_finished">Finished</string>
+    <!-- Status line when an AI agent's work on a request failed. -->
+    <string name="agent_turn_failed">Didn\'t finish</string>
+    <!-- Status line when someone stopped an AI agent's work on a request. -->
+    <string name="agent_turn_stopped">Stopped</string>
+    <!-- Button that stops an AI agent's current work in this chat. -->
+    <string name="agent_turn_stop">Stop</string>
+    <!-- Accessibility label for the Stop button. %1$s is the agent's name. -->
+    <string name="agent_turn_stop_description">Stop %1$s</string>
+    <!-- Shown after Stop was sent, until the agent confirms. -->
+    <string name="agent_turn_stopping">Stopping…</string>
+    <!-- Duration in seconds, such as "8s". -->
+    <string name="agent_duration_seconds">%1$ds</string>
+    <!-- Duration in minutes and seconds, such as "1m 12s". -->
+    <string name="agent_duration_minutes">%1$dm %2$ds</string>
+    <!-- Duration in hours and minutes, such as "2h 5m". -->
+    <string name="agent_duration_hours">%1$dh %2$dm</string>
+    <!-- Exit status of a command an AI agent ran. %1$d is the number. -->
+    <string name="agent_tool_exit_code">Exit %1$d</string>
+    <!-- Accessibility label for the progress indicator of a running agent step. -->
+    <string name="agent_item_running">Running</string>
+    <!-- The folder a command ran in. %1$s is the path. -->
+    <string name="agent_tool_cwd">In %1$s</string>
+    <!-- The agent shortened a command's output. %1$d is the full number of characters. -->
+    <string name="agent_tool_output_cut">Output shortened. Full length: %1$d characters.</string>
+    <!-- The agent left out some file changes because the update was too large. -->
+    <plurals name="agent_tool_diffs_cut">
+        <item quantity="one">%1$d more file left out</item>
+        <item quantity="other">%1$d more files left out</item>
+    </plurals>
+    <!-- Label above the input an AI agent passed to a tool. -->
+    <string name="agent_tool_input">Input</string>
+    <!-- Label above what a tool returned to an AI agent. -->
+    <string name="agent_tool_output">Output</string>
+    <!-- An approval the viewer or someone else answered. %1$s is the chosen option, such as "Allow once". -->
+    <string name="agent_approval_answered">Answered: %1$s</string>
+    <!-- An approval that was declined. -->
+    <string name="agent_approval_declined">Declined</string>
+    <!-- An approval the agent no longer needs, for example because its work was stopped. -->
+    <string name="agent_approval_expired">No longer needed</string>
+    <!-- Shown after an answer was sent and before the agent confirms it. %1$s is the agent's name. -->
+    <string name="agent_request_sent">Sent. Waiting for %1$s.</string>
+    <!-- Button that sends the selected answers to an AI agent's question. -->
+    <string name="agent_question_send">Send answer</string>
+    <!-- The agent asks for one choice. -->
+    <string name="agent_question_single_choice">Choose one</string>
+    <!-- The agent accepts several choices. -->
+    <string name="agent_question_multiple_choice">Choose any</string>
+    <!-- Hint for typing an answer to an agent's question. -->
+    <string name="agent_question_text_hint">Your answer</string>
+    <!-- The agent waits for an ordinary chat message as the answer. -->
+    <string name="agent_question_reply_in_chat">Reply in the chat to answer.</string>
+    <!-- The answer is secret and cannot be sent through the chat. -->
+    <string name="agent_question_secret">This answer is private. Give it on the agent\'s computer.</string>
+    <!-- A question that was answered. %1$s lists the answers. -->
+    <string name="agent_question_answered">Answered: %1$s</string>
+    <!-- A question the agent no longer needs answered. -->
+    <string name="agent_question_closed">Question closed</string>
+    <!-- Title above an AI agent's plan or to-do list. -->
+    <string name="agent_plan_title">Plan</string>
+    <!-- Accessibility label for a plan step. %1$s is the step. -->
+    <string name="agent_plan_step_done">Done: %1$s</string>
+    <!-- Accessibility label for a plan step. %1$s is the step. -->
+    <string name="agent_plan_step_running">In progress: %1$s</string>
+    <!-- Accessibility label for a plan step. %1$s is the step. -->
+    <string name="agent_plan_step_pending">To do: %1$s</string>
+    <!-- Divider where an AI agent starts a new session. %1$s is the agent's name. -->
+    <string name="agent_session_started">%1$s started a new session</string>
+    <!-- Second part of the session divider. %1$s is the AI model name. -->
+    <string name="agent_session_model">Model %1$s</string>
+    <!-- The agent did not act because the sender may not do that in this chat. -->
+    <string name="agent_refused_not_allowed">You can\'t do that for this agent</string>
+    <!-- The agent did not act because it was busy. -->
+    <string name="agent_refused_busy">The agent was busy</string>
+</resources>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="agent_request_failed">Impossible d’envoyer à l’agent</string>
+    <string name="agent_turn_working">En cours</string>
+    <string name="agent_turn_worked_for">A travaillé %1$s</string>
+    <string name="agent_turn_finished">Terminé</string>
+    <string name="agent_turn_failed">Non terminé</string>
+    <string name="agent_turn_stopped">Arrêté</string>
+    <string name="agent_turn_stop">Arrêter</string>
+    <string name="agent_turn_stop_description">Arrêter %1$s</string>
+    <string name="agent_turn_stopping">Arrêt…</string>
+    <string name="agent_duration_seconds">%1$d s</string>
+    <string name="agent_duration_minutes">%1$d min %2$d s</string>
+    <string name="agent_duration_hours">%1$d h %2$d min</string>
+    <string name="agent_tool_exit_code">Code de sortie %1$d</string>
+    <string name="agent_item_running">En cours d’exécution</string>
+    <string name="agent_tool_cwd">Dans %1$s</string>
+    <string name="agent_tool_output_cut">Sortie raccourcie. Longueur totale : %1$d caractères.</string>
+    <string name="agent_tool_input">Entrée</string>
+    <string name="agent_tool_output">Sortie</string>
+    <string name="agent_approval_answered">Réponse : %1$s</string>
+    <string name="agent_approval_declined">Refusé</string>
+    <string name="agent_approval_expired">Plus nécessaire</string>
+    <string name="agent_request_sent">Envoyé. En attente de %1$s.</string>
+    <string name="agent_question_send">Envoyer la réponse</string>
+    <string name="agent_question_single_choice">Choisissez-en une</string>
+    <string name="agent_question_multiple_choice">Choisissez-en autant que vous voulez</string>
+    <string name="agent_question_text_hint">Votre réponse</string>
+    <string name="agent_question_reply_in_chat">Répondez dans la discussion.</string>
+    <string name="agent_question_secret">Cette réponse est privée. Donnez-la sur l’ordinateur de l’agent.</string>
+    <string name="agent_question_answered">Réponse : %1$s</string>
+    <string name="agent_question_closed">Question fermée</string>
+    <string name="agent_plan_title">Plan d’action</string>
+    <string name="agent_plan_step_done">Fait : %1$s</string>
+    <string name="agent_plan_step_running">En cours : %1$s</string>
+    <string name="agent_plan_step_pending">À faire : %1$s</string>
+    <string name="agent_session_started">%1$s a commencé une nouvelle session</string>
+    <string name="agent_session_model">Modèle %1$s</string>
+    <string name="agent_refused_not_allowed">Vous ne pouvez pas faire cela pour cet agent</string>
+    <string name="agent_refused_busy">L’agent était occupé</string>
+    <plurals name="agent_tool_diffs_cut">
+        <item quantity="one">%1$d autre fichier omis</item>
+        <item quantity="many">%1$d autres fichiers omis</item>
+        <item quantity="other">%1$d autres fichiers omis</item>
+    </plurals>
+</resources>
