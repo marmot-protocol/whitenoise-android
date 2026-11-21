@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: settings-history-backups
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
+- tapOn: "History backups"
+- assertVisible:
+    id: "history_backups.list"
+- assertVisible:
+    id: "history_backups.status"
+- back
+- assertVisible:
+    id: "settings.account.group"
+- back
+- assertVisible: "Settings"

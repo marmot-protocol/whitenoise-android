@@ -415,6 +415,24 @@
           "SET-058"
         ]
       }
+    ],
+    "string_resources": [
+      {
+        "surface": "R.string.explanation_organize_hub_history_backups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.explanation_organize_hub_history_backups",
+        "test_ids": [
+          "SET-070"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.history_backups",
+        "test_ids": [
+          "SET-070"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

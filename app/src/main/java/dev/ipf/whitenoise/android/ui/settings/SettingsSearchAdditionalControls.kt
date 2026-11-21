@@ -236,6 +236,22 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
         control("Help.about", R.string.about, R.string.help, SettingsDetail.About)
         control("Help.bug_report", R.string.report_a_bug, R.string.help, SettingsDetail.BugReport)
         control(
+            "home.HistoryBackups",
+            R.string.history_backups,
+            R.string.account,
+            SettingsDetail.HistoryBackups,
+            summary = R.string.explanation_organize_hub_history_backups,
+            account = true,
+        )
+        control(
+            "HistoryBackups.restore",
+            R.string.history_backups_restore,
+            R.string.history_backups,
+            SettingsDetail.HistoryBackups,
+            "search.HistoryBackups.4",
+            account = true,
+        )
+        control(
             "Account.public_key",
             R.string.public_key,
             R.string.settings_profile_keys,

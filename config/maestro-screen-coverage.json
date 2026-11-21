@@ -179,6 +179,9 @@
     ],
     "EmojiSets": [
       "advanced-emoji-sets"
+    ],
+    "HistoryBackups": [
+      "settings-history-backups"
     ]
   },
   "main_routes": {
