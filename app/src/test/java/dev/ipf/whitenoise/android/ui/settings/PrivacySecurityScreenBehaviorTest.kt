@@ -90,15 +90,14 @@ class PrivacySecurityScreenBehaviorTest {
         composeRule.onNodeWithText("Off").assertExists()
     }
 
-    /** The account default starts Off, stages a picker choice, and persists only when Save is tapped. */
+    /** The account default starts Off and applies the chosen duration on tap. */
     @Test
     fun defaultDisappearingMessagesPickerSavesForTheActiveAccount() {
         val state = privacyState(UsageDiagnosticsDecisionFfi.DECLINED, "privacy-behaviour-disappearing")
         show(state, secure = false)
         composeRule.onNodeWithText("Default disappearing messages").performClick()
-        composeRule.onNodeWithText("1 week").performClick()
         composeRule.runOnIdle { assertEquals(0L, state.defaultDisappearingMessagesSeconds()) }
-        composeRule.onNodeWithText("Save").performClick()
+        composeRule.onNodeWithText("1 week").performClick()
         composeRule.runOnIdle { assertEquals(604_800L, state.defaultDisappearingMessagesSeconds()) }
         composeRule.onNodeWithText("1 week", substring = true).assertExists()
     }

@@ -1560,6 +1560,8 @@
     <string name="disappearing_seconds_format">%1$d saniye</string>
     <string name="disappearing_unit_seconds">Saniye</string>
     <string name="disappearing_set">Ayarla</string>
+    <string name="disappearing_custom_decrease">Kısalt</string>
+    <string name="disappearing_custom_increase">Uzat</string>
 
     <string name="contacts">Kişiler</string>
     <string name="next">İleri</string>

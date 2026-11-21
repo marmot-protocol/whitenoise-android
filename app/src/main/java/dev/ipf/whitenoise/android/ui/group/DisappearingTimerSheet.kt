@@ -71,11 +71,9 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -99,8 +97,7 @@ internal val disappearingGridSecs: List<Long> = disappearingPresetSecs.filter { 
 private const val GRID_COLUMNS = 3
 private const val UNIT_COLUMNS = 3
 
-/** Lets the selected chip settle visibly before the sheet slides away. */
-private const val PICK_SETTLE_MILLIS = 160L
+private const val PAGE_SLIDE_WIDTH_DIVISOR = 4
 
 private enum class DisappearingSheetPage { Presets, Custom }
 
@@ -112,7 +109,7 @@ private enum class DisappearingSheetPage { Presets, Custom }
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongParameterList", "LongMethod")
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod") // Keep dismissal and selection state together.
 internal fun DisappearingMessagesPickerSheet(
     currentSecs: Long,
     onDismiss: () -> Unit,
@@ -124,7 +121,6 @@ internal fun DisappearingMessagesPickerSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    val animate = rememberSystemAnimationsEnabled()
     val latestOnPick by rememberUpdatedState(onPick)
     val latestOnDismiss by rememberUpdatedState(onDismiss)
     var selected by remember(currentSecs) { mutableLongStateOf(currentSecs) }
@@ -144,13 +140,12 @@ internal fun DisappearingMessagesPickerSheet(
         latestOnDismiss()
     }
 
-    fun close(picked: Long?, settleSelection: Boolean = false) {
+    fun close(picked: Long?) {
         if (closing) return
         closing = true
         closingPick = picked
         scope.launch {
             try {
-                if (settleSelection && animate) delay(PICK_SETTLE_MILLIS)
                 sheetState.hide()
             } catch (interrupted: CancellationException) {
                 // A gesture can interrupt hide(); leaving composition cancels this job and must not apply.
@@ -175,7 +170,7 @@ internal fun DisappearingMessagesPickerSheet(
             else -> {
                 selected = secs
                 confirmOpen = false
-                close(secs, settleSelection = true)
+                close(secs)
             }
         }
     }
@@ -190,10 +185,11 @@ internal fun DisappearingMessagesPickerSheet(
             transitionSpec = {
                 val forward = targetState == DisappearingSheetPage.Custom
                 (
-                    slideInHorizontally { width -> if (forward) width / 4 else -width / 4 } +
+                    slideInHorizontally { width -> (if (forward) width else -width) / PAGE_SLIDE_WIDTH_DIVISOR } +
                         fadeIn()
                 ).togetherWith(
-                    slideOutHorizontally { width -> if (forward) -width / 4 else width / 4 } + fadeOut(),
+                    slideOutHorizontally { width -> (if (forward) -width else width) / PAGE_SLIDE_WIDTH_DIVISOR } +
+                        fadeOut(),
                 ).using(SizeTransform(clip = false))
             },
             label = "disappearing-sheet-page",
@@ -242,7 +238,6 @@ private fun DisappearingPresetsPage(
     onConfirm: (Long) -> Unit,
     onCancelConfirm: () -> Unit,
 ) {
-    val isCustom = selected !in disappearingPresetSecs
     Column(
         Modifier
             .fillMaxWidth()
@@ -270,42 +265,52 @@ private fun DisappearingPresetsPage(
             )
         }
         Spacer(Modifier.size(WhiteNoiseSpacing.Related))
-        Column(
-            Modifier.selectableGroup(),
-            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        ) {
-            disappearingGridSecs.chunked(GRID_COLUMNS).forEach { row ->
-                ChipRow {
-                    row.forEach { secs ->
-                        DisappearingChip(
-                            label = disappearingMessagesLabel(secs),
-                            selected = selected == secs,
-                            onClick = { onChoose(secs) },
-                            modifier = Modifier.weight(1f).testTag(disappearingPresetTag(secs)),
-                        )
-                    }
+        DisappearingPresetGrid(selected, onChoose, onCustom)
+    }
+}
+
+@Composable
+private fun DisappearingPresetGrid(
+    selected: Long,
+    onChoose: (Long) -> Unit,
+    onCustom: () -> Unit,
+) {
+    val isCustom = selected !in disappearingPresetSecs
+    Column(
+        Modifier.selectableGroup(),
+        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+    ) {
+        disappearingGridSecs.chunked(GRID_COLUMNS).forEach { row ->
+            ChipRow {
+                row.forEach { secs ->
+                    DisappearingChip(
+                        label = disappearingMessagesLabel(secs),
+                        selected = selected == secs,
+                        onClick = { onChoose(secs) },
+                        modifier = Modifier.weight(1f).testTag(disappearingPresetTag(secs)),
+                    )
                 }
             }
-            ChipRow {
-                DisappearingChip(
-                    label = stringResource(R.string.disappearing_off),
-                    selected = selected == 0L,
-                    onClick = { onChoose(0L) },
-                    modifier = Modifier.weight(1f).testTag(disappearingPresetTag(0L)),
-                )
-                DisappearingChip(
-                    label =
-                        if (isCustom) {
-                            disappearingMessagesLabel(selected)
-                        } else {
-                            stringResource(R.string.disappearing_custom)
-                        },
-                    selected = isCustom,
-                    onClick = onCustom,
-                    modifier = Modifier.weight(2f).testTag(DISAPPEARING_CUSTOM_ACTION_TAG),
-                    iconRes = R.drawable.ic_timer,
-                )
-            }
+        }
+        ChipRow {
+            DisappearingChip(
+                label = stringResource(R.string.disappearing_off),
+                selected = selected == 0L,
+                onClick = { onChoose(0L) },
+                modifier = Modifier.weight(1f).testTag(disappearingPresetTag(0L)),
+            )
+            DisappearingChip(
+                label =
+                    if (isCustom) {
+                        disappearingMessagesLabel(selected)
+                    } else {
+                        stringResource(R.string.disappearing_custom)
+                    },
+                selected = isCustom,
+                onClick = onCustom,
+                modifier = Modifier.weight(2f).testTag(DISAPPEARING_CUSTOM_ACTION_TAG),
+                iconRes = R.drawable.ic_timer,
+            )
         }
     }
 }
@@ -374,7 +379,11 @@ private fun DisappearingChip(
                 exit = shrinkHorizontally() + fadeOut(),
             ) {
                 Row {
-                    Icon(painterResource(R.drawable.ic_check), contentDescription = null, modifier = Modifier.size(12.dp))
+                    Icon(
+                        painterResource(R.drawable.ic_check),
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                    )
                     Spacer(Modifier.width(4.dp))
                 }
             }

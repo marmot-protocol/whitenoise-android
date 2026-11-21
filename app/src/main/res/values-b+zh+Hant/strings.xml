@@ -1544,6 +1544,8 @@
     <string name="disappearing_seconds_format">%1$d 秒</string>
     <string name="disappearing_unit_seconds">秒</string>
     <string name="disappearing_set">設定</string>
+    <string name="disappearing_custom_decrease">縮短</string>
+    <string name="disappearing_custom_increase">延長</string>
 
     <string name="contacts">聯絡人</string>
     <string name="next">下一步</string>

@@ -1575,6 +1575,8 @@
     <string name="disappearing_seconds_format">%1$d secondi</string>
     <string name="disappearing_unit_seconds">Secondi</string>
     <string name="disappearing_set">Imposta</string>
+    <string name="disappearing_custom_decrease">Riduci durata</string>
+    <string name="disappearing_custom_increase">Aumenta durata</string>
 
     <string name="contacts">Contatti</string>
     <string name="next">Avanti</string>

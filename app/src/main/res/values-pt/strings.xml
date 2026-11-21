@@ -1564,6 +1564,8 @@
     <string name="disappearing_seconds_format">%1$d segundos</string>
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Definir</string>
+    <string name="disappearing_custom_decrease">Encurtar</string>
+    <string name="disappearing_custom_increase">Prolongar</string>
 
     <string name="contacts">Contatos</string>
     <string name="next">Avançar</string>

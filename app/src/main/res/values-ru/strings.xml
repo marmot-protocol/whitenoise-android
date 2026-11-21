@@ -1635,6 +1635,8 @@
     <string name="disappearing_seconds_format">%1$d сек.</string>
     <string name="disappearing_unit_seconds">Секунды</string>
     <string name="disappearing_set">Задать</string>
+    <string name="disappearing_custom_decrease">Сократить</string>
+    <string name="disappearing_custom_increase">Увеличить</string>
 
     <string name="contacts">Контакты</string>
     <string name="next">Далее</string>
