@@ -15,7 +15,7 @@ name: notification-profiles-emoji-people
 - tapOn:
     id: "notification-profile.emoji"
 - assertVisible:
-    id: "emoji.picker"
+    id: "emoji.picker.grid"
 - back
 - assertVisible: "Edit profile"
 - scrollUntilVisible:

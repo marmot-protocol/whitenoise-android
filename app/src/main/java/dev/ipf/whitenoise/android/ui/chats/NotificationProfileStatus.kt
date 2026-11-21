@@ -51,6 +51,7 @@ internal fun NotificationProfileQuickAction(appState: WhiteNoiseAppState) {
     val store = appState.notificationProfiles
     val state by store.state.collectAsState()
     if (!state.showInChatList || state.profiles.isEmpty()) return
+    val scheme = MaterialTheme.colorScheme
     val active = rememberActiveNotificationProfile(store)
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
     val label =
@@ -71,14 +72,7 @@ internal fun NotificationProfileQuickAction(appState: WhiteNoiseAppState) {
         Icon(
             painterResource(R.drawable.ic_notifications_paused),
             contentDescription = label,
-            tint =
-                if (active !=
-                    null
-                ) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
+            tint = if (active != null) scheme.primary else scheme.onSurfaceVariant,
         )
     }
     if (sheetOpen) {

@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +51,7 @@ import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
 import dev.ipf.whitenoise.android.state.chatsAvatarOpensSelector
+import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.state.quickSwitchAvatarAccounts
 import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
@@ -132,6 +134,8 @@ internal fun ChatListTopBar(
     var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var addIdentityContour by remember(appState.runtimeGeneration) { mutableStateOf<SettingsContour?>(null) }
     var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
+    val profileState by appState.notificationProfiles.state.collectAsState()
+    val showProfileAction = profileState.showInChatList && profileState.profiles.isNotEmpty()
     val switchNotice = rememberQuickAccountSwitchNotice()
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
@@ -309,7 +313,7 @@ internal fun ChatListTopBar(
                                             appState = appState,
                                             onSwitchAccount = ::switchTo,
                                             onOpenSwitcher = ::openSelector,
-                                            barWidthDp = topBarWidthDp,
+                                            barWidthDp = topBarWidthDp - if (showProfileAction) 48.dp else 0.dp,
                                             retainedAvatars = retainedAccountAvatars,
                                         )
                                     }
@@ -328,7 +332,7 @@ internal fun ChatListTopBar(
                             )
                         }
                     } else {
-                        NotificationProfileQuickAction(appState)
+                        if (showProfileAction) NotificationProfileQuickAction(appState)
                         AppUpdateIconButton(
                             info = updateInfo,
                             selfUpdateEnabled = selfUpdateEnabled,

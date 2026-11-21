@@ -225,7 +225,9 @@ class NotificationProfilesScreenshotTest {
         active: ActiveNotificationProfile? = null,
         quickAccess: NotificationProfileQuickAccess? = null,
     ) {
-        render(theme) { NotificationProfilesContent(profiles, active, {}, {}, {}, {}, zone, quickAccess) }
+        render(theme) {
+            NotificationProfilesContent(profiles, active, {}, {}, {}, {}, zone, quickAccess, onSwitchProfile = {})
+        }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 

@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.notifications.MAX_NOTIFICATION_PROFILES
 import dev.ipf.whitenoise.android.notifications.NotificationProfile
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.notificationProfiles
+import dev.ipf.whitenoise.android.ui.chats.NotificationProfileQuickSheet
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
@@ -57,7 +58,7 @@ internal fun NotificationProfilesScreen(
     key(appState.runtimeGeneration) { NotificationProfilesSession(appState, onBack) }
 }
 
-/** Owns the open editor and the turn-off action for one runtime generation. */
+/** Owns the editor, profile chooser and turn-off action for one runtime generation. */
 @Suppress("FunctionNaming")
 @Composable
 private fun NotificationProfilesSession(
@@ -67,6 +68,7 @@ private fun NotificationProfilesSession(
     val store = appState.notificationProfiles
     val state by store.state.collectAsState()
     val active = rememberActiveNotificationProfile(store)
+    var chooserOpen by rememberSaveable { mutableStateOf(false) }
     var editorOpen by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -95,7 +97,11 @@ private fun NotificationProfilesSession(
             }
         },
         quickAccess = rememberNotificationProfileQuickAccess(appState, state),
+        onSwitchProfile = { chooserOpen = true },
     )
+    if (chooserOpen) {
+        NotificationProfileQuickSheet(appState = appState, onDismiss = { chooserOpen = false })
+    }
 }
 
 /** The list without state ownership, so tests can render each arrangement with a fixed clock. */
@@ -110,12 +116,21 @@ internal fun NotificationProfilesContent(
     onTurnOff: () -> Unit,
     zone: ZoneId = ZoneId.systemDefault(),
     quickAccess: NotificationProfileQuickAccess? = null,
+    onSwitchProfile: (() -> Unit)? = null,
 ) {
     val createLabel = stringResource(R.string.notification_profile_create)
     SettingsScaffold(
         title = stringResource(R.string.notification_profiles_title),
         onBack = onBack,
         topBarActions = {
+            if (profiles.isNotEmpty() && onSwitchProfile != null) {
+                IconButton(onClick = onSwitchProfile, modifier = Modifier.testTag("notification-profiles.switch")) {
+                    Icon(
+                        painterResource(R.drawable.ic_notifications_paused),
+                        contentDescription = stringResource(R.string.notification_profile_switch),
+                    )
+                }
+            }
             if (profiles.isNotEmpty() && profiles.size < MAX_NOTIFICATION_PROFILES) {
                 IconButton(
                     onClick = onCreate,
