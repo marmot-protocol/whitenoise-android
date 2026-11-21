@@ -32,6 +32,14 @@
         ]
       },
       {
+        "surface": "ChatInfoQuickActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "fun ChatInfoQuickActions(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
         "surface": "Quick action captions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
         "anchor": "if (showCaption)",
@@ -74,6 +82,80 @@
         "test_ids": [
           "GRP-001",
           "GRP-004"
+        ]
+      },
+      {
+        "surface": "string:about",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.about",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:disappearing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.disappearing",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:quick_action_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.quick_action_search",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.about",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.about",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "R.string.disappearing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.disappearing",
+        "test_ids": [
+          "GRP-017"
+        ]
+      },
+      {
+        "surface": "R.string.quick_action_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.quick_action_search",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_disappearing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.explanation_chat_info_disappearing",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.add_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.add_member",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.explanation_chat_info_add_members",
+        "test_ids": [
+          "GRP-001"
         ]
       }
     ]

@@ -8,6 +8,7 @@
     <string name="explanation_chat_info_mute">Silences ordinary message alerts from this chat. Direct mentions can still notify you, and you still receive every message.</string>
     <string name="explanation_chat_info_copy_peer_public_key">Copies this person\'s public key to the clipboard. Their public key is the address people use to find and connect with them, so it is safe to share. It never includes their private key.</string>
     <string name="explanation_chat_info_unmute">Turns notifications for this chat back on.</string>
+    <string name="explanation_chat_info_add_members">Opens the member picker so you can invite people to this group.</string>
     <string name="explanation_chat_info_disappearing">Sets whether new messages in this chat disappear after a chosen time. Messages already sent are not changed.</string>
     <string name="explanation_chat_info_copy_chat_link">Copies a link to this chat that you can share so others can ask to join.</string>
     <string name="explanation_chat_info_relays">Shows and edits the relays this group uses to send and receive messages. Changes apply to the whole group.</string>

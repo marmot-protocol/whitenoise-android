@@ -8,6 +8,7 @@
     <string name="explanation_chat_info_mute">Coupe les alertes de messages ordinaires de ce chat. Les mentions directes peuvent toujours vous notifier, et vous recevez toujours tous les messages.</string>
     <string name="explanation_chat_info_copy_peer_public_key">Copie la clé publique de cette personne dans le presse-papiers. Sa clé publique est l’adresse que les autres utilisent pour la trouver et se connecter avec elle, elle peut donc être partagée sans risque. Elle n’inclut jamais sa clé privée.</string>
     <string name="explanation_chat_info_unmute">Réactive les notifications de ce chat.</string>
+    <string name="explanation_chat_info_add_members">Ouvre le sélecteur de membres pour inviter des personnes dans ce groupe.</string>
     <string name="explanation_chat_info_disappearing">Définit si les nouveaux messages de ce chat disparaissent après un délai choisi. Les messages déjà envoyés ne changent pas.</string>
     <string name="explanation_chat_info_copy_chat_link">Copie un lien vers ce chat que vous pouvez partager pour que d\'autres demandent à le rejoindre.</string>
     <string name="explanation_chat_info_relays">Affiche et modifie les relais que ce groupe utilise pour envoyer et recevoir des messages. Les changements s\'appliquent à tout le groupe.</string>

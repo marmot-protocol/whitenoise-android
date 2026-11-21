@@ -8,6 +8,7 @@
     <string name="explanation_chat_info_mute">将此聊天中的普通消息提醒静音。直接提及仍可能通知你，你仍会收到所有消息。</string>
     <string name="explanation_chat_info_copy_peer_public_key">将此人的公钥复制到剪贴板。其公钥是他人用来找到并联系对方的地址，因此可以安全地分享。它绝不包含对方的私钥。</string>
     <string name="explanation_chat_info_unmute">重新开启此聊天的通知。</string>
+    <string name="explanation_chat_info_add_members">打开成员选择器，以便邀请他人加入此群组。</string>
     <string name="explanation_chat_info_disappearing">设置此聊天中的新消息是否在所选时间后消失。已发送的消息不受影响。</string>
     <string name="explanation_chat_info_copy_chat_link">复制指向此聊天的链接，你可以分享它，让他人申请加入。</string>
     <string name="explanation_chat_info_relays">显示并编辑此群组用于发送和接收消息的中继。更改适用于整个群组。</string>

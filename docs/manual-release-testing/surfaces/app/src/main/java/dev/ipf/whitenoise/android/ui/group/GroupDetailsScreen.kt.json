@@ -115,14 +115,6 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:about",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.about",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:add_member",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.add_member",
@@ -270,14 +262,6 @@
         "surface": "string:developer_tools",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.developer_tools",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:disappearing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing",
         "test_ids": [
           "GRP-001"
         ]
@@ -435,14 +419,6 @@
         ]
       },
       {
-        "surface": "string:quick_action_search",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.quick_action_search",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "Group relays row",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "groupRelaysTitleRes(isDm)",
@@ -553,14 +529,6 @@
         ]
       },
       {
-        "surface": "R.string.about",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.about",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "R.string.add_member",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.add_member",
@@ -623,14 +591,6 @@
         "anchor": "R.string.copy_chat_link_subtitle",
         "test_ids": [
           "SYS-015"
-        ]
-      },
-      {
-        "surface": "R.string.disappearing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.disappearing",
-        "test_ids": [
-          "GRP-017"
         ]
       },
       {
@@ -706,14 +666,6 @@
         "anchor": "R.string.profile_actions",
         "test_ids": [
           "ACC-008"
-        ]
-      },
-      {
-        "surface": "R.string.quick_action_search",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.quick_action_search",
-        "test_ids": [
-          "GRP-001"
         ]
       },
       {
@@ -818,14 +770,6 @@
         "surface": "R.string.explanation_chat_info_copy_chat_link",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.explanation_chat_info_copy_chat_link",
-        "test_ids": [
-          "GRP-042"
-        ]
-      },
-      {
-        "surface": "R.string.explanation_chat_info_disappearing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.explanation_chat_info_disappearing",
         "test_ids": [
           "GRP-042"
         ]

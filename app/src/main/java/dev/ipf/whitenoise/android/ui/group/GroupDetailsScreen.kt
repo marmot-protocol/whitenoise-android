@@ -114,7 +114,6 @@ import dev.ipf.whitenoise.android.state.updateCollapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.updateMessageRetention
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.abandonmentAccountName
-import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
@@ -1732,66 +1731,19 @@ internal fun GroupDetailsScreen(
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (isDm && dmPeerNpub != null) {
-                            val profileLaunch =
-                                dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
-                                    appState.presentProfile(dmPeerNpub, origin = origin)
-                                }
-                            QuickInfoAction(
-                                label = stringResource(R.string.about),
-                                icon = R.drawable.ic_person,
-                                onClick = profileLaunch.second,
-                                modifier = Modifier.weight(1f),
-                                buttonModifier = profileLaunch.first,
-                            )
-                        }
-                        if (!isDm && canEdit) {
-                            QuickInfoAction(
-                                label = stringResource(R.string.add_member),
-                                icon = R.drawable.ic_group_add,
-                                onClick = openAddMembers,
-                                enabled = canAdministerMembers && !mutationsBlocked,
-                                showCaption = false,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        QuickInfoAction(
-                            label = stringResource(muteControl.labelRes),
-                            icon = muteControl.iconRes,
-                            enabled = !muteControl.pending,
-                            explanation = chatsExplanation(muteControl.labelRes, muteControl.explanationRes),
-                            onClick = muteControl::toggle,
-                            showCaption = isDm,
-                            modifier = Modifier.weight(1f),
-                        )
-                        QuickInfoAction(
-                            label = stringResource(R.string.disappearing),
-                            icon = R.drawable.ic_timer,
-                            state = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
-                            enabled = disappearingTimerEditable(canEdit, mutationsBlocked),
-                            explanation =
-                                chatsExplanation(
-                                    R.string.disappearing,
-                                    R.string.explanation_chat_info_disappearing,
-                                ),
-                            onClick = { showDisappearingPicker = true },
-                            showCaption = isDm,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (onOpenSearch != null) {
-                            QuickInfoAction(
-                                label = stringResource(R.string.quick_action_search),
-                                icon = R.drawable.ic_search,
-                                onClick = onOpenSearch,
-                                showCaption = isDm,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
+                    ChatInfoQuickActions(
+                        onOpenProfile =
+                            dmPeerNpub?.takeIf { isDm }?.let { npub ->
+                                { origin -> appState.presentProfile(npub, origin = origin) }
+                            },
+                        onAddMembers = openAddMembers.takeIf { !isDm && canEdit },
+                        addMembersEnabled = canAdministerMembers && !mutationsBlocked,
+                        muteControl = muteControl,
+                        disappearingState = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
+                        disappearingEnabled = disappearingTimerEditable(canEdit, mutationsBlocked),
+                        onOpenDisappearing = { showDisappearingPicker = true },
+                        onOpenSearch = onOpenSearch,
+                    )
                     if (isDm && dmPeerAccountIdHex != null && dmPeerNpub != null) {
                         SettingsSection(stringResource(R.string.profile_actions))
                         SettingsGroup(modifier = Modifier.testTag("chat_info.group_actions")) {
