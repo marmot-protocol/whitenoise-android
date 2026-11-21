@@ -1525,7 +1525,6 @@
     <string name="disappearing_1_day">1 Tag</string>
     <string name="disappearing_90_days">3 Monate</string>
     <string name="disappearing_custom">Benutzerdefinierte Zeit</string>
-    <string name="disappearing_custom_value">Eigene Zeit: %1$s</string>
     <string name="disappearing_days_format">%1$d Tage</string>
     <string name="disappearing_hours_format">%1$d Stunden</string>
     <string name="disappearing_minutes_format">%1$d Minuten</string>
@@ -1547,11 +1546,9 @@
         <item quantity="one">%d Jahr</item>
         <item quantity="other">%d Jahre</item>
     </plurals>
-    <string name="toast_disappearing_messages_updated">Verschwindende Nachrichten aktualisiert</string>
     <string name="toast_couldnt_update_disappearing">Verschwindende Nachrichten konnten nicht aktualisiert werden</string>
     <string name="save">Speichern</string>
 
-    <string name="disappearing_confirm_title">Verschwinde-Timer einstellen?</string>
     <string name="disappearing_confirm_message">Nachrichten, die älter als %1$s sind, werden für alle dauerhaft entfernt.</string>
     <string name="disappearing_confirm_button">Timer einstellen</string>
 
@@ -1574,6 +1571,8 @@
     <string name="disappearing_seconds_format">%1$d Sekunden</string>
     <string name="disappearing_unit_seconds">Sekunden</string>
     <string name="disappearing_set">Festlegen</string>
+    <string name="disappearing_custom_decrease">Kürzer</string>
+    <string name="disappearing_custom_increase">Länger</string>
 
     <string name="contacts">Kontakte</string>
     <string name="next">Weiter</string>

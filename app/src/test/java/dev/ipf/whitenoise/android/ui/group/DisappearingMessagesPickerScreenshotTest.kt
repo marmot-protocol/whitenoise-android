@@ -1,23 +1,26 @@
 package dev.ipf.whitenoise.android.ui.group
 
-import android.widget.NumberPicker
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.filterToOne
-import androidx.compose.ui.test.hasAnySibling
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.unit.Density
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
-import com.github.takahirom.roborazzi.captureRoboImage
+import androidx.test.espresso.Espresso
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -27,305 +30,272 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
+/** The green action colour from the quick-swatch palette, used for the dark baselines. */
+private const val GREEN_ACCENT_ARGB = 0xFF15803DL
+
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "en")
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-xhdpi")
 class DisappearingMessagesPickerScreenshotTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-    private val nativePickers = mutableMapOf<Any?, NumberPicker>()
 
-    /** Optional frames from the actual retention picker caller; no alternate popup. */
+    /** Every preset, Off and Custom fit in one screen without scrolling; this is the baseline for the sheet. */
     @Test
-    @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
-    fun captureCustomRetentionPopupFrames() {
-        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
-                CompositionLocalProvider(
-                    dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled provides true,
-                ) {
-                    DisappearingMessagesPickerDialog(currentSecs = 604_800L, onDismiss = {}, onPick = {})
-                }
-            }
+    fun everyDurationIsVisibleAtOnce() {
+        render(currentSecs = 604_800L)
+
+        (disappearingGridSecs + 0L).forEach { secs ->
+            composeRule.onNodeWithTag(disappearingPresetTag(secs)).assertIsDisplayed()
         }
-        try {
-            captureCustomRetentionFrames("forward") {
-                composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
-            }
-            captureCustomRetentionFrames("reverse") {
-                composeRule
-                    .onAllNodesWithText(context.getString(R.string.cancel))
-                    .filterToOne(
-                        hasClickAction() and hasAnySibling(hasText(context.getString(R.string.disappearing_set))),
-                    ).assertIsDisplayed()
-                    .performClick()
-            }
-        } finally {
-            composeRule.mainClock.autoAdvance = true
-        }
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(disappearingPresetTag(604_800L)).assertIsSelected()
+        composeRule.onNodeWithText(context.getString(R.string.disappearing_explainer)).assertIsDisplayed()
+        captureScreenRoboImage("src/test/snapshots/disappearing_messages_picker.png")
     }
 
-    private fun captureCustomRetentionFrames(
-        direction: String,
-        action: () -> Unit,
-    ) {
-        val folder = java.io.File("build/animation-frames/custom-retention-popup/$direction").apply { mkdirs() }
+    @Test
+    fun darkGreenSheetBaseline() {
+        render(currentSecs = 604_800L, dark = true)
+        captureScreenRoboImage("src/test/snapshots/disappearing_messages_sheet_dark_green.png")
+    }
+
+    @Test
+    fun amoledSheetBaseline() {
+        render(currentSecs = 0L, dark = true, amoled = true)
+        captureScreenRoboImage("src/test/snapshots/disappearing_messages_sheet_amoled.png")
+    }
+
+    /** A pick that keeps history applies on the tap itself: no Save, no second dialog. */
+    @Test
+    fun safePickAppliesOnTap() {
+        val events = mutableListOf<String>()
+        render(
+            currentSecs = 3_600L,
+            onPick = { events += "pick:$it" },
+            onDismiss = { events += "dismiss" },
+        )
+
+        composeRule.onNodeWithTag(disappearingPresetTag(604_800L)).performClick()
         composeRule.waitForIdle()
-        composeRule.mainClock.autoAdvance = false
-        com.github.takahirom.roborazzi
-            .captureScreenRoboImage(java.io.File(folder, "source.png").path)
-        action()
-        composeRule.runOnIdle {
-            androidx.compose.runtime.snapshots.Snapshot
-                .sendApplyNotifications()
-        }
-        repeat(32) { frame ->
-            composeRule.mainClock.advanceTimeByFrame()
-            composeRule.waitForIdle()
-            com.github.takahirom.roborazzi
-                .captureScreenRoboImage(java.io.File(folder, "frame-%03d.png".format(frame)).path)
-        }
+
+        composeRule.runOnIdle { assertEquals(listOf("pick:604800", "dismiss"), events) }
     }
 
-    /** Preset ordering keeps the clearer three-month option above the shorter four-week fallback. */
+    /** Tapping the current value just closes the sheet without a mutation. */
     @Test
-    fun presetListShowsThreeMonthsAboveFourWeeks() {
-        render(currentSecs = 0L)
+    fun unchangedPickOnlyCloses() {
+        val events = mutableListOf<String>()
+        render(currentSecs = 3_600L, onPick = { events += "pick:$it" }, onDismiss = { events += "dismiss" })
 
-        composeRule.onNodeWithText(context.getString(R.string.disappearing_90_days)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.disappearing_4_weeks)).assertIsDisplayed()
+        composeRule.onNodeWithTag(disappearingPresetTag(3_600L)).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { assertEquals(listOf("dismiss"), events) }
     }
 
-    /** The rendered picker explains the unread-received read anchor and keeps a deterministic baseline. */
+    /** A pick that removes history expands an inline warning; nothing applies until it is confirmed. */
     @Test
-    fun explainerMatchesReadAnchoredRetentionBehavior() {
-        render(currentSecs = 0L)
-
-        composeRule
-            .onNodeWithText(
-                "Unread messages you receive start their timer when you read them. " +
-                    "Other new messages are permanently deleted for everyone after your chosen duration.",
-            ).assertIsDisplayed()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/disappearing_messages_picker.png")
-    }
-
-    @Test
-    fun saveSubmitsStagedSelectionWithoutChangingUntilSave() {
+    fun pruningPickConfirmsInline() {
         var picked: Long? = null
-        render(currentSecs = 604_800L, onPick = { picked = it })
+        render(currentSecs = 0L, dark = true, onPick = { picked = it }, requiresConfirmation = { it > 0L })
 
-        composeRule.onNodeWithText(context.getString(R.string.disappearing_90_days)).performClick()
-        composeRule.runOnIdle { assertNull(picked) }
+        composeRule.onNodeWithTag(disappearingPresetTag(300L)).performClick()
+        composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(context.getString(R.string.save)).performClick()
-        composeRule.runOnIdle { assertEquals(7_776_000L, picked) }
+        composeRule.onNodeWithTag(DISAPPEARING_CONFIRM_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(disappearingPresetTag(0L)).assertIsSelected()
+        assertNull(picked)
+        captureScreenRoboImage("src/test/snapshots/disappearing_messages_sheet_confirm_dark_green.png")
+
+        composeRule.onNodeWithTag(DISAPPEARING_CONFIRM_ACTION_TAG).performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitUntil { composeRule.runOnUiThread { picked != null } }
+        composeRule.runOnIdle { assertEquals(300L, picked) }
     }
 
+    /** Cancelling the warning restores the current selection and keeps the sheet open. */
     @Test
-    fun cancellingCustomDialogDoesNotChangeStagedPresetSelection() {
+    fun cancellingInlineConfirmKeepsCurrentTimer() {
         var picked: Long? = null
-        render(currentSecs = 604_800L, onPick = { picked = it })
-
-        openCustomDialog()
-        composeRule.runOnUiThread {
-            composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText(context.getString(R.string.save)).performClick()
-        composeRule.runOnIdle { assertEquals(604_800L, picked) }
-    }
-
-    @Test
-    fun cancellingCustomDialogPreservesStagedCustomSelection() {
-        var picked: Long? = null
-        render(currentSecs = 2_592_000L, onPick = { picked = it })
-
-        openCustomDialog()
-        composeRule.waitForIdle()
-        composeRule.runOnUiThread {
-            composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText(context.getString(R.string.save)).performClick()
-        composeRule.runOnIdle { assertEquals(2_592_000L, picked) }
-    }
-
-    @Test
-    @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
-    fun compactLargeFontKeepsPresetsSaveAndCustomReachable() {
-        composeRule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 2f)) {
-                WhiteNoiseTheme {
-                    DisappearingMessagesPickerDialog(
-                        currentSecs = 0L,
-                        onDismiss = {},
-                        onPick = {},
-                    )
-                }
-            }
-        }
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithText(context.getString(R.string.save)).assertIsDisplayed()
-        composeRule
-            .onAllNodesWithText(context.getString(R.string.disappearing_custom))
-            .filterToOne(hasClickAction())
-            .assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.disappearing_90_days)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.disappearing_off)).assertIsDisplayed()
-    }
-
-    @Test
-    fun twelveMonthLabelUsesPluralMonths() {
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                androidx.compose.material3.Text(disappearingMessagesLabel(31_104_000L))
-            }
-        }
-        composeRule.onNodeWithText("12 months").assertIsDisplayed()
-    }
-
-    @Test
-    fun oneMonthLabelUsesSingularMonth() {
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                androidx.compose.material3.Text(disappearingMessagesLabel(2_592_000L))
-            }
-        }
-        composeRule.onNodeWithText("1 month").assertIsDisplayed()
-    }
-
-    @Test
-    fun oneYearLabelUsesSingularYear() {
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                androidx.compose.material3.Text(disappearingMessagesLabel(31_536_000L))
-            }
-        }
-        composeRule.onNodeWithText("1 year").assertIsDisplayed()
-    }
-
-    @Test
-    fun tenYearLabelUsesPluralYears() {
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                androidx.compose.material3.Text(disappearingMessagesLabel(315_360_000L))
-            }
-        }
-        composeRule.onNodeWithText("10 years").assertIsDisplayed()
-    }
-
-    @Test
-    fun nativeCustomPickersClampSubmitAndCancelLongDurations() {
-        var confirmed: Long? = null
         var dismissed = false
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                disappearingCustomDialogTestHost(
-                    initialSecs = 60L,
-                    onDismiss = { dismissed = true },
-                    onConfirm = { confirmed = it },
-                    onPickerCreated = { picker -> nativePickers[picker.tag] = picker },
-                )
-            }
-        }
+        render(
+            currentSecs = 86_400L,
+            onPick = { picked = it },
+            onDismiss = { dismissed = true },
+            requiresConfirmation = { it in 1L until 86_400L },
+        )
+
+        composeRule.onNodeWithTag(disappearingPresetTag(30L)).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
         composeRule.waitForIdle()
 
-        setNativePicker(DISAPPEARING_CUSTOM_UNIT_PICKER_TAG, monthUnitIndex())
-        setNativePicker(DISAPPEARING_CUSTOM_VALUE_PICKER_TAG, 12)
-        clickCustomSet()
-        composeRule.runOnIdle { assertEquals(31_104_000L, confirmed) }
-
-        composeRule.runOnIdle { confirmed = null }
-        setNativePicker(DISAPPEARING_CUSTOM_UNIT_PICKER_TAG, yearUnitIndex())
-        assertEquals(10, nativePickerValue(DISAPPEARING_CUSTOM_VALUE_PICKER_TAG))
-        clickCustomSet()
-        composeRule.runOnIdle { assertEquals(315_360_000L, confirmed) }
-
-        composeRule.runOnIdle { confirmed = null }
-        setNativePicker(DISAPPEARING_CUSTOM_UNIT_PICKER_TAG, monthUnitIndex())
-        setNativePicker(DISAPPEARING_CUSTOM_VALUE_PICKER_TAG, 12)
-        clickCustomCancel()
-        composeRule.runOnIdle {
-            assertTrue(dismissed)
-            assertNull(confirmed)
-        }
+        composeRule.onNodeWithTag(disappearingPresetTag(86_400L)).assertIsSelected()
+        composeRule.onNodeWithTag(DISAPPEARING_CONFIRM_TAG).assertDoesNotExist()
+        assertNull(picked)
+        assertTrue(!dismissed)
     }
 
-    /** Opens custom dialog. */
-    private fun openCustomDialog() {
+    /** Custom opens a second page in the same sheet; unit, stepper and Set produce the exact duration. */
+    @Test
+    fun customPageComposesUnitAndValue() {
+        var picked: Long? = null
+        render(currentSecs = 0L, dark = true, onPick = { picked = it })
+
         composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
         composeRule.waitForIdle()
-    }
-
-    private fun clickCustomSet() {
-        composeRule
-            .onAllNodesWithText(context.getString(R.string.disappearing_set))
-            .filterToOne(hasClickAction())
-            .performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_PAGE_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(disappearingUnitTag(unitIndex(DAY_SECONDS))).performClick()
+        repeat(2) { composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_INCREASE_TAG).performClick() }
         composeRule.waitForIdle()
-    }
+        composeRule.onNodeWithText("3 days").assertIsDisplayed()
+        captureScreenRoboImage("src/test/snapshots/disappearing_messages_sheet_custom_dark_green.png")
 
-    private fun clickCustomCancel() {
-        composeRule
-            .onAllNodesWithText(context.getString(R.string.cancel))
-            .filterToOne(hasClickAction())
-            .performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_SET_TAG).performClick()
         composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(3L * DAY_SECONDS, picked) }
     }
 
-    private fun setNativePicker(
-        tag: String,
-        newValue: Int,
-    ) {
-        composeRule.runOnUiThread {
-            val picker = checkNotNull(nativePickers[tag])
-            val oldValue = picker.value
-            picker.value = newValue
-            checkNotNull(shadowOf(picker).onValueChangeListener)
-                .onValueChange(picker, oldValue, newValue)
+    /** Switching to a smaller unit clamps the value into that unit's range. */
+    @Test
+    fun customUnitSwitchClampsValue() {
+        var picked: Long? = null
+        render(currentSecs = 31_104_000L, onPick = { picked = it })
+
+        composeRule.onNodeWithText("12 months").assertIsDisplayed()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(disappearingUnitTag(unitIndex(WEEK_SECONDS))).performClick()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_SET_TAG).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { assertEquals(4L * WEEK_SECONDS, picked) }
+    }
+
+    @Test
+    fun customKeepsAnOutOfRangeValueWithoutExpandingTheSlider() {
+        val currentSecs = 31_535_999L
+        val maxSeconds = disappearingCustomUnits.first().max
+        render(currentSecs = currentSecs)
+
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_SLIDER_TAG).assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.ProgressBarRangeInfo,
+                ProgressBarRangeInfo(maxSeconds.toFloat(), 1f..maxSeconds.toFloat(), maxSeconds - 2),
+            ),
+        )
+    }
+
+    /** Back from Custom returns to the presets without picking anything. */
+    @Test
+    fun customBackReturnsToPresets() {
+        var picked: Long? = null
+        render(currentSecs = 3_600L, onPick = { picked = it })
+
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_PAGE_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("1 hour").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(disappearingPresetTag(3_600L)).assertIsSelected()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.waitForIdle()
+        Espresso.pressBack()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(disappearingPresetTag(3_600L)).assertIsSelected()
+        assertNull(picked)
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w320dp-h780dp-xhdpi")
+    fun compactLargeFontRtlKeepsEveryChoiceReachable() {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                WhiteNoiseTheme(darkTheme = true, accentColorArgb = GREEN_ACCENT_ARGB, fontScale = 1.6f) {
+                    DisappearingMessagesPickerSheet(currentSecs = 172_800L, onDismiss = {}, onPick = {})
+                }
+            }
         }
         composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(disappearingPresetTag(0L)).assertIsDisplayed()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("2 days").assertIsDisplayed()
+        captureScreenRoboImage("src/test/snapshots/disappearing_messages_sheet_dark_large_rtl.png")
     }
 
-    private fun nativePickerValue(tag: String): Int {
-        var value: Int? = null
-        composeRule.runOnUiThread {
-            value = checkNotNull(nativePickers[tag]).value
-        }
-        return checkNotNull(value)
-    }
+    @Test
+    fun twelveMonthLabelUsesPluralMonths() = assertLabel(31_104_000L, "12 months")
 
-    private fun monthUnitIndex(): Int =
-        disappearingCustomUnits.indexOfFirst {
-            it.seconds == DISAPPEARING_SECONDS_PER_MONTH
-        }
+    @Test
+    fun oneMonthLabelUsesSingularMonth() = assertLabel(2_592_000L, "1 month")
 
-    private fun yearUnitIndex(): Int =
-        disappearingCustomUnits.indexOfFirst {
-            it.seconds == DISAPPEARING_SECONDS_PER_YEAR
-        }
+    @Test
+    fun oneYearLabelUsesSingularYear() = assertLabel(31_536_000L, "1 year")
 
-    private fun render(
-        currentSecs: Long,
-        onPick: (Long) -> Unit = {},
+    @Test
+    fun tenYearLabelUsesPluralYears() = assertLabel(315_360_000L, "10 years")
+
+    private fun assertLabel(
+        secs: Long,
+        expected: String,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
-                DisappearingMessagesPickerDialog(
+            WhiteNoiseTheme { androidx.compose.material3.Text(disappearingMessagesLabel(secs)) }
+        }
+        composeRule.onNodeWithText(expected).assertIsDisplayed()
+    }
+
+    private fun unitIndex(seconds: Long): Int = disappearingCustomUnits.indexOfFirst { it.seconds == seconds }
+
+    @Suppress("LongParameterList")
+    private fun render(
+        currentSecs: Long,
+        dark: Boolean = false,
+        amoled: Boolean = false,
+        onPick: (Long) -> Unit = {},
+        onDismiss: () -> Unit = {},
+        requiresConfirmation: (Long) -> Boolean = { false },
+    ) {
+        composeRule.setContent {
+            Themed(dark, amoled) {
+                DisappearingMessagesPickerSheet(
                     currentSecs = currentSecs,
-                    onDismiss = {},
+                    onDismiss = onDismiss,
                     onPick = onPick,
+                    requiresConfirmation = requiresConfirmation,
                 )
             }
         }
+        composeRule.waitForIdle()
+    }
+
+    @Composable
+    private fun Themed(
+        dark: Boolean,
+        amoled: Boolean,
+        content: @Composable () -> Unit,
+    ) {
+        WhiteNoiseTheme(
+            darkTheme = dark,
+            amoled = amoled,
+            accentColorArgb = if (dark && !amoled) GREEN_ACCENT_ARGB else null,
+            content = content,
+        )
+    }
+
+    private companion object {
+        const val DAY_SECONDS = 86_400L
+        const val WEEK_SECONDS = 604_800L
     }
 }
 
@@ -342,11 +312,7 @@ class DisappearingMessagesPickerFrenchTest {
     fun threeMonthPresetUsesLocalizedLabel() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                DisappearingMessagesPickerDialog(
-                    currentSecs = 0L,
-                    onDismiss = {},
-                    onPick = {},
-                )
+                DisappearingMessagesPickerSheet(currentSecs = 0L, onDismiss = {}, onPick = {})
             }
         }
         composeRule.onNodeWithText(context.getString(R.string.disappearing_90_days)).assertIsDisplayed()

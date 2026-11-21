@@ -21,7 +21,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.setDefaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
-import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
+import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
@@ -207,19 +207,12 @@ internal fun DevicePrivacyScreen(
         )
     }
     if (defaultDisappearingPicker) {
-        DisappearingMessagesPickerDialog(
+        DisappearingMessagesPickerSheet(
             currentSecs = defaultDisappearingSeconds,
             explainer = stringResource(R.string.default_disappearing_messages_picker_detail),
             onDismiss = { defaultDisappearingPicker = false },
             onPick = { seconds ->
-                if (
-                    appState.setDefaultDisappearingMessagesSeconds(
-                        seconds = seconds,
-                        accountRef = activeAccountRef,
-                    )
-                ) {
-                    defaultDisappearingPicker = false
-                }
+                appState.setDefaultDisappearingMessagesSeconds(seconds = seconds, accountRef = activeAccountRef)
             },
         )
     }

@@ -894,7 +894,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
       "calls": {
         "fadingVerticalScroll": 1
       },

@@ -1529,7 +1529,6 @@
     <string name="disappearing_1_day">1 giorno</string>
     <string name="disappearing_90_days">3 mesi</string>
     <string name="disappearing_custom">Tempo personalizzato</string>
-    <string name="disappearing_custom_value">Tempo personalizzato: %1$s</string>
     <string name="disappearing_days_format">%1$d giorni</string>
     <string name="disappearing_hours_format">%1$d ore</string>
     <string name="disappearing_minutes_format">%1$d minuti</string>
@@ -1551,11 +1550,9 @@
         <item quantity="one">%d anno</item>
         <item quantity="other">%d anni</item>
     </plurals>
-    <string name="toast_disappearing_messages_updated">Messaggi effimeri aggiornati</string>
     <string name="toast_couldnt_update_disappearing">Impossibile aggiornare i messaggi effimeri</string>
     <string name="save">Salva</string>
 
-    <string name="disappearing_confirm_title">Impostare il timer di scomparsa?</string>
     <string name="disappearing_confirm_message">I messaggi più vecchi di %1$s verranno rimossi definitivamente per tutti.</string>
     <string name="disappearing_confirm_button">Imposta</string>
 
@@ -1578,6 +1575,8 @@
     <string name="disappearing_seconds_format">%1$d secondi</string>
     <string name="disappearing_unit_seconds">Secondi</string>
     <string name="disappearing_set">Imposta</string>
+    <string name="disappearing_custom_decrease">Riduci durata</string>
+    <string name="disappearing_custom_increase">Aumenta durata</string>
 
     <string name="contacts">Contatti</string>
     <string name="next">Avanti</string>
