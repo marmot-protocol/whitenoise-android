@@ -21,7 +21,6 @@ import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -45,21 +44,22 @@ internal val EmojiSheetDragHandleHeight = 48.dp
 internal class EmojiSheetFieldAnchor {
     internal val bringIntoViewRequester = BringIntoViewRequester()
 
-    /** The field's bottom edge in screen pixels, or null until the field has been placed. */
-    internal var fieldBottomOnScreen by mutableStateOf<Float?>(null)
-        private set
+    private var fieldCoordinates: LayoutCoordinates? = null
 
-    private var fieldSize = IntSize.Zero
+    /** Resolves screen position only when the picker actually needs it. */
+    internal val fieldBottomOnScreen: Float?
+        get() =
+            fieldCoordinates?.takeIf { it.isAttached }?.let { coordinates ->
+                (coordinates.positionOnScreen().y + coordinates.size.height).takeIf(Float::isFinite)
+            }
 
     internal fun place(coordinates: LayoutCoordinates) {
-        fieldSize = coordinates.size
-        fieldBottomOnScreen = coordinates.positionOnScreen().y + coordinates.size.height
+        fieldCoordinates = coordinates
     }
 
     /** Scrolls the field's scroll containers until [roomBelow] pixels below the field are on screen too. */
     internal suspend fun makeRoomBelow(roomBelow: Float) {
-        val size = fieldSize
-        if (size == IntSize.Zero) return
+        val size = fieldCoordinates?.takeIf { it.isAttached }?.size ?: return
         bringIntoViewRequester.bringIntoView(Rect(0f, 0f, size.width.toFloat(), size.height + roomBelow))
     }
 }
@@ -82,7 +82,7 @@ internal fun rememberEmojiSheetOpener(anchor: EmojiSheetFieldAnchor?): (open: ()
     val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val roomBelow = emojiSheetRoomBelowField(WindowInsets.navigationBars.getBottom(density), density)
+    val navigationBars = WindowInsets.navigationBars
     var opening by remember { mutableStateOf<Job?>(null) }
     return { open ->
         if (anchor == null) {
@@ -91,7 +91,7 @@ internal fun rememberEmojiSheetOpener(anchor: EmojiSheetFieldAnchor?): (open: ()
             keyboard?.hide()
             opening =
                 scope.launch {
-                    anchor.makeRoomBelow(roomBelow)
+                    anchor.makeRoomBelow(emojiSheetRoomBelowField(navigationBars.getBottom(density), density))
                     open()
                 }
         }
