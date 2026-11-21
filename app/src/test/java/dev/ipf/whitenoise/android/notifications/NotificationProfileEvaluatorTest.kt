@@ -232,6 +232,7 @@ class NotificationProfileEvaluatorTest {
 
         val dms = quiet.copy(allowAllDirectMessages = true)
         assertFalse(notificationProfileSuppresses(dms, profileTestUpdate(groupIdHex = "dm", isDm = true)))
+        assertFalse(notificationProfileSuppresses(dms, other, directConversation = true))
         assertTrue(notificationProfileSuppresses(dms, other))
 
         val changes = quiet.copy(allowGroupChanges = true)

@@ -18,13 +18,13 @@ class NotificationProfileGateCoverageTest {
         )
         assertTrue(
             "the profile gate can only narrow the local policy",
-            decision.contains("return allowedByLocalPolicy && !suppressedByNotificationProfile(update)"),
+            decision.contains("return allowedByLocalPolicy && !suppressedByNotificationProfile(update,"),
         )
         val gate = mutes.functionBody("suppressedByNotificationProfile")
         assertTrue("the gate reads the live profile", gate.contains("notificationProfiles.active()"))
         assertTrue(
             "the gate applies the evaluator",
-            gate.contains("notificationProfileSuppresses(profile, update)"),
+            gate.contains("notificationProfileSuppresses(profile, update,"),
         )
     }
 
@@ -32,17 +32,21 @@ class NotificationProfileGateCoverageTest {
     @Test
     fun everyPostAndEnrichmentFenceUsesThePostDecision() {
         val content = appModuleSource("$STATE/AppStateNotificationContent.kt")
-        listOf("processNotificationUpdate", "isNotificationGenerationPostAllowed").forEach { name ->
+        val gates = appModuleSource("$STATE/AppStateNotificationPostEligibility.kt")
+        listOf(
+            content to "processNotificationUpdate",
+            gates to "isNotificationGenerationPostAllowed",
+        ).forEach { (source, name) ->
             assertTrue(
                 "$name checks shouldPostNotification",
-                content.functionBody(name).contains("shouldPostNotification("),
+                source.functionBody(name).contains("shouldPostNotification("),
             )
         }
-        val enrichment = "private fun WhiteNoiseAppState.isNotificationEnrichmentAllowed("
-        assertTrue("late enrichment is declared", content.contains(enrichment))
+        val enrichment = "internal fun WhiteNoiseAppState.isNotificationEnrichmentAllowed("
+        assertTrue("late enrichment is declared", gates.contains(enrichment))
         assertTrue(
             "late enrichment re-checks the generation fence",
-            content
+            gates
                 .substringAfter(
                     enrichment,
                 ).substringBefore("\n/**")

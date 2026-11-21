@@ -28,12 +28,26 @@ class NotificationProfileRepeatsTest {
         val reply = profileTestUpdate(groupIdHex = "elsewhere", sender = "abcd", messageId = "second")
         val reopened = NotificationProfileRepeats(context, preferences)
         assertTrue(reopened.admit("sleep", reply, now + 2))
+        reopened.finish(reply, posted = true, nowMs = now + 2)
         assertTrue(reopened.admit("sleep", reply, now + 3))
         assertFalse(reopened.admit("focus", reply, now + 4))
         assertFalse(reopened.admit("sleep", reply.copy(accountRef = "account-b"), now + 4))
         assertFalse(reopened.admit("sleep", update, now + 5))
         assertFalse(reopened.admit("sleep", reply.copy(messageIdHex = "third"), now + 6))
         assertTrue(preferences.all.keys.none { it.contains("abcd") || it.contains("account-a") })
+    }
+
+    @Test
+    fun aFailedFollowUpLeavesTheHeldMessageAvailable() {
+        val now = System.currentTimeMillis()
+        val repeats = NotificationProfileRepeats(context, preferences)
+        val first = profileTestUpdate(sender = "sender")
+        val second = first.copy(messageIdHex = "second")
+        val third = first.copy(messageIdHex = "third")
+        assertFalse(repeats.admit("sleep", first, now))
+        assertTrue(repeats.admit("sleep", second, now + 1))
+        repeats.finish(second, posted = false, nowMs = now + 1)
+        assertTrue(repeats.admit("sleep", third, now + 2))
     }
 
     @Test

@@ -20,7 +20,12 @@ internal fun encodeProfiles(state: NotificationProfilesState): JSONObject =
                         },
                     )
                 is NotificationProfileManual.Paused ->
-                    put("manual", JSONObject().put("type", "paused").put("untilMs", manual.untilMs))
+                    put(
+                        "manual",
+                        JSONObject().put("type", "paused").put("untilMs", manual.untilMs).apply {
+                            manual.startedAtMs?.let { put("startedAtMs", it) }
+                        },
+                    )
                 null -> Unit
             }
         }
@@ -83,7 +88,10 @@ private fun decodeManual(choice: JSONObject): NotificationProfileManual? {
     val profileId = choice.optString("profileId").takeIf { it.isNotEmpty() }
     return when (choice.optString("type")) {
         "on" -> profileId?.let { NotificationProfileManual.On(it, untilMs) }
-        "paused" -> untilMs?.let(NotificationProfileManual::Paused)
+        "paused" ->
+            untilMs?.let {
+                NotificationProfileManual.Paused(it, choice.optLong("startedAtMs").takeIf { choice.has("startedAtMs") })
+            }
         else -> null
     }
 }

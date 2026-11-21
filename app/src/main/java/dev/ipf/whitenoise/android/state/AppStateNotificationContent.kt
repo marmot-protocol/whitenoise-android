@@ -226,77 +226,6 @@ internal suspend fun WhiteNoiseAppState.notificationTimelineRecord(update: Notif
     }
 
 /**
- * Rechecks synchronous app and content fences at every platform write. A reaction's own event id cannot verify
- * its quoted target, so a known removal in that conversation also rejects a captured, still-quoted update.
- */
-private fun WhiteNoiseAppState.isNotificationGenerationPostAllowed(
-    update: NotificationUpdateFfi,
-    postEpoch: Long,
-    accountCacheEpoch: Long,
-    engineMuted: Boolean,
-    requireUnlocked: Boolean,
-): Boolean {
-    val lockAllowsPost = !requireUnlocked || !appLock.screenVisible
-    val runtimeAllowsPost =
-        !networkNotificationRecoverySuppressed &&
-            notificationPostEpoch.isCurrent(postEpoch) &&
-            profileCacheLifetime.isCurrent(accountCacheEpoch)
-    // A deleted or hidden message can never be written back by a queued post or late enrichment (#3323).
-    val contentAvailable =
-        !notificationContentInvalidations.isRemoved(update.accountRef, update.groupIdHex, update.messageIdHex)
-    // Reactions name their own event, not the quoted target. Recheck removals at every platform write too.
-    val quoteAvailable =
-        !LocalNotificationFormatter.isReaction(update) ||
-            update.reactedToPreview.isNullOrBlank() ||
-            !notificationContentInvalidations.hasRemovalInConversation(update.accountRef, update.groupIdHex)
-    return lockAllowsPost &&
-        runtimeAllowsPost &&
-        contentAvailable &&
-        quoteAvailable &&
-        shouldPostNotification(update, engineMuted)
-}
-
-private fun WhiteNoiseAppState.isNotificationEnrichmentAllowed(
-    update: NotificationUpdateFfi,
-    postEpoch: Long,
-    accountCacheEpoch: Long,
-    engineMuted: Boolean,
-): Boolean =
-    isNotificationGenerationPostAllowed(
-        update = update,
-        postEpoch = postEpoch,
-        accountCacheEpoch = accountCacheEpoch,
-        engineMuted = engineMuted,
-        requireUnlocked = true,
-    ) &&
-        localNotificationPresenter.isNotificationUpdateCurrentForEnrichment(update)
-
-/** Re-checks every captured fence for one first-post correction candidate. */
-private fun WhiteNoiseAppState.isNotificationEnrichmentAllowed(
-    update: NotificationUpdateFfi,
-    firstPost: NotificationFirstPost,
-): Boolean =
-    isQueuedReactionQuoteCurrent(update, firstPost) &&
-        isNotificationEnrichmentAllowed(
-            update = update,
-            postEpoch = firstPost.epoch,
-            accountCacheEpoch = firstPost.accountCacheEpoch,
-            engineMuted = firstPost.engineMuted,
-        )
-
-/**
- * Identity eviction cannot make an already-captured opaque reaction quote eligible again. Any removal in the
- * same account conservatively rejects its queued quotes; no quoted-target identity is available to narrow it.
- */
-private fun WhiteNoiseAppState.isQueuedReactionQuoteCurrent(
-    update: NotificationUpdateFfi,
-    firstPost: NotificationFirstPost,
-): Boolean =
-    !LocalNotificationFormatter.isReaction(update) ||
-        update.reactedToPreview.isNullOrBlank() ||
-        notificationContentInvalidations.removalVersion(update.accountRef) == firstPost.contentRemovalVersion
-
-/**
  * Reads MDK's durable state for one message candidate right before it may alert or be enriched (#2065, #3323).
  * Only incoming timeline messages are governed by the read state: reactions, invites and membership events pass,
  * except that nothing but the invitation itself rings for a group this account has not accepted, since MDK still
@@ -1030,6 +959,7 @@ private suspend fun WhiteNoiseAppState.postInitialNotificationUpdate(
 
     val redactContent = appLock.screenVisible
     val onNotificationWritten = {
+        notificationProfileRepeats.finish(update, posted = true, nowMs = System.currentTimeMillis())
         recordNotificationFirstPostTiming(
             stage = NotificationFirstPostTimingStage.NotifyWritten,
             receivedAtElapsedMs = receivedAtElapsedMs,
@@ -1109,6 +1039,8 @@ private suspend fun WhiteNoiseAppState.showInitialNotificationUpdate(
                         accountCacheEpoch = firstPost.accountCacheEpoch,
                         engineMuted = firstPost.engineMuted,
                         requireUnlocked = !redactContent,
+                        directConversation = useDirectLayout || firstPost.profileDirectConversation,
+                        reserveRepeat = true,
                     )
             },
         )
@@ -1132,6 +1064,8 @@ private suspend fun WhiteNoiseAppState.showRedactedNotificationUpdate(
                 accountCacheEpoch = firstPost.accountCacheEpoch,
                 engineMuted = firstPost.engineMuted,
                 requireUnlocked = false,
+                directConversation = update.isDm || firstPost.profileDirectConversation,
+                reserveRepeat = true,
             )
         },
     )
@@ -1463,27 +1397,39 @@ private suspend fun WhiteNoiseAppState.processNotificationUpdate(incoming: Notif
     val postEpoch = notificationPostEpoch.capture()
     val accountCacheEpoch = profileCacheLifetime.capture()
     val engineMuted = engineNotificationMuted(update)
-    val shouldPost = shouldPostNotification(update, engineMuted)
-    recordNotificationFirstPostTiming(
-        stage = NotificationFirstPostTimingStage.EligibilityComplete,
-        receivedAtElapsedMs = receivedAtElapsedMs,
-        outcome = "resolved",
-    )
-    val firstPost =
-        resolveNotificationFirstPost(
-            update,
-            postEpoch,
-            accountCacheEpoch,
-            engineMuted,
-            shouldPost,
-            receivedAtElapsedMs,
-        ).copy(contentRemovalVersion = contentRemovalVersion)
-    postBeforeNotificationEnrichment(
-        post = { postInitialNotificationUpdate(update, firstPost, receivedAtElapsedMs) },
-        scheduleEnrichment = {
-            scheduleNotificationEnrichment(update, firstPost, receivedAtElapsedMs)
-        },
-    )
+    val directConversation =
+        update.isDm ||
+            (update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
+                notificationProfiles.active()?.profile?.allowAllDirectMessages == true &&
+                isStoredDirectNotificationConversation(update))
+    try {
+        val shouldPost = shouldPostNotification(update, engineMuted, directConversation, reserveRepeat = true)
+        recordNotificationFirstPostTiming(
+            stage = NotificationFirstPostTimingStage.EligibilityComplete,
+            receivedAtElapsedMs = receivedAtElapsedMs,
+            outcome = "resolved",
+        )
+        val firstPost =
+            resolveNotificationFirstPost(
+                update,
+                postEpoch,
+                accountCacheEpoch,
+                engineMuted,
+                shouldPost,
+                receivedAtElapsedMs,
+            ).copy(
+                contentRemovalVersion = contentRemovalVersion,
+                profileDirectConversation = directConversation,
+            )
+        postBeforeNotificationEnrichment(
+            post = { postInitialNotificationUpdate(update, firstPost, receivedAtElapsedMs) },
+            scheduleEnrichment = {
+                scheduleNotificationEnrichment(update, firstPost, receivedAtElapsedMs)
+            },
+        )
+    } finally {
+        notificationProfileRepeats.finish(update, posted = false, nowMs = System.currentTimeMillis())
+    }
     schedulePostNotificationMaintenance(update)
 }
 

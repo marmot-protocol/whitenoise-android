@@ -136,7 +136,7 @@ class NotificationProfilePreferencesTest {
         assertTrue(store.save(sleep))
         assertEquals("sleep", store.active(now, utc)?.profile?.id)
         assertTrue(store.turnOff(now, utc))
-        val paused = NotificationProfileManual.Paused(localMs("2026-11-21T07:00", utc))
+        val paused = NotificationProfileManual.Paused(localMs("2026-11-21T07:00", utc), now)
         assertEquals(paused, store.state.value.manual)
         assertNull(store.active(now, utc))
         // Renaming the paused profile, saving an unrelated one or moving another profile's future schedule
@@ -151,6 +151,19 @@ class NotificationProfilePreferencesTest {
         assertTrue(store.save(sleep.copy(name = "Night", schedule = profileSchedule("22:30", "07:00")), now, utc))
         assertNull(store.state.value.manual)
         assertEquals("Night", store.active(now, utc)?.profile?.name)
+    }
+
+    @Test
+    fun turningOffDoesNotPauseALaterOverlappingWindow() {
+        now = localMs("2026-11-20T22:30", utc)
+        val store = store()
+        assertTrue(store.save(testProfile("sleep", profileSchedule("22:00", "07:00"))))
+        assertTrue(store.save(testProfile("focus", profileSchedule("23:00", "06:00"))))
+
+        assertTrue(store.turnOff(now, utc))
+        assertNull(store.active(now, utc))
+        assertEquals("focus", store.active(localMs("2026-11-20T23:00", utc), utc)?.profile?.id)
+        assertNull(store.active(localMs("2026-11-21T06:00", utc), utc))
     }
 
     @Test

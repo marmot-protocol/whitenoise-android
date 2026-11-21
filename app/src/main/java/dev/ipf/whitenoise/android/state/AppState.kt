@@ -25,7 +25,6 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
-import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EventsSubscription
@@ -2085,13 +2084,8 @@ class WhiteNoiseAppState private constructor(
                 .orEmpty()
 
         /** Uses the receiver's chat row, including when its chat list is cold or another account is active. */
-        override suspend fun isDirectConversation(update: NotificationUpdateFfi): Boolean {
-            val cachedKind = notificationChatListItem(update)?.projection?.conversationKind
-            val kind =
-                cachedKind?.takeUnless { it == ChatConversationKindFfi.UNKNOWN }
-                    ?: presentedNotificationChatRow(update)?.row?.conversationKind
-            return kind == ChatConversationKindFfi.DIRECT
-        }
+        override suspend fun isDirectConversation(update: NotificationUpdateFfi): Boolean =
+            isStoredDirectNotificationConversation(update)
 
         override suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind =
             resolveNotificationMediaKind(
@@ -2106,7 +2100,7 @@ class WhiteNoiseAppState private constructor(
     internal val notificationAvatarCoordinator by lazy {
         NotificationAvatarCoordinator(
             appLocked = { appLock.screenVisible },
-            shouldPost = this::shouldPostNotification,
+            shouldPost = { update, engineMuted -> shouldPostNotification(update, engineMuted) },
             canPost = localNotificationPresenter::canPostNotifications,
             senderAvatarUrl = { update -> notificationSenderAvatarUrl(update, ::loadUserProfile) },
             groupAvatarUrl = { update ->

@@ -101,7 +101,7 @@ internal class NotificationProfilePreferences(
                 current.profiles
                     .mapNotNull { profile -> profile.schedule?.let { scheduleWindowContaining(it, nowMs, zone) } }
                     .maxOfOrNull { it.endMs }
-            current.copy(manual = openUntil?.let(NotificationProfileManual::Paused))
+            current.copy(manual = openUntil?.let { NotificationProfileManual.Paused(it, nowMs) })
         }
 
     /** Shows or hides the chat-list profile button; call off the main thread. */

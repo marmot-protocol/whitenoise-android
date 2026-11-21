@@ -26,12 +26,14 @@ internal class NotificationProfileRepeats(
     )
 
     private val entries = load()
+    private val reservations = mutableMapOf<String, String>()
 
-    /** Returns whether a distinct follow-up may notify, and atomically consumes its held message. */
+    /** Returns whether a distinct follow-up may notify, reserving its held message until the platform write. */
     fun admit(
         profileId: String,
         update: NotificationUpdateFfi,
         nowMs: Long,
+        reserve: Boolean = true,
     ): Boolean {
         val senderKey = senderKey(profileId, update)
         val messageId = update.messageIdHex
@@ -40,27 +42,60 @@ internal class NotificationProfileRepeats(
         return synchronized(lock) {
             val previous = entries[key]?.takeIf { notificationProfileRepeatOpen(it.at, nowMs) }
             if (previous != null) return@synchronized previous.decision == Decision.ADMITTED
+            if (!reserve) return@synchronized false
+            if (key in reservations) return@synchronized true
             val held =
                 entries.entries.firstOrNull { (entry, state) ->
                     entry.startsWith("$senderKey.") &&
+                        entry !in reservations.values &&
                         state.decision == Decision.HELD &&
                         notificationProfileRepeatOpen(state.at, nowMs)
                 }
-            if (held != null) held.setValue(held.value.copy(decision = Decision.CONSUMED))
-            entries[key] = RepeatState(nowMs, if (held == null) Decision.HELD else Decision.ADMITTED)
-            entries.entries.removeAll { !notificationProfileRepeatOpen(it.value.at, nowMs) }
-            while (entries.size > MAX_ENTRIES) entries.remove(entries.minBy { it.value.at }.key)
-            val editor = preferences.edit().clear()
-            entries.forEach { (entry, state) -> editor.putString(entry, "${state.at}:${state.decision.name}") }
-            runCatching { editor.apply() }
-            held != null
+            if (held != null) {
+                reservations[key] = held.key
+                return@synchronized true
+            }
+            entries[key] = RepeatState(nowMs, Decision.HELD)
+            persist(nowMs)
+            false
         }
+    }
+
+    /** Releases any reservation for the update, recording a repeat only after the platform write. */
+    fun finish(
+        update: NotificationUpdateFfi,
+        posted: Boolean,
+        nowMs: Long,
+    ) {
+        val messageId = update.messageIdHex?.takeIf { it.isNotBlank() } ?: return
+        val accountPrefix = "${sha256Hex(update.accountRef)}."
+        val messageSuffix = ".${sha256Hex(messageId)}"
+        synchronized(lock) {
+            val matching = reservations.keys.filter { it.startsWith(accountPrefix) && it.endsWith(messageSuffix) }
+            matching.forEach { key ->
+                val heldKey = reservations.remove(key)
+                if (posted && heldKey != null) {
+                    entries[heldKey]?.let { entries[heldKey] = it.copy(decision = Decision.CONSUMED) }
+                    entries[key] = RepeatState(nowMs, Decision.ADMITTED)
+                }
+            }
+            if (posted && matching.isNotEmpty()) persist(nowMs)
+        }
+    }
+
+    private fun persist(nowMs: Long) {
+        entries.entries.removeAll { !notificationProfileRepeatOpen(it.value.at, nowMs) }
+        while (entries.size > MAX_ENTRIES) entries.remove(entries.minBy { it.value.at }.key)
+        val editor = preferences.edit().clear()
+        entries.forEach { (entry, state) -> editor.putString(entry, "${state.at}:${state.decision.name}") }
+        runCatching { editor.apply() }
     }
 
     /** Forgets every person of local accounts that no longer exist. */
     fun retainAccounts(accountRefs: Collection<String>) {
         val prefixes = accountRefs.map { "${sha256Hex(it)}." }
         synchronized(lock) {
+            reservations.keys.removeAll { key -> prefixes.none(key::startsWith) }
             val removed = entries.keys.filter { key -> prefixes.none(key::startsWith) }
             if (removed.isEmpty()) return
             removed.forEach(entries::remove)

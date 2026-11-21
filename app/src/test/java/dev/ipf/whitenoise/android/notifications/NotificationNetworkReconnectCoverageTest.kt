@@ -330,16 +330,17 @@ class NotificationNetworkReconnectCoverageTest {
                 .substringAfter("private suspend fun WhiteNoiseAppState.enrichPostedNotificationUpdate")
                 .substringBefore("private suspend fun WhiteNoiseAppState.postNotificationContentCorrection")
         val latePost = notificationContent.functionBody("postNotificationLateCorrection")
+        val eligibility = notificationContentSource().resolveSibling("AppStateNotificationPostEligibility.kt").readText()
         val notificationGates =
-            notificationContent
-                .substringAfter("private fun WhiteNoiseAppState.isNotificationGenerationPostAllowed")
-                .substringBefore("/**")
+            eligibility
+                .substringAfter("internal fun WhiteNoiseAppState.isNotificationGenerationPostAllowed")
+                .substringBefore("internal fun WhiteNoiseAppState.isNotificationEnrichmentAllowed")
         val capturedEnrichmentGate =
             Regex(
-                """private fun WhiteNoiseAppState\.isNotificationEnrichmentAllowed\(""" +
+                """internal fun WhiteNoiseAppState\.isNotificationEnrichmentAllowed\(""" +
                     """\s*update: NotificationUpdateFfi,\s*""" +
                     """firstPost: NotificationFirstPost,\s*\): Boolean =([\s\S]*?)\n\s*/\*\*""",
-            ).find(notificationContent)?.groupValues?.get(1).orEmpty()
+            ).find(eligibility)?.groupValues?.get(1).orEmpty()
         assertTrue(
             "a wipe that starts during notification enrichment must block the final presenter write",
             "isNotificationEnrichmentAllowed(candidate, firstPost)" in enrichment &&

@@ -68,6 +68,8 @@ internal val WhiteNoiseAppState.memberMutePreferences: MemberMutePreferences
 internal fun WhiteNoiseAppState.shouldPostNotification(
     update: NotificationUpdateFfi,
     engineMuted: Boolean,
+    directConversation: Boolean = update.isDm,
+    reserveRepeat: Boolean = false,
 ): Boolean {
     val allowedByLocalPolicy =
         LocalNotificationPolicy.shouldPost(
@@ -84,7 +86,7 @@ internal fun WhiteNoiseAppState.shouldPostNotification(
                 profileNotificationOverrides.get(account, author).mode == ProfileNotificationMode.MUTED
             },
         )
-    return allowedByLocalPolicy && !suppressedByNotificationProfile(update)
+    return allowedByLocalPolicy && !suppressedByNotificationProfile(update, directConversation, reserveRepeat)
 }
 
 private var notificationProfileRepeatHolder: Pair<Context, NotificationProfileRepeats>? = null
@@ -102,13 +104,18 @@ internal val WhiteNoiseAppState.notificationProfileRepeats: NotificationProfileR
  * the profile lets repeated messages through, so the sender's next message within the window can notify.
  * Logs only a fixed vocabulary.
  */
-private fun WhiteNoiseAppState.suppressedByNotificationProfile(update: NotificationUpdateFfi): Boolean {
+private fun WhiteNoiseAppState.suppressedByNotificationProfile(
+    update: NotificationUpdateFfi,
+    directConversation: Boolean,
+    reserveRepeat: Boolean,
+): Boolean {
     val active = notificationProfiles.active() ?: return false
     val profile = active.profile
     val eligibleForRepeat = profile.allowRepeatedMessages && isNotificationProfileMessage(update)
     val suppressed =
-        notificationProfileSuppresses(profile, update) &&
-            !(eligibleForRepeat && notificationProfileRepeats.admit(profile.id, update, System.currentTimeMillis()))
+        notificationProfileSuppresses(profile, update, directConversation = directConversation) &&
+            !(eligibleForRepeat &&
+                notificationProfileRepeats.admit(profile.id, update, System.currentTimeMillis(), reserveRepeat))
     if (suppressed) {
         appStateDebug { "notification suppressed_by=notification_profile source=${active.source.name.lowercase()}" }
     }

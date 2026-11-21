@@ -41,7 +41,7 @@ internal fun notificationProfileManualUntilMs(
 }
 
 /**
- * The profile in force at [nowMs] in [zone]. A live manual choice wins; a live pause hides schedules;
+ * The profile in force at [nowMs] in [zone]. A live manual choice wins; a live pause hides windows already open when it began;
  * otherwise the open scheduled window that started last wins, ties going to the earlier listed profile.
  */
 internal fun activeNotificationProfile(
@@ -52,11 +52,11 @@ internal fun activeNotificationProfile(
     val manual = state.manual
     val on = (manual as? NotificationProfileManual.On)?.takeIf { it.untilMs == null || nowMs < it.untilMs }
     val manualProfile = on?.let { choice -> state.profiles.firstOrNull { it.id == choice.profileId } }
-    val paused = manual is NotificationProfileManual.Paused && nowMs < manual.untilMs
+    val pause = (manual as? NotificationProfileManual.Paused)?.takeIf { nowMs < it.untilMs }
     return when {
         manualProfile != null -> ActiveNotificationProfile(manualProfile, NotificationProfileSource.MANUAL, on.untilMs)
-        paused -> null
-        else -> scheduledNotificationProfile(state, nowMs, zone)
+        pause != null && pause.startedAtMs == null -> null
+        else -> scheduledNotificationProfile(state, nowMs, zone, pause?.startedAtMs)
     }
 }
 
@@ -65,10 +65,14 @@ private fun scheduledNotificationProfile(
     state: NotificationProfilesState,
     nowMs: Long,
     zone: ZoneId,
+    pausedAtMs: Long?,
 ): ActiveNotificationProfile? {
     val open =
         state.profiles.mapNotNull { profile ->
-            profile.schedule?.let { scheduleWindowContaining(it, nowMs, zone) }?.let { profile to it }
+            profile.schedule
+                ?.let { scheduleWindowContaining(it, nowMs, zone) }
+                ?.takeUnless { pausedAtMs != null && pausedAtMs in it.startMs until it.endMs }
+                ?.let { profile to it }
         }
     // maxByOrNull keeps the first of equal keys, so list order breaks ties.
     return open.maxByOrNull { it.second.startMs }?.let { (profile, window) ->
@@ -99,6 +103,7 @@ internal fun notificationProfileSuppresses(
     active: NotificationProfile?,
     update: NotificationUpdateFfi,
     repeated: Boolean = false,
+    directConversation: Boolean = update.isDm,
 ): Boolean {
     if (active == null || update.isFromSelf) return false
     val chat = NotificationProfileChat(update.accountRef, update.groupIdHex.lowercase(Locale.ROOT))
@@ -111,7 +116,7 @@ internal fun notificationProfileSuppresses(
     val allowed =
         chat in active.allowedChats ||
             person in active.allowedPeople ||
-            (active.allowAllDirectMessages && update.isDm) ||
+            (active.allowAllDirectMessages && directConversation) ||
             (active.allowMentions && message && update.isMention) ||
             (active.allowGroupChanges && update.trigger in GroupChangeTriggers) ||
             (active.allowRepeatedMessages && message && repeated)
