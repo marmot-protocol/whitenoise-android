@@ -91,10 +91,10 @@ internal fun chatListDisplayGroup(
 internal fun ConversationPresentationFfi.selectsSupersededGroupPicture(row: ChatListRowFfi): Boolean {
     val rowImage = row.avatar
     val rowUrl = ProfileSanitizer.protocolImageUrl(row.avatarUrl)
-    if (resolution != PresentationResolutionFfi.LAST_KNOWN ||
-        avatarSource != PresentationSourceFfi.GROUP ||
-        (rowImage == null && rowUrl == null)
-    ) {
+    val hasRowPicture = rowImage != null || rowUrl != null
+    val dirtyGroupPicture =
+        resolution == PresentationResolutionFfi.LAST_KNOWN && avatarSource == PresentationSourceFfi.GROUP
+    if (!dirtyGroupPicture || !hasRowPicture) {
         return false
     }
     return when (val selected = avatar) {
