@@ -325,7 +325,8 @@ private fun DisappearingPresetGrid(
 @Composable
 private fun disappearingChipColumns(): Int =
     if (
-        LocalDensity.current.fontScale >= COMPACT_FONT_SCALE || LocalWindowInfo.current.containerDpSize.width < compactWindowWidth
+        LocalDensity.current.fontScale >= COMPACT_FONT_SCALE ||
+        LocalWindowInfo.current.containerDpSize.width < compactWindowWidth
     ) {
         2
     } else {
