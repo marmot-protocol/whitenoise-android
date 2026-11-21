@@ -32,11 +32,17 @@ internal class DeviceSelfNaming(
         val label = modelLabel ?: return
         val devices = runCatchingCancellable { readDevices(accountRef) }.getOrNull().orEmpty()
         val own = devices.firstOrNull { it.isThisDevice && !it.removalPending }
-        val unnamed = own?.takeIf { it.label.isBlank() || it.label.trim() in placeholders }
+        val unnamed = own?.takeIf { it.label.isBlank() || isPlaceholder(it.label) }
         if (unnamed != null && attempted.add(unnamed.slotIdHex)) {
             runCatchingCancellable { rename(accountRef, unnamed.slotIdHex, label) }
         }
     }
+
+    /**
+     * Whether [label] is one of the [placeholders], ignoring surrounding space and letter case, since approving
+     * devices capitalise the same default name differently.
+     */
+    private fun isPlaceholder(label: String): Boolean = placeholders.any { it.equals(label.trim(), ignoreCase = true) }
 
     /** Checks once, then again whenever MDK reports this account's roster changed, until the stream ends. */
     suspend fun observe(nextEvent: suspend () -> MarmotEventFfi?) {

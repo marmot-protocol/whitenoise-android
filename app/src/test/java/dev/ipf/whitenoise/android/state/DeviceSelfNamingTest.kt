@@ -49,6 +49,17 @@ class DeviceSelfNamingTest {
             assertEquals(listOf("self" to "Pixel 9a"), renames)
         }
 
+    /** The placeholder is recognised in any letter case, as approving devices capitalise it differently. */
+    @Test
+    fun aPlaceholderInAnotherCaseIsReplaced() =
+        runTest {
+            roster = listOf(device("self", label = "New Device", isThisDevice = true))
+
+            DeviceSelfNaming(ACCOUNT, "Pixel 9a", { roster }, ::record, setOf("New device")).nameIfUnnamed()
+
+            assertEquals(listOf("self" to "Pixel 9a"), renames)
+        }
+
     /** A name anyone chose stays, and a device being removed is left alone. */
     @Test
     fun aNamedOrLeavingDeviceIsLeftAlone() =
