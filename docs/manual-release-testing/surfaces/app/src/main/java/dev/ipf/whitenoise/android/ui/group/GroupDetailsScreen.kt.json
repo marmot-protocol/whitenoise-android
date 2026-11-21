@@ -32,6 +32,14 @@
         ]
       },
       {
+        "surface": "Add Members quick action and settings row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "val openAddMembers =",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
         "surface": "GroupMutationErrorBanner",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "fun GroupMutationErrorBanner(",

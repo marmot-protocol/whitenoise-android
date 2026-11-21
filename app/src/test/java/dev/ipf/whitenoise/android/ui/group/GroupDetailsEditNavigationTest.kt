@@ -161,7 +161,10 @@ class GroupDetailsEditNavigationTest {
         }
 
         composeRule.onNodeWithText("Open details").performClick()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.add_member)).assertIsDisplayed().performClick()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.add_member))
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).assertIsDisplayed()
 
         restorationTester.emulateSavedInstanceStateRestore()
