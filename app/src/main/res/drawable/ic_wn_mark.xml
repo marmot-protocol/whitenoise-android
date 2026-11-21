@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    In-app brand mark: the same White Noise "M" path as the notification
-    small icon (ic_stat_whitenoise), kept as a separate resource so app
+    In-app brand mark: the White Noise "M" logo. The notification small
+    icon (ic_stat_whitenoise) is a separate per-density PNG, so app
     surfaces never depend on a notification-named asset (whose alpha-only
     white constraint is a system requirement, not a brand choice). The fill
     is plain white so callers theme it via Icon tint / drawable tint.

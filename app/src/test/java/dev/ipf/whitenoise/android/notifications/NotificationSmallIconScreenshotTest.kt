@@ -19,7 +19,7 @@ import kotlin.math.abs
 /** Guards the status-bar small icons' occupied area, clearance and tint-only artwork. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "mdpi")
+@Config(sdk = [36], qualifiers = "xxxhdpi")
 class NotificationSmallIconScreenshotTest {
     /** Records both icons at status-bar sizes, tinted for dark and light status bars. */
     @Test

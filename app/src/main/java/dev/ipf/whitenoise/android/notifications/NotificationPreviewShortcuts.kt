@@ -29,7 +29,7 @@ internal fun genericNotificationShortcut(
         .setShortLabel(name)
         .setLongLabel(name)
         .setDisabledMessage(name)
-        .setIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise))
+        .setIcon(IconCompat.createWithResource(context, R.drawable.ic_conversation_shortcut_mark))
         .setPersons(arrayOf(Person.Builder().setName(name).build()))
         .setCategories(emptySet())
         // Compat inventory reconstruction omits this framework flag; all owned conversation IDs are long-lived.
