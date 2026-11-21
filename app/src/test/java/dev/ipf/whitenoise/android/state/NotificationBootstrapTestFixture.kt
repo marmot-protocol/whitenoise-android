@@ -39,6 +39,8 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.Nip46ErrorFfi
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -642,6 +644,9 @@ internal class NotificationBootstrapTestFixture(
                             0
                         }
                     onDisplayName?.invoke(call, accountIdHex) ?: localDisplayName
+                }
+                "nip46Resume" -> {
+                    failSuspendedNativeCall(arguments, MarmotKitException.Nip46(Nip46ErrorFfi.Unavailable()))
                 }
                 "registerExternalSigner" -> {
                     signerRegistrationCalls.incrementAndGet()

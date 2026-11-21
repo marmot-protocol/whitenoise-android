@@ -78,6 +78,14 @@
           "NAV-004",
           "NAV-006"
         ]
+      },
+      {
+        "surface": "R.string.remote_signer_switcher_attention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "R.string.remote_signer_switcher_attention",
+        "test_ids": [
+          "ONB-029"
+        ]
       }
     ],
     "source_coverage": [

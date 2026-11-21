@@ -6,8 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.DialogProperties
@@ -19,6 +21,8 @@ import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
 import dev.ipf.whitenoise.android.ui.onboarding.SignInStep
 import dev.ipf.whitenoise.android.ui.onboarding.importIdentityErrorRes
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerFlow
 import dev.ipf.whitenoise.android.ui.onboarding.signInStepFor
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 
@@ -51,6 +55,7 @@ internal fun AddIdentitySheet(
             )
         }
     val amberSignerAvailable = remember(appState) { appState.isAmberSignerInstalled() }
+    var remoteSigner by remember(session) { mutableStateOf<RemoteSignerEntry?>(null) }
     DisposableEffect(session) { onDispose { session.dispose() } }
     LaunchedEffect(
         appState.activeAccountRef,
@@ -118,6 +123,15 @@ internal fun AddIdentitySheet(
                 decorFitsSystemWindows = false,
             ),
     ) {
+        remoteSigner?.let { entry ->
+            RemoteSignerFlow(
+                appState,
+                onClose = { remoteSigner = null },
+                onFinished = session::dismiss,
+                initialLink = entry.link,
+            )
+            return@MeasuredPlaybackDialog
+        }
         AddAccountSheetContent(
             amberSignerAvailable = amberSignerAvailable,
             inFlightAction = session.action,
@@ -141,6 +155,9 @@ internal fun AddIdentitySheet(
             privateKeyState = session.key,
             amberSignInStage = appState.amberSignInStage,
             onBack = this.dismiss,
+            onUseRemoteSigner = { link ->
+                if (session.action == OnboardingAction.Idle) remoteSigner = RemoteSignerEntry(link)
+            },
         )
         session.feedback?.let { AddProfileFeedbackDialog(it, session::dismissFeedback) }
     }

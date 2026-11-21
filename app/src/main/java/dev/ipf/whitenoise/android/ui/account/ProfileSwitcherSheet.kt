@@ -146,6 +146,9 @@ internal fun ProfileSwitcherSheet(
                                 )
                                 if (account.isReadOnly) Text(stringResource(R.string.read_only))
                                 if (account.isSignedOut) Text(stringResource(R.string.signed_out))
+                                if (account.signerNeedsAttention) {
+                                    Text(stringResource(R.string.remote_signer_switcher_attention))
+                                }
                             }
                         },
                         leadingContent = {

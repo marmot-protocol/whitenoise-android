@@ -1081,6 +1081,20 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "onboarding",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1

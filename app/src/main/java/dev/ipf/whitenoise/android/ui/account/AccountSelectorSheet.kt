@@ -6,6 +6,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +33,7 @@ internal data class AccountSelectorAccountState(
     val isReadOnly: Boolean,
     val isSignedOut: Boolean,
     val isActive: Boolean,
+    val signerNeedsAttention: Boolean = false,
 )
 
 internal data class AccountSelectorState(
@@ -44,6 +46,7 @@ internal fun accountSelectorState(
     accounts: List<AccountSummaryFfi>,
     activeAccountRef: String?,
     refreshing: Boolean,
+    signerNeedsAttention: (String) -> Boolean = { false },
 ): AccountSelectorState =
     AccountSelectorState(
         accounts =
@@ -54,6 +57,7 @@ internal fun accountSelectorState(
                     isReadOnly = !account.localSigning && !account.externalSigning,
                     isSignedOut = account.signedOut,
                     isActive = account.label == activeAccountRef,
+                    signerNeedsAttention = !account.signedOut && signerNeedsAttention(account.accountIdHex),
                 )
             },
         refreshing = refreshing,
@@ -146,13 +150,17 @@ internal fun AccountSelectorSheet(
             refreshing = false
         }
     }
+    val signerStatuses by appState.remoteSigners.statuses.collectAsState()
     WhiteNoiseModalBottomSheet(
         onDismissRequest = { closeWithMotion { dismiss() } },
         sheetState = sheetState,
         interactionEnabled = terminal.acceptsInput && !appState.profileSwitcherBlocked(),
     ) {
         ProfileSwitcherSheet(
-            state = accountSelectorState(appState.accounts, appState.activeAccountRef, refreshing),
+            state =
+                accountSelectorState(appState.accounts, appState.activeAccountRef, refreshing) {
+                    signerStatuses[it]?.health?.needsAttention == true
+                },
             displayName = appState::accountDisplayNameCached,
             shortNpub = appState::shortNpub,
             npub = appState::npubForDisplay,

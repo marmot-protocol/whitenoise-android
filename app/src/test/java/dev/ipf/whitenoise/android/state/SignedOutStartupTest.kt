@@ -38,6 +38,29 @@ class SignedOutStartupTest {
             }
         }
 
+    /**
+     * A remote-signer account whose pairing MDK erased (disconnected or signed out) reports no NIP-46 credentials.
+     * It must still never get an Amber callback, and Account keys must offer pairing again.
+     */
+    @Test
+    fun endedRemoteSignerPairingIsNotTakenForAnAmberAccount() =
+        runBlocking {
+            val preferences =
+                RuntimeEnvironment.getApplication().getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            assertTrue(preferences.edit().putStringSet("remote_signer_accounts", setOf("remote")).commit())
+            try {
+                val accounts = listOf(account("amber", external = true), account("remote", external = true))
+                withFixture(accounts, selected = "amber") { fixture ->
+                    assertEquals("only the Amber account gets a callback", 1, fixture.signerRegistrationCalls.get())
+                    val remote = fixture.appState.remoteSigners.status("remote")
+                    assertEquals(RemoteSignerHealth.PairingEnded, remote?.health)
+                    assertNull(fixture.appState.remoteSigners.status("amber"))
+                }
+            } finally {
+                preferences.edit().remove("remote_signer_accounts").commit()
+            }
+        }
+
     /** Last-profile sign-out removes the saved preference while retaining a reusable native identity. */
     @Test
     fun noSavedSelectionDoesNotReactivateTheRetainedProfile() =

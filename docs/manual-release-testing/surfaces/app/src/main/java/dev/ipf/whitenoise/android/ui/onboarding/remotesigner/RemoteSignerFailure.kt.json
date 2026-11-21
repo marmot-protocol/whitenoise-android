@@ -1,0 +1,81 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "R.string.remote_signer_error_declined",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+        "anchor": "R.string.remote_signer_error_declined",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_error_ended",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+        "anchor": "R.string.remote_signer_error_ended",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_error_sign_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+        "anchor": "R.string.remote_signer_error_sign_in",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_error_storage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+        "anchor": "R.string.remote_signer_error_storage",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_error_timeout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+        "anchor": "R.string.remote_signer_error_timeout",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_error_unreachable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+        "anchor": "R.string.remote_signer_error_unreachable",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_error_unsupported",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+        "anchor": "R.string.remote_signer_error_unsupported",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_error_wrong_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+        "anchor": "R.string.remote_signer_error_wrong_account",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
