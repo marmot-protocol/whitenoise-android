@@ -93,6 +93,8 @@ internal object HistoryBackupConditions {
             val facts = withContext(Dispatchers.IO) { context.applicationContext.currentHistoryBackupFacts() }
             if (lastReported?.let { it.first === marmot && it.second == facts } == true) return@withLock true
             try {
+                // Unknown until the setter returns: a cancelled report must not let a later one be skipped.
+                lastReported = null
                 withContext(Dispatchers.IO) { marmot.setRuntimeBackupBackgroundConditions(facts.wifi, facts.charging) }
                 lastReported = marmot to facts
                 true
