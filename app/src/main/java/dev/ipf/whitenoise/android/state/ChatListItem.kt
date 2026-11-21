@@ -75,7 +75,15 @@ internal fun chatListItemFromProjection(
     val resolvedMemberCount =
         selectedMemberCount
             ?: if (selectedPeer != null) DIRECT_CHAT_MEMBER_COUNT else presentation?.memberCount ?: 0
-    val displayGroup = chatListDisplayGroup(row, baseGroup, selectedPresentation, resolvedMemberCount)
+    // A replaced group picture still selected by a dirty presentation yields to the row's current picture.
+    val supersededPicture = selectedPresentation?.selectsSupersededGroupPicture(row) == true
+    val displayGroup =
+        chatListDisplayGroup(
+            row,
+            baseGroup,
+            selectedPresentation.takeUnless { supersededPicture },
+            resolvedMemberCount,
+        )
     return ChatListItem(
         group = displayGroup,
         latest = chatListLatestMessage(row),
@@ -92,7 +100,7 @@ internal fun chatListItemFromProjection(
         selectedPresentation = selectedPresentation,
         selectedAvatarAsset =
             adoptableSelectedAvatarAsset(
-                asset = selectedAvatarAsset,
+                asset = selectedAvatarAsset.takeUnless { supersededPicture },
                 avatarSource = selectedPresentation?.avatarSource,
                 group = displayGroup,
                 memberCount = resolvedMemberCount,

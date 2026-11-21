@@ -84,16 +84,10 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
         firstFrameDurableAvatarSelections(rows, accountRef) { groupIdHex ->
             draftStore.draftedAtSecondsFor(accountRef, groupIdHex)
         }.takeIf { it.isNotEmpty() } ?: return emptyList()
-    val awaited = if (awaitColdWorkers) selections else selectionsServableNow(selections, accountRef)
-    withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
-        coroutineScope {
-            awaited
-                .map { (asset, domain) ->
-                    // A decode still queued when the budget ends is skipped unless a mounted row asks for it again.
-                    async { durableAvatar(asset, accountRef, acquireMissing = false, domain, abandonable = true) }
-                }.awaitAll()
-        }
-    }
+    decodeDurableAvatarsWithinBudget(
+        if (awaitColdWorkers) selections else selectionsServableNow(selections, accountRef),
+        accountRef,
+    )
     return selections.map { it.first }.mapNotNull { asset ->
         val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
         AvatarImageLoader.cachedImage(key)?.let { image ->
@@ -105,6 +99,64 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
             )
         }
     }
+}
+
+/**
+ * Decodes MDK's stored bytes for [selections] into the in-memory pixel cache, waiting at most
+ * [FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS]. No acquisition is started; a decode still queued when the budget ends is
+ * skipped unless a mounted row asks for it again.
+ */
+private suspend fun WhiteNoiseAppState.decodeDurableAvatarsWithinBudget(
+    selections: List<Pair<AvatarAssetFfi, MediaTrustDomain>>,
+    accountRef: String,
+) {
+    if (selections.isEmpty()) return
+    withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
+        coroutineScope {
+            selections
+                .map { (asset, domain) ->
+                    async { durableAvatar(asset, accountRef, acquireMissing = false, domain, abandonable = true) }
+                }.awaitAll()
+        }
+    }
+}
+
+/**
+ * The stored avatars a chat-list frame newly selects for rows the list already shows, with their worker domains:
+ * a changed picture, or one MDK has just stored. [shown] maps every shown row's key to the asset it currently has,
+ * or null when it has none. Only renderable assets whose pixels are not decoded yet are returned, at most one
+ * first-frame window of them; a row entering the list keeps the ordinary lazy path.
+ */
+internal fun changedDurableAvatarSelections(
+    rows: List<PresentedChatRowFfi>,
+    accountRef: String,
+    shown: Map<String, AvatarAssetFfi?>,
+): List<Pair<AvatarAssetFfi, MediaTrustDomain>> =
+    rows
+        .asSequence()
+        .filter { it.row.groupIdHex.lowercase() in shown }
+        .map { chatListItemFromProjection(it.row, it.presentation, it.avatarAsset) }
+        .mapNotNull { item ->
+            val asset = item.selectedAvatarAsset?.takeIf(AvatarAssetFfi::isRenderable) ?: return@mapNotNull null
+            val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
+            val previous = shown[item.group.groupIdHex.lowercase()]?.takeIf(AvatarAssetFfi::isRenderable)
+            val unchanged = previous?.cacheKey(accountRef) == key
+            if (unchanged || AvatarImageLoader.cachedImage(key) != null) null else asset to chatListAvatarDomain(item, accountRef)
+        }.distinctBy { (asset, _) -> asset.reference to asset.contentRevision }
+        .take(FIRST_FRAME_DURABLE_AVATAR_ROWS)
+        .toList()
+
+/**
+ * Decodes the pictures a chat-list frame changes on rows the list already shows before that frame publishes, so a
+ * row whose picture changed draws the new one on its first frame instead of generated initials while MDK's stored
+ * bytes decode. Bounded by the first-frame budget; a slower decode keeps the lazy path.
+ */
+internal suspend fun WhiteNoiseAppState.prepareChangedChatListAvatars(
+    accountRef: String,
+    rows: List<PresentedChatRowFfi>,
+    shown: Map<String, AvatarAssetFfi?>,
+) {
+    decodeDurableAvatarsWithinBudget(changedDurableAvatarSelections(rows, accountRef, shown), accountRef)
 }
 
 /** The [selections] that need no new decoder worker: pixels already cached, or a domain a worker serves now. */
