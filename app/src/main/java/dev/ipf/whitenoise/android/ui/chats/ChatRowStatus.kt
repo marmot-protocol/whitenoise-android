@@ -58,7 +58,7 @@ private fun chatRowTerminalGroupStatus(item: ChatListItem): Int? =
 internal fun chatRowAttachmentIcon(kind: ChatListAttachmentKindFfi): Int =
     when (kind) {
         ChatListAttachmentKindFfi.PHOTO -> R.drawable.ic_image
-        ChatListAttachmentKindFfi.VIDEO -> R.drawable.ic_play_arrow
-        ChatListAttachmentKindFfi.AUDIO -> R.drawable.ic_mic
+        ChatListAttachmentKindFfi.VIDEO -> R.drawable.ic_videocam
+        ChatListAttachmentKindFfi.AUDIO -> R.drawable.ic_voice_note
         ChatListAttachmentKindFfi.FILE, ChatListAttachmentKindFfi.MIXED -> R.drawable.ic_description
     }

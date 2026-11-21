@@ -43,6 +43,7 @@ internal data class NotificationFirstPost(
     val avatars: PreWarmedNotificationAvatars = PreWarmedNotificationAvatars(null, null),
     val lateCorrectionPermit: NotificationLateCorrectionPermit = NotificationLateCorrectionPermit(),
     val contentRemovalVersion: Long = 0L,
+    val profileDirectConversation: Boolean = false,
 )
 
 /** Privacy-safe stages exposed to deterministic JVM and device timing probes. */

@@ -1,0 +1,65 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: notification-profiles-create-schedule
+---
+- runFlow: ../fixtures/open-new-notification-profile.yaml
+# The instrumentation host owns launch, reset and disposal.
+- tapOn:
+    id: "notification-profile.schedule"
+- scrollUntilVisible:
+    element:
+      id: "notification-profile.start"
+    direction: DOWN
+- tapOn:
+    id: "notification-profile.start"
+- assertVisible:
+    id: "notification-profile.time-dialog"
+- assertVisible:
+    id: "notification-profile.time-confirm"
+- tapOn:
+    id: "notification-profile.time-confirm"
+- assertNotVisible:
+    id: "notification-profile.time-dialog"
+- scrollUntilVisible:
+    element:
+      id: "notification-profile.days"
+    direction: DOWN
+- assertVisible:
+    id: "notification-profile.days"
+- assertVisible:
+    id: "notification-profile.day.SATURDAY"
+    checked: true
+- tapOn:
+    id: "notification-profile.day.SATURDAY"
+- tapOn:
+    id: "notification-profile.day.SUNDAY"
+- assertVisible:
+    id: "notification-profile.day.SATURDAY"
+    checked: false
+- assertVisible:
+    id: "notification-profile.day.SUNDAY"
+    checked: false
+- assertVisible:
+    id: "notification-profile.day.MONDAY"
+    checked: true
+- tapOn:
+    id: "notification-profile.save"
+- assertVisible:
+    id: "notification-profiles.list"
+- assertVisible: "Maestro sleep"
+# The row reads the schedule or "On until" depending on the emulator clock, so the reopened days carry the proof.
+- tapOn: "Maestro sleep"
+- assertVisible: "Edit profile"
+- scrollUntilVisible:
+    element:
+      id: "notification-profile.days"
+    direction: DOWN
+- assertVisible:
+    id: "notification-profile.day.SUNDAY"
+    checked: false
+- assertVisible:
+    id: "notification-profile.day.FRIDAY"
+    checked: true
+- back
+- assertVisible:
+    id: "notification-profiles.list"
+- assertNotVisible: "Discard changes[?]"

@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -56,9 +57,6 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
-import dev.ipf.whitenoise.android.ui.icons.filled.Schedule
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import kotlinx.coroutines.flow.map
 import java.util.Locale
@@ -421,19 +419,19 @@ private fun ForwardTargetProgressRow(
                     )
                 ForwardTargetPhase.Failed ->
                     Icon(
-                        Icons.Default.ErrorOutline,
+                        painterResource(R.drawable.ic_error),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
                     )
                 ForwardTargetPhase.Cancelled ->
                     Icon(
-                        Icons.Default.Close,
+                        painterResource(R.drawable.ic_close),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 ForwardTargetPhase.Waiting ->
                     Icon(
-                        Icons.Default.Schedule,
+                        painterResource(R.drawable.ic_schedule),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -56,8 +57,6 @@ import dev.ipf.whitenoise.android.ui.common.ProseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import java.util.Locale
 
@@ -216,14 +215,14 @@ internal fun PollCreateForm(
                     emojiOwner = options.toList(),
                     onValueChange = { onOptionChange(index, it) },
                     label = { Text(stringResource(R.string.poll_option, index + 1)) },
-                    modifier = Modifier.weight(1f),
+                    containerModifier = Modifier.weight(1f),
                     singleLine = true,
                     enabled = enabled,
                 )
                 if (index >= 2) {
                     IconButton(onClick = { onRemoveOption(index) }, enabled = enabled) {
                         Icon(
-                            Icons.Default.Close,
+                            painterResource(R.drawable.ic_close),
                             contentDescription = stringResource(R.string.poll_remove_option, index + 1),
                         )
                     }

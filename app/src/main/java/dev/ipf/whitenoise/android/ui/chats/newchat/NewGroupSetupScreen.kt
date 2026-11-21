@@ -774,9 +774,8 @@ private fun NewGroupSetupAccountScreen(
                 }
             },
             recentEmojis = recentEmojiRecentsOwner.recents,
-            onEmojiUsed = { emoji ->
-                if (detailsEditableNow()) recentEmojiRecentsOwner.onEmojiUsed(emoji)
-            },
+            onEmojiUsed = { emoji -> if (detailsEditableNow()) recentEmojiRecentsOwner.onEmojiUsed(emoji) },
+            fieldAnchor = draft.nameEmojiAnchor,
         )
     }
 }

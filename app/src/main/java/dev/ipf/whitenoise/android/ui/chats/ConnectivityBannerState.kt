@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -36,7 +37,6 @@ import dev.ipf.whitenoise.android.state.ChatListConnectionState
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Check
 import dev.ipf.whitenoise.android.ui.icons.filled.CloudOff
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -350,7 +350,7 @@ internal fun ChatListInlineConnectivityIndicator(
                     LoadingIndicator(modifier = Modifier.size(18.dp))
                 ConnectivityBannerState.JustConnected ->
                     Icon(
-                        Icons.Default.Check,
+                        painterResource(R.drawable.ic_check),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp),

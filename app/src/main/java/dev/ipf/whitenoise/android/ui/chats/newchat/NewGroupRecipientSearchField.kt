@@ -38,8 +38,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentPaste
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -140,7 +138,7 @@ internal fun NewGroupRecipientSearchField(
                                         )
                                     }
                                 }) {
-                                    Icon(Icons.Default.ContentPaste, stringResource(R.string.paste))
+                                    Icon(painterResource(R.drawable.ic_content_paste), stringResource(R.string.paste))
                                 }
                             }
                             IconButton(onScan) {

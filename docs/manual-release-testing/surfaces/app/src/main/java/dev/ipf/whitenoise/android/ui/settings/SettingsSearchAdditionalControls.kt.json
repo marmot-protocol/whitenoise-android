@@ -786,6 +786,30 @@
           "SET-043",
           "SET-046"
         ]
+      },
+      {
+        "surface": "string:explanation_privacy_notif_profiles",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.explanation_privacy_notif_profiles",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profiles_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_profiles_title",
+        "test_ids": [
+          "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:settings_search_alias_notification_profiles",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.settings_search_alias_notification_profiles",
+        "test_ids": [
+          "NTF-049"
+        ]
       }
     ],
     "composable_surfaces": [

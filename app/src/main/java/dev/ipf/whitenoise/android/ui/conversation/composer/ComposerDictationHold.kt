@@ -34,14 +34,13 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
-import dev.ipf.whitenoise.android.ui.icons.filled.Lock
 import dev.ipf.whitenoise.android.ui.navigation.LocalDictationLauncherOrigin
 import kotlin.math.roundToInt
 
@@ -259,7 +258,7 @@ internal fun DictationHoldHint(state: DictationHoldState) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            if (cancel) Icons.Default.Delete else Icons.Default.Lock,
+            painterResource(if (cancel) R.drawable.ic_delete else R.drawable.ic_lock),
             contentDescription = null,
             tint =
                 when {

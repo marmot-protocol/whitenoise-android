@@ -24,13 +24,13 @@ internal fun WhiteNoiseAppState.chatListDictationActivity(
         initializedConversationDictation()?.chatListActivity(it, item.group.groupIdHex)
     }
 
-/** Live dictation marker: red mic while speech is captured, accent transcript glyph while it becomes text. */
+/** Live dictation marker: the app's dictation mic, red while speech is captured and accent while it becomes text. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatRowDictationStatus(activity: ConversationDictationActivity) {
     val listening = activity == ConversationDictationActivity.Listening
     Icon(
-        painter = painterResource(if (listening) R.drawable.ic_mic else R.drawable.ic_subtitles),
+        painter = painterResource(R.drawable.ic_mic),
         contentDescription =
             stringResource(if (listening) R.string.dictation_listening else R.string.dictation_processing),
         modifier =

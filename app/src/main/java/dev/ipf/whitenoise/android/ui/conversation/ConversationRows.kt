@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -40,9 +41,6 @@ import dev.ipf.whitenoise.android.core.DateFormatPreference
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.chatHistoryTransfer
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Add
-import dev.ipf.whitenoise.android.ui.icons.filled.Group
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import java.time.LocalDate
@@ -221,7 +219,7 @@ internal fun ConversationEmptyMessage(
 internal fun EmptyGroupConversation(onAddMembers: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Icon(Icons.Default.Group, contentDescription = null, modifier = Modifier.size(56.dp))
+            Icon(painterResource(R.drawable.ic_group), contentDescription = null, modifier = Modifier.size(56.dp))
             Text(
                 stringResource(R.string.group_empty_only_you_title),
                 style = MaterialTheme.typography.titleLarge,
@@ -233,7 +231,7 @@ internal fun EmptyGroupConversation(onAddMembers: () -> Unit) {
                 textAlign = TextAlign.Center,
             )
             Button(onClick = onAddMembers) {
-                Icon(Icons.Default.Add, contentDescription = null)
+                Icon(painterResource(R.drawable.ic_add), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.add_member))
             }

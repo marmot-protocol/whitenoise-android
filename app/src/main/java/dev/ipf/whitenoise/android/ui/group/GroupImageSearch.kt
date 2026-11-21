@@ -60,10 +60,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -83,12 +86,6 @@ import dev.ipf.whitenoise.android.ui.common.SheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
-import dev.ipf.whitenoise.android.ui.icons.filled.EmojiEmotions
-import dev.ipf.whitenoise.android.ui.icons.filled.Image
-import dev.ipf.whitenoise.android.ui.icons.filled.PhotoLibrary
-import dev.ipf.whitenoise.android.ui.icons.filled.Search
 import dev.ipf.whitenoise.android.ui.settings.subtitleRes
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.CancellationException
@@ -226,7 +223,7 @@ internal fun ImageSearchPreview(
                         )
                     } else {
                         Icon(
-                            Icons.Default.Image,
+                            painterResource(R.drawable.ic_image),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(36.dp),
@@ -438,7 +435,7 @@ internal fun ImageSearchSheet(
                         ImageSourceButton(
                             label = emojiSourceLabel,
                             accessibilityLabel = resolvedChooseEmojiLabel,
-                            icon = Icons.Default.EmojiEmotions,
+                            icon = ImageVector.vectorResource(R.drawable.ic_emoji_smileys),
                             enabled = !inputBlocked,
                             onClick = onPickEmoji,
                             modifier = Modifier.weight(1f),
@@ -446,7 +443,7 @@ internal fun ImageSearchSheet(
                         ImageSourceButton(
                             label = photoSourceLabel,
                             accessibilityLabel = resolvedChoosePhotoLabel,
-                            icon = Icons.Default.PhotoLibrary,
+                            icon = ImageVector.vectorResource(R.drawable.ic_image),
                             enabled = !inputBlocked,
                             loading = inputBlocked && pendingAction == GroupImageAction.PickPhoto,
                             onClick = {
@@ -461,7 +458,7 @@ internal fun ImageSearchSheet(
                     ImageSourceButton(
                         label = emojiSourceLabel,
                         accessibilityLabel = resolvedChooseEmojiLabel,
-                        icon = Icons.Default.EmojiEmotions,
+                        icon = ImageVector.vectorResource(R.drawable.ic_emoji_smileys),
                         enabled = !inputBlocked,
                         onClick = onPickEmoji,
                         modifier = Modifier.fillMaxWidth(),
@@ -470,7 +467,7 @@ internal fun ImageSearchSheet(
                     ImageSourceButton(
                         label = photoSourceLabel,
                         accessibilityLabel = resolvedChoosePhotoLabel,
-                        icon = Icons.Default.PhotoLibrary,
+                        icon = ImageVector.vectorResource(R.drawable.ic_image),
                         enabled = !inputBlocked,
                         loading = inputBlocked && pendingAction == GroupImageAction.PickPhoto,
                         onClick = {
@@ -516,7 +513,7 @@ internal fun ImageSearchSheet(
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
                             Icon(
-                                Icons.Default.Search,
+                                painterResource(R.drawable.ic_search),
                                 contentDescription = stringResource(R.string.group_image_search_action),
                             )
                         }
@@ -587,7 +584,7 @@ internal fun ImageSearchSheet(
                                 color = MaterialTheme.colorScheme.error,
                             )
                         } else {
-                            Icon(Icons.Default.Delete, contentDescription = null)
+                            Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
                         }
                         Spacer(Modifier.width(8.dp))
                         Text(resolvedRemoveImageLabel)

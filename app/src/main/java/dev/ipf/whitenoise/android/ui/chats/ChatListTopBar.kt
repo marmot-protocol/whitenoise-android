@@ -21,6 +21,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,7 @@ import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
 import dev.ipf.whitenoise.android.state.chatsAvatarOpensSelector
+import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.state.quickSwitchAvatarAccounts
 import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
@@ -71,10 +73,8 @@ import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSearchScanStatus
 import dev.ipf.whitenoise.android.ui.conversation.allowsSearchSteps
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -132,6 +132,8 @@ internal fun ChatListTopBar(
     var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var addIdentityContour by remember(appState.runtimeGeneration) { mutableStateOf<SettingsContour?>(null) }
     var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
+    val profileState by appState.notificationProfiles.state.collectAsState()
+    val showProfileAction = profileState.showInChatList && profileState.profiles.isNotEmpty()
     val switchNotice = rememberQuickAccountSwitchNotice()
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
@@ -233,7 +235,7 @@ internal fun ChatListTopBar(
                         searchOpen ->
                             IconButton(onClick = onSearchClose) {
                                 Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    painterResource(R.drawable.ic_arrow_back),
                                     contentDescription = stringResource(R.string.back),
                                 )
                             }
@@ -309,7 +311,7 @@ internal fun ChatListTopBar(
                                             appState = appState,
                                             onSwitchAccount = ::switchTo,
                                             onOpenSwitcher = ::openSelector,
-                                            barWidthDp = topBarWidthDp,
+                                            barWidthDp = topBarWidthDp - if (showProfileAction) 48.dp else 0.dp,
                                             retainedAvatars = retainedAccountAvatars,
                                         )
                                     }
@@ -328,6 +330,7 @@ internal fun ChatListTopBar(
                             )
                         }
                     } else {
+                        if (showProfileAction) NotificationProfileQuickAction(appState)
                         AppUpdateIconButton(
                             info = updateInfo,
                             selfUpdateEnabled = selfUpdateEnabled,
@@ -519,7 +522,7 @@ internal fun ConversationSearchNavBar(
             if (status == ConversationSearchScanStatus.FAILED) {
                 IconButton(onClick = onRetryScan) {
                     Icon(
-                        Icons.Default.Refresh,
+                        painterResource(R.drawable.ic_refresh),
                         contentDescription = stringResource(R.string.conversation_search_retry),
                     )
                 }

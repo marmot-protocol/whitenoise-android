@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -37,8 +38,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailure
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Language
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -130,7 +129,7 @@ private fun UrlLibraryRow(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Default.Language,
+                painterResource(R.drawable.ic_language),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(22.dp),

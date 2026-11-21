@@ -1,5 +1,3 @@
-@file:Suppress("FunctionNaming") // Jetpack Compose functions intentionally use PascalCase.
-
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.runtime.Composable
@@ -8,21 +6,24 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkReminder
 
 /**
- * The chat list's notice slot: the account's history notice when [showHistoryNotice], then the reminder to link
- * this device when [showLinkReminder]. Search and the attachment browser show neither.
+ * Persistent chat-list notices shown above the list body, below the temporary top notices: the active
+ * notification profile (#3601), then any account history notice, then the reminder to link this device. Search and
+ * attachment browsing hide all of them.
  */
+@Suppress("FunctionNaming")
 @Composable
-internal fun ChatListNotices(
+internal fun ChatListPersistentNotices(
     appState: WhiteNoiseAppState,
     historyNotices: AccountHistoryNotices?,
-    showHistoryNotice: Boolean,
-    showLinkReminder: Boolean,
+    visible: Boolean,
 ) {
-    historyNotices?.takeIf { showHistoryNotice }?.let { owner ->
+    if (!visible) return
+    NotificationProfileChatListNotice(appState)
+    historyNotices?.takeIf { it.notices.isNotEmpty() }?.let { owner ->
         AccountHistoryNoticeBanner(
             dismissing = owner.dismissing,
             onDismiss = { appState.launchMutation { owner.dismissAll() } },
         )
     }
-    if (showLinkReminder) DeviceLinkReminder(appState)
+    DeviceLinkReminder(appState)
 }

@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -89,10 +90,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.Search
 import dev.ipf.whitenoise.android.ui.share.DestinationFilterIncomplete
 import dev.ipf.whitenoise.android.ui.share.DestinationFolderFilterState
 import dev.ipf.whitenoise.android.ui.share.DestinationFolderFilters
@@ -393,7 +390,10 @@ internal fun ForwardMessagePickerContent(
                                         onClear = closeSearch,
                                         emptyTrailingIcon = {
                                             IconButton(onClick = closeSearch) {
-                                                Icon(Icons.Default.Close, stringResource(R.string.close))
+                                                Icon(
+                                                    painterResource(R.drawable.ic_close),
+                                                    stringResource(R.string.close),
+                                                )
                                             }
                                         },
                                         modifier =
@@ -424,7 +424,7 @@ internal fun ForwardMessagePickerContent(
                                     modifier = Modifier.controlHandoffEndpoint(searchHandoff, false),
                                 ) {
                                     Icon(
-                                        Icons.Default.Search,
+                                        painterResource(R.drawable.ic_search),
                                         contentDescription = stringResource(R.string.forward_search_chats),
                                     )
                                 }
@@ -433,7 +433,7 @@ internal fun ForwardMessagePickerContent(
                         navigationIcon = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { if (searchOpen) closeSearch() else onDismiss() }) {
-                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+                                    Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
                                 }
                                 sendingAccount?.let { account ->
                                     val name = appState.networkDisplayName(account.accountIdHex)
@@ -495,7 +495,7 @@ internal fun ForwardMessagePickerContent(
                         modifier = Modifier.fillMaxWidth().testTag("forward.confirm"),
                     ) {
                         Icon(
-                            Icons.AutoMirrored.Filled.Forward,
+                            painterResource(R.drawable.ic_forward),
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )

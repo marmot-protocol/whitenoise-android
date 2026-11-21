@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification profiles (#3601): device-wide quiet times that let only chosen chats notify. -->
+    <string name="notification_profiles_title">Notification profiles</string>
+    <!-- Value on the Notifications settings row when no profile is on. -->
+    <string name="notification_profiles_value_off">Off</string>
+    <string name="explanation_privacy_notif_profiles">Pause notifications on a schedule or for a while, and choose which chats can still notify you.</string>
+    <string name="notification_profiles_explainer">While a profile is on, only the chats, people and exceptions you choose can notify you on this device. Messages still arrive and show as unread.</string>
+    <string name="notification_profiles_empty_title">No profiles yet</string>
+    <string name="notification_profiles_empty_body">Create a profile to pause notifications at night, at work, or whenever you need quiet.</string>
+    <!-- Names of the starter profiles every install begins with; saved once as ordinary, editable names. -->
+    <string name="notification_profile_preset_sleep">Sleep</string>
+    <string name="notification_profile_preset_work">Work</string>
+    <string name="notification_profile_preset_focus">Focus</string>
+    <string name="notification_profile_create">Create profile</string>
+    <string name="notification_profile_new_title">New profile</string>
+    <string name="notification_profile_edit_title">Edit profile</string>
+    <string name="notification_profile_name_label">Profile name</string>
+    <!-- Example names shown in the empty name field. -->
+    <string name="notification_profile_name_placeholder">Sleep, Work, Focus…</string>
+    <string name="notification_profile_allowed_section">Allowed notifications</string>
+    <string name="notification_profile_allowed_chats">Allowed chats</string>
+    <!-- Value of Allowed chats when the profile lets no chat through. -->
+    <string name="notification_profile_allowed_none">None</string>
+    <string name="notification_profile_allowed_hint">These chats and people still notify you while this profile is on. Muted chats stay muted.</string>
+    <!-- %1$s is the name of the signed-in account whose chats the picker shows. -->
+    <string name="notification_profile_allowed_account_note">Chats and people are chosen for %1$s. Switch accounts to choose them for another account.</string>
+    <string name="notification_profile_mentions">Notify for mentions</string>
+    <string name="notification_profile_mentions_detail">Messages that mention you still notify, even from other chats.</string>
+    <string name="notification_profile_schedule_section">Schedule</string>
+    <string name="notification_profile_schedule_enable">Turn on automatically</string>
+    <string name="notification_profile_schedule_start">Starts</string>
+    <string name="notification_profile_schedule_end">Ends</string>
+    <!-- %1$s is a clock time; shown when the quiet time ends after midnight. -->
+    <string name="notification_profile_schedule_end_next_day">%1$s the next day</string>
+    <string name="notification_profile_schedule_days">Days</string>
+    <string name="notification_profile_schedule_days_error">Choose at least one day.</string>
+    <string name="notification_profile_schedule_same_time_error">Start and end times must differ.</string>
+    <!-- %1$s is the days (for example Weekdays), %2$s the start time and %3$s the end time. -->
+    <string name="notification_profile_schedule_summary" translatable="false">%1$s, %2$s–%3$s</string>
+    <string name="notification_profile_days_every_day">Every day</string>
+    <string name="notification_profile_days_weekdays">Weekdays</string>
+    <string name="notification_profile_days_weekends">Weekends</string>
+    <string name="notification_profile_no_schedule">No schedule</string>
+    <string name="notification_profile_on">On</string>
+    <!-- %1$s is a clock time. -->
+    <string name="notification_profile_on_until">On until %1$s</string>
+    <!-- %1$s is the profile name. -->
+    <string name="notification_profile_banner_on">%1$s is on</string>
+    <!-- %1$s is the profile name and %2$s a clock time. -->
+    <string name="notification_profile_banner_on_until">%1$s is on until %2$s</string>
+    <string name="notification_profile_banner_detail">Only allowed chats notify you.</string>
+    <string name="notification_profile_banner_detail_mentions">Only allowed chats and mentions notify you.</string>
+    <string name="notification_profile_turn_on">Turn on</string>
+    <!-- %1$s is the profile name. -->
+    <string name="notification_profile_turn_off_named">Turn off %1$s</string>
+    <string name="notification_profile_for_one_hour">For 1 hour</string>
+    <!-- %1$s is a clock time. -->
+    <string name="notification_profile_until_time">Until %1$s</string>
+    <string name="notification_profile_until_off">Until I turn it off</string>
+    <string name="notification_profile_delete">Delete profile</string>
+    <!-- %1$s is the profile name. -->
+    <string name="notification_profile_delete_confirm_title">Delete %1$s?</string>
+    <string name="notification_profile_delete_confirm_body">Its schedule and allowed chats will be removed.</string>
+    <string name="notification_profile_discard_detail">Your profile changes have not been saved.</string>
+    <string name="notification_profile_save_failed">Couldn\'t save the profile. Try again.</string>
+    <string name="notification_profile_change_failed">Couldn\'t change the notification profile. Try again.</string>
+    <!-- %1$s is the profile name; read by screen readers for the chat list status button. -->
+    <string name="notification_profile_quick_open_active">Notification profile on: %1$s</string>
+    <string name="explanation_chats_notification_profiles">Turn a notification profile on or off without leaving your chats.</string>
+    <string name="settings_search_alias_notification_profiles">do not disturb|DND|quiet hours|schedule|focus|sleep</string>
+    <string name="notification_profile_allowed_people">Allowed people</string>
+    <string name="notification_profile_people_hint">These people can notify you in any chat while this profile is on.</string>
+    <string name="notification_profile_all_dms">Allow all direct messages</string>
+    <string name="notification_profile_all_dms_detail">Direct messages from anyone notify you.</string>
+    <string name="notification_profile_repeated">Let repeated messages through</string>
+    <string name="notification_profile_repeated_detail">A second message from the same person within 3 minutes notifies you.</string>
+    <string name="notification_profile_group_changes">Allow invites and group changes</string>
+    <string name="notification_profile_group_changes_detail">Invites, removals and admin changes notify you.</string>
+    <string name="notification_profile_emoji_choose">Choose emoji</string>
+    <string name="notification_profile_emoji_change">Change emoji</string>
+    <string name="notification_profile_emoji_remove">Remove emoji</string>
+    <string name="notification_profile_banner_detail_people">Only allowed chats and people notify you.</string>
+    <string name="notification_profile_banner_detail_dms">Only allowed chats and direct messages notify you.</string>
+    <string name="notification_profile_banner_detail_group_changes">Only allowed chats and group changes notify you.</string>
+    <string name="notification_profile_banner_detail_repeated">Only allowed chats and repeated messages notify you.</string>
+    <string name="notification_profile_banner_detail_exceptions">Only your exceptions notify you.</string>
+    <plurals name="notification_profile_people_count">
+        <item quantity="one">%1$d person</item>
+        <item quantity="other">%1$d people</item>
+    </plurals>
+    <string name="notification_profile_tile_label">Notification profile</string>
+    <string name="notification_profiles_quick_access">Quick access</string>
+    <string name="notification_profile_show_in_chat_list">Show in chat list</string>
+    <string name="notification_profile_show_in_chat_list_detail">Adds a button to the chat list for switching profiles.</string>
+    <string name="notification_profile_add_tile">Add to Quick Settings</string>
+    <string name="notification_profile_add_tile_detail">Switch profiles from your Quick Settings panel.</string>
+    <string name="notification_profile_add_tile_failed">Couldn\'t add the tile. Add it from your Quick Settings edit screen.</string>
+    <string name="notification_profile_tile_hint">To switch profiles from Quick Settings, add the Notification profile tile from its edit screen.</string>
+</resources>

@@ -217,7 +217,7 @@ internal fun AudioTranscribeDisc(
         stateDescription = if (working) stringResource(R.string.audio_transcription_working) else null,
         modifier = modifier.testTag(AUDIO_TRANSCRIBE_TEST_TAG),
     ) {
-        if (working) MessageSideDiscProgress() else MessageSideDiscIcon(R.drawable.ic_subtitles)
+        if (working) MessageSideDiscProgress() else MessageSideDiscIcon(R.drawable.ic_mic)
     }
 }
 

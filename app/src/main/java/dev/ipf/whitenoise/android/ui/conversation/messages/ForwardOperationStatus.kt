@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -53,11 +54,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
 
@@ -255,7 +252,7 @@ private fun ForwardOperationStatusRow(
             }
             if (snapshot.isActive) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    painter = painterResource(R.drawable.ic_chevron_right),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -264,7 +261,7 @@ private fun ForwardOperationStatusRow(
         if (snapshot.canRetry) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
         if (!snapshot.isActive) {
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.dismiss))
             }
         }
     }
@@ -306,7 +303,7 @@ private fun ForwardOperationStatusIcon(snapshot: ForwardOperationSnapshot) {
         ForwardOperationPhase.Cancelling,
         ->
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.Forward,
+                painter = painterResource(R.drawable.ic_forward),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.primary,
@@ -322,14 +319,14 @@ private fun ForwardOperationStatusIcon(snapshot: ForwardOperationSnapshot) {
         ForwardOperationPhase.Failed,
         ->
             Icon(
-                imageVector = Icons.Default.ErrorOutline,
+                painter = painterResource(R.drawable.ic_error),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.error,
             )
         ForwardOperationPhase.Cancelled ->
             Icon(
-                imageVector = Icons.Default.Close,
+                painter = painterResource(R.drawable.ic_close),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

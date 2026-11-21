@@ -26,8 +26,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Edit
 
 internal const val COMPOSER_EDIT_CANCEL_TAG = "conversation.composer.edit.cancel"
 
@@ -49,7 +47,12 @@ internal fun ComposerEditPill(
                 .padding(start = 12.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = color)
+        Icon(
+            painterResource(R.drawable.ic_edit),
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = color,
+        )
         Spacer(Modifier.width(6.dp))
         Text(
             stringResource(R.string.edit_message),

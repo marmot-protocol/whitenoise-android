@@ -13,7 +13,7 @@ class NewMessageEntryRouteCoverageTest {
 
         assertTrue("the shared transition must open NewChatFlowHost", "if (showNewChatFlow)" in source)
         assertEquals(1, Regex("""ChatsNewMessageFab\(\s*appState,\s*openNewMessageFlow,""").findAll(source).count())
-        assertEquals(1, Regex("""EmptyChats\(\s*appState,\s*onCreate = openNewMessageFlow,""").findAll(source).count())
+        assertEquals(1, Regex("""EmptyChats\(\s*appState,\s*onCreate = openNewMessageFlow\b""").findAll(source).count())
     }
 
     private fun sourceFile(): File =

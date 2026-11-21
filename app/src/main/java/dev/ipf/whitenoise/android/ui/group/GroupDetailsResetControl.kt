@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -40,10 +41,6 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
-import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
-import dev.ipf.whitenoise.android.ui.icons.outlined.RestartAlt
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /**
@@ -152,7 +149,7 @@ internal fun GroupDetailsResetControl(
     // list row menu offers the forget for direct chats alone.
     if (!offered) return
     DangerActionRow(
-        icon = if (isDm) ImageVector.vectorResource(R.drawable.ic_person_remove) else Icons.Outlined.RestartAlt,
+        icon = ImageVector.vectorResource(if (isDm) R.drawable.ic_person_remove else R.drawable.ic_restart_alt),
         title = stringResource(groupAbandonmentActionLabel(isDm)),
         modifier = Modifier.testTag(if (isDm) "chat_info.abandon" else "chat_info.reset"),
         enabled = enabled,
@@ -307,7 +304,7 @@ private fun GroupAbandonmentFailure(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.ErrorOutline, contentDescription = null)
+            Icon(painterResource(R.drawable.ic_error), contentDescription = null)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val summary = if (isDm) R.string.toast_couldnt_delete_chat else R.string.toast_couldnt_reset_group
                 Text(stringResource(summary), style = MaterialTheme.typography.bodySmall)
@@ -325,7 +322,10 @@ private fun GroupAbandonmentFailure(
                     onClick = { clipboard.setText(AnnotatedString(error.report)) },
                     modifier = Modifier.testTag("group.abandon.error.copy"),
                 ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
+                    Icon(
+                        painterResource(R.drawable.ic_content_copy),
+                        contentDescription = stringResource(R.string.copy),
+                    )
                 }
             }
         }

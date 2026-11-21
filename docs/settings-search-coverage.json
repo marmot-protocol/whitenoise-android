@@ -177,6 +177,10 @@
           "represented_by": "Notifications.permission"
         },
         {
+          "declaration": "\"profiles\"",
+          "represented_by": "Notifications.profiles"
+        },
+        {
           "declaration": "\"sounds\"",
           "represented_by": "home.NotificationSounds"
         },

@@ -1,0 +1,163 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "string:notification_profile_banner_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_dms",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_dms",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_exceptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_exceptions",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_group_changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_group_changes",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_mentions",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_people",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_repeated",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_repeated",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_on",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_on_until",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_on_until",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_days_every_day",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_days_every_day",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_days_weekdays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_days_weekdays",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_days_weekends",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_days_weekends",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_no_schedule",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_no_schedule",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_on",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_on_until",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_on_until",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_schedule_summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_schedule_summary",
+        "test_ids": [
+          "NTF-049",
+          "NTF-052"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

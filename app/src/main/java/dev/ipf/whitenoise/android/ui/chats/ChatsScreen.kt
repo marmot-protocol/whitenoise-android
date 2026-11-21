@@ -147,8 +147,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlGap
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
@@ -1085,7 +1083,7 @@ internal fun ChatsScreen(
             visibleItems.map(::visibleRowId)
         }
     val historyNotices = rememberAccountHistoryNotices(appState)
-    val showHistoryNotice = !searchActive && !browsingAttachments && historyNotices?.notices?.isNotEmpty() == true
+    val showChatListNotices = !searchActive && !browsingAttachments
     val leadingChatListItemCount =
         if (controller.error != null && loadFailurePlacement == LoadFailurePlacement.Inline) 1 else 0
     val visiblePinnedOrder =
@@ -2633,9 +2631,7 @@ internal fun ChatsScreen(
                         )
                     }
                 },
-                notice = {
-                    ChatListNotices(appState, historyNotices, showHistoryNotice, !searchActive && !browsingAttachments)
-                },
+                notice = { ChatListPersistentNotices(appState, historyNotices, showChatListNotices) },
             ) {
                 val unreadOwnerAvailable =
                     appState.activeAccountRef != null &&
@@ -2814,11 +2810,7 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(
-                                    appState,
-                                    onCreate = openNewMessageFlow,
-                                    onCreateOrigin = { newChatFlowOrigin = it },
-                                )
+                                EmptyChats(appState, onCreate = openNewMessageFlow) { newChatFlowOrigin = it }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
@@ -3089,7 +3081,7 @@ private fun ChatListIdentifierResult(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Icon(
-                    Icons.Default.ErrorOutline,
+                    painterResource(R.drawable.ic_error),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp),

@@ -8,7 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -17,9 +17,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Keyboard
-import dev.ipf.whitenoise.android.ui.icons.outlined.EmojiEmotions
 
 /**
  * The shared leading action for text entry surfaces that can insert emoji.
@@ -72,7 +69,7 @@ internal fun TextEntryEmojiAction(
                 if (!showKeyboard && emojiIcon != null) {
                     emojiIcon
                 } else {
-                    rememberVectorPainter(if (showKeyboard) Icons.Default.Keyboard else Icons.Outlined.EmojiEmotions)
+                    painterResource(if (showKeyboard) R.drawable.ic_keyboard else R.drawable.ic_emoji_smileys)
                 },
             contentDescription =
                 stringResource(

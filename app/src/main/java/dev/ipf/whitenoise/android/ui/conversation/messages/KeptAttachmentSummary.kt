@@ -15,18 +15,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.KeptAttachmentKind
 import dev.ipf.whitenoise.android.ui.conversation.KeptAttachmentPresentation
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.InsertDriveFile
-import dev.ipf.whitenoise.android.ui.icons.filled.Audiotrack
-import dev.ipf.whitenoise.android.ui.icons.filled.Image
-import dev.ipf.whitenoise.android.ui.icons.filled.Videocam
 
 /** Bounded collapsed metadata, with every attachment available in the expanded scrolling card. */
 @Composable
@@ -46,10 +43,10 @@ internal fun KeptAttachmentSummary(
             } else {
                 val icon =
                     when (attachment.kind) {
-                        KeptAttachmentKind.Image -> Icons.Default.Image
-                        KeptAttachmentKind.Audio -> Icons.Default.Audiotrack
-                        KeptAttachmentKind.Video -> Icons.Default.Videocam
-                        KeptAttachmentKind.File -> Icons.AutoMirrored.Filled.InsertDriveFile
+                        KeptAttachmentKind.Image -> ImageVector.vectorResource(R.drawable.ic_image)
+                        KeptAttachmentKind.Audio -> ImageVector.vectorResource(R.drawable.ic_voice_note)
+                        KeptAttachmentKind.Video -> ImageVector.vectorResource(R.drawable.ic_videocam)
+                        KeptAttachmentKind.File -> ImageVector.vectorResource(R.drawable.ic_description)
                     }
                 Icon(icon, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }

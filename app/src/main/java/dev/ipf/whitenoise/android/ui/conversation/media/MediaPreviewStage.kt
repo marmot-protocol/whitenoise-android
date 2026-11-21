@@ -56,8 +56,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Description
 
 private const val THUMBNAIL_MAX_EDGE_PX = 256
 private val PAGE_SPACING = 24.dp
@@ -256,7 +254,7 @@ private fun MediaPreviewDocumentPage(label: String) {
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            Icons.Default.Description,
+            painterResource(R.drawable.ic_description),
             contentDescription = null,
             modifier = Modifier.size(56.dp),
             tint = MaterialTheme.colorScheme.onBackground,
@@ -416,7 +414,7 @@ private fun MediaPreviewThumb(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Default.Description,
+                    painterResource(R.drawable.ic_description),
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.onBackground,

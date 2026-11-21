@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -69,8 +70,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
 import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
 import dev.ipf.whitenoise.android.ui.openMarkdownLink
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
@@ -205,7 +204,7 @@ private fun NostrEventReaderHeader(
     ) {
         IconButton(onClick = onDismiss) {
             Icon(
-                Icons.AutoMirrored.Outlined.ArrowBack,
+                painterResource(R.drawable.ic_arrow_back),
                 contentDescription = stringResource(R.string.close),
             )
         }
@@ -496,7 +495,7 @@ private fun NostrVideoPlayerSurface(
                     .padding(8.dp),
         ) {
             Icon(
-                Icons.AutoMirrored.Outlined.ArrowBack,
+                painterResource(R.drawable.ic_arrow_back),
                 contentDescription = stringResource(R.string.close),
                 tint = Color.White,
             )

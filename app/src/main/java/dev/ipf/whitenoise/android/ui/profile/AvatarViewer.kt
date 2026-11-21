@@ -56,6 +56,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
@@ -84,12 +85,6 @@ import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
 import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.Download
-import dev.ipf.whitenoise.android.ui.icons.filled.Edit
-import dev.ipf.whitenoise.android.ui.icons.filled.Image
-import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -428,12 +423,16 @@ internal fun AvatarViewerFrame(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White)
+                Icon(
+                    painterResource(R.drawable.ic_close),
+                    contentDescription = stringResource(R.string.close),
+                    tint = Color.White,
+                )
             }
             Box {
                 IconButton(onClick = { onMenuOpenChange(true) }) {
                     Icon(
-                        Icons.Default.MoreVert,
+                        painterResource(R.drawable.ic_more_vert),
                         contentDescription = stringResource(R.string.actions),
                         tint = Color.White,
                     )
@@ -447,7 +446,7 @@ internal fun AvatarViewerFrame(
                 ) { surface ->
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.media_save)) },
-                        leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
                         enabled = saveEnabled,
                         onClick = {
                             surface.close {
@@ -459,7 +458,7 @@ internal fun AvatarViewerFrame(
                     if (editActionLabel != null && onEditPicture != null) {
                         DropdownMenuItem(
                             text = { Text(editActionLabel) },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                            leadingIcon = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
                             onClick = {
                                 surface.close {
                                     onMenuOpenChange(false)

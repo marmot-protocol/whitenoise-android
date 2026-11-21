@@ -41,6 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
@@ -67,8 +68,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.outlined.Schedule
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -343,7 +342,7 @@ private fun rememberTimestampClocks(
             TIMESTAMP_CLOCK_PREFIX + range.item to
                 InlineTextContent(Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)) {
                     Icon(
-                        Icons.Outlined.Schedule,
+                        painterResource(R.drawable.ic_schedule),
                         contentDescription = timestampDisclosure(range.item),
                         modifier = Modifier.fillMaxSize().clickable { state.tapped = range.item },
                     )

@@ -1,0 +1,161 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AllowedNotificationsSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "fun AllowedNotificationsSection(",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:notification_profile_all_dms",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_all_dms",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_all_dms_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_all_dms_detail",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_allowed_account_note",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_allowed_account_note",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_allowed_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_allowed_chats",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_allowed_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_allowed_hint",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_allowed_none",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_allowed_none",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_allowed_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_allowed_people",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_allowed_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_allowed_section",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_group_changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_group_changes",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_group_changes_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_group_changes_detail",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_mentions",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_mentions_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_mentions_detail",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_repeated",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_repeated",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_repeated_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileAllowedSection.kt",
+        "anchor": "R.string.notification_profile_repeated_detail",
+        "test_ids": [
+          "NTF-050",
+          "NTF-055",
+          "NTF-056"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

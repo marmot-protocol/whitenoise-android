@@ -58,8 +58,7 @@ import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Download
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
+import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -580,7 +579,7 @@ internal fun MediaVideoBubble(
                         when {
                             uploadFailed ->
                                 Icon(
-                                    Icons.Default.Refresh,
+                                    painterResource(R.drawable.ic_refresh),
                                     contentDescription = stringResource(R.string.video_failed),
                                     modifier =
                                         Modifier
@@ -596,14 +595,14 @@ internal fun MediaVideoBubble(
                                 )
                             !startDownload && localFile == null ->
                                 Icon(
-                                    Icons.Default.Download,
+                                    Icons.Default.ArrowDownward,
                                     contentDescription = stringResource(R.string.media_tap_to_download),
                                     modifier = Modifier.size(24.dp),
                                 )
                             loading -> VideoDownloadingRing()
                             failed ->
                                 Icon(
-                                    Icons.Default.Refresh,
+                                    painterResource(R.drawable.ic_refresh),
                                     contentDescription = stringResource(R.string.video_failed),
                                     modifier =
                                         Modifier

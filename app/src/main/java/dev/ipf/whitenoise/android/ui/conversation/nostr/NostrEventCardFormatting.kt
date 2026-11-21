@@ -19,7 +19,7 @@ internal fun NostrEventCardKind.iconRes(eventKind: Int): Int =
         NostrEventCardKind.Video -> R.drawable.ic_videocam
         NostrEventCardKind.Release -> R.drawable.ic_package_2
         NostrEventCardKind.Git -> R.drawable.ic_code
-        NostrEventCardKind.File -> R.drawable.ic_draft
+        NostrEventCardKind.File -> R.drawable.ic_description
         NostrEventCardKind.Generic -> if (eventKind == KIND_IMAGE_EVENT) R.drawable.ic_image else R.drawable.ic_category
     }
 

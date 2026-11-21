@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -56,9 +57,6 @@ import androidx.media3.common.util.Util
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Pause
-import dev.ipf.whitenoise.android.ui.icons.filled.PlayArrow
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.delay
 
@@ -274,7 +272,7 @@ private fun VideoViewerPlayPauseButton(
                 .testTag(VIDEO_VIEWER_PLAY_PAUSE_TAG),
     ) {
         Icon(
-            imageVector = if (showPlay) Icons.Default.PlayArrow else Icons.Default.Pause,
+            painter = painterResource(if (showPlay) R.drawable.ic_play_arrow else R.drawable.ic_pause),
             contentDescription = stringResource(if (showPlay) R.string.video_play else R.string.video_pause),
             tint = Color.White,
             modifier = Modifier.size(PLAY_PAUSE_ICON),

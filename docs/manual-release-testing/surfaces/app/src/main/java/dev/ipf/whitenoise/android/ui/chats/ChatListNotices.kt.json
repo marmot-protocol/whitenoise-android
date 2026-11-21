@@ -4,11 +4,13 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "ChatListNotices",
+        "surface": "ChatListPersistentNotices",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListNotices.kt",
-        "anchor": "fun ChatListNotices(",
+        "anchor": "fun ChatListPersistentNotices(",
         "test_ids": [
-          "ACC-025"
+          "ACC-025",
+          "CHL-018",
+          "NTF-049"
         ]
       }
     ]

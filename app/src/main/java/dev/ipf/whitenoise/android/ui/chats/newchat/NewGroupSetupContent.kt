@@ -44,6 +44,8 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.emojiSheetFieldAnchor
+import dev.ipf.whitenoise.android.ui.common.rememberEmojiSheetOpener
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
@@ -139,15 +141,24 @@ internal fun NewGroupSetupContent(
                     Modifier.fillMaxWidth().padding(start = 16.dp, top = 24.dp, end = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    val openBelowName = rememberEmojiSheetOpener(draft.nameEmojiAnchor)
                     WhiteNoiseTextField(
                         state = draft.name,
                         enabled = state.detailsEditable,
-                        modifier = Modifier.fillMaxWidth().testTag("group_setup.name"),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .emojiSheetFieldAnchor(draft.nameEmojiAnchor)
+                                .testTag("group_setup.name"),
                         label = { Text(stringResource(R.string.group_name)) },
                         lineLimits = TextFieldLineLimits.SingleLine,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         leadingIcon = {
-                            TextEntryEmojiAction(state.emojiOpen, state.detailsEditable, actions.emoji)
+                            TextEntryEmojiAction(
+                                pickerOpen = state.emojiOpen,
+                                enabled = state.detailsEditable,
+                                onClick = { openBelowName(actions.emoji) },
+                            )
                         },
                     )
                     WhiteNoiseTextField(

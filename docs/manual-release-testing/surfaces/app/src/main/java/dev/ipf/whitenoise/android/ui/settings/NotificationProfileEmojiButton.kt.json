@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEmojiButton.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NotificationProfileEmojiButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEmojiButton.kt",
+        "anchor": "fun NotificationProfileEmojiButton(",
+        "test_ids": [
+          "NTF-057"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:notification_profile_emoji_change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEmojiButton.kt",
+        "anchor": "R.string.notification_profile_emoji_change",
+        "test_ids": [
+          "NTF-057"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_emoji_choose",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEmojiButton.kt",
+        "anchor": "R.string.notification_profile_emoji_choose",
+        "test_ids": [
+          "NTF-057"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_emoji_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEmojiButton.kt",
+        "anchor": "R.string.notification_profile_emoji_remove",
+        "test_ids": [
+          "NTF-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

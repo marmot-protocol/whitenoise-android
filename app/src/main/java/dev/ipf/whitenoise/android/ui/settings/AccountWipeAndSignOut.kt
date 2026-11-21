@@ -56,8 +56,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -413,7 +411,7 @@ private fun SignOutAndWipeSheet(
                         contentColor = MaterialTheme.colorScheme.error,
                     ),
             ) {
-                Icon(Icons.Default.Delete, contentDescription = null)
+                Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_out_and_wipe))
             }

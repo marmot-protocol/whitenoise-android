@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -45,9 +46,6 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
-import dev.ipf.whitenoise.android.ui.icons.filled.Info
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal enum class LoadFailurePlacement {
@@ -170,14 +168,18 @@ internal fun ErrorContent(
     val message = error.message.resolve(context)
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(40.dp))
+            Icon(painterResource(R.drawable.ic_info), contentDescription = null, modifier = Modifier.size(40.dp))
             Text(title, style = MaterialTheme.typography.titleLarge)
             SelectionContainer {
                 Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (error.retryable) {
                 Button(onClick = onRetry) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        painterResource(R.drawable.ic_refresh),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.retry))
                 }
@@ -190,7 +192,7 @@ internal fun ErrorContent(
                     ),
             ) {
                 Icon(
-                    Icons.Default.ContentCopy,
+                    painterResource(R.drawable.ic_content_copy),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                 )
@@ -228,7 +230,7 @@ internal fun InlineErrorBanner(
                 style = MaterialTheme.typography.bodyMedium,
             )
             IconButton(onClick = { clipboard.setText(AnnotatedString(error.report)) }) {
-                Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
+                Icon(painterResource(R.drawable.ic_content_copy), contentDescription = stringResource(R.string.copy))
             }
             if (error.retryable) {
                 TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }

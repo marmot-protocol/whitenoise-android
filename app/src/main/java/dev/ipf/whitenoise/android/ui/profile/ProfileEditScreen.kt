@@ -54,6 +54,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -84,9 +85,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Image
-import dev.ipf.whitenoise.android.ui.icons.filled.PhotoCamera
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
@@ -164,7 +162,7 @@ internal fun ProfileBannerControl(
                     verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
                 ) {
                     Icon(
-                        Icons.Default.Image,
+                        painterResource(R.drawable.ic_image),
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
                     )
@@ -206,7 +204,7 @@ internal fun ProfileBannerControl(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Icons.Default.PhotoCamera,
+                        painterResource(R.drawable.ic_camera),
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(22.dp),
@@ -358,7 +356,7 @@ internal fun ProfileHeroHeader(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            Icons.Default.PhotoCamera,
+                            painterResource(R.drawable.ic_camera),
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(22.dp),

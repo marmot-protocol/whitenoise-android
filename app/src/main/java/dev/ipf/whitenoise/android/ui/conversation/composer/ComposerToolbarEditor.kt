@@ -213,7 +213,7 @@ private fun ComposerToolbarPalette(
         enabled = !saving,
         modifier = Modifier.padding(vertical = ComposerToolbarGutter).testTag("composer.customize.reset"),
     ) {
-        Icon(painterResource(R.drawable.ic_refresh), null, Modifier.size(ButtonDefaults.IconSize))
+        Icon(painterResource(R.drawable.ic_settings_backup_restore), null, Modifier.size(ButtonDefaults.IconSize))
         Text(stringResource(R.string.composer_reset), Modifier.padding(start = ButtonDefaults.IconSpacing))
     }
 }

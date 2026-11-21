@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextField
@@ -13,7 +14,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 
-/** String-model forms still retain a real caret/selection; only explicitly opted-in prose fields use this. */
+/**
+ * A string-model field with a caret and selection. Pass parent layout data such as Row weight through
+ * [containerModifier] and field modifiers such as semantics and focus through [modifier].
+ */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList")
 internal fun ProseTextField(
@@ -31,17 +35,19 @@ internal fun ProseTextField(
     colors: TextFieldColors? = null,
     emojiOwner: Any? = null,
     emojiMaxLength: Int? = null,
+    containerModifier: Modifier = Modifier,
 ) {
     var field by remember { mutableStateOf(TextFieldValue(value)) }
     if (field.text != value) {
         field = TextFieldValue(value, field.selection)
     }
+    val emojiAnchor = rememberEmojiSheetFieldAnchor()
     val change: (TextFieldValue) -> Unit = { updated ->
         field = updated
         onValueChange(updated.text)
     }
     val emoji: @Composable () -> Unit = {
-        TextEntryEmojiFieldAction(field, enabled, emojiOwner to onValueChange) { updated ->
+        TextEntryEmojiFieldAction(field, enabled, emojiOwner to onValueChange, emojiAnchor) { updated ->
             if (emojiMaxLength != null && updated.text.length > emojiMaxLength) {
                 false
             } else {
@@ -50,35 +56,37 @@ internal fun ProseTextField(
             }
         }
     }
-    if (filled) {
-        TextField(
-            field,
-            change,
-            modifier,
-            enabled = enabled,
-            label = label,
-            placeholder = placeholder,
-            leadingIcon = emoji,
-            singleLine = singleLine,
-            maxLines = maxLines,
-            minLines = minLines,
-            isError = isError,
-            colors = colors ?: TextFieldDefaults.colors(),
-        )
-    } else {
-        OutlinedTextField(
-            field,
-            change,
-            modifier,
-            enabled = enabled,
-            label = label,
-            placeholder = placeholder,
-            leadingIcon = emoji,
-            singleLine = singleLine,
-            maxLines = maxLines,
-            minLines = minLines,
-            isError = isError,
-            colors = colors ?: OutlinedTextFieldDefaults.colors(),
-        )
+    Box(containerModifier.emojiSheetFieldAnchor(emojiAnchor), propagateMinConstraints = true) {
+        if (filled) {
+            TextField(
+                field,
+                change,
+                modifier,
+                enabled = enabled,
+                label = label,
+                placeholder = placeholder,
+                leadingIcon = emoji,
+                singleLine = singleLine,
+                maxLines = maxLines,
+                minLines = minLines,
+                isError = isError,
+                colors = colors ?: TextFieldDefaults.colors(),
+            )
+        } else {
+            OutlinedTextField(
+                field,
+                change,
+                modifier,
+                enabled = enabled,
+                label = label,
+                placeholder = placeholder,
+                leadingIcon = emoji,
+                singleLine = singleLine,
+                maxLines = maxLines,
+                minLines = minLines,
+                isError = isError,
+                colors = colors ?: OutlinedTextFieldDefaults.colors(),
+            )
+        }
     }
 }
