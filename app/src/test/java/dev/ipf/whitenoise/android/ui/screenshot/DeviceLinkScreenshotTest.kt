@@ -182,6 +182,20 @@ class DeviceLinkScreenshotTest {
         compose.onRoot().captureRoboImage("src/test/snapshots/device_link_chats_joining_banner_light.png")
     }
 
+    /** Just after linking, before MDK has a count, the list says chats are on their way. */
+    @Test
+    fun chatsAwaitingBannerLight() {
+        show(Look()) { ChatsArrivingBanner(ChatsArriving.Linked) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_chats_awaiting_banner_light.png")
+    }
+
+    /** An empty list just after linking says chats are coming instead of claiming there are none. */
+    @Test
+    fun chatsAwaitingEmptyLight() {
+        show(Look()) { EmptyChats(onCreate = {}, arriving = true) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_chats_awaiting_empty_light.png")
+    }
+
     /** History still arriving stays readable in dark mode with large RTL text. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h900dp-mdpi")

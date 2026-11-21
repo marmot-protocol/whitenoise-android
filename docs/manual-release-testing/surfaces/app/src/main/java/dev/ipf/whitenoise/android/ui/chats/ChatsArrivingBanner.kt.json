@@ -18,6 +18,14 @@
         "test_ids": [
           "SET-067"
         ]
+      },
+      {
+        "surface": "Linked devices: rememberAwaitingChatCount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
+        "anchor": "fun rememberAwaitingChatCount(",
+        "test_ids": [
+          "SET-067"
+        ]
       }
     ],
     "settings_controls": [
@@ -33,6 +41,14 @@
         "surface": "R.string.history_retrying",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
         "anchor": "R.string.history_retrying",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "R.string.chats_arriving_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
+        "anchor": "R.string.chats_arriving_detail",
         "test_ids": [
           "SET-067"
         ]

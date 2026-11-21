@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.DeviceLinkPromptFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -122,8 +123,13 @@ internal class DeviceLinkRequestWatcher(
     private val readSnapshot: suspend (accountRef: String) -> DeviceLinkSnapshotFfi,
     private val owns: () -> Boolean = { true },
     private val canPresentOutcome: (String) -> Boolean = { true },
+    private val nowMs: () -> Long = ::monotonicNowMs,
 ) {
     var snapshots by mutableStateOf<Map<String, DeviceLinkSnapshotFfi>>(emptyMap())
+        private set
+
+    /** Per profile, when [awaitingChatCount] saw its own link become Linked, by [monotonicNowMs]. */
+    var linkedAwaitingCount by mutableStateOf<Map<String, Long>>(emptyMap())
         private set
 
     var queue by mutableStateOf(DeviceLinkRequestQueue())
@@ -220,6 +226,7 @@ internal class DeviceLinkRequestWatcher(
         next: Map<String, DeviceLinkSnapshotFfi>,
         blocked: Boolean,
     ) {
+        linkedAwaitingCount = awaitingChatCount(snapshots, next, linkedAwaitingCount, nowMs())
         snapshots = next
         val visible = deviceLinkRequests(next).filter { it.open || canPresentOutcome(it.accountRef) }
         queue = queue.offer(visible, blocked)
@@ -235,6 +242,34 @@ internal class DeviceLinkRequestWatcher(
             null
         }
 }
+
+/** Milliseconds from a monotonic clock, the one [DeviceLinkRequestWatcher.linkedAwaitingCount] is measured on. */
+internal fun monotonicNowMs(): Long = System.nanoTime() / NANOS_PER_MILLI
+
+private const val NANOS_PER_MILLI = 1_000_000L
+
+/**
+ * Profiles whose own link just became Linked and that have no chat count from MDK yet, with when that was seen
+ * ([nowMs]). MDK counts the chats a new device is still owed only once the approving device's chat inventory
+ * arrives, which can follow its first Adds, so until then the chat list can only say chats are on their way. A
+ * link already Linked when first read is not new, and the first count ends a profile's wait for good.
+ */
+internal fun awaitingChatCount(
+    before: Map<String, DeviceLinkSnapshotFfi>,
+    after: Map<String, DeviceLinkSnapshotFfi>,
+    awaiting: Map<String, Long>,
+    nowMs: Long,
+): Map<String, Long> =
+    after
+        .mapNotNull { (account, snapshot) ->
+            val wasLinking = before[account]?.newDevice.let { it != null && it !is NewDeviceLinkStateFfi.Linked }
+            when {
+                snapshot.newDevice !is NewDeviceLinkStateFfi.Linked -> null
+                snapshot.chatProgress.any { it.onNewDevice } -> null
+                wasLinking -> account to nowMs
+                else -> awaiting[account]?.let { account to it }
+            }
+        }.toMap()
 
 /** Share the foreground watcher with chat-list readers and discard its snapshots when the native runtime changes. */
 internal fun WhiteNoiseAppState.runtimeLinkRequests() =

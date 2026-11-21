@@ -57,24 +57,28 @@ internal fun EmptyChats(
     onCreate: () -> Unit,
     onCreateOrigin: (Rect?) -> Unit = {},
 ) {
-    val snapshot = appState.activeAccountRef?.let { appState.deviceLinkRequests.snapshots[it] }
+    val links = appState.deviceLinkRequests
+    val snapshot = appState.activeAccountRef?.let { links.snapshots[it] }
     val progress = snapshot?.chatProgress?.firstOrNull { it.onNewDevice && it.isJoiningChats() }
-    EmptyChats(onCreate, progress = progress, onCreateOrigin = onCreateOrigin)
+    val awaiting = rememberAwaitingChatCount(appState.activeAccountRef?.let { links.linkedAwaitingCount[it] })
+    EmptyChats(onCreate, progress = progress, arriving = progress != null || awaiting, onCreateOrigin = onCreateOrigin)
 }
 
 /**
- * Keeps the existing actionable first-chat entry while adopting the prototype's title/detail presentation. With native
- * [progress], a newly linked device says its chats are on their way instead of claiming there are none.
+ * Keeps the existing actionable first-chat entry while adopting the prototype's title/detail presentation. While
+ * [arriving], a newly linked device says its chats are on their way instead of claiming there are none, with
+ * MDK's [progress] count once it has one.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun EmptyChats(
     onCreate: () -> Unit,
     progress: LinkChatProgressFfi? = null,
+    arriving: Boolean = progress != null,
     onCreateOrigin: (Rect?) -> Unit = {},
 ) {
-    val title = if (progress != null) R.string.chats_arriving_title else R.string.chat_rows_no_chats_title
-    val detail = if (progress == null) R.string.chat_rows_no_chats_detail else R.string.chats_arriving_detail
+    val title = if (arriving) R.string.chats_arriving_title else R.string.chat_rows_no_chats_title
+    val detail = if (arriving) R.string.chats_arriving_detail else R.string.chat_rows_no_chats_detail
     val (origin, create) =
         rememberMeasuredControlClick {
             onCreateOrigin(it)

@@ -19,6 +19,14 @@ class ChatsArrivingTest {
         assertEquals(ChatsArriving.Joining(joining), arriving)
     }
 
+    /** A link still awaiting MDK's first count says chats are on their way, ahead of history and behind a count. */
+    @Test
+    fun aJustLinkedDeviceSaysChatsAreComing() {
+        val receiving = listOf(ChatHistoryImportStateFfi.Receiving(retrying = false))
+        assertEquals(ChatsArriving.Linked, chatsArriving(null, receiving, awaiting = true))
+        assertEquals(ChatsArriving.Joining(joining), chatsArriving(joining, receiving, awaiting = true))
+    }
+
     /** Once every chat has joined, a chat still receiving its history keeps the notice up. */
     @Test
     fun historyStillReceivingKeepsTheNotice() {
