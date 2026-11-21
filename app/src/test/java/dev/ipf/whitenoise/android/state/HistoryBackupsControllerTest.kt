@@ -250,8 +250,10 @@ class HistoryBackupsControllerTest {
         assertEquals(HistoryBackupProblem.RestoreBusy, historyBackupProblem(refused("backup_restore_busy")))
         assertEquals(HistoryBackupProblem.InvalidRestoreWords, historyBackupProblem(refused("backup_recovery_key")))
         assertEquals(HistoryBackupProblem.Failed, historyBackupProblem(refused("something_new")))
-        assertEquals(HistoryBackupProblem.Failed, historyBackupProblem(MarmotKitException.Runtime("roster_unsupported")))
-        assertEquals(HistoryBackupProblem.Failed, historyBackupProblem(IllegalStateException("device group refused: roster_unsupported")))
+        assertEquals(HistoryBackupProblem.Failed,
+            historyBackupProblem(MarmotKitException.Runtime("roster_unsupported")))
+        assertEquals(HistoryBackupProblem.Failed,
+            historyBackupProblem(IllegalStateException("device group refused: roster_unsupported")))
     }
 
     @Test fun backgroundVisitRunsOnlyWritersAndRetriesFailures() =
@@ -355,7 +357,8 @@ class HistoryBackupsControllerTest {
 
         override suspend fun backupRestoreStatus(accountRef: String): BackupRestoreStatusFfi = restoreStatus
 
-        override suspend fun watchBackupRestore(accountRef: String): BackupRestoreSubscription = throw MarmotKitException.Runtime("no watch in tests")
+        override suspend fun watchBackupRestore(accountRef: String): BackupRestoreSubscription =
+            throw MarmotKitException.Runtime("no watch in tests")
 
         override suspend fun runDueBackupPass(accountRef: String): BackgroundBackupOutcomeFfi {
             passError?.let { throw it }
@@ -367,7 +370,9 @@ class HistoryBackupsControllerTest {
     private companion object {
         const val ACCOUNT = "account"
         const val BUDGET = 60_000L
-        val WORDS = listOf("alpha", "beta", "Gamma", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo", "lima")
+        val WORDS = listOf(
+            "alpha", "beta", "Gamma", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo", "lima",
+        )
 
         fun refused(code: String) = MarmotKitException.Runtime("device group refused: $code")
 

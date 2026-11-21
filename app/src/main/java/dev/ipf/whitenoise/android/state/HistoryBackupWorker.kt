@@ -60,16 +60,12 @@ internal suspend fun runDueHistoryBackups(
         writers++
         val remaining = deadline - System.currentTimeMillis()
         val outcome =
-            if (remaining <= 0) {
+            try {
+                withTimeoutOrNull(remaining) { marmot.runDueBackupPass(account) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
                 null
-            } else {
-                try {
-                    withTimeoutOrNull(remaining) { marmot.runDueBackupPass(account) }
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (_: Exception) {
-                    null
-                }
             }
         if (outcome == null) retry = true
     }
@@ -91,6 +87,7 @@ class HistoryBackupWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+    @Suppress("TooGenericExceptionCaught")
     override suspend fun doWork(): Result {
         val app = applicationContext as? WhiteNoiseApplication ?: return Result.success()
         val startedAt = synchronized(scheduleLock) { scheduleGeneration }

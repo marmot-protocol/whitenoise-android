@@ -70,6 +70,26 @@
           "SET-071"
         ]
       }
+    ],
+    "string_resources": [
+      {
+        "surface": "R.string.history_backups_problem_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "R.string.history_backups_problem_failed",
+        "test_ids": [
+          "SET-070",
+          "SET-071"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_status_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "R.string.history_backups_status_failed",
+        "test_ids": [
+          "SET-070",
+          "SET-071"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

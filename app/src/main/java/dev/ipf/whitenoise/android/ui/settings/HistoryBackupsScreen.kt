@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions", "MatchingDeclarationName")
+
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
@@ -131,13 +133,17 @@ internal fun HistoryBackupsContent(
     DisposableEffect(restoreWords) { onDispose { restoreWords.clearText() } }
     SettingsScaffold(title = stringResource(R.string.history_backups), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag("history_backups.list")) {
-            item(key = "search.HistoryBackups.1") { SettingsExplainer(stringResource(R.string.history_backups_explanation)) }
+            item(key = "search.HistoryBackups.1") {
+                SettingsExplainer(stringResource(R.string.history_backups_explanation))
+            }
             item(key = "search.HistoryBackups.2") {
                 HistoryBackupsStatusGroup(state, actions, onTurnOff = { confirmTurnOff = true })
             }
             historyBackupsCallouts(state)
             if (state.status != HistoryBackupStatus.Unavailable) {
-                item(key = "search.HistoryBackups.3") { SettingsSection(stringResource(R.string.history_backups_restore_section)) }
+                item(key = "search.HistoryBackups.3") {
+                    SettingsSection(stringResource(R.string.history_backups_restore_section))
+                }
                 item(key = "search.HistoryBackups.4") { HistoryRestoreGroup(state, restoreWords, actions) }
             }
         }
@@ -280,8 +286,11 @@ private fun HistoryRestoreGroup(
             Text(
                 text = historyRestoreProgressText(restore),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (restore.phase == BackupRestorePhaseFfi.PARTIAL) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.testTag("history_backups.restore_progress").semantics { liveRegion = LiveRegionMode.Polite },
+                color =
+                    if (restore.phase == BackupRestorePhaseFfi.PARTIAL) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.testTag("history_backups.restore_progress")
+                    .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
         if (running) {
@@ -306,7 +315,7 @@ private fun HistoryRestoreGroup(
                     words.clearText()
                     actions.onRestore(typed)
                 },
-                enabled = state.running == null && words.text.isNotBlank(),
+                enabled = state.running == null && hasTwelveRecoveryWords(words.text),
                 loading = starting,
                 loadingLabel = stringResource(R.string.history_backups_restoring),
                 modifier = Modifier.fillMaxWidth().testTag("history_backups.restore"),
@@ -340,7 +349,9 @@ private fun RecoveryWordsSetupContent(
     ) {
         SettingsList(modifier = Modifier.testTag("history_backups.setup")) {
             if (!setup.confirming) {
-                item(key = "words.message") { SettingsExplainer(stringResource(R.string.history_backups_words_message)) }
+                item(key = "words.message") {
+                    SettingsExplainer(stringResource(R.string.history_backups_words_message))
+                }
                 item(key = "words.grid") { RecoveryWordsGrid(setup.words) }
                 item(key = "words.actions") {
                     SetupButtons(
@@ -458,9 +469,19 @@ private fun SetupButtons(
             loadingLabel = primary,
             modifier = Modifier.fillMaxWidth().testTag(primaryTag),
         ) { Text(primary) }
-        WhiteNoiseOutlinedButton(onClick = onSecondary, enabled = secondaryEnabled, modifier = Modifier.fillMaxWidth()) { Text(secondary) }
+        WhiteNoiseOutlinedButton(
+            onClick = onSecondary,
+            enabled = secondaryEnabled,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(secondary) }
     }
 }
+
+/** MDK validates spelling and checksum. Keep incomplete entries on the form. */
+private fun hasTwelveRecoveryWords(text: CharSequence): Boolean =
+    text.indices.count { index ->
+        !text[index].isWhitespace() && (index == 0 || text[index - 1].isWhitespace())
+    } == 12
 
 /**
  * A field for recovery words. The password keyboard type asks the keyboard not to learn or suggest what is typed,
@@ -489,7 +510,8 @@ private fun RecoveryWordsInput(
                 keyboardType = KeyboardType.Password,
                 imeAction = if (multiLine) ImeAction.Default else ImeAction.Next,
             ),
-        lineLimits = if (multiLine) TextFieldLineLimits.MultiLine(minHeightInLines = 3) else TextFieldLineLimits.SingleLine,
+        lineLimits =
+            if (multiLine) TextFieldLineLimits.MultiLine(minHeightInLines = 3) else TextFieldLineLimits.SingleLine,
     )
 }
 
@@ -499,7 +521,8 @@ internal fun historyBackupStatusText(status: HistoryBackupStatus): Int =
         HistoryBackupStatus.Unavailable -> R.string.history_backups_status_unavailable
         HistoryBackupStatus.Off -> R.string.history_backups_status_off
         is HistoryBackupStatus.On ->
-            if (status.thisDeviceWrites) R.string.history_backups_status_on_this_device else R.string.history_backups_status_on_other_device
+            if (status.thisDeviceWrites) R.string.history_backups_status_on_this_device
+            else R.string.history_backups_status_on_other_device
         HistoryBackupStatus.LoadFailed -> R.string.history_backups_status_failed
     }
 
@@ -519,7 +542,8 @@ internal fun historyBackupProblemText(problem: HistoryBackupProblem): Int =
 private fun historyRestoreProgressText(restore: HistoryRestoreProgress): String {
     val count = restore.importedMessages.toInt()
     return when (restore.phase) {
-        BackupRestorePhaseFfi.IDLE, BackupRestorePhaseFfi.DISCOVERING -> stringResource(R.string.history_restore_discovering)
+        BackupRestorePhaseFfi.IDLE, BackupRestorePhaseFfi.DISCOVERING ->
+            stringResource(R.string.history_restore_discovering)
         BackupRestorePhaseFfi.RESTORING -> stringResource(R.string.history_restore_restoring, count)
         BackupRestorePhaseFfi.COMPLETE -> stringResource(R.string.history_restore_complete, count)
         BackupRestorePhaseFfi.PARTIAL -> stringResource(R.string.history_restore_partial, count)

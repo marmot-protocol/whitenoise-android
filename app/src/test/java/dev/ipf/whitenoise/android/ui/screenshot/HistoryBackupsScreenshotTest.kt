@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -73,7 +74,8 @@ class HistoryBackupsScreenshotTest {
     @Test fun unavailableLight() =
         capture("history_backups_unavailable_light", HistoryBackupsState(status = HistoryBackupStatus.Unavailable))
 
-    @Test fun wordsLight() = capture("history_backups_words_light", HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()))
+    @Test fun wordsLight() =
+        capture("history_backups_words_light", HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()))
 
     @Test fun confirmWrongWordsDark() =
         capture(
@@ -89,14 +91,16 @@ class HistoryBackupsScreenshotTest {
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
     fun wordsLargeRtl() =
-        capture("history_backups_words_rtl_large", HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()), rtl = true)
+        capture("history_backups_words_rtl_large",
+            HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()), rtl = true)
 
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
     fun statusLargeRtl() =
         capture(
             "history_backups_on_rtl_large",
-            HistoryBackupsState(status = HistoryBackupStatus.On(thisDeviceWrites = true), running = HistoryBackupAction.TurnOff),
+            HistoryBackupsState(status = HistoryBackupStatus.On(thisDeviceWrites = true),
+                running = HistoryBackupAction.TurnOff),
             rtl = true,
         )
 
@@ -114,14 +118,24 @@ class HistoryBackupsScreenshotTest {
             }
         }
         compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.restore"))
+        val button = compose.onNodeWithTag("history_backups.restore")
+        button.assertIsNotEnabled()
         compose.onNodeWithTag("history_backups.restore_words").performTextInput("alpha beta")
+        button.assertIsNotEnabled()
         tester.emulateSavedInstanceStateRestore()
         compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.restore"))
-        assertFalse(compose.onNodeWithTag("history_backups.restore_words").fetchSemanticsNode().config.toString().contains("alpha"))
-        compose.onNodeWithTag("history_backups.restore_words").performTextInput("gamma delta")
-        compose.onNodeWithTag("history_backups.restore").performClick()
-        assertEquals(listOf("gamma delta"), restored)
-        assertFalse(compose.onNodeWithTag("history_backups.restore_words").fetchSemanticsNode().config.toString().contains("gamma"))
+        assertFalse(
+            compose.onNodeWithTag("history_backups.restore_words")
+                .fetchSemanticsNode().config.toString().contains("alpha"),
+        )
+        val fixture = setup().words.joinToString(" ")
+        compose.onNodeWithTag("history_backups.restore_words").performTextInput(fixture)
+        button.performClick()
+        assertEquals(listOf(fixture), restored)
+        assertFalse(
+            compose.onNodeWithTag("history_backups.restore_words")
+                .fetchSemanticsNode().config.toString().contains("orbit"),
+        )
     }
 
     /** Renders [state] in the requested theme and direction, scrolls to [scrollTo], and records [name]. */
@@ -151,7 +165,10 @@ class HistoryBackupsScreenshotTest {
 
     private fun setup() =
         RecoveryWordsSetup(
-            words = listOf("orbit", "maple", "canyon", "velvet", "harbor", "pencil", "quartz", "meadow", "lantern", "ripple", "saddle", "thunder"),
+            words = listOf(
+                "orbit", "maple", "canyon", "velvet", "harbor", "pencil", "quartz",
+                "meadow", "lantern", "ripple", "saddle", "thunder",
+            ),
             confirmPositions = listOf(3, 9),
         )
 
