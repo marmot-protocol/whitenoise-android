@@ -185,7 +185,20 @@ internal class HistoryBackupsController(
     /** Asks MDK for new words. Words already on screen are replaced; MDK forgets the old ones too. */
     fun beginSetup() =
         run(HistoryBackupAction.BeginSetup) {
-            val words = setupMutex.withLock { setupCommand { beginRecoveryWords(accountRef) } }
+            val words =
+                setupMutex.withLock {
+                    var reachedMdk = false
+                    try {
+                        setupCommand {
+                            reachedMdk = true
+                            beginRecoveryWords(accountRef)
+                        }
+                    } catch (retired: CancellationException) {
+                        // MDK may hold words this screen will never show; forget them before a replacement can begin.
+                        if (reachedMdk) withContext(dispatcher + NonCancellable) { runCatching { marmot.cancelRecoveryWords(accountRef) } }
+                        throw retired
+                    }
+                }
             // A closed screen never shows them; close() already asked MDK to forget them.
             if (closed) return@run
             mutableState.update {
@@ -200,6 +213,8 @@ internal class HistoryBackupsController(
         run(HistoryBackupAction.Confirm) {
             setupMutex.withLock { setupCommand { confirmRecoveryWords(accountRef, answers.map(String::trim)) } }
             mutableState.update { it.copy(setup = null) }
+            // Confirming makes this device the writer; schedule even if the follow-up read fails.
+            withContext(dispatcher) { runCatching(onWriting) }
             reloadSettings()
         }
 

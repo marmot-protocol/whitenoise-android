@@ -93,7 +93,8 @@ internal fun HistoryBackupsScreen(
     // Keyed by controller: an account or runtime change disposes every input and state of the old owner.
     key(controller) {
         val state =
-            controller?.state?.collectAsState()?.value ?: HistoryBackupsState(status = HistoryBackupStatus.LoadFailed)
+            // No eligible account or runtime yet: nothing can be read or restored, so show only the pending status.
+            controller?.state?.collectAsState()?.value ?: HistoryBackupsState(status = HistoryBackupStatus.Loading)
         val actions =
             remember(controller) {
                 if (controller == null) {
@@ -140,7 +141,7 @@ internal fun HistoryBackupsContent(
                 HistoryBackupsStatusGroup(state, actions, onTurnOff = { confirmTurnOff = true })
             }
             historyBackupsCallouts(state)
-            if (state.status != HistoryBackupStatus.Unavailable) {
+            if (state.status != HistoryBackupStatus.Unavailable && state.status != HistoryBackupStatus.Loading) {
                 item(key = "search.HistoryBackups.3") {
                     SettingsSection(stringResource(R.string.history_backups_restore_section))
                 }
