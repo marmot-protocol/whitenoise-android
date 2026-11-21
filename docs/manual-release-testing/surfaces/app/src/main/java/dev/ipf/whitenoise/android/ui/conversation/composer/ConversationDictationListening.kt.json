@@ -47,6 +47,22 @@
         "test_ids": [
           "DIC-019"
         ]
+      },
+      {
+        "surface": "R.string.dictation_continue_recording",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationListening.kt",
+        "anchor": "R.string.dictation_continue_recording",
+        "test_ids": [
+          "DIC-019"
+        ]
+      },
+      {
+        "surface": "R.string.dictation_processing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationListening.kt",
+        "anchor": "R.string.dictation_processing",
+        "test_ids": [
+          "DIC-019"
+        ]
       }
     ]
   },

@@ -105,14 +105,14 @@ internal fun ConversationDictationContinueSlot(
                     .testTag(DICTATION_CONTINUE_TAG)
                     .explainOnLongPress(
                         composerExplanation(
-                            R.string.dictation_continue,
+                            R.string.dictation_continue_recording,
                             R.string.explanation_conversation_dictation_continue,
                         ),
                     ),
         ) {
             Icon(
                 painter = painterResource(DICTATION_CONTINUE_ICON),
-                contentDescription = stringResource(R.string.dictation_continue),
+                contentDescription = stringResource(R.string.dictation_continue_recording),
                 modifier = Modifier.size(20.dp),
             )
         }

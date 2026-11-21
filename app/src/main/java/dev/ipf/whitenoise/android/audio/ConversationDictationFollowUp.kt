@@ -33,6 +33,7 @@ internal class ConversationDictationFollowUpOwner {
     )
 
     var pending: Pending? by mutableStateOf(null)
+    var discardClosing by mutableStateOf(false)
 
     /** A queued Send whose predecessor did not deliver must not send on its own. */
     var blockedSendSessionId: Long? = null

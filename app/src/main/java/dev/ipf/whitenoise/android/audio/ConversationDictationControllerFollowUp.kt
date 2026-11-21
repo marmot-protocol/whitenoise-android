@@ -16,6 +16,7 @@ internal val ConversationDictationController.followUpAwaitingPrevious: Boolean
 internal val ConversationDictationController.canContinueDictation: Boolean
     get() =
         followUp.pending == null &&
+            !followUp.discardClosing &&
             inActiveRecognitionState &&
             finishRequested &&
             !recoveryHandedToComposer &&
@@ -91,7 +92,11 @@ internal fun ConversationDictationController.cancelFollowUp(): Boolean {
 internal fun ConversationDictationController.discardFollowUp() {
     val pending = followUp.pending ?: return
     followUp.pending = null
-    val closed: () -> Unit = { finishPlaybackInterruption(pending.sessionId) }
+    followUp.discardClosing = true
+    val closed: () -> Unit = {
+        finishPlaybackInterruption(pending.sessionId)
+        followUp.discardClosing = false
+    }
     if (!runCatching { platform.discardFollowUpCapture(closed) }.getOrDefault(false)) closed()
     notificationActionGeneration += 1L
     conversationDictationDiagnostic("event=follow_up action=discarded")
