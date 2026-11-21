@@ -8,12 +8,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseInputsValid
 import dev.ipf.whitenoise.android.state.APP_LOCK_ALLOWED_AUTHENTICATORS
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isAppLockCredentialAvailable
 import dev.ipf.whitenoise.android.ui.findActivity
 
-/** A fresh, one-shot challenge for a raw private-key action. */
+/** A fresh, one-shot challenge for any private-key action: reveal, copy, raw export or encrypted export. */
 internal fun interface RawKeyExportAuthentication {
     /** Runs the action after Android accepts the current credential challenge. */
     fun request(onAuthenticated: () -> Unit)
@@ -107,23 +108,36 @@ internal fun ProfileKeysUiState.openRawExport() {
     rawExportDialog = true
 }
 
-/** The callback can start preparation only while the same screen can still deliver account secrets. */
+/** Encrypted export gets the same per-presentation consent as raw export. */
+internal fun ProfileKeysUiState.openEncryptedExport() {
+    rawKeyConsent = Any()
+    passwordDialog = true
+}
+
+/**
+ * Every export, raw or encrypted, waits for a fresh challenge and starts preparation only while its own dialog and the
+ * same screen can still deliver account secrets.
+ */
 internal fun RawKeyExportAuthentication.gateExport(
     ui: ProfileKeysUiState,
     canDeliverSecret: () -> Boolean,
     beginExport: (Boolean, KeyExportDestination) -> Unit,
 ): (Boolean, KeyExportDestination) -> Unit =
     { encrypted, destination ->
-        if (encrypted) {
-            beginExport(true, destination)
-        } else {
-            authorize(ui, { ui.rawExportDialog && ui.exportIdle && canDeliverSecret() }) {
-                beginExport(false, destination)
+        val dialogReady = {
+            if (encrypted) {
+                ui.passwordDialog &&
+                    encryptedBackupPassphraseInputsValid(ui.password.text.toString(), ui.confirmation.text.toString())
+            } else {
+                ui.rawExportDialog
             }
+        }
+        authorize(ui, { dialogReady() && ui.exportIdle && canDeliverSecret() }) {
+            beginExport(encrypted, destination)
         }
     }
 
-/** Applies the same one-shot ownership check before every plaintext key disclosure. */
+/** Applies the same one-shot ownership check before every private-key disclosure. */
 internal fun RawKeyExportAuthentication.authorize(
     ui: ProfileKeysUiState,
     canDeliver: () -> Boolean,

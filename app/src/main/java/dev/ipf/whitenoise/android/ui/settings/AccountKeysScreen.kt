@@ -363,7 +363,7 @@ internal fun AccountKeysScreen(
                     )
                 }
             },
-            onExportEncrypted = { ui.passwordDialog = true },
+            onExportEncrypted = ui::openEncryptedExport,
             onExportRaw = ui::openRawExport,
             onWipe = { ui.wipeSheet = true },
             onSignOut = { if (ownsAccount()) showSignOut = true },
