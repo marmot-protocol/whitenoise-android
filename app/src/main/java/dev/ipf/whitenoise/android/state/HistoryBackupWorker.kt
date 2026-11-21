@@ -146,17 +146,18 @@ class HistoryBackupWorker(
         private var scheduleGeneration = 0L
 
         /** Starts the schedule, keeping an existing one so its cadence is not reset. */
-        fun schedule(context: Context): Operation = synchronized(scheduleLock) {
-            scheduleGeneration++
-            val request =
-                PeriodicWorkRequestBuilder<HistoryBackupWorker>(VISIT_INTERVAL_HOURS, TimeUnit.HOURS)
-                    .setConstraints(constraints())
-                    .build()
-            WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
-                UNIQUE_WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                request,
-            )
-        }
+        fun schedule(context: Context): Operation =
+            synchronized(scheduleLock) {
+                scheduleGeneration++
+                val request =
+                    PeriodicWorkRequestBuilder<HistoryBackupWorker>(VISIT_INTERVAL_HOURS, TimeUnit.HOURS)
+                        .setConstraints(constraints())
+                        .build()
+                WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
+                    UNIQUE_WORK_NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    request,
+                )
+            }
     }
 }

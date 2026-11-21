@@ -6,7 +6,6 @@ import dev.ipf.marmotkit.BackupRestoreStatusFfi
 import dev.ipf.marmotkit.BackupRestoreSubscription
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
-import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 
 /** Where the account's history backups stand, as MDK last reported them. */
 internal sealed interface HistoryBackupStatus {
@@ -81,8 +81,7 @@ internal class RecoveryWordsSetup(
     /** The words are shown once: confirmation keeps only the positions, so they cannot be displayed again. */
     fun confirming(): RecoveryWordsSetup = RecoveryWordsSetup(emptyList(), confirmPositions, confirming = true)
 
-    override fun toString(): String =
-        "RecoveryWordsSetup(words=[${words.size} redacted], confirmPositions=$confirmPositions, confirming=$confirming)"
+    override fun toString(): String = "RecoveryWordsSetup(words=[${words.size} redacted], confirming=$confirming)"
 }
 
 /** One restore's progress, reduced from MDK's aggregate status. */
@@ -355,8 +354,11 @@ internal class HistoryBackupsController(
                         it.copy(
                             problem = problem,
                             status =
-                                if (problem == HistoryBackupProblem.Unavailable) HistoryBackupStatus.Unavailable
-                                else it.status,
+                                if (problem == HistoryBackupProblem.Unavailable) {
+                                    HistoryBackupStatus.Unavailable
+                                } else {
+                                    it.status
+                                },
                             setup = if (problem == HistoryBackupProblem.SetupExpired) null else it.setup,
                         )
                     }

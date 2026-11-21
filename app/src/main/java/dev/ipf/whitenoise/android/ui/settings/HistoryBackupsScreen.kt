@@ -287,10 +287,15 @@ private fun HistoryRestoreGroup(
                 text = historyRestoreProgressText(restore),
                 style = MaterialTheme.typography.bodyMedium,
                 color =
-                    if (restore.phase == BackupRestorePhaseFfi.PARTIAL) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.testTag("history_backups.restore_progress")
-                    .semantics { liveRegion = LiveRegionMode.Polite },
+                    if (restore.phase == BackupRestorePhaseFfi.PARTIAL) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                modifier =
+                    Modifier
+                        .testTag("history_backups.restore_progress")
+                        .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
         if (running) {
@@ -523,8 +528,11 @@ internal fun historyBackupStatusText(status: HistoryBackupStatus): Int =
         HistoryBackupStatus.Unavailable -> R.string.history_backups_status_unavailable
         HistoryBackupStatus.Off -> R.string.history_backups_status_off
         is HistoryBackupStatus.On ->
-            if (status.thisDeviceWrites) R.string.history_backups_status_on_this_device
-            else R.string.history_backups_status_on_other_device
+            if (status.thisDeviceWrites) {
+                R.string.history_backups_status_on_this_device
+            } else {
+                R.string.history_backups_status_on_other_device
+            }
         HistoryBackupStatus.LoadFailed -> R.string.history_backups_status_failed
     }
 

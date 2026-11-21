@@ -72,10 +72,16 @@ class HistoryBackupsScreenshotTest {
         )
 
     @Test fun unavailableLight() =
-        capture("history_backups_unavailable_light", HistoryBackupsState(status = HistoryBackupStatus.Unavailable))
+        capture(
+            "history_backups_unavailable_light",
+            HistoryBackupsState(status = HistoryBackupStatus.Unavailable),
+        )
 
     @Test fun wordsLight() =
-        capture("history_backups_words_light", HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()))
+        capture(
+            "history_backups_words_light",
+            HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()),
+        )
 
     @Test fun confirmWrongWordsDark() =
         capture(
@@ -91,16 +97,21 @@ class HistoryBackupsScreenshotTest {
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
     fun wordsLargeRtl() =
-        capture("history_backups_words_rtl_large",
-            HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()), rtl = true)
+        capture(
+            "history_backups_words_rtl_large",
+            HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()),
+            rtl = true,
+        )
 
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
     fun statusLargeRtl() =
         capture(
             "history_backups_on_rtl_large",
-            HistoryBackupsState(status = HistoryBackupStatus.On(thisDeviceWrites = true),
-                running = HistoryBackupAction.TurnOff),
+            HistoryBackupsState(
+                status = HistoryBackupStatus.On(thisDeviceWrites = true),
+                running = HistoryBackupAction.TurnOff,
+            ),
             rtl = true,
         )
 
@@ -125,16 +136,24 @@ class HistoryBackupsScreenshotTest {
         tester.emulateSavedInstanceStateRestore()
         compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.restore"))
         assertFalse(
-            compose.onNodeWithTag("history_backups.restore_words")
-                .fetchSemanticsNode().config.toString().contains("alpha"),
+            compose
+                .onNodeWithTag("history_backups.restore_words")
+                .fetchSemanticsNode()
+                .config
+                .toString()
+                .contains("alpha"),
         )
         val fixture = setup().words.joinToString(" ")
         compose.onNodeWithTag("history_backups.restore_words").performTextInput(fixture)
         button.performClick()
         assertEquals(listOf(fixture), restored)
         assertFalse(
-            compose.onNodeWithTag("history_backups.restore_words")
-                .fetchSemanticsNode().config.toString().contains("orbit"),
+            compose
+                .onNodeWithTag("history_backups.restore_words")
+                .fetchSemanticsNode()
+                .config
+                .toString()
+                .contains("orbit"),
         )
     }
 
@@ -165,10 +184,21 @@ class HistoryBackupsScreenshotTest {
 
     private fun setup() =
         RecoveryWordsSetup(
-            words = listOf(
-                "orbit", "maple", "canyon", "velvet", "harbor", "pencil", "quartz",
-                "meadow", "lantern", "ripple", "saddle", "thunder",
-            ),
+            words =
+                listOf(
+                    "orbit",
+                    "maple",
+                    "canyon",
+                    "velvet",
+                    "harbor",
+                    "pencil",
+                    "quartz",
+                    "meadow",
+                    "lantern",
+                    "ripple",
+                    "saddle",
+                    "thunder",
+                ),
             confirmPositions = listOf(3, 9),
         )
 
