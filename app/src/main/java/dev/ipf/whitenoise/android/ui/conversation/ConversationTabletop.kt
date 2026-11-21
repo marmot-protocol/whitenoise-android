@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -40,7 +39,7 @@ internal fun ConversationBottomBarFrame(
     routeMorph: SettingsCardMorph?,
     content: @Composable () -> Unit,
 ) {
-    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val windowHeight = LocalWindowInfo.current.containerDpSize.height
     val lowerHalf = tabletopLowerHalf(LocalWindowFolds.current.tabletop, windowHeight)
     CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
         Box(Modifier.fillMaxWidth().heightIn(min = lowerHalf), contentAlignment = Alignment.TopCenter) {
