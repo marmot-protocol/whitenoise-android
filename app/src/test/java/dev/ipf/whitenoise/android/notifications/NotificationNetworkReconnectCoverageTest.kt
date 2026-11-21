@@ -330,7 +330,8 @@ class NotificationNetworkReconnectCoverageTest {
                 .substringAfter("private suspend fun WhiteNoiseAppState.enrichPostedNotificationUpdate")
                 .substringBefore("private suspend fun WhiteNoiseAppState.postNotificationContentCorrection")
         val latePost = notificationContent.functionBody("postNotificationLateCorrection")
-        val eligibility = notificationContentSource().resolveSibling("AppStateNotificationPostEligibility.kt").readText()
+        val eligibility =
+            notificationContentSource().resolveSibling("AppStateNotificationPostEligibility.kt").readText()
         val notificationGates =
             eligibility
                 .substringAfter("internal fun WhiteNoiseAppState.isNotificationGenerationPostAllowed")

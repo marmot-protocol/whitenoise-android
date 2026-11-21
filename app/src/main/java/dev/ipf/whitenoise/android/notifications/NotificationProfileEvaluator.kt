@@ -41,8 +41,8 @@ internal fun notificationProfileManualUntilMs(
 }
 
 /**
- * The profile in force at [nowMs] in [zone]. A live manual choice wins; a live pause hides windows already open when it began;
- * otherwise the open scheduled window that started last wins, ties going to the earlier listed profile.
+ * The profile in force at [nowMs] in [zone]. A live manual choice wins. A live pause hides windows already
+ * open when it began. Among eligible windows, the latest start wins, with ties going to the earlier profile.
  */
 internal fun activeNotificationProfile(
     state: NotificationProfilesState,

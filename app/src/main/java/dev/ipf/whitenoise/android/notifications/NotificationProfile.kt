@@ -102,7 +102,7 @@ internal sealed interface NotificationProfileManual {
         val untilMs: Long?,
     ) : NotificationProfileManual
 
-    /** The user turned profiles off inside a scheduled window; windows open at [startedAtMs] stay quiet until they end. */
+    /** Windows open when the user turned profiles off at [startedAtMs] stay quiet until they end. */
     data class Paused(
         val untilMs: Long,
         val startedAtMs: Long? = null,
