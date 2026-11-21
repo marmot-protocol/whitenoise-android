@@ -1,0 +1,16 @@
+{
+  "source": "app/src/main/res/drawable-xxxhdpi/ic_stat_whitenoise.png",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Message notification small icon is the White Noise logo drawn from per-density PNGs so it stays sharp in the status bar",
+        "source": "app/src/main/res/drawable-xxxhdpi/ic_stat_whitenoise.png",
+        "test_ids": [
+          "NTF-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
