@@ -40,11 +40,10 @@ internal fun listBesideConversation(
     folds: WindowFolds,
 ): Boolean = layout.fitsTwoPanes || folds.upright.any { it.separating }
 
-/** The chat list's width and the conversation's span, in pixels from the start edge. */
+/** The chat list's width and where the conversation starts, in pixels from the start edge. */
 internal data class ChatPaneSplit(
     val listWidth: Int,
     val conversationStart: Int,
-    val conversationEnd: Int,
 )
 
 /**
@@ -77,7 +76,7 @@ internal fun Density.chatPaneSplit(
     val minList = ListPaneMinWidth.roundToPx()
     val maxList = maxOf(minList, space - DetailPaneMinWidth.roundToPx())
     val listWidth = preferred.coerceIn(minList, maxList).coerceAtMost(space)
-    return ChatPaneSplit(listWidth, conversationStart = listWidth + dividerWidth, conversationEnd = width)
+    return ChatPaneSplit(listWidth = listWidth, conversationStart = listWidth + dividerWidth)
 }
 
 private fun Density.foldSplit(
@@ -103,7 +102,8 @@ private fun Density.foldSplit(
         span.start in ListPaneMinWidth.roundToPx()..FlatFoldListMaxWidth.roundToPx() &&
             width - conversationStartAfter(span) >= DetailPaneMinWidth.roundToPx()
     }
-    // A half-open hinge beats a flat crease; with several, the narrowest list leaves the most conversation.
+    // The half-open hinge (WindowFolds keeps at most one) beats a flat crease; among creases, the
+    // narrowest list leaves the most conversation.
     val chosen =
         spans.firstOrNull { it.separating }
             ?: spans.firstOrNull { !it.separating && creaseFits(it) }
@@ -111,10 +111,7 @@ private fun Density.foldSplit(
     val listWidth = chosen.start.coerceIn(0, width)
     // A hinge with a physical gap leaves the gap empty; a seamless fold keeps the divider on it.
     val conversationStart = conversationStartAfter(chosen).coerceAtMost(width)
-    // A second half-open hinge, as on a tri-fold folded into a Z, ends the conversation before it.
-    val conversationEnd =
-        spans.firstOrNull { it.separating && it.start > conversationStart }?.start ?: width
-    return ChatPaneSplit(listWidth, conversationStart, conversationEnd)
+    return ChatPaneSplit(listWidth = listWidth, conversationStart = conversationStart)
 }
 
 private data class FoldSpan(

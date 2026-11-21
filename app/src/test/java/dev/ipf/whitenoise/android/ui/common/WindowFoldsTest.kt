@@ -46,6 +46,12 @@ class WindowFoldsTest {
         assertEquals(listOf(325.dp, 650.dp), folds.upright.map { it.start })
     }
 
+    /** With both tri-fold hinges half open no split avoids them, so the regular layout applies. */
+    @Test
+    fun triFoldFoldedIntoAZIsIgnored() {
+        assertEquals(WindowFolds.None, folds(upright(1300, 1300, true), upright(650, 650, true), width = 1950))
+    }
+
     /** A flip phone held half open is in the tabletop posture. */
     @Test
     fun halfOpenFlipPhoneIsTabletop() {
