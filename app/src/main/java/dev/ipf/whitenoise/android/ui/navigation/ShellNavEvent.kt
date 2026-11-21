@@ -1,13 +1,15 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import dev.ipf.whitenoise.android.state.ChatListItem
+
 /**
- * The only way to change the shell's route stack. Each event names a user or system intent. In shadow mode the
- * events are sent from the same call sites that write master's hand-written route fields, see [reduceShellRoute].
+ * The only way to change the shell's route stack, which [ShellNavigator] owns. Each event names a user or system
+ * intent, and [reduceShellRoute] applies it.
  *
- * Not carried by any event, and so not covered by the shadow comparison: the Settings search origin and the
- * header-photo profile origin (screen-local `rememberSaveable` markers in the Settings screen that change where Back
- * goes), the just-created and DM-hint flags, conversation surface state such as Group Details and its sub-screens,
- * and every transition layer (pending open, exiting content, displaced controllers, routing overlays).
+ * Not carried by any event, because they are not route state: the Settings search origin and the header-photo
+ * profile origin (screen-local `rememberSaveable` markers in the Settings screen that change where Back goes), the
+ * just-created and DM-hint flags, conversation surface state such as Group Details itself, and every transition
+ * layer (pending open, exiting content, displaced controllers, routing overlays).
  */
 internal sealed interface ShellNavEvent {
     /** Events that only move within the Settings section, which master ignores while no account owns the shell. */
@@ -28,14 +30,19 @@ internal sealed interface ShellNavEvent {
         val conversation: ShellRoute.Conversation,
     ) : ShellNavEvent
 
-    /** A notification re-lands in the conversation that is already open, with a fresh open context. */
+    /**
+     * A notification re-lands in the conversation that is already open, with a fresh open context and, when the
+     * route read it again, the fresh chat-list [item].
+     */
     data class JumpWithin(
         val open: ConversationOpenContext,
+        val item: ChatListItem? = null,
     ) : ShellNavEvent
 
-    /** A provisional open is upgraded to its authoritative chat-list row, without navigating. */
+    /** A provisional open is upgraded to its authoritative chat-list row [item], without navigating. */
     data class ConversationRowReconciled(
         val groupIdHex: String,
+        val item: ChatListItem? = null,
     ) : ShellNavEvent
 
     /** The conversation saved before process death reopens once its account's local snapshot is authoritative. */
@@ -70,6 +77,15 @@ internal sealed interface ShellNavEvent {
 
     /** A plain pop of the top entry. From the root nothing is popped and the app is left, see [backLeavesApp]. */
     data object Back : ShellNavEvent
+
+    /**
+     * System Back delivered to one pane. On a phone and in the content pane it is a plain [Back]. In the list pane
+     * beside an open conversation it pops the top of the section under that conversation, which stays open, as
+     * Back from a Settings screen beside a conversation does on master.
+     */
+    data class BackFrom(
+        val pane: ShellPane,
+    ) : ShellNavEvent
 
     /** The Activity's saved section and detail come back, as on a fresh holder or after process death. */
     data class SectionRestored(
@@ -108,6 +124,15 @@ internal sealed interface ShellNavEvent {
 
     /** The shell's process state was released: onboarding, a failed phase or an isolated test holder. */
     data object ShellReleased : ShellNavEvent
+}
+
+/** The two panes a Back can be delivered to. On a phone everything is in [Content] except the chat list itself. */
+internal enum class ShellPane {
+    /** The chat list and the Settings section that replaces it. */
+    List,
+
+    /** The conversation and every screen opened above it. */
+    Content,
 }
 
 /** The event's stable name for shadow records and debug logs, with no field values. */

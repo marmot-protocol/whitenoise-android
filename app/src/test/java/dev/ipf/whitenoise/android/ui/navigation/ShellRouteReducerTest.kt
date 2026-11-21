@@ -233,42 +233,31 @@ class ShellRouteReducerTest {
         assertEquals(CHATS_ROOT, reduce(untraced, ShellNavEvent.OwnerReplaced(ACCOUNT_A, RUNTIME, ACCOUNT_B, RUNTIME)))
     }
 
-    /** The legacy projection puts the selected conversation above the section and ignores a detail under Chats. */
+    /** Back from the list pane beside a conversation pops the section under it and keeps the conversation open. */
     @Test
-    fun theLegacyProjectionFollowsTheCanonicalOrder() {
-        val open = ConversationOpenContext(notificationOpenRequestId = 4L)
+    fun listPaneBackPopsTheSectionUnderTheConversation() {
+        val stack = CHATS_ROOT + settingsChain(SettingsDetail.Developer) + ShellRoute.Diagnostics + conversationA
+        val developer = reduce(stack, ShellNavEvent.BackFrom(ShellPane.List))
+        assertEquals(CHATS_ROOT + settingsChain(SettingsDetail.Developer) + conversationA, developer)
         assertEquals(
-            CHATS_ROOT + settingsChain(SettingsDetail.Relays) + ShellRoute.Conversation(ACCOUNT_A, GROUP_ONE, open),
-            legacyShellRoute(MainSection.Settings.name, SettingsDetail.Relays.name, GROUP_ONE, open, ACCOUNT_A),
+            CHATS_ROOT + settingsChain(SettingsDetail.HelpSupport) + conversationA,
+            reduce(developer, ShellNavEvent.BackFrom(ShellPane.List)),
         )
-        assertEquals(
-            CHATS_ROOT,
-            legacyShellRoute(MainSection.Chats.name, SettingsDetail.Relays.name, null, open, ACCOUNT_A),
-        )
-        val pinned = ConversationOpenContext(pinnedAccountRef = ACCOUNT_B)
-        assertEquals(
-            listOf(ShellRoute.Chats, ShellRoute.Conversation(ACCOUNT_B, GROUP_ONE, pinned)),
-            legacyShellRoute(MainSection.Chats.name, null, GROUP_ONE, pinned, ACCOUNT_A),
-        )
+        val chatsBeside = listOf(ShellRoute.Chats, conversationA)
+        assertEquals(chatsBeside, reduce(chatsBeside, ShellNavEvent.BackFrom(ShellPane.List)))
+        assertEquals(CHATS_ROOT, reduce(chatsBeside, ShellNavEvent.BackFrom(ShellPane.Content)))
     }
 
-    /** The shadow log counts every comparison and records a disagreement with both whole values. */
+    /** Re-landing or reconciling the open conversation keeps its item unless the event carries a fresh one. */
     @Test
-    fun theShadowLogRecordsDisagreements() {
-        ShellShadowLog.reset()
-        assertTrue(ShellShadowLog.compare("same", CHATS_ROOT, CHATS_ROOT))
-        val differentContext = conversationA.copy(open = ConversationOpenContext(notificationOpenRequestId = 2L))
-        assertFalse(
-            ShellShadowLog.compare(
-                "context",
-                listOf(ShellRoute.Chats, conversationA),
-                listOf(ShellRoute.Chats, differentContext),
-            ),
+    fun theOpenConversationKeepsItsRowUntilAFreshOneArrives() {
+        val withoutItem = listOf(ShellRoute.Chats, conversationA)
+        val fresh = ConversationOpenContext(notificationOpenRequestId = 9L)
+        assertEquals(
+            listOf(ShellRoute.Chats, conversationA.copy(open = fresh)),
+            reduce(withoutItem, ShellNavEvent.JumpWithin(fresh)),
         )
-        assertEquals(2L, ShellShadowLog.comparisons)
-        assertEquals(1L, ShellShadowLog.mismatchCount)
-        assertEquals("context", ShellShadowLog.mismatches.single().origin)
-        ShellShadowLog.reset()
+        assertEquals(withoutItem, reduce(withoutItem, ShellNavEvent.ConversationRowReconciled(GROUP_ONE)))
     }
 
     /** Applies one event, so each test reads as a sequence of intents. */

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.ui.settings.settingsDetailParent
 
 /**
@@ -17,12 +18,14 @@ internal sealed interface ShellRoute {
 
     /**
      * The open conversation. [accountRef] is the account it is bound to, the pinned account of a notification early
-     * open or else the shell's owner account, so the stack is never keyed on the active account.
+     * open or else the shell's owner account, so the stack is never keyed on the active account. [item] is the live
+     * chat-list row the shell renders; it is process-scoped like the stack itself and never reaches saved state.
      */
     data class Conversation(
         val accountRef: String,
         val groupIdHex: String,
         val open: ConversationOpenContext,
+        val item: ChatListItem? = null,
     ) : ShellRoute
 
     /** Settings home when [detail] is null, otherwise one Settings screen. */
@@ -69,6 +72,27 @@ internal fun conversationRoot(stack: List<ShellRoute>): ShellRoute.Conversation?
     return conversations.firstOrNull()
 }
 
+/** The root and the section below the conversation, everything [stack] keeps when its conversation closes. */
+internal fun sectionOf(stack: List<ShellRoute>): List<ShellRoute> = stack.takeWhile { it !is ShellRoute.Conversation }
+
+/** The conversation root and every entry above it, empty when no conversation is open. */
+internal fun conversationSegment(stack: List<ShellRoute>): List<ShellRoute> {
+    val root = stack.indexOfFirst { it is ShellRoute.Conversation }
+    return if (root < 0) emptyList() else stack.drop(root)
+}
+
+/** The section and Settings detail that [stack] stands for, as master's saved section fields hold them. */
+internal fun sectionProjection(stack: List<ShellRoute>): Pair<MainSection, SettingsDetail?> {
+    val section = sectionOf(stack).drop(1)
+    val main =
+        when {
+            section.isEmpty() -> MainSection.Chats
+            section.last() == ShellRoute.Diagnostics -> MainSection.Diagnostics
+            else -> MainSection.Settings
+        }
+    return main to section.filterIsInstance<ShellRoute.Settings>().lastOrNull()?.detail
+}
+
 /** Whether a Back from [stack] has nothing left to pop and so leaves the app, as Back from the chat list does. */
 internal fun backLeavesApp(stack: List<ShellRoute>): Boolean = stack.size <= 1
 
@@ -80,23 +104,3 @@ internal fun mainSectionOf(name: String?): MainSection {
 
 /** Parses a saved Settings detail name the way [MainShellSectionState] validates it. */
 internal fun settingsDetailOf(name: String?): SettingsDetail? = SettingsDetail.entries.firstOrNull { it.name == name }
-
-/**
- * Projects master's hand-written route fields into the comparable stack value: the section and detail (the detail is
- * ignored while the section is Chats, where master never renders it), then the selected conversation with its whole
- * open context. A conversation's account is implicit in master, its pinned account or else [ownerAccountRef].
- */
-internal fun legacyShellRoute(
-    sectionName: String,
-    settingsDetailName: String?,
-    selectedGroupIdHex: String?,
-    openContext: ConversationOpenContext,
-    ownerAccountRef: String?,
-): List<ShellRoute> {
-    val section = sectionEntries(mainSectionOf(sectionName), settingsDetailOf(settingsDetailName))
-    val conversation =
-        selectedGroupIdHex?.let {
-            ShellRoute.Conversation(openContext.pinnedAccountRef ?: ownerAccountRef.orEmpty(), it, openContext)
-        }
-    return CHATS_ROOT + section + listOfNotNull(conversation)
-}

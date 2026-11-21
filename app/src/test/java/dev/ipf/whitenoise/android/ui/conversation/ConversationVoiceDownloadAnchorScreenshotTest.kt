@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachme
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
 import dev.ipf.whitenoise.android.ui.navigation.MainShellProcessState
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
+import dev.ipf.whitenoise.android.ui.navigation.openForTest
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CancellationException
@@ -236,7 +237,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
         try {
             awaitConversationCondition { fixture.controller.timeline.size == fixture.records.size }
             val firstHolder = MainShellStateHolder(appState, savedStateHandle, processState)
-            firstHolder.selectedChat.value = fixture.chat
+            firstHolder.openForTest(fixture.chat)
             firstHolder.persistConversationRoute(fixture.controller.boundAccountRef)
             assertTrue(firstHolder.hasSavedConversationRoute)
             assertEquals(

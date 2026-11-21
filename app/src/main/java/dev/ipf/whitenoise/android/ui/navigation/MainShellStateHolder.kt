@@ -33,7 +33,12 @@ internal class MainShellStateHolder(
     private val processState: MainShellProcessState = MainShellProcessState(appState),
 ) : ViewModel() {
     private val composerExpansionStateSubscription: AutoCloseable
-    val sectionState = MainShellSectionState(savedStateHandle)
+
+    /** The process-retained single route owner. */
+    val shellNavigator = processState.shellNavigator
+
+    /** This Activity's saved copy of the route's section, written from [shellNavigator]. */
+    val sectionState = MainShellSectionState(savedStateHandle, shellNavigator)
 
     init {
         appState.composerExpansionStateRetention.restoreIfEmpty(
@@ -94,15 +99,9 @@ internal class MainShellStateHolder(
     val conversationScrollSnapshots = processState.conversationScrollSnapshots
     val notificationFirstFrame = processState.notificationFirstFrame
 
-    /** The process-retained route owner running in shadow mode beside the fields above. */
-    val shellNavigator = processState.shellNavigator
-
     /** The account the route owner is bound to, which an unpinned conversation belongs to. */
     val routeOwnerAccountRef: String?
         get() = processState.routeOwnerAccountRef
-
-    // This holder's saved section reaches the process-retained navigator once, at its first owner bind.
-    var shadowSectionRestored = false
 
     private var savedAccountRef: String? = savedStateHandle[SAVED_ACCOUNT_REF_KEY]
     private var savedGroupIdHex: String? = savedStateHandle[SAVED_GROUP_ID_KEY]
@@ -202,10 +201,10 @@ internal class MainShellStateHolder(
         runtimeGeneration: Int,
     ): ChatsController {
         val revision = shellNavigator.revision
-        sectionState.bind(accountRef, runtimeGeneration)
+        // The owner rebinds first: its boundary event clears the stack before this holder restores its section.
         val controller = processState.chatsController(accountRef, runtimeGeneration)
-        restoreShadowSectionOnce()
-        if (shellNavigator.revision != revision) checkShellShadow(shellNavigator.lastEventName)
+        sectionState.bind(accountRef, runtimeGeneration)
+        if (shellNavigator.revision != revision) auditShellRoute(shellNavigator.lastEventName)
         return controller
     }
 
@@ -225,17 +224,18 @@ internal class MainShellStateHolder(
         if (savedAccountRef == null || savedAccountRef != activeAccountRef) {
             clearSavedConversationRoute()
         } else {
-            selectedChat.value =
+            val restored =
                 (controller.items + controller.archivedItems)
                     .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-            selectedChatOpenContext.value = ConversationOpenContext()
             selectedChatJustCreated.value = false
             selectedChatOpenedAsDmHint.value = false
             savedRouteResolutionPending = false
-            if (selectedChat.value == null) clearSavedConversationRoute()
-            selectedChat.value?.let { restored ->
-                val route = conversationRoute(restored, ConversationOpenContext())
-                dispatchShellNav(ShellNavEvent.RestoreSavedConversation(route))
+            if (restored == null) {
+                clearSavedConversationRoute()
+            } else {
+                dispatchShellNav(
+                    ShellNavEvent.RestoreSavedConversation(conversationRoute(restored, ConversationOpenContext())),
+                )
             }
         }
     }
@@ -305,7 +305,7 @@ internal class MainShellStateHolder(
             phase == AppPhase.Onboarding || phase is AppPhase.Failed -> {
                 sectionState.clear()
                 processState.release()
-                checkShellShadow(shellNavigator.lastEventName)
+                auditShellRoute(shellNavigator.lastEventName)
             }
         }
         return firstUsefulFrameReady(
@@ -402,7 +402,7 @@ internal class MainShellStateHolder(
         composerExpansionStateSubscription.close()
         sectionState.clear()
         processState.release()
-        checkShellShadow(shellNavigator.lastEventName)
+        auditShellRoute(shellNavigator.lastEventName)
     }
 
     private fun clearSavedConversationRoute() {

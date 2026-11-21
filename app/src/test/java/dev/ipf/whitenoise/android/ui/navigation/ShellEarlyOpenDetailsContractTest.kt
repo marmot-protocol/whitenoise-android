@@ -51,9 +51,9 @@ class ShellEarlyOpenDetailsContractTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    /** Asserts every route audit this test drove found a well-formed stack and a matching saved section. */
     @get:Rule
-    val shadow = ShellShadowRule()
+    val routeAudit = ShellRouteAuditRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val gate = AccountRouteOrderGate(preloadFinishesFirst = true)

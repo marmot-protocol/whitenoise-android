@@ -16,8 +16,7 @@ class MainShellSectionStateTest {
         val savedState = SavedStateHandle()
         val first = MainShellSectionState(savedState)
         first.bind("personal", 4)
-        first.sectionName = MainSection.Settings.name
-        first.settingsDetailName = SettingsDetail.DevicePrivacy.name
+        first.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
 
         val restored =
             MainShellSectionState(SavedStateHandle(savedState.keys().associateWith { savedState.get<Any?>(it) }))
@@ -70,8 +69,7 @@ class MainShellSectionStateTest {
         val savedState = SavedStateHandle()
         val first = MainShellSectionState(savedState)
         first.bind("personal", 4)
-        first.sectionName = MainSection.Settings.name
-        first.settingsDetailName = SettingsDetail.DevicePrivacy.name
+        first.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
 
         val restored =
             MainShellSectionState(SavedStateHandle(savedState.keys().associateWith { savedState.get<Any?>(it) }))
@@ -83,8 +81,7 @@ class MainShellSectionStateTest {
     fun signedOutScopeCannotSaveOrRecoverAProtectedDestination() {
         val route = privacyDestination()
         route.bind(null, 4)
-        route.sectionName = MainSection.Settings.name
-        route.settingsDetailName = SettingsDetail.AccountKeys.name
+        route.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.AccountKeys))
         assertChats(route)
         route.bind("personal", 4)
         assertChats(route)
@@ -95,8 +92,7 @@ class MainShellSectionStateTest {
         val savedState = SavedStateHandle()
         val route = MainShellSectionState(savedState)
         route.bind("personal", 4)
-        route.sectionName = MainSection.Settings.name
-        route.settingsDetailName = SettingsDetail.AccountKeys.name
+        route.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.AccountKeys))
         route.clear()
 
         val restored = MainShellSectionState(savedState)
@@ -139,8 +135,7 @@ class MainShellSectionStateTest {
     private fun privacyDestination(): MainShellSectionState =
         MainShellSectionState(SavedStateHandle()).apply {
             bind("personal", 4)
-            sectionName = MainSection.Settings.name
-            settingsDetailName = SettingsDetail.DevicePrivacy.name
+            dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
         }
 
     private fun assertChats(route: MainShellSectionState) {

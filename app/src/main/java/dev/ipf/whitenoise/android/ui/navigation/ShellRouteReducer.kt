@@ -1,10 +1,11 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 /**
- * The pure route reducer of the future single route owner. It never reads the active account, a clock or any other
- * state: everything it needs is in [stack] and [event], so the same sequence always gives the same stack.
+ * The pure route reducer of the single route owner. It never reads the active account, a clock or any other state:
+ * everything it needs is in [stack] and [event], so the same sequence always gives the same stack.
  *
- * The result keeps the canonical order described on [ShellRoute]: the root, the Settings section, the conversation.
+ * The result keeps the canonical order described on [ShellRoute]: the root, the Settings section, the conversation
+ * and the screens opened above it.
  */
 internal fun reduceShellRoute(
     stack: List<ShellRoute>,
@@ -27,18 +28,37 @@ private fun reduceConversationEvent(
     event: ShellNavEvent,
 ): List<ShellRoute> =
     when (event) {
-        is ShellNavEvent.OpenConversation -> sectionOf(stack) + event.conversation
-        is ShellNavEvent.RestoreSavedConversation -> sectionOf(stack) + event.conversation
-        is ShellNavEvent.JumpToConversation -> listOf(ShellRoute.Chats, event.conversation)
-        is ShellNavEvent.CommitNotificationRoute -> listOf(ShellRoute.Chats, event.conversation)
+        is ShellNavEvent.OpenConversation -> sectionOf(stack) + opened(stack, event.conversation)
+        is ShellNavEvent.RestoreSavedConversation -> sectionOf(stack) + opened(stack, event.conversation)
+        is ShellNavEvent.JumpToConversation -> CHATS_ROOT + opened(stack, event.conversation)
+        is ShellNavEvent.CommitNotificationRoute -> CHATS_ROOT + opened(stack, event.conversation)
         is ShellNavEvent.JumpWithin ->
-            conversationRoot(stack)?.let { listOf(ShellRoute.Chats, it.copy(open = event.open)) } ?: stack
+            conversationRoot(stack)?.let { root ->
+                CHATS_ROOT + opened(stack, root.copy(open = event.open, item = event.item ?: root.item))
+            } ?: stack
         is ShellNavEvent.ConversationRowReconciled ->
-            conversationRoot(stack)?.let { sectionOf(stack) + it.copy(groupIdHex = event.groupIdHex) } ?: stack
+            conversationRoot(stack)?.let { root ->
+                val upgraded = root.copy(groupIdHex = event.groupIdHex, item = event.item ?: root.item)
+                sectionOf(stack) + upgraded + conversationSegment(stack).drop(1)
+            } ?: stack
         else -> reduceStackEvent(stack, event)
     }
 
-/** Applies a close, a return to the list, a plain Back or a restored section. */
+/**
+ * [conversation] and the screens it keeps above it: reselecting the conversation that is already open keeps them,
+ * as master keeps its chat-details screens while the same chat stays selected, and any other conversation starts
+ * with none.
+ */
+private fun opened(
+    stack: List<ShellRoute>,
+    conversation: ShellRoute.Conversation,
+): List<ShellRoute> {
+    val root = conversationRoot(stack)
+    val same = root != null && root.accountRef == conversation.accountRef && root.groupIdHex == conversation.groupIdHex
+    return listOf(conversation) + if (same) conversationSegment(stack).drop(1) else emptyList()
+}
+
+/** Applies a close, a return to the list, a Back or a restored section. */
 private fun reduceStackEvent(
     stack: List<ShellRoute>,
     event: ShellNavEvent,
@@ -46,11 +66,29 @@ private fun reduceStackEvent(
     when (event) {
         ShellNavEvent.CloseConversation -> sectionOf(stack)
         ShellNavEvent.ReturnToChats -> CHATS_ROOT
-        ShellNavEvent.Back -> if (backLeavesApp(stack)) stack else stack.dropLast(1)
+        ShellNavEvent.Back -> popTop(stack)
+        is ShellNavEvent.BackFrom -> reduceBackFrom(stack, event.pane)
         is ShellNavEvent.SectionRestored ->
-            CHATS_ROOT + sectionEntries(event.section, event.detail) + listOfNotNull(conversationRoot(stack))
+            CHATS_ROOT + sectionEntries(event.section, event.detail) + conversationSegment(stack)
         else -> stack
     }
+
+/** Drops the top entry, or nothing from the root, which leaves the app instead. */
+private fun popTop(stack: List<ShellRoute>): List<ShellRoute> = if (backLeavesApp(stack)) stack else stack.dropLast(1)
+
+/**
+ * Back in [pane]. Only the list pane beside an open conversation differs from a plain pop: it pops the section's
+ * top entry and keeps the conversation, and with no section open it has nothing of its own to pop.
+ */
+private fun reduceBackFrom(
+    stack: List<ShellRoute>,
+    pane: ShellPane,
+): List<ShellRoute> {
+    val conversation = conversationSegment(stack)
+    if (pane == ShellPane.Content || conversation.isEmpty()) return popTop(stack)
+    val section = sectionOf(stack)
+    return if (backLeavesApp(section)) stack else section.dropLast(1) + conversation
+}
 
 /** Applies an event that only moves within the Settings section, keeping any conversation above it. */
 private fun reduceSectionEvent(
@@ -58,7 +96,6 @@ private fun reduceSectionEvent(
     event: ShellNavEvent.SectionOnly,
 ): List<ShellRoute> {
     val section = sectionOf(stack).drop(1)
-    val conversation = listOfNotNull(conversationRoot(stack))
     val nextSection =
         when (event) {
             is ShellNavEvent.OpenSettings -> settingsChain(event.detail)
@@ -74,12 +111,13 @@ private fun reduceSectionEvent(
                 section.filterIsInstance<ShellRoute.Settings>().ifEmpty { settingsChain(null) } +
                     ShellRoute.Diagnostics
         }
-    return CHATS_ROOT + nextSection + conversation
+    return CHATS_ROOT + nextSection + conversationSegment(stack)
 }
 
 /**
  * Applies an account, owner or process boundary. Each clears synchronously to the chat list, except the two exact
- * notification routes master carries across a boundary, and then only the conversation root itself survives.
+ * notification routes master carries across a boundary, and then only the conversation root itself survives: every
+ * screen opened above it is dropped.
  */
 private fun reduceBoundaryEvent(
     stack: List<ShellRoute>,
@@ -125,6 +163,3 @@ private fun ownerReplacementKeepsRoute(
         event.previousRuntimeGeneration == event.runtimeGeneration &&
         root.open.pinnedAccountRef == event.accountRef &&
         root.open.notificationRouteTraceRequestId != null
-
-/** The root and the Settings section of [stack], everything below the conversation. */
-private fun sectionOf(stack: List<ShellRoute>): List<ShellRoute> = stack.filterNot { it is ShellRoute.Conversation }

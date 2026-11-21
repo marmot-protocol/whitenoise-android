@@ -29,9 +29,9 @@ class ShellAppLockPrivacyContractTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
-    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    /** Asserts every route audit this test drove found a well-formed stack and a matching saved section. */
     @get:Rule
-    val shadow = ShellShadowRule()
+    val routeAudit = ShellRouteAuditRule()
 
     private val app = MountedContractApp(composeRule)
 

@@ -74,8 +74,7 @@ class WarmResumeStateHolderTest {
         val processState = MainShellProcessState(state)
         val holder = MainShellStateHolder(state, SavedStateHandle(), processState)
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
-        holder.sectionState.sectionName = MainSection.Settings.name
-        holder.sectionState.settingsDetailName = SettingsDetail.DevicePrivacy.name
+        holder.dispatchShellNav(ShellNavEvent.OpenSettings(SettingsDetail.DevicePrivacy))
         val snapshotController =
             ChatsController(
                 appState = state,
@@ -83,7 +82,7 @@ class WarmResumeStateHolderTest {
                 initialLocalSnapshot = localSnapshot(),
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
-        holder.selectedChat.value = snapshotController.items.single()
+        holder.openForTest(snapshotController.items.single())
 
         val onboardingFrameReady =
             holder.prepareFirstUsefulFrame(
@@ -124,8 +123,7 @@ class WarmResumeStateHolderTest {
         val holder = MainShellStateHolder(appState(), SavedStateHandle())
         try {
             holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
-            holder.sectionState.sectionName = MainSection.Settings.name
-            holder.sectionState.settingsDetailName = SettingsDetail.AccountKeys.name
+            holder.dispatchShellNav(ShellNavEvent.OpenSettings(SettingsDetail.AccountKeys))
             holder.prepareFirstUsefulFrame(
                 phase = AppPhase.Ready,
                 activeAccountRef = "second-account",
@@ -161,7 +159,7 @@ class WarmResumeStateHolderTest {
                 initialLocalSnapshot = localSnapshot(),
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
-        firstActivityHolder.selectedChat.value = snapshotController.items.single()
+        firstActivityHolder.openForTest(snapshotController.items.single())
 
         val freshActivityHolder = MainShellStateHolder(state, SavedStateHandle(), processState)
 
@@ -307,7 +305,7 @@ class WarmResumeStateHolderTest {
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
         val selected = snapshotController.items.single()
-        holder.selectedChat.value = selected
+        holder.openForTest(selected)
         val retainedConversation =
             holder.conversationController(
                 chatId = GROUP_ID,
@@ -349,12 +347,13 @@ class WarmResumeStateHolderTest {
                 initialLocalSnapshot = localSnapshot(),
                 memberSnapshotLoader = { _, _ -> emptyList() },
             )
-        holder.selectedChat.value = snapshotController.items.single()
-        holder.selectedChatOpenContext.value =
+        holder.openForTest(
+            snapshotController.items.single(),
             ConversationOpenContext(
                 notificationRouteTraceRequestId = 41L,
                 pinnedAccountRef = ACCOUNT_REF,
-            )
+            ),
+        )
 
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 5)
 
@@ -384,8 +383,7 @@ class WarmResumeStateHolderTest {
                 notificationRouteTraceRequestId = 23L,
                 pinnedAccountRef = SECOND_ACCOUNT_REF,
             )
-        holder.selectedChat.value = selected
-        holder.selectedChatOpenContext.value = routeContext
+        holder.openForTest(selected, routeContext)
         holder.selectedChatJustCreated.value = true
         holder.selectedChatOpenedAsDmHint.value = true
         holder.conversationScrollSnapshots[conversationScrollKey(SECOND_ACCOUNT_REF, GROUP_ID)] =
@@ -433,8 +431,10 @@ class WarmResumeStateHolderTest {
         val holder = MainShellStateHolder(state, SavedStateHandle())
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
         val snapshotController = snapshotController(state)
-        holder.selectedChat.value = snapshotController.items.single()
-        holder.selectedChatOpenContext.value = ConversationOpenContext(pinnedAccountRef = SECOND_ACCOUNT_REF)
+        holder.openForTest(
+            snapshotController.items.single(),
+            ConversationOpenContext(pinnedAccountRef = SECOND_ACCOUNT_REF),
+        )
         holder.chatsController(SECOND_ACCOUNT_REF, runtimeGeneration = 4)
 
         assertNull(holder.selectedChat.value)
@@ -450,12 +450,13 @@ class WarmResumeStateHolderTest {
         val holder = MainShellStateHolder(state, SavedStateHandle())
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
         val snapshotController = snapshotController(state)
-        holder.selectedChat.value = snapshotController.items.single()
-        holder.selectedChatOpenContext.value =
+        holder.openForTest(
+            snapshotController.items.single(),
             ConversationOpenContext(
                 notificationRouteTraceRequestId = 23L,
                 pinnedAccountRef = "another-account",
-            )
+            ),
+        )
 
         holder.chatsController(SECOND_ACCOUNT_REF, runtimeGeneration = 4)
 
