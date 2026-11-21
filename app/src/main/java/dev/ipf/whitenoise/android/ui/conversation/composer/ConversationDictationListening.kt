@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -15,7 +16,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,7 +32,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import kotlin.math.PI
 import kotlin.math.sin
@@ -36,11 +49,82 @@ private const val DICTATION_LISTENING_BAR_HEIGHT_RANGE_DP = 8f
 private const val DICTATION_PULSE_FADE_MILLIS = 120
 
 /**
+ * The one place that names the continue command's glyph, so it can be swapped without touching
+ * the layout that hosts it.
+ */
+@DrawableRes
+internal val DICTATION_CONTINUE_ICON = R.drawable.ic_mic
+internal const val DICTATION_CONTINUE_TAG = "dictation-continue"
+internal const val DICTATION_PREVIOUS_PENDING_TAG = "dictation-previous-pending"
+
+/**
  * The listening pulse takes and gives back its width as capture starts and stops, in step with the
- * compact actions' own width so the capsule closes the gap instead of keeping blank space.
+ * compact actions' own width so the capsule closes the gap instead of keeping blank space. While a
+ * follow-up records and the previous dictation is still being transcribed, a thin ring around the
+ * pulse says so without any text.
  */
 @Composable
-internal fun ConversationDictationListeningSlot(visible: Boolean) {
+internal fun ConversationDictationListeningSlot(
+    visible: Boolean,
+    previousPending: Boolean = false,
+) {
+    DictationLeadingSlot(visible) {
+        Box(contentAlignment = Alignment.Center) {
+            ConversationDictationListeningIndicator()
+            if (previousPending) {
+                val pendingLabel = stringResource(R.string.dictation_processing)
+                CircularProgressIndicator(
+                    modifier =
+                        Modifier
+                            .size(DICTATION_LISTENING_PULSE_WIDTH)
+                            .testTag(DICTATION_PREVIOUS_PENDING_TAG)
+                            .semantics { contentDescription = pendingLabel },
+                    strokeWidth = 1.5.dp,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Starts the next recording from the slot the pulse gave back, while the previous dictation is
+ * still being transcribed. It is icon-only; its label and long-press explanation carry the words.
+ */
+@Composable
+internal fun ConversationDictationContinueSlot(
+    visible: Boolean,
+    onContinue: () -> Unit,
+) {
+    DictationLeadingSlot(visible) {
+        IconButton(
+            onClick = onContinue,
+            modifier =
+                Modifier
+                    .width(DICTATION_LISTENING_PULSE_WIDTH)
+                    .height(ComposerShortcutTarget)
+                    .testTag(DICTATION_CONTINUE_TAG)
+                    .explainOnLongPress(
+                        composerExplanation(
+                            R.string.dictation_continue,
+                            R.string.explanation_conversation_dictation_continue,
+                        ),
+                    ),
+        ) {
+            Icon(
+                painter = painterResource(DICTATION_CONTINUE_ICON),
+                contentDescription = stringResource(R.string.dictation_continue),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+/** Both occupants of the slot left of Cancel resize it on the compact actions' clock. */
+@Composable
+private fun DictationLeadingSlot(
+    visible: Boolean,
+    content: @Composable () -> Unit,
+) {
     val motion = rememberSystemAnimationsEnabled()
     AnimatedVisibility(
         visible = visible,
@@ -57,7 +141,7 @@ internal fun ConversationDictationListeningSlot(visible: Boolean) {
                     shrinkTowards = Alignment.Start,
                 ),
     ) {
-        ConversationDictationListeningIndicator()
+        content()
     }
 }
 

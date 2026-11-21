@@ -25,6 +25,7 @@ internal fun ConversationDictationController.acknowledgeCaptureClosed(
     if (recoveryHandedToComposer) (state as? ConversationDictationState.Failed)?.let(this::handRecoveryToComposer)
     releaseExpiredRecoveryProtection()
     reattachForegroundRecoveryAfterClosure()
+    armFollowUpCapture()
 }
 
 /** Retries only the captured deferred draft; competing edits remain intact. */

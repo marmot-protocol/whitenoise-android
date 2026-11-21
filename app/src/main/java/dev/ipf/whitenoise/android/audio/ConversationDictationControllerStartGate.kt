@@ -12,6 +12,10 @@ internal fun ConversationDictationController.rejectsExistingSession(
     groupIdHex: String,
     mode: ConversationDictationMode,
 ): Boolean {
+    if (followUp.pending != null) {
+        conversationDictationDiagnostic("event=request_start accepted=false reason=follow_up_pending")
+        return true
+    }
     if (state is ConversationDictationState.ProviderActivityActive) {
         conversationDictationDiagnostic("event=request_start accepted=false reason=provider_activity_active")
         return true

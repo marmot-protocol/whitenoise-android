@@ -28,6 +28,7 @@ internal fun ConversationDictationController.stopWithDeliveryMode(
     deliveryMode: ConversationDictationDeliveryMode?,
     automatic: Boolean = false,
 ) {
+    if (followUpTakesCompletion(deliveryMode, automatic)) return
     expireRetainedRecoveryIfDue()
     val captureGeneration = captureClosureGeneration
     val current = state
