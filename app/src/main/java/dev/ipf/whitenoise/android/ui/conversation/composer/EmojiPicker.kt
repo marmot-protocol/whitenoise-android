@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
@@ -22,6 +24,9 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
+import dev.ipf.whitenoise.android.ui.common.EmojiSheetFieldAnchor
+import dev.ipf.whitenoise.android.ui.common.EmojiSheetFieldGap
+import dev.ipf.whitenoise.android.ui.common.emojiSheetHeightBelowField
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -46,6 +51,8 @@ internal val ComposerEmojiPaneHorizontalPadding = 16.dp
 /**
  * Full-height emoji sheet: search field on top, adaptive grid, category bar along the bottom.
  * [onConfigure] adds the settings action that leads to the quick-reaction configuration sheet.
+ * A sheet opened from a text field passes its [fieldAnchor]: the sheet then takes all the height below the
+ * field and never covers it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +64,7 @@ internal fun EmojiPickerSheet(
     onEmojiUsed: (String) -> Unit = {},
     onConfigure: (() -> Unit)? = null,
     closeOnPick: Boolean = true,
+    fieldAnchor: EmojiSheetFieldAnchor? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
@@ -65,6 +73,9 @@ internal fun EmojiPickerSheet(
         sheetState = sheetState,
         containerColor = amoledSheetContainerColor(),
     ) {
+        // The sheet's own window view: an anchored field is placed by screen position, wherever its window is.
+        val sheetView = LocalView.current
+        val fieldGap = with(LocalDensity.current) { EmojiSheetFieldGap.roundToPx() }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             EmojiPickerContent(
                 onEmojiPicked = { if (closeOnPick) terminal.close(it, onEmojiPicked) else onEmojiPicked(it) },
@@ -75,8 +86,18 @@ internal fun EmojiPickerSheet(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .fillMaxHeight(EMOJI_PICKER_EXPANDED_HEIGHT_FRACTION)
-                        .widthIn(max = EmojiPickerMaximumWidth)
+                        .then(
+                            if (fieldAnchor == null) {
+                                Modifier.fillMaxHeight(EMOJI_PICKER_EXPANDED_HEIGHT_FRACTION)
+                            } else {
+                                Modifier.emojiSheetHeightBelowField(
+                                    fieldAnchor,
+                                    sheetView,
+                                    fieldGap,
+                                    EMOJI_PICKER_EXPANDED_HEIGHT_FRACTION,
+                                )
+                            },
+                        ).widthIn(max = EmojiPickerMaximumWidth)
                         .imePadding()
                         .testTag(EMOJI_PICKER_TEST_TAG),
             )

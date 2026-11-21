@@ -97,12 +97,14 @@ internal fun WhiteNoiseTextField(
         textStyle.color.takeOrElse {
             colors.textColorFor(enabled = enabled, isError = isError, focused = focused)
         }
+    val emojiAnchor = rememberEmojiSheetFieldAnchor()
 
     CompositionLocalProvider(LocalTextSelectionColors provides colors.textSelectionColors) {
         BasicTextField(
             state = state,
             modifier =
                 modifier
+                    .then(if (emojiAction) Modifier.emojiSheetFieldAnchor(emojiAnchor) else Modifier)
                     .textFieldErrorSemantics(errorMessage)
                     .defaultMinSize(
                         minWidth = OutlinedTextFieldDefaults.MinWidth,
@@ -136,6 +138,7 @@ internal fun WhiteNoiseTextField(
                                         androidx.compose.ui.text.input
                                             .TextFieldValue(state.text.toString(), state.selection),
                                         enabled && !readOnly,
+                                        anchor = emojiAnchor,
                                     ) { value -> insertTextEntryEmoji(state, value, inputTransformation) }
                                 }
                             }

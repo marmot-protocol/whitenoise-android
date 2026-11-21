@@ -36,12 +36,13 @@ internal fun ProseTextField(
     if (field.text != value) {
         field = TextFieldValue(value, field.selection)
     }
+    val emojiAnchor = rememberEmojiSheetFieldAnchor()
     val change: (TextFieldValue) -> Unit = { updated ->
         field = updated
         onValueChange(updated.text)
     }
     val emoji: @Composable () -> Unit = {
-        TextEntryEmojiFieldAction(field, enabled, emojiOwner to onValueChange) { updated ->
+        TextEntryEmojiFieldAction(field, enabled, emojiOwner to onValueChange, emojiAnchor) { updated ->
             if (emojiMaxLength != null && updated.text.length > emojiMaxLength) {
                 false
             } else {
@@ -54,7 +55,7 @@ internal fun ProseTextField(
         TextField(
             field,
             change,
-            modifier,
+            modifier.emojiSheetFieldAnchor(emojiAnchor),
             enabled = enabled,
             label = label,
             placeholder = placeholder,
@@ -69,7 +70,7 @@ internal fun ProseTextField(
         OutlinedTextField(
             field,
             change,
-            modifier,
+            modifier.emojiSheetFieldAnchor(emojiAnchor),
             enabled = enabled,
             label = label,
             placeholder = placeholder,

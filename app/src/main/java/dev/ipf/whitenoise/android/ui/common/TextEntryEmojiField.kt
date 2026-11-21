@@ -16,13 +16,17 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 
-/** Field-local picker ownership. Disposed, disabled or externally changed editors cannot accept a late pick. */
+/**
+ * Field-local picker ownership. Disposed, disabled or externally changed editors cannot accept a late pick.
+ * [anchor] is the field this action sits in; the picker sheet then opens underneath the field.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun TextEntryEmojiFieldAction(
     value: TextFieldValue,
     enabled: Boolean,
     owner: Any? = null,
+    anchor: EmojiSheetFieldAnchor? = null,
     onInsert: (TextFieldValue) -> Boolean,
 ) {
     var openingValue by remember { mutableStateOf<TextFieldValue?>(null) }
@@ -33,17 +37,20 @@ internal fun TextEntryEmojiFieldAction(
     val currentOwner by rememberUpdatedState(owner)
     val insert by rememberUpdatedState(onInsert)
     val recents = rememberRecentEmojiRecentsOwner(LocalContext.current)
+    val openBelowField = rememberEmojiSheetOpener(anchor)
     DisposableEffect(Unit) { onDispose { active = false } }
     LaunchedEffect(enabled, owner) {
         if (!enabled || openingOwner != owner) openingValue = null
     }
-    TextEntryEmojiAction(openingValue != null, enabled, {
+    val open = {
         openingOwner = currentOwner
         openingValue = currentValue
-    })
+    }
+    TextEntryEmojiAction(openingValue != null, enabled, { openBelowField(open) })
     openingValue?.takeIf { enabled }?.let { captured ->
         EmojiPickerSheet(
             onDismissRequest = { openingValue = null },
+            fieldAnchor = anchor,
             recentEmojis = recents.recents,
             onEmojiPicked = { emoji ->
                 openingValue = null
