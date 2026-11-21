@@ -60,4 +60,5 @@
     <string name="explanation_message_action_info">Zeigt, wann diese Nachricht gesendet und empfangen wurde, wer sie gesendet hat, ihre ID und ihren Status.</string>
     <string name="explanation_message_action_report">Öffnet ein Meldeformular für die Admins dieser Gruppe, das White-Noise-Team oder beide. Nichts wird gesendet, bevor du bestätigst.</string>
     <string name="explanation_message_action_delete">Lässt dich diese Nachricht nur auf diesem Gerät oder für alle löschen. Für alle löschen lässt sich nicht rückgängig machen. Nichts wird gelöscht, bis du wählst.</string>
+    <string name="explanation_conversation_dictation_continue">Startet sofort die Aufnahme des nächsten Teils. Das bisher Gesagte wird noch in Text umgewandelt und zuerst eingefügt.</string>
 </resources>

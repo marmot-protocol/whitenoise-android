@@ -2740,4 +2740,5 @@
     <string name="nostr_git_comment">Git yorumu</string>
     <string name="nostr_git_copy_url">URL’yi kopyala: %1$s</string>
     <string name="nostr_git_open_url">URL’yi aç: %1$s</string>
+    <string name="dictation_continue_recording">Sonraki bölümü dikte et</string>
 </resources>

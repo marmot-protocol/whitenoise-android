@@ -60,4 +60,5 @@
     <string name="explanation_message_action_info">Mostra quando esta mensagem foi enviada e recebida, quem a enviou, seu ID e seu status.</string>
     <string name="explanation_message_action_report">Abre um formulário de denúncia para os admins deste grupo, a equipe do White Noise ou ambos. Nada é enviado até você confirmar.</string>
     <string name="explanation_message_action_delete">Permite excluir esta mensagem só neste dispositivo ou para todos. Excluir para todos não pode ser desfeito. Nada é excluído até você escolher.</string>
+    <string name="explanation_conversation_dictation_continue">Começa a gravar a próxima parte imediatamente. O que você já disse ainda está sendo transcrito e será inserido primeiro.</string>
 </resources>

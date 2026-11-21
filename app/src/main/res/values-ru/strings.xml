@@ -2832,4 +2832,5 @@
     <string name="nostr_git_comment">Комментарий Git</string>
     <string name="nostr_git_copy_url">Копировать URL: %1$s</string>
     <string name="nostr_git_open_url">Открыть URL: %1$s</string>
+    <string name="dictation_continue_recording">Продиктовать следующую часть</string>
 </resources>
