@@ -2938,7 +2938,7 @@
     <string name="remote_signer_method_code">Show a connection code</string>
     <string name="remote_signer_method_code_detail">Your signer scans it from this screen, or you copy it</string>
     <string name="remote_signer_link_label">Bunker link</string>
-    <string name="remote_signer_link_placeholder">bunker://…</string>
+    <string name="remote_signer_link_placeholder" translatable="false">bunker://…</string>
     <string name="remote_signer_link_help">The link works like a password. White Noise doesn’t show or store it.</string>
     <string name="remote_signer_continue">Continue</string>
     <string name="remote_signer_review_title">Allow this signer</string>
