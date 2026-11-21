@@ -349,6 +349,14 @@
             <sha256 value="f2ef17a7673ab491de3402a5722d509c503492d7d35b3f9a519271d069812a14" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.collection" name="collection" version="1.5.0">
+         <artifact name="collection-1.5.0.module">
+            <sha256 value="bfeb7bd84f3f7dda7bd73b6709d4a1f61f5a37f843728bae08a067e3df9a0aef" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="collection-1.5.0.pom">
+            <sha256 value="2d65c8d0b36d4b4faadc44aff9bade23d871d7159eedf2b3f02d802b34b77a57" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
       <component group="androidx.collection" name="collection-jvm" version="1.4.2">
          <artifact name="collection-jvm-1.4.2.module">
             <sha256 value="aad6b3536c0f0e570aa733d5141d70fa6b9b3add370f73a311ca4ca5dee25448" origin="Independent official supplier audit" />
@@ -3352,6 +3360,66 @@
             <sha256 value="d8b304aa239e0d09ab8bc841e1eb37e4d26a28bf87cfed99279376e8eb20da30" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.navigation3" name="navigation3-runtime" version="1.2.2">
+         <artifact name="navigation3-runtime-1.2.2.module">
+            <sha256 value="f9b970efe707087633c2760eadc3392731648e97aaf509b85802ffb9f31f848a" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-runtime-1.2.2.pom">
+            <sha256 value="a5c2f44e0e5cb04230fc1c4c93d4a260f96bab42a1a1033efa7a4ef1dc151c89" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
+      <component group="androidx.navigation3" name="navigation3-runtime-android" version="1.2.2">
+         <artifact name="navigation3-runtime-android-1.2.2.module">
+            <sha256 value="5bb48eb8943a743a10d4b8d23d06aa668a413ee0d4a80638eea25f976b3e59d8" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-runtime-android-1.2.2.pom">
+            <sha256 value="99d99881b130f8fe337119ab674176c8ce04ff815f282cb7c0d021f3e422e1f3" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-runtime.aar">
+            <sha256 value="4efd6b6f1d8a924f6276607b25b0d3291988c2c7347aa6a2335c2bc2c28a0443" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
+      <component group="androidx.navigation3" name="navigation3-runtime-desktop" version="1.2.2">
+         <artifact name="navigation3-runtime-desktop-1.2.2.jar">
+            <sha256 value="430fc8ccfd959f5079009921ad5052320fac9d93e7eb52af9cdc21562a6fc442" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-runtime-desktop-1.2.2.module">
+            <sha256 value="b2fdfe149d168cb342b2c25276f650d0cbef89fd802b3ae6c3d49ba77dfe73e6" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-runtime-desktop-1.2.2.pom">
+            <sha256 value="ad6ba5a9f922d6f40a53a5eb0588c9e4d4f67391403281248ff6059fa2cc7b43" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
+      <component group="androidx.navigation3" name="navigation3-ui" version="1.2.2">
+         <artifact name="navigation3-ui-1.2.2.module">
+            <sha256 value="84d2934797315e9d724eb5a66af7a30ca890ffa01eda3d81161a55a8c494f761" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-ui-1.2.2.pom">
+            <sha256 value="0cab8275309f579ac2d65a28474ab91b06fdec05f9a30fa076673d767d78ab88" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
+      <component group="androidx.navigation3" name="navigation3-ui-android" version="1.2.2">
+         <artifact name="navigation3-ui-android-1.2.2.module">
+            <sha256 value="c61746c405adff6b8e72f68aea059d1df4ee2b56e547f52a5f86e472ea4b90dc" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-ui-android-1.2.2.pom">
+            <sha256 value="bfea9566e45b05139e783810ea83a3976007a009f91cdbc13687a72ee3f8c9c8" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-ui.aar">
+            <sha256 value="2da1cfacc2370c400cf969bc61986fe72ca9ac1185bb5b1f6fd2c127c2685991" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
+      <component group="androidx.navigation3" name="navigation3-ui-jvmstubs" version="1.2.2">
+         <artifact name="navigation3-ui-jvmstubs-1.2.2.jar">
+            <sha256 value="5cad4d028ec9fe829fb0d6c6df921c805ab925f543baea5149a27cd4aa3e5970" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-ui-jvmstubs-1.2.2.module">
+            <sha256 value="ab9fe2871d4db1d3f05fd54cd0b718b0b60951c88782a2f72b15e4dbb411c1fb" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigation3-ui-jvmstubs-1.2.2.pom">
+            <sha256 value="334b17d351d3cefc1212da486e2bd06b75f134c5bc052de0e6425a2afae6e6a4" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
       <component group="androidx.navigationevent" name="navigationevent-android" version="1.0.0">
          <artifact name="navigationevent-android-1.0.0.module">
             <sha256 value="6fc6224b01bf8fc576724bfd8eccaad6dc19e49150499100cb0cda24e28c947d" origin="Independent official supplier audit" />
@@ -3416,6 +3484,17 @@
          </artifact>
          <artifact name="navigationevent-compose.aar">
             <sha256 value="4c978461881d0506dd8d38deb25f84f56ea28756a14e583f2561c0ee98dff2d6" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.navigationevent" name="navigationevent-compose-desktop" version="1.1.1">
+         <artifact name="navigationevent-compose-desktop-1.1.1.jar">
+            <sha256 value="1d7d20d7826a2cc63ace9862cddd8a7085a11a3ea2cff258c28b3d58e57f143b" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigationevent-compose-desktop-1.1.1.module">
+            <sha256 value="3f25078efa15f7860f16c9d0384cea009d77a839213837c893b7ae54bfd35356" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigationevent-compose-desktop-1.1.1.pom">
+            <sha256 value="b8138382e9eb5793eec69e96743d2f89f9d8b12eb3da58da637696777632945f" origin="Local Gradle candidate, matched a Google Maven download" />
          </artifact>
       </component>
       <component group="androidx.navigationevent" name="navigationevent-compose-jvmstubs" version="1.0.0">
@@ -3486,6 +3565,17 @@
          </artifact>
          <artifact name="navigationevent-1.1.1.pom">
             <sha256 value="9dcd19994582204423e43dc7f3356cc2225dcc0f6db4130f907f8aca7724f15c" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.navigationevent" name="navigationevent-desktop" version="1.1.1">
+         <artifact name="navigationevent-desktop-1.1.1.jar">
+            <sha256 value="4c92508d4bd3b9cafb2785e8211057d39ed8465b529660223864a19625cedb5b" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigationevent-desktop-1.1.1.module">
+            <sha256 value="ff1ff2b5ad10315fea2994ebf95631d61d6e07c9bf3f89d24dd2096cc0032094" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="navigationevent-desktop-1.1.1.pom">
+            <sha256 value="d1246f42604ca75226ac840f390351f4f836d0fd7c81c7a98ff39a6d4fcdb076" origin="Local Gradle candidate, matched a Google Maven download" />
          </artifact>
       </component>
       <component group="androidx.print" name="print" version="1.0.0">
@@ -3605,6 +3695,22 @@
             <sha256 value="c191b2b0d3ed2f765743e634f213c0e8150825547810789fc13487332bfc9cd3" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.savedstate" name="savedstate-compose" version="1.4.0">
+         <artifact name="savedstate-compose-1.4.0.module">
+            <sha256 value="7275211901a07ee3973e40a3455e8ad12955d1d234dc2489f8686fcfc820b8a8" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="savedstate-compose-1.4.0.pom">
+            <sha256 value="b15f47b42585442c9b6a9d416afc30782c69dbf9a5760a2c37175f0024f0d17e" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
+      <component group="androidx.savedstate" name="savedstate-compose-android" version="1.4.0">
+         <artifact name="savedstate-compose-android-1.4.0.module">
+            <sha256 value="2be8c753a07c920cf2f5d63d66e8743fb08a933d04c02b7a388b77b66fca848f" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="savedstate-compose-android-1.4.0.pom">
+            <sha256 value="de19831dabb84a4d0e120e86dceb08cf62c08606b5d99e91a8f8e6b4a4658883" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
       <component group="androidx.savedstate" name="savedstate-compose-android" version="1.5.0">
          <artifact name="savedstate-compose-android-1.5.0.module">
             <sha256 value="b0f8ba0ba240caff738cba76eaf866b9c834c10915c5d10cf66044a085a8941d" origin="Independent official supplier audit" />
@@ -3643,6 +3749,14 @@
             <sha256 value="23e1d1f34c6a80b067337e38f12d0474a1cdd227f2da88e866d0c0be2a9d4dc6" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.savedstate" name="savedstate-desktop" version="1.4.0">
+         <artifact name="savedstate-desktop-1.4.0.module">
+            <sha256 value="e73f2cf8818ece347d8b5dff990d0db639a7dfb8fcc85eeecb2618383f7ecef7" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="savedstate-desktop-1.4.0.pom">
+            <sha256 value="8f114a4273535ad6bdcbed1986cfdd98d955ebcd38a32a8fee4ee7dc8e211f5e" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+      </component>
       <component group="androidx.savedstate" name="savedstate-desktop" version="1.5.0">
          <artifact name="savedstate-desktop-1.5.0.jar">
             <sha256 value="58198c6c979a400fc7831f1ca51d8caa972ca0b1fbe3df5e469b53cf552332b5" origin="Independent official supplier audit" />
@@ -3668,6 +3782,14 @@
          </artifact>
          <artifact name="savedstate-ktx-1.3.1.pom">
             <sha256 value="14cec91f73dde4d4c7a11ec660b6c5d083dddf30ef412cf6a1743dc10a62a5b8" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.savedstate" name="savedstate-ktx" version="1.4.0">
+         <artifact name="savedstate-ktx-1.4.0.module">
+            <sha256 value="7cf86881220aa594c4ad1685ebd0f295e3d97b9c0fdc31b28300f4318a5045a8" origin="Local Gradle candidate, matched a Google Maven download" />
+         </artifact>
+         <artifact name="savedstate-ktx-1.4.0.pom">
+            <sha256 value="b085af7cc4bb297ed0f25ca85d3629613ab253c0b532684c6cf77c2aee7471c5" origin="Local Gradle candidate, matched a Google Maven download" />
          </artifact>
       </component>
       <component group="androidx.savedstate" name="savedstate-ktx" version="1.5.0">

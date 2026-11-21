@@ -20,6 +20,8 @@ composeBom = "2026.11.00"
 # Keep this exact pin while porting screens so Material token/interaction changes do not drift
 # across recorded baselines. The Compose BOM continues to own the other Compose dependencies.
 material3 = "1.5.0-alpha25"
+# Navigation 3 renders the shell navigator's stack (experiment). Newest stable on Google Maven.
+navigation3 = "1.2.2"
 emoji2 = "1.7.0"
 coroutines = "1.11.0"
 jna = "5.19.1"
@@ -70,6 +72,8 @@ androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-navigation3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "navigation3" }
+androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 androidx-emoji2-emojipicker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emoji2" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
