@@ -30,7 +30,8 @@ class NotificationProfileRepeatsTest {
         assertTrue(reopened.admit("sleep", reply, now + 3))
         assertFalse(reopened.admit("focus", reply, now + 4))
         assertFalse(reopened.admit("sleep", reply.copy(accountRef = "account-b"), now + 4))
-        assertFalse(reopened.admit("sleep", reply.copy(messageIdHex = "third"), now + 5))
+        assertFalse(reopened.admit("sleep", update, now + 5))
+        assertFalse(reopened.admit("sleep", reply.copy(messageIdHex = "third"), now + 6))
         assertTrue(preferences.all.keys.none { it.contains("abcd") || it.contains("account-a") })
     }
 
