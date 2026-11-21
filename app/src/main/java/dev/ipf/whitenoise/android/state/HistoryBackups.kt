@@ -239,7 +239,8 @@ internal class HistoryBackupsController(
     fun watchRestore() {
         if (watchJob?.isActive == true || closed) return
         watchJob =
-            scope.launch {
+            // Acquisition, reads and close all enter the binding off the main thread.
+            scope.launch(dispatcher) {
                 if (!isCurrent()) return@launch
                 var subscription: BackupRestoreSubscription? = null
                 try {
@@ -273,6 +274,8 @@ internal class HistoryBackupsController(
                 current.running == HistoryBackupAction.Confirm
         mutableState.update { it.copy(setup = null) }
         if (pending) forgetPendingWords()
+        // An admitted setup command still settles under NonCancellable and holds the lock the cleanup waits for.
+        actionJob?.cancel()
     }
 
     private fun forgetPendingWords() {
