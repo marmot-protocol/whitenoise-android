@@ -43,8 +43,8 @@ import androidx.lifecycle.SavedStateHandle
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
+import dev.ipf.whitenoise.android.ui.common.TwoPaneMinWindowWidth
 import dev.ipf.whitenoise.android.ui.common.WindowLayout
-import dev.ipf.whitenoise.android.ui.common.WindowWidthClass
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -55,7 +55,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** Two-pane chat layout across the 840dp boundary, through the production frame and shell. */
+/** Two-pane chat layout across the 661dp boundary, through the production frame and shell. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w1280dp-h800dp-mdpi")
 class TwoPaneChatLayoutTest {
@@ -70,7 +70,7 @@ class TwoPaneChatLayoutTest {
         composeRule.setContent {
             CompositionLocalProvider(LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, HEIGHT))) {
                 TwoPaneChatFrame(
-                    twoPane = LocalWindowLayout.current.widthClass == WindowWidthClass.Expanded,
+                    twoPane = LocalWindowLayout.current.fitsTwoPanes,
                     listPane = { Text("list") },
                 ) {
                     val identity = remember { Any() }
@@ -96,8 +96,8 @@ class TwoPaneChatLayoutTest {
 
     /**
      * Short, wide windows such as a phone held horizontally split the panes evenly after the divider,
-     * with the list capped for very wide short windows; taller expanded windows keep the fixed 360dp
-     * list (#3866).
+     * with the list capped for very wide short windows (#3866). Taller windows give the list 40%, from
+     * 300dp up to 360dp, and the conversation never drops below 360dp.
      */
     @Test
     fun shortExpandedWindowsBalanceThePanes() {
@@ -109,7 +109,10 @@ class TwoPaneChatLayoutTest {
                 DpSize(960.dp, 432.dp) to 479.5.dp,
                 DpSize(1080.dp, 432.dp) to ShortWindowListMaxWidth,
                 DpSize(1280.dp, 400.dp) to ShortWindowListMaxWidth,
-                DpSize(840.dp, 480.dp) to TwoPaneListWidth,
+                DpSize(700.dp, 360.dp) to 339.dp,
+                DpSize(661.dp, 841.dp) to 300.dp,
+                DpSize(673.dp, 841.dp) to 300.dp,
+                DpSize(840.dp, 480.dp) to 335.dp,
                 DpSize(1280.dp, 800.dp) to TwoPaneListWidth,
             )
         expected.forEach { (window, listWidth) ->
@@ -343,8 +346,8 @@ class TwoPaneChatLayoutTest {
     }
 
     private companion object {
-        val EXPANDED_WIDTH = 840.dp
-        val BELOW_EXPANDED_WIDTH = 839.dp
+        val EXPANDED_WIDTH = TwoPaneMinWindowWidth
+        val BELOW_EXPANDED_WIDTH = TwoPaneMinWindowWidth - 1.dp
         val HEIGHT = 800.dp
         val SHORT_HEIGHT = 400.dp
         const val PANE_TOLERANCE = 1f

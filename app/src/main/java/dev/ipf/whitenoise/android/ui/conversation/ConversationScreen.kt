@@ -4236,7 +4236,7 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+                ConversationBottomBarFrame(routeMorph) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
                             keyboardController?.hide()
