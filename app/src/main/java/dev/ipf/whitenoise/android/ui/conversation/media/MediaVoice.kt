@@ -899,8 +899,7 @@ private fun VoiceActionGlyph(actionVisual: VoiceActionVisual) {
         VoiceActionVisual.FAILED,
         VoiceActionVisual.STORAGE_BLOCKED,
         ->
-            val refreshIcon = painterResource(R.drawable.ic_refresh)
-            Icon(refreshIcon, contentDescription = null, modifier = Modifier.size(24.dp))
+            Icon(painterResource(R.drawable.ic_refresh), contentDescription = null, modifier = Modifier.size(24.dp))
         VoiceActionVisual.DOWNLOAD ->
             Icon(imageVector = Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(24.dp))
         VoiceActionVisual.PAUSE ->
