@@ -67,16 +67,30 @@ class HistoryBackupsControllerTest {
             assertEquals(WORDS, setup.words)
             assertEquals(listOf(3, 9), setup.confirmPositions)
             controller.continueToConfirm()
-            assertTrue(controller.state.value.setup!!.confirming)
+            assertTrue(
+                controller.state.value.setup!!
+                    .confirming,
+            )
             // Shown once: confirmation keeps only the positions.
-            assertTrue(controller.state.value.setup!!.words.isEmpty())
-            assertEquals(listOf(3, 9), controller.state.value.setup!!.confirmPositions)
+            assertTrue(
+                controller.state.value.setup!!
+                    .words
+                    .isEmpty(),
+            )
+            assertEquals(
+                listOf(3, 9),
+                controller.state.value.setup!!
+                    .confirmPositions,
+            )
 
             fake.confirmError = refused("recovery_words_mismatch")
             controller.confirm(listOf("nope", "nope"))
             runCurrent()
             assertEquals(HistoryBackupProblem.WrongWords, controller.state.value.problem)
-            assertTrue(controller.state.value.setup!!.confirming)
+            assertTrue(
+                controller.state.value.setup!!
+                    .confirming,
+            )
             assertNull(controller.state.value.running)
 
             fake.confirmError = null
@@ -228,9 +242,20 @@ class HistoryBackupsControllerTest {
             controller.cancelRestore()
             runCurrent()
             assertEquals(listOf("ab"), fake.cancelledRestores)
-            assertEquals(BackupRestorePhaseFfi.CANCELLED, controller.state.value.restore!!.phase)
-            assertEquals(4L, controller.state.value.restore!!.importedMessages)
-            assertFalse(controller.state.value.restore!!.running)
+            assertEquals(
+                BackupRestorePhaseFfi.CANCELLED,
+                controller.state.value.restore!!
+                    .phase,
+            )
+            assertEquals(
+                4L,
+                controller.state.value.restore!!
+                    .importedMessages,
+            )
+            assertFalse(
+                controller.state.value.restore!!
+                    .running,
+            )
         }
 
     @Test fun recoveryWordsNeverAppearInStateText() =
@@ -250,10 +275,14 @@ class HistoryBackupsControllerTest {
         assertEquals(HistoryBackupProblem.RestoreBusy, historyBackupProblem(refused("backup_restore_busy")))
         assertEquals(HistoryBackupProblem.InvalidRestoreWords, historyBackupProblem(refused("backup_recovery_key")))
         assertEquals(HistoryBackupProblem.Failed, historyBackupProblem(refused("something_new")))
-        assertEquals(HistoryBackupProblem.Failed,
-            historyBackupProblem(MarmotKitException.Runtime("roster_unsupported")))
-        assertEquals(HistoryBackupProblem.Failed,
-            historyBackupProblem(IllegalStateException("device group refused: roster_unsupported")))
+        assertEquals(
+            HistoryBackupProblem.Failed,
+            historyBackupProblem(MarmotKitException.Runtime("roster_unsupported")),
+        )
+        assertEquals(
+            HistoryBackupProblem.Failed,
+            historyBackupProblem(IllegalStateException("device group refused: roster_unsupported")),
+        )
     }
 
     @Test fun backgroundVisitRunsOnlyWritersAndRetriesFailures() =
@@ -357,8 +386,9 @@ class HistoryBackupsControllerTest {
 
         override suspend fun backupRestoreStatus(accountRef: String): BackupRestoreStatusFfi = restoreStatus
 
-        override suspend fun watchBackupRestore(accountRef: String): BackupRestoreSubscription =
+        override suspend fun watchBackupRestore(accountRef: String): BackupRestoreSubscription {
             throw MarmotKitException.Runtime("no watch in tests")
+        }
 
         override suspend fun runDueBackupPass(accountRef: String): BackgroundBackupOutcomeFfi {
             passError?.let { throw it }
@@ -370,9 +400,21 @@ class HistoryBackupsControllerTest {
     private companion object {
         const val ACCOUNT = "account"
         const val BUDGET = 60_000L
-        val WORDS = listOf(
-            "alpha", "beta", "Gamma", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet", "kilo", "lima",
-        )
+        val WORDS =
+            listOf(
+                "alpha",
+                "beta",
+                "Gamma",
+                "delta",
+                "echo",
+                "foxtrot",
+                "golf",
+                "hotel",
+                "india",
+                "juliet",
+                "kilo",
+                "lima",
+            )
 
         fun refused(code: String) = MarmotKitException.Runtime("device group refused: $code")
 
