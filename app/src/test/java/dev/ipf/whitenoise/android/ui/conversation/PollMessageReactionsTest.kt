@@ -16,7 +16,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.printToString
-import dev.ipf.marmotkit.TimelineUserReactionFfi
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_REACTION_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.conversation.reactions.REACTION_PILL_TEST_TAG
@@ -62,18 +61,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
         advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } }
-        // The complete read must reflect the successful publication, independently of the chip/optimistic preview.
-        reactionDetailsResponder = {
-            listOf(
-                TimelineUserReactionFfi(
-                    reactionMessageIdHex = "aa".repeat(32),
-                    targetMessageIdHex = item.record.messageIdHex,
-                    sender = requireNotNull(pollController.boundAccountIdHex),
-                    emoji = "👍",
-                    reactedAt = 1uL,
-                ),
-            )
-        }
+        stubPublishedReactionDetails(item, "👍")
         // Exercise the pill's action contract independently of the retiring menu and chip entry animation.
         composeRule
             .onNodeWithTag("$REACTION_PILL_TEST_TAG:0", useUnmergedTree = true)

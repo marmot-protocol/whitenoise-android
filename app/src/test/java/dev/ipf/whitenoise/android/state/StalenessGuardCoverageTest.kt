@@ -216,6 +216,17 @@ class StalenessGuardCoverageTest {
                     listOf("shouldAcceptMediaUploadForAccount", "mediaUploadSessionEpoch"),
                 "ConversationController.kt:refreshManagementState" to
                     listOf("managementStateLifetime.advance", "managementStateLifetime.runIfCurrent"),
+                "ConversationController.kt:runGroupConvergenceEventLoop" to
+                    listOf(
+                        "val runtime = conversationRuntimeGeneration",
+                        "ownsGroupRecoveryRead(account, groupId, runtime)",
+                        "synchronized(timelineSession.lock)",
+                        "if (owned) accountDevicesGroupRevision++",
+                        "if (!invalidateEligibility()) return",
+                        "watchGroupConvergenceEvents(stream, account, groupId, ::ownsStream, ::invalidateEligibility)",
+                    ),
+                "ConversationController.kt:watchGroupConvergenceEvents" to
+                    listOf("stream.next()", "if (!invalidateEligibility()) break", "requestGroupConvergenceRead()"),
                 "ConversationController.kt:refreshGroupRecoveryStatus" to
                     listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
                 "ConversationController.kt:confirmGroupRejoin" to

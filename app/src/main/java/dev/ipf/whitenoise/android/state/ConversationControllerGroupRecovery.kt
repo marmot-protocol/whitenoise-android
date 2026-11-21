@@ -183,29 +183,52 @@ internal suspend fun ConversationController.runGroupConvergenceEventLoop(
     awaitOpen: suspend () -> Unit = { groupConvergenceOpenSettled.await() },
     retryMillis: Long = GROUP_CONVERGENCE_EVENT_RETRY_MILLIS,
 ) {
+    val groupId = group.groupIdHex
+    val runtime = conversationRuntimeGeneration
+
+    fun ownsStream() = ownsGroupRecoveryRead(account, groupId, runtime)
+
+    // Retirement and publication share the session lock, including a native read that completes after teardown.
+    fun invalidateEligibility(): Boolean =
+        synchronized(timelineSession.lock) {
+            val owned = ownsStream()
+            if (owned) accountDevicesGroupRevision++
+            owned
+        }
+
     awaitOpen()
-    while (currentCoroutineContext().isActive) {
+    while (currentCoroutineContext().isActive && ownsStream()) {
         val stream = runCatchingCancellable { runtimeEventStreamOpener() }.getOrNull()
         if (stream != null) {
             try {
-                accountDevicesGroupRevision++
+                if (!invalidateEligibility()) return
                 requestGroupConvergenceRead()
                 runCatchingCancellable {
-                    while (true) {
-                        val event = stream.next() ?: break
-                        if (event.isGroupStateUpdateFor(account, group.groupIdHex)) {
-                            accountDevicesGroupRevision++
-                            requestGroupConvergenceRead()
-                        } else if (event.isAccountDevicesEpochChange(account, group.groupIdHex)) {
-                            accountDevicesGroupRevision++
-                        }
-                    }
+                    watchGroupConvergenceEvents(stream, account, groupId, ::ownsStream, ::invalidateEligibility)
                 }
             } finally {
                 withContext(NonCancellable + Dispatchers.IO) { runCatching { stream.destroy() } }
             }
         }
-        delay(retryMillis)
+        if (ownsStream()) delay(retryMillis)
+    }
+}
+
+/** Checks ownership again after each native read before applying any group capability change. */
+private suspend fun ConversationController.watchGroupConvergenceEvents(
+    stream: RuntimeEventStream,
+    account: String,
+    groupId: String,
+    ownsStream: () -> Boolean,
+    invalidateEligibility: () -> Boolean,
+) {
+    while (currentCoroutineContext().isActive && ownsStream()) {
+        val event = stream.next() ?: break
+        val groupUpdated = event.isGroupStateUpdateFor(account, groupId)
+        if (groupUpdated || event.isAccountDevicesEpochChange(account, groupId)) {
+            if (!invalidateEligibility()) break
+            if (groupUpdated) requestGroupConvergenceRead()
+        }
     }
 }
 

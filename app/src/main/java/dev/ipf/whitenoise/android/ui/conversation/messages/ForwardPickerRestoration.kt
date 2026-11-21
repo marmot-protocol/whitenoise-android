@@ -19,22 +19,22 @@ internal class ForwardPickerRestoration {
         disposition: (PendingForwardRequest) -> RestoredForwardDisposition,
         onDiscard: () -> Unit,
     ) {
-        if ((!hasInventory && !checked) || (checked && visible == null)) return
+        val shouldRead = if (checked) visible != null else hasInventory
+        if (!shouldRead) return
         val stored = persistence.load()
         if (checked && stored?.requestId != visible?.requestId) {
             dismiss()
-            return
-        }
-        if (!hasInventory) return
-        checked = true
-        if (stored == null || stored.requestId in persistence.openPickerIds) return
-        when (disposition(stored)) {
-            RestoredForwardDisposition.Restore -> if (visible == null) visible = stored
-            RestoredForwardDisposition.Ignore -> dismiss()
-            RestoredForwardDisposition.Discard -> {
-                dismiss()
-                persistence.discard(stored.requestId)
-                onDiscard()
+        } else if (hasInventory) {
+            checked = true
+            if (stored == null || stored.requestId in persistence.openPickerIds) return
+            when (disposition(stored)) {
+                RestoredForwardDisposition.Restore -> if (visible == null) visible = stored
+                RestoredForwardDisposition.Ignore -> dismiss()
+                RestoredForwardDisposition.Discard -> {
+                    dismiss()
+                    persistence.discard(stored.requestId)
+                    onDiscard()
+                }
             }
         }
     }

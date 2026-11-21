@@ -98,12 +98,11 @@ class GroupSystemReactionsTest : GroupSystemReactionTestFixtures() {
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } }
         composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").assertIsSelected().performClick()
         settle()
-        composeRule.waitUntil { recordedCalls().any { it.first == "deleteMessage" } }
+        assertMatchingRemoval(item)
         assertEquals(
             listOf("personal", item.record.groupIdHex, item.record.messageIdHex, "👍"),
-            recordedCalls().first { it.first == "reactToMessage" }.second.take(4),
+            recordedCalls().single { it.first == "reactToMessage" }.second.take(4),
         )
-        assertEquals("aa".repeat(32), recordedCalls().first { it.first == "deleteMessage" }.second[2])
     }
 
     /** Full emoji selection retains the original native system-row identifier. */
@@ -140,7 +139,8 @@ class GroupSystemReactionsTest : GroupSystemReactionTestFixtures() {
         composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").performClick()
         settle()
         composeRule.waitUntil { pollController.reactions[item.record.messageIdHex].isNullOrEmpty() }
-        assertTrue(recordedCalls().none { it.first == "reactToMessage" || it.first == "deleteMessage" })
+        val mutations = setOf("reactToMessage", "unreactFromMessageMatching")
+        assertTrue(recordedCalls().none { it.first in mutations })
     }
 
     /** Removal fences a queued reaction even while frame settlement preserves the old display snapshot. */
@@ -164,34 +164,37 @@ class GroupSystemReactionsTest : GroupSystemReactionTestFixtures() {
 
     /** Read-only history retains reactor details without a removal or quick-reaction action. */
     @Test fun readOnlyHistoryKeepsDetailsWithoutMutation() {
-        render()
+        val item = render()
         openMenu()
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
         settle()
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } }
+        stubPublishedReactionDetails(item, "👍")
         composeRule.runOnIdle { readOnly.value = true }
         composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").performClick()
+        awaitDetailsText("You")
         composeRule.onNodeWithText("Tap to remove").assertDoesNotExist()
         assertEquals(1, recordedCalls().count { it.first == "reactToMessage" })
-        assertTrue(recordedCalls().none { it.first == "deleteMessage" })
+        assertTrue(recordedCalls().none { it.first == "unreactFromMessageMatching" })
     }
 
     /** Long press keeps the ordinary reactor sheet and its own-reaction removal behavior. */
     @Test fun chipLongPressOpensDetailsAndRemovesOwnReaction() {
-        render()
+        val item = render()
         openMenu()
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
         settle()
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } }
+        stubPublishedReactionDetails(item, "👍")
         composeRule
             .onNodeWithTag("$REACTION_PILL_TEST_TAG:0")
             .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
-        composeRule.waitUntil { composeRule.onAllNodesWithText("Tap to remove").fetchSemanticsNodes().size == 1 }
+        awaitDetailsText("Tap to remove")
         composeRule.onNodeWithText("Tap to remove").performClick()
         composeRule.onNodeWithText("Tap to remove").assertDoesNotExist()
-        assertTrue(recordedCalls().none { it.first == "deleteMessage" })
+        assertTrue(recordedCalls().none { it.first == "unreactFromMessageMatching" })
         settle()
-        composeRule.waitUntil { recordedCalls().any { it.first == "deleteMessage" } }
+        assertMatchingRemoval(item)
     }
 
     /** Deleted and invalidated projections remove the reaction hit targets immediately. */
@@ -273,6 +276,23 @@ class GroupSystemReactionsTest : GroupSystemReactionTestFixtures() {
                 }
             }
         }
+
+    /** Waits for the exact-message read and its Android Main continuation to render the reactor row. */
+    private fun awaitDetailsText(text: String) {
+        composeRule.waitUntil(5_000) {
+            shadowOf(Looper.getMainLooper()).idle()
+            composeRule.onAllNodesWithText(text).fetchSemanticsNodes().size == 1
+        }
+    }
+
+    /** Both a chip tap and the details action retract the emoji on the original group activity. */
+    private fun assertMatchingRemoval(item: TimelineMessage) {
+        composeRule.waitUntil { recordedCalls().any { it.first == "unreactFromMessageMatching" } }
+        assertEquals(
+            listOf("personal", item.record.groupIdHex, item.record.messageIdHex, "👍"),
+            recordedCalls().single { it.first == "unreactFromMessageMatching" }.second.take(4),
+        )
+    }
 
     /** TalkBack/keyboard invoke the same semantic long press as touch. */
     private fun openMenu() {

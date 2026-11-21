@@ -426,6 +426,71 @@ class ConversationGroupConvergenceParkedTest {
             assertEquals(1, stream.destroyed.get())
         }
 
+    /** A native stream returned after a runtime replacement is released before it can publish or start a read. */
+    @Test
+    fun replacementDuringStreamOpenDropsTheLateHandle() = checkRetiredStream(holdOpen = true)
+
+    /** An event already being read when account teardown happens cannot change eligibility or read convergence. */
+    @Test
+    fun teardownDuringEventReadDropsTheLateEvent() = checkRetiredStream(holdOpen = false)
+
+    private fun checkRetiredStream(holdOpen: Boolean) =
+        runBlocking {
+            val app = testAppState()
+            val waiting = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val reads = AtomicInteger(0)
+            val destroyed = AtomicInteger(0)
+            val groupId = conversationTimelineTestGroup().groupIdHex
+
+            suspend fun waitForRetirement() {
+                waiting.complete(Unit)
+                release.await()
+            }
+            val stream =
+                object : RuntimeEventStream {
+                    private var delivered = false
+
+                    override suspend fun next(): MarmotEventFfi {
+                        if (delivered) awaitCancellation()
+                        delivered = true
+                        waitForRetirement()
+                        return MarmotEventFfi.GroupStateUpdated(ACCOUNT_ID, ACCOUNT_REF, groupId)
+                    }
+
+                    override fun destroy() {
+                        destroyed.incrementAndGet()
+                    }
+                }
+            val controller =
+                controller(app, parked = { reads.incrementAndGet() > 0 }, events = {
+                    if (holdOpen) waitForRetirement()
+                    stream
+                })
+            val loop =
+                CoroutineScope(Job() + Dispatchers.Default).launch {
+                    controller.runGroupConvergenceEventLoop(ACCOUNT_REF, awaitOpen = {}, retryMillis = 1L)
+                }
+            try {
+                withTimeout(EVENT_TIMEOUT_MILLIS) { waiting.await() }
+                if (holdOpen) {
+                    replaceRuntimeOwner(app)
+                } else {
+                    controller.closeLiveSubscriptionsForAccountTeardown(ACCOUNT_REF)
+                }
+                release.complete(Unit)
+                withTimeout(EVENT_TIMEOUT_MILLIS) { loop.join() }
+                val published = if (holdOpen) 0 else 1
+                assertEquals(published, reads.get())
+                assertEquals(published.toLong(), controller.accountDevicesGroupRevision)
+                assertEquals(1, destroyed.get())
+            } finally {
+                loop.cancel()
+                release.complete(Unit)
+                loop.join()
+            }
+        }
+
     /** A stream that ends is destroyed and reopened, and every reopen reads the flag again. */
     @Test
     fun anEndedStreamIsReopenedAndReReads() = assertReopens(ScriptedStream.End.CLOSE)

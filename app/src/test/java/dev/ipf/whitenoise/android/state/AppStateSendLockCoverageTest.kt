@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.conversationControllerSource
+import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.notificationDeliveryControllerSource
 import org.junit.Assert.assertFalse
@@ -166,22 +167,27 @@ class AppStateSendLockCoverageTest {
                 0 until publicEntry.indexOf("signOutAndWipeActiveAccountLocked(requested)"),
         )
         val entry = appStateFunctionBody("signOutAndWipeActiveAccountLocked")
+        val revocation = entry.indexOf("withRevokedPinnedTarget(wipedRef)")
+        assertTrue("wipe must acquire durable launcher revocation for its target", revocation >= 0)
+        val revokedBody = entry.kotlinBlockFrom(entry.indexOf('{', revocation), "launcher revocation")
         assertTrue(
             "the public wipe must delegate completion inside the durable launcher-revocation bracket",
-            entry.indexOf("withRevokedPinnedTarget(wipedRef)") in
-                0 until entry.indexOf("finishRevokedAccountWipe(wipedRef, wipedShareAccount)"),
+            "finishRevokedAccountWipe(wipedRef, wipedShareAccount)" in revokedBody,
         )
         val body = appStateFunctionBody("finishRevokedAccountWipe")
         val serializedWipeIndex = body.indexOf("nativePushSyncMutex.withSerializedNativePushWipe")
-        val removalIndex = body.indexOf("perAccountSyncedFingerprints.remove(wipedRef)")
-
+        assertTrue("wipe must acquire the native push mutex", serializedWipeIndex >= 0)
+        val serialized = body.kotlinBlockFrom(body.indexOf('{', serializedWipeIndex), "serialized native wipe")
+        val nativeWipe = serialized.indexOf("signOutAndWipe(wipedRef)")
+        val completed = serialized.indexOf("if (outcome.localCleanup.completed)")
         assertTrue(
-            "destructive wipes must serialize push cache mutation with native push sync",
-            serializedWipeIndex >= 0,
+            "push cleanup must follow completed native removal under the same mutex",
+            nativeWipe in 0 until completed,
         )
+        val completedBody = serialized.kotlinBlockFrom(serialized.indexOf('{', completed), "successful native removal")
         assertTrue(
-            "destructive wipes must drop the wiped account's cached push fingerprint under the native push mutex",
-            removalIndex > serializedWipeIndex,
+            "a completed wipe must remove only its target's fingerprint under the native push mutex",
+            "perAccountSyncedFingerprints.remove(wipedRef)" in completedBody,
         )
         assertFalse(
             "withSerializedNativePushWipe already holds the mutex; nesting withLock would deadlock",
@@ -654,18 +660,7 @@ class AppStateSendLockCoverageTest {
     private fun appStateFunctionBody(
         functionName: String,
         sourceFile: File = appStateSource(),
-    ): String {
-        val source = sourceFile.motionOwnerSource()
-        val start =
-            Regex("""\bfun\s+(?:WhiteNoiseAppState\.)?${Regex.escape(functionName)}\s*\(""")
-                .find(source)
-                ?.range
-                ?.first
-                ?: error("Missing function $functionName")
-        val braceStart = source.indexOf('{', start)
-        require(braceStart >= 0) { "Missing body for $functionName" }
-        return source.kotlinBlockFrom(braceStart, "function $functionName")
-    }
+    ): String = sourceFile.motionOwnerSource().functionBody(functionName)
 
     private fun notificationDeliveryFunctionBody(functionName: String): String =
         controllerFunctionBody(functionName, controllerFileName = "NotificationDeliveryController.kt")

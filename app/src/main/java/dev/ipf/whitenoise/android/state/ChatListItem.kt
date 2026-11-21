@@ -81,14 +81,7 @@ internal fun chatListItemFromProjection(
     val baseGroup = group ?: emptyGroupRecord(row)
     val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
     val selectedPeer = selectedPresentation?.peerId?.takeIf { it.isNotBlank() && !it.equals(activeAccountIdHex, true) }
-    val selectedMemberCount =
-        (selectedPresentation?.title as? PresentationTextFfi.UnnamedGroup)
-            ?.memberCount
-            ?.coerceAtMost(Int.MAX_VALUE.toULong())
-            ?.toInt()
-    val resolvedMemberCount =
-        selectedMemberCount
-            ?: if (selectedPeer != null) DIRECT_CHAT_MEMBER_COUNT else presentation?.memberCount ?: 0
+    val resolvedMemberCount = presentationMemberCount(selectedPresentation, selectedPeer, presentation)
     // A replaced group picture still selected by a dirty presentation yields to the row's current picture.
     val supersededPicture = selectedPresentation?.selectsSupersededGroupPicture(row) == true
     val displayGroup =
@@ -137,6 +130,17 @@ internal fun chatListItemFromProjection(
         awaitingSendPreview = awaitingSendPreview,
         hasOptimisticSendPreview = hasOptimisticSendPreview,
     )
+}
+
+/** Uses the selected group count, then the direct peer, then the roster retained for display. */
+private fun presentationMemberCount(
+    selected: ConversationPresentationFfi?,
+    peer: String?,
+    roster: ChatListMemberPresentation?,
+): Int {
+    val unnamedGroup = selected?.title as? PresentationTextFfi.UnnamedGroup
+    return unnamedGroup?.memberCount?.coerceAtMost(Int.MAX_VALUE.toULong())?.toInt()
+        ?: if (peer != null) DIRECT_CHAT_MEMBER_COUNT else roster?.memberCount ?: 0
 }
 
 /** The chat-list row's latest message as a renderable record, or null when the row has none. */

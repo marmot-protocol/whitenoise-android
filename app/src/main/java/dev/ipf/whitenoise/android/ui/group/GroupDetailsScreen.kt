@@ -87,13 +87,11 @@ import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
-import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.accountDevicesRevision
 import dev.ipf.whitenoise.android.state.acknowledgeDisbandFailure
 import dev.ipf.whitenoise.android.state.cancelBlockedLeave
 import dev.ipf.whitenoise.android.state.collapseLongMessagesInGroup
@@ -109,7 +107,6 @@ import dev.ipf.whitenoise.android.state.inviteProfileToGroups
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.profileAddableGroupsState
-import dev.ipf.whitenoise.android.state.readAccountDevicesActivation
 import dev.ipf.whitenoise.android.state.removeMember
 import dev.ipf.whitenoise.android.state.setConversationVibrationPattern
 import dev.ipf.whitenoise.android.state.stepDownAsAdmin
@@ -364,19 +361,8 @@ internal fun GroupDetailsScreen(
         var accountDevicesConfirmOpen by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateOf(false)
         }
-        // Re-read after every group change, refusal or roster change: MDK's answer is advisory and can move either way.
         val accountDevicesActivation =
-            rememberAccountDevicesActivation(
-                owner = controller,
-                enabled = linkedDevicesAvailable() && controller.isSelfMember,
-                revision = controller.accountDevicesRevision(),
-                read = controller::readAccountDevicesActivation,
-            )
-        val eligibilityLost =
-            accountDevicesActivation != null && accountDevicesActivation != AccountDevicesActivationFfi.ELIGIBLE
-        LaunchedEffect(eligibilityLost, controller.isSelfMember) {
-            if (eligibilityLost || !controller.isSelfMember) accountDevicesConfirmOpen = false
-        }
+            observeGroupAccountDevicesActivation(controller) { accountDevicesConfirmOpen = false }
         // #1131: when set, the transfer-admin picker is being used as the first step
         // of a sole-admin Leave (3+ members) — picking transfers admin then leaves,
         // rather than the standalone transfer-only action. Holds the group name for

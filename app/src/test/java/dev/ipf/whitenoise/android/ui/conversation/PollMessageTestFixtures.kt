@@ -63,6 +63,24 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
     /** Complete exact-message reactions returned by the native read, independently of chip previews. */
     protected var reactionDetailsResponder: (List<Any?>) -> List<TimelineUserReactionFfi> = { emptyList() }
 
+    /** Supplies the complete own row for this message after a successful quick reaction. */
+    protected fun stubPublishedReactionDetails(
+        item: TimelineMessage,
+        emoji: String,
+    ) {
+        val record = item.record
+        val expected = listOf(pollController.boundAccountRef, record.groupIdHex, record.messageIdHex)
+        val own =
+            TimelineUserReactionFfi(
+                reactionMessageIdHex = reactionSummary.messageIds.single(),
+                targetMessageIdHex = record.messageIdHex,
+                sender = requireNotNull(pollController.boundAccountIdHex),
+                emoji = emoji,
+                reactedAt = 1uL,
+            )
+        reactionDetailsResponder = { args -> if (args == expected) listOf(own) else emptyList() }
+    }
+
     /** The controller's wall clock, so disappearing-message deadlines can be crossed deterministically. */
     protected var pollClockMillis: Long = 1_000_000_000_000L
 

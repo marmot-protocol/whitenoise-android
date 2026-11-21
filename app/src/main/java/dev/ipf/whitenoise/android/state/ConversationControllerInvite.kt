@@ -133,9 +133,9 @@ private fun ConversationController.requestDeclineConsentIfNeeded(
 ): Boolean {
     inviteDeclineStepDownRequest = null
     if (stepDownConsent != null) return stepDownConsent != invitation
-    if (!isSoleAdminInvitee()) return false
-    appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
-    return true
+    val soleAdmin = isSoleAdminInvitee()
+    if (soleAdmin) appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
+    return soleAdmin
 }
 
 /**

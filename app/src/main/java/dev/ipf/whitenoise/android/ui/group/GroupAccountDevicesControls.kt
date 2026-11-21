@@ -13,7 +13,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.AccountDevicesActivationFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.accountDevicesActivationReason
+import dev.ipf.whitenoise.android.state.accountDevicesRevision
+import dev.ipf.whitenoise.android.state.readAccountDevicesActivation
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
@@ -22,6 +26,26 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsValue
 
 internal const val GROUP_ACCOUNT_DEVICES_ENABLE_TAG = "group.account_devices.enable"
 internal const val GROUP_ACCOUNT_DEVICES_STATUS_TAG = "group.account_devices.status"
+
+/** Follow the current group’s eligibility and withdraw its confirmation if the group loses the capability. */
+@Composable
+internal fun observeGroupAccountDevicesActivation(
+    controller: ConversationController,
+    onEligibilityLost: () -> Unit,
+): AccountDevicesActivationFfi? {
+    val activation =
+        rememberAccountDevicesActivation(
+            owner = controller,
+            enabled = linkedDevicesAvailable() && controller.isSelfMember,
+            revision = controller.accountDevicesRevision(),
+            read = controller::readAccountDevicesActivation,
+        )
+    val eligibilityLost = activation != null && activation != AccountDevicesActivationFfi.ELIGIBLE
+    LaunchedEffect(eligibilityLost, controller.isSelfMember) {
+        if (eligibilityLost || !controller.isSelfMember) onEligibilityLost()
+    }
+    return activation
+}
 
 /**
  * MDK's answer to whether this group can take linked devices, read when the details open and again whenever
