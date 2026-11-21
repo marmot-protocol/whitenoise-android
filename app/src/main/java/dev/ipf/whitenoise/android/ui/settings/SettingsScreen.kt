@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,30 +74,15 @@ import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
-/** Back handler: nested detail, then home, blocked during sign-out. */
-@Composable
-private fun settingsBackHandler(
-    signOutInProgress: Boolean,
-    detail: SettingsDetail?,
-    parentOf: (SettingsDetail) -> SettingsDetail?,
-    onBackToChats: () -> Unit,
-    onDetailChange: (SettingsDetail?) -> Unit,
-) {
-    BackHandler {
-        if (signOutInProgress) return@BackHandler
-        if (detail == null) {
-            onBackToChats()
-        } else {
-            onDetailChange(parentOf(detail))
-        }
-    }
-}
-
-/** Settings root hosting the hub and every detail destination. */
+/**
+ * Owns the Settings section's state (search, its origin, the header-photo shortcut) and its Back handler for the
+ * open [detail], and returns the renderer for one Settings route. A host that renders each route as its own entry,
+ * such as the shell's route display, calls it once per route while this state stays in one place above them.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
-internal fun SettingsScreen(
+internal fun rememberSettingsRouteRenderer(
     appState: WhiteNoiseAppState,
     onBackToChats: () -> Unit,
     onOpenDiagnostics: () -> Unit,
@@ -109,7 +93,7 @@ internal fun SettingsScreen(
     onHomeViewportChange: (SettingsHomeViewport) -> Unit,
     suppressMotion: Boolean = false,
     selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
-) {
+): @Composable (SettingsDetail?) -> Unit {
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
     // back fell through to the Activity and exited the app. Always
@@ -177,14 +161,7 @@ internal fun SettingsScreen(
 
     var openProfilePictureActions by
         rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
-    SettingsRouteMotion(
-        target = detail,
-        depth = settingsDetailDepth(detail),
-        ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
-        suppressMotion = suppressMotion,
-        contentVisible = !appState.appLock.screenVisible,
-        cardMorph = true,
-    ) { route ->
+    return { route ->
         CompositionLocalProvider(
             LocalSettingsSearchTarget provides
                 searchOrigin?.takeIf { it.destination == route && eligibility.allows(it) },
