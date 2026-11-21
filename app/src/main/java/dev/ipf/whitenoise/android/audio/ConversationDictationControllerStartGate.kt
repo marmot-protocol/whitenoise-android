@@ -12,12 +12,14 @@ internal fun ConversationDictationController.rejectsExistingSession(
     groupIdHex: String,
     mode: ConversationDictationMode,
 ): Boolean {
-    if (followUp.pending != null) {
-        conversationDictationDiagnostic("event=request_start accepted=false reason=follow_up_pending")
-        return true
-    }
-    if (state is ConversationDictationState.ProviderActivityActive) {
-        conversationDictationDiagnostic("event=request_start accepted=false reason=provider_activity_active")
+    val unavailableReason =
+        when {
+            followUp.pending != null -> "follow_up_pending"
+            state is ConversationDictationState.ProviderActivityActive -> "provider_activity_active"
+            else -> null
+        }
+    if (unavailableReason != null) {
+        conversationDictationDiagnostic("event=request_start accepted=false reason=$unavailableReason")
         return true
     }
     val retainsTranscript =

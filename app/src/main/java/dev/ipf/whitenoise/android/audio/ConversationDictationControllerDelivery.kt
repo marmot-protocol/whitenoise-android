@@ -14,15 +14,16 @@ internal fun ConversationDictationController.deliverTranscript(
     // setting existed — pastes into the draft rather than sending on its own.
     val deliveryMode = requestedDeliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft
     finishTiming.delivered(elapsedRealtime(), deliveryMode)?.let { conversationDictationDiagnostic(it) }
-    if (deliveryMode == ConversationDictationDeliveryMode.SendOnFinish && followUpSendBlocked(sessionId)) {
-        fail(sessionId, target, ConversationDictationFailure.SendBlocked, retainedTranscript = transcript)
+    if (deliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
+        if (followUpSendBlocked(sessionId)) {
+            fail(sessionId, target, ConversationDictationFailure.SendBlocked, retainedTranscript = transcript)
+        } else {
+            completion.intent.commit()
+            sendTranscriptOnFinish(sessionId, target, transcript)
+        }
         return
     }
     completion.intent.commit()
-    if (deliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
-        sendTranscriptOnFinish(sessionId, target, transcript)
-        return
-    }
     if (completion.draftRecovery.owns(sessionId, target)) {
         completeRecoveredPaste(sessionId, target, transcript)
         return

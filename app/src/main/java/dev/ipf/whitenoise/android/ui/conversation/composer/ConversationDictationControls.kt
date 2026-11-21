@@ -252,10 +252,7 @@ private fun ConversationDictationActiveActions(
 ) {
     val sendLabel = stringResource(R.string.send)
     val sendExplanation = composerExplanation(R.string.send, R.string.explanation_conversation_dictation_send)
-    Box {
-        ConversationDictationListeningSlot(facts.captureInProgress, previousPending = facts.previousPending)
-        ConversationDictationContinueSlot(facts.continueAvailable) { controller.continueDictation() }
-    }
+    ConversationDictationLeadingActions(controller, facts)
     IconButton(
         onClick = settleControlMorph(controller::cancel),
         enabled = !facts.deliveryInProgress,
@@ -480,3 +477,14 @@ internal fun dictationFailureLabel(reason: ConversationDictationFailure): String
             ConversationDictationFailure.DraftWriteRefused -> R.string.toast_draft_save_failed
         },
     )
+
+@Composable
+private fun ConversationDictationLeadingActions(
+    controller: ConversationDictationController,
+    facts: DictationControlFacts,
+) {
+    Box {
+        ConversationDictationListeningSlot(facts.captureInProgress, previousPending = facts.previousPending)
+        ConversationDictationContinueSlot(facts.continueAvailable) { controller.continueDictation() }
+    }
+}

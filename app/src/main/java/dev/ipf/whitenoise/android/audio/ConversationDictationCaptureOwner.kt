@@ -40,14 +40,15 @@ internal class ConversationDictationCaptureOwner(
 
     /** Records beside the session capture without attaching a provider stream. */
     fun beginFollowUp(): Boolean {
-        if (followUp != null) return false
-        val capture = create() ?: return false
-        if (!capture.start()) {
+        val capture = if (followUp == null) create() else null
+        if (capture == null) return false
+        val started = capture.start()
+        if (started) {
+            followUp = capture
+        } else {
             capture.discard()
-            return false
         }
-        followUp = capture
-        return true
+        return started
     }
 
     fun finishFollowUp(onClosed: () -> Unit): Boolean {

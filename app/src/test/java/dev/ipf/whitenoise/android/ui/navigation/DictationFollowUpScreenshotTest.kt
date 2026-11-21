@@ -67,7 +67,9 @@ internal class DictationFollowUpScreenshotTest : DictationNavigationRenderFixtur
                                 state,
                                 controller,
                                 facts =
-                                    processing.copy(processingDeliveryMode = ConversationDictationDeliveryMode.SendOnFinish),
+                                    processing.copy(
+                                        processingDeliveryMode = ConversationDictationDeliveryMode.SendOnFinish,
+                                    ),
                             )
                             ConversationDictationPersistentControl(
                                 state,
