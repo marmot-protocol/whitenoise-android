@@ -234,7 +234,8 @@ class DeviceLinkRequestsTest {
             val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p1", 10u)) })
             watcher.refresh(listOf("a"), blocked = false)
 
-            watcher.accept("a", snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking)), blocked = false, beforeCommand = watcher.snapshots["a"])
+            val linking = snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking))
+            watcher.accept("a", linking, blocked = false, beforeCommand = watcher.snapshots["a"])
 
             assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
         }

@@ -39,15 +39,15 @@ class InviteDeclineAllDevicesDialogScreenshotTest {
     /** A successfully read empty or single-device roster declines at once. */
     @Test
     fun aLoneDeviceIsNotAsked() {
-        assertFalse(declineReachesOtherDevices(Result.success(listOf(device("a", isThisDevice = true)))).getOrThrow())
-        assertFalse(declineReachesOtherDevices(Result.success(emptyList())).getOrThrow())
+        assertFalse(Result.success(listOf(device("a", isThisDevice = true))).declineNeedsConsent().getOrThrow())
+        assertFalse(Result.success(emptyList<LinkedDeviceFfi>()).declineNeedsConsent().getOrThrow())
     }
 
     /** An unreadable inventory cannot take the path that declines on a lone device. */
     @Test
     fun failedReadKeepsTheInvitationPending() {
         val failure = IllegalStateException("roster unavailable")
-        val decision = declineReachesOtherDevices(Result.failure(failure))
+        val decision = Result.failure<List<LinkedDeviceFfi>>(failure).declineNeedsConsent()
         assertEquals(failure, decision.exceptionOrNull())
     }
 
@@ -56,8 +56,9 @@ class InviteDeclineAllDevicesDialogScreenshotTest {
     fun anotherLinkedDeviceIsAskedAbout() {
         val here = device("a", isThisDevice = true)
 
-        assertTrue(declineReachesOtherDevices(Result.success(listOf(here, device("b")))).getOrThrow())
-        assertTrue(declineReachesOtherDevices(Result.success(listOf(here, device("b", removalPending = true)))).getOrThrow())
+        assertTrue(Result.success(listOf(here, device("b"))).declineNeedsConsent().getOrThrow())
+        val removing = listOf(here, device("b", removalPending = true))
+        assertTrue(Result.success(removing).declineNeedsConsent().getOrThrow())
     }
 
     /** The all-devices question and both answers in the light dialog surface. */

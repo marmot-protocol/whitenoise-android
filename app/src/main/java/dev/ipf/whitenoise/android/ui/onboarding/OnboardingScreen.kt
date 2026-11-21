@@ -127,7 +127,12 @@ internal fun OnboardingScreen(
                     unlinkedProfile = null
                     runStep {
                         val step =
-                            signInAfterRemovalConsent(label, key, appState::removeUnlinkedAccount, appState::importIdentity)
+                            signInAfterRemovalConsent(
+                                label,
+                                key,
+                                appState::removeUnlinkedAccount,
+                                appState::importIdentity,
+                            )
                         if (step is SignInStep.InlineError) appState.present(step.messageRes)
                         step
                     }
@@ -260,7 +265,10 @@ internal suspend fun signInAfterRemovalConsent(
     key: String,
     remove: suspend (String) -> Boolean,
     signIn: suspend (String) -> IdentityImportOutcome,
-): SignInStep = if (remove(label)) signInStepFor(signIn(key), key) else SignInStep.InlineError(R.string.unlinked_account_remove_failed)
+): SignInStep {
+    if (!remove(label)) return SignInStep.InlineError(R.string.unlinked_account_remove_failed)
+    return signInStepFor(signIn(key), key)
+}
 
 /**
  * Each account-setup state gets its own message. The two resumable states point

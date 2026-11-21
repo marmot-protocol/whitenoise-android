@@ -5791,7 +5791,7 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Publishes the account list a post-wipe read produced. A failed read retains the known survivors as a non-
-     * authoritative projection, so surviving accounts' automatic work waits for the next successful read instead of ending.
+     * authoritative projection. Automatic work waits for the next successful read.
      */
     internal fun publishRefreshedAccountList(result: Result<List<AccountSummaryFfi>>) {
         result.onSuccess { accounts = it }

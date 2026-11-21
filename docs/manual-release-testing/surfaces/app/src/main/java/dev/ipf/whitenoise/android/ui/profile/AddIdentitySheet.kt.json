@@ -11,6 +11,14 @@
           "PRO-001",
           "NAV-011"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_remove_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddIdentitySheet.kt",
+        "anchor": "R.string.unlinked_account_remove_failed",
+        "test_ids": [
+          "SET-066"
+        ]
       }
     ]
   },

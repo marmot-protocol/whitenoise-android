@@ -110,7 +110,12 @@ internal fun AddIdentitySheet(
                 if (confirmedRemoval == null) {
                     signInStepFor(appState.importIdentity(submitted), submitted)
                 } else {
-                    signInAfterRemovalConsent(confirmedRemoval, submitted, appState::removeUnlinkedAccount, appState::importIdentity)
+                    signInAfterRemovalConsent(
+                        confirmedRemoval,
+                        submitted,
+                        appState::removeUnlinkedAccount,
+                        appState::importIdentity,
+                    )
                 }
             when (step) {
                 SignInStep.SignedIn, SignInStep.SetupStarted -> {
@@ -120,7 +125,11 @@ internal fun AddIdentitySheet(
                 // Recovery requires its existing dedicated consent route; adding a profile never implies that grant.
                 SignInStep.AskRecoveryConsent -> reportError(importIdentityErrorRes(submitted))
                 is SignInStep.AskRemovalConsent ->
-                    if (session.ownsEntry()) removalRef = step.accountRef else reportError(R.string.unlinked_account_remove_failed)
+                    if (session.ownsEntry()) {
+                        removalRef = step.accountRef
+                    } else {
+                        reportError(R.string.unlinked_account_remove_failed)
+                    }
                 is SignInStep.InlineError -> reportError(step.messageRes)
             }
         }

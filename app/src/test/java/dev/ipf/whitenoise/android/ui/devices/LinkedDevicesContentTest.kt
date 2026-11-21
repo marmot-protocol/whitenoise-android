@@ -107,7 +107,8 @@ class LinkedDevicesContentTest {
         assertNull(roster.withChatProgress(listOf(progress.copy(remaining = 0u))).device("sibling")?.chatProgress)
         assertNull(roster.withChatProgress(listOf(progress.copy(remaining = 13u))).device("sibling")?.chatProgress)
         content(LinkedDeviceRosterState(roster = active))
-        compose.onNodeWithText(context.getString(R.string.link_device_adding_chats, 7, 12), substring = true).assertExists()
+        val adding = context.getString(R.string.link_device_adding_chats, 7, 12)
+        compose.onNodeWithText(adding, substring = true).assertExists()
     }
 
     /** An account with only this device says no other device is linked. */

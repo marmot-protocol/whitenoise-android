@@ -203,9 +203,8 @@ class MarmotKitRecoveryQualificationTest {
     /**
      * Once an admin's device knows its group moved on without it, MDK refuses that admin's group change as catching up,
      * and after one acknowledgement the same change goes through (MDK #2273). This is the refusal runGroupChange turns
-     * into the app-level question. The receiver’s group-specific recovery status is the signal that MDK recorded the gap, so no
-     * change is attempted before it; the acknowledged change then commits on the device's own epoch, which is fine for
-     * a disposable group.
+     * into the app-level question. A successful acknowledgement proves the receiver recorded its gap. Reopening that
+     * receiver clears its process-local consent, so the first real change must be refused again.
      */
     @Test
     fun catchingUpRefusalIsAcknowledgedForOneChange() =

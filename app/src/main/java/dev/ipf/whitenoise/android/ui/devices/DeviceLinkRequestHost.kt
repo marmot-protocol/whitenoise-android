@@ -13,7 +13,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -107,7 +106,7 @@ internal fun DeviceLinkApprovalGate(
     content: @Composable (DeviceLinkApprovalDraft) -> Unit,
 ) {
     key(runtimeGeneration, request.accountRef, request.promptId) {
-        val draft = rememberSaveable(saver = DeviceLinkApprovalDraft.Saver) { DeviceLinkApprovalDraft() }
+        val draft = rememberApprovalDraft()
         if (!blocked) content(draft)
     }
 }

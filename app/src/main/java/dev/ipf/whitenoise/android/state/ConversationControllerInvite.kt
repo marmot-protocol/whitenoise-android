@@ -88,13 +88,7 @@ internal suspend fun ConversationController.declineInviteWithConsent(
         if (rendered != null && !ownsRenderedDecline(rendered)) return@withMutationLockResult false
         val stepDownAgreed = stepDownConsent != null
         if (requestDeclineConsentIfNeeded(invitation, stepDownConsent)) return@withMutationLockResult false
-        val stillPending = {
-            mutationPresentation.ownsCurrentPresentation() &&
-                (rendered == null || ownsRenderedDecline(rendered)) &&
-                !inviteAcceptanceResolutionPending &&
-                group.pendingConfirmation &&
-                inviteGeneration(group) == invitation
-        }
+        val stillPending = { canFinishDecline(invitation, rendered) }
         runCatching {
             when (declinePendingInvite(account, invitation.groupIdHex, stepDownAgreed, stillPending)) {
                 InviteDeclineOutcome.DECLINED -> Unit
@@ -117,6 +111,17 @@ internal suspend fun ConversationController.declineInviteWithConsent(
             false
         }
     }
+
+/** Revalidate the Welcome and its presentation immediately before each native operation. */
+private fun ConversationController.canFinishDecline(
+    invitation: InviteAcceptanceGeneration,
+    rendered: InviteAcceptanceGeneration?,
+): Boolean =
+    mutationPresentation.ownsCurrentPresentation() &&
+        (rendered == null || ownsRenderedDecline(rendered)) &&
+        !inviteAcceptanceResolutionPending &&
+        group.pendingConfirmation &&
+        inviteGeneration(group) == invitation
 
 /**
  * Stops Decline for [invitation] when it must not go ahead yet, and returns whether it stopped. Consent counts

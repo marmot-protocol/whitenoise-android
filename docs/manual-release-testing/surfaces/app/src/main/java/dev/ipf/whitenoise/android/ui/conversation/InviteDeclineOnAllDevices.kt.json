@@ -50,6 +50,14 @@
         "test_ids": [
           "SET-068"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+        "anchor": "R.string.linked_devices_load_failed",
+        "test_ids": [
+          "SET-068"
+        ]
       }
     ]
   }

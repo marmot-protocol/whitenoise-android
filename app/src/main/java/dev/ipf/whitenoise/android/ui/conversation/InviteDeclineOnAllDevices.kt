@@ -30,11 +30,8 @@ internal const val INVITE_DECLINE_ALL_DEVICES_TAG = "invite.decline.allDevices.d
 internal const val INVITE_DECLINE_ALL_DEVICES_CONFIRM_TAG = "invite.decline.allDevices.confirm"
 internal const val INVITE_DECLINE_ALL_DEVICES_CANCEL_TAG = "invite.decline.allDevices.cancel"
 
-/**
- * Whether declining here also takes the account's other devices out of the chat. MDK shares a decline with every
- * device of the account whenever the successfully read [devices] include a sibling.
- */
-internal fun declineReachesOtherDevices(devices: Result<List<LinkedDeviceFfi>>): Result<Boolean> = devices.map { linkedDeviceRoster(it).hasOtherDevices }
+/** A failed roster read leaves the invitation pending. A sibling in a successful read requires consent. */
+internal fun Result<List<LinkedDeviceFfi>>.declineNeedsConsent() = map { linkedDeviceRoster(it).hasOtherDevices }
 
 /**
  * Hands [content] the Decline action for the invitation in view. With no other linked device it declines at once.
@@ -57,14 +54,16 @@ internal fun InviteDeclineGate(
             appState.launchMutation {
                 val result = runCatchingCancellable { appState.marmotIo { linkedDevices(account) } }
                 if (!controller.ownsRenderedDecline(invitation)) return@launchMutation
-                declineReachesOtherDevices(result)
+                result.declineNeedsConsent()
                     .onSuccess { needsConsent ->
                         if (needsConsent) {
                             asking = true
                         } else if (controller.declineInviteWithConsent(null, invitation)) {
                             onDeclined()
                         }
-                    }.onFailure { appState.presentFailure(R.string.linked_devices_load_failed, "INVITE_DEVICE_ROSTER", it) }
+                    }.onFailure {
+                        appState.presentFailure(R.string.linked_devices_load_failed, "INVITE_DEVICE_ROSTER", it)
+                    }
             }
         }
     }

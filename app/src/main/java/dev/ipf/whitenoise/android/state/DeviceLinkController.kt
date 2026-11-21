@@ -315,15 +315,21 @@ internal suspend fun DeviceLinkController.dismissMoveSibling(
 internal suspend fun WhiteNoiseAppState.cancelLinkAfterProfileSwitch(label: String) {
     val previous = accounts.firstOrNull { it.label == label && !it.signedOut && it.localSigning } ?: return
     val offers = DeviceLinkOffers.shared(appContext)
-    if (offers.linkingFor == previous.accountIdHex) offers.closeLinking()
-    runCatchingCancellable {
-        marmotIo {
-            val outgoing = deviceLinkSnapshot(label).newDevice
-            if (outgoing != null && outgoing !is NewDeviceLinkStateFfi.Ended && outgoing !is NewDeviceLinkStateFfi.Linked) {
-                cancelDeviceLink(label)
-            }
+    val wasLinking = offers.linkingFor == previous.accountIdHex
+    if (wasLinking) offers.closeLinking()
+    val outgoing =
+        runCatchingCancellable { marmotIo { deviceLinkSnapshot(label).newDevice } }.getOrElse {
+            if (wasLinking) presentFailure(R.string.link_device_action_failed, "DEVICE_LINK_CANCEL", it)
+            appStateDebug(it) { "could not read outgoing device link after profile switch" }
+            return
         }
-    }.onFailure {
-        if (deviceGroupRefusal(it) != "no_link_in_progress") presentFailure(R.string.link_device_action_failed, "DEVICE_LINK_CANCEL", it)
+    when (outgoing) {
+        null, is NewDeviceLinkStateFfi.Ended, NewDeviceLinkStateFfi.Linked -> Unit
+        else ->
+            runCatchingCancellable { marmotIo { cancelDeviceLink(label) } }.onFailure {
+                if (deviceGroupRefusal(it) != "no_link_in_progress") {
+                    presentFailure(R.string.link_device_action_failed, "DEVICE_LINK_CANCEL", it)
+                }
+            }
     }
 }

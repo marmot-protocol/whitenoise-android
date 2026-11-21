@@ -107,10 +107,21 @@ internal class DeviceLinkApprovalDraft(
         val Saver =
             listSaver<DeviceLinkApprovalDraft, Any>(
                 save = { listOf(it.label.text.toString(), it.optionsOpen, it.addToAllChats, it.bringHistory) },
-                restore = { DeviceLinkApprovalDraft(it[0] as String, it[1] as Boolean, it[2] as Boolean, it[3] as Boolean) },
+                restore = { values ->
+                    val (name, expanded, add, history) = values
+                    DeviceLinkApprovalDraft(name as String, expanded as Boolean, add as Boolean, history as Boolean)
+                },
             )
     }
 }
+
+/** Retain the transient choices across activity recreation for this composition. */
+@Composable
+internal fun rememberApprovalDraft() =
+    rememberSaveable(
+        saver = DeviceLinkApprovalDraft.Saver,
+        init = { DeviceLinkApprovalDraft() },
+    )
 
 /**
  * A link request as the approving device shows it. While MDK shows the code, Link device is one tap: the new device
@@ -128,7 +139,7 @@ internal fun DeviceLinkRequestContent(
     onDecline: () -> Unit,
     onClose: () -> Unit,
     failed: Boolean = false,
-    draft: DeviceLinkApprovalDraft = rememberSaveable(saver = DeviceLinkApprovalDraft.Saver) { DeviceLinkApprovalDraft() },
+    draft: DeviceLinkApprovalDraft = rememberApprovalDraft(),
 ) {
     val label = draft.label
     // MDK requires a name, so an empty field sends the placeholder the new device then replaces with its model.

@@ -178,6 +178,22 @@
         "test_ids": [
           "SET-060"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_adding_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_adding_chats",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_joining_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_joining_chats",
+        "test_ids": [
+          "SET-067"
+        ]
       }
     ]
   },

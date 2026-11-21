@@ -192,7 +192,7 @@ internal fun WhiteNoiseAppState.automaticAttachmentPolicy(accountRef: String): A
     return AutomaticAttachmentPolicy(
         account =
             when {
-                account == null && !accountListLoaded -> AutomaticPolicyAccount.Unloaded
+                !accountListLoaded -> AutomaticPolicyAccount.Unloaded
                 account == null -> AutomaticPolicyAccount.Unknown
                 account.signedOut -> AutomaticPolicyAccount.SignedOut
                 else -> AutomaticPolicyAccount.SignedIn

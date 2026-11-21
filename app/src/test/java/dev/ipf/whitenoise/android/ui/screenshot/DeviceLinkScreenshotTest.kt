@@ -164,14 +164,17 @@ class DeviceLinkScreenshotTest {
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h900dp-mdpi")
     fun removeAndSignInDarkRtl() {
-        show(Look(dark = true, rtl = true)) { UnlinkedProfileRemovalDialog(onRemove = {}, onCancel = {}, signingIn = true) }
+        show(Look(dark = true, rtl = true)) {
+            UnlinkedProfileRemovalDialog(onRemove = {}, onCancel = {}, signingIn = true)
+        }
         compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/device_link_remove_and_sign_in_dark_rtl.png")
     }
 
     /** The existing device sees the receiving slot's outstanding adds alongside its device name. */
     @Test
     fun addingChatsOnRosterDark() {
-        val device = fixtureDevice("sibling", label = "Laptop").copy(chatProgress = LinkChatProgressFfi("sibling", false, 12u, 5u))
+        val progress = LinkChatProgressFfi("sibling", false, 12u, 5u)
+        val device = fixtureDevice("sibling", label = "Laptop").copy(chatProgress = progress)
         val roster = LinkedDeviceRoster(fixtureDevice("this", isThisDevice = true), listOf(device), emptyList())
         show(Look(dark = true)) { LinkedDevicesContent(LinkedDeviceRosterState(roster = roster), {}) }
         compose.onRoot().captureRoboImage("src/test/snapshots/device_link_adding_chats_dark.png")

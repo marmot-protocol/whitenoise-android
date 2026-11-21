@@ -74,6 +74,22 @@
         "test_ids": [
           "SET-066"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_remove_sign_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.unlinked_remove_sign_in",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_remove_sign_in_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.unlinked_remove_sign_in_detail",
+        "test_ids": [
+          "SET-066"
+        ]
       }
     ]
   },

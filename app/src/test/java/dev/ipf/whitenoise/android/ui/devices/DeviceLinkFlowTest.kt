@@ -182,7 +182,8 @@ class DeviceLinkFlowTest {
         compose.setContent {
             WhiteNoiseTheme {
                 DeviceLinkApprovalGate(1, request.value, blocked.value) { draft ->
-                    DeviceLinkRequestContent(DeviceLinkPromptStateFfi.Comparing(CODE), null, { linked = it }, {}, {}, draft = draft)
+                    val state = DeviceLinkPromptStateFfi.Comparing(CODE)
+                    DeviceLinkRequestContent(state, null, { linked = it }, {}, {}, draft = draft)
                 }
             }
         }

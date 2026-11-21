@@ -34,7 +34,8 @@ class AccountSetupRecoveryTest {
     /** MDK's refusal to sign in an unlinked profile keeps its meaning instead of reading as a bad key. */
     @Test
     fun anUnlinkedRefusalKeepsItsMeaning() {
-        assertEquals(IdentityImportOutcome.Unlinked("work"), identityImportOutcome(MarmotKitException.AccountUnlinked("work")))
+        val refusal = MarmotKitException.AccountUnlinked("work")
+        assertEquals(IdentityImportOutcome.Unlinked("work"), identityImportOutcome(refusal))
     }
 
     @Test

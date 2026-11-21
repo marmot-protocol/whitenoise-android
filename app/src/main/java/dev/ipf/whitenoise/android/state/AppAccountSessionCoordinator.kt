@@ -138,20 +138,10 @@ internal class AppAccountSessionCoordinator(
                 }
                 val previous = activation.activeAccount
                 publish()
-                cancelReplacedLink(previous, label)
+                activation.cancelReplacedLink(previous, label)
             }
         } finally {
             handoff.finishRequest(generation)
-        }
-    }
-
-    /** The profile was published under the lifetime lock, so finish retiring its predecessor even if the UI closes. */
-    private suspend fun cancelReplacedLink(
-        previous: String?,
-        current: String,
-    ) {
-        if (previous != null && previous != current) {
-            withContext(NonCancellable) { activation.cancelOutgoingDeviceLink(previous) }
         }
     }
 
@@ -351,7 +341,7 @@ internal class AppAccountSessionCoordinator(
                 activation.publish(request.label, generation, switching, prepared)
                 // The synchronous local-ready projection belongs to this same accepted publication.
                 onActivated()
-                cancelReplacedLink(previous, request.label)
+                activation.cancelReplacedLink(previous, request.label)
                 prepared to switching
             } else {
                 null
@@ -383,4 +373,12 @@ internal class AppAccountSessionCoordinator(
             activation.reconcileNotificationDelivery(includeBackgroundAccountModes = switching && !startup)
         }
     }
+}
+
+/** Finish retiring the previous profile under the lifetime lock even if the account picker closes. */
+private suspend fun AppAccountSessionActivation.cancelReplacedLink(
+    previous: String?,
+    current: String,
+) {
+    if (previous != null && previous != current) withContext(NonCancellable) { cancelOutgoingDeviceLink(previous) }
 }
