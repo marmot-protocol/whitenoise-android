@@ -6,7 +6,8 @@ candidate_root=${2:?candidate root is required}
 output_root=${3:?output root is required}
 : "${PR_NUMBER:?PR_NUMBER is required}"
 
-for channel in stable; do
+for channel in stable isolated; do
+  [[ "$channel" != isolated || -d "$candidate_root/$channel" ]] || continue
   output_dir="$output_root/$channel"
   mkdir -p "$output_dir"
   cp "$signed_root/$channel/whitenoise-pr-${PR_NUMBER}-${channel}.apk" \

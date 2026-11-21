@@ -3,7 +3,7 @@ const END = '<!-- pr-apk-preview:end -->'
 const LEGACY_COMMENT_MARKER = '<!-- pr-apk-preview -->'
 const APK_MIME = 'application/vnd.android.package-archive'
 
-function renderSection({ prNumber, headSha, stableUrl }) {
+function renderSection({ prNumber, headSha, stableUrl, isolatedUrl }) {
   return [
     START,
     '## Preview APK',
@@ -12,7 +12,8 @@ function renderSection({ prNumber, headSha, stableUrl }) {
     '',
     `Built from PR #${prNumber} at \`${headSha.slice(0, 12)}\`. This replaces the installed White Noise PR app and retains its accounts and history.`,
     '',
-    'Updates automatically on every push to this PR.',
+    ...(isolatedUrl ? [`[Isolated PR #${prNumber}](${isolatedUrl}) — separate app and data for side-by-side testing.`, ''] : []),
+    'Built on request for the revision above.',
     END,
   ].join('\n')
 }
@@ -73,6 +74,7 @@ async function run({ github, context, core }) {
   const prNumber = Number(process.env.PR_NUMBER)
   const headSha = process.env.HEAD_SHA
   const stableUrl = process.env.STABLE_URL
+  const isolatedUrl = process.env.ISOLATED_URL
   if (!prNumber || !headSha || !stableUrl) {
     throw new Error('PR_NUMBER, HEAD_SHA, and STABLE_URL are required')
   }
@@ -86,7 +88,7 @@ async function run({ github, context, core }) {
     core.info(`Skipping preview links for superseded PR head ${headSha}.`)
     return
   }
-  const section = renderSection({ prNumber, headSha, stableUrl })
+  const section = renderSection({ prNumber, headSha, stableUrl, isolatedUrl })
   await github.rest.pulls.update({
     owner: context.repo.owner,
     repo: context.repo.repo,
