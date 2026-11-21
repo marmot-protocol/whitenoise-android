@@ -139,7 +139,9 @@ class ChatsSettingsTransitionFramesTest {
             "Expected bounded page travel at $tag, observed $travel dp",
             travel > 0f && travel <= AppPageTravel.value + 1f,
         )
-        assertEquals("Native width at $tag", settled.width.value, first.width.value, 0.5f)
+        val settledWidth = settled.right - settled.left
+        val firstWidth = first.right - first.left
+        assertEquals("Native width at $tag", settledWidth.value, firstWidth.value, 0.5f)
         assertEquals("Native vertical position at $tag", settled.top.value, first.top.value, 0.5f)
     }
 

@@ -34,7 +34,20 @@ private class PresentedPage<T>(
     val target: T,
     var translationPx: Float = 0f,
     var inFlight: Boolean = false,
-)
+) {
+    fun entryOffset(
+        destination: T,
+        enabled: Boolean,
+        forward: Boolean,
+        travelPx: Float,
+    ): Float =
+        when {
+            !enabled || target == destination -> 0f
+            inFlight -> translationPx / travelPx
+            forward -> 1f
+            else -> -1f
+        }
+}
 
 private class PagePresentation<T>(
     initial: T,
@@ -56,15 +69,7 @@ internal fun <T> rememberPageHandoff(
     val presentation = remember(ownerKey) { PagePresentation(target) }
     val offset =
         remember(presentation, target, enabled) {
-            val previous = presentation.current
-            val entry =
-                when {
-                    !enabled || previous.target == target -> 0f
-                    previous.inFlight -> previous.translationPx / travelPx
-                    forward -> 1f
-                    else -> -1f
-                }
-            Animatable(entry)
+            Animatable(presentation.current.entryOffset(target, enabled, forward, travelPx))
         }
     val presented =
         remember(offset, contourActive) {
