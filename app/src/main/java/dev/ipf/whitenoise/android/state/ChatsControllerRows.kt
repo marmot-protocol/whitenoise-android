@@ -21,6 +21,14 @@ internal suspend fun ChatsController.applyChatListWindowRows(
     val folderRevision = folder?.currentRevision
     val frame = windows.frame().withFolder(folder)
     val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
+    // A shown row's changed picture is decoded first, so it never drops to initials while local bytes decode.
+    if (valid && windows.isCurrent(frame)) {
+        appState.prepareChangedChatListAvatars(
+            accountRef,
+            frame.rows,
+            (items + archivedItems).associate { it.foldedId to it.selectedAvatarAsset },
+        )
+    }
     // The plain revision guards only the plain rows; a folder swap or install since capture makes this frame
     // stale too, and the change that superseded it publishes its own frame.
     val folderCurrent = folderWindows === folder && folder?.currentRevision == folderRevision

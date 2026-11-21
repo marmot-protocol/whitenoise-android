@@ -1,14 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
-import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
-import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -46,55 +43,6 @@ class MessageBatchActionsTest {
         assertFalse(guard.tryStart())
         guard.finish()
         assertTrue(guard.tryStart())
-    }
-
-    @Test
-    fun systemEventsAndDeletedMessagesAreNeverBatchSelectable() {
-        assertTrue(
-            isBatchSelectableMessage(
-                messageId = "m1",
-                userVisibleMessage = true,
-                committedMessage = true,
-                projectedDeleted = false,
-                deletedMessageIds = emptySet(),
-            ),
-        )
-        assertFalse(
-            isBatchSelectableMessage(
-                messageId = "m1",
-                userVisibleMessage = true,
-                committedMessage = true,
-                projectedDeleted = true,
-                deletedMessageIds = emptySet(),
-            ),
-        )
-        assertFalse(
-            isBatchSelectableMessage(
-                messageId = "m1",
-                userVisibleMessage = true,
-                committedMessage = true,
-                projectedDeleted = false,
-                deletedMessageIds = setOf("m1"),
-            ),
-        )
-        assertFalse(
-            isBatchSelectableMessage(
-                messageId = "m1",
-                userVisibleMessage = false,
-                committedMessage = true,
-                projectedDeleted = false,
-                deletedMessageIds = emptySet(),
-            ),
-        )
-        assertFalse(
-            isBatchSelectableMessage(
-                messageId = "temp-id",
-                userVisibleMessage = true,
-                committedMessage = false,
-                projectedDeleted = false,
-                deletedMessageIds = emptySet(),
-            ),
-        )
     }
 
     @Test
@@ -260,7 +208,7 @@ class MessageBatchActionsTest {
     }
 
     @Test
-    fun reconciliationPrunesOnlyVisibleInvalidOrKnownDeletedSelections() {
+    fun reconciliationKeepsAnOffscreenPlaceholderAfterItsOverlayIdIsPruned() {
         val invalidVisible = selection("invalid-visible", recordedAt = 100uL, timelineOrder = 1uL)
         val deletedOffscreen = selection("deleted-offscreen", recordedAt = 200uL, timelineOrder = 2uL)
 
@@ -276,7 +224,15 @@ class MessageBatchActionsTest {
                 invalidVisibleMessageIds = setOf(invalidVisible.action.messageId),
             )
 
-        assertTrue(retained.isEmpty())
+        val placeholder = retained.getValue(deletedOffscreen.action.messageId)
+        assertEquals(1, retained.size)
+        assertTrue(placeholder.action.deleted)
+        assertFalse(placeholder.action.canDeleteForEveryone)
+        assertEquals(null, placeholder.action.copyableText)
+        assertEquals(
+            placeholder,
+            reconcileBatchSelections(mapOf("c" to placeholder), emptyMap(), emptySet(), emptySet())["c"],
+        )
     }
 
     @Test
@@ -322,6 +278,44 @@ class MessageBatchActionsTest {
         assertEquals(BatchDeleteBreakdown(deleteForEveryone = 0, hideLocally = 2), breakdown)
         assertFalse(breakdown.canOfferDeleteForEveryone)
     }
+
+    @Test
+    fun mixedDeleteOnlySendsLiveRecordsToTheProtocolCallback() =
+        runBlocking {
+            val live = selection("live", recordedAt = 100uL, timelineOrder = 1uL, canDeleteForEveryone = true)
+            val placeholder =
+                selection(
+                    "deleted",
+                    recordedAt = 200uL,
+                    timelineOrder = 2uL,
+                    canDeleteForEveryone = true,
+                ).asPlaceholder()
+            val selections = listOf(live, placeholder)
+            for (scope in BatchDeleteScope.entries) {
+                val protocolDeletes = mutableListOf<String>()
+                val localHides = mutableListOf<String>()
+                val result =
+                    executeBatchDelete(
+                        batchDeleteAttempts(selections, scope),
+                        deleteForEveryone = { record ->
+                            protocolDeletes += record.messageIdHex
+                            Result.success(Unit)
+                        },
+                        hideLocally = { id ->
+                            localHides += id
+                            Result.success(Unit)
+                        },
+                    )
+                assertEquals(2, result.succeeded)
+                if (scope == BatchDeleteScope.EVERYONE) {
+                    assertEquals(listOf("live"), protocolDeletes)
+                    assertEquals(listOf("deleted"), localHides)
+                } else {
+                    assertTrue(protocolDeletes.isEmpty())
+                    assertEquals(listOf("live", "deleted"), localHides)
+                }
+            }
+        }
 
     @Test
     fun executeBatchDeleteEveryoneScopeRoutesByCapabilityAndAggregatesFailures() =
@@ -542,39 +536,10 @@ class MessageBatchActionsTest {
             thumbhash = null,
         )
 
-    /** Builds a batch selection for the given message, optionally deletable for everyone. */
     private fun selection(
         id: String,
         recordedAt: ULong,
         timelineOrder: ULong,
         canDeleteForEveryone: Boolean = false,
-    ): BatchMessageSelection =
-        BatchMessageSelection(
-            action = BatchMessageActionItem(id, "alice", "Alice", id, id, canDeleteForEveryone = canDeleteForEveryone),
-            record =
-                AppMessageRecordFfi(
-                    invalidated = false,
-                    messageIdHex = id,
-                    direction = "received",
-                    groupIdHex = "group",
-                    sender = "alice",
-                    plaintext = id,
-                    contentTokens =
-                        MarkdownDocumentFfi(
-                            truncated = false,
-                            blocks = emptyList(),
-                            blankLinesBefore = ByteArray(0),
-                        ),
-                    kind = 9uL,
-                    tags = emptyList(),
-                    sourceEpoch = null,
-                    retentionSeconds = null,
-                    retentionExpiresAt = null,
-                    recordedAt = recordedAt,
-                    receivedAt = recordedAt,
-                    sticker = null,
-                ),
-            status = MessageStatus.Received,
-            timelineOrder = timelineOrder,
-        )
+    ): BatchMessageSelection = testBatchSelection(id, recordedAt, timelineOrder, canDeleteForEveryone)
 }

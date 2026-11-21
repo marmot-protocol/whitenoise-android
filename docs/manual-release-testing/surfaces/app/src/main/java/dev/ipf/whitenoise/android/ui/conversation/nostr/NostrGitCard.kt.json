@@ -1,0 +1,105 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "R.string.nostr_git_applied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_applied",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_closed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_closed",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_comment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_comment",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_draft",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_issue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_issue",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_open",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_patch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_patch",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_pr",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_pr",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_refs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_refs",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_repository",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_repository",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_services",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_services",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrGitCard.kt",
+        "anchor": "R.string.nostr_git_update",
+        "test_ids": [
+          "RDR-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

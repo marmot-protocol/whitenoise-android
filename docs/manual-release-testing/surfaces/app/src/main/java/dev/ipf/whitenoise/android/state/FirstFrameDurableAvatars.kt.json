@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDurableAvatars.kt",
+  "legacy_sha256": "dfa85a1548602d0c595d0ee553fcf38384c61afbb63c03ad74bad2bd271b6b7a",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "A restored or switched-to chat list decodes stored peer avatars before its first frame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDurableAvatars.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(",
+        "test_ids": [
+          "CHL-023"
+        ]
+      },
+      {
+        "surface": "A chat-list row whose picture changed decodes the new stored picture before the frame publishes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDurableAvatars.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.prepareChangedChatListAvatars(",
+        "test_ids": [
+          "CHL-039"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

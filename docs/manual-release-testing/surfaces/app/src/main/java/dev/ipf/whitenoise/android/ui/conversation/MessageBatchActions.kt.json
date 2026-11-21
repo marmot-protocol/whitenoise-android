@@ -10,6 +10,14 @@
         "test_ids": [
           "MSG-010"
         ]
+      },
+      {
+        "surface": "Select and remove deleted placeholders",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/MessageBatchActions.kt",
+        "anchor": "fun reconcileBatchSelections(",
+        "test_ids": [
+          "MSG-008"
+        ]
       }
     ]
   },

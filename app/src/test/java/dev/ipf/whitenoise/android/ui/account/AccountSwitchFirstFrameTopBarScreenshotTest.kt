@@ -18,14 +18,16 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -119,8 +121,9 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
                 .onNodeWithTag(SCREENSHOT_TAG)
                 .captureRoboImage("src/test/snapshots/account_switch_first_frame_seeded_profiles_light.png")
 
-            // The active avatar owns the first header frame; other cached identities now live in the selector.
-            composeRule.onNodeWithTag("chats.switchProfile").assertHasClickAction().performClick()
+            composeRule
+                .onNodeWithTag(otherAccountAvatarTag(STUDIO_REF), useUnmergedTree = true)
+                .performTouchInput { longClick() }
             composeRule.onNodeWithTag(profileRowTag(ACTIVE_REF)).assertIsDisplayed().assertIsSelected()
             composeRule.onNodeWithTag(profileRowTag(STUDIO_REF)).assertIsDisplayed().assertIsNotSelected()
             composeRule.onNodeWithTag(profileRowTag(WORK_REF)).assertIsDisplayed().assertIsNotSelected()
@@ -301,10 +304,9 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
 
         assertEquals(ACTIVE_REF, appState.activeAccountRef)
         composeRule
-            .onNodeWithTag("chats.switchProfile")
+            .onNodeWithTag(OTHER_ACCOUNT_OVERFLOW_TAG, useUnmergedTree = true)
             .assertIsDisplayed()
-            .assertHasClickAction()
-            .performClick()
+            .performTouchInput { click() }
         val labels = listOf(ACTIVE_REF, STUDIO_REF, WORK_REF, "travel", "community", "archive")
         labels.forEachIndexed { index, label ->
             composeRule.onNode(hasScrollToIndexAction()).performScrollToIndex(index)

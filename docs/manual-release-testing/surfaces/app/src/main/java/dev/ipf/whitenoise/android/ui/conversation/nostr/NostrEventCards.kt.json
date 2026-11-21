@@ -129,9 +129,9 @@
     ],
     "source_coverage": [
       {
-        "surface": "Referenced author avatar uses cached pixels only",
+        "surface": "Compact event author label avoids avatar acquisition",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
-        "anchor": "picture = AvatarImageLoader.peek",
+        "anchor": "text = eventAuthorLabel(card, authorDisplayName)",
         "test_ids": [
           "RDR-004"
         ]

@@ -123,6 +123,22 @@
         "test_ids": [
           "MSG-048"
         ]
+      },
+      {
+        "surface": "R.string.delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.delete",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "R.string.delete_for_me",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.delete_for_me",
+        "test_ids": [
+          "MSG-008"
+        ]
       }
     ],
     "settings_controls": [

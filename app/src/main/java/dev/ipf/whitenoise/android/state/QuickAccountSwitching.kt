@@ -42,8 +42,9 @@ internal fun WhiteNoiseAppState.quickSwitchAvatarAccounts(): List<AccountSummary
         eligible = accountSetup::eligible,
     )
 
-/** Whether the avatar should open the native selector instead of the single-account Settings destination. */
+/** Whether the avatar needs to offer account switching when quick switching is off. */
 internal fun WhiteNoiseAppState.chatsAvatarOpensSelector(): Boolean {
+    if (quickAccountSwitching) return false
     val eligibleCount = accounts.count { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
     return eligibleCount > 1
 }

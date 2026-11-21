@@ -109,6 +109,30 @@
         "test_ids": [
           "MED-047"
         ]
+      },
+      {
+        "surface": "Copy advertised Git event URLs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "if (card.gitLinks.isNotEmpty())",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_copy_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "R.string.nostr_git_copy_url",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_git_open_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "R.string.nostr_git_open_url",
+        "test_ids": [
+          "RDR-002"
+        ]
       }
     ]
   },

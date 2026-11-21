@@ -28,10 +28,10 @@ internal suspend fun prepareNostrEventPreview(
     card: NostrEventCardModel,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
 ): NostrEventPreparedPreview {
-    val document = parsePreviewDocument(card.summary, parseMarkdown)
+    val document = if (card.literalReaderBody) null else parsePreviewDocument(card.summary, parseMarkdown)
     val body = boundedNostrImageBody(card.readerBody)
     val bodyDocument =
-        if (body == card.summary) {
+        if (card.literalReaderBody || body == card.summary) {
             document
         } else {
             bodyImageParsePermits.withPermit { parsePreviewDocument(body, parseMarkdown) }

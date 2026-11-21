@@ -35,8 +35,8 @@ internal fun rememberNostrReaderPreparation(
                 val body = card.readerBody ?: card.summary.orEmpty()
                 val textChunks = nostrReaderTextChunks(body)
                 try {
-                    val document = parseMarkdown(body)
-                    val blocks = document.takeIf(::nostrReaderCanFormat)?.let(::nostrReaderBlocks).orEmpty()
+                    val document = if (card.literalReaderBody) null else parseMarkdown(body)
+                    val blocks = document?.takeIf(::nostrReaderCanFormat)?.let(::nostrReaderBlocks).orEmpty()
                     NostrReaderPreparation(
                         document = document,
                         blocks = blocks,
