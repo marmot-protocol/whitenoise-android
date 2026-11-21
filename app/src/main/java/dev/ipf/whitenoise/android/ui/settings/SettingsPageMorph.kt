@@ -147,8 +147,10 @@ internal class SettingsPageMorph {
     /** Closing to a route without groups folds into the outline it opened from, when that is on screen. */
     private fun closingTarget(native: List<SettingsContour>?): List<SettingsContour>? {
         if (opening || native?.isEmpty() != true) return native
-        val anchor = anchorContour?.invoke()?.takeIf { it.bounds.validIn(transitionHost) } ?: return native
-        return listOf(anchor.copy(key = targetAnchorKey ?: correspondenceKey ?: 0, viewport = transitionHost))
+        val anchor = anchorContour?.invoke()?.takeIf { it.bounds.validIn(transitionHost) }
+        return anchor?.let {
+            listOf(it.copy(key = targetAnchorKey ?: correspondenceKey ?: 0, viewport = transitionHost))
+        } ?: native
     }
 
     internal fun outgoingPresence(time: Float): Float {
