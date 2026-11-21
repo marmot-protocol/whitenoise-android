@@ -114,7 +114,7 @@ class QuickAccountSwitchingUiTest {
         composeRule.onNodeWithTag(OTHER_ACCOUNT_STACK_TAG).assertExists()
         composeRule
             .onNodeWithTag("chats.switchProfile")
-            .assertContentDescriptionContains(context.getString(R.string.open_settings))
+            .assertContentDescriptionContains(context.getString(R.string.open_settings), substring = true)
             .performClick()
 
         assertEquals(1, settings)
