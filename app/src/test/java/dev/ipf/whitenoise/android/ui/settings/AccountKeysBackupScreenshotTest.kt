@@ -189,7 +189,11 @@ class AccountKeysBackupScreenshotTest {
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
-                    AccountKeysScreen(appState = appState, onBack = {})
+                    AccountKeysScreen(
+                        appState = appState,
+                        onBack = {},
+                        rawExportAuthenticator = RawKeyExportAuthentication { authenticated -> authenticated() },
+                    )
                 }
             }
         }

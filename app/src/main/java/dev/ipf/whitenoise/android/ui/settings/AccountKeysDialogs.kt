@@ -120,7 +120,10 @@ internal fun ProfileKeysDialogs(
             onConfirm = { onExport(true, KeyExportDestination.File) },
             onViewBackup = { onExport(true, KeyExportDestination.Preview) },
             onDismiss = ui::cancelExport,
-            onDismissStart = ui::cancelExportPreparation,
+            onDismissStart = {
+                ui.cancelExportPreparation()
+                cancelRawAuthentication()
+            },
         )
     }
     ui.encryptedBackup?.let { backup ->
