@@ -149,7 +149,7 @@ internal class ExternalSignerCleanupPublicationTest : ExternalSignerSignOutFixtu
 
             val outcome = appState.signOutAndWipeActiveAccount()
 
-            assertEquals(wipeOutcome, outcome)
+            assertEquals(wipeOutcome, outcome?.native)
             assertEquals(1, wipeCalls.get())
             assertTrue(listAccountsCalls.get() > 0)
             assertTrue(appState.accounts.isEmpty())
@@ -319,7 +319,7 @@ internal class ExternalSignerCleanupPublicationTest : ExternalSignerSignOutFixtu
                 assertTrue(state.accounts.isEmpty())
                 assertNull(PinnedConversationTokens.create(owner).issue(accountRef, "ab".repeat(16)))
             }
-            assertEquals(wipeOutcome, state.signOutAndWipeActiveAccount())
+            assertEquals(wipeOutcome, state.signOutAndWipeActiveAccount()?.native)
             assertTrue(listAccountsCalls.get() > 0)
             assertTrue(state.accounts.isEmpty())
             assertNull(state.activeAccountRef)
@@ -347,7 +347,7 @@ internal class ExternalSignerCleanupPublicationTest : ExternalSignerSignOutFixtu
                     }
                 }
             val state = appState(pushTokenStore = PushTokenStore(corruptAfterWipe))
-            assertEquals(wipeOutcome, state.signOutAndWipeActiveAccount())
+            assertEquals(wipeOutcome, state.signOutAndWipeActiveAccount()?.native)
             assertTrue(failedPushReads > 0)
             assertTrue(engineWiped)
             assertTrue(state.accounts.isEmpty())
@@ -372,7 +372,7 @@ internal class ExternalSignerCleanupPublicationTest : ExternalSignerSignOutFixtu
 
             val outcome = appState.signOutAndWipeActiveAccount()
 
-            assertEquals(wipeOutcome, outcome)
+            assertEquals(wipeOutcome, outcome?.native)
             assertEquals(1, wipeCalls.get())
             assertEquals(0, listAccountsCalls.get())
             assertEquals(listOf(accountRef), appState.accounts.map { it.label })

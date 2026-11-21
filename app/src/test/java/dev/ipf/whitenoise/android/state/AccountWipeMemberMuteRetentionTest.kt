@@ -7,7 +7,10 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.WipeOutcomeFfi
+import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -15,6 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.File
 import java.lang.reflect.Proxy
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
@@ -116,6 +120,23 @@ class AccountWipeMemberMuteRetentionTest {
                 .getDeclaredField("marmotRuntime")
                 .apply { isAccessible = true }
                 .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
+        }
+
+    /** A completed native wipe triggers cleanup for the account whose shares were staged. */
+    @Test
+    fun completedWipeRemovesOnlyTheWipedAccountsStagedCopies() =
+        runBlocking {
+            val shared = File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
+            val removed =
+                File(shared, sharedPlaintextPrefix(context, WIPED_ACCOUNT) + "wipe.pdf").apply { writeText("test") }
+            val preserved =
+                File(shared, sharedPlaintextPrefix(context, SURVIVING_ACCOUNT) + "keep.pdf").apply { writeText("test") }
+
+            val result = checkNotNull(appState().signOutAndWipeActiveAccount())
+
+            assertTrue(result.native.localCleanup.completed)
+            assertFalse(removed.exists())
+            assertTrue(preserved.exists())
         }
 
     /** Wiping the final signed-in identity must not select a retained signed-out identity. */

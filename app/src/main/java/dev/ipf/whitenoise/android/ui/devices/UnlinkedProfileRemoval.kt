@@ -12,11 +12,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AccountWipeCompletion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.removeUnlinkedAccountForOutcome
-import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.settings.runAccountWipeMutation
 
@@ -87,9 +86,9 @@ internal fun UnlinkedProfileRemovalHost(
  */
 private fun reportUnlinkedProfileRemoval(
     appState: WhiteNoiseAppState,
-    outcome: WipeOutcomeFfi?,
+    completion: AccountWipeCompletion?,
 ) {
-    val report = outcome?.let(::wipeReport)
+    val report = completion?.report
     when {
         report == null -> appState.present(R.string.unlinked_account_remove_failed)
         report.clean -> appState.presentTransient(R.string.unlinked_account_removed)

@@ -44,7 +44,6 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.RuntimePolicyHooks
@@ -97,7 +96,6 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
-import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaThumbnail
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
@@ -5238,46 +5236,6 @@ class WhiteNoiseAppState private constructor(
         inFlightAttachmentAcquisitions.cancelAll()
     }
 
-    /**
-     * Wipe the device-side decrypted-media footprint that outlives the
-     * in-memory caches: the L2 disk cache (cacheDir/decrypted-media) and the
-     * decrypted voice/video plaintext and unsent pasted media that the
-     * conversation UI materializes under cacheDir. Used at sign-out, when we
-     * treat that footprint as ending with the session. Re-opening a chat after
-     * the next sign-in re-downloads from Blossom.
-     *
-     * Suspends so the sign-out flow can await completion rather than racing a
-     * fast re-sign-in against an unfinished wipe. `shared_media` is left to its
-     * age-based janitor on purpose: those files can back a live external
-     * "open with"/share reader and deleting them out from under it would break
-     * an in-progress share.
-     */
-    private suspend fun wipeDecryptedMediaFromDisk() {
-        withContext(Dispatchers.IO) {
-            AttachmentCachePublication.onWipeStarted()
-            try {
-                // Each target holds decrypted plaintext, so wipe them independently
-                // and best-effort: a failure in one (IO error, locked file) must not
-                // skip the others, and a swallowed failure should still be visible.
-                runCatchingCancellable { clearMediaDiskCaches() }
-                    .onFailure {
-                        appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
-                    }
-                dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext(appContext.cacheDir) { name, failure ->
-                    appStateDebug { "$name plaintext wipe failed: ${failure.readableMessage()}" }
-                }
-                // The single pending-forward entry can hold the wiped account's
-                // message plaintext; a destructive wipe drops it unconditionally.
-                runCatchingCancellable { forwardRequestPersistence.clear() }
-                    .onFailure {
-                        appStateDebug { "pending forward request wipe failed: ${it.readableMessage()}" }
-                    }
-            } finally {
-                AttachmentCachePublication.onWipeFinished()
-            }
-        }
-    }
-
     // Guards the window where a sign-out/wipe clears an account's contact
     // details on IO while the account can still read as active on Main: the
     // setters reject writes for guarded refs instead of racing the clear and
@@ -5670,15 +5628,10 @@ class WhiteNoiseAppState private constructor(
         stopTtsForRemovedAccount(account)
     }
 
-    /**
-     * Destructive sign-out: leave MLS groups, delete relay KeyPackages, and
-     * wipe all local state for the active account via Marmot's
-     * [dev.ipf.marmotkit.Marmot.signOutAndWipe]. Returns the structured
-     * outcome so the UI can surface partial failures.
-     */
+    /** Leaves groups, deletes relay KeyPackages and reports native and Android cleanup outcomes. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
-    suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
+    internal suspend fun signOutAndWipeActiveAccount(): AccountWipeCompletion? {
         val requested = activeAccountRef ?: return null
         val runtime = marmotRuntime
         val epoch = runtimeGeneration
@@ -5692,7 +5645,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    internal suspend fun signOutAndWipeActiveAccountLocked(wipedRef: String): WipeOutcomeFfi? {
+    internal suspend fun signOutAndWipeActiveAccountLocked(wipedRef: String): AccountWipeCompletion? {
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(wipedRef) {
@@ -5706,9 +5659,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** The caller holds launcher revocation through cleanup; completed native ownership is published first. */
+    /** Holds launcher revocation through cleanup and publishes native removal first. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
-    private suspend fun finishRevokedAccountWipe(wipedRef: String): WipeOutcomeFfi? {
+    private suspend fun finishRevokedAccountWipe(wipedRef: String): AccountWipeCompletion? {
+        if (!prepareSharedPlaintextWipe(wipedRef)) return null
         val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         val inView = activeAccountRef
         conversationDictation.onAccountUnavailable(wipedRef)
@@ -5723,8 +5677,7 @@ class WhiteNoiseAppState private constructor(
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
-                                // The wipe invalidates server-side registration state for this account, and
-                                // withSerializedNativePushWipe already holds nativePushSyncMutex here.
+                                // Native wipe invalidates registration while the push-sync mutex is held.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)
                                 runCatching { pushTokenStore.clear() }
                             }
@@ -5745,12 +5698,14 @@ class WhiteNoiseAppState private constructor(
                     return null
                 }
             if (!outcome.localCleanup.completed) {
+                discardRejectedSharedPlaintextWipe(wipedRef)
                 appStateDebug {
                     "signOutAndWipe kept active account=${wipedRef.take(8)} because engine cleanup did not complete"
                 }
                 restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
-                return outcome
+                return AccountWipeCompletion(outcome, wipeReport(outcome))
             }
+            val mediaWipeFailed = wipeDecryptedMediaFromDisk(wipedRef)
             chatMutePreferences.removeAccount(wipedRef)
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             attachmentCollections.forgetAccount(wipedRef)
@@ -5781,7 +5736,6 @@ class WhiteNoiseAppState private constructor(
                     appStateDebug { "local alert preference cleanup will retry during account retention" }
                 }
             }
-            wipeDecryptedMediaFromDisk()
             if (!clearHiddenMessagesForAccount(wipedRef)) {
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
             }
@@ -5843,7 +5797,7 @@ class WhiteNoiseAppState private constructor(
             notificationNetworkRecovery.resumeIfPending()
             refreshLocalNotificationSettings()
             diagnostics.refresh(marmot())
-            return outcome
+            return AccountWipeCompletion(outcome, wipeReport(outcome, localMediaFailure(mediaWipeFailed)))
         } finally {
             // Backstop: the suppression bracket must not outlive this call
             // whatever throws above — a latched flag would silently disable

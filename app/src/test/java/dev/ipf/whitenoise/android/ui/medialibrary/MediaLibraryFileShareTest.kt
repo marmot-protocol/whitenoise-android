@@ -50,7 +50,7 @@ class MediaLibraryFileShareTest {
             registerShareTarget(PDF)
             val source = PatternedPlaintext(ATTACHMENT_PRESENTATION_MAX_BYTES + CHUNK_BYTES + 7)
 
-            shareLibraryFile(context, row("report.pdf", PDF), "Share", currentRow = ::currentRow) { source }
+            shareLibraryFile(context, "account", row("report.pdf", PDF), "Share", currentRow = ::currentRow) { source }
 
             val uri = sharedStream(PDF)
             assertEquals("report.pdf", displayName(uri))
@@ -67,7 +67,13 @@ class MediaLibraryFileShareTest {
             registerShareTarget(PDF)
             val bytes = "retained upload bytes".encodeToByteArray()
 
-            shareLibraryFile(context, row("draft.pdf", PDF, mine = true), "Share", currentRow = ::currentRow) {
+            shareLibraryFile(
+                context,
+                "account",
+                row("draft.pdf", PDF, mine = true),
+                "Share",
+                currentRow = ::currentRow,
+            ) {
                 AttachmentPlaintext.Bytes(bytes)
             }
 
@@ -90,7 +96,7 @@ class MediaLibraryFileShareTest {
             val sharing =
                 async {
                     runCatching {
-                        shareLibraryFile(context, sharedRow, "Share", currentRow = { mounted }) {
+                        shareLibraryFile(context, "account", sharedRow, "Share", currentRow = { mounted }) {
                             staging.complete(Unit)
                             release.await()
                             AttachmentPlaintext.Bytes("secret".encodeToByteArray())
@@ -116,7 +122,7 @@ class MediaLibraryFileShareTest {
             val sharedRow = row("report.pdf", PDF)
             val recomposed = sharedRow.copy(recordedAt = 2uL)
 
-            shareLibraryFile(context, sharedRow, "Share", currentRow = { recomposed }) {
+            shareLibraryFile(context, "account", sharedRow, "Share", currentRow = { recomposed }) {
                 AttachmentPlaintext.Bytes("bytes".encodeToByteArray())
             }
 

@@ -51,7 +51,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SignOutCompletion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
-import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
@@ -132,23 +131,17 @@ internal fun launchAccountWipe(appState: WhiteNoiseAppState) {
             },
             onFinished = { appState.wipeInProgress = false },
         ) {
-            val outcome = appState.signOutAndWipeActiveAccount()
-            if (outcome == null) {
+            val report = appState.signOutAndWipeActiveAccount()?.report
+            if (report == null) {
                 // Total FFI failure: nothing was wiped and the
                 // runtime state was restored — this one is
                 // worth a bug report, so keep it copyable.
                 appState.present(R.string.toast_couldnt_wipe_account, copyable = true)
+            } else if (report.clean) {
+                appState.presentTransient(R.string.toast_signed_out_and_wiped)
             } else {
-                val report = wipeReport(outcome)
-                if (report.clean) {
-                    appState.presentTransient(R.string.toast_signed_out_and_wiped)
-                } else {
-                    // The app-root sheet lists every
-                    // incomplete stage. If local cleanup
-                    // failed, AppState restored the active
-                    // session instead of tearing it down.
-                    appState.pendingWipeReport = report
-                }
+                // The app-root sheet lists native and Android cleanup failures.
+                appState.pendingWipeReport = report
             }
         }
     }

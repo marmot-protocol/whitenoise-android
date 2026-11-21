@@ -341,6 +341,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Destructive wipe reports Android shared-file cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt",
+        "anchor": "appState.signOutAndWipeActiveAccount()?.report",
+        "test_ids": [
+          "ACC-009"
+        ]
       }
     ]
   },

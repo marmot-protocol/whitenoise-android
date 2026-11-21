@@ -515,6 +515,7 @@ class MediaVideoShareParityTest {
                 request.reference.fileName,
                 request.reference.mediaType,
                 chooserTitle = shareContext.getString(R.string.shared_media_share),
+                accountRef = "account",
             ).also(outcomes::add)
         }
 

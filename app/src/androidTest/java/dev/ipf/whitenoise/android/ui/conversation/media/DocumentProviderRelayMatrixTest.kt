@@ -160,7 +160,13 @@ class DocumentProviderRelayMatrixTest {
                     val pdfIndex = fixtureCases.indexOfFirst { it.id == "pdf" }
                     val pdf = marmot.downloadMedia(receiver.label, group, receivedReferences[pdfIndex])
                     val pdfFile =
-                        materializeDocumentAttachment(context, messageId, pdfIndex, receivedReferences[pdfIndex]) {
+                        materializeDocumentAttachment(
+                            context,
+                            receiver.label,
+                            messageId,
+                            pdfIndex,
+                            receivedReferences[pdfIndex],
+                        ) {
                             pdf.plaintext
                         }
                     val viewsBefore = viewerStatus(context).views
@@ -184,6 +190,7 @@ class DocumentProviderRelayMatrixTest {
                     val unhandledFile =
                         materializeDocumentAttachment(
                             context,
+                            receiver.label,
                             messageId,
                             unhandledIndex,
                             receivedReferences[unhandledIndex],

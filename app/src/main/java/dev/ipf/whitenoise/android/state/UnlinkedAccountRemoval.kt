@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.WipeOutcomeFfi
-
 /**
  * Removes a saved account that another of its devices unlinked, from the sign-in screen where no account is active.
  * It runs the same wipe as removing the account in view, so the drafts, decrypted media, launcher shortcuts and
@@ -10,15 +8,15 @@ import dev.ipf.marmotkit.WipeOutcomeFfi
  * account was in view when it fails, or none, so a failed removal never activates the account being removed.
  */
 internal suspend fun WhiteNoiseAppState.removeUnlinkedAccount(label: String): Boolean {
-    val outcome = removeUnlinkedAccountForOutcome(label)
-    return outcome?.localCleanup?.completed == true
+    val completion = removeUnlinkedAccountForOutcome(label)
+    return completion?.native?.localCleanup?.completed == true
 }
 
 /**
- * The same removal with MDK's whole outcome, for a caller that reports each cleanup stage. Null when the wipe could
- * not start, in which case nothing was removed.
+ * The same removal with MDK's outcome and the full cleanup report, for a caller that reports each stage. Null when
+ * the wipe could not start, in which case nothing was removed.
  */
-internal suspend fun WhiteNoiseAppState.removeUnlinkedAccountForOutcome(label: String): WipeOutcomeFfi? {
+internal suspend fun WhiteNoiseAppState.removeUnlinkedAccountForOutcome(label: String): AccountWipeCompletion? {
     // A cancelled setup child may need the account lifetime for its own cleanup before the wipe can take it.
     accountSetup.close()
     return withAccountLifetime { signOutAndWipeActiveAccountLocked(label) }

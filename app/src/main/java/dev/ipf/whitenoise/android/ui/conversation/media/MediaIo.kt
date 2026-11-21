@@ -130,8 +130,8 @@ internal fun fileProviderUri(
  * out of a chat (an external PDF reader holding the granted URI, the
  * system share-sheet target, etc.). Yanking the file out from under
  * those readers caused the "opened PDF goes blank when I leave the chat"
- * class of bug — the [sweepStaleSharedMedia] janitor cleans those on a
- * stale-age basis at app start instead.
+ * class of bug. The [sweepStaleSharedMedia] janitor handles expiry at app
+ * startup, and Sign Out & Wipe explicitly revokes access and deletes them.
  */
 internal fun clearMediaTempFiles(context: android.content.Context) {
     runCatching { AttachmentPlaintextCache.clearUnheldFiles(java.io.File(context.cacheDir, "camera")) }
