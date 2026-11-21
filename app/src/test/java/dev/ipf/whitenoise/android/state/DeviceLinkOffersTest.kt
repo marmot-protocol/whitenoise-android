@@ -2,8 +2,12 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupDeviceNotice
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.lang.reflect.Proxy
 
 /** The offer to link a newly signed-in device follows what sign-in found and the user's answers, per account. */
 @RunWith(RobolectricTestRunner::class)
@@ -116,6 +121,41 @@ class DeviceLinkOffersTest {
         assertNull(offers.linkingFor)
         assertEquals(DeviceLinkOfferStage.Offer, offers.stage(ACCOUNT))
     }
+
+    /** A Settings-started link has no open offer. Cancel must precede any read that could process its Welcome. */
+    @Test
+    fun profileSwitchCancelsWithoutReadingOrRequiringAnOpenOffer() =
+        runTest {
+            val calls = mutableListOf<String>()
+            val api = MarmotInterface::class.java
+            val native =
+                Proxy.newProxyInstance(api.classLoader, arrayOf(api)) { proxy, method, args ->
+                    when (method.name) {
+                        "toString" -> "DeviceLinkCancelFixture"
+                        "hashCode" -> System.identityHashCode(proxy)
+                        "equals" -> proxy === args?.firstOrNull()
+                        "cancelDeviceLink" -> {
+                            calls += "cancel:${args?.firstOrNull()}"
+                            throw MarmotKitException.Runtime("device group refused: no_link_in_progress")
+                        }
+                        "deviceLinkSnapshot" -> error("Reading can advance the pending Welcome")
+                        else -> null
+                    }
+                } as MarmotInterface
+            val state =
+                WhiteNoiseAppState(
+                    context = context,
+                    draftStore = DraftStore.forContext(context),
+                    accountIdHexResolver = { ACCOUNT },
+                    accounts = listOf(AccountSummaryFfi("old", ACCOUNT, true, false, false, true, false)),
+                    activeAccountRef = "new",
+                    initialMarmotRuntime = AppMarmotRuntime("test", native),
+                )
+            DeviceLinkOffers.shared(context).closeLinking()
+            state.cancelLinkAfterProfileSwitch("old")
+            assertEquals(listOf("cancel:old"), calls)
+            assertNull(state.toast)
+        }
 
     private companion object {
         const val ACCOUNT = "aa11"

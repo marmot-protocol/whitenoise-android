@@ -108,8 +108,12 @@ internal class DeviceLinkApprovalDraft(
             listSaver<DeviceLinkApprovalDraft, Any>(
                 save = { listOf(it.label.text.toString(), it.optionsOpen, it.addToAllChats, it.bringHistory) },
                 restore = { values ->
-                    val (name, expanded, add, history) = values
-                    DeviceLinkApprovalDraft(name as String, expanded as Boolean, add as Boolean, history as Boolean)
+                    DeviceLinkApprovalDraft(
+                        name = values[0] as String,
+                        expanded = values[1] as Boolean,
+                        add = values[2] as Boolean,
+                        history = values[3] as Boolean,
+                    )
                 },
             )
     }

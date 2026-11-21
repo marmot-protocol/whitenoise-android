@@ -70,3 +70,10 @@ sign-in notice's `client` label. None changes existing behavior.
 ## Upgrade
 
 The [first hosted campaign](https://github.com/marmot-protocol/whitenoise-android/actions/runs/44900723941) passed populated upgrade from 0.17.0, key migration and cold restart. The database advances from schema 207 to 216 and downgrade is unsupported. The original pending upload hit an epoch change (2 to 3). The qualification fixture now isolates this same-epoch control from peer commits and retains the separate real stale-upload retry. The recovery fixture generates the missing-epoch traffic after MDK’s five-minute Welcome margin and waits for the receiver’s own group to start recovery. Receive-after-local-deletion also failed on the 0.17.0 control and remains tracked by [MDK #3264](https://github.com/marmot-protocol/mdk/issues/3264). See [INT-010](manual-release-testing/cases/INT-010.md).
+
+In the [revised campaign](https://github.com/marmot-protocol/whitenoise-android/actions/runs/44912905684),
+the original pending upload sent unchanged and its plaintext survived another restart. The native catch-up
+refusal passed in both relay modes. All seven recovery cases passed with silent relay comparison. With
+comparison refused, receipt in a healthy chat after a different chat was deleted failed on its first pass
+([MDK #3264](https://github.com/marmot-protocol/mdk/issues/3264)). The community’s missing group invites and
+the signed tester APK were outside this campaign.

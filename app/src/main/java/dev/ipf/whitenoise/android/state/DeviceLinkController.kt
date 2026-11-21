@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.marmotkit.LinkedDeviceFfi
 import dev.ipf.marmotkit.MarmotEventFfi
-import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -315,21 +314,12 @@ internal suspend fun DeviceLinkController.dismissMoveSibling(
 internal suspend fun WhiteNoiseAppState.cancelLinkAfterProfileSwitch(label: String) {
     val previous = accounts.firstOrNull { it.label == label && !it.signedOut && it.localSigning } ?: return
     val offers = DeviceLinkOffers.shared(appContext)
-    val wasLinking = offers.linkingFor == previous.accountIdHex
-    if (wasLinking) offers.closeLinking()
-    val outgoing =
-        runCatchingCancellable { marmotIo { deviceLinkSnapshot(label).newDevice } }.getOrElse {
-            if (wasLinking) presentFailure(R.string.link_device_action_failed, "DEVICE_LINK_CANCEL", it)
-            appStateDebug(it) { "could not read outgoing device link after profile switch" }
-            return
+    if (offers.linkingFor == previous.accountIdHex) offers.closeLinking()
+    if (marmotOrNull() == null) return
+    // Reading a snapshot drives pairing and could accept a waiting Welcome. Cancel is atomic in MDK.
+    runCatchingCancellable { marmotIo { cancelDeviceLink(label) } }.onFailure {
+        if (deviceGroupRefusal(it) != "no_link_in_progress") {
+            presentFailure(R.string.link_device_action_failed, "DEVICE_LINK_CANCEL", it)
         }
-    when (outgoing) {
-        null, is NewDeviceLinkStateFfi.Ended, NewDeviceLinkStateFfi.Linked -> Unit
-        else ->
-            runCatchingCancellable { marmotIo { cancelDeviceLink(label) } }.onFailure {
-                if (deviceGroupRefusal(it) != "no_link_in_progress") {
-                    presentFailure(R.string.link_device_action_failed, "DEVICE_LINK_CANCEL", it)
-                }
-            }
     }
 }

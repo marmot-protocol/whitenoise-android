@@ -54,7 +54,8 @@ internal fun InviteDeclineGate(
             appState.launchMutation {
                 val result = runCatchingCancellable { appState.marmotIo { linkedDevices(account) } }
                 if (!controller.ownsRenderedDecline(invitation)) return@launchMutation
-                result.declineNeedsConsent()
+                result
+                    .declineNeedsConsent()
                     .onSuccess { needsConsent ->
                         if (needsConsent) {
                             asking = true
