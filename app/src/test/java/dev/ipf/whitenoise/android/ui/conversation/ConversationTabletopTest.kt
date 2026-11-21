@@ -34,11 +34,11 @@ class ConversationTabletopTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** The lower half below the hinge, or nothing without a tabletop fold. */
+    /** The bottom bar reserves from the top of the hinge down, keeping the hinge gap empty. */
     @Test
-    fun lowerHalfIsTheWindowBelowTheHinge() {
-        assertEquals(0.dp, tabletopLowerHalf(null, 900.dp))
-        assertEquals(440.dp, tabletopLowerHalf(WindowFold(450.dp, 460.dp, separating = true), 900.dp))
+    fun reserveStartsAtTheTopOfTheHinge() {
+        assertEquals(TabletopReserve(0.dp, 0.dp), tabletopReserve(null, 900.dp))
+        assertEquals(TabletopReserve(450.dp, 10.dp), tabletopReserve(WindowFold(450.dp, 460.dp, true), 900.dp))
     }
 
     /**
@@ -55,7 +55,7 @@ class ConversationTabletopTest {
             windowHeight = LocalWindowInfo.current.containerDpSize.height
             val folds =
                 if (tabletop.value) {
-                    WindowFolds(tabletop = WindowFold(windowHeight / 2, windowHeight / 2, separating = true))
+                    WindowFolds(tabletop = WindowFold(windowHeight / 2 - GAP, windowHeight / 2 + GAP, separating = true))
                 } else {
                     WindowFolds.None
                 }
@@ -72,8 +72,9 @@ class ConversationTabletopTest {
         }
         composeRule.waitForIdle()
 
-        assertDp(windowHeight / 2, bottom(MESSAGES))
-        assertDp(windowHeight / 2, top(COMPOSER))
+        // Neither the messages nor the composer is drawn under the hinge.
+        assertDp(windowHeight / 2 - GAP, bottom(MESSAGES))
+        assertDp(windowHeight / 2 + GAP, top(COMPOSER))
 
         tabletop.value = false
         composeRule.waitForIdle()
@@ -95,6 +96,7 @@ class ConversationTabletopTest {
         const val MESSAGES = "tabletop_messages"
         const val COMPOSER = "tabletop_composer"
         val COMPOSER_HEIGHT = 72.dp
+        val GAP = 5.dp
         const val TOLERANCE = 1f
     }
 }

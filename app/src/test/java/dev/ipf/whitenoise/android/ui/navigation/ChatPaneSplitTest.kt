@@ -32,48 +32,54 @@ class ChatPaneSplitTest {
     /** Regular-height windows give the list 40%, between 300dp and 360dp, and keep the chat at least 360dp. */
     @Test
     fun regularWindowsShareTheWidth() {
-        assertEquals(ChatPaneSplit(300, 301), split(661))
-        assertEquals(ChatPaneSplit(300, 301), split(673))
-        assertEquals(ChatPaneSplit(336, 337), split(841))
-        assertEquals(ChatPaneSplit(360, 361), split(1280))
+        assertEquals(ChatPaneSplit(300, 301, 661), split(661))
+        assertEquals(ChatPaneSplit(300, 301, 673), split(673))
+        assertEquals(ChatPaneSplit(336, 337, 841), split(841))
+        assertEquals(ChatPaneSplit(360, 361, 1280), split(1280))
     }
 
     /** Short windows such as a phone held horizontally split evenly, keeping the chat at least 360dp. */
     @Test
     fun shortWindowsBalanceThePanes() {
-        assertEquals(ChatPaneSplit(339, 340), split(700, short = true))
-        assertEquals(ChatPaneSplit(419, 420), split(840, short = true))
-        assertEquals(ChatPaneSplit(480, 481), split(1280, short = true))
+        assertEquals(ChatPaneSplit(339, 340, 700), split(700, short = true))
+        assertEquals(ChatPaneSplit(419, 420, 840), split(840, short = true))
+        assertEquals(ChatPaneSplit(480, 481, 1280), split(1280, short = true))
     }
 
     /** A half-open hinge sets the split even where the proportional list would be narrower. */
     @Test
     fun halfOpenHingeSetsTheSplit() {
-        assertEquals(ChatPaneSplit(400, 401), split(800, fold(400, 400, separating = true)))
-        assertEquals(ChatPaneSplit(390, 410), split(800, fold(390, 410, separating = true)))
+        assertEquals(ChatPaneSplit(400, 401, 800), split(800, fold(400, 400, separating = true)))
+        assertEquals(ChatPaneSplit(390, 410, 800), split(800, fold(390, 410, separating = true)))
     }
 
     /** Right to left, the list fills the right side of the fold. */
     @Test
     fun rightToLeftMeasuresFromTheRightEdge() {
-        assertEquals(ChatPaneSplit(460, 461), split(800, fold(340, 340, separating = true), LayoutDirection.Rtl))
+        val rtl = split(800, fold(340, 340, separating = true), direction = LayoutDirection.Rtl)
+        assertEquals(ChatPaneSplit(460, 461, 800), rtl)
     }
 
     /** A flat crease lines up the divider only while it leaves both panes a good width. */
     @Test
     fun flatCreaseAlignsWhenItFits() {
-        assertEquals(ChatPaneSplit(420, 421), split(841, fold(420, 420, separating = false)))
+        assertEquals(ChatPaneSplit(420, 421, 841), split(841, fold(420, 420, separating = false)))
         // The crease would leave the chat 345dp, under its 360dp minimum, so the proportional split wins.
-        assertEquals(ChatPaneSplit(300, 301), split(690, fold(345, 345, separating = false)))
+        assertEquals(ChatPaneSplit(300, 301, 690), split(690, fold(345, 345, separating = false)))
+        // Counting the divider, a crease at 301dp in a 661dp window would leave the chat 359dp.
+        assertEquals(ChatPaneSplit(300, 301, 661), split(661, fold(301, 301, separating = false)))
     }
 
-    /** With two hinges, the list takes the narrower outer section and the chat the rest. */
+    /** With two hinges, the list takes the narrower outer section and the chat stays off the other hinge. */
     @Test
     fun triFoldPrefersTheNarrowerListSection() {
         val hinges = listOf(WindowFold(325.dp, 325.dp, true), WindowFold(650.dp, 650.dp, true))
 
-        assertEquals(ChatPaneSplit(325, 326), split(975, *hinges.toTypedArray()))
-        assertEquals(ChatPaneSplit(325, 326), split(975, *hinges.toTypedArray(), direction = LayoutDirection.Rtl))
+        assertEquals(ChatPaneSplit(325, 326, 650), split(975, *hinges.toTypedArray()))
+        assertEquals(ChatPaneSplit(325, 326, 650), split(975, *hinges.toTypedArray(), direction = LayoutDirection.Rtl))
+        // Only a half-open second hinge ends the conversation; a flat one is crossed.
+        val oneFlat = listOf(WindowFold(325.dp, 325.dp, true), WindowFold(650.dp, 650.dp, false))
+        assertEquals(ChatPaneSplit(325, 326, 975), split(975, *oneFlat.toTypedArray()))
     }
 
     private fun fold(

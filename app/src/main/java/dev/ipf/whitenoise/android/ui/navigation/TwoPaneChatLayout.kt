@@ -92,7 +92,8 @@ internal fun TwoPaneChatFrame(
                 layoutDirection = layoutDirection,
             )
         val listPlaceable = list.measure(Constraints.fixed(split.listWidth, height))
-        val conversationPlaceable = conversation.measure(Constraints.fixed(width - split.conversationStart, height))
+        val conversationWidth = (minOf(split.conversationEnd, width) - split.conversationStart).coerceAtLeast(0)
+        val conversationPlaceable = conversation.measure(Constraints.fixed(conversationWidth, height))
         layout(width, height) {
             listPlaceable.placeRelative(0, 0)
             dividerPlaceable.placeRelative(split.listWidth, 0)
