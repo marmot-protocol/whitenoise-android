@@ -77,3 +77,5 @@ refusal passed in both relay modes. All seven recovery cases passed with silent 
 comparison refused, receipt in a healthy chat after a different chat was deleted failed on its first pass
 ([MDK #3264](https://github.com/marmot-protocol/mdk/issues/3264)). The community’s missing group invites and
 the signed tester APK were outside this campaign.
+
+A [repeat campaign](https://github.com/marmot-protocol/whitenoise-android/actions/runs/44916129932) passed the same upload and catch-up checks. In that run the healthy chat missed pre-restart traffic in both relay modes. This matches the open recovery issue. Delivery of a new group invitation still needs its own end-to-end check.
