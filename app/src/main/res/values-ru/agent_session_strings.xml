@@ -44,4 +44,5 @@
         <item quantity="many">Пропущено ещё %1$d файлов</item>
         <item quantity="other">Пропущено ещё %1$d файла</item>
     </plurals>
+    <string name="agent_text_show_all">Показать всё</string>
 </resources>

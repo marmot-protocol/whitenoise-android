@@ -81,4 +81,6 @@
     <string name="agent_refused_not_allowed">You can\'t do that for this agent</string>
     <!-- The agent did not act because it was busy. -->
     <string name="agent_refused_busy">The agent was busy</string>
+    <!-- Opens the rest of a long command, output or diff from an AI agent. -->
+    <string name="agent_text_show_all">Show all</string>
 </resources>

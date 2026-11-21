@@ -36,12 +36,12 @@ object AgentItemProjector {
     /** The first event of the item this record is a version of: itself for the first version. */
     fun firstEventId(record: AppMessageRecordFfi): String = record.tagValue(ITEM_TAG) ?: record.messageIdHex
 
-    /**
-     * True for a session item, read from the start of its `fields` tag without parsing the rest, so
-     * sender grouping can ask it for every row cheaply. Sessions draw as dividers, outside any run.
-     */
+    /** True for a session item. Sessions draw as dividers, outside any sender run. */
     fun isSessionItem(record: AppMessageRecordFfi): Boolean =
-        isAgentItem(record) && record.tagValue(FIELDS_TAG)?.let { SESSION_FIELDS_PREFIX.containsMatchIn(it) } == true
+        isAgentItem(record) &&
+            record.tagValue(FIELDS_TAG)?.let { fields ->
+                runCatching { JSONObject(fields).optString("type") }.getOrNull() == "session"
+            } == true
 
     /** The item's version, or null when the record is not a readable item. */
     fun version(record: AppMessageRecordFfi): Long? = record.tagValue(VERSION_TAG)?.toLongOrNull()
@@ -104,7 +104,6 @@ object AgentItemProjector {
         return tag?.values?.getOrNull(1)
     }
 
-    private val SESSION_FIELDS_PREFIX = Regex("^\\s*\\{\\s*\"type\"\\s*:\\s*\"session\"")
     private const val VERSION_TAG = "v"
     private const val STATE_TAG = "state"
     private const val TITLE_TAG = "title"

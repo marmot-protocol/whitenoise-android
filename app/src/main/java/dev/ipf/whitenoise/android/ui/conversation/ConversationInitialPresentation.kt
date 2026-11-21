@@ -34,14 +34,18 @@ internal fun conversationFirstFrameSeedPresentation(
     notificationOpenRequestId: Long,
 ): ConversationFirstFrameSeedPresentation {
     val rendered = conversationRenderedTimeline(controller.timeline)
+    // A loaded page holding only rows that draw nothing (later agent versions, requests, edits)
+    // has no tail to anchor; leave it to the authoritative path, which pages back for real rows.
+    val onlyHiddenRows = rendered.isEmpty() && controller.timeline.isNotEmpty()
     val anchorTailImmediately =
-        shouldAnchorConversationTailOnFirstFrame(
-            entryUnreadCount = entryUnreadCount,
-            projectionAvailable = projectionAvailable,
-            hasScrollRestore = hasScrollRestore,
-            hasFocusedDestination = hasFocusedDestination,
-            notificationOpenRequestId = notificationOpenRequestId,
-        )
+        !onlyHiddenRows &&
+            shouldAnchorConversationTailOnFirstFrame(
+                entryUnreadCount = entryUnreadCount,
+                projectionAvailable = projectionAvailable,
+                hasScrollRestore = hasScrollRestore,
+                hasFocusedDestination = hasFocusedDestination,
+                notificationOpenRequestId = notificationOpenRequestId,
+            )
     return ConversationFirstFrameSeedPresentation(
         anchorTailImmediately = anchorTailImmediately,
         // Start on the real keyed tail row. Compose then keeps that message key

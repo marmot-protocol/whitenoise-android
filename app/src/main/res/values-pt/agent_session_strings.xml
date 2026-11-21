@@ -43,4 +43,5 @@
         <item quantity="many">%1$d arquivos a mais omitidos</item>
         <item quantity="other">%1$d arquivos a mais omitidos</item>
     </plurals>
+    <string name="agent_text_show_all">Mostrar tudo</string>
 </resources>

@@ -43,4 +43,5 @@
         <item quantity="many">%1$d autres fichiers omis</item>
         <item quantity="other">%1$d autres fichiers omis</item>
     </plurals>
+    <string name="agent_text_show_all">Tout afficher</string>
 </resources>

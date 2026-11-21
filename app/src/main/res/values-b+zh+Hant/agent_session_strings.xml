@@ -41,4 +41,5 @@
     <plurals name="agent_tool_diffs_cut">
         <item quantity="other">另有 %1$d 個檔案未顯示</item>
     </plurals>
+    <string name="agent_text_show_all">顯示全部</string>
 </resources>

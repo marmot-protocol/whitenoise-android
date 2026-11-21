@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,16 +59,15 @@ internal fun AgentApprovalCard(
             modifier = Modifier.semantics { heading() },
         )
         if (item.text.isNotBlank()) {
-            SelectionContainer {
-                Text(
-                    text = agentDisplayCommand(item.text),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = APPROVAL_SUBJECT_MAX_LINES,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            AgentExpandableText(
+                text = AnnotatedString(agentDisplayCommand(item.text)),
+                style =
+                    MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                maxLines = APPROVAL_SUBJECT_MAX_LINES,
+            )
         }
         AgentRequestStatusLabel(actions)
         if (actions.enabled) AgentApprovalChoices(approval.choices, actions)

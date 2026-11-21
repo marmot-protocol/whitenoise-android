@@ -107,12 +107,8 @@ internal fun agentPlainPlanText(text: String): String =
 /** Whether the line has more to show when it is opened. */
 internal fun agentActivityExpandable(item: AgentItem): Boolean =
     when (val body = item.body) {
-        is AgentItemBody.Tool ->
-            body.output != null ||
-                body.changes.isNotEmpty() ||
-                body.inputJson != null ||
-                body.error != null ||
-                item.text.lines().size > 1
+        // Every tool row opens: at least the full command, path or query and where it ran.
+        is AgentItemBody.Tool -> true
         is AgentItemBody.Approval, is AgentItemBody.Question -> false
         is AgentItemBody.Reasoning -> item.text.isNotBlank()
         is AgentItemBody.Error -> item.text.isNotBlank() || body.code != null

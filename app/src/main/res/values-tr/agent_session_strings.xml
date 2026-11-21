@@ -42,4 +42,5 @@
         <item quantity="one">%1$d dosya daha atlandı</item>
         <item quantity="other">%1$d dosya daha atlandı</item>
     </plurals>
+    <string name="agent_text_show_all">Tümünü göster</string>
 </resources>

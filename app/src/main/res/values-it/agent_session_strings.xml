@@ -43,4 +43,5 @@
         <item quantity="many">%1$d altri file omessi</item>
         <item quantity="other">%1$d altri file omessi</item>
     </plurals>
+    <string name="agent_text_show_all">Mostra tutto</string>
 </resources>

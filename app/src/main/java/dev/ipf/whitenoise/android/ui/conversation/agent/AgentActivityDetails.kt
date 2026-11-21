@@ -55,7 +55,10 @@ private fun AgentToolDetails(
     item: AgentItem,
     tool: AgentItemBody.Tool,
 ) {
-    tool.command?.let { command -> AgentCodeBlock("$ " + agentDisplayCommand(command)) }
+    // An edit names its files above each diff, so its path is not repeated here.
+    val path = tool.path?.takeIf { tool.changes.isEmpty() }
+    val subject = tool.command?.let { "$ " + agentDisplayCommand(it) } ?: path ?: tool.query
+    subject?.let { AgentCodeBlock(it) }
     toolMeta(tool)?.let { AgentMeta(it) }
     val subjectInBody = tool.command != null || tool.path != null || tool.query != null
     if (!subjectInBody && item.text.lines().size > 1) {
@@ -154,20 +157,20 @@ private fun AgentCodeBlock(text: AnnotatedString) {
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        SelectionContainer {
-            Text(
-                text = text,
-                modifier =
-                    Modifier
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = AGENT_CODE_BLOCK_MAX_LINES,
-                softWrap = false,
-            )
-        }
+        AgentExpandableText(
+            text = text,
+            modifier =
+                Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            style =
+                MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+            maxLines = AGENT_CODE_BLOCK_MAX_LINES,
+            softWrap = false,
+        )
     }
 }
 

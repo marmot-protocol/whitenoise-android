@@ -109,6 +109,23 @@ class AgentItemTimelineTest {
     }
 
     @Test
+    fun sessionItemIsRecognisedWhateverTheFieldOrder() {
+        val reordered =
+            record(
+                "ee".repeat(32),
+                AgentItemProjector.ITEM_KIND,
+                listOf(
+                    listOf("v", "1"),
+                    listOf("state", "running"),
+                    listOf("item_id", "session:1"),
+                    listOf("fields", "{\"body\":{\"settings\":[]},\"type\":\"session\"}"),
+                ),
+            )
+        assertTrue(AgentItemProjector.isSessionItem(reordered))
+        assertTrue(AgentItemProjector.project(reordered)!!.body is AgentItemBody.Session)
+    }
+
+    @Test
     fun oldAgentActivityShapeIsNotAnAgentItem() {
         val legacy = record("dd".repeat(32), 1201uL, listOf(listOf("status", "working")))
         assertFalse(AgentItemProjector.isAgentItem(legacy))

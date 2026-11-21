@@ -42,4 +42,5 @@
         <item quantity="one">%1$d weitere Datei ausgelassen</item>
         <item quantity="other">%1$d weitere Dateien ausgelassen</item>
     </plurals>
+    <string name="agent_text_show_all">Alles anzeigen</string>
 </resources>
