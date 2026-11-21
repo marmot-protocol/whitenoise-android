@@ -430,7 +430,7 @@ internal fun ConversationScreen(
     chat: ChatListItem,
     controller: ConversationController,
     onBack: () -> Unit,
-    // False beside the chat list at expanded width, where system Back must not close the visible
+    // False when the chat list is alongside the conversation, where system Back must not close the visible
     // conversation. Its own inner Back steps and the header arrow still apply (#3685).
     systemBackClosesConversation: Boolean = true,
     // When opened from a chat-list message-body search hit (issue #290), the
@@ -4236,7 +4236,7 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+                ConversationBottomBarFrame(routeMorph, with(density) { (displayedMenuImeBottom ?: 0).toDp() }) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
                             keyboardController?.hide()
