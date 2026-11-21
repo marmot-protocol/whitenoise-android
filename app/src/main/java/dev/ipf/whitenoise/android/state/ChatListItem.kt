@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
@@ -97,7 +98,15 @@ internal fun chatListItemFromProjection(
         inviteConfirmationUnresolved =
             !displayGroup.selfMembership.isNonMember() &&
                 (group?.let { it.pendingConfirmation != row.pendingConfirmation } ?: row.pendingConfirmation),
-        selectedPresentation = selectedPresentation,
+        selectedPresentation =
+            if (supersededPicture) {
+                selectedPresentation?.copy(
+                    avatar = SelectedAvatarFfi.Placeholder(row.groupIdHex, PresentationSourceFfi.GROUP_FALLBACK),
+                    avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
+                )
+            } else {
+                selectedPresentation
+            },
         selectedAvatarAsset =
             adoptableSelectedAvatarAsset(
                 asset = selectedAvatarAsset.takeUnless { supersededPicture },

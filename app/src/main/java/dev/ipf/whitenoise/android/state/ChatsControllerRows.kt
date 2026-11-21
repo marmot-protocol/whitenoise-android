@@ -26,7 +26,7 @@ internal suspend fun ChatsController.applyChatListWindowRows(
         appState.prepareChangedChatListAvatars(
             accountRef,
             frame.rows,
-            chatRowsByGroup.keys.associateWith { selectedAvatarAssetsByGroup[it] },
+            (items + archivedItems).associate { it.foldedId to it.selectedAvatarAsset },
         )
     }
     // The plain revision guards only the plain rows; a folder swap or install since capture makes this frame

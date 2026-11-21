@@ -74,6 +74,7 @@ class ChangedGroupPictureCoverageTest {
 
         assertNull("the replaced picture's stored bytes are never adopted", item.selectedAvatarAsset)
         assertEquals("the row shows its current picture", NEW_HASH, item.group.imageHashHex)
+        assertEquals(row.groupIdHex, item.selectedAvatarSeed)
     }
 
     /** A dirty presentation still naming the row's current picture keeps it, as does a recomputed one. */
@@ -282,13 +283,14 @@ class ChangedGroupPictureCoverageTest {
                 lastMessage = null,
             )
 
-        fun image(hash: String) = ChatListAvatarFfi(
-            hash,
-            "1c".repeat(32),
-            "2d".repeat(12),
-            "3e".repeat(32),
-            "image/png",
-        )
+        fun image(hash: String) =
+            ChatListAvatarFfi(
+                hash,
+                "1c".repeat(32),
+                "2d".repeat(12),
+                "3e".repeat(32),
+                "image/png",
+            )
 
         /** MDK's group presentation selecting the encrypted picture [hash]. */
         fun groupPresentation(
@@ -323,17 +325,18 @@ class ChangedGroupPictureCoverageTest {
         )
 
         /** The stored bytes MDK returns for [reference]. */
-        fun payload(reference: String) = AvatarBytesFfi(
-            reference,
-            AvatarAvailabilityFfi.READY,
-            1uL,
-            1_024uL,
-            false,
-            png(),
-            "image/png",
-            64u,
-            64u,
-        )
+        fun payload(reference: String) =
+            AvatarBytesFfi(
+                reference,
+                AvatarAvailabilityFfi.READY,
+                1uL,
+                1_024uL,
+                false,
+                png(),
+                "image/png",
+                64u,
+                64u,
+            )
 
         /** A small opaque PNG. */
         fun png(): ByteArray {
