@@ -88,6 +88,56 @@ internal class MountedContractShell(
         }
     }
 
+    /**
+     * Mounts the production shell like [withMountedShell] and hands [exercise] a way to emulate process death: the
+     * composition's saved instance state and the holder's saved keys survive into a fresh holder over a fresh
+     * process state, so nothing process-retained, the route owner included, comes back. Returns the fresh holder.
+     */
+    fun withRestartableShell(
+        width: MutableState<Dp>,
+        fixture: ReturnFixture,
+        exercise: (ReturnFixture, MainShellStateHolder, () -> MainShellStateHolder) -> Unit,
+    ) {
+        withGlobalSnapshotApply {
+            val mounted = mutableStateOf(true)
+            var saved = SavedStateHandle()
+            val holders = mutableListOf(MainShellStateHolder(fixture.appState, saved))
+            // A plain field, read only when the restored composition is created, so a restart never recomposes.
+            var current = holders.single()
+            val controller =
+                current.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
+            fixture.appState.setAppInForeground(true)
+            restoration.setContent {
+                if (mounted.value) {
+                    CompositionLocalProvider(
+                        LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, SHELL_HEIGHT)),
+                    ) {
+                        WhiteNoiseTheme { MainShell(appState = fixture.appState, stateHolder = current) }
+                    }
+                }
+            }
+            val restart = {
+                saved = SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })
+                current = MainShellStateHolder(fixture.appState, saved, MainShellProcessState(fixture.appState))
+                holders += current
+                recreate()
+                current
+            }
+            try {
+                awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
+                composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+                composeRule.waitForIdle()
+                exercise(fixture, holders.first(), restart)
+            } finally {
+                composeRule.runOnIdle {
+                    mounted.value = false
+                    holders.asReversed().forEach { it.release() }
+                }
+                composeRule.waitForIdle()
+            }
+        }
+    }
+
     /** Opens the fixture's target chat from its list row and waits for the route to settle. */
     fun openTarget(
         fixture: ReturnFixture,
