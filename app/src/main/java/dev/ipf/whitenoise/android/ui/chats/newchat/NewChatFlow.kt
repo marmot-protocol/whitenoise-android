@@ -823,11 +823,8 @@ internal fun StartChatErrorCard(
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm)) {
             if (error.invitation) {
                 Button(onClick = onInvite) {
-                    Icon(
-                        painterResource(R.drawable.ic_share),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
+                    val shareIcon = painterResource(R.drawable.ic_share)
+                    Icon(shareIcon, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.share))
                 }

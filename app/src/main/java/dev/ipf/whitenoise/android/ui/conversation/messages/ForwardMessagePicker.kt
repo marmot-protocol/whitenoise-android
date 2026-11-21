@@ -433,10 +433,7 @@ internal fun ForwardMessagePickerContent(
                         navigationIcon = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { if (searchOpen) closeSearch() else onDismiss() }) {
-                                    Icon(
-                                        painterResource(R.drawable.ic_close),
-                                        contentDescription = stringResource(R.string.close),
-                                    )
+                                    Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
                                 }
                                 sendingAccount?.let { account ->
                                     val name = appState.networkDisplayName(account.accountIdHex)
