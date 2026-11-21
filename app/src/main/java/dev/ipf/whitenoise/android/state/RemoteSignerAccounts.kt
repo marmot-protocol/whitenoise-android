@@ -5,6 +5,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 
 /**
@@ -68,6 +69,11 @@ internal class RemoteSignerAccounts {
     @Synchronized
     fun retainRuntime(runtime: Any?) {
         if (runtime != null && owner != null && owner !== runtime) clear()
+    }
+
+    /** Suspends until some screen collects [statuses]. */
+    suspend fun awaitObserver() {
+        published.subscriptionCount.first { it > 0 }
     }
 
     /** Re-reads every session's local status; MDK serves it without network access. */

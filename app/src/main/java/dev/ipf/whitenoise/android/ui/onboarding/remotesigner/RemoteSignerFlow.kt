@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.onboarding.remotesigner
 
 import android.content.ActivityNotFoundException
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
@@ -16,6 +18,7 @@ import dev.ipf.marmotkit.Nip46SessionFfiInterface
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.loginWithRemoteSigner
 import dev.ipf.whitenoise.android.state.repairRemoteSigner
+import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -72,7 +75,13 @@ internal fun RemoteSignerFlow(
     val finished by rememberUpdatedState(onFinished)
     DisposableEffect(pairing) { onDispose { pairing.dispose() } }
     LaunchedEffect(pairing) { if (initialLink != null) pairing.choose(RemoteSignerMethod.BunkerLink, initialLink) }
-    LaunchedEffect(pairing.step) { if (pairing.step == RemoteSignerStep.Done) finished() }
+    LaunchedEffect(pairing.step) {
+        if (pairing.step == RemoteSignerStep.Done) {
+            // The link carries the pairing secret; once used it leaves the clipboard, as a submitted key does.
+            pairing.usedLink?.let { clearClipboardIfHolding(context, it) }
+            finished()
+        }
+    }
     RemoteSignerScreen(
         pairing = pairing,
         onClose = onClose,
@@ -94,3 +103,18 @@ internal fun RemoteSignerFlow(
 internal class RemoteSignerEntry(
     val link: String?,
 )
+
+/** Clears the clipboard only while it still holds [used]. */
+private fun clearClipboardIfHolding(
+    context: Context,
+    used: String,
+) {
+    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
+    val text =
+        clipboard.primaryClip
+            ?.takeIf { it.itemCount == 1 }
+            ?.getItemAt(0)
+            ?.text
+            ?.toString()
+    if (text?.trim() == used) clearSensitiveClipboard(context)
+}

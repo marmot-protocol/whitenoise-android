@@ -63,11 +63,15 @@ internal fun WhiteNoiseAppState.completeRemoteSignerApproval(
  * device and erases the local connection key. Signing stays paused until the user pairs again.
  */
 internal fun WhiteNoiseAppState.disconnectRemoteSigner(accountIdHex: String) {
-    val session = remoteSigners.session(accountIdHex) ?: return
+    val runtime = marmotOrNull() ?: return
+    val session = remoteSigners.session(runtime, accountIdHex) ?: return
     launchMutation {
         runCatchingCancellable { session.logout() }
             .onFailure { appStateDebug { "remote signer logout incomplete: ${it.readableMessage()}" } }
-        remoteSigners.refresh()
+        // MDK erased the pairing either way; dropping the handle also lets the status watcher stop.
+        if (marmotOrNull() === runtime && remoteSigners.session(runtime, accountIdHex) === session) {
+            remoteSigners.markWithoutSession(runtime, accountIdHex, RemoteSignerHealth.PairingEnded)
+        }
     }
 }
 
@@ -78,6 +82,8 @@ internal fun WhiteNoiseAppState.watchRemoteSigners() {
         mutationsScope.launch(Dispatchers.Default) {
             // Refresh only. Startup and session registration manage runtime ownership.
             while (isActive && remoteSigners.hasSessions()) {
+                // Sleeps while no screen shows a signer status; MDK's status is local, so a late read loses nothing.
+                remoteSigners.awaitObserver()
                 runCatchingCancellable { remoteSigners.refresh() }
                 delay(REMOTE_SIGNER_STATUS_INTERVAL_MS)
             }

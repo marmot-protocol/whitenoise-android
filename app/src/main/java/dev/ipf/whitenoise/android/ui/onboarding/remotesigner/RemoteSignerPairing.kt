@@ -13,12 +13,15 @@ import dev.ipf.whitenoise.android.state.appStateDebug
 import dev.ipf.whitenoise.android.state.readableMessage
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -84,6 +87,8 @@ internal class RemoteSignerPairing(
     private val scope: CoroutineScope,
     private val expectedAccountHex: String? = null,
     private val offerRelays: List<String> = remoteSignerOfferRelays,
+    /** Where MDK's local session reads run, keeping them off the main thread. */
+    private val sessionDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     var step by mutableStateOf<RemoteSignerStep>(RemoteSignerStep.Choose)
         private set
@@ -103,11 +108,18 @@ internal class RemoteSignerPairing(
     private var acknowledgedRequest: String? = null
     private var lastOpen: Pair<RemoteSignerMethod, String>? = null
 
+    /** The bunker link the finished pairing used, so the host can clear it from the clipboard; null otherwise. */
+    var usedLink: String? = null
+        private set
+
     /** Whether leaving now would abandon an account handoff that must finish. */
     val busy: Boolean
         get() = step == RemoteSignerStep.SigningIn
 
-    /** Opens [chosen]; a bunker link waits for input, a connection code starts its offline session right away. */
+    /**
+     * Opens [chosen]. A connection code starts its session right away; a bunker link waits for input unless [prefill]
+     * already holds one, which goes straight to the permission review.
+     */
     fun choose(
         chosen: RemoteSignerMethod,
         prefill: String? = null,
@@ -121,10 +133,13 @@ internal class RemoteSignerPairing(
         } else {
             prefill?.let { link.setTextAndPlaceCursorAtEnd(it.trim()) }
             step = RemoteSignerStep.EnterLink
+            if (prefill != null && isBunkerLink(prefill)) submitLink()
         }
     }
 
+    /** Starts a session for the entered link, or shows why it is not a bunker link. */
     fun submitLink() {
+        if (step != RemoteSignerStep.EnterLink) return
         val value = link.text.toString().trim()
         if (isBunkerLink(value)) {
             open(RemoteSignerMethod.BunkerLink, JSONObject().put("uri", value).toString())
@@ -142,11 +157,17 @@ internal class RemoteSignerPairing(
         }
     }
 
+    /** Tries a failed attempt again on its session, or starts over where reusing it cannot work. */
     fun retry() {
         val current = step as? RemoteSignerStep.Failed ?: return
         val reopen = lastOpen
         when {
             current.failure.startOver -> back()
+            // A bunker link's secret is spent once its session connected; the signer needs a fresh link.
+            session == null && reopen?.first == RemoteSignerMethod.BunkerLink -> {
+                link.clearText()
+                step = RemoteSignerStep.EnterLink
+            }
             // No session to retry on: creating it failed, or it was already handed to the account step.
             session == null && reopen != null -> open(reopen.first, reopen.second)
             session == null -> back()
@@ -177,6 +198,7 @@ internal class RemoteSignerPairing(
     /** Ends the flow; an account handoff already in progress finishes on its own. */
     fun dispose() {
         link.clearText()
+        usedLink = null
         lastOpen = null
         if (!busy) discard()
     }
@@ -192,17 +214,31 @@ internal class RemoteSignerPairing(
         job =
             scope.launch {
                 val created = runCatchingCancellable { host.newSession(configJson) }.getOrNull()
+                val review =
+                    created?.let { new ->
+                        try {
+                            runCatchingCancellable { withContext(sessionDispatcher) { new.reviewPermissions() } }
+                        } catch (closed: CancellationException) {
+                            // The flow closed before it owned the session; nothing else will end it.
+                            new.cancel()
+                            throw closed
+                        }
+                    }
                 when {
                     token != attempt -> created?.cancel()
-                    created != null -> {
+                    created != null && review?.isSuccess == true -> {
                         session = created
-                        step = RemoteSignerStep.Review(chosen, created.reviewPermissions())
+                        step = RemoteSignerStep.Review(chosen, review.getOrThrow())
                     }
                     chosen == RemoteSignerMethod.BunkerLink -> {
+                        created?.cancel()
                         linkErrorRes = R.string.remote_signer_error_invalid_link
                         step = RemoteSignerStep.EnterLink
                     }
-                    else -> step = RemoteSignerStep.Failed(RemoteSignerFailure.Unreachable)
+                    else -> {
+                        created?.cancel()
+                        step = RemoteSignerStep.Failed(RemoteSignerFailure.Unreachable)
+                    }
                 }
             }
     }
@@ -240,7 +276,8 @@ internal class RemoteSignerPairing(
         val userHex =
             coroutineScope {
                 val isCurrent = { token == attempt && step !is RemoteSignerStep.Failed }
-                val watcher = launch { awaitSignerApproval(active, isCurrent, onSignal) }
+                val readStatus = suspend { withContext(sessionDispatcher) { active.status() } }
+                val watcher = launch { awaitSignerApproval(readStatus, isCurrent, onSignal) }
                 try {
                     active.connect()
                 } finally {
@@ -257,6 +294,7 @@ internal class RemoteSignerPairing(
                 session = null
                 val handedOff = handOffToAccount(host, active, userHex)
                 if (handedOff) {
+                    usedLink = link.text.toString().trim().takeIf { method == RemoteSignerMethod.BunkerLink }
                     link.clearText()
                     lastOpen = null
                 }

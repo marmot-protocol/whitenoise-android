@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.Nip46StatusFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -26,7 +27,7 @@ class RemoteSignerPairingTest {
     private fun TestScope.pairing(
         host: FakeRemoteSignerHost,
         expected: String? = null,
-    ) = RemoteSignerPairing(host, backgroundScope, expected)
+    ) = RemoteSignerPairing(host, backgroundScope, expected, sessionDispatcher = StandardTestDispatcher(testScheduler))
 
     @Test
     fun bunkerLinkReviewsExactGrantsBeforePairingThenSignsIn() =
@@ -35,9 +36,8 @@ class RemoteSignerPairingTest {
             val host = FakeRemoteSignerHost(session)
             val flow = pairing(host)
 
+            // A link already entered in the key field goes straight to the review.
             flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
-            assertEquals(RemoteSignerStep.EnterLink, flow.step)
-            flow.submitLink()
             runCurrent()
 
             assertEquals(BUNKER, JSONObject(host.configs.single()).getString("uri"))
@@ -56,7 +56,9 @@ class RemoteSignerPairingTest {
             assertEquals(RemoteSignerStep.Done, flow.step)
             assertEquals(ACCOUNT, host.finished.single().second)
             assertTrue("the link leaves memory once the account owns the session", flow.link.text.isEmpty())
+            assertEquals("the host may clear exactly this link from the clipboard", BUNKER, flow.usedLink)
             flow.dispose()
+            assertNull(flow.usedLink)
             assertFalse("a handed-over session is never cancelled by the flow", session.cancelled)
         }
 
@@ -73,6 +75,7 @@ class RemoteSignerPairingTest {
             val relays = config.getJSONArray("relays")
             assertEquals(remoteSignerOfferRelays, List(relays.length()) { relays.getString(it) })
             assertTrue(flow.step is RemoteSignerStep.Review)
+            assertEquals("MDK accepts no call before approval", 0, session.offers)
 
             flow.approve()
             runCurrent()
@@ -80,6 +83,7 @@ class RemoteSignerPairingTest {
             session.offerReply.complete("nostrconnect://client?secret=x")
             runCurrent()
             assertEquals("nostrconnect://client?secret=x", (flow.step as RemoteSignerStep.WaitingForSigner).offer)
+            assertEquals("the prepared offer is used, not requested again", 1, session.offers)
 
             session.connectReply.complete(ACCOUNT)
             runCurrent()
@@ -112,7 +116,6 @@ class RemoteSignerPairingTest {
             val session = FakeRemoteSignerSession()
             val flow = pairing(FakeRemoteSignerHost(session))
             flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
-            flow.submitLink()
             runCurrent()
             flow.approve()
             runCurrent()
@@ -134,7 +137,6 @@ class RemoteSignerPairingTest {
             val session = FakeRemoteSignerSession()
             val flow = pairing(FakeRemoteSignerHost(session))
             flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
-            flow.submitLink()
             runCurrent()
             flow.approve()
             runCurrent()
@@ -152,7 +154,6 @@ class RemoteSignerPairingTest {
             val session = FakeRemoteSignerSession()
             val flow = pairing(FakeRemoteSignerHost(session))
             flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
-            flow.submitLink()
             runCurrent()
             flow.approve()
             runCurrent()
@@ -177,7 +178,6 @@ class RemoteSignerPairingTest {
             val host = FakeRemoteSignerHost(session)
             val flow = pairing(host, expected = ACCOUNT)
             flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
-            flow.submitLink()
             runCurrent()
             flow.approve()
             runCurrent()
@@ -198,7 +198,6 @@ class RemoteSignerPairingTest {
             val host = FakeRemoteSignerHost(session)
             val flow = pairing(host)
             flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
-            flow.submitLink()
             runCurrent()
             flow.approve()
             runCurrent()
@@ -217,7 +216,6 @@ class RemoteSignerPairingTest {
             val session = FakeRemoteSignerSession()
             val flow = pairing(FakeRemoteSignerHost(session))
             flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
-            flow.submitLink()
             runCurrent()
             flow.approve()
             runCurrent()
@@ -235,7 +233,6 @@ class RemoteSignerPairingTest {
             val host = FakeRemoteSignerHost(session).apply { finishError = IllegalStateException("relay down") }
             val flow = pairing(host)
             flow.choose(RemoteSignerMethod.BunkerLink, BUNKER)
-            flow.submitLink()
             runCurrent()
             flow.approve()
             runCurrent()
@@ -248,7 +245,7 @@ class RemoteSignerPairingTest {
         }
 
     @Test
-    fun interruptedHandoffEndsInARetryableFailureInsteadOfStayingBusy() =
+    fun interruptedHandoffAsksForAFreshLinkInsteadOfStayingBusy() =
         runTest {
             val session = FakeRemoteSignerSession()
             val retried = FakeRemoteSignerSession()
@@ -264,8 +261,9 @@ class RemoteSignerPairingTest {
             assertFalse(session.cancelled)
             flow.retry()
             runCurrent()
-            assertTrue("retry starts a fresh session after a handoff", flow.step is RemoteSignerStep.Review)
-            assertEquals(2, host.configs.size)
+            assertEquals("a used link's secret is spent", RemoteSignerStep.EnterLink, flow.step)
+            assertEquals("no session reuses the spent link", 1, host.configs.size)
+            assertTrue("the spent link is cleared", flow.link.text.isEmpty())
         }
 
     @Test
