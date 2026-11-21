@@ -17,6 +17,8 @@ internal val ConversationDictationController.canContinueDictation: Boolean
     get() =
         followUp.pending == null &&
             !followUp.discardClosing &&
+            !foregroundMicrophoneRequired &&
+            !microphone.held &&
             inActiveRecognitionState &&
             finishRequested &&
             !recoveryHandedToComposer &&
@@ -32,7 +34,6 @@ internal fun ConversationDictationController.continueDictation(): Boolean {
         return false
     }
     val sessionId = ++nextSessionId
-    followUp.blockedSendSessionId = null
     followUp.pending = ConversationDictationFollowUpOwner.Pending(sessionId, origin, Phase.Arming)
     notificationActionGeneration += 1L
     conversationDictationDiagnostic("event=follow_up action=requested accepted=true follow_up_session=$sessionId")
@@ -144,13 +145,6 @@ internal fun ConversationDictationController.promoteFollowUp(
         return
     }
     followUp.pending = null
-    if (pending.phase == Phase.Sealed && !runCatching(platform::callerAudioHasPending).getOrDefault(true)) {
-        // Nothing was recorded before the follow-up ended, so there is no session to run.
-        runCatching { platform.discardCallerAudio {} }
-        finishPlaybackInterruption(pending.sessionId)
-        conversationDictationDiagnostic("event=follow_up action=discarded reason=empty")
-        return
-    }
     startPromotedFollowUp(pending, target, previousDelivered)
 }
 

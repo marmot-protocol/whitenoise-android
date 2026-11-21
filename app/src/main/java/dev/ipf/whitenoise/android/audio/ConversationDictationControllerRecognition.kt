@@ -330,7 +330,11 @@ internal fun ConversationDictationController.startRecognition(
         }
     runCatching {
         val session = platform.createSession(listener).also(generation::attach)
-        session.start()
+        if (finishRequested && platform.followUpCaptureSupported()) {
+            session.startWithCallerAudio()
+        } else {
+            session.start()
+        }
         if (owns(sessionId, generationId) && session.usesCallerAudioCapture()) {
             generation.markCallerAudioEndpointing()
             armSilenceDeadline(sessionId, target)

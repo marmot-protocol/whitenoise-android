@@ -31,16 +31,6 @@ internal const val CONVERSATION_DICTATION_PREFERENCES_NAME = "whitenoise"
 
 private const val READINESS_UI_FRAME_MILLIS = 16L
 
-/** Native recorder closure never mutates controller ownership from a capture thread. */
-internal fun mainThreadDictationCaptureClosure(onClosed: () -> Unit): () -> Unit =
-    {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            onClosed()
-        } else {
-            Handler(Looper.getMainLooper()).post(onClosed)
-        }
-    }
-
 /** Attachment may precede generation registration, so caller-audio failures always queue to main. */
 internal fun mainThreadDictationCallerAudioFailure(
     listener: ConversationDictationRecognitionListener,
@@ -521,11 +511,16 @@ private class AndroidConversationDictationRecognitionSession(
     }
 
     /** Starts listening for one final free-form result without requesting partial hypotheses. */
-    override fun start() {
+    override fun start() = start(requireCallerAudio = false)
+
+    override fun startWithCallerAudio() = start(requireCallerAudio = true)
+
+    private fun start(requireCallerAudio: Boolean) {
         check(!started && !destroyed)
         started = true
         val capturing = callerAudio?.start() == true
         callerAudioCapturing = capturing
+        check(!requireCallerAudio || capturing) { "Caller-audio drain requires a provider audio stream" }
         conversationDictationDiagnostic("event=platform_start_listening caller_audio=$capturing")
         val intent = startIntent(capturing)
         // Both descriptors stay open until capture ends. SpeechRecognizer.startListening only

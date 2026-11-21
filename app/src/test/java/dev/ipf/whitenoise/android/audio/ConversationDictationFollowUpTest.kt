@@ -122,6 +122,8 @@ class ConversationDictationFollowUpTest {
         override fun createSession(listener: ConversationDictationRecognitionListener): RecognitionSession {
             recognizers++
             return object : RecognitionSession {
+                override fun usesCallerAudioCapture() = true
+
                 override fun start() = Unit
 
                 override fun stop() = Unit

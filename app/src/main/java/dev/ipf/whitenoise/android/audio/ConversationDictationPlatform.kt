@@ -33,6 +33,8 @@ internal interface ConversationDictationRecognitionSession {
     /** Begins recognition for this provider generation. */
     fun start()
 
+    fun startWithCallerAudio() = start()
+
     /** Requests a final result while preserving provider output already in flight. */
     fun stop()
 

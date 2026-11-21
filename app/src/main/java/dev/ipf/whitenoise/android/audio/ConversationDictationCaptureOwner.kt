@@ -1,5 +1,18 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.os.Handler
+import android.os.Looper
+
+/** Native recorder closure never mutates controller ownership from a capture thread. */
+internal fun mainThreadDictationCaptureClosure(onClosed: () -> Unit): () -> Unit =
+    {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            onClosed()
+        } else {
+            Handler(Looper.getMainLooper()).post(onClosed)
+        }
+    }
+
 /** Closed PCM can leave the active slot without being discarded or acquiring a microphone. */
 internal interface ConversationDictationParkedAudio {
     fun restore(): Boolean

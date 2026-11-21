@@ -200,7 +200,6 @@ internal class ConversationDictationController internal constructor(
     internal fun conversationDictationDiagnostic(event: String) {
         DictationDiagnostics.record("$event session=${state.sessionId ?: 0L}")
     }
-
     internal val completionRevisions = mutableStateMapOf<ConversationDictationKey, Int>()
     internal val pendingSendRevisions = mutableStateMapOf<ConversationDictationKey, Int>()
     internal var nextSessionId = 0L
