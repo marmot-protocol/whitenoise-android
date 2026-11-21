@@ -195,20 +195,6 @@ internal const val NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS = 10_000L
 private const val AUTOMATIC_ADMISSION_ATTEMPTS = 2
 internal const val INCOMING_ATTACHMENT_TAG = "DMAttachmentReceipt"
 
-/**
- * How inviting one profile to several groups went: of [attempted] groups, [failures] failed and in [waited] the user
- * chose to wait on a group-change question, so those groups were not invited either.
- */
-internal data class ProfileGroupInviteOutcome(
-    val attempted: Int,
-    val failures: Int,
-    val firstFailure: AppText? = null,
-    val waited: Int = 0,
-) {
-    val delivered: Int = attempted - failures - waited
-    val completedSuccessfully: Boolean = attempted > 0 && failures == 0 && waited == 0
-}
-
 internal fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
 internal data class AppMarmotRuntime(
