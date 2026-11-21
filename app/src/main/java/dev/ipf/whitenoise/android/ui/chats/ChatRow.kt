@@ -211,7 +211,7 @@ internal fun ChatRow(
     val activeAccountIdHex = ownerAccountIdHex
     val rowHasUnread = item.effectiveHasUnread(activeAccountIdHex)
     val rowUnreadCount = item.effectiveUnreadCount(activeAccountIdHex)
-    val timestampAt = item.latestAt ?: 0uL
+    val timestampAt = item.previewTimestamp ?: 0uL
     val avatarAccount = chatListItemAvatarAccount(item)
     val openableDmAvatarAccount =
         avatarAccount

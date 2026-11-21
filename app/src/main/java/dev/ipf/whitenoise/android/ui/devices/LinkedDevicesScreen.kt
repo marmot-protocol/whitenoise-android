@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import dev.ipf.marmotkit.LinkChatProgressFfi
 import dev.ipf.marmotkit.LinkedDeviceStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -196,6 +197,7 @@ internal fun linkedDeviceSummary(device: LinkedDeviceRow): List<String> =
                     ?: stringResource(R.string.linked_devices_no_activity_seen),
             )
         }
+        device.chatProgress?.let { add(linkChatProgressText(it)) }
         linkedDeviceStateLabel(device)?.let { add(stringResource(it)) }
     }
 
@@ -224,3 +226,11 @@ private fun deviceDate(
             dateStyle = FormatStyle.MEDIUM,
             timeStyle = FormatStyle.SHORT.takeIf { withTime },
         ).takeIf(String::isNotEmpty)
+
+/** MDK counts outstanding Adds on an approving device and outstanding joins on the receiving device. */
+@Composable
+internal fun linkChatProgressText(progress: LinkChatProgressFfi): String {
+    val text = if (progress.onNewDevice) R.string.link_device_joining_chats else R.string.link_device_adding_chats
+    val done = progress.total - progress.remaining.coerceAtMost(progress.total)
+    return stringResource(text, done.toLong(), progress.total.toLong())
+}

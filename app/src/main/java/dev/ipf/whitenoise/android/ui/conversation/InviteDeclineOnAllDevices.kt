@@ -18,7 +18,11 @@ import dev.ipf.marmotkit.LinkedDeviceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.declineInviteWithConsent
+import dev.ipf.whitenoise.android.state.inviteGeneration
 import dev.ipf.whitenoise.android.state.linkedDeviceRoster
+import dev.ipf.whitenoise.android.state.ownsRenderedDecline
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 
@@ -28,13 +32,9 @@ internal const val INVITE_DECLINE_ALL_DEVICES_CANCEL_TAG = "invite.decline.allDe
 
 /**
  * Whether declining here also takes the account's other devices out of the chat. MDK shares a decline with every
- * device of the account, so it does whenever [devices] lists one besides this device. A roster that could not be
- * read is null and asks nothing, because the question would then claim devices nobody confirmed.
+ * device of the account whenever the successfully read [devices] include a sibling.
  */
-internal fun declineReachesOtherDevices(devices: List<LinkedDeviceFfi>?): Boolean {
-    if (devices == null) return false
-    return linkedDeviceRoster(devices).hasOtherDevices
-}
+internal fun declineReachesOtherDevices(devices: Result<List<LinkedDeviceFfi>>): Result<Boolean> = devices.map { linkedDeviceRoster(it).hasOtherDevices }
 
 /**
  * Hands [content] the Decline action for the invitation in view. With no other linked device it declines at once.
@@ -49,29 +49,32 @@ internal fun InviteDeclineGate(
     onDeclined: () -> Unit,
     content: @Composable (onDecline: () -> Unit) -> Unit,
 ) {
-    var askedFor by remember { mutableStateOf<String?>(null) }
-    val groupIdHex = controller.group.groupIdHex
+    val account = controller.conversationAccountRef
+    val invitation = inviteGeneration(controller.group)
+    var asking by remember(controller, invitation) { mutableStateOf(false) }
     content {
-        appState.launchMutation {
-            val devices =
-                controller.conversationAccountRef?.let { account ->
-                    runCatchingCancellable { appState.marmotIo { linkedDevices(account) } }.getOrNull()
-                }
-            if (declineReachesOtherDevices(devices)) {
-                askedFor = groupIdHex
-            } else if (controller.declineInvite()) {
-                onDeclined()
+        if (account != null) {
+            appState.launchMutation {
+                val result = runCatchingCancellable { appState.marmotIo { linkedDevices(account) } }
+                if (!controller.ownsRenderedDecline(invitation)) return@launchMutation
+                declineReachesOtherDevices(result)
+                    .onSuccess { needsConsent ->
+                        if (needsConsent) {
+                            asking = true
+                        } else if (controller.declineInviteWithConsent(null, invitation)) {
+                            onDeclined()
+                        }
+                    }.onFailure { appState.presentFailure(R.string.linked_devices_load_failed, "INVITE_DEVICE_ROSTER", it) }
             }
         }
     }
-    // The question belongs to one invitation, and goes away with it when another device answers first.
-    if (askedFor == groupIdHex && controller.group.pendingConfirmation) {
+    if (asking && controller.ownsRenderedDecline(invitation)) {
         InviteDeclineAllDevicesDialog(
             onConfirm = {
-                askedFor = null
-                appState.launchMutation { if (controller.declineInvite()) onDeclined() }
+                asking = false
+                appState.launchMutation { if (controller.declineInviteWithConsent(null, invitation)) onDeclined() }
             },
-            onDismiss = { askedFor = null },
+            onDismiss = { asking = false },
         )
     }
 }

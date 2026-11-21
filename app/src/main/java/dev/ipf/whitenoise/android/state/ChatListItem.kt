@@ -300,6 +300,10 @@ data class ChatListItem(
             ?: (presentationOtherMemberAccount ?: "~$presentationMemberCount").lowercase()
     }
 
+    /** Time of the message shown to the reader. Empty and pruned rows retain their last known activity. */
+    val previewTimestamp: ULong?
+        get() = projection?.lastMessage?.timelineAt?.takeIf { it > 0uL } ?: latestAt
+
     val latestAt: ULong?
         // Prefer MDK's durable semantic activity timestamp. It is advanced by
         // real conversation activity and retained across secure pruning, while

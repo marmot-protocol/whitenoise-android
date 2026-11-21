@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -178,8 +179,9 @@ internal class DeviceLinkRequestWatcher(
         accountRef: String,
         snapshot: DeviceLinkSnapshotFfi,
         blocked: Boolean,
+        beforeCommand: DeviceLinkSnapshotFfi?,
     ) {
-        if (!owns()) return
+        if (!owns() || snapshots[accountRef] !== beforeCommand) return
         accepted = accepted + (accountRef to (accepted[accountRef] ?: 0L) + 1L)
         publish(snapshots + (accountRef to snapshot), blocked)
     }
@@ -210,3 +212,13 @@ internal class DeviceLinkRequestWatcher(
             null
         }
 }
+
+/** Share the foreground watcher with chat-list readers and discard its snapshots when the native runtime changes. */
+internal fun WhiteNoiseAppState.runtimeLinkRequests() =
+    derivedStateOf {
+        val epoch = runtimeGeneration
+        DeviceLinkRequestWatcher(
+            readSnapshot = { account -> marmotIo { deviceLinkSnapshot(account) } },
+            owns = { runtimeGeneration == epoch },
+        )
+    }

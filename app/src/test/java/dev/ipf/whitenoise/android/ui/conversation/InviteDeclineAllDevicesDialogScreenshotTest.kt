@@ -36,12 +36,19 @@ class InviteDeclineAllDevicesDialogScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** A device on its own declines at once, and so does one whose roster could not be read. */
+    /** A successfully read empty or single-device roster declines at once. */
     @Test
     fun aLoneDeviceIsNotAsked() {
-        assertFalse(declineReachesOtherDevices(listOf(device("a", isThisDevice = true))))
-        assertFalse(declineReachesOtherDevices(emptyList()))
-        assertFalse(declineReachesOtherDevices(null))
+        assertFalse(declineReachesOtherDevices(Result.success(listOf(device("a", isThisDevice = true)))).getOrThrow())
+        assertFalse(declineReachesOtherDevices(Result.success(emptyList())).getOrThrow())
+    }
+
+    /** An unreadable inventory cannot take the path that declines on a lone device. */
+    @Test
+    fun failedReadKeepsTheInvitationPending() {
+        val failure = IllegalStateException("roster unavailable")
+        val decision = declineReachesOtherDevices(Result.failure(failure))
+        assertEquals(failure, decision.exceptionOrNull())
     }
 
     /** Any other device of the account is reached by the decline, one whose removal is still pending included. */
@@ -49,8 +56,8 @@ class InviteDeclineAllDevicesDialogScreenshotTest {
     fun anotherLinkedDeviceIsAskedAbout() {
         val here = device("a", isThisDevice = true)
 
-        assertTrue(declineReachesOtherDevices(listOf(here, device("b"))))
-        assertTrue(declineReachesOtherDevices(listOf(here, device("b", removalPending = true))))
+        assertTrue(declineReachesOtherDevices(Result.success(listOf(here, device("b")))).getOrThrow())
+        assertTrue(declineReachesOtherDevices(Result.success(listOf(here, device("b", removalPending = true)))).getOrThrow())
     }
 
     /** The all-devices question and both answers in the light dialog surface. */

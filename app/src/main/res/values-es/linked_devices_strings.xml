@@ -169,4 +169,8 @@
     <string name="chats_arriving_detail">Tus otros dispositivos añaden aquí los chats que esta cuenta ya tiene, normalmente en uno o dos minutos. Si aún no tiene ninguno, inicia uno.</string>
     <string name="linked_devices_linked_by">Vinculado por %1$s</string>
     <string name="device_move_finish_linking">Un dispositivo que aprobaste aún se está vinculando. Deja que termine antes de mover este dispositivo, o puede que no se una a tus chats.</string>
+    <string name="link_device_joining_chats">Uniéndose a chats: %1$d de %2$d</string>
+    <string name="link_device_adding_chats">Añadiendo a chats: %1$d de %2$d</string>
+    <string name="unlinked_remove_sign_in">Eliminar e iniciar sesión</string>
+    <string name="unlinked_remove_sign_in_detail">Este dispositivo se desvinculó. ¿Quieres eliminar los chats y datos de este perfil de este dispositivo y volver a iniciar sesión con la clave que introdujiste? Tus otros dispositivos conservarán sus datos.</string>
 </resources>

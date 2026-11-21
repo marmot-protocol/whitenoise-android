@@ -15,6 +15,7 @@ import dev.ipf.marmotkit.DeviceGroupMoveStateFfi
 import dev.ipf.marmotkit.DeviceGroupMoveViewFfi
 import dev.ipf.marmotkit.DeviceLinkEndReasonFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
+import dev.ipf.marmotkit.LinkChatProgressFfi
 import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.state.LinkedDeviceRoster
@@ -29,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.devices.LinkThisDeviceContent
 import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesContent
 import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesLinking
 import dev.ipf.whitenoise.android.ui.devices.UnlinkedAccountPrompt
+import dev.ipf.whitenoise.android.ui.devices.UnlinkedProfileRemovalDialog
 import dev.ipf.whitenoise.android.ui.devices.fixtureCode
 import dev.ipf.whitenoise.android.ui.devices.fixtureDevice
 import dev.ipf.whitenoise.android.ui.devices.newDeviceLinkStep
@@ -147,8 +149,32 @@ class DeviceLinkScreenshotTest {
     /** A newly linked device's empty chat list while its chats are still arriving. */
     @Test
     fun chatsArrivingLight() {
-        show(Look()) { EmptyChats(onCreate = {}, arriving = true) }
+        show(Look()) { EmptyChats(onCreate = {}, progress = LinkChatProgressFfi("this", true, 12u, 5u)) }
         compose.onRoot().captureRoboImage("src/test/snapshots/device_link_chats_arriving_light.png")
+    }
+
+    /** Replacing the unlinked profile requires explicit local deletion and sign-in consent. */
+    @Test
+    fun removeAndSignInLight() {
+        show(Look()) { UnlinkedProfileRemovalDialog(onRemove = {}, onCancel = {}, signingIn = true) }
+        compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/device_link_remove_and_sign_in_light.png")
+    }
+
+    /** The removal explanation and both actions remain readable in dark mode with large RTL text. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h900dp-mdpi")
+    fun removeAndSignInDarkRtl() {
+        show(Look(dark = true, rtl = true)) { UnlinkedProfileRemovalDialog(onRemove = {}, onCancel = {}, signingIn = true) }
+        compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/device_link_remove_and_sign_in_dark_rtl.png")
+    }
+
+    /** The existing device sees the receiving slot's outstanding adds alongside its device name. */
+    @Test
+    fun addingChatsOnRosterDark() {
+        val device = fixtureDevice("sibling", label = "Laptop").copy(chatProgress = LinkChatProgressFfi("sibling", false, 12u, 5u))
+        val roster = LinkedDeviceRoster(fixtureDevice("this", isThisDevice = true), listOf(device), emptyList())
+        show(Look(dark = true)) { LinkedDevicesContent(LinkedDeviceRosterState(roster = roster), {}) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_adding_chats_dark.png")
     }
 
     /** The chat list's reminder after Not now. */

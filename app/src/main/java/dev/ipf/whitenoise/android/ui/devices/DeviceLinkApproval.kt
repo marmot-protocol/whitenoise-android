@@ -6,11 +6,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -89,6 +90,28 @@ private fun addedElsewhereStep(state: DeviceLinkPromptStateFfi.AddedElsewhere): 
     )
 }
 
+/** Transient consent for one request, owned above the dialog so covering it cannot reset the sharing choices. */
+@Stable
+internal class DeviceLinkApprovalDraft(
+    name: String = "",
+    expanded: Boolean = false,
+    add: Boolean = true,
+    history: Boolean = true,
+) {
+    val label = TextFieldState(name)
+    var optionsOpen by mutableStateOf(expanded)
+    var addToAllChats by mutableStateOf(add)
+    var bringHistory by mutableStateOf(history)
+
+    companion object {
+        val Saver =
+            listSaver<DeviceLinkApprovalDraft, Any>(
+                save = { listOf(it.label.text.toString(), it.optionsOpen, it.addToAllChats, it.bringHistory) },
+                restore = { DeviceLinkApprovalDraft(it[0] as String, it[1] as Boolean, it[2] as Boolean, it[3] as Boolean) },
+            )
+    }
+}
+
 /**
  * A link request as the approving device shows it. While MDK shows the code, Link device is one tap: the new device
  * gets a placeholder name, which it replaces with its model, and joins the account's chats with their history
@@ -105,11 +128,9 @@ internal fun DeviceLinkRequestContent(
     onDecline: () -> Unit,
     onClose: () -> Unit,
     failed: Boolean = false,
+    draft: DeviceLinkApprovalDraft = rememberSaveable(saver = DeviceLinkApprovalDraft.Saver) { DeviceLinkApprovalDraft() },
 ) {
-    val label = rememberTextFieldState()
-    var optionsOpen by rememberSaveable { mutableStateOf(false) }
-    var addToAllChats by rememberSaveable { mutableStateOf(true) }
-    var bringHistory by rememberSaveable { mutableStateOf(true) }
+    val label = draft.label
     // MDK requires a name, so an empty field sends the placeholder the new device then replaces with its model.
     val placeholder = stringResource(R.string.link_request_default_label)
     val name =
@@ -128,24 +149,24 @@ internal fun DeviceLinkRequestContent(
         failed = failed,
         onAction = { action ->
             when (action) {
-                DeviceLinkAction.Link -> onLink(DeviceLinkChoices(name, addToAllChats, bringHistory))
+                DeviceLinkAction.Link -> onLink(DeviceLinkChoices(name, draft.addToAllChats, draft.bringHistory))
                 DeviceLinkAction.NotNow -> onDecline()
                 else -> onClose()
             }
         },
     ) {
         if (state is DeviceLinkPromptStateFfi.Comparing) {
-            DeviceLinkOptionsRow(onToggle = { optionsOpen = !optionsOpen })
+            DeviceLinkOptionsRow(onToggle = { draft.optionsOpen = !draft.optionsOpen })
         }
-        if (state is DeviceLinkPromptStateFfi.Comparing && (optionsOpen || !nameFits)) {
+        if (state is DeviceLinkPromptStateFfi.Comparing && (draft.optionsOpen || !nameFits)) {
             DeviceLinkChoiceFields(
                 label = label,
                 tooLong = stringResource(R.string.link_request_label_too_long).takeUnless { nameFits },
-                addToAllChats = addToAllChats,
-                bringHistory = bringHistory,
+                addToAllChats = draft.addToAllChats,
+                bringHistory = draft.bringHistory,
                 enabled = running == null,
-                onAddToAllChats = { addToAllChats = it },
-                onBringHistory = { bringHistory = it },
+                onAddToAllChats = { draft.addToAllChats = it },
+                onBringHistory = { draft.bringHistory = it },
             )
         }
     }

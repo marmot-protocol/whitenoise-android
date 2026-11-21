@@ -52,6 +52,14 @@
         ]
       },
       {
+        "surface": "DeviceLinkApprovalGate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "fun DeviceLinkApprovalGate(",
+        "test_ids": [
+          "SET-061"
+        ]
+      },
+      {
         "surface": "DeviceLinkFailureEffect",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
         "anchor": "fun DeviceLinkFailureEffect(",

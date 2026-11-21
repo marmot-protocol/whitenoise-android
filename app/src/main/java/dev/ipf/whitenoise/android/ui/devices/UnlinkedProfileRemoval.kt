@@ -101,15 +101,18 @@ private fun reportUnlinkedProfileRemoval(
 internal fun UnlinkedProfileRemovalDialog(
     onRemove: () -> Unit,
     onCancel: () -> Unit,
+    signingIn: Boolean = false,
 ) {
+    val detail = if (signingIn) R.string.unlinked_remove_sign_in_detail else R.string.unlinked_account_remove_detail
+    val action = if (signingIn) R.string.unlinked_remove_sign_in else R.string.unlinked_account_remove_confirm
     WhiteNoiseAlertDialog(
         onDismissRequest = onCancel,
         modifier = Modifier.testTag(UNLINKED_PROFILE_REMOVAL_TAG),
         title = { Text(stringResource(R.string.device_unlinked_title)) },
-        text = { Text(stringResource(R.string.unlinked_account_remove_detail)) },
+        text = { Text(stringResource(detail)) },
         confirmButton = {
             TextButton(onClick = onRemove, modifier = Modifier.testTag(UNLINKED_PROFILE_REMOVAL_CONFIRM_TAG)) {
-                Text(stringResource(R.string.unlinked_account_remove_confirm))
+                Text(stringResource(action))
             }
         },
         dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },

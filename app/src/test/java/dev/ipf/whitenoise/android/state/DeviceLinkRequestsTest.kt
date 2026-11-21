@@ -234,7 +234,7 @@ class DeviceLinkRequestsTest {
             val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p1", 10u)) })
             watcher.refresh(listOf("a"), blocked = false)
 
-            watcher.accept("a", snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking)), blocked = false)
+            watcher.accept("a", snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking)), blocked = false, beforeCommand = watcher.snapshots["a"])
 
             assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
         }
@@ -248,7 +248,7 @@ class DeviceLinkRequestsTest {
             watcher =
                 DeviceLinkRequestWatcher(
                     readSnapshot = {
-                        watcher.accept("a", linking, blocked = false)
+                        watcher.accept("a", linking, blocked = false, beforeCommand = watcher.snapshots["a"])
                         snapshot(prompt("p1", 10u))
                     },
                 )
@@ -260,19 +260,28 @@ class DeviceLinkRequestsTest {
             assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.presentedPrompt?.state)
         }
 
-    /** A command's snapshot that lands after MDK's newer state is corrected by the re-read that follows it. */
+    /** A delayed command and a failed reconciliation must preserve an independently observed terminal state. */
     @Test
-    fun aRereadAfterACommandsResultRestoresTheNewerState() =
+    fun aSettledPromptSurvivesAnOlderCommandAndFailedRead() =
         runTest {
-            val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p1", 10u, ENDED)) })
+            var current = snapshot(prompt("p1", 10u))
+            var fails = false
+            val watcher =
+                DeviceLinkRequestWatcher(readSnapshot = {
+                    check(!fails)
+                    current
+                })
             watcher.refresh(listOf("a"), blocked = false)
-            watcher.onEvent(MarmotEventFfi.DeviceLinkChanged("id", "a"), listOf("a"), blocked = false)
+            val beforeCommand = watcher.snapshots["a"]
+            current = snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linked))
+            watcher.reread("a", blocked = false)
+            fails = true
 
-            watcher.accept("a", snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking)), blocked = false)
-            assertEquals(DeviceLinkPromptStateFfi.Linking, watcher.prompt("a", "p1")?.state)
+            val delayed = snapshot(prompt("p1", 10u, DeviceLinkPromptStateFfi.Linking))
+            watcher.accept("a", delayed, blocked = false, beforeCommand = beforeCommand)
             watcher.reread("a", blocked = false)
 
-            assertEquals(ENDED, watcher.prompt("a", "p1")?.state)
+            assertEquals(DeviceLinkPromptStateFfi.Linked, watcher.prompt("a", "p1")?.state)
         }
 
     /** Closing the prompt hides it and answers nothing; unblocking later does not bring it back. */

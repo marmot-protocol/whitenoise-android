@@ -64,7 +64,11 @@ internal class RuntimeDeviceLink(
     override suspend fun linkedDevices(accountRef: String) = io { linkedDevices(accountRef) }
 
     /** Starts this device's link. */
-    override suspend fun startDeviceLink(accountRef: String) = io { startDeviceLink(accountRef) }
+    override suspend fun startDeviceLink(accountRef: String) =
+        appState.withAccountLifetime {
+            check(appState.activeAccountRef == accountRef)
+            io { startDeviceLink(accountRef) }
+        }
 
     /** Confirms the emoji match. */
     override suspend fun confirmDeviceLinkMatch(accountRef: String) = io { confirmDeviceLinkMatch(accountRef) }

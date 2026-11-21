@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.LinkChatProgressFfi
 import dev.ipf.marmotkit.LinkedDeviceFfi
 import dev.ipf.marmotkit.LinkedDeviceStatusFfi
 
@@ -23,6 +24,7 @@ internal data class LinkedDeviceRow(
     val keepWhileInactive: Boolean = false,
     /** The name of the device that linked this one, blank when that device has none, null when MDK names no linker. */
     val linkedByLabel: String? = null,
+    val chatProgress: LinkChatProgressFfi? = null,
 )
 
 /**
@@ -81,3 +83,15 @@ private fun LinkedDeviceFfi.toRow(linkedByLabel: String?): LinkedDeviceRow =
         keepWhileInactive = keepWhileInactive,
         linkedByLabel = linkedByLabel,
     )
+
+/** A slot shows progress only while it has a consistent count of outstanding chats. */
+internal fun LinkChatProgressFfi.isJoiningChats(): Boolean = remaining > 0u && remaining <= total
+
+/** Attach MDK’s current inventory to the matching slot on either end of the link. */
+internal fun LinkedDeviceRoster.withChatProgress(progress: List<LinkChatProgressFfi>): LinkedDeviceRoster {
+    if (progress.isEmpty()) return this
+    val bySlot = progress.filter { it.isJoiningChats() }.associateBy { it.slotIdHex }
+
+    fun row(device: LinkedDeviceRow) = device.copy(chatProgress = bySlot[device.slotIdHex])
+    return LinkedDeviceRoster(thisDevice?.let(::row), others.map(::row), removing.map(::row))
+}

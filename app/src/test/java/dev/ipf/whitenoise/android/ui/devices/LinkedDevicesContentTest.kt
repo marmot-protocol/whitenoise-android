@@ -9,10 +9,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.LinkChatProgressFfi
 import dev.ipf.marmotkit.LinkedDeviceStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.LinkedDeviceRoster
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
+import dev.ipf.whitenoise.android.state.withChatProgress
 import dev.ipf.whitenoise.android.ui.profile.ProfileReadiness
 import dev.ipf.whitenoise.android.ui.settings.AccountHubGroup
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -90,6 +92,22 @@ class LinkedDevicesContentTest {
         compose.onNodeWithTag("linked_devices.group.others").assertIsDisplayed()
         compose.onNodeWithTag("linked_devices.group.removing").assertIsDisplayed()
         compose.onNodeWithTag(LINKED_DEVICES_EMPTY_TAG).assertDoesNotExist()
+    }
+
+    /** Completed and inconsistent inventories disappear. An outstanding inventory belongs to its exact slot. */
+    @Test
+    fun progressIsScopedToADeviceAndDisappearsWhenDone() {
+        val self = fixtureDevice("self", isThisDevice = true)
+        val sibling = fixtureDevice("sibling")
+        val roster = LinkedDeviceRoster(self, listOf(sibling), emptyList())
+        val progress = LinkChatProgressFfi("sibling", false, 12u, 5u)
+        val active = roster.withChatProgress(listOf(progress))
+        assertNull(active.thisDevice?.chatProgress)
+        assertEquals(progress, active.device("sibling")?.chatProgress)
+        assertNull(roster.withChatProgress(listOf(progress.copy(remaining = 0u))).device("sibling")?.chatProgress)
+        assertNull(roster.withChatProgress(listOf(progress.copy(remaining = 13u))).device("sibling")?.chatProgress)
+        content(LinkedDeviceRosterState(roster = active))
+        compose.onNodeWithText(context.getString(R.string.link_device_adding_chats, 7, 12), substring = true).assertExists()
     }
 
     /** An account with only this device says no other device is linked. */

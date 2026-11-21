@@ -55,9 +55,7 @@ review, history and the group setting.
 - A repair proposal with `inconclusive` set shows a warning above the preview
   that a source did not answer and that saving is at the user's own risk.
 
-- `DeviceLinkSnapshotFfi` gains `chatProgress`, how many chats a newly linked
-  device is still waiting on ([MDK #3543](https://github.com/marmot-protocol/mdk/pull/3543)).
-  It defaults to empty and Android does not show it yet.
+- Android reads each slot’s `chatProgress` from the device-link snapshot. The approving device counts completed Adds and the new device counts joined chats, using the inventory MDK supplies.
 
 - `followAvailabilityPage`, `followAvailabilityStatus`,
   `refreshFollowAvailability` and `cancelFollowAvailability` arrive with six
@@ -71,9 +69,4 @@ sign-in notice's `client` label. None changes existing behavior.
 
 ## Upgrade
 
-The disposable hosted upgrade campaign has not run yet. It will start from
-0.17.0 at `4df811ae`. Account schema advances from 207 to 216 (migrations 0208
-to 0216) and downgrade is unsupported. The campaign is to exercise populated
-upgrade, cold reopen, the original pending upload and both recovery relay modes. No
-qualification source differs between the two runtimes, so the baseline overlay
-directory is empty. See [INT-010](manual-release-testing/cases/INT-010.md).
+The [first hosted campaign](https://github.com/marmot-protocol/whitenoise-android/actions/runs/44900723941) passed populated upgrade from 0.17.0, key migration and cold restart. The database advances from schema 207 to 216 and downgrade is unsupported. The original pending upload hit an epoch change (2 to 3). The qualification fixture now isolates this same-epoch control from peer commits and retains the separate real stale-upload retry. The recovery fixture generates the missing-epoch traffic after MDK’s five-minute Welcome margin and waits for the receiver’s own group to start recovery. Receive-after-local-deletion also failed on the 0.17.0 control and remains tracked by [MDK #3264](https://github.com/marmot-protocol/mdk/issues/3264). See [INT-010](manual-release-testing/cases/INT-010.md).

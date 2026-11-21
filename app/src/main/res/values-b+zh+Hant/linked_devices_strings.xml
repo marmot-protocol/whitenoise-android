@@ -169,4 +169,8 @@
     <string name="chats_arriving_detail">此帳號已有的聊天會由你的其他裝置加入這裡，通常在一兩分鐘內。如果還沒有聊天，請發起一個。</string>
     <string name="linked_devices_linked_by">由 %1$s 連結</string>
     <string name="device_move_finish_linking">你核准的一部裝置仍在連結中。請等它完成後再移動此裝置，否則它可能無法加入你的聊天。</string>
+    <string name="link_device_joining_chats">正在加入聊天：%1$d/%2$d</string>
+    <string name="link_device_adding_chats">正在新增至聊天：%1$d/%2$d</string>
+    <string name="unlinked_remove_sign_in">移除並登入</string>
+    <string name="unlinked_remove_sign_in_detail">此裝置已解除連結。要從此裝置移除此個人檔案的聊天和資料，並使用剛輸入的金鑰重新登入嗎？其他裝置會保留其資料。</string>
 </resources>

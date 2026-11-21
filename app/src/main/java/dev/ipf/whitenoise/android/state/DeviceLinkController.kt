@@ -7,6 +7,8 @@ import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.marmotkit.LinkedDeviceFfi
 import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.NewDeviceLinkStateFfi
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
@@ -308,3 +310,20 @@ internal suspend fun DeviceLinkController.dismissMoveSibling(
     moveId: String,
     slotIdHex: String,
 ) = command(DeviceLinkCommand.DismissMoveSibling) { dismissDeviceGroupMoveSibling(it, moveId, slotIdHex) }
+
+/** MDK keeps a link across screen changes. Only a committed profile switch cancels the old profile's outgoing link. */
+internal suspend fun WhiteNoiseAppState.cancelLinkAfterProfileSwitch(label: String) {
+    val previous = accounts.firstOrNull { it.label == label && !it.signedOut && it.localSigning } ?: return
+    val offers = DeviceLinkOffers.shared(appContext)
+    if (offers.linkingFor == previous.accountIdHex) offers.closeLinking()
+    runCatchingCancellable {
+        marmotIo {
+            val outgoing = deviceLinkSnapshot(label).newDevice
+            if (outgoing != null && outgoing !is NewDeviceLinkStateFfi.Ended && outgoing !is NewDeviceLinkStateFfi.Linked) {
+                cancelDeviceLink(label)
+            }
+        }
+    }.onFailure {
+        if (deviceGroupRefusal(it) != "no_link_in_progress") presentFailure(R.string.link_device_action_failed, "DEVICE_LINK_CANCEL", it)
+    }
+}

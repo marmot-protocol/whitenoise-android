@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -60,6 +61,9 @@ internal interface AppAccountSessionActivation {
 
     /** Removes old platform share targets before the target account becomes visible. */
     suspend fun hidePreviousAccountShortcuts()
+
+    /** Ends the outgoing profile’s own device-link attempt after a different profile has taken ownership. */
+    suspend fun cancelOutgoingDeviceLink(label: String)
 
     /** Publishes seeds, preferences and the active account in one non-suspending state transaction. */
     fun publish(
@@ -132,10 +136,22 @@ internal class AppAccountSessionCoordinator(
                 if (!handoff.isCurrent(generation)) {
                     throw kotlinx.coroutines.CancellationException("Identity publication superseded")
                 }
+                val previous = activation.activeAccount
                 publish()
+                cancelReplacedLink(previous, label)
             }
         } finally {
             handoff.finishRequest(generation)
+        }
+    }
+
+    /** The profile was published under the lifetime lock, so finish retiring its predecessor even if the UI closes. */
+    private suspend fun cancelReplacedLink(
+        previous: String?,
+        current: String,
+    ) {
+        if (previous != null && previous != current) {
+            withContext(NonCancellable) { activation.cancelOutgoingDeviceLink(previous) }
         }
     }
 
@@ -331,9 +347,11 @@ internal class AppAccountSessionCoordinator(
             if (!allowed()) return null
             if (switching) activation.hidePreviousAccountShortcuts()
             return if (allowed()) {
+                val previous = activation.activeAccount
                 activation.publish(request.label, generation, switching, prepared)
                 // The synchronous local-ready projection belongs to this same accepted publication.
                 onActivated()
+                cancelReplacedLink(previous, request.label)
                 prepared to switching
             } else {
                 null

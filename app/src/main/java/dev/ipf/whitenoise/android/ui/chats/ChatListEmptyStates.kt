@@ -13,10 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.LinkChatProgressFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.ChatsArrivingHint
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isJoiningChats
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.devices.linkChatProgressText
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 /** Empty filtering remains specific to query, unread folder, or the selected folder's contents. */
@@ -52,21 +54,25 @@ internal fun EmptyChats(
     appState: WhiteNoiseAppState,
     onCreate: () -> Unit,
     onCreateOrigin: (Rect?) -> Unit = {},
-) = EmptyChats(onCreate, ChatsArrivingHint.showsFor(appState.activeAccount?.accountIdHex), onCreateOrigin)
+) {
+    val snapshot = appState.activeAccountRef?.let { appState.deviceLinkRequests.snapshots[it] }
+    val progress = snapshot?.chatProgress?.firstOrNull { it.onNewDevice && it.isJoiningChats() }
+    EmptyChats(onCreate, progress = progress, onCreateOrigin = onCreateOrigin)
+}
 
 /**
- * Keeps the existing actionable first-chat entry while adopting the prototype's title/detail presentation. While
- * [arriving], a newly linked device says its chats are on their way instead of claiming there are none.
+ * Keeps the existing actionable first-chat entry while adopting the prototype's title/detail presentation. With native
+ * [progress], a newly linked device says its chats are on their way instead of claiming there are none.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun EmptyChats(
     onCreate: () -> Unit,
-    arriving: Boolean = false,
+    progress: LinkChatProgressFfi? = null,
     onCreateOrigin: (Rect?) -> Unit = {},
 ) {
-    val title = if (arriving) R.string.chats_arriving_title else R.string.chat_rows_no_chats_title
-    val detail = if (arriving) R.string.chats_arriving_detail else R.string.chat_rows_no_chats_detail
+    val title = if (progress != null) R.string.chats_arriving_title else R.string.chat_rows_no_chats_title
+    val detail = progress?.let { linkChatProgressText(it) } ?: stringResource(R.string.chat_rows_no_chats_detail)
     val (origin, create) =
         rememberMeasuredControlClick {
             onCreateOrigin(it)
@@ -74,7 +80,7 @@ internal fun EmptyChats(
         }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            WhiteNoiseEmptyState(title = stringResource(title), detail = stringResource(detail))
+            WhiteNoiseEmptyState(title = stringResource(title), detail = detail)
             Button(onClick = create, modifier = Modifier.padding(horizontal = 24.dp).then(origin)) {
                 Text(stringResource(R.string.new_chat))
             }

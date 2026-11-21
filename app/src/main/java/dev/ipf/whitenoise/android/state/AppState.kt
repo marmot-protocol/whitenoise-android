@@ -1567,6 +1567,8 @@ class WhiteNoiseAppState private constructor(
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
         private set
 
+    internal val deviceLinkRequests by runtimeLinkRequests()
+
     // staleness-exempt: observable process identity serialized through destructive-wipe state transitions.
     var runtimeGeneration by mutableIntStateOf(0)
         private set
@@ -4928,6 +4930,8 @@ class WhiteNoiseAppState private constructor(
             recordAccountSwitchMark("previous-shortcuts-hide-finished")
         }
 
+        override suspend fun cancelOutgoingDeviceLink(label: String) = cancelLinkAfterProfileSwitch(label)
+
         /** Commits the prepared projection and active label together without a suspension. */
         override fun publish(
             label: String,
@@ -5741,7 +5745,7 @@ class WhiteNoiseAppState private constructor(
                 runCatchingCancellable {
                     marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
                 }
-            val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
+            val refreshedAccounts = refreshedAccountsResult.getOrElse { accounts.filterNot { it.label == wipedRef } }
             val retainedAccountGeneration =
                 accountListLifetime.advance {
                     publishRefreshedAccountList(refreshedAccountsResult)
@@ -5786,11 +5790,11 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Publishes the account list a post-wipe read produced. A failed read leaves an empty list that is not
-     * authoritative, so surviving accounts' automatic work waits for the next successful read instead of ending.
+     * Publishes the account list a post-wipe read produced. A failed read retains the known survivors as a non-
+     * authoritative projection, so surviving accounts' automatic work waits for the next successful read instead of ending.
      */
     internal fun publishRefreshedAccountList(result: Result<List<AccountSummaryFfi>>) {
-        accounts = result.getOrDefault(emptyList())
+        result.onSuccess { accounts = it }
         accountListLoaded = result.isSuccess
     }
 

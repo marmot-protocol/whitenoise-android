@@ -169,4 +169,8 @@
     <string name="chats_arriving_detail">Chats this account already has are added here by your other devices, usually within a minute or two. If it has none yet, start one.</string>
     <string name="linked_devices_linked_by">Linked by %1$s</string>
     <string name="device_move_finish_linking">A device you approved is still being linked. Let it finish before moving this device, or it may not join your chats.</string>
+    <string name="link_device_joining_chats">Joining chats: %1$d of %2$d</string>
+    <string name="link_device_adding_chats">Adding to chats: %1$d of %2$d</string>
+    <string name="unlinked_remove_sign_in">Remove and sign in</string>
+    <string name="unlinked_remove_sign_in_detail">This device was unlinked. Remove this profile’s chats and data from this device and sign in again with the key you entered? Your other devices keep their data.</string>
 </resources>

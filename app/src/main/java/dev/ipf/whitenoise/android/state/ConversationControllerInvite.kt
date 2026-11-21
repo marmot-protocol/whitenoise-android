@@ -68,19 +68,29 @@ internal fun ConversationController.applyAcceptedInviteGroup(
     inviteConfirmationAuthority.finish()
 }
 
+/** True while the open profile and Welcome still own the decline that was rendered. */
+internal fun ConversationController.ownsRenderedDecline(invitation: InviteAcceptanceGeneration): Boolean =
+    ownsRetainedForegroundPresentation &&
+        canAcceptRenderedInvite(group, invitation)
+
 /**
  * Declines the current pending Welcome, stepping down first only when [stepDownConsent] names this invitation.
  * Without that consent an admin invitee, or a decline MDK refuses for an admin, raises the step-down question.
  */
-internal suspend fun ConversationController.declineInviteWithConsent(stepDownConsent: InviteAcceptanceGeneration?): Boolean =
+internal suspend fun ConversationController.declineInviteWithConsent(
+    stepDownConsent: InviteAcceptanceGeneration?,
+    rendered: InviteAcceptanceGeneration? = null,
+): Boolean =
     withMutationLockResult(false) {
         if (inviteAcceptanceResolutionPending) return@withMutationLockResult false
         val account = conversationAccountRef ?: return@withMutationLockResult false
-        val invitation = inviteGeneration(group)
+        val invitation = rendered ?: inviteGeneration(group)
+        if (rendered != null && !ownsRenderedDecline(rendered)) return@withMutationLockResult false
         val stepDownAgreed = stepDownConsent != null
         if (requestDeclineConsentIfNeeded(invitation, stepDownConsent)) return@withMutationLockResult false
         val stillPending = {
             mutationPresentation.ownsCurrentPresentation() &&
+                (rendered == null || ownsRenderedDecline(rendered)) &&
                 !inviteAcceptanceResolutionPending &&
                 group.pendingConfirmation &&
                 inviteGeneration(group) == invitation

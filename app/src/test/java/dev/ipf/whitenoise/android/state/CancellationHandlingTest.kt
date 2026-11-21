@@ -74,7 +74,7 @@ class CancellationHandlingTest {
             "runCatching { marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() } }.getOrDefault(emptyList())" to
                 "val refreshedAccountsResult = runCatchingCancellable { " +
                 "marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() } } " +
-                "val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())",
+                "val refreshedAccounts = refreshedAccountsResult.getOrElse { accounts.filterNot { it.label == wipedRef } }",
             "runCatching { marmotIo { accountRelayLists(account) } }.getOrNull()" to
                 "runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()",
             "runCatching { " +

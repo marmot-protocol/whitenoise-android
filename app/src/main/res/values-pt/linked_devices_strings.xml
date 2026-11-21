@@ -169,4 +169,8 @@
     <string name="chats_arriving_detail">As conversas que esta conta já tem são adicionadas aqui pelos seus outros dispositivos, geralmente em um ou dois minutos. Se ainda não houver nenhuma, inicie uma.</string>
     <string name="linked_devices_linked_by">Vinculado por %1$s</string>
     <string name="device_move_finish_linking">Um dispositivo que você aprovou ainda está sendo vinculado. Deixe-o terminar antes de mover este dispositivo, ou ele pode não entrar nas suas conversas.</string>
+    <string name="link_device_joining_chats">Entrando nas conversas: %1$d de %2$d</string>
+    <string name="link_device_adding_chats">Adicionando às conversas: %1$d de %2$d</string>
+    <string name="unlinked_remove_sign_in">Remover e entrar</string>
+    <string name="unlinked_remove_sign_in_detail">Este dispositivo foi desvinculado. Remover as conversas e os dados deste perfil deste dispositivo e entrar novamente com a chave informada? Os outros dispositivos manterão os dados.</string>
 </resources>

@@ -12,9 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.ChatsArrivingHint
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -31,10 +29,6 @@ class UnlinkedAccountTest {
     @get:Rule val compose = createComposeRule()
 
     private val context: Context = ApplicationProvider.getApplicationContext()
-
-    /** Leaves no arrival hint behind for another test. */
-    @After
-    fun endHint() = ChatsArrivingHint.end()
 
     /** The prompt explains the removal and its one action asks for it once. */
     @Test
@@ -181,24 +175,5 @@ class UnlinkedAccountTest {
         UnlinkedProfileRemoval.close()
 
         assertEquals(null, UnlinkedProfileRemoval.askedFor)
-    }
-
-    /** The arrival hint belongs to the account that linked, in any letter case, until it is ended. */
-    @Test
-    fun theArrivalHintIsForTheAccountThatLinked() {
-        assertFalse(ChatsArrivingHint.shown)
-
-        ChatsArrivingHint.mark("AB12", nowMs = 1_000L, durationMs = 500L)
-
-        assertTrue(ChatsArrivingHint.shown)
-        assertTrue(ChatsArrivingHint.showsFor("ab12"))
-        assertFalse(ChatsArrivingHint.showsFor("cd34"))
-        assertFalse(ChatsArrivingHint.showsFor(null))
-        assertEquals(200L, ChatsArrivingHint.remainingMs(nowMs = 1_300L))
-        assertEquals(0L, ChatsArrivingHint.remainingMs(nowMs = 9_000L))
-
-        ChatsArrivingHint.end()
-
-        assertFalse(ChatsArrivingHint.showsFor("ab12"))
     }
 }

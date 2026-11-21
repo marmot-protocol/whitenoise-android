@@ -19,5 +19,8 @@ internal suspend fun WhiteNoiseAppState.removeUnlinkedAccount(label: String): Bo
 internal suspend fun WhiteNoiseAppState.removeUnlinkedAccountForOutcome(label: String): AccountWipeCompletion? {
     // A cancelled setup child may need the account lifetime for its own cleanup before the wipe can take it.
     accountSetup.close()
-    return withAccountLifetime { signOutAndWipeActiveAccountLocked(label) }
+    return withAccountLifetime {
+        val unlinked = runCatchingCancellable { marmotIo { listAccounts().any { it.label == label && it.unlinked } } }
+        if (unlinked.getOrDefault(false)) signOutAndWipeActiveAccountLocked(label) else null
+    }
 }

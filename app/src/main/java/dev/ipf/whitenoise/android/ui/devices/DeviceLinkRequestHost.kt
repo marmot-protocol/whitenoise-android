@@ -8,10 +8,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -20,6 +22,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DeviceLinkController
 import dev.ipf.whitenoise.android.state.DeviceLinkRequest
@@ -63,13 +66,7 @@ internal fun DeviceLinkRequestHost(
     val accounts = deviceLinkWatchedAccounts(appState.accounts)
     val currentAccounts = rememberUpdatedState(accounts)
     val currentBlocked = rememberUpdatedState(blocked)
-    val watcher =
-        remember(runtimeGeneration) {
-            DeviceLinkRequestWatcher(
-                readSnapshot = { account -> appState.marmotIo { deviceLinkSnapshot(account) } },
-                owns = { appState.runtimeGeneration == runtimeGeneration },
-            )
-        }
+    val watcher = appState.deviceLinkRequests
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(watcher, lifecycle, accounts) {
         appState.followEventsWhileStarted(lifecycle) { nextEvent ->
@@ -81,10 +78,12 @@ internal fun DeviceLinkRequestHost(
     }
     LaunchedEffect(watcher, blocked) { watcher.reoffer(blocked) }
     // A request already on screen is taken down while the app is locked, so nothing can be answered until unlock.
-    val request = watcher.queue.presented?.takeUnless { blocked } ?: return
+    val request = watcher.queue.presented ?: return
     if (request.accountRef == appState.activeAccountRef) {
-        ActiveProfileLinkRequest(appState, watcher, request, blocked)
-    } else {
+        DeviceLinkApprovalGate(runtimeGeneration, request, blocked) { draft ->
+            ActiveProfileLinkRequest(appState, watcher, request, draft)
+        }
+    } else if (!blocked) {
         DeviceLinkOtherProfileDialog(
             profileName = appState.profileName(request.accountRef),
             onReview = {
@@ -96,6 +95,20 @@ internal fun DeviceLinkRequestHost(
             },
             onNotNow = { watcher.hidePresented(blocked) },
         )
+    }
+}
+
+/** A lock hides the comparison. Only a different runtime, profile or prompt resets the entered choices. */
+@Composable
+internal fun DeviceLinkApprovalGate(
+    runtimeGeneration: Int,
+    request: DeviceLinkRequest,
+    blocked: Boolean,
+    content: @Composable (DeviceLinkApprovalDraft) -> Unit,
+) {
+    key(runtimeGeneration, request.accountRef, request.promptId) {
+        val draft = rememberSaveable(saver = DeviceLinkApprovalDraft.Saver) { DeviceLinkApprovalDraft() }
+        if (!blocked) content(draft)
     }
 }
 
@@ -115,7 +128,7 @@ private fun ActiveProfileLinkRequest(
     appState: WhiteNoiseAppState,
     watcher: DeviceLinkRequestWatcher,
     request: DeviceLinkRequest,
-    blocked: Boolean,
+    draft: DeviceLinkApprovalDraft,
 ) {
     val prompt = watcher.presentedPrompt ?: return
     val runtimeGeneration = appState.runtimeGeneration
@@ -131,24 +144,32 @@ private fun ActiveProfileLinkRequest(
             )
         }
     DisposableEffect(controller) { onDispose { controller.retire() } }
+    var beforeCommand by remember(controller) { mutableStateOf<DeviceLinkSnapshotFfi?>(null) }
     LaunchedEffect(controller.link) {
         val result = controller.link ?: return@LaunchedEffect
-        watcher.accept(request.accountRef, result, blocked)
+        watcher.accept(request.accountRef, result, blocked = false, beforeCommand = beforeCommand)
         // This effect runs a frame after the command, so MDK's own event may already have published a newer state.
-        watcher.reread(request.accountRef, blocked)
+        watcher.reread(request.accountRef, blocked = false)
     }
     val failed = rememberDeviceLinkFailed(controller)
     Dialog(
-        onDismissRequest = { watcher.hidePresented(blocked) },
+        onDismissRequest = { watcher.hidePresented(blocked = false) },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         DeviceLinkRequestContent(
             state = prompt.state,
             running = controller.running,
-            onLink = { choices -> scope.launch { controller.link(request.promptId, choices) } },
-            onDecline = { scope.launch { controller.decline(request.promptId) } },
-            onClose = { watcher.hidePresented(blocked) },
+            onLink = { choices ->
+                beforeCommand = watcher.snapshots[request.accountRef]
+                scope.launch { controller.link(request.promptId, choices) }
+            },
+            onDecline = {
+                beforeCommand = watcher.snapshots[request.accountRef]
+                scope.launch { controller.decline(request.promptId) }
+            },
+            onClose = { watcher.hidePresented(blocked = false) },
             failed = failed,
+            draft = draft,
         )
     }
 }

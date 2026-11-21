@@ -169,4 +169,8 @@
     <string name="chats_arriving_detail">Chats, die dieses Konto schon hat, werden von deinen anderen Geräten hier hinzugefügt, meist innerhalb von ein bis zwei Minuten. Wenn es noch keine gibt, starte einen.</string>
     <string name="linked_devices_linked_by">Verknüpft von %1$s</string>
     <string name="device_move_finish_linking">Ein Gerät, das du bestätigt hast, wird noch verknüpft. Warte, bis es fertig ist, bevor du dieses Gerät verschiebst, sonst tritt es deinen Chats vielleicht nicht bei.</string>
+    <string name="link_device_joining_chats">Chats beitreten: %1$d von %2$d</string>
+    <string name="link_device_adding_chats">Zu Chats hinzufügen: %1$d von %2$d</string>
+    <string name="unlinked_remove_sign_in">Entfernen und anmelden</string>
+    <string name="unlinked_remove_sign_in_detail">Dieses Gerät wurde getrennt. Chats und Daten dieses Profils von diesem Gerät entfernen und mit dem eingegebenen Schlüssel erneut anmelden? Die Daten auf deinen anderen Geräten bleiben erhalten.</string>
 </resources>

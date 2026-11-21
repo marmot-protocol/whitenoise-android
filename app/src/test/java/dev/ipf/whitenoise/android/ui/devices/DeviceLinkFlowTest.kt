@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.devices
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -22,6 +23,7 @@ import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DeviceLinkChoices
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
+import dev.ipf.whitenoise.android.state.DeviceLinkRequest
 import dev.ipf.whitenoise.android.state.LinkedDeviceRoster
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -169,6 +171,33 @@ class DeviceLinkFlowTest {
         compose.runOnIdle {
             assertEquals(DeviceLinkChoices(label = "Desk", addToAllChats = true, bringHistory = false), linked)
         }
+    }
+
+    /** Locking cannot turn history back on. A new prompt starts with its own choices. */
+    @Test
+    fun historyChoiceSurvivesLockOnlyForTheSamePrompt() {
+        val blocked = mutableStateOf(false)
+        val request = mutableStateOf(DeviceLinkRequest("account", "first", 0L))
+        var linked: DeviceLinkChoices? = null
+        compose.setContent {
+            WhiteNoiseTheme {
+                DeviceLinkApprovalGate(1, request.value, blocked.value) { draft ->
+                    DeviceLinkRequestContent(DeviceLinkPromptStateFfi.Comparing(CODE), null, { linked = it }, {}, {}, draft = draft)
+                }
+            }
+        }
+        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(DEVICE_LINK_BRING_HISTORY_TAG).performScrollTo().performClick()
+        compose.runOnIdle { blocked.value = true }
+        compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).assertDoesNotExist()
+        compose.runOnIdle { blocked.value = false }
+        compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
+        compose.runOnIdle {
+            assertEquals(false, linked?.bringHistory)
+            request.value = request.value.copy(promptId = "second")
+        }
+        compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().performClick()
+        compose.runOnIdle { assertEquals(true, linked?.bringHistory) }
     }
 
     /** Both choices start on, as MDK offers them, and one tap links under the placeholder name, options closed. */

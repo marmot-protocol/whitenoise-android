@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.state.cancel
 import dev.ipf.whitenoise.android.state.confirmMatch
 import dev.ipf.whitenoise.android.state.dismissMoveSibling
 import dev.ipf.whitenoise.android.state.start
+import dev.ipf.whitenoise.android.state.withChatProgress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -76,7 +77,10 @@ private fun LinkedDevicesPages(
     DeviceLinkFailureEffect(appState, controller)
     DeviceLinkOfferSettled(appState, controller)
     DeviceManagementFailureEffect(appState, management)
-    val openDevice = deviceSlot?.let { controller.roster.roster?.device(it) }
+    val roster = controller.roster
+    val progress = controller.link?.chatProgress.orEmpty()
+    val visibleRoster = remember(roster, progress) { roster.copy(roster = roster.roster?.withChatProgress(progress)) }
+    val openDevice = deviceSlot?.let { visibleRoster.roster?.device(it) }
     val firstRead = linkedDevicesFirstRead(controller, management)
     when {
         linking -> LinkThisDeviceRoute(controller, onClose = { linking = false }, failed = linkStepFailed)
@@ -84,7 +88,7 @@ private fun LinkedDevicesPages(
         !firstRead -> LinkedDevicesContent(LinkedDeviceRosterState(), onBack, showLoading = false)
         else ->
             LinkedDevicesContent(
-                state = controller.roster,
+                state = visibleRoster,
                 onBack = onBack,
                 linking = linkedDevicesLinking(appState, controller, management),
                 actions =
