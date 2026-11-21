@@ -1399,11 +1399,7 @@ private suspend fun WhiteNoiseAppState.processNotificationUpdate(incoming: Notif
     val engineMuted = engineNotificationMuted(update)
     val directConversation =
         update.isDm ||
-            (
-                update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
-                    notificationProfiles.active()?.profile?.allowAllDirectMessages == true &&
-                    isStoredDirectChat(update)
-            )
+            (update.trigger == NotificationTriggerFfi.NEW_MESSAGE && isStoredDirectChat(update))
     try {
         val shouldPost = shouldPostNotification(update, engineMuted, directConversation, reserveRepeat = true)
         recordNotificationFirstPostTiming(

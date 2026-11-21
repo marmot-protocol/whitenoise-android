@@ -336,6 +336,10 @@ class NotificationNetworkReconnectCoverageTest {
             eligibility
                 .substringAfter("internal fun WhiteNoiseAppState.isNotificationGenerationPostAllowed")
                 .substringBefore("internal fun WhiteNoiseAppState.isNotificationEnrichmentAllowed")
+        val epochEnrichmentGate =
+            eligibility
+                .substringAfter("internal fun WhiteNoiseAppState.isNotificationEnrichmentAllowed")
+                .substringBefore("/**")
         val capturedEnrichmentGate =
             Regex(
                 """internal fun WhiteNoiseAppState\.isNotificationEnrichmentAllowed\(""" +
@@ -351,7 +355,7 @@ class NotificationNetworkReconnectCoverageTest {
                 "firstPost.epoch" in capturedEnrichmentGate &&
                 "firstPost.accountCacheEpoch" in capturedEnrichmentGate &&
                 "firstPost.engineMuted" in capturedEnrichmentGate &&
-                "isNotificationGenerationPostAllowed(" in notificationGates &&
+                "isNotificationGenerationPostAllowed(" in epochEnrichmentGate &&
                 "!networkNotificationRecoverySuppressed" in notificationGates,
         )
     }
