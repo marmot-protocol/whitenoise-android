@@ -282,8 +282,13 @@ class ChangedGroupPictureCoverageTest {
                 lastMessage = null,
             )
 
-        fun image(hash: String) =
-            ChatListAvatarFfi(hash, "1c".repeat(32), "2d".repeat(12), "3e".repeat(32), "image/png")
+        fun image(hash: String) = ChatListAvatarFfi(
+            hash,
+            "1c".repeat(32),
+            "2d".repeat(12),
+            "3e".repeat(32),
+            "image/png",
+        )
 
         /** MDK's group presentation selecting the encrypted picture [hash]. */
         fun groupPresentation(
@@ -318,8 +323,17 @@ class ChangedGroupPictureCoverageTest {
         )
 
         /** The stored bytes MDK returns for [reference]. */
-        fun payload(reference: String) =
-            AvatarBytesFfi(reference, AvatarAvailabilityFfi.READY, 1uL, 1_024uL, false, png(), "image/png", 64u, 64u)
+        fun payload(reference: String) = AvatarBytesFfi(
+            reference,
+            AvatarAvailabilityFfi.READY,
+            1uL,
+            1_024uL,
+            false,
+            png(),
+            "image/png",
+            64u,
+            64u,
+        )
 
         /** A small opaque PNG. */
         fun png(): ByteArray {
