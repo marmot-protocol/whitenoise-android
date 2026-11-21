@@ -29,7 +29,14 @@ import kotlin.math.roundToInt
  * rounded down to whole pixels, then at a half-pixel offset with bilinear filtering, so a vector
  * reads blurry; a PNG at the device's density is sampled once and stays sharp.
  *
- * Recording Roborazzi baselines rewrites the PNGs from the artwork.
+ * After editing the artwork, regenerate the PNGs from the repository root:
+ * ```
+ * WN_RECORD_NOTIFICATION_SMALL_ICONS=true ./gradlew :app:testDevZapstoreDebugUnitTest --rerun \
+ *   --tests '*NotificationSmallIconBitmapTest.smallIconPngsMatchTheirArtwork'
+ * ```
+ *
+ * Record Roborazzi screenshots in a separate Gradle invocation so Android merges the new resources
+ * before the screenshot tests start.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -38,7 +45,7 @@ class NotificationSmallIconBitmapTest {
     /** The shipped PNGs are the artwork rendered at each density, so the logo itself never drifts. */
     @Test
     fun smallIconPngsMatchTheirArtwork() {
-        val record = System.getProperty("roborazzi.test.record") == "true"
+        val record = System.getenv("WN_RECORD_NOTIFICATION_SMALL_ICONS") == "true"
         for ((icon, artwork) in ARTWORK) {
             for ((bucket, scale) in DENSITIES) {
                 val size = (ICON_DP * scale).roundToInt()
@@ -119,6 +126,7 @@ class NotificationSmallIconBitmapTest {
 
     private companion object {
         const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
+
         /** Shipped PNG name to its vector artwork, relative to the app module. */
         val ARTWORK =
             mapOf(
