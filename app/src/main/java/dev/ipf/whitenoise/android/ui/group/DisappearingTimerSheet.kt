@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.group
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
@@ -58,6 +59,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -94,8 +97,9 @@ internal fun disappearingUnitTag(index: Int): String = "disappearing.unit.$index
 /** Durations shown in the grid, shortest first; Off and Custom sit in their own row below. */
 internal val disappearingGridSecs: List<Long> = disappearingPresetSecs.filter { it > 0L }.sorted()
 
-private const val GRID_COLUMNS = 3
-private const val UNIT_COLUMNS = 3
+private const val DEFAULT_CHIP_COLUMNS = 3
+private const val COMPACT_FONT_SCALE = 1.3f
+private val compactWindowWidth = 340.dp
 
 private const val PAGE_SLIDE_WIDTH_DIVISOR = 4
 
@@ -180,6 +184,9 @@ internal fun DisappearingMessagesPickerSheet(
         modifier = Modifier.testTag(DISAPPEARING_PICKER_TAG),
         sheetState = sheetState,
     ) {
+        BackHandler(enabled = page == DisappearingSheetPage.Custom && !closing) {
+            page = DisappearingSheetPage.Presets
+        }
         AnimatedContent(
             targetState = page,
             transitionSpec = {
@@ -280,7 +287,7 @@ private fun DisappearingPresetGrid(
         Modifier.selectableGroup(),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        disappearingGridSecs.chunked(GRID_COLUMNS).forEach { row ->
+        disappearingGridSecs.chunked(disappearingChipColumns()).forEach { row ->
             ChipRow {
                 row.forEach { secs ->
                     DisappearingChip(
@@ -314,6 +321,16 @@ private fun DisappearingPresetGrid(
         }
     }
 }
+
+@Composable
+private fun disappearingChipColumns(): Int =
+    if (
+        LocalDensity.current.fontScale >= COMPACT_FONT_SCALE || LocalWindowInfo.current.containerDpSize.width < compactWindowWidth
+    ) {
+        2
+    } else {
+        DEFAULT_CHIP_COLUMNS
+    }
 
 @Composable
 private fun DisappearingSheetTitle(text: String) {
@@ -395,7 +412,6 @@ private fun DisappearingChip(
                 label,
                 style = MaterialTheme.typography.labelLarge,
                 textAlign = TextAlign.Center,
-                maxLines = 2,
             )
         }
     }
@@ -465,7 +481,8 @@ private fun DisappearingCustomPage(
     val startState = remember(initialSecs) { disappearingCustomPickerStateForSeconds(initialSecs) }
     var unitIndex by remember(initialSecs) { mutableIntStateOf(startState.unitIndex) }
     var value by remember(initialSecs) { mutableIntStateOf(startState.value) }
-    val maxValue = maxOf(units[unitIndex].max, value)
+    val maxValue = units[unitIndex].max
+    val columns = disappearingChipColumns()
     val secs = disappearingCustomSeconds(value, unitIndex)
     Column(
         Modifier
@@ -508,14 +525,14 @@ private fun DisappearingCustomPage(
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
-                    onClick = { value = (value - 1).coerceAtLeast(1) },
+                    onClick = { value = (value - 1).coerceIn(1, maxValue) },
                     enabled = value > 1,
                     modifier = Modifier.testTag(DISAPPEARING_CUSTOM_DECREASE_TAG),
                 ) {
                     Icon(painterResource(R.drawable.ic_remove), stringResource(R.string.disappearing_custom_decrease))
                 }
                 Slider(
-                    value = value.toFloat(),
+                    value = value.coerceAtMost(maxValue).toFloat(),
                     onValueChange = { value = it.toInt().coerceIn(1, maxValue) },
                     valueRange = 1f..maxValue.toFloat(),
                     steps = (maxValue - 2).coerceAtLeast(0),
@@ -533,7 +550,7 @@ private fun DisappearingCustomPage(
                 Modifier.selectableGroup(),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
-                units.indices.chunked(UNIT_COLUMNS).forEach { row ->
+                units.indices.chunked(columns).forEach { row ->
                     ChipRow {
                         row.forEach { index ->
                             DisappearingChip(
@@ -546,7 +563,7 @@ private fun DisappearingCustomPage(
                                 modifier = Modifier.weight(1f).testTag(disappearingUnitTag(index)),
                             )
                         }
-                        repeat(UNIT_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
+                        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }

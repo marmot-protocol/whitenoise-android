@@ -37,6 +37,17 @@
         ]
       },
       {
+        "surface": "disappearingChipColumns",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
+        "anchor": "fun disappearingChipColumns(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-043",
+          "SET-028",
+          "SET-058"
+        ]
+      },
+      {
         "surface": "DisappearingSheetTitle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
         "anchor": "fun DisappearingSheetTitle(",

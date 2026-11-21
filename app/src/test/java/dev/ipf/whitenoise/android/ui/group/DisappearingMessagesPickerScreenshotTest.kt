@@ -4,7 +4,11 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -15,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -172,6 +177,22 @@ class DisappearingMessagesPickerScreenshotTest {
         composeRule.runOnIdle { assertEquals(4L * WEEK_SECONDS, picked) }
     }
 
+    @Test
+    fun customKeepsAnOutOfRangeValueWithoutExpandingTheSlider() {
+        val currentSecs = 31_535_999L
+        val maxSeconds = disappearingCustomUnits.first().max
+        render(currentSecs = currentSecs)
+
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_SLIDER_TAG).assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.ProgressBarRangeInfo,
+                ProgressBarRangeInfo(maxSeconds.toFloat(), 1f..maxSeconds.toFloat(), maxSeconds - 2),
+            ),
+        )
+    }
+
     /** Back from Custom returns to the presets without picking anything. */
     @Test
     fun customBackReturnsToPresets() {
@@ -185,6 +206,11 @@ class DisappearingMessagesPickerScreenshotTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.waitForIdle()
 
+        composeRule.onNodeWithTag(disappearingPresetTag(3_600L)).assertIsSelected()
+        composeRule.onNodeWithTag(DISAPPEARING_CUSTOM_ACTION_TAG).performClick()
+        composeRule.waitForIdle()
+        Espresso.pressBack()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag(disappearingPresetTag(3_600L)).assertIsSelected()
         assertNull(picked)
     }
