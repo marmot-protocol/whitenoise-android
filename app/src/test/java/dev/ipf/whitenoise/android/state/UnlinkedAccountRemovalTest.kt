@@ -42,13 +42,4 @@ class UnlinkedAccountRemovalTest {
             assertEquals(3, reads)
             assertEquals(4_000L, currentTime)
         }
-
-    /** With linked devices the account's own chat message can carry attachments to fetch; without them it cannot. */
-    @Test
-    fun anOwnMessageMayCarryAttachmentsOnlyWithLinkedDevices() {
-        assertTrue(receivedChatMayCarryAttachments(MARMOT_CHAT_EVENT_KIND, fromSelf = false, linkedDevices = false))
-        assertTrue(receivedChatMayCarryAttachments(MARMOT_CHAT_EVENT_KIND, fromSelf = true, linkedDevices = true))
-        assertFalse(receivedChatMayCarryAttachments(MARMOT_CHAT_EVENT_KIND, fromSelf = true, linkedDevices = false))
-        assertFalse(receivedChatMayCarryAttachments(7uL, fromSelf = false, linkedDevices = true))
-    }
 }

@@ -1019,6 +1019,7 @@
     <string name="toast_couldnt_sign_in_account">Couldn\'t sign in to account</string>
     <string name="toast_couldnt_export_nsec">Couldn\'t export secret key</string>
     <string name="wipe">Wipe</string>
+    <string name="wipe_media_ownership_unknown">Some cached files have no profile owner. Encrypted media, thumbnails, or temporary voice, video, document, attachment, paste or upload files remain on this device.</string>
     <string name="wipe_media_cleanup_failed">Some local media files or sharing permissions could not be removed.</string>
     <string name="toast_signed_out_and_wiped">Account wiped from this device</string>
     <string name="toast_couldnt_wipe_account">Couldn\'t wipe account</string>
@@ -2247,8 +2248,6 @@
     <string name="setup_device_unchecked">We couldn’t finish checking for other sign-ins.</string>
     <string name="setup_device_found_on_date">It looks like you’ve signed in to this account before, on another device or in another app.</string>
     <string name="setup_device_found">It looks like you’ve signed in to this account before, on another device or in another app.</string>
-    <string name="setup_device_separate_chats">This device will have its own separate chats. Chats in the other app stay there and won’t appear here.</string>
-    <string name="setup_device_new_chats_either_app">When someone starts a new chat with you, it may arrive in either app.</string>
     <string name="setup_device_separate_chats_if_other_app">If you have chats in another app, they won’t appear here automatically.</string>
     <string name="setup_device_stage">Device use</string>
     <string name="setup_approval_saved_pending">Your approval is saved. The change is still pending.</string>

@@ -569,7 +569,7 @@ internal class MediaDownloadIntegrationFixture(
 
     /** Marks the account list as successfully loaded, as an account read that returned no accounts does. */
     fun markAccountListLoaded() {
-        field("accountListLoaded").setBoolean(state, true)
+        state.accountListLoaded = true
     }
 
     companion object {

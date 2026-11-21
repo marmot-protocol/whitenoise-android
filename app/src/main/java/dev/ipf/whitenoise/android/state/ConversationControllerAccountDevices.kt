@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AccountDevicesActivationFfi
+import dev.ipf.marmotkit.GroupEventKindFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 
@@ -16,10 +18,20 @@ internal suspend fun ConversationController.readAccountDevicesActivation(): Acco
     }.getOrNull()
 }
 
+/** A remote MLS commit can change eligibility while the display group record stays equal. */
+internal fun MarmotEventFfi.isAccountDevicesEpochChange(
+    account: String,
+    groupId: String,
+): Boolean =
+    this is MarmotEventFfi.GroupEvent &&
+        accountLabel == account &&
+        groupIdHex.equals(groupId, ignoreCase = true) &&
+        event is GroupEventKindFfi.EpochChanged
+
 /** What MDK's advisory answer depends on here: it is read again whenever any part of this changes. */
 internal fun ConversationController.accountDevicesRevision(): Any {
     val mutation = mutationInFlight to lastMutationError
-    return managementState to mutation
+    return Triple(accountDevicesGroupRevision, managementState, mutation)
 }
 
 /**

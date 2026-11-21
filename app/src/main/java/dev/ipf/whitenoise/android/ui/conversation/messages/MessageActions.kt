@@ -19,7 +19,9 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -456,13 +458,19 @@ internal fun ForwardMessageSheet(
     onDismiss: () -> Unit,
     restoredRequest: PendingForwardRequest? = null,
     origin: Rect? = null,
+    newRequestId: String? = null,
 ) {
     // Plain remember on purpose: the encrypted store owns recreation, and the
     // saved-state Bundle must not carry forward-request identifiers.
     val requestId =
-        remember(originGroupIdHex) {
-            restoredRequest?.requestId ?: UUID.randomUUID().toString()
+        remember(originGroupIdHex, newRequestId, restoredRequest?.requestId) {
+            restoredRequest?.requestId ?: newRequestId ?: UUID.randomUUID().toString()
         }
+    DisposableEffect(appState, requestId) {
+        val openPickers = appState.forwardRequestPersistence.openPickerIds
+        if (restoredRequest == null) openPickers.add(requestId)
+        onDispose { if (restoredRequest == null) openPickers.remove(requestId) }
+    }
     var pickerTitles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     val dismissAndDiscard = {
         appState.forwardRequestPersistence.discard(requestId)
@@ -506,6 +514,7 @@ internal fun ForwardMessageSheet(
                         destinationAccountRef = destinationAccountRef,
                         selectedGroupIds = selectedGroupIds,
                     ),
+                    restored = restoredRequest != null,
                 )
             }
         },
@@ -533,12 +542,10 @@ internal fun restoredForwardRequestDisposition(
     isOwnerSignedIn: (String) -> Boolean,
 ): RestoredForwardDisposition =
     when {
-        !request.originGroupIdHex.equals(boundGroupIdHex, ignoreCase = true) ->
-            RestoredForwardDisposition.Ignore
-        request.sourceAccountRef != boundAccountRef -> RestoredForwardDisposition.Ignore
         !isOwnerSignedIn(request.sourceAccountRef) -> RestoredForwardDisposition.Discard
-        request.destinationAccountRef?.let { !isOwnerSignedIn(it) } == true ->
-            RestoredForwardDisposition.Discard
+        request.destinationAccountRef?.let { !isOwnerSignedIn(it) } == true -> RestoredForwardDisposition.Discard
+        !request.originGroupIdHex.equals(boundGroupIdHex, ignoreCase = true) -> RestoredForwardDisposition.Ignore
+        request.sourceAccountRef != boundAccountRef -> RestoredForwardDisposition.Ignore
         else -> RestoredForwardDisposition.Restore
     }
 
@@ -556,32 +563,26 @@ internal fun RestoredForwardRequestHost(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
 ) {
-    var restored by remember { mutableStateOf<PendingForwardRequest?>(null) }
-    LaunchedEffect(controller.group.groupIdHex, controller.boundAccountRef) {
-        val request = appState.forwardRequestPersistence.load() ?: return@LaunchedEffect
-        when (
+    val restoration = remember(controller.group.groupIdHex, controller.boundAccountRef) { ForwardPickerRestoration() }
+    val persistence = appState.forwardRequestPersistence
+    val revision by persistence.revision.collectAsState()
+    LaunchedEffect(restoration, appState.accountListLoaded, appState.accounts, revision) {
+        restoration.refresh(persistence, appState.accountListLoaded, { request ->
             restoredForwardRequestDisposition(
                 request = request,
                 boundGroupIdHex = controller.group.groupIdHex,
                 boundAccountRef = controller.boundAccountRef,
                 isOwnerSignedIn = { appState.isForwardOwnerSignedIn(it) },
             )
-        ) {
-            RestoredForwardDisposition.Ignore -> Unit
-            RestoredForwardDisposition.Discard -> {
-                appState.forwardRequestPersistence.discard(request.requestId)
-                appState.presentTransient(R.string.forward_restore_discarded)
-            }
-            RestoredForwardDisposition.Restore -> restored = request
-        }
+        }) { appState.presentTransient(R.string.forward_restore_discarded) }
     }
-    restored?.let { request ->
+    restoration.visible?.let { request ->
         ForwardMessageSheet(
             appState = appState,
             payloads = request.payloads,
             sourceAccountRef = request.sourceAccountRef,
             originGroupIdHex = request.originGroupIdHex,
-            onDismiss = { restored = null },
+            onDismiss = restoration::dismiss,
             restoredRequest = request,
         )
     }

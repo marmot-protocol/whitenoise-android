@@ -73,7 +73,7 @@ private fun LinkedDevicesPages(
     var reviewingSlot by rememberSaveable(key) { mutableStateOf<String?>(null) }
     var repairing by rememberSaveable(key) { mutableStateOf(false) }
     // Read before the notice below clears the failure, so the step itself also says a link action failed.
-    val linkStepFailed = rememberDeviceLinkFailed(controller)
+    val stepFailureMessage = rememberLinkFailureMessage(controller)
     DeviceLinkFailureEffect(appState, controller)
     DeviceLinkOfferSettled(appState, controller)
     DeviceManagementFailureEffect(appState, management)
@@ -83,7 +83,7 @@ private fun LinkedDevicesPages(
     val openDevice = deviceSlot?.let { visibleRoster.roster?.device(it) }
     val firstRead = linkedDevicesFirstRead(controller, management)
     when {
-        linking -> LinkThisDeviceRoute(controller, onClose = { linking = false }, failed = linkStepFailed)
+        linking -> LinkThisDeviceRoute(controller, onClose = { linking = false }, failureMessage = stepFailureMessage)
         openDevice != null -> LinkedDeviceDetailRoute(openDevice, management, scope, onClose = { deviceSlot = null })
         !firstRead -> LinkedDevicesContent(LinkedDeviceRosterState(), onBack, showLoading = false)
         else ->
@@ -165,7 +165,7 @@ private fun LinkedDevicesDialogs(
         RepairDeviceLinkDialog(
             onRepair = {
                 onClose()
-                scope.launch { if (management.devices.resetForRepair() != null) onRepaired() }
+                scope.launch { if (management.devices.resetForRepair()) onRepaired() }
             },
             onDismiss = onClose,
         )
@@ -202,6 +202,7 @@ private fun linkedDevicesHealth(
         counts = management.devices.counts,
         keyPackageRefreshOverdue = management.devices.keyPackageRefreshOverdue,
         stalled = controller.link?.deviceGroupStalled == true,
+        repairNeedsConfirmation = management.devices.repairNeedsConfirmation,
         busy = busy,
         review =
             SignInReviewState(
@@ -267,7 +268,7 @@ private fun LinkedDeviceDetailRoute(
 internal fun LinkThisDeviceRoute(
     controller: DeviceLinkController,
     onClose: () -> Unit,
-    failed: Boolean = false,
+    failureMessage: Int? = null,
 ) {
     val scope = rememberCoroutineScope()
     val state = controller.link?.newDevice
@@ -279,7 +280,7 @@ internal fun LinkThisDeviceRoute(
         step = state?.let(::newDeviceLinkStep) ?: notStartedLinkStep(starting),
         running = controller.running,
         onBack = onClose,
-        failed = failed,
+        failureMessage = failureMessage,
         onAction = { action ->
             when (action) {
                 DeviceLinkAction.ConfirmMatch -> scope.launch { controller.confirmMatch() }

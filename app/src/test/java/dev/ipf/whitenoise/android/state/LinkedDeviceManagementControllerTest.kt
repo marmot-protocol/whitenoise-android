@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CompletableDeferred
@@ -63,11 +62,12 @@ class LinkedDeviceManagementControllerTest {
         /** Answers with the scripted overdue flag. */
         override suspend fun keyPackageRefreshOverdue(accountRef: String): Boolean = overdue()
 
-        /** Records the reset, runs the scripted edit and answers with an empty snapshot. */
-        override suspend fun resetDeviceGroupForRepair(accountRef: String): DeviceLinkSnapshotFfi {
+        override suspend fun repairNeedsConfirmation(accountRef: String) = false
+
+        /** Records the completed repair or throws the scripted error. */
+        override suspend fun resetDeviceGroupForRepair(accountRef: String) {
             calls += "repair:$accountRef"
             edit()
-            return DeviceLinkSnapshotFfi(null, emptyList(), emptyList(), false)
         }
     }
 
@@ -125,7 +125,7 @@ class LinkedDeviceManagementControllerTest {
             controller.rename("slot", "Desk")
             controller.updateSettings("slot", patch)
             controller.remove("slot")
-            val snapshot = controller.resetForRepair()
+            val repaired = controller.resetForRepair()
 
             assertEquals(
                 listOf(
@@ -136,7 +136,7 @@ class LinkedDeviceManagementControllerTest {
                 ),
                 native.calls,
             )
-            assertEquals(DeviceLinkSnapshotFfi(null, emptyList(), emptyList(), false), snapshot)
+            assertTrue(repaired)
             assertNull(controller.failure)
         }
 
@@ -202,15 +202,15 @@ class LinkedDeviceManagementControllerTest {
         assertNull(deviceGroupRefusal(IllegalStateException("device group refused: device_group_busy")))
     }
 
-    /** A failed repair returns no snapshot, so the caller does not move on to linking. */
+    /** A failed repair leaves the caller on the roster to act on its failure. */
     @Test
-    fun aFailedRepairReturnsNoSnapshot() =
+    fun aFailedRepairKeepsTheUserOnTheRoster() =
         runTest {
             val native = Native()
             native.edit = { throw MarmotKitException.TransportClosed() }
             val controller = LinkedDeviceManagementController(ACCOUNT, native)
 
-            assertNull(controller.resetForRepair())
+            assertFalse(controller.resetForRepair())
             assertTrue(controller.failure is LinkedDeviceActionFailure.Other)
         }
 

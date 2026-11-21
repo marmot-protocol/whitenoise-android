@@ -42,7 +42,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
 
-/** Poll discussion shares native reaction admission, rollback and event-scoped removal. */
+/** Poll discussion shares native reaction admission, rollback and emoji-scoped removal. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -82,7 +82,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         awaitOwnReactionRow(item.record.messageIdHex)
         composeRule.onNodeWithText("Tap to remove").performClick()
         advanceReactionQuietPeriod()
-        composeRule.waitUntil { recordedCalls().any { it.first == "deleteMessage" } }
+        composeRule.waitUntil { recordedCalls().any { it.first == "unreactFromMessageMatching" } }
         composeRule.runOnIdle {
             assertEquals(
                 listOf("personal", item.record.groupIdHex, item.record.messageIdHex),
@@ -93,8 +93,8 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
                 recordedCalls().first { it.first == "reactToMessage" }.second.take(4),
             )
             assertEquals(
-                listOf("personal", item.record.groupIdHex, "aa".repeat(32)),
-                recordedCalls().first { it.first == "deleteMessage" }.second.take(3),
+                listOf("personal", item.record.groupIdHex, item.record.messageIdHex, "👍"),
+                recordedCalls().single { it.first == "unreactFromMessageMatching" }.second.take(4),
             )
             assertTrue(recordedCalls().none { it.first == "castPollVote" })
             assertEquals(emptyList<String>(), item.projected?.poll?.localSelection)
@@ -181,7 +181,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
             assertEquals(1, recordedCalls().count { it.first == "reactToMessage" })
         }
 
-    @Test fun queuedRemovalRechecksAvailabilityBeforeDeletingReactionEvent() =
+    @Test fun queuedRemovalRechecksAvailabilityBeforeRetractingEmoji() =
         runTest {
             val item = render()
             pollController.toggleReaction("👍", item.record)
@@ -198,7 +198,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
             removal.await()
             assertEquals(1, admissionChecks)
             assertEquals(1, recordedCalls().count { it.first == "reactToMessage" })
-            assertTrue(recordedCalls().none { it.first == "deleteMessage" || it.first == "unreactFromMessage" })
+            assertTrue(recordedCalls().none { it.first == "unreactFromMessageMatching" })
         }
 
     @Test fun pollRemovedDuringGroupLockWaitDoesNotReachNative() =
@@ -256,7 +256,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
             shadowOf(Looper.getMainLooper()).idle()
             pollController.reactions[target].isNullOrEmpty()
         }
-        assertTrue(recordedCalls().none { it.first == "reactToMessage" || it.first == "unreactFromMessage" })
+        assertTrue(recordedCalls().none { it.first == "reactToMessage" || it.first == "unreactFromMessageMatching" })
     }
 
     @Test fun pollReplyUsesExistingNativeComposerSendAndStableTarget() =

@@ -109,6 +109,8 @@
     <string name="devices_leftover_chats_detail">這些聊天無法接受來自你裝置的移除操作。聊天管理員可以在那裡移除該裝置。</string>
     <string name="devices_key_refresh_overdue">此裝置無法更新其邀請金鑰。30 天後，可能無法再將它加入新聊天。請在你的裝置上保持應用程式開啟，以便它們同步。</string>
     <string name="devices_stalled">此裝置已無法與你的其他裝置保持同步。請修復其連結以繼續。</string>
+    <string name="device_repair_confirm_again">請在設定中打開「已連結的裝置」，再次確認修復後再連結此裝置。</string>
+    <string name="device_repair_try_link_again">連結已重設。請嘗試重新連結裝置以完成修復。</string>
     <string name="devices_repair">修復此裝置的連結</string>
     <string name="devices_repair_confirm">這會移除目前的連結，讓你重新連結這部裝置。聊天、訊息、草稿和設定都會保留。即使取消重新連結，也無法恢復原本的連結。</string>
     <string name="sign_ins_section">待確認的登入</string>

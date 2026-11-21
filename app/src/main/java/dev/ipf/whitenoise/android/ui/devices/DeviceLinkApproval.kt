@@ -129,11 +129,10 @@ internal fun rememberApprovalDraft() =
 
 /**
  * A link request as the approving device shows it. While MDK shows the code, Link device is one tap: the new device
- * gets a placeholder name, which it replaces with its model, and joins the account's chats with their history
+ * gets the default name unless the user enters one, and joins the account's chats with their history
  * (both on, as MDK offers them). Options opens the name and the two choices for anyone who wants to change them,
  * and a name over MDK's limit keeps them open. The choices stay as entered if a submission fails. [onLink]
- * receives them; [onDecline] is Not now; [onClose] leaves without answering; [failed] says the last answer did not
- * go through.
+ * receives them; [onDecline] is Not now and [onClose] leaves without answering.
  */
 @Composable
 internal fun DeviceLinkRequestContent(
@@ -142,11 +141,11 @@ internal fun DeviceLinkRequestContent(
     onLink: (DeviceLinkChoices) -> Unit,
     onDecline: () -> Unit,
     onClose: () -> Unit,
-    failed: Boolean = false,
+    failureMessage: Int? = null,
     draft: DeviceLinkApprovalDraft = rememberApprovalDraft(),
 ) {
     val label = draft.label
-    // MDK requires a name, so an empty field sends the placeholder the new device then replaces with its model.
+    // MDK requires a name. The approving device supplies the default when the field is empty.
     val placeholder = stringResource(R.string.link_request_default_label)
     val name =
         label.text
@@ -160,8 +159,8 @@ internal fun DeviceLinkRequestContent(
         step = step,
         running = running,
         onBack = onClose,
-        primaryEnabled = nameFits,
-        failed = failed,
+        primaryEnabled = step.primary != DeviceLinkAction.Link || nameFits,
+        failureMessage = failureMessage,
         onAction = { action ->
             when (action) {
                 DeviceLinkAction.Link -> onLink(DeviceLinkChoices(name, draft.addToAllChats, draft.bringHistory))
@@ -270,7 +269,7 @@ internal fun LinkThisDeviceContent(
     running: DeviceLinkCommand?,
     onBack: () -> Unit,
     onAction: (DeviceLinkAction) -> Unit,
-    failed: Boolean = false,
+    failureMessage: Int? = null,
 ) {
     DeviceLinkStepLayout(
         screenTitle = stringResource(R.string.link_device_this_title),
@@ -278,6 +277,6 @@ internal fun LinkThisDeviceContent(
         running = running,
         onBack = onBack,
         onAction = onAction,
-        failed = failed,
+        failureMessage = failureMessage,
     )
 }

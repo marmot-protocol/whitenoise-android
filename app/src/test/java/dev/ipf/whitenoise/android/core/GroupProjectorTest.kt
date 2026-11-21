@@ -709,6 +709,7 @@ class GroupProjectorTest {
         val forwarded = group(name = "", pending = true, welcomer = "me")
 
         assertNull(GroupProjector.inviteAccount(forwarded, otherMemberAccount = "ME", selfAccountIdHex = "me"))
+        assertNull(GroupProjector.avatarAccount(forwarded, "ME", memberCount = 2, selfAccountIdHex = "me"))
     }
 
     /** An unnamed pending chat passed on by the account's own device is titled after the other member. */

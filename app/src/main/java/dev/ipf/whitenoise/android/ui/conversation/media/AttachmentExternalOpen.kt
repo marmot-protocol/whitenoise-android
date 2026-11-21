@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.SharedPlaintextWrite
 import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
 import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
 import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
@@ -101,7 +102,7 @@ internal suspend fun materializeDocumentAttachmentSource(
     reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
     resolveSource: suspend () -> AttachmentPlaintext,
 ): java.io.File {
-    val writeGeneration = captureSharedPlaintextWrite()
+    val writeGeneration = captureSharedPlaintextWrite(accountRef)
     val file =
         withContext(Dispatchers.IO) {
             documentAttachmentCacheFile(context, accountRef, messageIdHex, attachmentIndex, reference, writeGeneration)
@@ -133,7 +134,7 @@ private fun documentAttachmentCacheFile(
     messageIdHex: String,
     attachmentIndex: Int,
     reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
-    writeGeneration: Long,
+    writeGeneration: SharedPlaintextWrite,
 ): java.io.File {
     // A surviving OS grant to a previously evicted file cannot regain access when it is staged after a wipe or restart.
     val digestInput =

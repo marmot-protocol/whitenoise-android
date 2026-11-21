@@ -11,9 +11,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.whitenoise.android.state.DeviceLinkChoices
 import dev.ipf.whitenoise.android.state.DeviceLinkController
 import dev.ipf.whitenoise.android.state.DeviceLinkNative
+import dev.ipf.whitenoise.android.state.DeviceLinkOffers
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
@@ -67,14 +69,38 @@ internal class RuntimeDeviceLink(
     override suspend fun startDeviceLink(accountRef: String) =
         appState.withAccountLifetime {
             check(appState.activeAccountRef == accountRef)
-            io { startDeviceLink(accountRef) }
+            val account = checkNotNull(appState.activeAccount)
+            io {
+                DeviceLinkOffers.shared(appState.appContext).repair(account.accountIdHex).start(
+                    rotate = { rotateKeyPackage(accountRef) },
+                    pair = { startDeviceLink(accountRef) },
+                )
+            }.also { link ->
+                appState.unconfirmedLinkOwner =
+                    when (link.newDevice) {
+                        NewDeviceLinkStateFfi.WaitingForAnswer, is NewDeviceLinkStateFfi.Comparing ->
+                            accountRef to appState.runtimeGeneration
+                        else -> null
+                    }
+            }
         }
 
     /** Confirms the emoji match. */
-    override suspend fun confirmDeviceLinkMatch(accountRef: String) = io { confirmDeviceLinkMatch(accountRef) }
+    override suspend fun confirmDeviceLinkMatch(accountRef: String) =
+        appState.withAccountLifetime {
+            check(appState.activeAccountRef == accountRef)
+            // A lost native response can still mean consent committed. Only explicit Cancel may withdraw it now.
+            appState.unconfirmedLinkOwner = null
+            io { confirmDeviceLinkMatch(accountRef) }
+        }
 
     /** Cancels this device's link. */
-    override suspend fun cancelDeviceLink(accountRef: String) = io { cancelDeviceLink(accountRef) }
+    override suspend fun cancelDeviceLink(accountRef: String) =
+        appState.withAccountLifetime {
+            check(appState.activeAccountRef == accountRef)
+            appState.unconfirmedLinkOwner = null
+            io { cancelDeviceLink(accountRef) }
+        }
 
     /** Links the requesting device with the user's choices. */
     override suspend fun linkDevice(

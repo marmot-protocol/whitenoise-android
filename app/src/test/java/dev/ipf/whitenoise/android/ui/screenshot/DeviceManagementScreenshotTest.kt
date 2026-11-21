@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.state.LinkedDeviceChatCounts
 import dev.ipf.whitenoise.android.state.SignInListState
 import dev.ipf.whitenoise.android.ui.devices.DEVICE_DETAIL_REMOVE_TAG
 import dev.ipf.whitenoise.android.ui.devices.DEVICE_DETAIL_RENAME_TAG
+import dev.ipf.whitenoise.android.ui.devices.LINKED_DEVICES_REPAIR_TAG
 import dev.ipf.whitenoise.android.ui.devices.LinkedDeviceDetailContent
 import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesContent
 import dev.ipf.whitenoise.android.ui.devices.LinkedDevicesHealth
@@ -142,6 +143,15 @@ class DeviceManagementScreenshotTest {
         val rejected = signIn("a").copy(state = UnrecognizedSignInStateFfi.REJECTED_ELSEWHERE)
         show(Look()) { SignInReviewDialog(rejected, onAnswer = {}, onClose = {}) }
         compose.onNode(isDialog()).captureRoboImage("src/test/snapshots/sign_in_review_rejected_elsewhere_light.png")
+    }
+
+    /** An uncertain discard keeps the repair explanation and its action together on an otherwise healthy roster. */
+    @Test
+    fun repairNeedsConfirmation() {
+        val health = LinkedDevicesHealth(repairNeedsConfirmation = true)
+        show(Look()) { LinkedDevicesContent(fixtureRosterState(), onBack = {}, health = health) }
+        compose.onNodeWithTag(LINKED_DEVICES_REPAIR_TAG).performScrollTo()
+        compose.onRoot().captureRoboImage("src/test/snapshots/linked_devices_repair_needs_confirmation.png")
     }
 
     /** The repair explanation. */

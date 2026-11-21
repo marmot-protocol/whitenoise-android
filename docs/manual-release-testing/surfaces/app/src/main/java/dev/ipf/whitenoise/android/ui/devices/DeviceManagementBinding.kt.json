@@ -47,6 +47,22 @@
           "SET-064",
           "SET-065"
         ]
+      },
+      {
+        "surface": "Link repair awaiting KeyPackage publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
+        "anchor": "R.string.device_repair_try_link_again",
+        "test_ids": [
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Unconfirmed device-group repair",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceManagementBinding.kt",
+        "anchor": "R.string.device_repair_confirm_again",
+        "test_ids": [
+          "SET-065"
+        ]
       }
     ]
   },

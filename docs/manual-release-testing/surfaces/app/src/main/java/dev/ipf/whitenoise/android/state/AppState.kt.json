@@ -103,9 +103,10 @@
       {
         "surface": "Private share account wipe",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": ".leases.releaseAccount(account)",
+        "anchor": "purgeWipedAccountSources(wipedRef, wipedShareAccount)",
         "test_ids": [
-          "SYS-005"
+          "SYS-005",
+          "SET-066"
         ]
       },
       {

@@ -179,6 +179,15 @@ class DeviceManagementContentTest {
         compose.runOnIdle { assertEquals(1, repairs) }
     }
 
+    /** A lost repair reply keeps its explicit repair action reachable even after MDK reports a healthy group. */
+    @Test
+    fun anUncertainDiscardKeepsRepairReachable() {
+        var repairs = 0
+        roster(LinkedDevicesHealth(repairNeedsConfirmation = true), LinkedDevicesActions(onRepair = { repairs++ }))
+        compose.onNodeWithTag(LINKED_DEVICES_REPAIR_TAG).performClick()
+        compose.runOnIdle { assertEquals(1, repairs) }
+    }
+
     /** A healthy device shows neither notice. */
     @Test
     fun aHealthyDeviceShowsNoNotice() {

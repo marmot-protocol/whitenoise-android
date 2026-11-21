@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.GroupCommitDeliveryFfi
 import dev.ipf.marmotkit.GroupCommitRefusalCauseFfi
 import dev.ipf.marmotkit.GroupCommitRefusedRelayFfi
+import dev.ipf.marmotkit.GroupEventKindFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotKitException
@@ -366,12 +367,15 @@ class ConversationGroupConvergenceParkedTest {
         runBlocking {
             val reads = AtomicInteger(0)
             val groupIdHex = conversationTimelineTestGroup().groupIdHex
+            val epochChange = GroupEventKindFfi.EpochChanged(1uL, 2uL)
             val stream =
                 ScriptedStream(
                     listOf(
                         MarmotEventFfi.GroupStateUpdated(ACCOUNT_ID, ACCOUNT_REF, "cc".repeat(32)),
                         MarmotEventFfi.GroupStateUpdated(ACCOUNT_ID, "bob", groupIdHex),
                         MarmotEventFfi.GroupStateUpdated(ACCOUNT_ID, ACCOUNT_REF, groupIdHex.uppercase()),
+                        MarmotEventFfi.GroupEvent(ACCOUNT_ID, "bob", groupIdHex, epochChange),
+                        MarmotEventFfi.GroupEvent(ACCOUNT_ID, ACCOUNT_REF, groupIdHex, epochChange),
                     ),
                 )
             val controller = controller(testAppState(), events = { stream }, parked = { reads.incrementAndGet() > 0 })
@@ -380,6 +384,7 @@ class ConversationGroupConvergenceParkedTest {
             delay(SETTLE_MILLIS)
 
             assertEquals("the open plus this chat's own event", 2, reads.get())
+            assertEquals("local update and remote epoch", 3L, controller.accountDevicesGroupRevision)
             assertTrue(controller.groupConvergenceParked)
         }
 

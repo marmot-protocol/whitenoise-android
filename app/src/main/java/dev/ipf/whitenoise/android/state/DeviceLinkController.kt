@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.marmotkit.LinkedDeviceFfi
 import dev.ipf.marmotkit.MarmotEventFfi
-import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
@@ -310,16 +309,16 @@ internal suspend fun DeviceLinkController.dismissMoveSibling(
     slotIdHex: String,
 ) = command(DeviceLinkCommand.DismissMoveSibling) { dismissDeviceGroupMoveSibling(it, moveId, slotIdHex) }
 
-/** MDK keeps a link across screen changes. Only a committed profile switch cancels the old profile's outgoing link. */
+/** Under account lifetime, cancels only a link Android started and this device has not yet confirmed. */
 internal suspend fun WhiteNoiseAppState.cancelLinkAfterProfileSwitch(label: String) {
-    val previous = accounts.firstOrNull { it.label == label && !it.signedOut && it.localSigning } ?: return
+    val previous = accounts.firstOrNull { it.label == label } ?: return
     val offers = DeviceLinkOffers.shared(appContext)
     if (offers.linkingFor == previous.accountIdHex) offers.closeLinking()
-    if (marmotOrNull() == null) return
-    // Reading a snapshot drives pairing and could accept a waiting Welcome. Cancel is atomic in MDK.
+    if (unconfirmedLinkOwner != (label to runtimeGeneration)) return
+    unconfirmedLinkOwner = null
     runCatchingCancellable { marmotIo { cancelDeviceLink(label) } }.onFailure {
         if (deviceGroupRefusal(it) != "no_link_in_progress") {
-            presentFailure(R.string.link_device_action_failed, "DEVICE_LINK_CANCEL", it)
+            appStateDebug(it) { "Could not cancel an unconfirmed device link" }
         }
     }
 }

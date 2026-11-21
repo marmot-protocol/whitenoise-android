@@ -9,10 +9,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 private const val MAX_SHARE_EXTENSION_LENGTH = 12
-private val sharedPlaintextGeneration = AtomicLong()
+private const val ACCOUNT_ONLY = "owner:"
+private val sessionGeneration = AtomicLong()
+private val accountGenerations = ConcurrentHashMap<String, AtomicLong>()
 private val sharedPlaintextMutex = Mutex()
 private val pendingLiveWipes = mutableSetOf<String>()
 internal const val WIPE_PREFERENCES = "shared_plaintext_wipe"
@@ -27,29 +30,54 @@ internal fun sharedPlaintextSuffix(displayName: String): String {
     return if (safeExtension) ".$extension" else ".bin"
 }
 
-/** Capture before loading share bytes, so a wipe can retire writes waiting on decryption or downloads. */
-internal fun captureSharedPlaintextWrite(): Long = sharedPlaintextGeneration.get()
+/** Binds a pending export to its account and to the session that admitted it. */
+internal data class SharedPlaintextWrite(
+    val owner: String,
+    val sessionGeneration: Long,
+    val accountGeneration: Long,
+)
 
-/** Serialize active staging with cleanup and reject work that started before cleanup. */
+/** Capture before decryption so removing one account fences its writers while other exports finish. */
+internal fun captureSharedPlaintextWrite(accountRef: String): SharedPlaintextWrite {
+    val owner = legacySharedPlaintextPrefix(accountRef)
+    return SharedPlaintextWrite(owner, sessionGeneration.get(), accountGenerations[owner]?.get() ?: 0L)
+}
+
+/** Serializes publication with cleanup and rejects a writer retired by either its account wipe or session teardown. */
 internal suspend fun <T> withSharedPlaintextWrite(
-    generation: Long,
+    permit: SharedPlaintextWrite,
     write: suspend () -> T,
 ): T =
     withContext(Dispatchers.IO) {
         sharedPlaintextMutex.withLock {
-            if (generation != sharedPlaintextGeneration.get()) throw CancellationException("shared plaintext was wiped")
+            if (permit.sessionGeneration != sessionGeneration.get() ||
+                permit.accountGeneration != (accountGenerations[permit.owner]?.get() ?: 0L)
+            ) {
+                throw CancellationException("shared plaintext was wiped")
+            }
             write()
         }
     }
+
+/** Existing journal entries include unowned legacy exports. New owner-only entries preserve that choice on restart. */
+private fun wipeEntries(
+    context: Context,
+    accountRef: String,
+    includeUnscoped: Boolean,
+): Set<String> {
+    val prefixes = setOf(sharedPlaintextPrefix(context, accountRef), legacySharedPlaintextPrefix(accountRef))
+    return if (includeUnscoped) prefixes else prefixes.mapTo(mutableSetOf()) { ACCOUNT_ONLY + it }
+}
 
 /** Persists the cleanup obligation before native wipe can irreversibly remove the account. */
 internal suspend fun recordSharedPlaintextWipe(
     context: Context,
     accountRef: String,
+    includeUnscoped: Boolean = true,
 ): Boolean =
     withContext(Dispatchers.IO) {
         sharedPlaintextMutex.withLock {
-            val prefixes = setOf(sharedPlaintextPrefix(context, accountRef), legacySharedPlaintextPrefix(accountRef))
+            val prefixes = wipeEntries(context, accountRef, includeUnscoped)
             val preferences = context.getSharedPreferences(WIPE_PREFERENCES, Context.MODE_PRIVATE)
             val pending = preferences.getStringSet(PENDING_WIPES, emptySet()).orEmpty() + prefixes
             val saved = preferences.edit().putStringSet(PENDING_WIPES, pending).commit()
@@ -62,10 +90,11 @@ internal suspend fun recordSharedPlaintextWipe(
 internal suspend fun discardSharedPlaintextWipe(
     context: Context,
     accountRef: String,
+    includeUnscoped: Boolean = true,
 ): Boolean =
     withContext(Dispatchers.IO) {
         sharedPlaintextMutex.withLock {
-            val prefixes = setOf(sharedPlaintextPrefix(context, accountRef), legacySharedPlaintextPrefix(accountRef))
+            val prefixes = wipeEntries(context, accountRef, includeUnscoped)
             val discarded = removePendingWipe(context, prefixes)
             if (discarded) pendingLiveWipes -= prefixes
             discarded
@@ -89,10 +118,11 @@ internal suspend fun recoverSharedPlaintextWipes(
 internal suspend fun wipeSharedPlaintext(
     context: Context,
     accountRef: String,
+    includeUnscoped: Boolean = true,
     onFailure: (String, Throwable) -> Unit,
 ) {
     sharedPlaintextMutex.withLock {
-        val prefixes = setOf(sharedPlaintextPrefix(context, accountRef), legacySharedPlaintextPrefix(accountRef))
+        val prefixes = wipeEntries(context, accountRef, includeUnscoped)
         try {
             finishSharedPlaintextWipe(context, prefixes, onFailure)
         } finally {
@@ -107,9 +137,16 @@ private fun finishSharedPlaintextWipe(
     prefixes: Set<String>,
     onFailure: (String, Throwable) -> Unit,
 ) {
-    sharedPlaintextGeneration.incrementAndGet()
+    val includeUnscoped = prefixes.any { !it.startsWith(ACCOUNT_ONLY) }
+    val owners = prefixes.mapTo(mutableSetOf()) { it.removePrefix(ACCOUNT_ONLY) }
+    if (includeUnscoped) {
+        sessionGeneration.incrementAndGet()
+        accountGenerations.clear()
+    } else {
+        owners.forEach { accountGenerations.getOrPut(it) { AtomicLong() }.incrementAndGet() }
+    }
     var failed = false
-    deleteSharedPlaintext(context, prefixes) { area, error ->
+    deleteSharedPlaintext(context, owners, includeUnscoped) { area, error ->
         failed = true
         onFailure(area, error)
     }
@@ -133,6 +170,7 @@ private fun removePendingWipe(
 private fun deleteSharedPlaintext(
     context: Context,
     prefixes: Set<String>,
+    includeUnscoped: Boolean,
     onFailure: (String, Throwable) -> Unit,
 ) {
     for (name in listOf(MediaCacheDirs.SHARED, ConversationTranscriptExport.CacheDirName)) {
@@ -148,8 +186,8 @@ private fun deleteSharedPlaintext(
         val matching =
             entries.filter { file ->
                 // Legacy private shares have no prefix. Public profile cards also use the shared root.
-                prefixes.any { file.name.startsWith(it) } ||
-                    (!file.name.startsWith(ACCOUNT_SHARE_PREFIX) && !file.name.startsWith("profile_card_"))
+                val unowned = isUnownedPrivateShare(file.name)
+                prefixes.any { file.name.startsWith(it) } || (includeUnscoped && unowned)
             }
         matching.forEach { file ->
             revokeSharedPlaintextGrant(context, file, name, onFailure)

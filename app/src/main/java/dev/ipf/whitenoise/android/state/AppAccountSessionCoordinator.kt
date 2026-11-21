@@ -62,7 +62,7 @@ internal interface AppAccountSessionActivation {
     /** Removes old platform share targets before the target account becomes visible. */
     suspend fun hidePreviousAccountShortcuts()
 
-    /** Ends the outgoing profile’s own device-link attempt after a different profile has taken ownership. */
+    /** Retires the previous profile's linking UI and any locally started, unconfirmed link. */
     suspend fun cancelOutgoingDeviceLink(label: String)
 
     /** Publishes seeds, preferences and the active account in one non-suspending state transaction. */

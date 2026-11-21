@@ -1445,6 +1445,7 @@
     <string name="wipe_outcome_key_packages_deleted">已移除 %1$d 个邀请密钥</string>
     <string name="wipe_outcome_local_wipe_done">本地数据已清除</string>
     <string name="wipe_outcome_local_wipe_incomplete">本地数据未完全清除</string>
+    <string name="wipe_media_ownership_unknown">部分缓存文件无法确定所属的个人资料。此设备上仍有加密媒体、缩略图，或语音、视频、文档、附件、粘贴内容或上传内容的临时文件。</string>
     <string name="wipe_media_cleanup_failed">部分本地媒体文件无法删除，或部分共享权限无法撤销。</string>
     <string name="export_nsec">导出 nsec</string>
     <string name="share_secret_key">分享密钥</string>
@@ -2013,8 +2014,6 @@
     <string name="setup_device_unchecked">未能完成对其他登录记录的检查。</string>
     <string name="setup_device_found_on_date">你似乎曾在其他设备或应用上登录过这个账号。</string>
     <string name="setup_device_found">你似乎曾在其他设备或应用上登录过这个账号。</string>
-    <string name="setup_device_separate_chats">此设备将拥有自己独立的聊天。另一个应用中的聊天会留在那里，不会显示在这里。</string>
-    <string name="setup_device_new_chats_either_app">当有人与你开始新的聊天时，聊天可能出现在任一应用中。</string>
     <string name="setup_device_separate_chats_if_other_app">其他应用里的聊天不会自动出现在这里。</string>
     <string name="setup_device_stage">设备使用</string>
     <string name="setup_approval_saved_pending">您的批准已保存。变更仍在等待中。</string>

@@ -1445,6 +1445,7 @@
     <string name="wipe_outcome_key_packages_deleted">已移除 %1$d 個邀請金鑰</string>
     <string name="wipe_outcome_local_wipe_done">本機資料已清除</string>
     <string name="wipe_outcome_local_wipe_incomplete">本機資料未完全清除</string>
+    <string name="wipe_media_ownership_unknown">部分暫存檔無法確認所屬的個人檔案。此裝置上仍有加密媒體、縮圖，或語音、影片、文件、附件、貼上內容或上傳內容的暫存檔。</string>
     <string name="wipe_media_cleanup_failed">部分本機媒體檔案無法刪除，或部分分享權限無法撤銷。</string>
     <string name="export_nsec">匯出 nsec</string>
     <string name="share_secret_key">分享金鑰</string>
@@ -2014,8 +2015,6 @@
     <string name="setup_device_unchecked">無法完成其他登入紀錄的檢查。</string>
     <string name="setup_device_found_on_date">你似乎曾在其他裝置或 App 登入過這個帳號。</string>
     <string name="setup_device_found">你似乎曾在其他裝置或 App 登入過這個帳號。</string>
-    <string name="setup_device_separate_chats">此裝置將擁有自己獨立的聊天。另一個 App 中的聊天會留在那裡，不會顯示在這裡。</string>
-    <string name="setup_device_new_chats_either_app">當有人與你開始新的聊天時，聊天可能出現在任一 App 中。</string>
     <string name="setup_device_separate_chats_if_other_app">其他 App 中的聊天不會自動出現在這裡。</string>
     <string name="setup_device_stage">裝置使用</string>
     <string name="setup_approval_saved_pending">你的核准已儲存。變更仍待處理。</string>

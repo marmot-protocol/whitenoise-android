@@ -82,6 +82,14 @@
         "test_ids": [
           "SET-061"
         ]
+      },
+      {
+        "surface": "Unconfirmed device-group repair",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "R.string.device_repair_confirm_again",
+        "test_ids": [
+          "SET-065"
+        ]
       }
     ]
   },

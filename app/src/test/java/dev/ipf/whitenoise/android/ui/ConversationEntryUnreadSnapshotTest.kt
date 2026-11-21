@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.ui.conversation.shouldCommitConversationInitia
 import dev.ipf.whitenoise.android.ui.conversation.shouldShowConversationEntryUnreadDivider
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -473,6 +474,12 @@ class ConversationEntryUnreadSnapshotTest {
             true,
             hasSentMessageAfterUnreadBoundary(
                 timeline = listOf(received("u1"), received("u2"), sent("reply")),
+                firstUnreadMessageId = "u1",
+            ),
+        )
+        assertFalse(
+            hasSentMessageAfterUnreadBoundary(
+                timeline = listOf(received("u1"), received("own-elsewhere").copy(fromOtherOwnDevice = true)),
                 firstUnreadMessageId = "u1",
             ),
         )

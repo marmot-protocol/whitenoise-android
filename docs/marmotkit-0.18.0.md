@@ -41,7 +41,11 @@ review, history and the group setting.
 
 - `AppMessageRecordFfi` gains `invalidated`. Android builds such records only
   for its own optimistic and display rows, which are never tombstones, so each
-  passes `false`.
+  passes `false`. Notification content and reaction navigation skip invalidated raw messages.
+- Android calls `unreactFromMessageMatching` with the bound account, group, target and emoji.
+  MDK removes all matching own events in one operation, including duplicates from linked devices.
+  Its `messageReactions` read supplies effective ownership for omitted chips and confirms local absence
+  if another device has already removed the reaction.
 - `MarmotKitError.NoUsableRelay` replaces `Publish` for a group send none of
   whose relays MDK may use. Android classifies it wherever it classified
   `Publish`, so the same failure reads as before.
@@ -64,7 +68,7 @@ review, history and the group setting.
 
 Not adopted in this change: `groupChangesNotDelivered` and its event,
 `attachment_removals`, file-backed draft attachments, direct chats founded
-with a disappearing-message duration, `unreactFromMessageMatching` and the
+with a disappearing-message duration and the
 sign-in notice's `client` label. None changes existing behavior.
 
 ## Upgrade

@@ -252,12 +252,12 @@
         ]
       },
       {
-        "surface": "Linked devices: R.string.link_device_action_failed",
+        "surface": "The reason this link step was refused",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",
-        "anchor": "R.string.link_device_action_failed",
+        "anchor": "stringResource(failureMessage)",
         "test_ids": [
-          "ACC-025",
-          "SET-061"
+          "SET-061",
+          "SET-065"
         ]
       },
       {

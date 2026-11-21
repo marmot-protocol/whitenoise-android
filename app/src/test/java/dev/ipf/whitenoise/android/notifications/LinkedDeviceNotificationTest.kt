@@ -50,13 +50,12 @@ class LinkedDeviceNotificationTest {
 
     /** With linked devices the account's message from another device still has its attachments fetched here. */
     @Test
-    fun aSiblingDevicesAttachmentsAreFetchedOnlyWithLinkedDevices() {
+    fun siblingAndPeerAttachmentsAreBothFetched() {
         val sibling = update(fromSibling = true)
         val peer = update(fromSibling = false)
 
-        assertFalse(needsIncomingAttachmentDownload(sibling, linkedDevices = false))
-        assertTrue(needsIncomingAttachmentDownload(sibling, linkedDevices = true))
-        assertTrue(needsIncomingAttachmentDownload(peer, linkedDevices = false))
+        assertTrue(needsIncomingAttachmentDownload(sibling))
+        assertTrue(needsIncomingAttachmentDownload(peer))
     }
 
     /** Only new messages are considered for attachment fetching. */
@@ -64,7 +63,7 @@ class LinkedDeviceNotificationTest {
     fun onlyNewMessagesFetchAttachments() {
         val invite = update(fromSibling = false).copy(trigger = NotificationTriggerFfi.GROUP_INVITE)
 
-        assertFalse(needsIncomingAttachmentDownload(invite, linkedDevices = true))
+        assertFalse(needsIncomingAttachmentDownload(invite))
     }
 
     private fun content(update: NotificationUpdateFfi): LocalNotificationContent? =

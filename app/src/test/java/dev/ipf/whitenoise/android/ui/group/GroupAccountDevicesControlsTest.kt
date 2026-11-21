@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -18,10 +19,10 @@ import dev.ipf.whitenoise.android.state.accountDevicesActivationReason
 import dev.ipf.whitenoise.android.state.accountDevicesRefusalDetail
 import dev.ipf.whitenoise.android.state.deviceUnlinkedAccount
 import dev.ipf.whitenoise.android.state.failureDetail
-import dev.ipf.whitenoise.android.state.nextSignedInAccount
 import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -52,6 +53,29 @@ class GroupAccountDevicesControlsTest {
         compose.onNodeWithTag(GROUP_ACCOUNT_DEVICES_STATUS_TAG).assertDoesNotExist()
         compose.onNodeWithTag(GROUP_ACCOUNT_DEVICES_ENABLE_TAG).performClick()
         compose.runOnIdle { assertEquals(1, requests) }
+    }
+
+    /** A newer group revision immediately retires the old action while its new eligibility read is suspended. */
+    @Test
+    fun aRemoteChangeRetiresEligibilityBeforeTheNewAnswerReturns() {
+        val revision = mutableStateOf(0)
+        val current = CompletableDeferred<AccountDevicesActivationFfi>()
+        compose.setContent {
+            val observed = revision.value
+            val eligibility =
+                rememberAccountDevicesActivation(owner = this, enabled = true, revision = observed) {
+                    if (observed == 0) AccountDevicesActivationFfi.ELIGIBLE else current.await()
+                }
+            WhiteNoiseTheme {
+                SettingsGroup { groupAccountDevicesRows(eligibility, enabled = true, onEnableRequested = {}) }
+            }
+        }
+        compose.onNodeWithTag(GROUP_ACCOUNT_DEVICES_ENABLE_TAG).assertExists()
+        compose.runOnIdle { revision.value++ }
+        compose.onNodeWithTag(GROUP_ACCOUNT_DEVICES_ENABLE_TAG).assertDoesNotExist()
+        compose.runOnIdle { current.complete(AccountDevicesActivationFfi.ALREADY_ENABLED) }
+        compose.onNodeWithTag(GROUP_ACCOUNT_DEVICES_STATUS_TAG).assertExists()
+        compose.onNodeWithTag(GROUP_ACCOUNT_DEVICES_ENABLE_TAG).assertDoesNotExist()
     }
 
     /** A member who is not an admin, and a group whose answer is unread, show no row. */
@@ -154,15 +178,6 @@ class GroupAccountDevicesControlsTest {
         assertEquals("work", deviceUnlinkedAccount(MarmotEventFfi.DeviceUnlinked("id", "work")))
         assertNull(deviceUnlinkedAccount(MarmotEventFfi.LinkedDevicesChanged("id", "work")))
         assertNull(deviceUnlinkedAccount(MarmotEventFfi.DeviceLinkChanged("id", "work")))
-    }
-
-    /** After an unlink the app moves to another signed-in profile, never to a signed-out one or back to the same. */
-    @Test
-    fun theNextProfileIsOneStillSignedIn() {
-        val accounts = listOf("work" to false, "old" to true, "home" to false)
-
-        assertEquals("home", nextSignedInAccount(accounts, unlinked = "work"))
-        assertNull(nextSignedInAccount(listOf("work" to false, "old" to true), unlinked = "work"))
     }
 
     /** Signing in to an unlinked account explains the unlink instead of suggesting a retry. */

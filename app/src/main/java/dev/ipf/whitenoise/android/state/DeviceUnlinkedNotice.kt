@@ -23,7 +23,7 @@ internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(accountRef: String
     val name = accounts.firstOrNull { it.label == accountRef }?.accountIdHex?.let(::unlinkedAccountName)
     val listed = readWithRetries { runCatchingCancellable { refreshAccounts() }.isSuccess }
     val active = activeAccountRef == accountRef
-    val next = nextSignedInAccount(accounts.map { it.label to it.signedOut }, accountRef)
+    val next = signOutOutcome(accounts, accountRef).nextActiveRef
     if (unlinkNoticeNeeded(listed, active, hasNext = next != null)) {
         presentText(
             title = AppText.Resource(R.string.device_unlinked_title),
@@ -60,15 +60,6 @@ internal suspend fun readWithRetries(
 
 private const val UNLINK_READ_ATTEMPTS = 3
 private const val UNLINK_READ_FIRST_PAUSE_MS = 1_000L
-
-/**
- * The profile to move to after [unlinked] stopped: the first one still signed in, or null when there is none and
- * the unlinked-account prompt takes over.
- */
-internal fun nextSignedInAccount(
-    accounts: List<Pair<String, Boolean>>,
-    unlinked: String,
-): String? = accounts.firstOrNull { (label, signedOut) -> label != unlinked && !signedOut }?.first
 
 /** The name the unlinked notices use: the profile's display name, or its short public key when it has none. */
 internal fun WhiteNoiseAppState.unlinkedAccountName(accountIdHex: String): String {

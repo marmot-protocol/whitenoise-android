@@ -75,7 +75,7 @@ internal fun ConversationController.ownsRenderedDecline(invitation: InviteAccept
 
 /**
  * Declines the current pending Welcome, stepping down first only when [stepDownConsent] names this invitation.
- * Without that consent an admin invitee, or a decline MDK refuses for an admin, raises the step-down question.
+ * MDK can step an admin down atomically. Its explicit legacy refusal requires a separate confirmation.
  */
 internal suspend fun ConversationController.declineInviteWithConsent(
     stepDownConsent: InviteAcceptanceGeneration?,
@@ -124,31 +124,18 @@ private fun ConversationController.canFinishDecline(
         inviteGeneration(group) == invitation
 
 /**
- * Stops Decline for [invitation] when it must not go ahead yet, and returns whether it stopped. Consent counts
- * only for the invitation it named and is used up here, under the mutation lock. A sole admin cannot step down,
- * so asking would promise what MDK refuses: they get the existing guidance at once. Any other admin who has not
- * agreed yet gets the step-down question. MDK's own refusals stay the fallback when this copy of the roles is
- * stale.
+ * Checks that any explicit consent still names this Welcome and protects a sole admin. Otherwise MDK decides
+ * whether the decline is atomic or requires the user to approve a separate step-down.
  */
 private fun ConversationController.requestDeclineConsentIfNeeded(
     invitation: InviteAcceptanceGeneration,
     stepDownConsent: InviteAcceptanceGeneration?,
 ): Boolean {
     inviteDeclineStepDownRequest = null
-    val stop =
-        when {
-            stepDownConsent != null -> stepDownConsent != invitation
-            isSoleAdminInvitee() -> {
-                appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
-                true
-            }
-            isSelfAdmin -> {
-                inviteDeclineStepDownRequest = invitation
-                true
-            }
-            else -> false
-        }
-    return stop
+    if (stepDownConsent != null) return stepDownConsent != invitation
+    if (!isSoleAdminInvitee()) return false
+    appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
+    return true
 }
 
 /**
@@ -201,7 +188,10 @@ private suspend fun ConversationController.declinePendingInvite(
                             selfDemoteAdminDetailed(account, groupIdHex)
                         }
                     }
-                if (!stillPending()) return@withContext InviteDeclineOutcome.STALE
+                if (!stillPending()) {
+                    refreshReplacedInviteRoster(account, groupIdHex)
+                    return@withContext InviteDeclineOutcome.STALE
+                }
                 applyMutationDetails(account, demotion.details)
                 if (stillPending()) {
                     appState.marmotIo { declineGroupInvite(account, groupIdHex) }

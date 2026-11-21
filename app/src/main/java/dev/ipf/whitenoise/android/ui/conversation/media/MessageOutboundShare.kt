@@ -254,7 +254,7 @@ internal suspend fun stageMessageShareStreams(
     resolveSource: suspend (MessageShareAttachmentSource) -> AttachmentPlaintext,
 ): StagedMessageShareStreams {
     if (sources.isEmpty()) return StagedMessageShareStreams(emptyList(), emptyList())
-    val writePermit = captureSharedPlaintextWrite()
+    val writePermit = captureSharedPlaintextWrite(accountRef)
     val protectedFiles = mutableListOf<File>()
     var totalBytes = 0L
     try {

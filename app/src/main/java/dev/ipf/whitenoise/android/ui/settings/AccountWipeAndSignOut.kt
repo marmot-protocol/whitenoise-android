@@ -83,6 +83,8 @@ internal fun AccountWipeFlow(
     }
 
     if (WIPE_ENGINE_FFI_AVAILABLE && ui.wipeConfirm) {
+        val requested = appState.activeAccountRef
+        val epoch = appState.runtimeGeneration
         // Type-to-confirm gate (#348): the destructive confirm button stays
         // disabled until the user types the confirmation keyword. The match is
         // case-insensitive and ignores surrounding whitespace. This is the last
@@ -109,7 +111,7 @@ internal fun AccountWipeFlow(
                 // wipeInProgress (not signOutInProgress) drives the
                 // app-root staged progress sheet (#350), which survives
                 // that nav reset.
-                launchAccountWipe(appState)
+                if (requested != null) launchAccountWipe(appState, requested, epoch)
             },
         )
     }
@@ -117,9 +119,13 @@ internal fun AccountWipeFlow(
 
 /**
  * Signs the active account out and wipes it on the process-lifetime scope, showing the app-root staged progress and
- * reporting the outcome. Used by the typed confirmation and by the prompt for an account another device unlinked.
+ * reporting the outcome. The typed confirmation runs on the app scope so navigation cannot interrupt cleanup.
  */
-internal fun launchAccountWipe(appState: WhiteNoiseAppState) {
+private fun launchAccountWipe(
+    appState: WhiteNoiseAppState,
+    requested: String,
+    epoch: Int,
+) {
     appState.wipeInProgress = true
     appState.launchMutation {
         runAccountWipeMutation(
@@ -129,6 +135,9 @@ internal fun launchAccountWipe(appState: WhiteNoiseAppState) {
             },
             onFinished = { appState.wipeInProgress = false },
         ) {
+            if (appState.activeAccountRef != requested || appState.runtimeGeneration != epoch) {
+                return@runAccountWipeMutation
+            }
             val report = appState.signOutAndWipeActiveAccount()?.report
             if (report == null) {
                 // Total FFI failure: nothing was wiped and the

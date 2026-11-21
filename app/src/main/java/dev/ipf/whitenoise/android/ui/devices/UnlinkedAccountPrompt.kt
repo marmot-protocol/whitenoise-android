@@ -17,7 +17,6 @@ import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import dev.ipf.whitenoise.android.ui.settings.launchAccountWipe
 
 internal const val UNLINKED_ACCOUNT_PROMPT_TAG = "device_link.unlinked_account"
 internal const val UNLINKED_ACCOUNT_REMOVE_TAG = "device_link.unlinked_account.remove"
@@ -35,11 +34,12 @@ internal fun UnlinkedAccountPromptHost(
     appState: WhiteNoiseAppState,
     blocked: Boolean,
 ) {
+    val epoch = appState.runtimeGeneration
     UnlinkedAccountPromptGate(
         unlinkedLabel = appState.activeAccount?.takeIf { it.unlinked }?.label,
         inView = appState.activeAccountRef,
         hidden = blocked || appState.wipeInProgress,
-        onRemove = { launchAccountWipe(appState) },
+        onRemove = { label -> launchUnlinkedProfileRemoval(appState, label, epoch, requireInView = true) },
     )
 }
 
@@ -55,7 +55,7 @@ internal fun UnlinkedAccountPromptGate(
     unlinkedLabel: String?,
     hidden: Boolean,
     inView: String? = unlinkedLabel,
-    onRemove: () -> Unit,
+    onRemove: (String) -> Unit,
 ) {
     var attemptedFor by remember { mutableStateOf<String?>(null) }
     var closedFor by remember { mutableStateOf<String?>(null) }
@@ -69,7 +69,7 @@ internal fun UnlinkedAccountPromptGate(
     UnlinkedAccountPrompt(
         onRemove = {
             attemptedFor = label
-            onRemove()
+            onRemove(label)
         },
         onClose = { closedFor = label }.takeIf { attemptedFor == label },
     )

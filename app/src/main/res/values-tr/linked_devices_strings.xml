@@ -109,6 +109,8 @@
     <string name="devices_leftover_chats_detail">Bu sohbetler kaldırma işlemini cihazlarınızdan alamıyor. Bir sohbet yöneticisi cihazı orada kaldırabilir.</string>
     <string name="devices_key_refresh_overdue">Bu cihaz davet anahtarlarını yenileyemedi. 30 gün sonra yeni sohbetlere eklenemeyebilir. Cihazlarınızın yetişebilmesi için uygulamayı açık tutun.</string>
     <string name="devices_stalled">Bu cihaz artık diğer cihazlarınıza yetişemiyor. Devam etmek için bağlantısını onarın.</string>
+    <string name="device_repair_confirm_again">Ayarlar bölümünde bağlı cihazları açın ve bağlantı kurmadan önce onarımı yeniden onaylayın.</string>
+    <string name="device_repair_try_link_again">Bağlantı sıfırlandı. Onarımı tamamlamak için cihazı tekrar bağlamayı deneyin.</string>
     <string name="devices_repair">Bu cihazın bağlantısını onar</string>
     <string name="devices_repair_confirm">Bu cihazı yeniden bağlayabilmeniz için mevcut bağlantı kaldırılır. Sohbetleriniz, mesajlarınız, taslaklarınız ve ayarlarınız korunur. Bağlamayı iptal etseniz bile eski bağlantı geri yüklenemez.</string>
     <string name="sign_ins_section">İncelenecek oturum açmalar</string>

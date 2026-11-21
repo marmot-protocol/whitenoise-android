@@ -74,6 +74,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.AccountDevicesActivationFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
@@ -108,6 +109,7 @@ import dev.ipf.whitenoise.android.state.inviteProfileToGroups
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.profileAddableGroupsState
+import dev.ipf.whitenoise.android.state.readAccountDevicesActivation
 import dev.ipf.whitenoise.android.state.removeMember
 import dev.ipf.whitenoise.android.state.setConversationVibrationPattern
 import dev.ipf.whitenoise.android.state.stepDownAsAdmin
@@ -365,19 +367,22 @@ internal fun GroupDetailsScreen(
         // Re-read after every group change, refusal or roster change: MDK's answer is advisory and can move either way.
         val accountDevicesActivation =
             rememberAccountDevicesActivation(
-                controller = controller,
+                owner = controller,
                 enabled = linkedDevicesAvailable() && controller.isSelfMember,
                 revision = controller.accountDevicesRevision(),
+                read = controller::readAccountDevicesActivation,
             )
+        val eligibilityLost =
+            accountDevicesActivation != null && accountDevicesActivation != AccountDevicesActivationFfi.ELIGIBLE
+        LaunchedEffect(eligibilityLost, controller.isSelfMember) {
+            if (eligibilityLost || !controller.isSelfMember) accountDevicesConfirmOpen = false
+        }
         // #1131: when set, the transfer-admin picker is being used as the first step
         // of a sole-admin Leave (3+ members) — picking transfers admin then leaves,
         // rather than the standalone transfer-only action. Holds the group name for
         // the leave call/toast.
         var transferThenLeaveName by remember(controller.group.groupIdHex) { mutableStateOf<String?>(null) }
-        // Disband eligibility, blockers, and any in-flight request are
-        // engine-authoritative; fetch on entry and again whenever the group
-        // record moves, so a remote admin's enable/disband lands here without
-        // reopening the screen.
+        // Follow remote admin changes while the details screen stays open.
         GroupManagementSnapshotRefreshEffect(controller)
         var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
         var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -2386,7 +2391,10 @@ internal fun GroupDetailsScreen(
                         if (accountDevicesConfirmOpen) {
                             GroupAccountDevicesConfirmDialog(
                                 identity = ownIdentity,
-                                enabled = !mutationsBlocked && actingMemberHex != null,
+                                enabled =
+                                    !mutationsBlocked &&
+                                        actingMemberHex != null &&
+                                        accountDevicesActivation == AccountDevicesActivationFfi.ELIGIBLE,
                                 onConfirm = {
                                     accountDevicesConfirmOpen = false
                                     runGroupMutation(

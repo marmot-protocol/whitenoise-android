@@ -23,6 +23,16 @@ class SignOutOutcomeTest {
             unlinked = false,
         )
 
+    /** An unlinked profile's successor must still be able to sign, including through an external signer. */
+    @Test
+    fun unlinkSkipsUnsignedBlankAndSignedOutAccounts() {
+        val external = account("home").copy(localSigning = false, externalSigning = true, running = false)
+        val unsigned = account("view").copy(localSigning = false)
+        val skipped = listOf(account("work"), account(""), account("old", signedOut = true), unsigned)
+        assertNull(signOutOutcome(skipped, "work").nextActiveRef)
+        assertEquals("home", signOutOutcome(skipped + external, "work").nextActiveRef)
+    }
+
     /** Removing a profile that was not in view leaves the one that was in view, wherever it sits in the list. */
     @Test
     fun removingAnotherProfileKeepsTheOneInView() {

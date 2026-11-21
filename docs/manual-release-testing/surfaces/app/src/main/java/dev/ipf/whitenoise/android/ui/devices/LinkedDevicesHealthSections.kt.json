@@ -92,6 +92,14 @@
           "SET-064",
           "SET-065"
         ]
+      },
+      {
+        "surface": "Unconfirmed device-group repair",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.device_repair_confirm_again",
+        "test_ids": [
+          "SET-065"
+        ]
       }
     ]
   },

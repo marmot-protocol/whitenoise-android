@@ -23,9 +23,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.DeviceLinkCommandFailure
 import dev.ipf.whitenoise.android.state.DeviceLinkController
 import dev.ipf.whitenoise.android.state.DeviceLinkRequest
 import dev.ipf.whitenoise.android.state.DeviceLinkRequestWatcher
+import dev.ipf.whitenoise.android.state.DeviceRepairConfirmationRequired
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.decline
 import dev.ipf.whitenoise.android.state.link
@@ -75,14 +77,14 @@ internal fun DeviceLinkRequestHost(
             }
         }
     }
-    LaunchedEffect(watcher, blocked) { watcher.reoffer(blocked) }
+    LaunchedEffect(watcher, blocked, appState.activeAccountRef) { watcher.reoffer(blocked) }
     // A request already on screen is taken down while the app is locked, so nothing can be answered until unlock.
     val request = watcher.queue.presented ?: return
     if (request.accountRef == appState.activeAccountRef) {
         DeviceLinkApprovalGate(runtimeGeneration, request, blocked) { draft ->
             ActiveProfileLinkRequest(appState, watcher, request, draft)
         }
-    } else if (!blocked) {
+    } else if (!blocked && request.open) {
         DeviceLinkOtherProfileDialog(
             profileName = appState.profileName(request.accountRef),
             onReview = {
@@ -150,7 +152,7 @@ private fun ActiveProfileLinkRequest(
         // This effect runs a frame after the command, so MDK's own event may already have published a newer state.
         watcher.reread(request.accountRef, blocked = false)
     }
-    val failed = rememberDeviceLinkFailed(controller)
+    val failureMessage = rememberLinkFailureMessage(controller)
     Dialog(
         onDismissRequest = { watcher.hidePresented(blocked = false) },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -167,31 +169,38 @@ private fun ActiveProfileLinkRequest(
                 scope.launch { controller.decline(request.promptId) }
             },
             onClose = { watcher.hidePresented(blocked = false) },
-            failed = failed,
+            failureMessage = failureMessage,
             draft = draft,
         )
     }
 }
 
 /**
- * Whether [controller]'s last command failed, for a step drawn over the whole window where the app's failure notice
- * would sit unseen behind it. The flag clears when the next command starts.
+ * Retains the reason for a refusal on the full-window link step until the next command starts.
  */
 @Composable
-internal fun rememberDeviceLinkFailed(controller: DeviceLinkController): Boolean {
-    var failed by remember(controller) { mutableStateOf(false) }
+internal fun rememberLinkFailureMessage(controller: DeviceLinkController): Int? {
+    var message by remember(controller) { mutableStateOf<Int?>(null) }
     val failure = controller.failure
     val running = controller.running
     LaunchedEffect(failure, running) {
         if (failure != null) {
-            failed = true
+            message = failure.messageResource()
             controller.failureShown()
         } else if (running != null) {
-            failed = false
+            message = null
         }
     }
-    return failed
+    return message
 }
+
+/** A lost repair outcome needs an explicit decision in Settings before a new link can start. */
+private fun DeviceLinkCommandFailure.messageResource(): Int =
+    if (cause is DeviceRepairConfirmationRequired) {
+        R.string.device_repair_confirm_again
+    } else {
+        R.string.link_device_action_failed
+    }
 
 /** Shows a failed link command once as the app's copyable failure notice. */
 @Composable
@@ -202,7 +211,7 @@ internal fun DeviceLinkFailureEffect(
     val failure = controller.failure
     LaunchedEffect(failure) {
         if (failure != null) {
-            appState.presentFailure(R.string.link_device_action_failed, "DEVICE_LINK", failure.cause)
+            appState.presentFailure(failure.messageResource(), "DEVICE_LINK", failure.cause)
             controller.failureShown()
         }
     }

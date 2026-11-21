@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.quickAccountSwitching
@@ -27,7 +26,7 @@ import dev.ipf.whitenoise.android.ui.profile.rememberProfileReadiness
  */
 
 /**
- * Account hub: the profile, its keys, the relays that carry it and, in builds with linked devices, the account's
+ * Account hub: the profile, its keys, the relays that carry it and the account's
  * device roster, which opens in place and returns here on Back.
  */
 @Suppress("FunctionNaming")
@@ -36,11 +35,10 @@ internal fun AccountScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onOpenDetail: (SettingsDetail?) -> Unit,
-    linkedDevices: Boolean = linkedDevicesAvailable(),
 ) {
     // Keyed by account so a roster opened for one profile never reopens over another.
     var linkedDevicesOpen by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
-    if (linkedDevices && linkedDevicesOpen) {
+    if (linkedDevicesOpen) {
         BackHandler { linkedDevicesOpen = false }
         LinkedDevicesScreen(appState, onBack = { linkedDevicesOpen = false })
         return
@@ -58,7 +56,7 @@ internal fun AccountScreen(
             item(key = "search.Account.1") {
                 AccountHubGroup(
                     readiness = readiness,
-                    onOpenLinkedDevices = if (linkedDevices) ({ linkedDevicesOpen = true }) else null,
+                    onOpenLinkedDevices = { linkedDevicesOpen = true },
                     onOpenDetail = onOpenDetail,
                 )
             }

@@ -18,7 +18,6 @@ import dev.ipf.marmotkit.LinkedDeviceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.declineInviteWithConsent
 import dev.ipf.whitenoise.android.state.inviteGeneration
 import dev.ipf.whitenoise.android.state.linkedDeviceRoster
 import dev.ipf.whitenoise.android.state.ownsRenderedDecline
@@ -59,7 +58,7 @@ internal fun InviteDeclineGate(
                     .onSuccess { needsConsent ->
                         if (needsConsent) {
                             asking = true
-                        } else if (controller.declineInviteWithConsent(null, invitation)) {
+                        } else if (controller.declineInvite(invitation)) {
                             onDeclined()
                         }
                     }.onFailure {
@@ -72,7 +71,7 @@ internal fun InviteDeclineGate(
         InviteDeclineAllDevicesDialog(
             onConfirm = {
                 asking = false
-                appState.launchMutation { if (controller.declineInviteWithConsent(null, invitation)) onDeclined() }
+                appState.launchMutation { if (controller.declineInvite(invitation)) onDeclined() }
             },
             onDismiss = { asking = false },
         )

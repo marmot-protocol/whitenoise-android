@@ -109,6 +109,8 @@
     <string name="devices_leftover_chats_detail">这些聊天无法接受来自你设备的移除操作。聊天管理员可以在那里移除该设备。</string>
     <string name="devices_key_refresh_overdue">此设备无法刷新其邀请密钥。30 天后，可能无法再将它添加到新聊天。请在你的设备上保持应用打开，以便它们同步。</string>
     <string name="devices_stalled">此设备已无法与你的其他设备保持同步。请修复其关联以继续。</string>
+    <string name="device_repair_confirm_again">请在设置中打开“已关联的设备”，再次确认修复后再关联此设备。</string>
+    <string name="device_repair_try_link_again">连接已重置。请尝试重新关联设备以完成修复。</string>
     <string name="devices_repair">修复此设备的关联</string>
     <string name="devices_repair_confirm">这会移除当前关联，以便你重新关联这台设备。聊天、消息、草稿和设置都会保留。即使取消重新关联，也无法恢复原来的关联。</string>
     <string name="sign_ins_section">待确认的登录</string>

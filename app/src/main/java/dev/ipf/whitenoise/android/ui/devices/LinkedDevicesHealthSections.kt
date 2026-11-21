@@ -35,10 +35,12 @@ internal fun LazyListScope.linkedDevicesNotices(
     health: LinkedDevicesHealth,
     onRepair: () -> Unit,
 ) {
-    if (health.stalled) {
+    if (health.stalled || health.repairNeedsConfirmation) {
+        val detail =
+            if (health.repairNeedsConfirmation) R.string.device_repair_confirm_again else R.string.devices_stalled
         item(key = "stalled") {
             SettingsCallout(
-                text = stringResource(R.string.devices_stalled),
+                text = stringResource(detail),
                 isError = true,
                 modifier = Modifier.testTag(LINKED_DEVICES_STALLED_TAG),
             )

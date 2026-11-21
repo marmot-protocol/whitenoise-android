@@ -17,7 +17,6 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
-import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -91,7 +90,7 @@ internal suspend fun WhiteNoiseAppState.notificationMessageRecord(update: Notifi
         // miss simply falls back to the generic notification body.
         runCatchingCancellable { marmotIo { messages(update.accountRef, update.groupIdHex, 30u, null) } }
             .getOrNull()
-            ?.firstOrNull { it.messageIdHex.equals(messageId, ignoreCase = true) }
+            ?.validRawMessage(messageId)
     }
 
 /**
@@ -103,7 +102,7 @@ internal suspend fun WhiteNoiseAppState.notificationMessageRecord(update: Notifi
  */
 private suspend fun WhiteNoiseAppState.scheduleIncomingAttachmentDownloads(update: NotificationUpdateFfi) {
     val messageIdHex = update.messageIdHex
-    if (messageIdHex == null || !needsIncomingAttachmentDownload(update, linkedDevicesAvailable())) return
+    if (messageIdHex == null || !needsIncomingAttachmentDownload(update)) return
     scheduleReceivedMessageAttachments(update.accountRef, update.groupIdHex, messageIdHex, update.timestampMs)
 }
 
@@ -834,7 +833,8 @@ private fun WhiteNoiseAppState.latePictureLoader(
 private suspend fun WhiteNoiseAppState.storedConversationIdentity(update: NotificationUpdateFfi): LateRowIdentity? {
     val row = presentedNotificationChatRow(update) ?: return null
     val account = update.accountRef
-    val item = chatListItemFromProjection(row.row, row.presentation, row.avatarAsset)
+    val item =
+        chatListItemFromProjection(row.row, row.presentation, row.avatarAsset, activeAccountIdHex = update.accountIdHex)
     return lateRowIdentity(account, item)
 }
 
@@ -1289,8 +1289,7 @@ private suspend fun WhiteNoiseAppState.reconcileConversationNotificationCards(
 }
 
 /** Whether [this] is a chat message whose attachments this device may still have to fetch. */
-private fun RuntimeMessageReceivedFfi.mayCarryIncomingAttachments(): Boolean =
-    receivedChatMayCarryAttachments(message.kind, message.sender.equals(accountIdHex, true), linkedDevicesAvailable())
+private fun RuntimeMessageReceivedFfi.mayCarryIncomingAttachments(): Boolean = message.kind == MARMOT_CHAT_EVENT_KIND
 
 /**
  * Schedules one received chat message's media from the runtime event stream, whatever its notification did. The

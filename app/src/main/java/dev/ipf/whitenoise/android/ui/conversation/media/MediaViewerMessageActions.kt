@@ -211,7 +211,7 @@ internal fun rememberMediaViewerForwardActions(
             payloads = activeRequest.payloads,
             sourceAccountRef = owner.accountRef,
             originGroupIdHex = owner.conversationId,
-            restoredRequest = activeRequest,
+            newRequestId = activeRequest.requestId,
             onDismiss = {
                 request = null
                 requestedPage = null

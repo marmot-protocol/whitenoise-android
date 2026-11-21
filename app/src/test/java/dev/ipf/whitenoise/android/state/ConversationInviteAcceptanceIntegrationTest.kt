@@ -75,7 +75,7 @@ class ConversationInviteAcceptanceIntegrationTest {
                 )
             val earlier = inviteGeneration(group(pending = true, welcome = OLD_WELCOME))
             controller.applyGroupStateForTest(group(pending = true, welcome = NEW_WELCOME))
-            assertFalse(controller.declineInviteWithConsent(null, earlier))
+            assertFalse(controller.declineInvite(earlier))
 
             assertFalse(
                 controller.acceptInvite(

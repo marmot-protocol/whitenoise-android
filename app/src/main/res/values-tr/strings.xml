@@ -1458,6 +1458,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d davet anahtarı kaldırıldı</string>
     <string name="wipe_outcome_local_wipe_done">Yerel veriler silindi</string>
     <string name="wipe_outcome_local_wipe_incomplete">Yerel veriler tamamen silinemedi</string>
+    <string name="wipe_media_ownership_unknown">Bazı önbellek dosyalarının hangi profile ait olduğu bilinmiyor. Şifreli medya, küçük resimler veya geçici ses, video, belge, ek, yapıştırma ya da yükleme dosyaları bu cihazda duruyor.</string>
     <string name="wipe_media_cleanup_failed">Bazı yerel medya dosyaları silinemedi veya paylaşım izinleri kaldırılamadı.</string>
     <string name="export_nsec">nsec dışa aktar</string>
     <string name="share_secret_key">Gizli anahtarı paylaş</string>
@@ -2046,8 +2047,6 @@
     <string name="setup_device_unchecked">Diğer oturum açma işlemlerini kontrol etmeyi tamamlayamadık.</string>
     <string name="setup_device_found_on_date">Görünüşe göre bu hesapta daha önce başka bir cihazda veya uygulamada oturum açmışsınız.</string>
     <string name="setup_device_found">Görünüşe göre bu hesapta daha önce başka bir cihazda veya uygulamada oturum açmışsınız.</string>
-    <string name="setup_device_separate_chats">Bu cihazın kendi ayrı sohbetleri olacak. Diğer uygulamadaki sohbetler orada kalır ve burada görünmez.</string>
-    <string name="setup_device_new_chats_either_app">Biri sizinle yeni bir sohbet başlattığında, sohbet iki uygulamadan herhangi birine gelebilir.</string>
     <string name="setup_device_separate_chats_if_other_app">Başka bir uygulamadaki sohbetleriniz burada otomatik olarak görünmez.</string>
     <string name="setup_device_stage">Cihaz kullanımı</string>
     <string name="setup_approval_saved_pending">Onayınız kaydedildi. Değişiklik hâlâ beklemede.</string>

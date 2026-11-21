@@ -229,6 +229,29 @@ class DeviceLinkFlowTest {
         compose.runOnIdle { assertEquals(0, links) }
     }
 
+    /** A saved overlong draft only blocks Link; the user can always finish a settled request. */
+    @Test
+    fun anOverlongNameCannotTrapASettledRequest() {
+        val state = mutableStateOf<DeviceLinkPromptStateFfi>(DeviceLinkPromptStateFfi.Comparing(CODE))
+        var closes = 0
+        compose.setContent {
+            WhiteNoiseTheme { DeviceLinkRequestContent(state.value, null, {}, {}, { closes++ }) }
+        }
+        compose.onNodeWithTag(DEVICE_LINK_OPTIONS_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(DEVICE_LINK_LABEL_TAG).performTextReplacement("é".repeat(33))
+        compose.onNodeWithTag(DEVICE_LINK_PRIMARY_TAG).performScrollTo().assertIsNotEnabled()
+        listOf(DeviceLinkPromptStateFfi.Linked, DeviceLinkPromptStateFfi.Ended(DeviceLinkEndReasonFfi.TIMED_OUT))
+            .forEach { terminal ->
+                compose.runOnIdle { state.value = terminal }
+                compose
+                    .onNodeWithTag(DEVICE_LINK_PRIMARY_TAG)
+                    .performScrollTo()
+                    .assertIsEnabled()
+                    .performClick()
+            }
+        compose.runOnIdle { assertEquals(2, closes) }
+    }
+
     /** Not now declines; Back only closes and declines nothing. */
     @Test
     fun notNowDeclinesAndCloseAnswersNothing() {

@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
 
 /** Read a raw message record from the in-memory window or recent store tail. */
 internal suspend fun ConversationController.lookupMessageRecord(messageIdHex: String): AppMessageRecordFfi? {
-    messageById[messageIdHex]?.let { return it }
+    messageById[messageIdHex]?.let { return it.takeUnless(AppMessageRecordFfi::invalidated) }
     val account = conversationAccountRef ?: return null
     return runCatchingCancellable {
         withContext(Dispatchers.IO) {
@@ -34,7 +34,7 @@ internal suspend fun ConversationController.lookupMessageRecord(messageIdHex: St
     }.onFailure {
         if (BuildConfig.DEBUG) Log.w("DMConversation", "lookup message failed", it)
     }.getOrNull()
-        ?.firstOrNull { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
+        ?.validRawMessage(messageIdHex)
 }
 
 /**

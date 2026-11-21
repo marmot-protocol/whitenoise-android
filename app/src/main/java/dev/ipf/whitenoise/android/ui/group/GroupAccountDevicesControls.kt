@@ -13,9 +13,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.AccountDevicesActivationFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.accountDevicesActivationReason
-import dev.ipf.whitenoise.android.state.readAccountDevicesActivation
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
@@ -32,13 +30,14 @@ internal const val GROUP_ACCOUNT_DEVICES_STATUS_TAG = "group.account_devices.sta
  */
 @Composable
 internal fun rememberAccountDevicesActivation(
-    controller: ConversationController,
+    owner: Any,
     enabled: Boolean,
-    revision: Any?,
+    revision: Any,
+    read: suspend () -> AccountDevicesActivationFfi?,
 ): AccountDevicesActivationFfi? {
-    var activation by remember(controller) { mutableStateOf<AccountDevicesActivationFfi?>(null) }
-    LaunchedEffect(controller, enabled, revision) {
-        activation = if (enabled) controller.readAccountDevicesActivation() else null
+    var activation by remember(owner, enabled, revision) { mutableStateOf<AccountDevicesActivationFfi?>(null) }
+    LaunchedEffect(owner, enabled, revision) {
+        activation = if (enabled) read() else null
     }
     return activation
 }

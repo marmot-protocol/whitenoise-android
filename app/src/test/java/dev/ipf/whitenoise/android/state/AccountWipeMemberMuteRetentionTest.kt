@@ -7,9 +7,16 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.WipeOutcomeFfi
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -39,6 +46,9 @@ class AccountWipeMemberMuteRetentionTest {
     private var signInCalls = 0
     private var wiped = false
     private var localCleanupCompleted = true
+    private var unreachableSibling = false
+    private var savedUnlinked = false
+    private var nativeWipeTarget: Any? = null
 
     /** Builds a locally signing account summary whose id is derived from the label hash. */
     private fun localAccount(
@@ -80,11 +90,14 @@ class AccountWipeMemberMuteRetentionTest {
                         keyPackageFailures = emptyList(),
                         localCleanup = LocalCleanupReportFfi(completed = localCleanupCompleted, reason = null),
                         groupsLeftToSiblings = 0u,
-                        siblingsNotReached = false,
-                    ).also { wiped = true }
+                        siblingsNotReached = unreachableSibling,
+                    ).also {
+                        nativeWipeTarget = arguments?.firstOrNull()
+                        wiped = localCleanupCompleted
+                    }
                 "listAccounts" -> {
-                    listAccountsFailure?.let(::suspendFailure)
-                        ?: if (wiped) remainingAccounts else listOf(localAccount(WIPED_ACCOUNT))
+                    val before = listOf(localAccount(WIPED_ACCOUNT).copy(unlinked = savedUnlinked))
+                    listAccountsFailure?.let(::suspendFailure) ?: if (wiped) remainingAccounts else before
                 }
                 "signInAccount" -> {
                     signInCalls++
@@ -302,6 +315,115 @@ class AccountWipeMemberMuteRetentionTest {
             org.junit.Assert.assertEquals(SURVIVING_ACCOUNT, state.activeAccountRef)
             org.junit.Assert.assertEquals(listOf(SURVIVING_ACCOUNT), state.accounts.map { it.label })
             assertFalse(state.accountListLoaded)
+        }
+
+    /** Removing an unlinked profile while another is active must preserve its upload, composer and cold-read cache. */
+    @Test
+    fun inactiveRemovalKeepsTheSelectedAccountAndItsWork() = verifyInactiveWipe(completed = true)
+
+    /** A native refusal must leave the selected profile's work and the unlinked account's files intact. */
+    @Test
+    fun refusedInactiveRemovalKeepsBothProfilesIntact() = verifyInactiveWipe(completed = false)
+
+    private fun verifyInactiveWipe(completed: Boolean) =
+        runBlocking {
+            savedUnlinked = true
+            localCleanupCompleted = completed
+            unreachableSibling = completed
+            val state = appState(active = SURVIVING_ACCOUNT)
+            val files =
+                listOf(MediaCacheDirs.COMPOSER_PASTE, MediaCacheDirs.UPLOAD_SOURCES).map { directory ->
+                    val root = File(context.cacheDir, directory).apply { mkdirs() }
+                    File(root, "active-copy").apply { writeText("mine") }
+                }
+            val scopedShare =
+                File(
+                    File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() },
+                    sharedPlaintextPrefix(context, WIPED_ACCOUNT) + "removed.pdf",
+                ).apply { writeText("theirs") }
+            val epoch = state.runtimeGeneration
+            val cached = state.diskMediaCache.capturePublicationToken()
+            val uploadEpoch = state.mediaUploadSessionEpoch()
+            val registered = CompletableDeferred<Unit>()
+            val upload =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    state.trackInFlightMediaUpload(SURVIVING_ACCOUNT, GROUP, "outgoing")
+                    registered.complete(Unit)
+                    awaitCancellation()
+                }
+            try {
+                registered.await()
+                assertEquals(completed, state.removeUnlinkedAccount(WIPED_ACCOUNT))
+                assertEquals(WIPED_ACCOUNT, nativeWipeTarget)
+                assertEquals(SURVIVING_ACCOUNT, state.activeAccountRef)
+                assertEquals(epoch, state.runtimeGeneration)
+                assertEquals(uploadEpoch, state.mediaUploadSessionEpoch())
+                assertEquals(cached, state.diskMediaCache.capturePublicationToken())
+                assertTrue(upload.isActive)
+                assertTrue(files.all { it.readText() == "mine" })
+                assertEquals(!completed, scopedShare.exists())
+                assertFalse(checkNotNull(state.pendingWipeReport).clean)
+            } finally {
+                upload.cancel()
+            }
+        }
+
+    /** An inactive wipe reports retained ownerless files, evicts unused playback and keeps a live player readable. */
+    @Test
+    fun retainedPlaybackAndOpaqueMediaKeepInactiveWipePartial() =
+        runBlocking {
+            val state = appState(active = SURVIVING_ACCOUNT)
+
+            fun file(
+                folder: String,
+                name: String,
+            ): File {
+                val dir = File(context.cacheDir, folder).apply { mkdirs() }
+                return File(dir, name).apply { writeText("private fixture") }
+            }
+            val playing = file(MediaCacheDirs.VOICE, "abc-name.ogg")
+            val unused = file(MediaCacheDirs.VIDEO, "def-name.mp4")
+            AttachmentPlaintextCache.protectPublicationFile(playing)
+            try {
+                val failure = state.wipeDecryptedMediaFromDisk(WIPED_ACCOUNT, retireSession = false)
+                assertEquals(context.getString(R.string.wipe_media_ownership_unknown), failure?.reason)
+                assertEquals("private fixture", playing.readText())
+                assertFalse(unused.exists())
+            } finally {
+                AttachmentPlaintextCache.unprotectPublicationFile(playing)
+            }
+            val folders =
+                listOf(
+                    MediaCacheDirs.ORIGINALS,
+                    MediaCacheDirs.DISPLAY_THUMBNAILS,
+                    MediaCacheDirs.DOCUMENT_READER,
+                    MediaCacheDirs.NATIVE_ATTACHMENT_LEASES,
+                    MediaCacheDirs.COMPOSER_PASTE,
+                    MediaCacheDirs.UPLOAD_SOURCES,
+                )
+            for (folder in folders) {
+                val opaque = file(folder, "entry")
+                val failure = state.wipeDecryptedMediaFromDisk(WIPED_ACCOUNT, retireSession = false)
+                assertEquals(folder, context.getString(R.string.wipe_media_ownership_unknown), failure?.reason)
+                assertTrue(opaque.delete())
+            }
+            assertFalse(playing.exists())
+            org.junit.Assert.assertNull(state.wipeDecryptedMediaFromDisk(WIPED_ACCOUNT, retireSession = false))
+        }
+
+    /** An old active-profile confirmation and a profile that is no longer unlinked have no authority to wipe. */
+    @Test
+    fun staleRemovalCannotWipeTheCurrentAccount() =
+        runBlocking {
+            val state = appState(active = SURVIVING_ACCOUNT)
+            savedUnlinked = true
+            org.junit.Assert.assertNull(state.removeUnlinkedAccountForOutcome(WIPED_ACCOUNT, requireInView = true))
+            val retired = state.runtimeGeneration - 1
+            org.junit.Assert.assertNull(state.removeUnlinkedAccountForOutcome(WIPED_ACCOUNT, retired))
+            savedUnlinked = false
+            org.junit.Assert.assertNull(state.removeUnlinkedAccountForOutcome(WIPED_ACCOUNT))
+            org.junit.Assert.assertNull(nativeWipeTarget)
+            assertEquals(SURVIVING_ACCOUNT, state.activeAccountRef)
         }
 
     private companion object {

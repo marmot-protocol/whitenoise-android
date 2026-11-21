@@ -181,6 +181,15 @@
         "test_ids": [
           "MSG-011"
         ]
+      },
+      {
+        "surface": "Discarded forward after source or destination profile removal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_restore_discarded",
+        "test_ids": [
+          "MSG-010",
+          "SET-066"
+        ]
       }
     ]
   },

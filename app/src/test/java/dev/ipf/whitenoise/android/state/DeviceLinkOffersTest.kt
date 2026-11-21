@@ -3,9 +3,12 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.NewDeviceLinkStateFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
+import dev.ipf.whitenoise.android.ui.devices.RuntimeDeviceLink
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupDeviceNotice
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -17,9 +20,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-import kotlin.coroutines.resumeWithException
 
 /** The offer to link a newly signed-in device follows what sign-in found and the user's answers, per account. */
 @RunWith(RobolectricTestRunner::class)
@@ -111,9 +111,9 @@ class DeviceLinkOffersTest {
         assertEquals(DeviceLinkOfferStage.Offer, offers.stage(OTHER))
     }
 
-    /** Opening and closing the linking steps changes no recorded stage. */
+    /** Closing the steps after accepting the offer leaves the reminder instead of reopening the question. */
     @Test
-    fun openingTheStepsKeepsTheStage() {
+    fun closingTheStepsKeepsOnlyTheReminder() {
         val offers = DeviceLinkOffers(preferences)
         offers.recordSignIn(ACCOUNT, otherInstallationFound = true)
 
@@ -122,14 +122,16 @@ class DeviceLinkOffersTest {
         offers.closeLinking()
 
         assertNull(offers.linkingFor)
-        assertEquals(DeviceLinkOfferStage.Offer, offers.stage(ACCOUNT))
+        assertFalse(offers.takeStartRequest())
+        assertEquals(DeviceLinkOfferStage.Reminder, DeviceLinkOffers(preferences).stage(ACCOUNT))
     }
 
-    /** A Settings-started link has no open offer. Cancel must precede any read that could process its Welcome. */
+    /** A plain switch issues no link command. Switches cancel an unconfirmed start but preserve submitted consent. */
     @Test
-    fun profileSwitchCancelsWithoutReadingOrRequiringAnOpenOffer() =
+    fun aSwitchCancelsOnlyALocallyStartedUnconfirmedLink() =
         runTest {
             val calls = mutableListOf<String>()
+            var loseConfirmationReply = false
             val api = MarmotInterface::class.java
             val native =
                 Proxy.newProxyInstance(api.classLoader, arrayOf(api)) { proxy, method, args ->
@@ -137,12 +139,16 @@ class DeviceLinkOffersTest {
                         "toString" -> "DeviceLinkCancelFixture"
                         "hashCode" -> System.identityHashCode(proxy)
                         "equals" -> proxy === args?.firstOrNull()
+                        "startDeviceLink" -> snapshot(NewDeviceLinkStateFfi.WaitingForAnswer)
+                        "confirmDeviceLinkMatch" ->
+                            if (loseConfirmationReply) {
+                                failSuspendedNativeCall(args, MarmotKitException.TransportClosed())
+                            } else {
+                                snapshot(NewDeviceLinkStateFfi.WaitingForOtherDevice)
+                            }
                         "cancelDeviceLink" -> {
                             calls += "cancel:${args?.firstOrNull()}"
-                            val continuation = checkNotNull(args).last() as Continuation<*>
-                            val refusal = MarmotKitException.Runtime("device group refused: no_link_in_progress")
-                            continuation.resumeWithException(refusal)
-                            COROUTINE_SUSPENDED
+                            failSuspendedNativeCall(args, MarmotKitException.TransportClosed())
                         }
                         "deviceLinkSnapshot" -> error("Reading can advance the pending Welcome")
                         else -> null
@@ -154,16 +160,29 @@ class DeviceLinkOffersTest {
                     draftStore = DraftStore.forContext(context),
                     accountIdHexResolver = { ACCOUNT },
                     accounts = listOf(AccountSummaryFfi("old", ACCOUNT, true, false, false, true, false)),
-                    activeAccountRef = "new",
+                    activeAccountRef = "old",
                     initialMarmotRuntime = AppMarmotRuntime("test", native),
                 )
             DeviceLinkOffers.shared(context).closeLinking()
+            val binding = RuntimeDeviceLink(state)
+            state.cancelLinkAfterProfileSwitch("old")
+            assertTrue(calls.isEmpty())
+            binding.startDeviceLink("old")
+            state.cancelLinkAfterProfileSwitch("old")
+            binding.startDeviceLink("old")
+            binding.confirmDeviceLinkMatch("old")
+            state.cancelLinkAfterProfileSwitch("old")
+            binding.startDeviceLink("old")
+            loseConfirmationReply = true
+            assertTrue(runCatching { binding.confirmDeviceLinkMatch("old") }.isFailure)
             state.cancelLinkAfterProfileSwitch("old")
             assertEquals(listOf("cancel:old"), calls)
             assertNull(state.toast)
         }
 
     private companion object {
+        fun snapshot(state: NewDeviceLinkStateFfi) = DeviceLinkSnapshotFfi(state, emptyList(), emptyList(), false)
+
         const val ACCOUNT = "aa11"
         const val OTHER = "bb22"
     }

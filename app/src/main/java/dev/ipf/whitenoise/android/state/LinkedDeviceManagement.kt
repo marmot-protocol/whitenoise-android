@@ -4,7 +4,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CancellationException
@@ -42,8 +41,11 @@ internal interface LinkedDeviceManagementNative {
     /** Whether this device's KeyPackage refresh is overdue. */
     suspend fun keyPackageRefreshOverdue(accountRef: String): Boolean
 
-    /** Discards this device's local device-group copy so it can be linked afresh. */
-    suspend fun resetDeviceGroupForRepair(accountRef: String): DeviceLinkSnapshotFfi
+    /** Whether a previously confirmed repair lost its native discard response. */
+    suspend fun repairNeedsConfirmation(accountRef: String): Boolean
+
+    /** Discards the local copy on confirmation and completes KeyPackage publication. */
+    suspend fun resetDeviceGroupForRepair(accountRef: String)
 }
 
 /**
@@ -137,6 +139,9 @@ internal class LinkedDeviceManagementController(
     var keyPackageRefreshOverdue by mutableStateOf(false)
         private set
 
+    var repairNeedsConfirmation by mutableStateOf(false)
+        private set
+
     var running by mutableStateOf<LinkedDeviceAction?>(null)
         private set
 
@@ -171,6 +176,7 @@ internal class LinkedDeviceManagementController(
             val closed = read { native.chatsClosedToLinkedDevices(accountRef).toInt() }
             val leftover = read { native.removedDeviceLeftoverChats(accountRef).toInt() }
             val overdue = read { native.keyPackageRefreshOverdue(accountRef) }
+            val unconfirmed = read { native.repairNeedsConfirmation(accountRef) }
             if (!current) return
             counts =
                 LinkedDeviceChatCounts(
@@ -178,6 +184,7 @@ internal class LinkedDeviceManagementController(
                     holdingRemovedDevice = leftover ?: counts.holdingRemovedDevice,
                 )
             if (overdue != null) keyPackageRefreshOverdue = overdue
+            if (unconfirmed != null) repairNeedsConfirmation = unconfirmed
         }
     }
 
@@ -209,14 +216,14 @@ internal class LinkedDeviceManagementController(
         act(LinkedDeviceAction.Remove) { native.removeLinkedDevice(accountRef, slotIdHex) }
     }
 
-    /**
-     * Discards this device's local device-group copy. Returns MDK's snapshot on success so the caller can show the
-     * state linking starts from, or null when the reset did not happen.
-     */
-    suspend fun resetForRepair(): DeviceLinkSnapshotFfi? {
-        var snapshot: DeviceLinkSnapshotFfi? = null
-        act(LinkedDeviceAction.Repair) { snapshot = native.resetDeviceGroupForRepair(accountRef) }
-        return snapshot.takeIf { current }
+    /** Returns true only once the original group has been discarded and a fresh KeyPackage has been published. */
+    suspend fun resetForRepair(): Boolean {
+        var completed = false
+        act(LinkedDeviceAction.Repair) {
+            native.resetDeviceGroupForRepair(accountRef)
+            completed = true
+        }
+        return current && completed
     }
 
     /** Runs one action, then re-reads the counts it may have changed. */

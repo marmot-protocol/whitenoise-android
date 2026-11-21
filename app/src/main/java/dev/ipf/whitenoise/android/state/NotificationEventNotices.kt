@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotEventFfi
-import dev.ipf.marmotkit.NotificationTriggerFfi
+import dev.ipf.marmotkit.NotificationTriggerFfi.NEW_MESSAGE
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,23 +29,5 @@ internal fun WhiteNoiseAppState.presentEventNotices(
     }
 }
 
-/**
- * Whether a new-message [update] may carry attachments this device still has to fetch. Without linked devices a
- * self update is this installation's own send, whose media is already local. With them it can be the account's
- * message from another device, which arrives here like any received message.
- */
-internal fun needsIncomingAttachmentDownload(
-    update: NotificationUpdateFfi,
-    linkedDevices: Boolean,
-): Boolean = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && (!update.isFromSelf || linkedDevices)
-
-/**
- * Whether a received message of [kind] may carry attachments this device still has to fetch, by the same rule as
- * [needsIncomingAttachmentDownload]: a chat message from someone else always may, and with linked devices so may the
- * account's own message, because it can have been sent from another of its devices.
- */
-internal fun receivedChatMayCarryAttachments(
-    kind: ULong,
-    fromSelf: Boolean,
-    linkedDevices: Boolean,
-): Boolean = kind == MARMOT_CHAT_EVENT_KIND && (!fromSelf || linkedDevices)
+/** A new-message receipt can carry media from a peer or another device signed in to this account. */
+internal fun needsIncomingAttachmentDownload(update: NotificationUpdateFfi) = update.trigger == NEW_MESSAGE

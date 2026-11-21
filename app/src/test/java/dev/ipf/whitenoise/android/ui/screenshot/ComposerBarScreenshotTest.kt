@@ -344,6 +344,14 @@ class ComposerBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_dictation_idle_reply_compact_large_font.png")
     }
 
+    /** A reply to our other device's received record shows the same author label as a local send. */
+    @Test
+    fun replyToLinkedDeviceShowsYou() {
+        render(darkTheme = false, draft = "", showReply = true, ownerAccountIdHex = "ALICE")
+        composeRule.onNodeWithText(app.getString(R.string.reply_you)).assertIsDisplayed()
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_reply_other_own_device.png")
+    }
+
     /** Captures the production AMOLED reply card without an outer mismatched-radius clip. */
     @Test
     fun composerReplyAmoledCompactLargeFont() {
@@ -480,6 +488,7 @@ class ComposerBarScreenshotTest {
         rtl: Boolean = false,
         dictationPreview: DictationPreview? = null,
         showReply: Boolean = false,
+        ownerAccountIdHex: String? = null,
         showEdit: Boolean = false,
         voiceRecordingController: VoiceRecordingController? = null,
         attachmentsEnabled: Boolean = false,
@@ -495,6 +504,7 @@ class ComposerBarScreenshotTest {
                     Surface(modifier = Modifier.width(width.dp).testTag(TAG)) {
                         ComposerBar(
                             replyingTo = replyRecord().takeIf { showReply },
+                            ownerAccountIdHex = ownerAccountIdHex,
                             replyingToDisplay =
                                 TimelineReplyDisplay(
                                     sender = "alice",

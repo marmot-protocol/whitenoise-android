@@ -189,8 +189,7 @@ internal fun DeviceLinkCode(
 /**
  * The shared layout of a link step: a heading, one explanation announced when it changes, the comparison code when
  * there is one, any extra [content], then the step's actions. While a command runs the main action shows progress
- * and neither action can be pressed again, so a second tap submits nothing. [failed] says the last action did not go
- * through, on the step itself, because a notice behind a full-window step would not be seen.
+ * and a second tap submits nothing. [failureMessage] explains a refusal on the step itself.
  */
 @Composable
 internal fun DeviceLinkStepLayout(
@@ -200,7 +199,7 @@ internal fun DeviceLinkStepLayout(
     onBack: () -> Unit,
     onAction: (DeviceLinkAction) -> Unit,
     primaryEnabled: Boolean = true,
-    failed: Boolean = false,
+    failureMessage: Int? = null,
     content: @Composable () -> Unit = {},
 ) {
     SettingsScaffold(title = screenTitle, onBack = onBack) {
@@ -228,11 +227,11 @@ internal fun DeviceLinkStepLayout(
             item(key = "content") {
                 Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField)) { content() }
             }
-            if (failed) {
+            if (failureMessage != null) {
                 val polite = LiveRegionMode.Polite
                 item(key = "failed") {
                     SettingsCallout(
-                        text = stringResource(R.string.link_device_action_failed),
+                        text = stringResource(failureMessage),
                         isError = true,
                         modifier = Modifier.testTag(DEVICE_LINK_FAILED_TAG).semantics { liveRegion = polite },
                     )

@@ -42,8 +42,12 @@ internal class DeviceLinkOffers(
     // Set by the tap that opens the steps and taken once, so only that tap can start a request.
     private var startRequested = false
 
+    /** The durable repair receipt for this account. Use under account lifetime on the native IO dispatcher. */
+    fun repair(accountIdHex: String) = DeviceLinkRepair(preferences, accountIdHex)
+
     /** Opens the linking steps for [accountIdHex] because the user asked to link this device. */
     fun openLinking(accountIdHex: String) {
+        if (stage(accountIdHex) == DeviceLinkOfferStage.Offer) postpone(accountIdHex)
         linkingFor = accountIdHex
         startRequested = true
     }
@@ -61,6 +65,7 @@ internal class DeviceLinkOffers(
     /** Closes the linking steps. The link itself carries on in MDK. */
     fun closeLinking() {
         linkingFor = null
+        startRequested = false
     }
 
     /** The stage recorded for [accountIdHex], or null when nothing is offered. */
@@ -81,8 +86,15 @@ internal class DeviceLinkOffers(
 
     /** Forgets every stage of an account not in [accountIdsHex], so nothing outlives an account removed here. */
     fun retainAccounts(accountIdsHex: Collection<String>) {
-        val kept = accountIdsHex.mapTo(mutableSetOf(), ::key)
-        val stale = preferences.all.keys.filter { it.startsWith(STAGE_PREFIX) && it !in kept }
+        val kept = accountIdsHex.mapTo(mutableSetOf()) { it.lowercase(Locale.ROOT) }
+        val stale =
+            preferences.all.keys.filter { entry ->
+                when {
+                    entry.startsWith(STAGE_PREFIX) -> entry.removePrefix(STAGE_PREFIX) !in kept
+                    entry.startsWith(REPAIR_PREFIX) -> entry.removePrefix(REPAIR_PREFIX) !in kept
+                    else -> false
+                }
+            }
         if (stale.isEmpty()) return
         val editor = preferences.edit()
         stale.forEach(editor::remove)
@@ -108,6 +120,7 @@ internal class DeviceLinkOffers(
     internal companion object {
         const val PREFERENCES_NAME = "whitenoise.device_link_offers"
         private const val STAGE_PREFIX = "stage."
+        internal const val REPAIR_PREFIX = "repair.rotation."
 
         @Volatile
         private var shared: DeviceLinkOffers? = null

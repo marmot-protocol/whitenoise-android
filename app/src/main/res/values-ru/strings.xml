@@ -1527,6 +1527,7 @@
     <string name="wipe_outcome_key_packages_deleted">Удалено ключей приглашений: %1$d</string>
     <string name="wipe_outcome_local_wipe_done">Локальные данные стёрты</string>
     <string name="wipe_outcome_local_wipe_incomplete">Локальные данные стёрты не полностью</string>
+    <string name="wipe_media_ownership_unknown">Некоторые файлы кеша не привязаны к профилю. На устройстве остались зашифрованные медиафайлы, миниатюры или временные файлы голосовых сообщений, видео, документов, вложений, вставки или отправки.</string>
     <string name="wipe_media_cleanup_failed">Не удалось удалить некоторые локальные медиафайлы или отозвать разрешения на общий доступ.</string>
     <string name="export_nsec">Экспортировать nsec</string>
     <string name="share_secret_key">Поделиться секретным ключом</string>
@@ -2122,8 +2123,6 @@
     <string name="setup_device_unchecked">Не удалось завершить проверку других входов.</string>
     <string name="setup_device_found_on_date">Похоже, вы уже входили в этот аккаунт на другом устройстве или в другом приложении.</string>
     <string name="setup_device_found">Похоже, вы уже входили в этот аккаунт на другом устройстве или в другом приложении.</string>
-    <string name="setup_device_separate_chats">На этом устройстве будут свои, отдельные чаты. Чаты в другом приложении останутся там и здесь не появятся.</string>
-    <string name="setup_device_new_chats_either_app">Когда кто-то начнёт с вами новый чат, он может прийти в любое из двух приложений.</string>
     <string name="setup_device_separate_chats_if_other_app">Чаты из другого приложения не появятся здесь автоматически.</string>
     <string name="setup_device_stage">Использование устройства</string>
     <string name="setup_approval_saved_pending">Ваше одобрение сохранено. Изменение все еще ожидается.</string>

@@ -1473,6 +1473,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d chiavi di invito rimosse</string>
     <string name="wipe_outcome_local_wipe_done">Dati locali cancellati</string>
     <string name="wipe_outcome_local_wipe_incomplete">Cancellazione dei dati locali incompleta</string>
+    <string name="wipe_media_ownership_unknown">Alcuni file nella cache non sono associati a un profilo. Su questo dispositivo restano contenuti multimediali cifrati, miniature o file temporanei di voce, video, documenti, allegati, contenuti incollati o caricamenti.</string>
     <string name="wipe_media_cleanup_failed">Non è stato possibile rimuovere alcuni file multimediali locali o alcune autorizzazioni di condivisione.</string>
     <string name="export_nsec">Esporta nsec</string>
     <string name="share_secret_key">Condividi chiave segreta</string>
@@ -2053,8 +2054,6 @@
     <string name="setup_device_unchecked">Non siamo riusciti a completare la verifica degli altri accessi.</string>
     <string name="setup_device_found_on_date">Sembra che tu abbia già effettuato l’accesso a questo account su un altro dispositivo o in un’altra app.</string>
     <string name="setup_device_found">Sembra che tu abbia già effettuato l’accesso a questo account su un altro dispositivo o in un’altra app.</string>
-    <string name="setup_device_separate_chats">Questo dispositivo avrà chat proprie e separate. Le chat nell’altra app restano lì e non appariranno qui.</string>
-    <string name="setup_device_new_chats_either_app">Quando qualcuno inizia una nuova chat con te, può arrivare in una delle due app.</string>
     <string name="setup_device_separate_chats_if_other_app">Se hai chat in un’altra app, non appariranno qui automaticamente.</string>
     <string name="setup_device_stage">Utilizzo del dispositivo</string>
     <string name="setup_approval_saved_pending">La tua approvazione è salvata. La modifica è ancora in sospeso.</string>

@@ -31,6 +31,14 @@ class ConversationWindowReactionsTest {
             omittedKinds = 0uL,
         )
 
+    /** Omitted reaction kinds cannot confirm an optimistic withdrawal. */
+    @Test
+    fun missingKindNeedsACompleteSummary() {
+        val empty = ConversationReactionsFfi(0uL, 0uL, emptyList(), 0uL)
+        assertEquals(false, empty.viewerReactedTo("👍"))
+        assertEquals(null, empty.copy(omittedKinds = 1uL).viewerReactedTo("👍"))
+    }
+
     /** Counts come from MDK even when the reactor preview is shorter, and the viewer flag marks mine. */
     @Test
     fun talliesUseCompleteCountsAndViewerFlag() {

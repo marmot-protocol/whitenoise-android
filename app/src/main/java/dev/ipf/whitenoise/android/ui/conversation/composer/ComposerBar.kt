@@ -304,6 +304,7 @@ internal fun rememberComposerTextState(
 @Composable
 internal fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
+    ownerAccountIdHex: String? = null,
     replyingToMedia: List<MediaAttachmentReferenceFfi> = emptyList(),
     replyingToDisplay: TimelineReplyDisplay? = null,
     replyingToEmoji: dev.ipf.whitenoise.android.ui.ReceivedEmoji = dev.ipf.whitenoise.android.ui.ReceivedEmoji.None,
@@ -1229,6 +1230,7 @@ internal fun ComposerBar(
                                     }
                                 }
                                 if (replyingTo != null) {
+                                    val replyingToIsOwn = MessageProjector.isMine(replyingTo, ownerAccountIdHex)
                                     val replyEntrance =
                                         rememberComposerAccessoryEntrance(
                                             key = replyingTo.messageIdHex,
@@ -1236,8 +1238,7 @@ internal fun ComposerBar(
                                             motionEnabled = accessoryMotionEnabled,
                                         )
                                     Box(
-                                        // The accessory owns its shape. A second outer clip with a different
-                                        // radius trims the AMOLED reply outline at all four corners.
+                                        // The accessory owns its shape; clipping it again trims the card corners.
                                         Modifier
                                             .padding(8.dp)
                                             .composerAccessoryEntrance(replyEntrance)
@@ -1291,13 +1292,13 @@ internal fun ComposerBar(
                                             secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                             accentColor = MaterialTheme.colorScheme.primary,
                                             senderTitle =
-                                                if (replyingTo.direction == "sent") {
+                                                if (replyingToIsOwn) {
                                                     stringResource(R.string.reply_you)
                                                 } else {
                                                     appState?.displayName(replyingTo.sender)
                                                         ?: replyingTo.sender.take(8)
                                                 },
-                                            isOwn = replyingTo.direction == "sent",
+                                            isOwn = replyingToIsOwn,
                                             body = replyBody,
                                             receivedEmoji = replyingToEmoji,
                                             mediaKind = mediaKind,

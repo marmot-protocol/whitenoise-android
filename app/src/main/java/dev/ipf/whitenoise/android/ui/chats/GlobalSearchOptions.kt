@@ -66,7 +66,7 @@ private fun ChatListItem.choiceKey(): GlobalSearchChatChoiceKey =
     GlobalSearchChatChoiceKey(
         canonicalChatListGroupId(group.groupIdHex),
         group.name,
-        GroupProjector.inviteAccount(group, presentationOtherMemberAccount),
+        GroupProjector.inviteAccount(group, presentationOtherMemberAccount, ownerAccountIdHex),
         selectedPresentation?.title,
         projectedTitle,
         projection?.conversationKind,

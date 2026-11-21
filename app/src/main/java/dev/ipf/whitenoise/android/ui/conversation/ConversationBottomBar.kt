@@ -243,6 +243,7 @@ internal fun ConversationBottomBar(
                                         appState,
                                     ),
                                 replyingTo = controller.replyingTo,
+                                ownerAccountIdHex = controller.boundAccountIdHex,
                                 replyingToMedia =
                                     controller.replyingTo
                                         ?.let(controller::mediaReferencesFor)

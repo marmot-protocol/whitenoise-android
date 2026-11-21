@@ -85,7 +85,7 @@ private fun DeviceLinkOfferSteps(
     offers: DeviceLinkOffers,
 ) {
     val controller = rememberDeviceLinkController(appState) ?: return
-    val failed = rememberDeviceLinkFailed(controller)
+    val failureMessage = rememberLinkFailureMessage(controller)
     DeviceLinkOfferSettled(appState, controller)
     LaunchedEffect(controller) {
         controller.refreshLink()
@@ -98,7 +98,7 @@ private fun DeviceLinkOfferSteps(
         onDismissRequest = offers::closeLinking,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        LinkThisDeviceRoute(controller, onClose = offers::closeLinking, failed = failed)
+        LinkThisDeviceRoute(controller, onClose = offers::closeLinking, failureMessage = failureMessage)
     }
 }
 

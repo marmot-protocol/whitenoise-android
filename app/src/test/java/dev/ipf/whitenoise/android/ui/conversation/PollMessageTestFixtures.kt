@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.runtime.Composable
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.EventsSubscription
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
@@ -35,6 +37,8 @@ import java.util.Locale
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 
 private const val POLL_INTERVAL_MS = 25L
 
@@ -42,6 +46,15 @@ private const val POLL_INTERVAL_MS = 25L
 open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
     protected val nativeCalls = mutableListOf<Pair<String, List<Any?>>>()
     protected var reactionFailure: Throwable? = null
+    protected var reactionSummary =
+        SendSummaryFfi(
+            1u,
+            listOf("aa".repeat(32)),
+            SendAcceptDispositionFfi.PUBLISHED,
+            SendMaintenanceDispositionFfi.READY,
+        )
+    protected var removeMatchingReaction: (List<Any?>) -> Unit = {}
+    protected var rawMessages: List<AppMessageRecordFfi> = emptyList()
     protected var beforeVoteReturn: (() -> Unit)? = null
 
     /** Answers `pollVotes` with the fixture's scripted per-voter page; the default is an empty page. */
@@ -112,7 +125,18 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                     if (name == "reactToMessage") reactionFailure?.let { throw it }
                     if (name == "castPollVote") beforeVoteReturn?.invoke()
                     when (name) {
-                        "castPollVote", "reactToMessage", "deleteMessage" ->
+                        "reactToMessage" -> reactionSummary
+                        "unreactFromMessageMatching" -> {
+                            try {
+                                removeMatchingReaction(args.orEmpty().toList())
+                                reactionSummary
+                            } catch (failure: MarmotKitException) {
+                                // The generated interface delivers native errors through its continuation.
+                                (args.orEmpty().last() as Continuation<*>).resumeWith(Result.failure<Nothing>(failure))
+                                COROUTINE_SUSPENDED
+                            }
+                        }
+                        "castPollVote" ->
                             SendSummaryFfi(
                                 1u,
                                 listOf("aa".repeat(32)),
@@ -125,7 +149,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                         "pollVotes" -> pollVotesResponder(args.orEmpty().toList())
                         "messageReactions" -> reactionDetailsResponder(args.orEmpty().toList())
                         "parseMarkdown" -> markdown(args.orEmpty().first() as String)
-                        "messages" -> emptyList<dev.ipf.marmotkit.AppMessageRecordFfi>()
+                        "messages" -> rawMessages
                         else -> null
                     }
                 }

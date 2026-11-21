@@ -169,7 +169,7 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "the public wipe must delegate completion inside the durable launcher-revocation bracket",
             entry.indexOf("withRevokedPinnedTarget(wipedRef)") in
-                0 until entry.indexOf("finishRevokedAccountWipe(wipedRef)"),
+                0 until entry.indexOf("finishRevokedAccountWipe(wipedRef, wipedShareAccount)"),
         )
         val body = appStateFunctionBody("finishRevokedAccountWipe")
         val serializedWipeIndex = body.indexOf("nativePushSyncMutex.withSerializedNativePushWipe")

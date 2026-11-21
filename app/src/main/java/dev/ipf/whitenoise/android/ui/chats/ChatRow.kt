@@ -54,7 +54,6 @@ import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationActivity
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -88,12 +87,7 @@ internal fun Modifier.chatListSelectionRow(
         .semantics { this.selected = selected }
         .chatListSelectionRowClickable(interactionsEnabled, onClick)
 
-internal fun chatListItemAvatarAccount(item: ChatListItem): String? =
-    GroupProjector.avatarAccount(
-        group = item.group,
-        otherMemberAccount = item.presentationOtherMemberAccount,
-        memberCount = item.presentationMemberCount,
-    )
+internal fun chatListItemAvatarAccount(item: ChatListItem): String? = item.avatarAccount
 
 /**
  * A stationary long press opens the single-chat actions surface. Continuing

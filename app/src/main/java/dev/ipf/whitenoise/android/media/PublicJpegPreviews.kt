@@ -121,6 +121,15 @@ internal class PublicJpegPreviewPreferences(
 
     fun enabled(accountRef: String): Boolean = choices.value[accountRef] == true
 
+    /** Fences a removed profile's in-flight consent write and deletes its choice without consulting other profiles. */
+    fun removeAccount(accountId: String) {
+        synchronized(this) {
+            consentRevisions[accountId] = (consentRevisions[accountId] ?: 0L) + 1
+            choices.value = choices.value - accountId
+            preferences.edit().remove(accountId).apply()
+        }
+    }
+
     /** Account removal revokes consent immediately and prunes its device-local preference. */
     fun retainAccounts(accountIds: Collection<String>): Set<String> =
         synchronized(this) {

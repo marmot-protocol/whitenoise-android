@@ -46,6 +46,17 @@ data class ChatListAvatarSeed(
 private const val DIRECT_CHAT_MEMBER_COUNT = 2
 
 /**
+ * Build the first notification-open frame solely from the exact local row.
+ * Membership enrichment is intentionally absent from this boundary because it
+ * is loaded by the conversation after navigation and may be queued behind
+ * account activation. The row still preserves pre-read unread state.
+ */
+internal fun chatListItemFromNotificationProjection(
+    projection: ChatListRowFfi,
+    accountIdHex: String? = null,
+): ChatListItem = chatListItemFromProjection(row = projection, activeAccountIdHex = accountIdHex)
+
+/**
  * Builds a chat-list item from the engine projection and its selected presentation.
  * [members] remains the only authoritative source for membership-sensitive fields;
  * [presentationMembers] supplies display continuity while a newer roster loads.
@@ -69,7 +80,7 @@ internal fun chatListItemFromProjection(
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
-    val selectedPeer = selectedPresentation?.peerId?.takeIf(String::isNotBlank)
+    val selectedPeer = selectedPresentation?.peerId?.takeIf { it.isNotBlank() && !it.equals(activeAccountIdHex, true) }
     val selectedMemberCount =
         (selectedPresentation?.title as? PresentationTextFfi.UnnamedGroup)
             ?.memberCount
@@ -89,6 +100,7 @@ internal fun chatListItemFromProjection(
         )
     return ChatListItem(
         group = displayGroup,
+        ownerAccountIdHex = activeAccountIdHex,
         latest = chatListLatestMessage(row),
         otherMemberAccount = members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) },
         memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0,
@@ -219,7 +231,19 @@ data class ChatListItem(
      * [ChatsController] supplies a monotonic value for live/local activity.
      */
     val activitySequence: ULong = 0uL,
+    /** The identity whose native row this is, including rows displayed for an inactive profile. */
+    val ownerAccountIdHex: String? = null,
 ) {
+    /** Inviter or direct peer used by avatar fallbacks across chat, picker, notification and shortcut surfaces. */
+    internal val avatarAccount: String?
+        get() =
+            GroupProjector.avatarAccount(
+                group,
+                presentationOtherMemberAccount,
+                presentationMemberCount,
+                ownerAccountIdHex,
+            )
+
     val id: String = group.groupIdHex
 
     /** Presentation only: conflicting snapshots cannot establish invitation consent. */

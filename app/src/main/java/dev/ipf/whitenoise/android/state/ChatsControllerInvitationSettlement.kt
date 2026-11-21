@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import kotlinx.coroutines.launch
 
@@ -13,25 +14,65 @@ internal fun invitationSettlementDisagrees(
     cachedPendingConfirmation: Boolean?,
 ): Boolean = cachedPendingConfirmation != null && cachedPendingConfirmation != rowPendingConfirmation
 
-/**
- * Re-reads a chat's group from MDK when its row and its cached record disagree on the invitation. When another of
- * the account's devices answers an invitation, MDK moves the row here, and the record this list cached may not be
- * repeated on the record stream, so without this read the chat stays shown as being checked until it is opened.
- * The read is MDK's own answer, applied to the row and the record together. It is dropped when the list was bound
- * again meanwhile, or when the record it set out to replace was itself replaced, because then it is the older one.
- */
-internal fun ChatsController.settleInvitationFromMdk(row: ChatListRowFfi) {
+/** One outstanding native read for a row and its disagreeing cached group. */
+internal class InvitationSettlementRead(
+    val cached: AppGroupRecordFfi,
+) {
+    var superseded = false
+}
+
+/** Re-read only a disagreement. Duplicate snapshots share the read; a replacement waits for its own answer. */
+internal fun ChatsController.settleInvitationFromMdk(
+    row: ChatListRowFfi,
+    read: suspend (String, String) -> AppGroupRecordFfi = { account, groupId ->
+        appState.marmotIo { groupDetails(account, groupId).group }
+    },
+) {
     val account = accountRef ?: return
-    val cached = groupRecordsById[row.groupIdHex]
-    if (!invitationSettlementDisagrees(row.pendingConfirmation, cached?.pendingConfirmation)) return
+    val key = chatRowKey(row.groupIdHex)
+    val cached =
+        groupRecordsById[row.groupIdHex]?.takeIf {
+            invitationSettlementDisagrees(row.pendingConfirmation, it.pendingConfirmation)
+        }
+    val request = claimInvitationRead(key, cached) ?: return
     val epoch = bindEpoch
     recomputeScope.launch {
-        runCatchingCancellable { appState.marmotIo { groupDetails(account, row.groupIdHex) } }
-            .onSuccess { details ->
-                val unchanged = groupRecordsById[row.groupIdHex] === cached
-                if (isActiveBindEpoch(epoch) && accountRef == account && unchanged) {
-                    applyProfileGroupDetails(account, details)
-                }
+        try {
+            val record = runCatchingCancellable { read(account, row.groupIdHex) }.getOrNull()
+            val ownsRead = !request.superseded && isActiveBindEpoch(epoch) && accountRef == account
+            val currentRow = chatRowsByGroup[key]
+            val sameGroup = groupRecordsById[row.groupIdHex] == request.cached
+            if (ownsRead && sameGroup && record?.settlesRow(row, currentRow) == true) {
+                // The row stream already owns its newer archive, title and unread values. Only settle the record.
+                foldGroup(record)
             }
+        } finally {
+            if (invitationReads.remove(key, request) && request.superseded && isActiveBindEpoch(epoch)) {
+                chatRowsByGroup[key]?.let { settleInvitationFromMdk(it, read) }
+            }
+        }
+    }
+}
+
+/** Both row projections must still describe the invitation state returned by MDK. */
+private fun AppGroupRecordFfi.settlesRow(
+    requested: ChatListRowFfi,
+    current: ChatListRowFfi?,
+): Boolean =
+    groupIdHex == requested.groupIdHex &&
+        pendingConfirmation == requested.pendingConfirmation &&
+        pendingConfirmation == current?.pendingConfirmation
+
+/** Keeps one reader per group and remembers whether a later stream update retired its evidence. */
+private fun ChatsController.claimInvitationRead(
+    key: String,
+    cached: AppGroupRecordFfi?,
+): InvitationSettlementRead? {
+    val active = invitationReads[key]
+    return if (active == null) {
+        cached?.let { InvitationSettlementRead(it) }?.also { invitationReads[key] = it }
+    } else {
+        if (active.cached != cached) active.superseded = true
+        null
     }
 }

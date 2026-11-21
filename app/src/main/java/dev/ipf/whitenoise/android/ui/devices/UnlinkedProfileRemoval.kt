@@ -61,23 +61,34 @@ internal fun UnlinkedProfileRemovalHost(
     val stillUnlinked = appState.accounts.any { it.label == label && it.unlinked }
     LaunchedEffect(stillUnlinked) { if (!stillUnlinked) UnlinkedProfileRemoval.close() }
     if (!stillUnlinked || blocked || appState.wipeInProgress) return
+    val epoch = appState.runtimeGeneration
     UnlinkedProfileRemovalDialog(
         onRemove = {
             UnlinkedProfileRemoval.close()
-            // The wipe takes the profile in view down and puts it back, so it runs behind the same progress and the
-            // same disabled screens as removing the profile in view.
-            appState.wipeInProgress = true
-            appState.launchMutation {
-                runAccountWipeMutation(
-                    onUnconfirmed = { appState.present(R.string.toast_wipe_outcome_unconfirmed, copyable = true) },
-                    onFinished = { appState.wipeInProgress = false },
-                ) {
-                    reportUnlinkedProfileRemoval(appState, appState.removeUnlinkedAccountForOutcome(label))
-                }
-            }
+            launchUnlinkedProfileRemoval(appState, label, epoch)
         },
         onCancel = UnlinkedProfileRemoval::close,
     )
+}
+
+/** Runs the confirmed profile's removal on the app scope even when its prompting screen is dismissed. */
+internal fun launchUnlinkedProfileRemoval(
+    appState: WhiteNoiseAppState,
+    label: String,
+    expectedRuntime: Int,
+    requireInView: Boolean = false,
+) {
+    if (appState.wipeInProgress) return
+    appState.wipeInProgress = true
+    appState.launchMutation {
+        runAccountWipeMutation(
+            onUnconfirmed = { appState.present(R.string.toast_wipe_outcome_unconfirmed, copyable = true) },
+            onFinished = { appState.wipeInProgress = false },
+        ) {
+            val outcome = appState.removeUnlinkedAccountForOutcome(label, expectedRuntime, requireInView)
+            reportUnlinkedProfileRemoval(appState, outcome)
+        }
+    }
 }
 
 /**

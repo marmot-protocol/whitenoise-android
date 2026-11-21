@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.ChatHistoryImportStateFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.ChatHistoryImports
 import dev.ipf.whitenoise.android.state.ChatHistoryTransfer
 import dev.ipf.whitenoise.android.state.ImportedHistorySource
@@ -44,18 +43,15 @@ internal const val HISTORY_TRANSFER_NOTICE_TAG = "conversation.history_transfer"
 internal val LocalChatHistoryImport = compositionLocalOf<() -> ChatHistoryImportStateFfi?> { { null } }
 
 /**
- * Binds MDK's history-import state for [groupIdHex] of [accountRef] to this composition, or a constant null in
- * builds without linked devices. While the conversation is started it reads once and then follows MDK's change
- * event; a new holder is made for every account or runtime change so no state crosses accounts.
+ * Reads history imports for [accountRef] and follows MDK changes while the conversation is started. A new
+ * holder on each account or runtime change keeps [groupIdHex] scoped to the current profile.
  */
 @Composable
 internal fun rememberChatHistoryImport(
     appState: WhiteNoiseAppState,
     accountRef: String,
     groupIdHex: String,
-    available: Boolean = linkedDevicesAvailable(),
 ): () -> ChatHistoryImportStateFfi? {
-    if (!available) return NoHistoryImport
     val runtimeGeneration = appState.runtimeGeneration
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val imports =
@@ -73,8 +69,6 @@ internal fun rememberChatHistoryImport(
     }
     return remember(imports, groupIdHex) { { imports.state(groupIdHex) } }
 }
-
-private val NoHistoryImport: () -> ChatHistoryImportStateFfi? = { null }
 
 /**
  * What a timeline row draws above itself for imported history. At the top of the loaded history, a transfer still

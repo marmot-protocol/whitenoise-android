@@ -109,6 +109,8 @@
     <string name="devices_leftover_chats_detail">These chats can\'t take the removal from your devices. A chat admin can remove the device there.</string>
     <string name="devices_key_refresh_overdue">This device couldn\'t refresh its invitation keys. After 30 days people may stop being able to add it to new chats. Keep the app open on your devices so they can catch up.</string>
     <string name="devices_stalled">This device can no longer keep up with your other devices. Repair its link to continue.</string>
+    <string name="device_repair_confirm_again">Open Linked devices in Settings and confirm the repair again before linking.</string>
+    <string name="device_repair_try_link_again">Link reset. Try linking again to finish the repair.</string>
     <string name="devices_repair">Repair this device\'s link</string>
     <string name="devices_repair_confirm">This removes the current link so you can link this device again. Your chats, messages, drafts and settings stay. The old link can’t be restored, even if you cancel linking.</string>
     <string name="sign_ins_section">Sign-ins to review</string>

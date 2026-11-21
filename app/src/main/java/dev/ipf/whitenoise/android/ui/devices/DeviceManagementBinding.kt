@@ -11,6 +11,9 @@ import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SignInResponseFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.DeviceLinkOffers
+import dev.ipf.whitenoise.android.state.DeviceRepairConfirmationRequired
+import dev.ipf.whitenoise.android.state.DeviceRepairPublicationFailed
 import dev.ipf.whitenoise.android.state.LinkedDeviceActionFailure
 import dev.ipf.whitenoise.android.state.LinkedDeviceManagementController
 import dev.ipf.whitenoise.android.state.LinkedDeviceManagementNative
@@ -19,6 +22,8 @@ import dev.ipf.whitenoise.android.state.SignInReviewController
 import dev.ipf.whitenoise.android.state.SignInReviewNative
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** MDK's device-management calls through the app's runtime, on its native IO dispatcher. */
 internal class RuntimeLinkedDeviceManagement(
@@ -64,8 +69,25 @@ internal class RuntimeLinkedDeviceManagement(
     /** Reads whether the KeyPackage refresh is overdue. */
     override suspend fun keyPackageRefreshOverdue(accountRef: String) = io { keyPackageRefreshOverdue(accountRef) }
 
-    /** Discards the local device-group copy. */
-    override suspend fun resetDeviceGroupForRepair(accountRef: String) = io { resetDeviceGroupForRepair(accountRef) }
+    /** Reads the installation's durable receipt for this profile, including after process death. */
+    override suspend fun repairNeedsConfirmation(accountRef: String): Boolean {
+        val owner = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex ?: return false
+        return withContext(Dispatchers.IO) {
+            DeviceLinkOffers.shared(appState.appContext).repair(owner).needsConfirmation
+        }
+    }
+
+    /** Discards the old copy and publishes a fresh KeyPackage before a new link can start. */
+    override suspend fun resetDeviceGroupForRepair(accountRef: String) =
+        appState.withAccountLifetime {
+            val account = checkNotNull(appState.activeAccount?.takeIf { it.label == accountRef })
+            io {
+                DeviceLinkOffers.shared(appState.appContext).repair(account.accountIdHex).reset(
+                    discard = { resetDeviceGroupForRepair(accountRef) },
+                    rotate = { rotateKeyPackage(accountRef) },
+                )
+            }
+        }
 }
 
 /** MDK's sign-in review calls through the app's runtime, on its native IO dispatcher. */
@@ -171,8 +193,15 @@ internal fun DeviceManagementFailureEffect(
             null -> return@LaunchedEffect
             is LinkedDeviceActionFailure.Busy -> appState.present(R.string.device_action_busy)
             is LinkedDeviceActionFailure.LinkPending -> appState.present(R.string.device_action_link_pending)
-            is LinkedDeviceActionFailure.Other ->
-                appState.presentFailure(R.string.device_action_failed, "LINKED_DEVICE_ACTION", deviceFailure.cause)
+            is LinkedDeviceActionFailure.Other -> {
+                val title =
+                    when (deviceFailure.cause) {
+                        is DeviceRepairPublicationFailed -> R.string.device_repair_try_link_again
+                        is DeviceRepairConfirmationRequired -> R.string.device_repair_confirm_again
+                        else -> R.string.device_action_failed
+                    }
+                appState.presentFailure(title, "LINKED_DEVICE_ACTION", deviceFailure.cause)
+            }
         }
         management.devices.failureShown()
     }

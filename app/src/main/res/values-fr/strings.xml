@@ -1473,6 +1473,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d clés d’invitation retirées</string>
     <string name="wipe_outcome_local_wipe_done">Données locales effacées</string>
     <string name="wipe_outcome_local_wipe_incomplete">Effacement des données locales incomplet</string>
+    <string name="wipe_media_ownership_unknown">Certains fichiers en cache ne sont associés à aucun profil. Des médias chiffrés, des miniatures ou des fichiers temporaires de voix, de vidéos, de documents, de pièces jointes, de collage ou d’envoi restent sur cet appareil.</string>
     <string name="wipe_media_cleanup_failed">Certains fichiers multimédias locaux ou certaines autorisations de partage n’ont pas pu être supprimés.</string>
     <string name="export_nsec">Exporter le nsec</string>
     <string name="share_secret_key">Partager la clé secrète</string>
@@ -2053,8 +2054,6 @@
     <string name="setup_device_unchecked">Nous n’avons pas pu terminer la recherche d’autres connexions.</string>
     <string name="setup_device_found_on_date">Il semble que vous vous soyez déjà connecté à ce compte sur un autre appareil ou dans une autre application.</string>
     <string name="setup_device_found">Il semble que vous vous soyez déjà connecté à ce compte sur un autre appareil ou dans une autre application.</string>
-    <string name="setup_device_separate_chats">Cet appareil aura ses propres discussions, séparées. Les discussions de l’autre app y restent et n’apparaîtront pas ici.</string>
-    <string name="setup_device_new_chats_either_app">Quand quelqu’un commence une nouvelle discussion avec vous, elle peut arriver dans l’une ou l’autre app.</string>
     <string name="setup_device_separate_chats_if_other_app">Si vous avez des discussions dans une autre application, elles n’apparaîtront pas ici automatiquement.</string>
     <string name="setup_device_stage">Utilisation de l\'appareil</string>
     <string name="setup_approval_saved_pending">Votre approbation est enregistrée. Le changement est toujours en attente.</string>

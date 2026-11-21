@@ -188,11 +188,17 @@ internal suspend fun ConversationController.runGroupConvergenceEventLoop(
         val stream = runCatchingCancellable { runtimeEventStreamOpener() }.getOrNull()
         if (stream != null) {
             try {
+                accountDevicesGroupRevision++
                 requestGroupConvergenceRead()
                 runCatchingCancellable {
                     while (true) {
                         val event = stream.next() ?: break
-                        if (event.isGroupStateUpdateFor(account, group.groupIdHex)) requestGroupConvergenceRead()
+                        if (event.isGroupStateUpdateFor(account, group.groupIdHex)) {
+                            accountDevicesGroupRevision++
+                            requestGroupConvergenceRead()
+                        } else if (event.isAccountDevicesEpochChange(account, group.groupIdHex)) {
+                            accountDevicesGroupRevision++
+                        }
                     }
                 }
             } finally {

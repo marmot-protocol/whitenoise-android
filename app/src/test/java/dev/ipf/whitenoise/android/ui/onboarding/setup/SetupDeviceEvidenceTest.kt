@@ -41,10 +41,6 @@ class SetupDeviceEvidenceTest {
             listOf(R.string.setup_device_link_next),
             setupDeviceExplanation(SetupDeviceEvidence.OtherApps),
         )
-        assertEquals(
-            listOf(R.string.setup_device_separate_chats, R.string.setup_device_new_chats_either_app),
-            setupDeviceExplanation(SetupDeviceEvidence.OtherApps, linkedDevices = false),
-        )
     }
 
     /** The evidence for a completed notice reporting [discovery] with [publishedAt] package dates. */

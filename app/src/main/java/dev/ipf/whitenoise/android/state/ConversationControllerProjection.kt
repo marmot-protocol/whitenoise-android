@@ -27,11 +27,16 @@ internal fun ConversationController.pruneConfirmedOptimisticMessages() {
 
 /** Settles reaction overlays once the authoritative projection matches their intended state. */
 internal fun ConversationController.pruneConfirmedOptimisticReactions() {
+    if (optimisticReactionChanges.isEmpty() && unprojectedOwnReactions.isEmpty()) return
     confirmedOptimisticReactionKeys(
         activeAccountIdHex = conversationAccountIdHex,
         optimisticChanges = optimisticReactionChanges,
         confirmedSendersByTarget = baseReactionSenders(),
+        references = window.frame?.references,
     ).forEach(optimisticReactionChanges::remove)
+    unprojectedOwnReactions.removeAll { (target, emoji) ->
+        window.references(target)?.reactions?.viewerReactedTo(emoji) == true
+    }
 }
 
 /** Only newly delivered live events are timed; initial, paging and refresh rows are excluded. */

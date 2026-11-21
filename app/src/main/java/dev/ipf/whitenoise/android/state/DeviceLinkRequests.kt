@@ -22,6 +22,7 @@ internal data class DeviceLinkRequest(
     val promptId: String,
     val requestedAtSeconds: Long,
     val open: Boolean = true,
+    val comparing: Boolean = false,
 )
 
 /**
@@ -53,7 +54,13 @@ internal fun deviceLinkRequests(snapshots: Map<String, DeviceLinkSnapshotFfi>): 
     snapshots
         .flatMap { (accountRef, snapshot) ->
             snapshot.prompts.map { prompt ->
-                DeviceLinkRequest(accountRef, prompt.promptId, prompt.requestedAt.toLong(), prompt.state.isOpen())
+                DeviceLinkRequest(
+                    accountRef,
+                    prompt.promptId,
+                    prompt.requestedAt.toLong(),
+                    open = prompt.state.isOpen(),
+                    comparing = prompt.state is DeviceLinkPromptStateFfi.Comparing,
+                )
             }
         }.sortedWith(
             compareBy(DeviceLinkRequest::requestedAtSeconds)
@@ -70,7 +77,7 @@ internal fun deviceLinkRequests(snapshots: Map<String, DeviceLinkSnapshotFfi>): 
  */
 internal data class DeviceLinkRequestQueue(
     val presented: DeviceLinkRequest? = null,
-    val hidden: Set<Pair<String, String>> = emptySet(),
+    val hidden: Map<Pair<String, String>, HiddenUntil> = emptyMap(),
 ) {
     /** The queue after MDK's latest [requests]. Requests MDK no longer lists are forgotten. */
     fun offer(
@@ -78,7 +85,11 @@ internal data class DeviceLinkRequestQueue(
         blocked: Boolean,
     ): DeviceLinkRequestQueue {
         val listed = requests.associateBy { it.accountRef to it.promptId }
-        val stillHidden = hidden.intersect(listed.keys)
+        val stillHidden =
+            hidden.filter { (id, until) ->
+                val request = listed[id]
+                request != null && !(until == HiddenUntil.Comparison && request.comparing)
+            }
         val kept = presented?.let { listed[it.accountRef to it.promptId] }
         val startable = requests.firstOrNull { it.open && (it.accountRef to it.promptId) !in stillHidden }
         val next = kept ?: startable.takeUnless { blocked }
@@ -86,9 +97,17 @@ internal data class DeviceLinkRequestQueue(
     }
 
     /** The queue after the user closed the presented request without answering it. */
-    fun hidePresented(): DeviceLinkRequestQueue {
+    fun hidePresented(reopenForComparison: Boolean = true): DeviceLinkRequestQueue {
         val closed = presented ?: return this
-        return DeviceLinkRequestQueue(presented = null, hidden = hidden + (closed.accountRef to closed.promptId))
+        val until = if (reopenForComparison && !closed.comparing) HiddenUntil.Comparison else HiddenUntil.End
+        val id = closed.accountRef to closed.promptId
+        return DeviceLinkRequestQueue(presented = null, hidden = hidden + (id to until))
+    }
+
+    /** An active comparison can reopen after preparation; Not now on another profile lasts for this request. */
+    enum class HiddenUntil {
+        Comparison,
+        End,
     }
 }
 
@@ -102,6 +121,7 @@ internal data class DeviceLinkRequestQueue(
 internal class DeviceLinkRequestWatcher(
     private val readSnapshot: suspend (accountRef: String) -> DeviceLinkSnapshotFfi,
     private val owns: () -> Boolean = { true },
+    private val canPresentOutcome: (String) -> Boolean = { true },
 ) {
     var snapshots by mutableStateOf<Map<String, DeviceLinkSnapshotFfi>>(emptyMap())
         private set
@@ -191,7 +211,9 @@ internal class DeviceLinkRequestWatcher(
 
     /** Hides the presented request without answering it. */
     fun hidePresented(blocked: Boolean) {
-        queue = queue.hidePresented().offer(deviceLinkRequests(snapshots), blocked)
+        val presented = queue.presented ?: return
+        queue = queue.hidePresented(reopenForComparison = canPresentOutcome(presented.accountRef))
+        reoffer(blocked)
     }
 
     private fun publish(
@@ -199,7 +221,8 @@ internal class DeviceLinkRequestWatcher(
         blocked: Boolean,
     ) {
         snapshots = next
-        queue = queue.offer(deviceLinkRequests(next), blocked)
+        val visible = deviceLinkRequests(next).filter { it.open || canPresentOutcome(it.accountRef) }
+        queue = queue.offer(visible, blocked)
     }
 
     @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure keeps the prior snapshot.
@@ -220,5 +243,6 @@ internal fun WhiteNoiseAppState.runtimeLinkRequests() =
         DeviceLinkRequestWatcher(
             readSnapshot = { account -> marmotIo { deviceLinkSnapshot(account) } },
             owns = { runtimeGeneration == epoch },
+            canPresentOutcome = { account -> activeAccountRef == account },
         )
     }

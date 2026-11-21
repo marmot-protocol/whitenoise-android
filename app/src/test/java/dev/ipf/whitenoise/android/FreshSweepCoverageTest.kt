@@ -180,6 +180,7 @@ class FreshSweepCoverageTest {
 
     @Test
     fun twoStepLeavesAndInviteFailuresStayInsideTheirSafetyBoundaries() {
+        val adminLeave = source("state/AdminGroupLeave.kt")
         val departure = source("state/ChatsControllerDeparture.kt")
         val source = source("state/ChatsController.kt") + "\n" + conversationControllerSource()
         val chatListLeave =
@@ -197,7 +198,10 @@ class FreshSweepCoverageTest {
             )
 
         assertTrue(chatListLeave.contains("withContext(NonCancellable)"))
-        assertTrue(conversationLeave.contains("withContext(NonCancellable)"))
+        assertTrue(conversationLeave.contains("leaveWithRoster("))
+        assertTrue(adminLeave.kotlinFunctionBody("demoteThenLeave").contains("withContext(NonCancellable)"))
+        val legacyLeave = "leaveAsAdmin(account, group.groupIdHex) { demoteThenLeave(account, onDemoted) }"
+        assertTrue(adminLeave.contains(legacyLeave))
         assertTrue(accept.indexOf("acceptGroupInvite") < accept.indexOf("refreshMembers()"))
         val resolver =
             source.section(

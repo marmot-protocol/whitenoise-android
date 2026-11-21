@@ -57,6 +57,7 @@ internal data class LinkedDevicesHealth(
     val counts: LinkedDeviceChatCounts = LinkedDeviceChatCounts(),
     val keyPackageRefreshOverdue: Boolean = false,
     val stalled: Boolean = false,
+    val repairNeedsConfirmation: Boolean = false,
     val busy: Boolean = false,
     val review: SignInReviewState = SignInReviewState(),
 )

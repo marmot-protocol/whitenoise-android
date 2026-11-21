@@ -109,6 +109,8 @@
     <string name="devices_leftover_chats_detail">Estos chats no pueden aplicar la eliminación desde tus dispositivos. Un administrador del chat puede eliminar el dispositivo allí.</string>
     <string name="devices_key_refresh_overdue">Este dispositivo no pudo renovar sus claves de invitación. Pasados 30 días puede que ya no se le pueda añadir a chats nuevos. Mantén la app abierta en tus dispositivos para que se pongan al día.</string>
     <string name="devices_stalled">Este dispositivo ya no puede seguir el ritmo de tus otros dispositivos. Repara su vínculo para continuar.</string>
+    <string name="device_repair_confirm_again">Abre los dispositivos vinculados en Ajustes y vuelve a confirmar la reparación antes de vincular este dispositivo.</string>
+    <string name="device_repair_try_link_again">Se ha restablecido el vínculo. Vuelve a vincular el dispositivo para terminar la reparación.</string>
     <string name="devices_repair">Reparar el vínculo de este dispositivo</string>
     <string name="devices_repair_confirm">Se eliminará el vínculo actual para que puedas volver a vincular este dispositivo. Conservarás tus chats, mensajes, borradores y ajustes. El vínculo anterior no se puede recuperar, aunque canceles la vinculación.</string>
     <string name="sign_ins_section">Inicios de sesión por revisar</string>

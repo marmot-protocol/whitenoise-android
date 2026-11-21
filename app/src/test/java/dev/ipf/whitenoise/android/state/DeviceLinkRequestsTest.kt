@@ -120,9 +120,64 @@ class DeviceLinkRequestsTest {
         val dropped = hidden.offer(listOf(second), blocked = false)
 
         assertEquals(second, hidden.presented)
-        assertEquals(setOf("a" to "p1"), hidden.hidden)
+        assertEquals(setOf("a" to "p1"), hidden.hidden.keys)
         assertTrue(dropped.hidden.isEmpty())
     }
+
+    /** Closing preparation allows the later emoji comparison for the same MDK prompt to appear. */
+    @Test
+    fun closeDuringPreparationKeepsTheComparisonReachable() =
+        runTest {
+            var state: DeviceLinkPromptStateFfi = DeviceLinkPromptStateFfi.Preparing
+            val watcher = DeviceLinkRequestWatcher(readSnapshot = { snapshot(prompt("p", 1u, state)) })
+            watcher.reread("a", blocked = false)
+            watcher.hidePresented(blocked = false)
+            watcher.reread("a", blocked = false)
+            assertNull(watcher.queue.presented)
+
+            state = DeviceLinkPromptStateFfi.Comparing(emptyList())
+            watcher.reread("a", blocked = false)
+            assertTrue(watcher.queue.presented?.comparing == true)
+            watcher.hidePresented(blocked = false)
+            watcher.reread("a", blocked = false)
+            assertNull(watcher.queue.presented)
+        }
+
+    /** Not now on the other-profile notice keeps that notice hidden when the same request reaches comparison. */
+    @Test
+    fun anIgnoredOtherProfileRequestStaysQuiet() =
+        runTest {
+            var state: DeviceLinkPromptStateFfi = DeviceLinkPromptStateFfi.Preparing
+            val watcher =
+                DeviceLinkRequestWatcher(
+                    readSnapshot = { snapshot(prompt("p", 1u, state)) },
+                    canPresentOutcome = { false },
+                )
+            watcher.reread("other", blocked = false)
+            watcher.hidePresented(blocked = false)
+            state = DeviceLinkPromptStateFfi.Comparing(emptyList())
+            watcher.reread("other", blocked = false)
+            assertNull(watcher.queue.presented)
+        }
+
+    /** A settled request for another account drops its notice and frees the queue for the next request. */
+    @Test
+    fun otherProfileNoticeEndsWhenTheRequestSettles() =
+        runTest {
+            var first: DeviceLinkPromptStateFfi = DeviceLinkPromptStateFfi.Preparing
+            val watcher =
+                DeviceLinkRequestWatcher(
+                    readSnapshot = { ref ->
+                        if (ref == "other") snapshot(prompt("p", 1u, first)) else snapshot(prompt("next", 2u))
+                    },
+                    canPresentOutcome = { it == "mine" },
+                )
+            watcher.refresh(listOf("other", "mine"), blocked = false)
+            assertEquals("other", watcher.queue.presented?.accountRef)
+            first = ENDED
+            watcher.reread("other", blocked = false)
+            assertEquals("next", watcher.queue.presented?.promptId)
+        }
 
     /** A request MDK no longer lists stops being presented. */
     @Test

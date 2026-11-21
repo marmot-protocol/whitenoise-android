@@ -54,7 +54,7 @@ object GroupProjector {
             name = group.name,
             pendingInviteAccount = inviteAccount(group, otherMemberAccount, selfAccountIdHex),
             groupIdHex = group.groupIdHex,
-            otherMemberAccount = otherMemberAccount,
+            otherMemberAccount = otherMemberAccount?.takeUnless { it.equals(selfAccountIdHex, ignoreCase = true) },
             memberCount = memberCount,
             memberTitle = memberTitle,
             copy = copy,
@@ -133,7 +133,9 @@ object GroupProjector {
         selfAccountIdHex: String? = null,
     ): String? =
         inviteAccount(group, otherMemberAccount, selfAccountIdHex)
-            ?: otherMemberAccount?.takeIf { isUnnamed(group.name) && memberCount == 2 }
+            ?: otherMemberAccount?.takeIf {
+                !it.equals(selfAccountIdHex, ignoreCase = true) && isUnnamed(group.name) && memberCount == 2
+            }
 
     /**
      * Whether a member's own picture may stand in for this conversation's
