@@ -5,6 +5,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -18,13 +19,27 @@ import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 
 /**
- * Height of the half below a tabletop fold, which the composer area fills so the messages end at
- * the hinge; zero when the window has no tabletop fold.
+ * What the conversation's bottom bar reserves in the tabletop posture: everything from the top of
+ * the hinge down, so the messages end at the hinge, with the hinge's own gap left empty above the
+ * composer. Both are zero when the window has no tabletop fold.
  */
-internal fun tabletopLowerHalf(
+internal data class TabletopReserve(
+    val minHeight: Dp,
+    val hingeGap: Dp,
+)
+
+internal fun tabletopReserve(
     tabletop: WindowFold?,
     windowHeight: Dp,
-): Dp = tabletop?.let { (windowHeight - it.end).coerceAtLeast(0.dp) } ?: 0.dp
+): TabletopReserve =
+    if (tabletop == null) {
+        TabletopReserve(0.dp, 0.dp)
+    } else {
+        TabletopReserve(
+            minHeight = (windowHeight - tabletop.start).coerceAtLeast(0.dp),
+            hingeGap = (tabletop.end - tabletop.start).coerceAtLeast(0.dp),
+        )
+    }
 
 /**
  * Holds the conversation's bottom bar.
@@ -40,9 +55,12 @@ internal fun ConversationBottomBarFrame(
     content: @Composable () -> Unit,
 ) {
     val windowHeight = LocalWindowInfo.current.containerDpSize.height
-    val lowerHalf = tabletopLowerHalf(LocalWindowFolds.current.tabletop, windowHeight)
+    val reserve = tabletopReserve(LocalWindowFolds.current.tabletop, windowHeight)
     CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
-        Box(Modifier.fillMaxWidth().heightIn(min = lowerHalf), contentAlignment = Alignment.TopCenter) {
+        Box(
+            Modifier.fillMaxWidth().heightIn(min = reserve.minHeight).padding(top = reserve.hingeGap),
+            contentAlignment = Alignment.TopCenter,
+        ) {
             content()
         }
     }

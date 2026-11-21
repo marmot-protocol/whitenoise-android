@@ -40,10 +40,11 @@ internal fun listBesideConversation(
     folds: WindowFolds,
 ): Boolean = layout.fitsTwoPanes || folds.upright.any { it.separating }
 
-/** The chat list's width and where the conversation starts, in pixels from the start edge. */
+/** The chat list's width and the conversation's span, in pixels from the start edge. */
 internal data class ChatPaneSplit(
     val listWidth: Int,
     val conversationStart: Int,
+    val conversationEnd: Int,
 )
 
 /**
@@ -76,7 +77,7 @@ internal fun Density.chatPaneSplit(
     val minList = ListPaneMinWidth.roundToPx()
     val maxList = maxOf(minList, space - DetailPaneMinWidth.roundToPx())
     val listWidth = preferred.coerceIn(minList, maxList).coerceAtMost(space)
-    return ChatPaneSplit(listWidth = listWidth, conversationStart = listWidth + dividerWidth)
+    return ChatPaneSplit(listWidth, conversationStart = listWidth + dividerWidth, conversationEnd = width)
 }
 
 private fun Density.foldSplit(
@@ -87,23 +88,37 @@ private fun Density.foldSplit(
 ): ChatPaneSplit? {
     // Measured from the start edge: in right-to-left layouts the list sits right of the fold.
     val spans =
-        folds.map { fold ->
-            val left = fold.start.roundToPx()
-            val right = fold.end.roundToPx()
-            val span = if (layoutDirection == LayoutDirection.Ltr) left to right else (width - right) to (width - left)
-            Triple(span.first, span.second, fold.separating)
-        }
-    val creaseFits = { start: Int, end: Int ->
-        start in ListPaneMinWidth.roundToPx()..FlatFoldListMaxWidth.roundToPx() &&
-            width - end >= DetailPaneMinWidth.roundToPx()
+        folds
+            .map { fold ->
+                val left = fold.start.roundToPx()
+                val right = fold.end.roundToPx()
+                if (layoutDirection == LayoutDirection.Ltr) {
+                    FoldSpan(left, right, fold.separating)
+                } else {
+                    FoldSpan(width - right, width - left, fold.separating)
+                }
+            }.sortedBy { it.start }
+    val conversationStartAfter = { span: FoldSpan -> maxOf(span.end, span.start + dividerWidth) }
+    val creaseFits = { span: FoldSpan ->
+        span.start in ListPaneMinWidth.roundToPx()..FlatFoldListMaxWidth.roundToPx() &&
+            width - conversationStartAfter(span) >= DetailPaneMinWidth.roundToPx()
     }
     // A half-open hinge beats a flat crease; with several, the narrowest list leaves the most conversation.
     val chosen =
-        spans.filter { it.third }.minByOrNull { it.first }
-            ?: spans.filter { !it.third && creaseFits(it.first, it.second) }.minByOrNull { it.first }
+        spans.firstOrNull { it.separating }
+            ?: spans.firstOrNull { !it.separating && creaseFits(it) }
             ?: return null
-    val listWidth = chosen.first.coerceIn(0, width)
+    val listWidth = chosen.start.coerceIn(0, width)
     // A hinge with a physical gap leaves the gap empty; a seamless fold keeps the divider on it.
-    val conversationStart = maxOf(chosen.second, listWidth + dividerWidth).coerceAtMost(width)
-    return ChatPaneSplit(listWidth = listWidth, conversationStart = conversationStart)
+    val conversationStart = conversationStartAfter(chosen).coerceAtMost(width)
+    // A second half-open hinge, as on a tri-fold folded into a Z, ends the conversation before it.
+    val conversationEnd =
+        spans.firstOrNull { it.separating && it.start > conversationStart }?.start ?: width
+    return ChatPaneSplit(listWidth, conversationStart, conversationEnd)
 }
+
+private data class FoldSpan(
+    val start: Int,
+    val end: Int,
+    val separating: Boolean,
+)
