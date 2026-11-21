@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="disappearing">Katoavat</string>
+    <string name="advanced">Lisäasetukset</string>
+    <string name="save_conversation_transcript">Tallenna keskusteluhistoria</string>
+</resources>

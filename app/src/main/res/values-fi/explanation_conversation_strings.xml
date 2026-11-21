@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Read Aloud bar explanations, shown when a transport button is held. -->
+    <string name="explanation_conversation_tts_previous_message">Siirtää ääneen lukemisen edellisen viestin alkuun. Se ei muuta viestiä.</string>
+    <string name="explanation_conversation_tts_previous_sentence">Siirtää ääneen lukemisen nykyisen virkkeen alkuun tai edelliseen virkkeeseen, jos olet jo virkkeen alussa.</string>
+    <string name="explanation_conversation_tts_next_sentence">Siirtyy seuraavaan virkkeeseen ääneen luettavassa viestissä.</string>
+    <string name="explanation_conversation_tts_next_message">Siirtyy seuraavan viestin alkuun. Ääneen lukeminen jatkuu siitä.</string>
+    <string name="explanation_conversation_tts_resume_follow">Vierittää keskustelun takaisin ääneen luettavaan viestiin. Se ei keskeytä eikä aloita ääntä alusta.</string>
+
+    <!-- Dictation explanations, shown when a dictation control is held. -->
+    <string name="explanation_conversation_dictation_cancel">Hylkää sanomasi. Mitään ei lähetetä eikä lisätä viestiin, eikä tätä voi kumota.</string>
+    <string name="explanation_conversation_dictation_send">Lopettaa kuuntelun ja lähettää tunnistetun tekstin viestinä. Valitse sen sijaan Liitä litterointi, jos haluat tarkistaa tekstin ennen lähettämistä.</string>
+    <string name="explanation_conversation_dictation_paste">Lisää tunnistetun tekstin viestikenttään lähettämättä sitä, jotta voit ensin muokata sitä.</string>
+    <string name="explanation_conversation_dictation_recovery_paste">Lisää tunnistetun tekstin viestikenttään lähettämättä sitä.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_send">Yrittää uudelleen lähettää tunnistetun tekstin viestinä.</string>
+    <string name="explanation_conversation_dictation_recovery_app_settings">Avaa White Noisen Android-asetukset, joissa voit sallia mikrofonin käytön.</string>
+    <string name="explanation_conversation_dictation_recovery_speech">Avaa Androidin puheentunnistusasetukset, joissa voit valita tai asentaa tunnistuspalvelun.</string>
+    <string name="explanation_conversation_dictation_recovery_retry">Aloittaa kuuntelun uudelleen. Aiemmin tunnistettua tekstiä ei lisätä.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_retained">Yrittää tätä sanelua uudelleen jo nauhoitetulla tai tunnistetulla sisällöllä. Kuuntelua ei aloiteta uudelleen.</string>
+
+    <!-- Voice message explanations, shown when a recording or review control is held. -->
+    <string name="explanation_conversation_voice_discard">Poistaa tämän nauhoituksen lähettämättä sitä. Tätä ei voi kumota.</string>
+    <string name="explanation_conversation_voice_record_again">Poistaa tämän nauhoituksen ja aloittaa uuden. Mitään ei lähetetä.</string>
+    <string name="explanation_conversation_voice_delete">Pysäyttää ja poistaa nauhoituksen lähettämättä sitä. Tätä ei voi kumota.</string>
+    <string name="explanation_conversation_voice_stop">Pysäyttää nauhoituksen, jotta voit kuunnella sen. Mitään ei lähetetä ennen kuin lähetät sen.</string>
+
+    <!-- Media preview explanations, shown when a preview control is held. -->
+    <string name="explanation_media_preview_send">Lähettää tässä näkyvät liitteet kuvatekstin kanssa tähän keskusteluun. Valitse sen sijaan Valmis, jos haluat pitää ne kirjoituskentässä.</string>
+    <string name="explanation_media_preview_done">Tallentaa muutoksesi ja palaa kirjoituskenttään. Mitään ei lähetetä, ja valinnasta poistamasi kohteet poistetaan luonnoksesta.</string>
+    <string name="explanation_media_preview_cancel">Sulkee esikatselun lähettämättä mitään. Lähetettäväksi valmisteltavat liitteet hylätään.</string>
+    <string name="explanation_media_preview_add_more">Avaa valikon, josta voit lisätä tähän viestiin kuvia tai tiedostoja.</string>
+
+    <!-- Conversation header and navigation explanations. -->
+    <string name="explanation_conversation_header_details">Avaa tämän keskustelun tiedot, kuten jäsenet ja asetukset.</string>
+    <string name="explanation_conversation_jump_to_mention">Vierittää seuraavaan lukemattomaan viestiin, jossa sinut mainitaan.</string>
+    <string name="explanation_composer_draft_top">Vierittää luonnoksen takaisin ensimmäiselle riville. Se ei muuta tekstiä.</string>
+    <string name="explanation_emoji_search">Hakee emojiluettelosta nimen perusteella.</string>
+    <string name="explanation_emoji_configure">Avaa asetukset, joissa valitset pikareaktioiden emojit.</string>
+
+    <!-- Poll creation explanations. -->
+    <string name="explanation_poll_add_option">Lisää kyselyyn uuden vastausvaihtoehdon sallittuun enimmäismäärään asti.</string>
+    <string name="explanation_poll_single_choice">Jäsenet voivat äänestää vain yhtä vaihtoehtoa.</string>
+    <string name="explanation_poll_multiple_choice">Jäsenet voivat äänestää useampaa kuin yhtä vaihtoehtoa.</string>
+
+    <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_reply">Lainaa tämän viestin kirjoituskenttään, jotta vastauksesi liittyy siihen.</string>
+    <string name="explanation_message_action_edit">Avaa viestisi kirjoituskenttään, jotta voit muuttaa sitä.</string>
+    <string name="explanation_message_action_select">Ottaa valintatilan käyttöön, jotta voit valita useita viestejä kerralla.</string>
+    <string name="explanation_message_action_select_text">Voit valita osan tämän viestin tekstistä.</string>
+    <string name="explanation_message_action_copy">Kopioi viestin tekstin puhelimesi leikepöydälle.</string>
+    <string name="explanation_message_action_translate">Avaa paneelin, jossa on käännös. Käännös tehdään laitteellasi Offline Translator -sovelluksella.</string>
+    <string name="explanation_message_action_read_aloud">Lukee tämän viestin ääneen ja jatkaa sen jälkeisillä viesteillä.</string>
+    <string name="explanation_message_action_read_code_literally">Lukee tämän viestin ääneen niin, että koodi luetaan täsmälleen kirjoitetussa muodossa, ja jatkaa sen jälkeisillä viesteillä.</string>
+    <string name="explanation_message_action_forward">Avaa keskustelujen valitsimen. Valitsemasi keskustelut saavat tästä viestistä uuden kopion.</string>
+    <string name="explanation_message_action_keep_on_screen">Pitää tämän viestin pienenä korttina keskustelun yläosassa. Voit poistaa kortin milloin tahansa.</string>
+    <string name="explanation_message_action_show_less">Tiivistää tämän pitkän viestin lyhyemmäksi esikatseluksi.</string>
+    <string name="explanation_message_action_share">Avaa Androidin jakovalikon tällä viestillä. Valitsemasi sovellus saa viestin, ja se on White Noisen ulkopuolella.</string>
+    <string name="explanation_message_action_save">Tallentaa tämän viestin liitteet laitteellesi.</string>
+    <string name="explanation_message_action_info">Näyttää, milloin viesti lähetettiin ja vastaanotettiin, kuka sen lähetti, sen tunnuksen ja tilan.</string>
+    <string name="explanation_message_action_report">Avaa ilmiantolomakkeen tämän ryhmän ylläpitäjille, White Noisen tiimille tai molemmille. Mitään ei lähetetä ennen kuin vahvistat.</string>
+    <string name="explanation_message_action_delete">Voit poistaa tämän viestin vain tältä laitteelta tai kaikilta. Kaikilta poistamista ei voi kumota. Mitään ei poisteta ennen kuin valitset.</string>
+</resources>

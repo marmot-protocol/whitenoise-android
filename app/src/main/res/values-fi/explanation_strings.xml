@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accessibility action that opens the long-press explanation for a control. -->
+    <string name="explanation_action_explain">Selitä</string>
+
+    <!-- Composer shortcut explanations, shown when a toolbar button or + menu row is held. -->
+    <string name="explanation_composer_sending_identity">Näyttää, millä tileistäsi viestit lähetetään tässä keskustelussa. Se ei vaihda tiliä.</string>
+    <string name="explanation_composer_more">Avaa toiminnot, joita ei ole kiinnitetty työkaluriville, mukaan lukien Mukauta kirjoituskenttää.</string>
+    <string name="explanation_composer_emoji">Avaa emojivalitsimen, jossa ovat myös omat emojisi.</string>
+    <string name="explanation_composer_paste">Liittää kopioimasi sisällön viestiin.</string>
+    <string name="explanation_composer_dictation">Kirjoittaa sanomasi Androidin puheentunnistuksella. White Noise pyytää offline-tunnistusta, mutta laitteesi voi silti käyttää verkkopalvelua.</string>
+    <string name="explanation_composer_translate">Ottaa käännöstilan käyttöön tai pois. Kun se on päällä, Lähetä lähettää Lähetetään-rivillä näkyvän käännöksen, eikä mitään lähetetä ennen kuin käännös on valmis.</string>
+    <string name="explanation_composer_voice_note">Pidä painettuna nauhoittaaksesi ääniviestin.</string>
+    <string name="explanation_composer_camera">Avaa kameran, jotta voit liittää uuden kuvan. Android pyytää kameran käyttöoikeutta ensimmäisellä kerralla.</string>
+    <string name="explanation_composer_gallery">Avaa Androidin kuvavalitsimen. White Noise saa vain valitsemasi kuvat ja videot.</string>
+    <string name="explanation_composer_files">Avaa Androidin tiedostovalitsimen, jolla voit liittää minkä tahansa tiedoston.</string>
+    <string name="explanation_composer_location">Lähettää nykyisen sijaintisi kerran karttalinkkinä. Sijaintia ei jaeta jatkuvasti.</string>
+    <string name="explanation_composer_person">Jakaa White Noisen käyttäjän julkisen avaimen tekstinä, jotta muut voivat lähettää hänelle viestin.</string>
+    <string name="explanation_composer_contact">Jakaa yhteystietokortin puhelimesi yhteystiedoista.</string>
+    <string name="explanation_composer_poll">Luo kyselyn, johon ryhmän jäsenet voivat vastata.</string>
+    <string name="explanation_composer_sticker">Avaa tarrasi, jotta voit lähettää tarran.</string>
+    <string name="explanation_composer_customize">Valitse, mitkä pikatoiminnot pysyvät työkalurivillä, kummalla puolella ne ovat ja missä ääniviestipainike on.</string>
+
+    <!-- Settings home row explanations. -->
+    <string name="explanation_settings_account">Profiilisi, henkilöllisyytesi todistavat avaimet ja releet, jotka välittävät viestisi.</string>
+    <string name="explanation_settings_notifications">Äänet ja värinä, taustatoimitus sekä Androidin ilmoitusasetukset White Noiselle.</string>
+    <string name="explanation_settings_chats">Kansiot, pyyhkäisytoiminnot, kirjoituskenttä, Enter-näppäin, omat emojit ja nopea tilinvaihto.</string>
+    <string name="explanation_settings_appearance">Teema, värit, fontti, tekstin koko sekä päivämäärien ja kellonaikojen näyttötapa.</string>
+    <string name="explanation_settings_voice_language">Sovelluksen kieli, Lue ääneen, sanelu ja viestien kääntäminen.</string>
+    <string name="explanation_settings_privacy_security">Sovelluksen lukitus, näytön suojaus, Incognito-näppäimistö, estetyt käyttäjät, oletusarvoiset katoavat viestit ja diagnostiikan jakaminen.</string>
+    <string name="explanation_settings_data_usage">Katso, mikä vie tallennustilaa, ja valitse, milloin media ladataan ja millä laadulla se lähetetään.</string>
+    <string name="explanation_settings_ai_agents">Yhdistä tekoälyagentteja, joiden kanssa voit keskustella White Noisessa, tai määritä agentti käsin.</string>
+    <string name="explanation_settings_help_support">Ohjeartikkelit, keskustelu tuen kanssa, lahjoitukset ja kehittäjätyökalut.</string>
+</resources>

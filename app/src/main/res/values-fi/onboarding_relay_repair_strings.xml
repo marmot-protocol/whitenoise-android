@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_reset_relays">Palauta suositellut releet</string>
+    <string name="setup_repair_preview">Tarkista tämä relekorjaus ennen julkaisemista. Muut Nostr-sovelluksesi näkevät saman muutoksen.</string>
+    <string name="setup_repair_manual">Tarkista tämä relelista ennen muutosten tekemistä.</string>
+    <string name="setup_repair_before">Nykyinen ilmoitus</string>
+    <string name="setup_repair_after">Ehdotettu ilmoitus</string>
+    <string name="setup_repair_retained">Säilytä</string>
+    <string name="setup_repair_removed">Poista</string>
+    <string name="setup_repair_added">Lisää</string>
+    <string name="setup_repair_read">Luku</string>
+    <string name="setup_repair_write">Julkaise</string>
+    <string name="setup_repair_both">Lue ja julkaise</string>
+    <string name="setup_repair_inbox">Vastaanota kutsut</string>
+    <string name="setup_repair_other">Muut metatiedot</string>
+    <string name="setup_repair_content">Tapahtuman sisältö</string>
+    <string name="setup_repair_edit_unavailable">Tämä sovellus ei voi muokata tätä relelistaa turvallisesti.</string>
+    <string name="setup_repair_edit_unchanged">Muuta jotakin relettä ennen korvaavan listan tarkistamista. Mitään ei julkaista ennen kuin hyväksyt.</string>
+</resources>

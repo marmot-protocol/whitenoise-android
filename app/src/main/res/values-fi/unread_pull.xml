@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pull_unread_setting">Näytä lukemattomat keskustelut vetämällä alas</string>
+    <string name="pull_unread_only">Vain lukemattomat</string>
+    <string name="pull_unread_show_all">Näytä kaikki</string>
+    <string name="pull_unread_retry">Lataa lukemattomat keskustelut uudelleen</string>
+    <string name="pull_unread_load_failed">Lukemattomia keskusteluja ei voitu ladata. Yritä uudelleen.</string>
+    <string name="pull_unread_hint">Näytä lukemattomat vetämällä</string>
+    <string name="pull_unread_release">Näytä lukemattomat päästämällä irti</string>
+    <string name="pull_unread_filtered">Suodatettu: lukemattomat</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_title">Tarkista ääniviesti</string>
+    <string name="voice_record_again">Nauhoita uudelleen</string>
+    <string name="voice_message_release_to_review">Tarkista päästämällä irti · peru liu\'uttamalla sivuun</string>
+    <string name="voice_recording_stop">Lopeta nauhoitus</string>
+</resources>

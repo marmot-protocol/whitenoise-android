@@ -16,6 +16,7 @@ internal val languageOptions =
         LanguageOption("en", R.string.language_english),
         LanguageOption("de", R.string.language_german),
         LanguageOption("es", R.string.language_spanish),
+        LanguageOption("fi", R.string.language_finnish),
         LanguageOption("fr", R.string.language_french),
         LanguageOption("it", R.string.language_italian),
         LanguageOption("pt", R.string.language_portuguese),

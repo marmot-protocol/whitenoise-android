@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_review_unavailable_title">Nauhoitus ei saatavilla</string>
+    <string name="voice_review_unavailable_message">Tätä nauhoitusta ei voitu palauttaa. Tee uusi nauhoitus.</string>
+</resources>
