@@ -136,7 +136,7 @@ internal fun rememberRemoteSignerAccountActions(
 /** Disconnect confirmation, renewed permission review and the re-pair flow for one account. */
 @Suppress("FunctionNaming")
 @Composable
-private fun RemoteSignerAccountDialogs(
+internal fun RemoteSignerAccountDialogs(
     appState: WhiteNoiseAppState,
     account: String,
     dialog: RemoteSignerAccountAction?,
