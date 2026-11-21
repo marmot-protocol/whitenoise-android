@@ -10,7 +10,8 @@
         "test_ids": [
           "NAV-011",
           "DIC-002",
-          "NAV-012"
+          "NAV-012",
+          "DIC-019"
         ]
       },
       {
@@ -19,6 +20,48 @@
         "anchor": "fun ConversationDictationListeningIndicator(",
         "test_ids": [
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationContinueSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationListening.kt",
+        "anchor": "fun ConversationDictationContinueSlot(",
+        "test_ids": [
+          "DIC-019"
+        ]
+      },
+      {
+        "surface": "DictationLeadingSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationListening.kt",
+        "anchor": "fun DictationLeadingSlot(",
+        "test_ids": [
+          "DIC-019"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_conversation_dictation_continue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationListening.kt",
+        "anchor": "R.string.explanation_conversation_dictation_continue",
+        "test_ids": [
+          "DIC-019"
+        ]
+      },
+      {
+        "surface": "R.string.dictation_continue_recording",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationListening.kt",
+        "anchor": "R.string.dictation_continue_recording",
+        "test_ids": [
+          "DIC-019"
+        ]
+      },
+      {
+        "surface": "R.string.dictation_processing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationListening.kt",
+        "anchor": "R.string.dictation_processing",
+        "test_ids": [
+          "DIC-019"
         ]
       }
     ]

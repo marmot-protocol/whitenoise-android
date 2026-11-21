@@ -60,4 +60,5 @@
     <string name="explanation_message_action_info">显示这条消息的发送和接收时间、发送者、ID 和状态。</string>
     <string name="explanation_message_action_report">打开举报表单，可发送给此群组的管理员、White Noise 团队或两者。确认前不会发送任何内容。</string>
     <string name="explanation_message_action_delete">让你选择只在此设备上删除这条消息，或为所有人删除。为所有人删除无法撤销。在你选择之前不会删除任何内容。</string>
+    <string name="explanation_conversation_dictation_continue">立即开始录制下一段。上一段仍在转换成文字，会先插入。</string>
 </resources>

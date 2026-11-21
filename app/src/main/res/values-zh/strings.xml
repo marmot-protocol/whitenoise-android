@@ -2700,4 +2700,5 @@
     <string name="nostr_git_comment">Git 评论</string>
     <string name="nostr_git_copy_url">复制网址：%1$s</string>
     <string name="nostr_git_open_url">打开网址：%1$s</string>
+    <string name="dictation_continue_recording">听写下一段</string>
 </resources>

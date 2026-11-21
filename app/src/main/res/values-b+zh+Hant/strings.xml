@@ -2700,4 +2700,5 @@
     <string name="nostr_git_comment">Git 留言</string>
     <string name="nostr_git_copy_url">複製網址：%1$s</string>
     <string name="nostr_git_open_url">開啟網址：%1$s</string>
+    <string name="dictation_continue_recording">聽寫下一段</string>
 </resources>

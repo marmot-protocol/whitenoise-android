@@ -60,4 +60,5 @@
     <string name="explanation_message_action_info">顯示這則訊息的傳送和接收時間、傳送者、ID 和狀態。</string>
     <string name="explanation_message_action_report">開啟檢舉表單，可傳送給此群組的管理員、White Noise 團隊或兩者。確認前不會傳送任何內容。</string>
     <string name="explanation_message_action_delete">讓你選擇只在此裝置上刪除這則訊息，或為所有人刪除。為所有人刪除無法復原。在你選擇之前不會刪除任何內容。</string>
+    <string name="explanation_conversation_dictation_continue">立即開始錄製下一段。上一段仍在轉成文字，會先放入。</string>
 </resources>

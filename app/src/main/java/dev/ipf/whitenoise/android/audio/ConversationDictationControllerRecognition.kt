@@ -23,9 +23,10 @@ internal fun ConversationDictationController.startRecognition(
     clearRecognitionGeneration(cancel = false)
     if (!ensureDurableSession(sessionId, target)) return
     if (deferRecognitionUntilTeardownSettles(sessionId, target)) return
-    if (microphone.heldByOtherSession(sessionId)) {
+    if (!finishRequested && microphone.heldByOtherSession(sessionId)) {
         // A replaced session's asynchronous recorder close has not returned yet.
-        // Never reuse its microphone or focus lease for a different target.
+        // Never reuse its microphone or focus lease for a different target. A drain generation
+        // opens no microphone, so a follow-up recording beside it is not a conflict.
         fail(sessionId, target, ConversationDictationFailure.MicrophoneInUse)
         return
     }
@@ -329,7 +330,11 @@ internal fun ConversationDictationController.startRecognition(
         }
     runCatching {
         val session = platform.createSession(listener).also(generation::attach)
-        session.start()
+        if (finishRequested && platform.followUpCaptureSupported()) {
+            session.startWithCallerAudio()
+        } else {
+            session.start()
+        }
         if (owns(sessionId, generationId) && session.usesCallerAudioCapture()) {
             generation.markCallerAudioEndpointing()
             armSilenceDeadline(sessionId, target)

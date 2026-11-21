@@ -50,6 +50,9 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.canContinueDictation
+import dev.ipf.whitenoise.android.audio.continueDictation
+import dev.ipf.whitenoise.android.audio.followUpAwaitingPrevious
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
@@ -78,17 +81,31 @@ internal data class DictationControlFacts(
     val completionActionsEnabled: Boolean,
     val processingDeliveryMode: ConversationDictationDeliveryMode?,
     val recoveryHandedToComposer: Boolean,
-)
+    /** The previous dictation is still being transcribed and another recording may start beside it. */
+    val continueAvailable: Boolean = false,
+    /** A follow-up owns these commands while the previous dictation is still being transcribed. */
+    val previousPending: Boolean = false,
+) {
+    /** The slot left of Cancel holds the listening pulse or the continue command, never both. */
+    val leadingSlotOccupied: Boolean get() = captureInProgress || continueAvailable
+}
 
 internal val ConversationDictationController.controlFacts: DictationControlFacts
     get() =
         DictationControlFacts(
             captureInProgress = captureInProgress,
-            deliveryInProgress = deliveryInProgress,
+            // Cancel, Paste and Send belong to a follow-up while one exists, whatever the previous send is doing.
+            deliveryInProgress = deliveryInProgress && followUp.pending == null,
             completionActionsEnabled = completionActionsEnabled,
             processingDeliveryMode = processingDeliveryMode,
             recoveryHandedToComposer = recoveryHandedToComposer,
+            continueAvailable = canContinueDictation,
+            previousPending = followUpAwaitingPrevious,
         )
+
+/** The composer reserves the same width the commands animate to. */
+internal val ConversationDictationController.leadingSlotOccupied: Boolean
+    get() = controlFacts.leadingSlotOccupied
 
 /** Floating app-root control used while the immutable dictation origin is not visible. */
 @Composable
@@ -171,7 +188,7 @@ internal fun ConversationDictationCompactActions(
     // Capture stopping and recovery both change the command width; ease each edge instead of snapping.
     val motion = rememberSystemAnimationsEnabled()
     val width by animateDpAsState(
-        targetValue = state.compactActionsWidth(facts.captureInProgress),
+        targetValue = state.compactActionsWidth(facts.leadingSlotOccupied),
         animationSpec = if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
         label = "dictation actions width",
     )
@@ -233,7 +250,7 @@ private fun ConversationDictationActiveActions(
 ) {
     val sendLabel = stringResource(R.string.send)
     val sendExplanation = composerExplanation(R.string.send, R.string.explanation_conversation_dictation_send)
-    ConversationDictationListeningSlot(facts.captureInProgress)
+    ConversationDictationLeadingActions(controller, facts)
     IconButton(
         onClick = settleControlMorph(controller::cancel),
         enabled = !facts.deliveryInProgress,
@@ -458,3 +475,14 @@ internal fun dictationFailureLabel(reason: ConversationDictationFailure): String
             ConversationDictationFailure.DraftWriteRefused -> R.string.toast_draft_save_failed
         },
     )
+
+@Composable
+private fun ConversationDictationLeadingActions(
+    controller: ConversationDictationController,
+    facts: DictationControlFacts,
+) {
+    Box {
+        ConversationDictationListeningSlot(facts.captureInProgress, previousPending = facts.previousPending)
+        ConversationDictationContinueSlot(facts.continueAvailable) { controller.continueDictation() }
+    }
+}

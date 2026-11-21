@@ -33,6 +33,8 @@ internal interface ConversationDictationRecognitionSession {
     /** Begins recognition for this provider generation. */
     fun start()
 
+    fun startWithCallerAudio() = start()
+
     /** Requests a final result while preserving provider output already in flight. */
     fun stop()
 
@@ -194,6 +196,21 @@ internal interface ConversationDictationPlatform {
 
     /** Releases volatile caller audio at logical-session teardown. */
     fun discardCallerAudio(onClosed: () -> Unit): Boolean = false
+
+    /** Whether the current session records through White Noise, so a second recording can be held back. */
+    fun followUpCaptureSupported(): Boolean = false
+
+    /** Opens a second recorder that only buffers audio; no recognizer is attached to it. */
+    fun beginFollowUpCapture(): Boolean = false
+
+    /** Seals the follow-up recorder's tail and keeps its audio. */
+    fun finishFollowUpCapture(onClosed: () -> Unit): Boolean = false
+
+    /** Wipes the follow-up audio and closes its recorder. */
+    fun discardFollowUpCapture(onClosed: () -> Unit): Boolean = false
+
+    /** Makes the follow-up recording the session capture once the previous one has left the slot. */
+    fun adoptFollowUpCapture(): Boolean = false
 
     /** Creates one recognition generation whose callbacks are owned by [listener]. */
     fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession

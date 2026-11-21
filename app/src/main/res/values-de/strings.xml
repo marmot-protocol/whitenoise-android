@@ -2758,4 +2758,5 @@
     <string name="nostr_git_comment">Git-Kommentar</string>
     <string name="nostr_git_copy_url">URL kopieren: %1$s</string>
     <string name="nostr_git_open_url">URL öffnen: %1$s</string>
+    <string name="dictation_continue_recording">Den nächsten Teil diktieren</string>
 </resources>

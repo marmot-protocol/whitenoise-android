@@ -120,12 +120,14 @@ internal fun ConversationDictationController.complete(target: ConversationDictat
         return
     }
     retainedAudioFailure = null
+    val sent = requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish
     clearRecognitionSession(cancel = false)
     completion.draftRecovery.reset()
     resetTranscriptSession()
     val key = ConversationDictationKey.from(target.accountRef, target.groupIdHex)
     completionRevisions[key] = (completionRevisions[key] ?: 0) + 1
     state = ConversationDictationState.Idle
+    promoteFollowUp(previousDelivered = true, previousSent = sent)
 }
 
 /** Saves text locally even when reply or network validation prevents sending. */

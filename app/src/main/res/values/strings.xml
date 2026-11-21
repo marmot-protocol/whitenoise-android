@@ -1718,6 +1718,7 @@
     <string name="dictation_listening">Dictating…</string>
     <string name="dictation_processing">Transcribing…</string>
     <string name="dictation_cancel">Cancel dictation</string>
+    <string name="dictation_continue_recording">Dictate the next part</string>
     <string name="dictation_notification_title">Dictation active</string>
     <string name="dictation_notification_text">Choose Cancel, Paste, or Send</string>
     <string name="dictation_notification_unavailable">Enable dictation notifications to use Cancel, Paste and Send outside the app.</string>

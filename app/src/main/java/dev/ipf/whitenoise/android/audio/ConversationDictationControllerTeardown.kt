@@ -27,7 +27,8 @@ internal fun ConversationDictationController.clearRecognitionSession(
         // Dismissal can publish Idle, but the service must retain its promoted capture identity.
         foregroundLease.deferReleaseUntilCaptureClosed(closingCaptureGeneration, notificationSessionToken)
     }
-    val captureSessionId = microphone.captureSessionId
+    // A follow-up recording beside this session keeps its own microphone lease.
+    val captureSessionId = microphone.captureSessionId.takeIf { it == closingSessionId }
     val onCaptureFinished: () -> Unit = {
         captureSessionId?.let(this::finishPlaybackInterruption)
         closingSessionId?.let { acknowledgeCaptureClosed(it, closingCaptureGeneration) }
@@ -69,7 +70,10 @@ internal fun ConversationDictationController.finishProviderOwnedCapture(sessionI
 }
 
 /** Restores only playback that this recognition session interrupted, at most once. */
-internal fun ConversationDictationController.finishPlaybackInterruption(sessionId: Long) = microphone.finish(sessionId)
+internal fun ConversationDictationController.finishPlaybackInterruption(sessionId: Long) {
+    microphone.finish(sessionId)
+    armFollowUpCapture()
+}
 
 /** Tears down one recognizer generation and optionally acknowledges physical capture closure. */
 internal fun ConversationDictationController.clearRecognitionGeneration(

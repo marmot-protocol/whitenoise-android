@@ -1830,7 +1830,7 @@ internal fun ComposerBar(
                                 }
                             },
                         dictationControlsWidth =
-                            dictationState.compactActionsWidth(activeDictationController?.captureInProgress == true),
+                            dictationState.compactActionsWidth(activeDictationController?.leadingSlotOccupied == true),
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
                         enterKeyBehavior = enterKeyBehavior,
