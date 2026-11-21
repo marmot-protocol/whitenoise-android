@@ -23,19 +23,19 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
  * the hinge down, so the messages end at the hinge, with the hinge's own gap left empty above the
  * composer. Both are zero when the window has no tabletop fold.
  */
-internal data class TabletopReserve(
+internal data class ConversationTabletop(
     val minHeight: Dp,
     val hingeGap: Dp,
 )
 
-internal fun tabletopReserve(
+internal fun conversationTabletop(
     tabletop: WindowFold?,
     windowHeight: Dp,
-): TabletopReserve =
+): ConversationTabletop =
     if (tabletop == null) {
-        TabletopReserve(0.dp, 0.dp)
+        ConversationTabletop(0.dp, 0.dp)
     } else {
-        TabletopReserve(
+        ConversationTabletop(
             minHeight = (windowHeight - tabletop.start).coerceAtLeast(0.dp),
             hingeGap = (tabletop.end - tabletop.start).coerceAtLeast(0.dp),
         )
@@ -55,7 +55,7 @@ internal fun ConversationBottomBarFrame(
     content: @Composable () -> Unit,
 ) {
     val windowHeight = LocalWindowInfo.current.containerDpSize.height
-    val reserve = tabletopReserve(LocalWindowFolds.current.tabletop, windowHeight)
+    val reserve = conversationTabletop(LocalWindowFolds.current.tabletop, windowHeight)
     CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
         Box(
             Modifier.fillMaxWidth().heightIn(min = reserve.minHeight).padding(top = reserve.hingeGap),
