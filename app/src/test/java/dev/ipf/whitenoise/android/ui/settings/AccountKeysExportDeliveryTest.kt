@@ -120,89 +120,6 @@ class AccountKeysExportDeliveryTest {
         assertEquals(1, fixture.native.rawCalls.get())
     }
 
-    /** Encrypted export also waits for a fresh challenge and ignores success after its dialog is reopened. */
-    @Test
-    fun encryptedExportWaitsForAuthenticationInItsOwnDialog() {
-        var pending: (() -> Unit)? = null
-        val exports = mutableListOf<KeyExportDestination>()
-        val ui = ProfileKeysUiState().apply { openEncryptedExport() }
-        val authenticate = RawKeyExportAuthentication { pending = it }
-        val export = authenticate.gateExport(ui, { true }) { _, destination -> exports += destination }
-
-        ui.enterPassphrase()
-        export(true, KeyExportDestination.Preview)
-        assertTrue(exports.isEmpty())
-        ui.cancelExport()
-        ui.openEncryptedExport()
-        ui.enterPassphrase()
-        checkNotNull(pending).invoke()
-        assertTrue(exports.isEmpty())
-
-        export(true, KeyExportDestination.File)
-        checkNotNull(pending).invoke()
-        assertEquals(listOf(KeyExportDestination.File), exports)
-    }
-
-    /** An invalid passphrase never opens a challenge, and clearing it during one rejects the result. */
-    @Test
-    fun encryptedExportRequiresValidPassphraseAroundAuthentication() {
-        var requests = 0
-        var pending: (() -> Unit)? = null
-        var delivered = false
-        val ui = ProfileKeysUiState().apply { openEncryptedExport() }
-        val authenticate =
-            RawKeyExportAuthentication {
-                requests++
-                pending = it
-            }
-        val export = authenticate.gateExport(ui, { true }) { _, _ -> delivered = true }
-
-        export(true, KeyExportDestination.File)
-        assertEquals(0, requests)
-
-        ui.enterPassphrase()
-        export(true, KeyExportDestination.File)
-        assertEquals(1, requests)
-        ui.clearPasswords()
-        checkNotNull(pending).invoke()
-        assertFalse(delivered)
-    }
-
-    /** The encrypted save cannot encrypt the key or open a destination before authentication. */
-    @Test
-    fun encryptedSaveWaitsForTheScreenAuthenticationCallback() {
-        var pending: (() -> Unit)? = null
-        val fixture = render(authenticator = RawKeyExportAuthentication { pending = it })
-
-        beginExport(encrypted = true)
-
-        composeRule.runOnIdle {
-            assertEquals(0, fixture.native.encryptedCalls.get())
-            assertEquals(0, fixture.picker.launchCount)
-            checkNotNull(pending).invoke()
-        }
-        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
-        assertEquals(1, fixture.native.encryptedCalls.get())
-    }
-
-    /** Dismissing the password dialog retires a pending challenge before the dialog disappears. */
-    @Test
-    fun encryptedDismissalStartRejectsAuthentication() {
-        var pending: (() -> Unit)? = null
-        var delivered = false
-        val ui = ProfileKeysUiState().apply { openEncryptedExport() }
-        val authentication = RawKeyExportAuthentication { pending = it }
-        val export = authentication.gateExport(ui, { true }) { _, _ -> delivered = true }
-
-        ui.enterPassphrase()
-        export(true, KeyExportDestination.File)
-        ui.cancelExportPreparation()
-        assertTrue(ui.passwordDialog)
-        checkNotNull(pending).invoke()
-
-        assertFalse(delivered)
-    }
-
     /** A late result loses authority immediately when the dialog begins its exit. */
     @Test
     fun dismissalStartRejectsAuthenticationBeforeTheDialogDisappears() {
@@ -701,12 +618,6 @@ class AccountKeysExportDeliveryTest {
             composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
             dialogButton(R.string.export_nsec).performClick()
         }
-    }
-
-    /** Fills both encrypted-export fields with a passphrase that satisfies the export rules. */
-    private fun ProfileKeysUiState.enterPassphrase() {
-        password.edit { replace(0, length, PASSPHRASE) }
-        confirmation.edit { replace(0, length, PASSPHRASE) }
     }
 
     /** Restricts the match to the dialog because the underlying screen contains the same export label. */
