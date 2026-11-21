@@ -33,7 +33,8 @@ internal data class WindowFold(
 /**
  * The folds that leave usable room on both sides, read from the activity window.
  *
- * Book-style foldables and dual-screen devices report an upright fold; a tri-fold can report two.
+ * Book-style foldables and dual-screen devices report an upright fold; a tri-fold can report two,
+ * of which at most one half-open hinge is kept.
  * A flip phone held half open like a laptop, or a book-style foldable turned on its side, reports a
  * separating horizontal fold: the tabletop posture. Flip phones opened flat and phones without a
  * fold report none.
@@ -70,9 +71,13 @@ internal fun windowFolds(
     with(density) {
         val width = windowWidthPx.toDp()
         val height = windowHeightPx.toDp()
+        val vertical = features.filter { it.orientation == FoldingFeature.Orientation.VERTICAL }
+        // Two half-open upright hinges, as on a tri-fold folded into a Z, leave no single split that
+        // keeps both panes off every hinge, so the regular layout applies.
+        val halfOpen = vertical.count { it.isSeparating }
         val upright =
-            features
-                .filter { it.orientation == FoldingFeature.Orientation.VERTICAL }
+            vertical
+                .filterNot { it.isSeparating && halfOpen > 1 }
                 .map { WindowFold(it.bounds.left.toDp(), it.bounds.right.toDp(), it.isSeparating) }
                 .filter { it.start >= MinWindowFoldSideWidth && width - it.end >= MinWindowFoldSideWidth }
                 .sortedBy { it.start }
