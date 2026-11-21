@@ -4589,10 +4589,12 @@ class WhiteNoiseAppState private constructor(
                 }
             if (snapshot != null) {
                 requireRuntime()
+                rememberRemoteSignerAccount(pubkeyHex, remote = false)
                 accountSetup.open(snapshot, runtime, epoch) { accountSession.handoff.isCurrent(selection) }
                 return
             }
             val summary = loginAmberFallback(runtime, pubkeyHex, ::requireRuntime)
+            rememberRemoteSignerAccount(pubkeyHex, remote = false)
             activateImportedIdentity(summary, runtime, epoch, selection)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)

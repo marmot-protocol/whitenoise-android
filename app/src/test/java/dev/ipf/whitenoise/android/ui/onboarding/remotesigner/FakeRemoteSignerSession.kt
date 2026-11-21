@@ -39,6 +39,7 @@ internal class FakeRemoteSignerSession(
     var connectReply = CompletableDeferred<String>()
     var offerReply = CompletableDeferred<String>()
     var connects = 0
+    var offers = 0
 
     override suspend fun approvePermissions(
         version: UInt,
@@ -69,7 +70,10 @@ internal class FakeRemoteSignerSession(
 
     override suspend fun logout() = Unit
 
-    override suspend fun pairingOffer(): String = offerReply.await()
+    override suspend fun pairingOffer(): String {
+        offers++
+        return offerReply.await()
+    }
 
     override fun permissions(): Nip46PermissionsFfi = Nip46PermissionsFfi(1u, grants)
 

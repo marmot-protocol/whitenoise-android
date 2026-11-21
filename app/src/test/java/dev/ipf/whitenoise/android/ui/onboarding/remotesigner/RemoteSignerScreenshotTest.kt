@@ -113,7 +113,6 @@ class RemoteSignerScreenshotTest {
 
     private fun RemoteSignerPairing.reviewed(): FakeRemoteSignerSession {
         choose(RemoteSignerMethod.BunkerLink, "bunker://abcdef?relay=wss://relay.example&secret=s")
-        submitLink()
         return session
     }
 
@@ -131,7 +130,10 @@ class RemoteSignerScreenshotTest {
         setup: RemoteSignerPairing.() -> Unit,
     ) {
         session = FakeRemoteSignerSession()
-        val pairing = RemoteSignerPairing(FakeRemoteSignerHost(session), CoroutineScope(Dispatchers.Unconfined))
+        val host = FakeRemoteSignerHost(session)
+        // Unconfined throughout, so each step is on screen before the capture.
+        val unconfined = Dispatchers.Unconfined
+        val pairing = RemoteSignerPairing(host, CoroutineScope(unconfined), sessionDispatcher = unconfined)
         pairing.setup()
         capture(name, dark, rtl, scale) { RemoteSignerScreen(pairing, onClose = {}, onOpenApproval = {}) }
     }

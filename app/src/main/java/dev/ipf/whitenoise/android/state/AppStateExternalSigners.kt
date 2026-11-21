@@ -72,17 +72,27 @@ internal suspend fun WhiteNoiseAppState.reconnectSetupSigner(
 
 /**
  * Claims every external account MDK knows as a remote-signer account and returns their ids; none of them may get an
- * Amber callback. Only MDK's positive answer that an account has no NIP-46 credentials (`Unavailable`) leaves it an
- * Amber account. Any other resume failure keeps the account unresolved, shown as unreachable with a retry.
+ * Amber callback. MDK's answer that an account has no NIP-46 credentials (`Unavailable`) leaves it an Amber account
+ * unless it signed in with a remote signer here, whose pairing was then ended. Any other resume failure keeps the
+ * account unresolved, shown as unreachable with a retry.
  */
 private suspend fun WhiteNoiseAppState.restoreRemoteSignerAccounts(): Set<String> {
     val runtime = marmotOrNull() ?: return emptySet()
     remoteSigners.retainRuntime(runtime)
+    val remembered = rememberedRemoteSignerAccounts()
     val claimed = HashSet<String>()
     accounts.filter { it.externalSigning }.forEach { account ->
         when (val outcome = resumeRemoteSigner(runtime, account.label, account.accountIdHex)) {
-            RemoteSignerResume.Absent -> Unit
-            RemoteSignerResume.Restored -> claimed += account.accountIdHex
+            // Disconnecting or signing out erases MDK's pairing; such an account still waits to be paired again.
+            RemoteSignerResume.Absent ->
+                if (account.accountIdHex in remembered && marmotOrNull() === runtime) {
+                    claimed += account.accountIdHex
+                    remoteSigners.markWithoutSession(runtime, account.accountIdHex, RemoteSignerHealth.PairingEnded)
+                }
+            RemoteSignerResume.Restored -> {
+                claimed += account.accountIdHex
+                rememberRemoteSignerAccount(account.accountIdHex, remote = true)
+            }
             is RemoteSignerResume.Unresolved -> {
                 claimed += account.accountIdHex
                 val label = account.label.take(8)
@@ -148,6 +158,7 @@ internal suspend fun WhiteNoiseAppState.loginWithRemoteSigner(
                 runtime.nip46Login(session, whiteNoiseNip65Relays, MarmotClient.bootstrapRelays, whiteNoiseInboxRelays)
             }
         }
+    rememberRemoteSignerAccount(summary.accountIdHex, remote = true)
     // A runtime replaced while login ran owns its own handles; this session belongs to the old one.
     if (marmotOrNull() === runtime) remoteSigners.adopt(runtime, summary.accountIdHex, session)
     watchRemoteSigners()
@@ -178,6 +189,7 @@ internal suspend fun WhiteNoiseAppState.repairRemoteSigner(
             runtime.nip46Register(account.label, session)
         }
     }
+    rememberRemoteSignerAccount(accountIdHex, remote = true)
     if (marmotOrNull() === runtime) remoteSigners.adopt(runtime, accountIdHex, session)
     watchRemoteSigners()
 }
@@ -186,4 +198,24 @@ internal suspend fun WhiteNoiseAppState.repairRemoteSigner(
 internal fun WhiteNoiseAppState.accountRefFor(accountIdHex: String): String {
     val account = accounts.firstOrNull { it.accountIdHex == accountIdHex }
     return account?.label ?: accountIdHex
+}
+
+private const val REMOTE_SIGNER_ACCOUNTS_KEY = "remote_signer_accounts"
+
+/**
+ * Account ids that signed in with a remote signer on this device. MDK erases a pairing when it is disconnected or
+ * the account signs out, so this non-secret list keeps such an account from being taken for an Amber account after
+ * a restart.
+ */
+internal fun WhiteNoiseAppState.rememberedRemoteSignerAccounts(): Set<String> =
+    preferences.getStringSet(REMOTE_SIGNER_ACCOUNTS_KEY, null).orEmpty()
+
+/** Records whether [accountIdHex] signs with a remote signer; signing in with Amber for it clears the record. */
+internal fun WhiteNoiseAppState.rememberRemoteSignerAccount(
+    accountIdHex: String,
+    remote: Boolean,
+) = synchronized(remoteSigners) {
+    val current = rememberedRemoteSignerAccounts()
+    val next = if (remote) current + accountIdHex else current - accountIdHex
+    if (next != current) preferences.edit().putStringSet(REMOTE_SIGNER_ACCOUNTS_KEY, next).apply()
 }

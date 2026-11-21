@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.ui.onboarding.remotesigner
 
-import dev.ipf.marmotkit.Nip46SessionFfiInterface
 import dev.ipf.marmotkit.Nip46StateFfi
+import dev.ipf.marmotkit.Nip46StatusFfi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -22,14 +22,14 @@ internal sealed interface ApprovalSignal {
     ) : ApprovalSignal
 }
 
-/** Re-reads MDK's local status while [isCurrent] and reports what it means for the approval prompt. */
+/** Re-reads MDK's local status through [readStatus] while [isCurrent]; reports what it means for the prompt. */
 internal suspend fun awaitSignerApproval(
-    active: Nip46SessionFfiInterface,
+    readStatus: suspend () -> Nip46StatusFfi,
     isCurrent: () -> Boolean,
     onSignal: (ApprovalSignal) -> Unit,
 ) {
     while (currentCoroutineContext().isActive && isCurrent()) {
-        val status = active.status()
+        val status = readStatus()
         val url = status.authUrl
         val request = status.requestId
         val signal =
