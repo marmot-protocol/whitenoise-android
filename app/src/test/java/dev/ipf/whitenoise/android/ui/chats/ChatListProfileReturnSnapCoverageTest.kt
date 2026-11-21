@@ -132,7 +132,8 @@ class ChatListProfileReturnSnapCoverageTest {
         val createdGroupOpen =
             mainShell.requiredSection(
                 start = "val openGroupFromGroupCreateCompletion:",
-                end = "selectedChat = item",
+                // The open is one route event now, not a write to the selected chat.
+                end = "ShellNavEvent.OpenConversation(",
             )
         assertTrue(
             "the shell must arm a created group from the flow-origin head",
@@ -166,9 +167,10 @@ class ChatListProfileReturnSnapCoverageTest {
         val mainShell = mainShellSource().readText()
         val profileSheetBlock =
             mainShell.requiredSection(
+                // The coordinator's definition moved to its own file, so its call is the only occurrence left.
                 start = "ProfileGroupForegroundCoordinator(",
                 end = "val routeForwardDirection =",
-                occurrence = 1,
+                occurrence = 0,
             )
 
         val onDismissBlock =
