@@ -47,8 +47,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Description
 
 /** Above this many items the staging screen opens on the compact grid instead of the single-item pager. */
 internal const val MEDIA_COLLECTION_GRID_THRESHOLD = 10
@@ -222,7 +220,11 @@ private fun MediaCollectionCell(
             Image(bitmap, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(6.dp)) {
-                Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+                Icon(
+                    painterResource(R.drawable.ic_description),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
                 if (item is StagedPreviewItem.Document) {
                     Text(
                         name,

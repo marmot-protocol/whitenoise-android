@@ -105,7 +105,7 @@ internal fun ChatContextMenu(
                 add(
                     chatMenuItem(
                         R.string.leave_and_delete,
-                        R.drawable.ic_delete,
+                        R.drawable.ic_logout,
                         "LeaveAndDelete",
                         destructive = true,
                         explanation =
@@ -163,13 +163,13 @@ internal fun ChatContextMenu(
                 )
             }
             add(
-                chatMenuItem(R.string.chat_list_action_add_to_folder, R.drawable.ic_folder, "Folder") {
+                chatMenuItem(R.string.chat_list_action_add_to_folder, R.drawable.ic_folder_add, "Folder") {
                     onAddToFolder()
                 },
             )
             if (onExcludeFromFolder != null) {
                 add(
-                    chatMenuItem(R.string.folder_exclude_chat, R.drawable.ic_folder, "ExcludeFolder") {
+                    chatMenuItem(R.string.folder_exclude_chat, R.drawable.ic_folder_remove, "ExcludeFolder") {
                         onExcludeFromFolder()
                     },
                 )

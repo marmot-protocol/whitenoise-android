@@ -141,7 +141,7 @@ private fun GlobalAttachmentTile(
                 )
             } else {
                 Icon(
-                    painter = painterResource(if (video) R.drawable.ic_play_arrow else R.drawable.ic_image),
+                    painter = painterResource(if (video) R.drawable.ic_videocam else R.drawable.ic_image),
                     contentDescription = null,
                     modifier = Modifier.size(LibraryPlaceholderIconSize),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -187,7 +187,7 @@ private fun GlobalAttachmentRow(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 val audio = presentation == GlobalAttachmentPresentation.AUDIO
-                val icon = if (audio) R.drawable.ic_mic else R.drawable.ic_description
+                val icon = if (audio) R.drawable.ic_voice_note else R.drawable.ic_description
                 Icon(painterResource(icon), contentDescription = null)
             }
         }

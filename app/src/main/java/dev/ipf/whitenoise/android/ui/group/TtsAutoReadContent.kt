@@ -88,7 +88,7 @@ internal fun TtsAutoReadGroupActionRow(
                 .testTag(TTS_AUTO_READ_GROUP_ROW_TAG)
                 .semantics(mergeDescendants = true) { contentDescription = "$title. $provenanceLabel" },
         value = provenanceLabel,
-        leading = { SettingsLeadingIcon(R.drawable.ic_volume_up) },
+        leading = { SettingsLeadingIcon(R.drawable.ic_record_voice_over) },
         explanation = stringResource(R.string.explanation_appearance_tts_auto_read_group),
     )
 }

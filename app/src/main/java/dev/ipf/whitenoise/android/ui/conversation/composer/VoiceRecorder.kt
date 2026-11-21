@@ -54,10 +54,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
-import dev.ipf.whitenoise.android.ui.icons.filled.Lock
 
 /**
  * Hold-to-record voice button. Press → start; release inside the button
@@ -231,7 +227,7 @@ internal fun RecordingStripLeading(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(
-            Icons.Default.Delete,
+            painterResource(R.drawable.ic_delete),
             contentDescription = null,
             tint = if (canceling) cancelTint else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
@@ -278,7 +274,7 @@ internal fun RecordingStripLeading(
             // collapses to a compact "Locked" indicator so the row stays
             // visually quiet while the trailing Stop+Trash do the work.
             Icon(
-                Icons.Default.Lock,
+                painterResource(R.drawable.ic_lock),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(16.dp),
@@ -292,7 +288,7 @@ internal fun RecordingStripLeading(
             )
         } else if (!nearLimit) {
             Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
+                painterResource(R.drawable.ic_arrow_back),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(14.dp),
@@ -334,7 +330,7 @@ internal fun LockHintAbove(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Default.Lock,
+            painterResource(R.drawable.ic_lock),
             contentDescription = null,
             tint =
                 if (armed) {

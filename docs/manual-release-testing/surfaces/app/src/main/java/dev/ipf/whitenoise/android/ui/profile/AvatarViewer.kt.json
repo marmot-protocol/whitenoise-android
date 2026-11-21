@@ -59,6 +59,14 @@
           "PRO-001",
           "PRO-006"
         ]
+      },
+      {
+        "surface": "Avatar viewer close button",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "PRO-001"
+        ]
       }
     ],
     "source_coverage": [

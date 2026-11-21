@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -20,8 +21,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.OptimisticGroupRosterMutation
 import dev.ipf.whitenoise.android.state.PendingGroupMembershipActivity
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.outlined.Schedule
 
 /** Local request feedback, deliberately separate from MDK's authoritative group-system rows. */
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
@@ -49,7 +48,7 @@ internal fun PendingGroupMembershipRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = Icons.Outlined.Schedule,
+            painter = painterResource(R.drawable.ic_schedule),
             contentDescription = null,
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -170,7 +170,7 @@ internal fun PersonProfileContent(
                                 routeKey = ProfileSheetPage.ADD_TO_GROUPS,
                                 opensRoute = true,
                                 enabled = !busy,
-                                leading = { SettingsLeadingIcon(R.drawable.ic_group) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                                 modifier = Modifier.testTag("person_profile.add_to_group"),
                             )
                         }

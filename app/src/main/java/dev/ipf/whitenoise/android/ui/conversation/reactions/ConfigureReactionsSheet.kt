@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -44,9 +45,6 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Add
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -187,7 +185,7 @@ private fun OptionalReactionSlot(
         val removeDescription = stringResource(R.string.configure_reactions_remove, index + 1, emojiPlainLabel(emoji))
         IconButton(onClick = onRemove) {
             Icon(
-                Icons.Default.Close,
+                painterResource(R.drawable.ic_close),
                 contentDescription = removeDescription,
             )
         }
@@ -206,7 +204,7 @@ private fun AddReactionSlot(onClick: () -> Unit) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
-                Icons.Default.Add,
+                painterResource(R.drawable.ic_add),
                 contentDescription = stringResource(R.string.configure_reactions_add),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -130,7 +130,7 @@ internal fun DictationSettingsScreen(
                             value =
                                 preferences.providerSelection?.let { "${it.appName} — ${it.engineName}" }
                                     ?: stringResource(R.string.dictation_provider_automatic),
-                            leading = { SettingsLeadingIcon(R.drawable.ic_graphic_eq) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_mic) },
                         )
                     }
                     row("pause_other_audio") { context ->

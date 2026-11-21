@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -27,8 +28,6 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.VolumeOff
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.VolumeUp
 import dev.ipf.whitenoise.android.ui.icons.filled.Forward10
-import dev.ipf.whitenoise.android.ui.icons.filled.Pause
-import dev.ipf.whitenoise.android.ui.icons.filled.PlayArrow
 import dev.ipf.whitenoise.android.ui.icons.filled.Replay10
 
 private val TRANSPORT_ICON = 32.dp
@@ -53,7 +52,7 @@ internal fun DraftVideoPlayPauseButton(player: Player) {
         onDispose { player.removeListener(listener) }
     }
     DraftVideoIconButton(
-        icon = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+        icon = ImageVector.vectorResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play_arrow),
         description = stringResource(if (playing) R.string.video_pause else R.string.video_play),
         testTag = "conversation.media.preview.video.playpause",
     ) {

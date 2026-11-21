@@ -1,0 +1,66 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt",
+  "legacy_sha256": "7979fb1508447e637004d2e6fe5113faf6cf2e58d6b961a76d86b5e8bbd5a304",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji prompt: ShareChatPickerChrome",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Compact sending account accessibility label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt",
+        "anchor": "R.string.share_sending_as_value",
+        "test_ids": [
+          "FLD-001",
+          "SYS-004"
+        ]
+      },
+      {
+        "surface": "ChatPickerSendingAccountRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt",
+        "anchor": "fun ChatPickerSendingAccountRow(",
+        "test_ids": [
+          "SYS-001"
+        ]
+      },
+      {
+        "surface": "ShareChatPickerAccountIdentity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt",
+        "anchor": "fun ShareChatPickerAccountIdentity(",
+        "test_ids": [
+          "SYS-001"
+        ]
+      },
+      {
+        "surface": "ShareChatPickerCloseButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt",
+        "anchor": "fun ShareChatPickerCloseButton(",
+        "test_ids": [
+          "SYS-001"
+        ]
+      },
+      {
+        "surface": "ShareChatPickerPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt",
+        "anchor": "fun ShareChatPickerPreview(",
+        "test_ids": [
+          "SYS-001"
+        ]
+      },
+      {
+        "surface": "Share picker close button",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SYS-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

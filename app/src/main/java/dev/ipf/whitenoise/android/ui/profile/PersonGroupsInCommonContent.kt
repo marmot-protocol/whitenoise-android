@@ -41,8 +41,6 @@ import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Group
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -194,7 +192,7 @@ internal fun PersonSharedGroupAvatars(
     avatar: @Composable (String) -> ImageBitmap? = { null },
 ) {
     if (rows.isEmpty()) {
-        Icon(Icons.Default.Group, null, Modifier.size(24.dp))
+        Icon(painterResource(R.drawable.ic_group), null, Modifier.size(24.dp))
         return
     }
     val shown = rows.take(3)

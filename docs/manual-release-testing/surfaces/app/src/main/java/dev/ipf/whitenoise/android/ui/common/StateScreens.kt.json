@@ -1,0 +1,66 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+  "legacy_sha256": "ad9fa7161eca9af5959657259b593874f76ecfd6fdcfc3cf5ca72ed559d216db",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ErrorContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "fun ErrorContent(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "InlineConfirmationNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "fun InlineConfirmationNotice(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "InlineErrorBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "fun InlineErrorBanner(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "LoadingScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "fun LoadingScreen(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "StartupLoadingScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "fun StartupLoadingScreen(",
+        "test_ids": [
+          "INT-003",
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "WarmResumeUsefulSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "fun WarmResumeUsefulSurface(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "Error details copy button",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "AXY-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

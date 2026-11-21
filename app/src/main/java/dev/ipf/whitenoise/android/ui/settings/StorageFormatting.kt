@@ -57,8 +57,8 @@ internal enum class StoredAttachmentKind(
     @DrawableRes val iconRes: Int,
 ) {
     Photo(R.string.storage_attachment_photo, R.drawable.ic_image),
-    Video(R.string.storage_attachment_video, R.drawable.ic_play_arrow),
-    Audio(R.string.storage_attachment_audio, R.drawable.ic_mic),
+    Video(R.string.storage_attachment_video, R.drawable.ic_videocam),
+    Audio(R.string.storage_attachment_audio, R.drawable.ic_voice_note),
     File(R.string.storage_attachment_file, R.drawable.ic_description),
 }
 

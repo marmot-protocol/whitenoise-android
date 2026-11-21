@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -29,8 +30,6 @@ import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.previewConversationVibration
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.PlayArrow
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 @Suppress("FunctionNaming")
@@ -122,7 +121,7 @@ private fun VibrationPatternRow(
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         IconButton(onClick = onPreview) {
             Icon(
-                Icons.Default.PlayArrow,
+                painterResource(R.drawable.ic_play_arrow),
                 contentDescription = stringResource(R.string.preview_vibration_pattern, label),
             )
         }
