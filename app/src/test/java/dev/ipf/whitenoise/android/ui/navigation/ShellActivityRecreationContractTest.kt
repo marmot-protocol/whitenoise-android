@@ -45,6 +45,10 @@ class ShellActivityRecreationContractTest {
     @get:Rule
     val composeRule = createEmptyComposeRule()
 
+    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    @get:Rule
+    val shadow = ShellShadowRule()
+
     /**
      * Chat details and the conversation controller survive the Activity being destroyed and created again, and
      * Back on the new Activity still returns to that conversation first.

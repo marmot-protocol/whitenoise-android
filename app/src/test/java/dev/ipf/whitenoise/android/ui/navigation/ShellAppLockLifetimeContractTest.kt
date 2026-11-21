@@ -38,6 +38,10 @@ class ShellAppLockLifetimeContractTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    @get:Rule
+    val shadow = ShellShadowRule()
+
     private val app = MountedContractApp(composeRule)
 
     /**
@@ -148,8 +152,7 @@ class ShellAppLockLifetimeContractTest {
     fun anOpenSettingsScreenReopensAfterTheLock() {
         app.withMountedApp { fixture, holder ->
             composeRule.runOnIdle {
-                holder.sectionState.sectionName = MainSection.Settings.name
-                holder.sectionState.settingsDetailName = SettingsDetail.Appearance.name
+                holder.restoreSection(MainSection.Settings, SettingsDetail.Appearance)
             }
             app.awaitCondition { app.shown(APPEARANCE_TAG) }
 
@@ -182,7 +185,7 @@ class ShellAppLockLifetimeContractTest {
     @Test
     fun theHeaderPhotoProfileKeepsEditModeButNotItsPhotoMenuAcrossTheLock() {
         app.withMountedApp { fixture, holder ->
-            composeRule.runOnIdle { holder.sectionState.sectionName = MainSection.Settings.name }
+            composeRule.runOnIdle { holder.restoreSection(MainSection.Settings) }
             app.awaitCondition { app.shown(HEADER_PHOTO_TAG) }
             composeRule.onNodeWithTag(HEADER_PHOTO_TAG).performClick()
             app.awaitCondition { labelled(R.string.profile_choose_photos) }

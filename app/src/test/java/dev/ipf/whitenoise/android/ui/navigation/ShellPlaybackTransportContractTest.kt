@@ -35,6 +35,10 @@ class ShellPlaybackTransportContractTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    @get:Rule
+    val shadow = ShellShadowRule()
+
     private val shell = MountedContractShell(composeRule)
 
     /** Releases the process-wide player so one test's session cannot reach the next. */

@@ -43,6 +43,10 @@ class ShellRouteContractTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    @get:Rule
+    val shadow = ShellShadowRule()
+
     private val shell = MountedContractShell(composeRule)
 
     /** A switch to another account closes the open conversation and leaves no open context behind. */
@@ -86,8 +90,7 @@ class ShellRouteContractTest {
     fun aSignedOutMomentLeavesSettingsForChatsOnTheNextAccount() {
         withMountedShell(mutableStateOf(COMPACT_WIDTH)) { fixture, holder ->
             composeRule.runOnIdle {
-                holder.sectionState.sectionName = MainSection.Settings.name
-                holder.sectionState.settingsDetailName = SettingsDetail.Appearance.name
+                holder.restoreSection(MainSection.Settings, SettingsDetail.Appearance)
             }
             settle()
             assertEquals(SettingsDetail.Appearance.name, holder.sectionState.settingsDetailName)

@@ -31,6 +31,10 @@ class ShellAccountBoundaryFrameContractTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    @get:Rule
+    val shadow = ShellShadowRule()
+
     private val shell = MountedContractShell(composeRule)
 
     /** Every frame after the switch is free of the previous account's message and of its composer. */

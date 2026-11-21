@@ -36,6 +36,10 @@ class ShellSubScreenBackContractTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    @get:Rule
+    val shadow = ShellShadowRule()
+
     private val shell = MountedContractShell(composeRule)
 
     /** Back from the chat's relay screen returns to chat details, then the conversation, then the chat list. */
@@ -72,8 +76,7 @@ class ShellSubScreenBackContractTest {
     fun backFromDiagnosticsReturnsToTheSettingsScreenItWasOpenedFrom() {
         shell.withMountedShell(mutableStateOf(COMPACT_WIDTH)) { _, holder ->
             composeRule.runOnIdle {
-                holder.sectionState.settingsDetailName = SettingsDetail.Developer.name
-                holder.sectionState.sectionName = MainSection.Diagnostics.name
+                holder.restoreSection(MainSection.Diagnostics, SettingsDetail.Developer)
             }
             shell.awaitCondition { shown(DIAGNOSTICS_CONTENT_TAG) }
 
@@ -101,7 +104,7 @@ class ShellSubScreenBackContractTest {
     @Test
     fun backFromTheProfileOpenedFromTheHeaderPhotoReturnsToSettingsHome() {
         shell.withMountedShell(mutableStateOf(COMPACT_WIDTH)) { _, holder ->
-            composeRule.runOnIdle { holder.sectionState.sectionName = MainSection.Settings.name }
+            composeRule.runOnIdle { holder.restoreSection(MainSection.Settings) }
             shell.awaitCondition { shown(HEADER_PHOTO_TAG) }
             composeRule.onNodeWithTag(HEADER_PHOTO_TAG).performClick()
             shell.awaitCondition { holder.sectionState.settingsDetailName == SettingsDetail.Profile.name }

@@ -32,6 +32,10 @@ class ShellBackLadderContractTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    @get:Rule
+    val shadow = ShellShadowRule()
+
     private val shell = MountedContractShell(composeRule)
 
     /** Back from an open conversation closes it and leaves no open context behind. */
@@ -71,8 +75,7 @@ class ShellBackLadderContractTest {
     fun backFromASettingsScreenReturnsToSettingsThenChats() {
         shell.withMountedShell(mutableStateOf(COMPACT_WIDTH)) { _, holder ->
             composeRule.runOnIdle {
-                holder.sectionState.sectionName = MainSection.Settings.name
-                holder.sectionState.settingsDetailName = SettingsDetail.Appearance.name
+                holder.restoreSection(MainSection.Settings, SettingsDetail.Appearance)
             }
             shell.settle()
 

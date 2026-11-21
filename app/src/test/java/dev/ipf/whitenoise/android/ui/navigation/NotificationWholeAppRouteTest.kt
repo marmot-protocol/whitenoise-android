@@ -78,6 +78,10 @@ class NotificationWholeAppRouteTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Asserts the shadow navigator agreed with the hand-written route on every comparison this test drove. */
+    @get:Rule
+    val shadow = ShellShadowRule()
+
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val harnesses = mutableListOf<Harness>()
 
