@@ -11,10 +11,8 @@
     Conversation shortcuts use this vector directly, because Android draws
     them well above 24dp. It is also the artwork for the status-bar icon:
     drawable-*dpi/ic_stat_whitenoise.png is rendered from this file by
-    NotificationSmallIconBitmapTest. SystemUI draws a vector small icon from
-    a cache rounded down to whole pixels, then at a half-pixel offset with
-    bilinear filtering, which visibly blurs it; the per-density PNGs keep the
-    same artwork sharp.
+    NotificationSmallIconBitmapTest. These bitmaps avoid SystemUI's vector
+    cache. Android may still resample them for the device density and slot size.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"

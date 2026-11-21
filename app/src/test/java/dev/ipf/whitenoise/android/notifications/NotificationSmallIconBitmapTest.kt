@@ -25,9 +25,8 @@ import kotlin.math.roundToInt
 
 /**
  * Keeps the status-bar small icons as per-density PNGs rendered from their vector artwork
- * ([ARTWORK]). SystemUI draws a vector small icon from a cache
- * rounded down to whole pixels, then at a half-pixel offset with bilinear filtering, so a vector
- * reads blurry; a PNG at the device's density is sampled once and stays sharp.
+ * ([ARTWORK]). The PNGs avoid SystemUI's vector cache. Android can still resample the
+ * bitmap when the display density falls between buckets and when drawing it in the status bar.
  *
  * After editing the artwork, regenerate the PNGs from the repository root:
  * ```
@@ -61,7 +60,12 @@ class NotificationSmallIconBitmapTest {
                 assertEquals("$file height", size, shipped.height)
                 for (y in 0 until size) {
                     for (x in 0 until size) {
-                        val drift = abs(Color.alpha(shipped.getPixel(x, y)) - Color.alpha(expected.getPixel(x, y)))
+                        val pixel = shipped.getPixel(x, y)
+                        val drift = abs(Color.alpha(pixel) - Color.alpha(expected.getPixel(x, y)))
+                        if (Color.alpha(pixel) != 0) {
+                            val darkest = minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+                            assertTrue("$file pixel ($x, $y) must be white", darkest >= WHITE_MIN_CHANNEL)
+                        }
                         assertTrue("$file pixel ($x, $y) alpha differs by $drift", drift <= ALPHA_TOLERANCE)
                     }
                 }
@@ -89,6 +93,9 @@ class NotificationSmallIconBitmapTest {
     ): Bitmap {
         val parser = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }.newDocumentBuilder()
         val vector = parser.parse(File(artwork)).documentElement
+        check(vector.tagName == "vector")
+        vector.checkAttributes("width", "height", "viewportWidth", "viewportHeight")
+        check(vector.attr("width") == "${ICON_DP}dp" && vector.attr("height") == "${ICON_DP}dp")
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.scale(size / vector.attr("viewportWidth").toFloat(), size / vector.attr("viewportHeight").toFloat())
@@ -107,18 +114,38 @@ class NotificationSmallIconBitmapTest {
             val child = children.item(index) as? Element ?: continue
             when (child.tagName) {
                 "group" -> {
+                    child.checkAttributes()
                     canvas.save()
                     drawChildren(child, canvas, paint)
                     canvas.restore()
                 }
-                "clip-path" -> canvas.clipPath(PathParser.createPathFromPathData(child.attr("pathData")))
+                "clip-path" -> {
+                    child.checkAttributes("pathData")
+                    canvas.clipPath(PathParser.createPathFromPathData(child.attr("pathData")))
+                }
                 "path" -> {
+                    child.checkAttributes("pathData", "fillType", "fillColor")
+                    check(child.attr("fillColor") == "@android:color/white")
                     val path = PathParser.createPathFromPathData(child.attr("pathData"))
-                    if (child.attr("fillType") == "evenOdd") path.fillType = Path.FillType.EVEN_ODD
+                    path.fillType =
+                        when (val fillType = child.attr("fillType")) {
+                            "", "nonZero" -> Path.FillType.WINDING
+                            "evenOdd" -> Path.FillType.EVEN_ODD
+                            else -> error("Unsupported small-icon fill type $fillType")
+                        }
                     canvas.drawPath(path, paint)
                 }
                 else -> error("Unsupported small-icon element <${child.tagName}>")
             }
+        }
+    }
+
+    private fun Element.checkAttributes(vararg allowed: String) {
+        for (index in 0 until attributes.length) {
+            val attribute = attributes.item(index)
+            val androidAttribute = attribute.namespaceURI == ANDROID_NS && attribute.localName in allowed
+            val namespaceDeclaration = attribute.namespaceURI == javax.xml.XMLConstants.XMLNS_ATTRIBUTE_NS_URI
+            check(androidAttribute || namespaceDeclaration) { "Unsupported attribute ${attribute.nodeName} on <$tagName>" }
         }
     }
 
@@ -147,5 +174,6 @@ class NotificationSmallIconBitmapTest {
 
         /** PNG round trips are exact; this only absorbs renderer rounding between Robolectric versions. */
         const val ALPHA_TOLERANCE = 2
+        const val WHITE_MIN_CHANNEL = 250
     }
 }
