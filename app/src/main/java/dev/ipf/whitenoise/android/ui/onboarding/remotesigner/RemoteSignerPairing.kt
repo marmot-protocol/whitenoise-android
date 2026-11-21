@@ -294,7 +294,8 @@ internal class RemoteSignerPairing(
                 session = null
                 val handedOff = handOffToAccount(host, active, userHex)
                 if (handedOff) {
-                    usedLink = link.text.toString().trim().takeIf { method == RemoteSignerMethod.BunkerLink }
+                    val submitted = link.text.toString()
+                    usedLink = submitted.trim().takeIf { method == RemoteSignerMethod.BunkerLink }
                     link.clearText()
                     lastOpen = null
                 }

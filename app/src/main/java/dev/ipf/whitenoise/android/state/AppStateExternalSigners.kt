@@ -207,8 +207,10 @@ private const val REMOTE_SIGNER_ACCOUNTS_KEY = "remote_signer_accounts"
  * the account signs out, so this non-secret list keeps such an account from being taken for an Amber account after
  * a restart.
  */
-internal fun WhiteNoiseAppState.rememberedRemoteSignerAccounts(): Set<String> =
-    preferences.getStringSet(REMOTE_SIGNER_ACCOUNTS_KEY, null).orEmpty()
+internal fun WhiteNoiseAppState.rememberedRemoteSignerAccounts(): Set<String> {
+    val stored = preferences.getStringSet(REMOTE_SIGNER_ACCOUNTS_KEY, null)
+    return stored.orEmpty()
+}
 
 /** Records whether [accountIdHex] signs with a remote signer; signing in with Amber for it clears the record. */
 internal fun WhiteNoiseAppState.rememberRemoteSignerAccount(
