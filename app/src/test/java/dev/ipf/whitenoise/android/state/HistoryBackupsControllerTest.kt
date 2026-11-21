@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.BackgroundBackupOutcomeFfi
 import dev.ipf.marmotkit.BackupRestorePhaseFfi
 import dev.ipf.marmotkit.BackupRestoreStatusFfi
-import dev.ipf.marmotkit.BackupRestoreSubscription
 import dev.ipf.marmotkit.BackupSettingsFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
@@ -386,9 +385,7 @@ class HistoryBackupsControllerTest {
 
         override suspend fun backupRestoreStatus(accountRef: String): BackupRestoreStatusFfi = restoreStatus
 
-        override suspend fun watchBackupRestore(accountRef: String): BackupRestoreSubscription {
-            throw MarmotKitException.Runtime("no watch in tests")
-        }
+        override suspend fun watchBackupRestore(accountRef: String): Nothing = throw MarmotKitException.Runtime("no watch")
 
         override suspend fun runDueBackupPass(accountRef: String): BackgroundBackupOutcomeFfi {
             passError?.let { throw it }
