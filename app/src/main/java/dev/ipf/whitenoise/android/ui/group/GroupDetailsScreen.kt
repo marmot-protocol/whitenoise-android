@@ -1739,7 +1739,8 @@ internal fun GroupDetailsScreen(
                         onAddMembers = openAddMembers.takeIf { !isDm && canEdit },
                         addMembersEnabled = canAdministerMembers && !mutationsBlocked,
                         muteControl = muteControl,
-                        disappearingState = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
+                        disappearingState =
+                            disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
                         disappearingEnabled = disappearingTimerEditable(canEdit, mutationsBlocked),
                         onOpenDisappearing = { showDisappearingPicker = true },
                         onOpenSearch = onOpenSearch,
