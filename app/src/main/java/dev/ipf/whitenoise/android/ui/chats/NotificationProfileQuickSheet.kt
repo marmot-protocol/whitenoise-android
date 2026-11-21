@@ -168,7 +168,7 @@ private fun ActiveProfileSummary(
                     .padding(
                         top = WhiteNoiseSpacing.Related,
                     ).testTag("notificationProfile.turnOff"),
-        ) { Text(stringResource(R.string.notification_profile_turn_off_named, active.profile.name)) }
+        ) { Text(stringResource(R.string.notification_profile_turn_off_named, active.profile.label)) }
     }
 }
 
@@ -187,7 +187,7 @@ private fun ProfileChoices(
             row(profile.id) { context ->
                 SettingsChoice(
                     context = context,
-                    title = profile.name,
+                    title = profile.label,
                     subtitle = notificationProfileStatus(profile, active, zone),
                     selected = profile.id == selectedId,
                     onClick = { onSelect(profile.id) },

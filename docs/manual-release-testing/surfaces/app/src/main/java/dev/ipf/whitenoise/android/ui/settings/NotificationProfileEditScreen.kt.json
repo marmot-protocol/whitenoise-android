@@ -13,6 +13,15 @@
         ]
       },
       {
+        "surface": "AllowedPeoplePicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "fun AllowedPeoplePicker(",
+        "test_ids": [
+          "NTF-049",
+          "NTF-055"
+        ]
+      },
+      {
         "surface": "NotificationProfileDeleteDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
         "anchor": "fun NotificationProfileDeleteDialog(",
@@ -96,6 +105,15 @@
         ]
       },
       {
+        "surface": "string:notification_profile_allowed_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_allowed_people",
+        "test_ids": [
+          "NTF-049",
+          "NTF-055"
+        ]
+      },
+      {
         "surface": "string:notification_profile_delete_confirm_body",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
         "anchor": "R.string.notification_profile_delete_confirm_body",
@@ -117,6 +135,15 @@
         "anchor": "R.string.notification_profile_discard_detail",
         "test_ids": [
           "NTF-049"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_people_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+        "anchor": "R.string.notification_profile_people_hint",
+        "test_ids": [
+          "NTF-049",
+          "NTF-055"
         ]
       },
       {

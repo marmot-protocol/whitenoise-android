@@ -3,7 +3,7 @@
     <string name="notification_profiles_title">Perfiles de notificación</string>
     <string name="notification_profiles_value_off">Desactivado</string>
     <string name="explanation_privacy_notif_profiles">Pausa las notificaciones según un horario o durante un tiempo y elige qué chats pueden seguir avisándote.</string>
-    <string name="notification_profiles_explainer">Mientras un perfil está activo, solo los chats permitidos y, si lo activas, las menciones te notifican en este dispositivo. Los mensajes siguen llegando y aparecen como no leídos.</string>
+    <string name="notification_profiles_explainer">Mientras un perfil está activo, solo los chats, las personas y las excepciones que elijas pueden notificarte en este dispositivo. Los mensajes siguen llegando y aparecen como no leídos.</string>
     <string name="notification_profiles_empty_title">Aún no hay perfiles</string>
     <string name="notification_profiles_empty_body">Crea un perfil para pausar las notificaciones por la noche, en el trabajo o cuando necesites tranquilidad.</string>
     <string name="notification_profile_preset_sleep">Dormir</string>
@@ -17,8 +17,8 @@
     <string name="notification_profile_allowed_section">Notificaciones permitidas</string>
     <string name="notification_profile_allowed_chats">Chats permitidos</string>
     <string name="notification_profile_allowed_none">Ninguno</string>
-    <string name="notification_profile_allowed_hint">Estos chats te siguen notificando mientras el perfil está activo. Los chats silenciados siguen silenciados.</string>
-    <string name="notification_profile_allowed_account_note">Los chats se eligen para %1$s. Cambia de cuenta para elegir chats de otra cuenta.</string>
+    <string name="notification_profile_allowed_hint">Estos chats y personas te siguen notificando mientras el perfil está activo. Los chats silenciados siguen silenciados.</string>
+    <string name="notification_profile_allowed_account_note">Los chats y las personas se eligen para %1$s. Cambia de cuenta para elegirlos en otra cuenta.</string>
     <string name="notification_profile_mentions">Notificar menciones</string>
     <string name="notification_profile_mentions_detail">Los mensajes que te mencionan te siguen notificando, incluso desde otros chats.</string>
     <string name="notification_profile_schedule_section">Horario</string>
@@ -53,4 +53,24 @@
     <string name="notification_profile_quick_open_active">Perfil de notificación activado: %1$s</string>
     <string name="explanation_chats_notification_profiles">Activa o desactiva un perfil de notificación sin salir de tus chats.</string>
     <string name="settings_search_alias_notification_profiles">no molestar|DND|horas de silencio|horario|concentración|dormir</string>
+    <string name="notification_profile_allowed_people">Personas permitidas</string>
+    <string name="notification_profile_people_hint">Estas personas pueden notificarte en cualquier chat mientras el perfil está activo.</string>
+    <string name="notification_profile_all_dms">Permitir todos los mensajes directos</string>
+    <string name="notification_profile_all_dms_detail">Los mensajes directos de cualquiera te notifican.</string>
+    <string name="notification_profile_repeated">Dejar pasar mensajes repetidos</string>
+    <string name="notification_profile_repeated_detail">Un segundo mensaje de la misma persona en menos de 3 minutos te notifica.</string>
+    <string name="notification_profile_group_changes">Permitir invitaciones y cambios de grupo</string>
+    <string name="notification_profile_group_changes_detail">Las invitaciones, expulsiones y cambios de administrador te notifican.</string>
+    <string name="notification_profile_emoji_choose">Elegir emoji</string>
+    <string name="notification_profile_emoji_change">Cambiar emoji</string>
+    <string name="notification_profile_emoji_remove">Quitar emoji</string>
+    <string name="notification_profile_banner_detail_people">Solo te notifican los chats y las personas permitidos.</string>
+    <string name="notification_profile_banner_detail_dms">Solo te notifican los chats permitidos y los mensajes directos.</string>
+    <string name="notification_profile_banner_detail_group_changes">Solo te notifican los chats permitidos y los cambios de grupo.</string>
+    <string name="notification_profile_banner_detail_repeated">Solo te notifican los chats permitidos y los mensajes repetidos.</string>
+    <string name="notification_profile_banner_detail_exceptions">Solo te notifican tus excepciones.</string>
+    <plurals name="notification_profile_people_count">
+        <item quantity="one">%1$d persona</item>
+        <item quantity="other">%1$d personas</item>
+    </plurals>
 </resources>

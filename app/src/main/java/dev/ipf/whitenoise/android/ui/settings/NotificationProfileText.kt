@@ -142,7 +142,7 @@ internal fun notificationProfileStatus(
     }
 }
 
-/** "Sleep is on until 07:00" or "Sleep is on". */
+/** "🌙 Sleep is on until 07:00" or "🌙 Sleep is on". */
 @Composable
 internal fun notificationProfileActiveLabel(
     active: ActiveNotificationProfile,
@@ -151,18 +151,30 @@ internal fun notificationProfileActiveLabel(
     active.endsAtMs?.let {
         stringResource(
             R.string.notification_profile_banner_on_until,
-            active.profile.name,
+            active.profile.label,
             notificationProfileInstantClock(it, zone),
         )
-    } ?: stringResource(R.string.notification_profile_banner_on, active.profile.name)
+    } ?: stringResource(R.string.notification_profile_banner_on, active.profile.label)
 
-/** What still notifies while [profile] is on: allowed chats, plus mentions when the profile lets them through. */
+/**
+ * What still notifies while [profile] is on, in one short line: allowed chats alone, allowed chats and the one
+ * exception switched on, or "your exceptions" once two or more apply.
+ */
 @Composable
-internal fun notificationProfileActiveDetail(profile: NotificationProfile): String =
-    stringResource(
-        if (profile.allowMentions) {
-            R.string.notification_profile_banner_detail_mentions
-        } else {
-            R.string.notification_profile_banner_detail
+internal fun notificationProfileActiveDetail(profile: NotificationProfile): String {
+    val exceptions =
+        listOfNotNull(
+            R.string.notification_profile_banner_detail_mentions.takeIf { profile.allowMentions },
+            R.string.notification_profile_banner_detail_people.takeIf { profile.allowedPeople.isNotEmpty() },
+            R.string.notification_profile_banner_detail_dms.takeIf { profile.allowAllDirectMessages },
+            R.string.notification_profile_banner_detail_group_changes.takeIf { profile.allowGroupChanges },
+            R.string.notification_profile_banner_detail_repeated.takeIf { profile.allowRepeatedMessages },
+        )
+    return stringResource(
+        when (exceptions.size) {
+            0 -> R.string.notification_profile_banner_detail
+            1 -> exceptions.single()
+            else -> R.string.notification_profile_banner_detail_exceptions
         },
     )
+}

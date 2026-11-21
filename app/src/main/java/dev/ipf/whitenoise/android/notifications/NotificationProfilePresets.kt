@@ -41,6 +41,8 @@ internal fun notificationProfilePresets(
             allowMentions = false,
             schedule = NotificationProfileSchedule(false, SLEEP_START, SLEEP_END, DayOfWeek.entries.toSet()),
             createdAtMs = createdAtMs,
+            allowRepeatedMessages = true,
+            emoji = "🌙",
         ),
         NotificationProfile(
             id = "preset-work",
@@ -55,6 +57,8 @@ internal fun notificationProfilePresets(
                     days = DayOfWeek.entries.filterTo(HashSet()) { it != DayOfWeek.SATURDAY && it != DayOfWeek.SUNDAY },
                 ),
             createdAtMs = createdAtMs,
+            allowAllDirectMessages = true,
+            emoji = "💼",
         ),
         NotificationProfile(
             id = "preset-focus",
@@ -63,5 +67,7 @@ internal fun notificationProfilePresets(
             allowMentions = true,
             schedule = null,
             createdAtMs = createdAtMs,
+            allowRepeatedMessages = true,
+            emoji = "🎯",
         ),
     ).map { it.copy(name = normalizedNotificationProfileName(it.name)) }

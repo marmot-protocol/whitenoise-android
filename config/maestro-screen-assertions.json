@@ -3946,6 +3946,22 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
+      "symbol": "AllowedPeoplePicker",
+      "bindings": [
+        {
+          "case": "notification-profiles-emoji-people",
+          "selector": {
+            "id": "notification-profile.peopleSearch"
+          },
+          "scope": "Allowed people opens the active account's multi-select people picker; selecting Maestro Bob and Done shows 1 person in the editor and survives save and reopen.",
+          "opened_by": {
+            "id": "notification-profile.people"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditScreen.kt",
       "symbol": "NotificationProfileDeleteDialog",
       "bindings": [
         {
@@ -4003,6 +4019,25 @@
             "text": "Edit profile"
           },
           "scope": "Tapping a saved profile reopens the editor on its saved schedule."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEmojiButton.kt",
+      "symbol": "NotificationProfileEmojiButton",
+      "bindings": [
+        {
+          "case": "notification-profiles-emoji-people",
+          "selector": {
+            "text": "Remove emoji"
+          },
+          "scope": "The emoji badge of a profile with an emoji opens its Change/Remove menu; Remove emoji clears it and the empty badge then opens the emoji picker.",
+          "entry_assertion": {
+            "text": "Remove emoji"
+          },
+          "opened_by": {
+            "id": "notification-profile.emoji"
+          }
         }
       ]
     },

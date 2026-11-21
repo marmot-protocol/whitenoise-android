@@ -55,7 +55,7 @@ internal fun NotificationProfileQuickAction(appState: WhiteNoiseAppState) {
     val active = rememberActiveNotificationProfile(store)
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
     val label =
-        active?.let { stringResource(R.string.notification_profile_quick_open_active, it.profile.name) }
+        active?.let { stringResource(R.string.notification_profile_quick_open_active, it.profile.label) }
             ?: stringResource(R.string.notification_profiles_title)
     IconButton(
         onClick = { sheetOpen = true },

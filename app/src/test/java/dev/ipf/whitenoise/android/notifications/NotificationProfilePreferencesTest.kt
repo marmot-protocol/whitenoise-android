@@ -52,6 +52,28 @@ class NotificationProfilePreferencesTest {
     }
 
     @Test
+    fun exceptionsAndEmojiSurviveARoundTripAndOlderStateReadsAsDefaults() {
+        val person = NotificationProfilePerson("account-a", "ABCD")
+        val profile =
+            testProfile("focus").copy(
+                allowedPeople = setOf(person),
+                allowAllDirectMessages = true,
+                allowRepeatedMessages = true,
+                allowGroupChanges = true,
+                emoji = " 🎯 ",
+            )
+        assertTrue(store().save(profile))
+        val reopened = store().state.value.profiles.single()
+        assertEquals(setOf(NotificationProfilePerson("account-a", "abcd")), reopened.allowedPeople)
+        assertEquals(profile.copy(allowedPeople = reopened.allowedPeople, emoji = "🎯"), reopened)
+
+        val older = preferences("notification-profiles-older")
+        older.edit().putString("state.v1", """{"profiles":[{"id":"a","name":"A","future":1}]}""").commit()
+        val read = store(older).state.value.profiles.single()
+        assertEquals(testProfile("a", name = "A"), read)
+    }
+
+    @Test
     fun corruptStoredStateFailsOpen() {
         val raw = preferences("notification-profiles-corrupt")
         raw.edit().putString("state.v1", "{not json").commit()
@@ -147,8 +169,11 @@ class NotificationProfilePreferencesTest {
         val store = store()
         val kept = NotificationProfileChat("kept", "aa")
         val removed = NotificationProfileChat("removed", "aa")
-        assertTrue(store.save(testProfile("sleep", allowedChats = setOf(kept, removed))))
+        val keptPerson = NotificationProfilePerson("kept", "bb")
+        val people = setOf(keptPerson, NotificationProfilePerson("removed", "bb"))
+        assertTrue(store.save(testProfile("sleep", allowedChats = setOf(kept, removed)).copy(allowedPeople = people)))
         store.retainAccounts(listOf("kept"))
+        assertEquals(setOf(keptPerson), store.state.value.profiles.single().allowedPeople)
         assertEquals(
             setOf(kept),
             store.state.value.profiles

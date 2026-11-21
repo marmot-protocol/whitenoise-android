@@ -1,9 +1,12 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -17,10 +20,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ActiveNotificationProfile
 import dev.ipf.whitenoise.android.notifications.MAX_NOTIFICATION_PROFILES
@@ -181,7 +186,7 @@ private fun ActiveProfileGroup(
         row("active") { context ->
             SettingsAction(
                 context = context,
-                title = stringResource(R.string.notification_profile_turn_off_named, active.profile.name),
+                title = stringResource(R.string.notification_profile_turn_off_named, active.profile.label),
                 subtitle = notificationProfileActiveLabel(active, zone),
                 onClick = onTurnOff,
                 modifier = Modifier.testTag("notification-profiles.turn-off"),
@@ -215,8 +220,10 @@ private fun ProfileListGroup(
                     modifier = Modifier.testTag("notification-profiles.row.${profile.id}"),
                     leading = {
                         val scheme = MaterialTheme.colorScheme
-                        SettingsLeadingIcon(
-                            if (scheduled && !isActive) R.drawable.ic_schedule else R.drawable.ic_notifications_paused,
+                        NotificationProfileLeading(
+                            emoji = profile.emoji,
+                            fallback =
+                                if (scheduled && !isActive) R.drawable.ic_schedule else R.drawable.ic_notifications_paused,
                             tint = if (isActive) scheme.primary else scheme.onSurfaceVariant,
                         )
                     },
@@ -225,3 +232,22 @@ private fun ProfileListGroup(
         }
     }
 }
+
+/** The profile's emoji in the row's icon slot, or [fallback] when it has none. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun NotificationProfileLeading(
+    emoji: String?,
+    @DrawableRes fallback: Int,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    if (emoji == null) {
+        SettingsLeadingIcon(fallback, tint = tint)
+    } else {
+        Box(Modifier.size(SettingsRowDefaults.LeadingIconSize), contentAlignment = Alignment.Center) {
+            Text(emoji, fontSize = ProfileEmojiSize, maxLines = 1)
+        }
+    }
+}
+
+private val ProfileEmojiSize = 20.sp

@@ -5,8 +5,10 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.NotificationProfilePreferences
+import dev.ipf.whitenoise.android.notifications.NotificationProfileRepeats
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationMode
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
+import dev.ipf.whitenoise.android.notifications.isNotificationProfileMessage
 import dev.ipf.whitenoise.android.notifications.notificationProfileSuppresses
 
 private val memberMuteLock = Any()
@@ -88,11 +90,30 @@ internal fun WhiteNoiseAppState.shouldPostNotification(
     return allowedByLocalPolicy && !suppressedByNotificationProfile(update)
 }
 
-/** Whether the notification profile in force now holds [update] back. Logs only a fixed vocabulary. */
+private var notificationProfileRepeatHolder: Pair<Context, NotificationProfileRepeats>? = null
+
+/** Who was just held back by a notification profile, for the repeated-message exception. */
+internal val WhiteNoiseAppState.notificationProfileRepeats: NotificationProfileRepeats
+    get() =
+        synchronized(memberMuteLock) {
+            notificationProfileRepeatHolder?.takeIf { it.first === appContext }?.second
+                ?: NotificationProfileRepeats(appContext).also { notificationProfileRepeatHolder = appContext to it }
+        }
+
+/**
+ * Whether the notification profile in force now holds [update] back. A held-back message is remembered when
+ * the profile lets repeated messages through, so the sender's next message within the window can notify.
+ * Logs only a fixed vocabulary.
+ */
 private fun WhiteNoiseAppState.suppressedByNotificationProfile(update: NotificationUpdateFfi): Boolean {
     val active = notificationProfiles.active() ?: return false
-    val suppressed = notificationProfileSuppresses(active.profile, update)
+    val profile = active.profile
+    val nowMs = System.currentTimeMillis()
+    val tracksRepeats = profile.allowRepeatedMessages && isNotificationProfileMessage(update)
+    val repeated = tracksRepeats && notificationProfileRepeats.heldAtMs(update, nowMs) != null
+    val suppressed = notificationProfileSuppresses(profile, update, repeated)
     if (suppressed) {
+        if (tracksRepeats) notificationProfileRepeats.recordHeld(update, nowMs)
         appStateDebug { "notification suppressed_by=notification_profile source=${active.source.name.lowercase()}" }
     }
     return suppressed
@@ -120,6 +141,7 @@ internal fun WhiteNoiseAppState.retainMemberMutesForAccounts(accountRefs: Collec
     memberMutePreferences.retainAccounts(accountRefs)
     conversationAlertPreferences.retainAccounts(accountRefs)
     notificationProfiles.retainAccounts(accountRefs)
+    notificationProfileRepeats.retainAccounts(accountRefs)
     publicJpegPreviewPreferences
         .retainAccounts(accounts.filter { it.label in accountRefs }.map { it.accountIdHex })
         .forEach(publicJpegPreviewLoader::clearPixels)

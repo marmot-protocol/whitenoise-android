@@ -76,22 +76,51 @@ private fun scheduledNotificationProfile(
     }
 }
 
+/** How long after a held-back message a second one from the same person may notify. */
+internal const val NOTIFICATION_PROFILE_REPEAT_WINDOW_MS = 3L * 60L * 1_000L
+
+private val GroupChangeTriggers =
+    setOf(
+        NotificationTriggerFfi.GROUP_INVITE,
+        NotificationTriggerFfi.REMOVED_FROM_GROUP,
+        NotificationTriggerFfi.MADE_ADMIN,
+        NotificationTriggerFfi.REMOVED_AS_ADMIN,
+    )
+
+/** A new text message rather than a reaction or a membership event: the only kind that counts as repeated. */
+internal fun isNotificationProfileMessage(update: NotificationUpdateFfi): Boolean =
+    update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !LocalNotificationFormatter.isReaction(update)
+
+/** True when [heldAtMs], the last held-back message from the same person, is recent enough at [nowMs]. */
+internal fun notificationProfileRepeatOpen(
+    heldAtMs: Long?,
+    nowMs: Long,
+): Boolean = heldAtMs != null && nowMs >= heldAtMs && nowMs - heldAtMs < NOTIFICATION_PROFILE_REPEAT_WINDOW_MS
+
 /**
- * Whether an active profile keeps [update] from being posted. Own messages are left to the existing policy;
- * allowed chats and, when enabled, direct mentions in new messages pass. Everything else is held back,
- * including reactions, invites, membership and admin events.
+ * Whether an active profile keeps [update] from being posted. Own messages are left to the existing policy.
+ * An allowed chat or person, and each exception the profile switches on (direct messages, mentions, invites
+ * and group changes, or a [repeated] message from someone just held back), lets the update through.
+ * Everything else is held back, including reactions and membership events.
  */
 internal fun notificationProfileSuppresses(
     active: NotificationProfile?,
     update: NotificationUpdateFfi,
+    repeated: Boolean = false,
 ): Boolean {
     if (active == null || update.isFromSelf) return false
     val chat = NotificationProfileChat(update.accountRef, update.groupIdHex.lowercase(Locale.ROOT))
-    val mention =
-        update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
-            update.isMention &&
-            !LocalNotificationFormatter.isReaction(update)
-    return chat !in active.allowedChats && !(active.allowMentions && mention)
+    val sender = update.sender.accountIdHex.trim().lowercase(Locale.ROOT)
+    val person = NotificationProfilePerson(update.accountRef, sender)
+    val message = isNotificationProfileMessage(update)
+    val allowed =
+        chat in active.allowedChats ||
+            person in active.allowedPeople ||
+            (active.allowAllDirectMessages && update.isDm) ||
+            (active.allowMentions && message && update.isMention) ||
+            (active.allowGroupChanges && update.trigger in GroupChangeTriggers) ||
+            (active.allowRepeatedMessages && message && repeated)
+    return !allowed
 }
 
 /** The next instant after [nowMs] at which [activeNotificationProfile] may change, or null if none is scheduled. */

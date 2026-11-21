@@ -30,7 +30,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -68,6 +67,11 @@ internal data class NotificationProfileEditFormState(
     val error: String?,
     /** A save or delete is being written; the draft is read-only until it finishes. */
     val busy: Boolean = false,
+    val emoji: String? = null,
+    val allowedPeopleCount: Int = 0,
+    val allowAllDirectMessages: Boolean = false,
+    val allowRepeatedMessages: Boolean = false,
+    val allowGroupChanges: Boolean = false,
 )
 
 /** The editor's callbacks, grouped so the form stays a stateless rendering of [NotificationProfileEditFormState]. */
@@ -81,6 +85,12 @@ internal class NotificationProfileEditActions(
     val onEditEnd: () -> Unit,
     val onToggleDay: (DayOfWeek) -> Unit,
     val onDelete: () -> Unit,
+    val onChooseEmoji: () -> Unit = {},
+    val onRemoveEmoji: () -> Unit = {},
+    val onOpenPeople: () -> Unit = {},
+    val onDirectMessagesChange: (Boolean) -> Unit = {},
+    val onRepeatedChange: (Boolean) -> Unit = {},
+    val onGroupChangesChange: (Boolean) -> Unit = {},
 )
 
 /** Rejects edits that would make the name longer than the stored limit, counted in code points. */
@@ -117,7 +127,7 @@ internal fun NotificationProfileEditContent(
         },
     ) {
         SettingsList(listTag = NOTIFICATION_PROFILE_EDIT_LIST_TAG) {
-            item(key = "name") { ProfileNameField(state) }
+            item(key = "name") { ProfileNameField(state, actions) }
             item(key = "allowed") { AllowedNotificationsSection(state, actions) }
             item(key = "schedule") { ScheduleSection(state.schedule, actions, enabled = !state.busy) }
             if (state.canDelete) {
@@ -129,7 +139,10 @@ internal fun NotificationProfileEditContent(
 
 @Suppress("FunctionNaming")
 @Composable
-private fun ProfileNameField(state: NotificationProfileEditFormState) {
+private fun ProfileNameField(
+    state: NotificationProfileEditFormState,
+    actions: NotificationProfileEditActions,
+) {
     Column(
         Modifier.fillMaxWidth().padding(
             horizontal = WhiteNoiseSpacing.CompactScreenMargin,
@@ -137,16 +150,27 @@ private fun ProfileNameField(state: NotificationProfileEditFormState) {
         ),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        WhiteNoiseTextField(
-            state = state.name,
-            enabled = !state.busy,
-            emojiAction = true,
-            modifier = Modifier.fillMaxWidth().testTag("notification-profile.name"),
-            label = { Text(stringResource(R.string.notification_profile_name_label)) },
-            placeholder = { Text(stringResource(R.string.notification_profile_name_placeholder)) },
-            inputTransformation = ProfileNameLimit,
-            lineLimits = TextFieldLineLimits.SingleLine,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        ) {
+            NotificationProfileEmojiButton(
+                emoji = state.emoji,
+                enabled = !state.busy,
+                onChoose = actions.onChooseEmoji,
+                onRemove = actions.onRemoveEmoji,
+            )
+            WhiteNoiseTextField(
+                state = state.name,
+                enabled = !state.busy,
+                emojiAction = true,
+                modifier = Modifier.weight(1f).testTag("notification-profile.name"),
+                label = { Text(stringResource(R.string.notification_profile_name_label)) },
+                placeholder = { Text(stringResource(R.string.notification_profile_name_placeholder)) },
+                inputTransformation = ProfileNameLimit,
+                lineLimits = TextFieldLineLimits.SingleLine,
+            )
+        }
         state.error?.let { error ->
             Text(
                 error,
@@ -156,52 +180,6 @@ private fun ProfileNameField(state: NotificationProfileEditFormState) {
             )
         }
     }
-}
-
-@Suppress("FunctionNaming")
-@Composable
-private fun AllowedNotificationsSection(
-    state: NotificationProfileEditFormState,
-    actions: NotificationProfileEditActions,
-) {
-    val enabled = !state.busy
-    SettingsSection(stringResource(R.string.notification_profile_allowed_section))
-    SettingsGroup {
-        row("chats") { context ->
-            SettingsLink(
-                context = context,
-                enabled = enabled,
-                title = stringResource(R.string.notification_profile_allowed_chats),
-                value =
-                    if (state.allowedChatCount == 0) {
-                        stringResource(R.string.notification_profile_allowed_none)
-                    } else {
-                        pluralStringResource(
-                            R.plurals.chat_folder_chat_count,
-                            state.allowedChatCount,
-                            state.allowedChatCount,
-                        )
-                    },
-                onClick = actions.onOpenChats,
-                modifier = Modifier.testTag("notification-profile.chats"),
-                leading = { SettingsLeadingIcon(R.drawable.ic_forum) },
-            )
-        }
-        row("mentions") { context ->
-            SettingsSwitch(
-                context = context,
-                enabled = enabled,
-                title = stringResource(R.string.notification_profile_mentions),
-                subtitle = stringResource(R.string.notification_profile_mentions_detail),
-                checked = state.allowMentions,
-                onCheckedChange = actions.onMentionsChange,
-                modifier = Modifier.testTag("notification-profile.mentions"),
-                leading = { SettingsLeadingIcon(R.drawable.ic_alternate_email) },
-            )
-        }
-    }
-    SettingsExplainer(stringResource(R.string.notification_profile_allowed_hint))
-    state.accountName?.let { SettingsExplainer(stringResource(R.string.notification_profile_allowed_account_note, it)) }
 }
 
 @Suppress("FunctionNaming", "LongMethod")

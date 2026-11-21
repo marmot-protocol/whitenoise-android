@@ -51,9 +51,17 @@ internal data class NotificationProfileSchedule(
     }
 }
 
+/** One person a profile always lets through, in any chat, scoped to the local account that knows them. */
+internal data class NotificationProfilePerson(
+    val accountRef: String,
+    /** Lower-case account id of the sender. */
+    val accountIdHex: String,
+)
+
 /**
- * A device-wide notification profile. While it is active, only [allowedChats] (and mentions when
- * [allowMentions] is on) may notify; everything else is not posted.
+ * A device-wide notification profile. While it is active only its exceptions may notify: [allowedChats],
+ * [allowedPeople], mentions, direct messages, invites and group changes, and a repeated message from someone
+ * just held back, each when switched on. Everything else is not posted.
  */
 internal data class NotificationProfile(
     val id: String,
@@ -62,7 +70,23 @@ internal data class NotificationProfile(
     val allowMentions: Boolean,
     val schedule: NotificationProfileSchedule?,
     val createdAtMs: Long,
-)
+    val allowedPeople: Set<NotificationProfilePerson> = emptySet(),
+    val allowAllDirectMessages: Boolean = false,
+    val allowRepeatedMessages: Boolean = false,
+    val allowGroupChanges: Boolean = false,
+    /** One optional emoji shown before the name. */
+    val emoji: String? = null,
+) {
+    /** The name with its emoji, as the banner, quick sheet and Notifications row show it. */
+    val label: String get() = emoji?.let { "$it $name" } ?: name
+}
+
+/** The trimmed emoji, or null when blank or implausibly long for one emoji. */
+internal fun normalizedNotificationProfileEmoji(emoji: String?): String? =
+    emoji?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_NOTIFICATION_PROFILE_EMOJI_CHARS }
+
+/** Generous room for one emoji with skin tone, gender and joiner sequences. */
+private const val MAX_NOTIFICATION_PROFILE_EMOJI_CHARS = 32
 
 /** One occurrence of a schedule as the half-open interval [[startMs], [endMs]). */
 internal data class NotificationProfileWindow(

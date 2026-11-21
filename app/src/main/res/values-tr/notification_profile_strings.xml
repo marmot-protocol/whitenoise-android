@@ -3,7 +3,7 @@
     <string name="notification_profiles_title">Bildirim profilleri</string>
     <string name="notification_profiles_value_off">Kapalı</string>
     <string name="explanation_privacy_notif_profiles">Bildirimleri bir programa göre ya da bir süreliğine duraklatın ve hangi sohbetlerin yine de bildirim gönderebileceğini seçin.</string>
-    <string name="notification_profiles_explainer">Bir profil açıkken bu cihazda yalnızca izin verilen sohbetler ve, açarsanız, bahsedilmeler bildirim gönderir. Mesajlar yine gelir ve okunmamış olarak görünür.</string>
+    <string name="notification_profiles_explainer">Bir profil açıkken bu cihazda size yalnızca seçtiğiniz sohbetler, kişiler ve istisnalar bildirim gönderebilir. Mesajlar yine gelir ve okunmamış olarak görünür.</string>
     <string name="notification_profiles_empty_title">Henüz profil yok</string>
     <string name="notification_profiles_empty_body">Bildirimleri gece, işte ya da sessizliğe ihtiyaç duyduğunuz her an duraklatmak için bir profil oluşturun.</string>
     <string name="notification_profile_preset_sleep">Uyku</string>
@@ -17,8 +17,8 @@
     <string name="notification_profile_allowed_section">İzin verilen bildirimler</string>
     <string name="notification_profile_allowed_chats">İzin verilen sohbetler</string>
     <string name="notification_profile_allowed_none">Yok</string>
-    <string name="notification_profile_allowed_hint">Profil açıkken bu sohbetler size bildirim göndermeye devam eder. Sessize alınmış sohbetler sessiz kalır.</string>
-    <string name="notification_profile_allowed_account_note">Sohbetler %1$s için seçilir. Başka bir hesabın sohbetlerini seçmek için hesap değiştirin.</string>
+    <string name="notification_profile_allowed_hint">Profil açıkken bu sohbetler ve kişiler size bildirim göndermeye devam eder. Sessize alınmış sohbetler sessiz kalır.</string>
+    <string name="notification_profile_allowed_account_note">Sohbetler ve kişiler %1$s için seçilir. Başka bir hesap için seçmek üzere hesap değiştirin.</string>
     <string name="notification_profile_mentions">Bahsedilmelerde bildir</string>
     <string name="notification_profile_mentions_detail">Sizden bahseden mesajlar başka sohbetlerden gelse bile bildirim gönderir.</string>
     <string name="notification_profile_schedule_section">Program</string>
@@ -53,4 +53,24 @@
     <string name="notification_profile_quick_open_active">Bildirim profili açık: %1$s</string>
     <string name="explanation_chats_notification_profiles">Sohbetlerinizden ayrılmadan bir bildirim profilini açın veya kapatın.</string>
     <string name="settings_search_alias_notification_profiles">rahatsız etmeyin|DND|sessiz saatler|program|odak|uyku</string>
+    <string name="notification_profile_allowed_people">İzin verilen kişiler</string>
+    <string name="notification_profile_people_hint">Profil açıkken bu kişiler size herhangi bir sohbette bildirim gönderebilir.</string>
+    <string name="notification_profile_all_dms">Tüm doğrudan mesajlara izin ver</string>
+    <string name="notification_profile_all_dms_detail">Herkesten gelen doğrudan mesajlar bildirim gönderir.</string>
+    <string name="notification_profile_repeated">Tekrarlanan mesajları geçir</string>
+    <string name="notification_profile_repeated_detail">Aynı kişiden 3 dakika içinde gelen ikinci mesaj bildirim gönderir.</string>
+    <string name="notification_profile_group_changes">Davetlere ve grup değişikliklerine izin ver</string>
+    <string name="notification_profile_group_changes_detail">Davetler, çıkarılmalar ve yönetici değişiklikleri bildirim gönderir.</string>
+    <string name="notification_profile_emoji_choose">Emoji seç</string>
+    <string name="notification_profile_emoji_change">Emojiyi değiştir</string>
+    <string name="notification_profile_emoji_remove">Emojiyi kaldır</string>
+    <string name="notification_profile_banner_detail_people">Yalnızca izin verilen sohbetler ve kişiler bildirim gönderir.</string>
+    <string name="notification_profile_banner_detail_dms">Yalnızca izin verilen sohbetler ve doğrudan mesajlar bildirim gönderir.</string>
+    <string name="notification_profile_banner_detail_group_changes">Yalnızca izin verilen sohbetler ve grup değişiklikleri bildirim gönderir.</string>
+    <string name="notification_profile_banner_detail_repeated">Yalnızca izin verilen sohbetler ve tekrarlanan mesajlar bildirim gönderir.</string>
+    <string name="notification_profile_banner_detail_exceptions">Yalnızca istisnalarınız bildirim gönderir.</string>
+    <plurals name="notification_profile_people_count">
+        <item quantity="one">%1$d kişi</item>
+        <item quantity="other">%1$d kişi</item>
+    </plurals>
 </resources>

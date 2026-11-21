@@ -13,12 +13,67 @@
         ]
       },
       {
+        "surface": "string:notification_profile_banner_detail_dms",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_dms",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_exceptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_exceptions",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_group_changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_group_changes",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
         "surface": "string:notification_profile_banner_detail_mentions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
         "anchor": "R.string.notification_profile_banner_detail_mentions",
         "test_ids": [
           "NTF-049",
           "NTF-051"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_people",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_banner_detail_repeated",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileText.kt",
+        "anchor": "R.string.notification_profile_banner_detail_repeated",
+        "test_ids": [
+          "NTF-049",
+          "NTF-051",
+          "NTF-055",
+          "NTF-056"
         ]
       },
       {

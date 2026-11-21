@@ -83,9 +83,14 @@ class NotificationProfileInteractionTest {
     fun theDraftIsReadOnlyWhileASaveIsInFlight() {
         render(busy = true)
         listOf(
+            "notification-profile.emoji",
             "notification-profile.name",
             "notification-profile.chats",
+            "notification-profile.people",
+            "notification-profile.dms",
             "notification-profile.mentions",
+            "notification-profile.repeated",
+            "notification-profile.group-changes",
             "notification-profile.schedule",
             "notification-profile.start",
             "notification-profile.day.MONDAY",

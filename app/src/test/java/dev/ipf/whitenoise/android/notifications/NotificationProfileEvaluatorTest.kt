@@ -218,6 +218,55 @@ class NotificationProfileEvaluatorTest {
     }
 
     @Test
+    fun eachSwitchedOnExceptionLetsOnlyItsOwnKindThrough() {
+        val quiet = testProfile("quiet", allowMentions = false)
+        val other = profileTestUpdate(groupIdHex = "group-b")
+        assertTrue(notificationProfileSuppresses(quiet, other))
+
+        val person = NotificationProfilePerson("account-a", "abcd")
+        val people = quiet.copy(allowedPeople = setOf(person))
+        assertFalse(notificationProfileSuppresses(people, profileTestUpdate(groupIdHex = "group-b", sender = "ABCD")))
+        assertFalse(notificationProfileSuppresses(people, profileTestUpdate(sender = "abcd", reactionEmoji = "👍")))
+        assertTrue(notificationProfileSuppresses(people, profileTestUpdate(accountRef = "account-b", sender = "abcd")))
+        assertTrue(notificationProfileSuppresses(people, other))
+
+        val dms = quiet.copy(allowAllDirectMessages = true)
+        assertFalse(notificationProfileSuppresses(dms, profileTestUpdate(groupIdHex = "dm", isDm = true)))
+        assertTrue(notificationProfileSuppresses(dms, other))
+
+        val changes = quiet.copy(allowGroupChanges = true)
+        listOf(
+            NotificationTriggerFfi.GROUP_INVITE,
+            NotificationTriggerFfi.REMOVED_FROM_GROUP,
+            NotificationTriggerFfi.MADE_ADMIN,
+            NotificationTriggerFfi.REMOVED_AS_ADMIN,
+        ).forEach { trigger ->
+            assertFalse("$trigger", notificationProfileSuppresses(changes, profileTestUpdate(trigger = trigger)))
+            assertTrue("$trigger", notificationProfileSuppresses(quiet, profileTestUpdate(trigger = trigger)))
+        }
+        assertTrue(notificationProfileSuppresses(changes, other))
+
+        val repeats = quiet.copy(allowRepeatedMessages = true)
+        assertTrue(notificationProfileSuppresses(repeats, other, repeated = false))
+        assertFalse(notificationProfileSuppresses(repeats, other, repeated = true))
+        assertTrue(notificationProfileSuppresses(quiet, other, repeated = true))
+        assertTrue(notificationProfileSuppresses(repeats, profileTestUpdate(reactionEmoji = "👍"), repeated = true))
+        val invite = profileTestUpdate(trigger = NotificationTriggerFfi.GROUP_INVITE)
+        assertTrue(notificationProfileSuppresses(repeats, invite, repeated = true))
+        assertFalse(notificationProfileSuppresses(repeats, profileTestUpdate(isFromSelf = true)))
+    }
+
+    @Test
+    fun aRepeatCountsOnlyInsideThreeMinutesAfterTheHeldMessage() {
+        val held = 1_000_000L
+        assertFalse(notificationProfileRepeatOpen(null, held))
+        assertTrue(notificationProfileRepeatOpen(held, held))
+        assertTrue(notificationProfileRepeatOpen(held, held + NOTIFICATION_PROFILE_REPEAT_WINDOW_MS - 1))
+        assertFalse(notificationProfileRepeatOpen(held, held + NOTIFICATION_PROFILE_REPEAT_WINDOW_MS))
+        assertFalse(notificationProfileRepeatOpen(held, held - 1))
+    }
+
+    @Test
     fun nextTransitionCoversManualExpiryWindowEndAndNextStart() {
         val now = localMs("2026-11-20T12:00", utc)
         assertNull(

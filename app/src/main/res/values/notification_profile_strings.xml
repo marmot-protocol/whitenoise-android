@@ -5,7 +5,7 @@
     <!-- Value on the Notifications settings row when no profile is on. -->
     <string name="notification_profiles_value_off">Off</string>
     <string name="explanation_privacy_notif_profiles">Pause notifications on a schedule or for a while, and choose which chats can still notify you.</string>
-    <string name="notification_profiles_explainer">While a profile is on, only the chats you allow, and mentions if you turn them on, can notify you on this device. Messages still arrive and show as unread.</string>
+    <string name="notification_profiles_explainer">While a profile is on, only the chats, people and exceptions you choose can notify you on this device. Messages still arrive and show as unread.</string>
     <string name="notification_profiles_empty_title">No profiles yet</string>
     <string name="notification_profiles_empty_body">Create a profile to pause notifications at night, at work, or whenever you need quiet.</string>
     <!-- Names of the starter profiles every install begins with; saved once as ordinary, editable names. -->
@@ -22,9 +22,9 @@
     <string name="notification_profile_allowed_chats">Allowed chats</string>
     <!-- Value of Allowed chats when the profile lets no chat through. -->
     <string name="notification_profile_allowed_none">None</string>
-    <string name="notification_profile_allowed_hint">These chats still notify you while this profile is on. Muted chats stay muted.</string>
+    <string name="notification_profile_allowed_hint">These chats and people still notify you while this profile is on. Muted chats stay muted.</string>
     <!-- %1$s is the name of the signed-in account whose chats the picker shows. -->
-    <string name="notification_profile_allowed_account_note">Chats are chosen for %1$s. Switch accounts to choose chats for another account.</string>
+    <string name="notification_profile_allowed_account_note">Chats and people are chosen for %1$s. Switch accounts to choose them for another account.</string>
     <string name="notification_profile_mentions">Notify for mentions</string>
     <string name="notification_profile_mentions_detail">Messages that mention you still notify, even from other chats.</string>
     <string name="notification_profile_schedule_section">Schedule</string>
@@ -69,4 +69,24 @@
     <string name="notification_profile_quick_open_active">Notification profile on: %1$s</string>
     <string name="explanation_chats_notification_profiles">Turn a notification profile on or off without leaving your chats.</string>
     <string name="settings_search_alias_notification_profiles">do not disturb|DND|quiet hours|schedule|focus|sleep</string>
+    <string name="notification_profile_allowed_people">Allowed people</string>
+    <string name="notification_profile_people_hint">These people can notify you in any chat while this profile is on.</string>
+    <string name="notification_profile_all_dms">Allow all direct messages</string>
+    <string name="notification_profile_all_dms_detail">Direct messages from anyone notify you.</string>
+    <string name="notification_profile_repeated">Let repeated messages through</string>
+    <string name="notification_profile_repeated_detail">A second message from the same person within 3 minutes notifies you.</string>
+    <string name="notification_profile_group_changes">Allow invites and group changes</string>
+    <string name="notification_profile_group_changes_detail">Invites, removals and admin changes notify you.</string>
+    <string name="notification_profile_emoji_choose">Choose emoji</string>
+    <string name="notification_profile_emoji_change">Change emoji</string>
+    <string name="notification_profile_emoji_remove">Remove emoji</string>
+    <string name="notification_profile_banner_detail_people">Only allowed chats and people notify you.</string>
+    <string name="notification_profile_banner_detail_dms">Only allowed chats and direct messages notify you.</string>
+    <string name="notification_profile_banner_detail_group_changes">Only allowed chats and group changes notify you.</string>
+    <string name="notification_profile_banner_detail_repeated">Only allowed chats and repeated messages notify you.</string>
+    <string name="notification_profile_banner_detail_exceptions">Only your exceptions notify you.</string>
+    <plurals name="notification_profile_people_count">
+        <item quantity="one">%1$d person</item>
+        <item quantity="other">%1$d people</item>
+    </plurals>
 </resources>

@@ -3,7 +3,7 @@
     <string name="notification_profiles_title">Perfis de notificação</string>
     <string name="notification_profiles_value_off">Desativado</string>
     <string name="explanation_privacy_notif_profiles">Pause as notificações com um horário ou por um tempo e escolha quais conversas ainda podem notificar você.</string>
-    <string name="notification_profiles_explainer">Enquanto um perfil está ativo, só as conversas permitidas e, se você ativar, as menções notificam você neste dispositivo. As mensagens continuam chegando e aparecem como não lidas.</string>
+    <string name="notification_profiles_explainer">Enquanto um perfil está ativo, só as conversas, pessoas e exceções que você escolher podem notificar você neste dispositivo. As mensagens continuam chegando e aparecem como não lidas.</string>
     <string name="notification_profiles_empty_title">Nenhum perfil ainda</string>
     <string name="notification_profiles_empty_body">Crie um perfil para pausar as notificações à noite, no trabalho ou sempre que precisar de silêncio.</string>
     <string name="notification_profile_preset_sleep">Dormir</string>
@@ -17,8 +17,8 @@
     <string name="notification_profile_allowed_section">Notificações permitidas</string>
     <string name="notification_profile_allowed_chats">Conversas permitidas</string>
     <string name="notification_profile_allowed_none">Nenhuma</string>
-    <string name="notification_profile_allowed_hint">Estas conversas continuam notificando você enquanto o perfil está ativo. Conversas silenciadas continuam silenciadas.</string>
-    <string name="notification_profile_allowed_account_note">As conversas são escolhidas para %1$s. Troque de conta para escolher conversas de outra conta.</string>
+    <string name="notification_profile_allowed_hint">Estas conversas e pessoas continuam notificando você enquanto o perfil está ativo. Conversas silenciadas continuam silenciadas.</string>
+    <string name="notification_profile_allowed_account_note">As conversas e pessoas são escolhidas para %1$s. Troque de conta para escolhê-las em outra conta.</string>
     <string name="notification_profile_mentions">Notificar menções</string>
     <string name="notification_profile_mentions_detail">Mensagens que mencionam você continuam notificando, mesmo de outras conversas.</string>
     <string name="notification_profile_schedule_section">Horário</string>
@@ -53,4 +53,24 @@
     <string name="notification_profile_quick_open_active">Perfil de notificação ativado: %1$s</string>
     <string name="explanation_chats_notification_profiles">Ative ou desative um perfil de notificação sem sair das suas conversas.</string>
     <string name="settings_search_alias_notification_profiles">não perturbe|DND|horário de silêncio|horário|foco|dormir</string>
+    <string name="notification_profile_allowed_people">Pessoas permitidas</string>
+    <string name="notification_profile_people_hint">Estas pessoas podem notificar você em qualquer conversa enquanto o perfil está ativo.</string>
+    <string name="notification_profile_all_dms">Permitir todas as mensagens diretas</string>
+    <string name="notification_profile_all_dms_detail">Mensagens diretas de qualquer pessoa notificam você.</string>
+    <string name="notification_profile_repeated">Deixar passar mensagens repetidas</string>
+    <string name="notification_profile_repeated_detail">Uma segunda mensagem da mesma pessoa em até 3 minutos notifica você.</string>
+    <string name="notification_profile_group_changes">Permitir convites e mudanças no grupo</string>
+    <string name="notification_profile_group_changes_detail">Convites, remoções e mudanças de administrador notificam você.</string>
+    <string name="notification_profile_emoji_choose">Escolher emoji</string>
+    <string name="notification_profile_emoji_change">Trocar emoji</string>
+    <string name="notification_profile_emoji_remove">Remover emoji</string>
+    <string name="notification_profile_banner_detail_people">Só as conversas e as pessoas permitidas notificam você.</string>
+    <string name="notification_profile_banner_detail_dms">Só as conversas permitidas e as mensagens diretas notificam você.</string>
+    <string name="notification_profile_banner_detail_group_changes">Só as conversas permitidas e as mudanças no grupo notificam você.</string>
+    <string name="notification_profile_banner_detail_repeated">Só as conversas permitidas e as mensagens repetidas notificam você.</string>
+    <string name="notification_profile_banner_detail_exceptions">Só as suas exceções notificam você.</string>
+    <plurals name="notification_profile_people_count">
+        <item quantity="one">%1$d pessoa</item>
+        <item quantity="other">%1$d pessoas</item>
+    </plurals>
 </resources>

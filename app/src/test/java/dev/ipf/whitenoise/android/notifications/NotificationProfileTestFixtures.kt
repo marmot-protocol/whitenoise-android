@@ -62,6 +62,7 @@ internal fun profileTestUpdate(
     isFromSelf: Boolean = false,
     reactionEmoji: String? = null,
     trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
+    sender: String = "sender",
 ): NotificationUpdateFfi =
     NotificationUpdateFfi(
         notificationKey = "key",
@@ -75,7 +76,7 @@ internal fun profileTestUpdate(
         isDm = isDm,
         isMention = isMention,
         messageIdHex = "message",
-        sender = NotificationUserFfi("sender", "Sender", null),
+        sender = NotificationUserFfi(sender, "Sender", null),
         receiver = NotificationUserFfi("self", "Self", null),
         previewText = "Hello",
         reactionEmoji = reactionEmoji,

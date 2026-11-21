@@ -57,6 +57,8 @@ internal class NotificationProfilePreferences(
                 profile.copy(
                     name = name,
                     allowedChats = profile.allowedChats.map(::normalizedChat).toSet(),
+                    allowedPeople = profile.allowedPeople.map(::normalizedPerson).toSet(),
+                    emoji = normalizedNotificationProfileEmoji(profile.emoji),
                 )
             val others = current.profiles.map { if (it.id == saved.id) saved else it }
             val profiles = if (isNew) current.profiles + saved else others
@@ -105,8 +107,8 @@ internal class NotificationProfilePreferences(
         }
 
     /**
-     * Drops allowed chats of local accounts that no longer exist; profiles themselves stay. Publishes at once
-     * with best-effort asynchronous persistence, like the other account-retention hooks.
+     * Drops allowed chats and people of local accounts that no longer exist; profiles themselves stay. Publishes
+     * at once with best-effort asynchronous persistence, like the other account-retention hooks.
      */
     fun retainAccounts(accountRefs: Collection<String>) {
         val retained = accountRefs.toSet()
@@ -114,7 +116,10 @@ internal class NotificationProfilePreferences(
             val current = _state.value
             val profiles =
                 current.profiles.map { profile ->
-                    profile.copy(allowedChats = profile.allowedChats.filterTo(HashSet()) { it.accountRef in retained })
+                    profile.copy(
+                        allowedChats = profile.allowedChats.filterTo(HashSet()) { it.accountRef in retained },
+                        allowedPeople = profile.allowedPeople.filterTo(HashSet()) { it.accountRef in retained },
+                    )
                 }
             val updated = current.copy(profiles = profiles)
             if (updated == current) return
@@ -177,6 +182,11 @@ private fun normalizedChat(chat: NotificationProfileChat): NotificationProfileCh
     return chat.copy(groupIdHex = groupIdHex)
 }
 
+private fun normalizedPerson(person: NotificationProfilePerson): NotificationProfilePerson {
+    val accountIdHex = person.accountIdHex.trim().lowercase(Locale.ROOT)
+    return person.copy(accountIdHex = accountIdHex)
+}
+
 private fun NotificationProfilesState.withoutExpiredManual(nowMs: Long): NotificationProfilesState {
     val live =
         when (val choice = manual) {
@@ -221,9 +231,20 @@ private fun encodeProfile(profile: NotificationProfile): JSONObject =
                     JSONObject().put("accountRef", chat.accountRef).put("groupIdHex", chat.groupIdHex)
                 },
             ),
+        ).put(
+            "allowedPeople",
+            JSONArray(
+                profile.allowedPeople.map { person ->
+                    JSONObject().put("accountRef", person.accountRef).put("accountIdHex", person.accountIdHex)
+                },
+            ),
         ).put("allowMentions", profile.allowMentions)
+        .put("allowAllDirectMessages", profile.allowAllDirectMessages)
+        .put("allowRepeatedMessages", profile.allowRepeatedMessages)
+        .put("allowGroupChanges", profile.allowGroupChanges)
         .put("createdAtMs", profile.createdAtMs)
         .apply {
+            profile.emoji?.let { put("emoji", it) }
             profile.schedule?.let { schedule ->
                 put(
                     "schedule",
@@ -272,6 +293,11 @@ private fun decodeProfile(json: JSONObject): NotificationProfile? {
         allowMentions = json.optBoolean("allowMentions", true),
         schedule = json.optJSONObject("schedule")?.let(::decodeSchedule),
         createdAtMs = json.optLong("createdAtMs", 0L),
+        allowedPeople = decodePeople(json.optJSONArray("allowedPeople") ?: JSONArray()),
+        allowAllDirectMessages = json.optBoolean("allowAllDirectMessages", false),
+        allowRepeatedMessages = json.optBoolean("allowRepeatedMessages", false),
+        allowGroupChanges = json.optBoolean("allowGroupChanges", false),
+        emoji = normalizedNotificationProfileEmoji(json.optString("emoji").takeIf { json.has("emoji") }),
     )
 }
 
@@ -283,6 +309,16 @@ private fun decodeChats(array: JSONArray): Set<NotificationProfileChat> =
             }
         }.filter { it.accountRef.isNotEmpty() && it.groupIdHex.isNotEmpty() }
         .map(::normalizedChat)
+        .toSet()
+
+private fun decodePeople(array: JSONArray): Set<NotificationProfilePerson> =
+    (0 until array.length())
+        .mapNotNull { index ->
+            array.optJSONObject(index)?.let { person ->
+                NotificationProfilePerson(person.optString("accountRef"), person.optString("accountIdHex"))
+            }
+        }.filter { it.accountRef.isNotEmpty() && it.accountIdHex.isNotEmpty() }
+        .map(::normalizedPerson)
         .toSet()
 
 private fun decodeSchedule(json: JSONObject): NotificationProfileSchedule {

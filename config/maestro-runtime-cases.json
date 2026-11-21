@@ -96,6 +96,15 @@
       "assertions": "Fresh data lists the Sleep, Work and Focus starter profiles. Delete on Work asks first; Cancel keeps the editor and the profile, confirming removes Work while Sleep and Focus stay.",
       "postcondition": "none"
     },
+    "notification-profiles-emoji-people": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-055",
+        "NTF-057"
+      ],
+      "assertions": "On the Sleep starter profile the emoji badge offers Remove emoji, which clears it; tapping the empty badge opens the emoji picker. Allowed people opens the active account's people picker; choosing Maestro Bob shows 1 person, which survives save and reopen. No delivery proof.",
+      "postcondition": "none"
+    },
     "notification-profiles-quick-sheet": {
       "suite": "settings",
       "manual_ids": [

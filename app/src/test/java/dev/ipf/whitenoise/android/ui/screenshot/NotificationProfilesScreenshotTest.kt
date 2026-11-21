@@ -58,8 +58,10 @@ class NotificationProfilesScreenshotTest {
     private val now = Instant.parse("2026-11-20T23:15:00Z").toEpochMilli()
     private val weekdays =
         setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY)
-    private val sleep = profile("sleep", "Sleep", NotificationProfileSchedule(true, 22 * 60, 7 * 60, weekdays))
-    private val work = profile("work", "Work", NotificationProfileSchedule(true, 9 * 60, 17 * 60 + 30, weekdays))
+    private val sleep =
+        profile("sleep", "Sleep", NotificationProfileSchedule(true, 22 * 60, 7 * 60, weekdays)).copy(emoji = "🌙")
+    private val work =
+        profile("work", "Work", NotificationProfileSchedule(true, 9 * 60, 17 * 60 + 30, weekdays)).copy(emoji = "💼")
     private val focus = profile("focus", "Focus", null)
     private val longName =
         profile(
@@ -202,6 +204,9 @@ class NotificationProfilesScreenshotTest {
             canSave = true,
             canDelete = true,
             error = null,
+            emoji = "🌙",
+            allowedPeopleCount = 1,
+            allowRepeatedMessages = true,
         )
 
     private fun captureList(

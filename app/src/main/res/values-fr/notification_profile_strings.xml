@@ -3,7 +3,7 @@
     <string name="notification_profiles_title">Profils de notification</string>
     <string name="notification_profiles_value_off">Désactivé</string>
     <string name="explanation_privacy_notif_profiles">Mettez les notifications en pause selon un horaire ou pour un moment, et choisissez les discussions qui peuvent encore vous notifier.</string>
-    <string name="notification_profiles_explainer">Quand un profil est actif, seules les discussions autorisées et, si vous l\'activez, les mentions vous notifient sur cet appareil. Les messages arrivent quand même et restent non lus.</string>
+    <string name="notification_profiles_explainer">Quand un profil est actif, seules les discussions, personnes et exceptions que vous choisissez peuvent vous notifier sur cet appareil. Les messages arrivent quand même et restent non lus.</string>
     <string name="notification_profiles_empty_title">Aucun profil pour l\'instant</string>
     <string name="notification_profiles_empty_body">Créez un profil pour mettre les notifications en pause la nuit, au travail ou dès que vous avez besoin de calme.</string>
     <string name="notification_profile_preset_sleep">Sommeil</string>
@@ -17,8 +17,8 @@
     <string name="notification_profile_allowed_section">Notifications autorisées</string>
     <string name="notification_profile_allowed_chats">Discussions autorisées</string>
     <string name="notification_profile_allowed_none">Aucune</string>
-    <string name="notification_profile_allowed_hint">Ces discussions continuent de vous notifier quand le profil est actif. Les discussions en sourdine le restent.</string>
-    <string name="notification_profile_allowed_account_note">Les discussions sont choisies pour %1$s. Changez de compte pour choisir celles d\'un autre compte.</string>
+    <string name="notification_profile_allowed_hint">Ces discussions et personnes continuent de vous notifier quand le profil est actif. Les discussions en sourdine le restent.</string>
+    <string name="notification_profile_allowed_account_note">Les discussions et personnes sont choisies pour %1$s. Changez de compte pour les choisir pour un autre compte.</string>
     <string name="notification_profile_mentions">Notifier les mentions</string>
     <string name="notification_profile_mentions_detail">Les messages qui vous mentionnent vous notifient, même depuis d\'autres discussions.</string>
     <string name="notification_profile_schedule_section">Horaire</string>
@@ -53,4 +53,24 @@
     <string name="notification_profile_quick_open_active">Profil de notification activé : %1$s</string>
     <string name="explanation_chats_notification_profiles">Activez ou désactivez un profil de notification sans quitter vos discussions.</string>
     <string name="settings_search_alias_notification_profiles">ne pas déranger|NPD|heures calmes|horaire|concentration|sommeil</string>
+    <string name="notification_profile_allowed_people">Personnes autorisées</string>
+    <string name="notification_profile_people_hint">Ces personnes peuvent vous notifier dans n\'importe quelle discussion quand le profil est actif.</string>
+    <string name="notification_profile_all_dms">Autoriser tous les messages privés</string>
+    <string name="notification_profile_all_dms_detail">Les messages privés de n\'importe qui vous notifient.</string>
+    <string name="notification_profile_repeated">Laisser passer les messages répétés</string>
+    <string name="notification_profile_repeated_detail">Un deuxième message de la même personne en moins de 3 minutes vous notifie.</string>
+    <string name="notification_profile_group_changes">Autoriser les invitations et les changements de groupe</string>
+    <string name="notification_profile_group_changes_detail">Les invitations, retraits et changements d\'administrateur vous notifient.</string>
+    <string name="notification_profile_emoji_choose">Choisir un emoji</string>
+    <string name="notification_profile_emoji_change">Changer l\'emoji</string>
+    <string name="notification_profile_emoji_remove">Retirer l\'emoji</string>
+    <string name="notification_profile_banner_detail_people">Seules les discussions et les personnes autorisées vous notifient.</string>
+    <string name="notification_profile_banner_detail_dms">Seules les discussions autorisées et les messages privés vous notifient.</string>
+    <string name="notification_profile_banner_detail_group_changes">Seules les discussions autorisées et les changements de groupe vous notifient.</string>
+    <string name="notification_profile_banner_detail_repeated">Seules les discussions autorisées et les messages répétés vous notifient.</string>
+    <string name="notification_profile_banner_detail_exceptions">Seules vos exceptions vous notifient.</string>
+    <plurals name="notification_profile_people_count">
+        <item quantity="one">%1$d personne</item>
+        <item quantity="other">%1$d personnes</item>
+    </plurals>
 </resources>

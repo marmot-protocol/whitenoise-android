@@ -21,7 +21,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.notifications.NotificationProfile
 import dev.ipf.whitenoise.android.notifications.NotificationProfileChat
+import dev.ipf.whitenoise.android.notifications.NotificationProfilePerson
 import dev.ipf.whitenoise.android.notifications.NotificationProfileSchedule
+import dev.ipf.whitenoise.android.notifications.normalizedNotificationProfileEmoji
 import dev.ipf.whitenoise.android.notifications.normalizedNotificationProfileName
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.allLoadedFolderChats
@@ -30,7 +32,9 @@ import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
+import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.DayOfWeek
@@ -49,6 +53,17 @@ private val ProfileChatsSaver =
             saved
                 .mapNotNull { key ->
                     key.split(CHAT_KEY_SEPARATOR).takeIf { it.size == 2 }?.let { NotificationProfileChat(it[0], it[1]) }
+                }.toSet()
+        },
+    )
+
+private val ProfilePeopleSaver =
+    Saver<Set<NotificationProfilePerson>, ArrayList<String>>(
+        save = { people -> ArrayList(people.map { "${it.accountRef}$CHAT_KEY_SEPARATOR${it.accountIdHex}" }) },
+        restore = { saved ->
+            saved
+                .mapNotNull { key ->
+                    key.split(CHAT_KEY_SEPARATOR).takeIf { it.size == 2 }?.let { NotificationProfilePerson(it[0], it[1]) }
                 }.toSet()
         },
     )
@@ -103,12 +118,24 @@ internal fun NotificationProfileEditScreen(
     val name = rememberTextFieldState(existing?.name.orEmpty())
     val initialChats = remember { existing?.allowedChats.orEmpty() }
     var allowedChats by rememberSaveable(stateSaver = ProfileChatsSaver) { mutableStateOf(initialChats) }
+    val initialPeople = remember { existing?.allowedPeople.orEmpty() }
+    var allowedPeople by rememberSaveable(stateSaver = ProfilePeopleSaver) { mutableStateOf(initialPeople) }
     val initialMentions = remember { existing?.allowMentions ?: true }
     var allowMentions by rememberSaveable { mutableStateOf(initialMentions) }
+    val initialDms = remember { existing?.allowAllDirectMessages ?: false }
+    var allowAllDms by rememberSaveable { mutableStateOf(initialDms) }
+    val initialRepeated = remember { existing?.allowRepeatedMessages ?: false }
+    var allowRepeated by rememberSaveable { mutableStateOf(initialRepeated) }
+    val initialGroupChanges = remember { existing?.allowGroupChanges ?: false }
+    var allowGroupChanges by rememberSaveable { mutableStateOf(initialGroupChanges) }
+    val initialEmoji = remember { existing?.emoji }
+    var emoji by rememberSaveable { mutableStateOf(initialEmoji) }
     val initialSchedule = remember { existing?.schedule ?: NotificationProfileSchedule.Default.copy(enabled = false) }
     var schedule by rememberSaveable(stateSaver = ProfileScheduleSaver) { mutableStateOf(initialSchedule) }
     var timeField by rememberSaveable { mutableStateOf<ProfileTimeField?>(null) }
     var pickerOpen by rememberSaveable { mutableStateOf(false) }
+    var peoplePickerOpen by rememberSaveable { mutableStateOf(false) }
+    var emojiPickerOpen by rememberSaveable { mutableStateOf(false) }
     var discard by rememberSaveable { mutableStateOf(false) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     var failed by rememberSaveable { mutableStateOf(false) }
@@ -120,7 +147,12 @@ internal fun NotificationProfileEditScreen(
     val dirty =
         trimmedName != existing?.name.orEmpty() ||
             allowedChats != initialChats ||
+            allowedPeople != initialPeople ||
             allowMentions != initialMentions ||
+            allowAllDms != initialDms ||
+            allowRepeated != initialRepeated ||
+            allowGroupChanges != initialGroupChanges ||
+            emoji != initialEmoji ||
             schedule != initialSchedule
 
     /** Back waits for an in-flight write: it either closes the editor or hands the draft back. */
@@ -148,6 +180,11 @@ internal fun NotificationProfileEditScreen(
                 name = trimmedName,
                 allowedChats = allowedChats,
                 allowMentions = allowMentions,
+                allowedPeople = allowedPeople,
+                allowAllDirectMessages = allowAllDms,
+                allowRepeatedMessages = allowRepeated,
+                allowGroupChanges = allowGroupChanges,
+                emoji = emoji,
                 // A switched-off schedule keeps its times for next time; one never turned on is not stored.
                 schedule = schedule.takeIf { it.enabled || existing?.schedule != null },
                 createdAtMs = existing?.createdAtMs ?: System.currentTimeMillis(),
@@ -186,6 +223,8 @@ internal fun NotificationProfileEditScreen(
             ?.let { appState.accountDisplayNameCached(it.accountIdHex) }
     val activeChatIds =
         allowedChats.filter { it.accountRef == accountRef }.mapTo(HashSet()) { it.groupIdHex }
+    val activePeopleIds =
+        allowedPeople.filter { it.accountRef == accountRef }.mapTo(HashSet()) { it.accountIdHex }
 
     NotificationProfileEditContent(
         state =
@@ -199,6 +238,11 @@ internal fun NotificationProfileEditScreen(
                 canSave = draftValid && !submitted && canMutate(),
                 canDelete = profileId != null && !missing,
                 busy = submitted,
+                emoji = emoji,
+                allowedPeopleCount = activePeopleIds.size,
+                allowAllDirectMessages = allowAllDms,
+                allowRepeatedMessages = allowRepeated,
+                allowGroupChanges = allowGroupChanges,
                 error =
                     when {
                         failed || (missing && !submitted) -> stringResource(R.string.notification_profile_save_failed)
@@ -216,6 +260,12 @@ internal fun NotificationProfileEditScreen(
                 onEditEnd = { edit { timeField = ProfileTimeField.END } },
                 onToggleDay = { day -> edit { schedule = schedule.copy(days = schedule.days.toggled(day)) } },
                 onDelete = { edit { if (canMutate()) confirmDelete = true } },
+                onChooseEmoji = { edit { emojiPickerOpen = true } },
+                onRemoveEmoji = { edit { emoji = null } },
+                onOpenPeople = { edit { if (accountRef != null) peoplePickerOpen = true } },
+                onDirectMessagesChange = { edit { allowAllDms = it } },
+                onRepeatedChange = { edit { allowRepeated = it } },
+                onGroupChangesChange = { edit { allowGroupChanges = it } },
             ),
     )
 
@@ -251,6 +301,26 @@ internal fun NotificationProfileEditScreen(
                 allowedChats = if (chat in allowedChats) allowedChats - chat else allowedChats + chat
             },
             onClose = { pickerOpen = false },
+        )
+    }
+    if (peoplePickerOpen && accountRef != null) {
+        AllowedPeoplePicker(
+            appState = appState,
+            selectedIds = activePeopleIds,
+            onToggle = { id ->
+                val person = NotificationProfilePerson(accountRef, id)
+                allowedPeople = if (person in allowedPeople) allowedPeople - person else allowedPeople + person
+            },
+            onClose = { peoplePickerOpen = false },
+        )
+    }
+    if (emojiPickerOpen) {
+        EmojiPickerSheet(
+            onDismissRequest = { emojiPickerOpen = false },
+            onEmojiPicked = { picked ->
+                emojiPickerOpen = false
+                edit { emoji = normalizedNotificationProfileEmoji(picked) }
+            },
         )
     }
     if (confirmDelete) {
@@ -303,6 +373,47 @@ private fun AllowedChatsPicker(
         onDone = onClose,
         searchTag = "notification-profile.pickerSearch",
         rowTagPrefix = "notification-profile.choice",
+    )
+}
+
+/** People the active account knows from its chats, multi-select; they notify in any chat while the profile is on. */
+@Suppress("FunctionNaming")
+@Composable
+private fun AllowedPeoplePicker(
+    appState: WhiteNoiseAppState,
+    selectedIds: Set<String>,
+    onToggle: (String) -> Unit,
+    onClose: () -> Unit,
+) {
+    val activeHex = appState.activeAccount?.accountIdHex
+    val rows =
+        remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose, selectedIds) {
+            val known =
+                deriveRecipientCandidates(appState, activeHex).map { candidate ->
+                    WhiteNoisePickerItem(
+                        id = candidate.accountIdHex.lowercase(Locale.ROOT),
+                        title = candidate.displayName,
+                        avatarSeed = candidate.accountIdHex,
+                    )
+                }
+            // Someone allowed earlier stays listed, and removable, after leaving every loaded chat.
+            val knownIds = known.mapTo(HashSet()) { it.id }
+            known +
+                selectedIds.filterNot(knownIds::contains).map { id ->
+                    WhiteNoisePickerItem(id = id, title = appState.displayName(id), avatarSeed = id)
+                }
+        }
+    WhiteNoiseEntityPickerSheet(
+        title = stringResource(R.string.notification_profile_allowed_people),
+        description = stringResource(R.string.notification_profile_people_hint),
+        items = rows,
+        onDismiss = onClose,
+        onSelect = onToggle,
+        selectedIds = selectedIds,
+        multiple = true,
+        onDone = onClose,
+        searchTag = "notification-profile.peopleSearch",
+        rowTagPrefix = "notification-profile.person",
     )
 }
 
