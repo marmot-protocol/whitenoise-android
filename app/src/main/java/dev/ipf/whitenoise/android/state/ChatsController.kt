@@ -504,9 +504,7 @@ class ChatsController private constructor(
         get() = chatRowsByGroup.values
     internal val invitationReads = mutableMapOf<String, InvitationSettlementRead>()
     internal var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
-
-    /** Whether [groupRecordsById] holds a group snapshot for the bound account, so a missing record is real. */
-    internal var groupRecordsLoaded = false
+    internal var groupRecordsLoaded = false // groupRecordsById holds the bound account's snapshot
 
     // Holds a locally committed rename on its row until the subscription agrees (#2696). A clear
     // stays held until the group record agrees too, because a blank row falls back to its name.
