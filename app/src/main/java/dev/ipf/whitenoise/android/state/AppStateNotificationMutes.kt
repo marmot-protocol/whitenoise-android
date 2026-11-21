@@ -114,8 +114,10 @@ private fun WhiteNoiseAppState.suppressedByNotificationProfile(
     val eligibleForRepeat = profile.allowRepeatedMessages && isNotificationProfileMessage(update)
     val suppressed =
         notificationProfileSuppresses(profile, update, directConversation = directConversation) &&
-            !(eligibleForRepeat &&
-                notificationProfileRepeats.admit(profile.id, update, System.currentTimeMillis(), reserveRepeat))
+            !(
+                eligibleForRepeat &&
+                    notificationProfileRepeats.admit(profile.id, update, System.currentTimeMillis(), reserveRepeat)
+            )
     if (suppressed) {
         appStateDebug { "notification suppressed_by=notification_profile source=${active.source.name.lowercase()}" }
     }
