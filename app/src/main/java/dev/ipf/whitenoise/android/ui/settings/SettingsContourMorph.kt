@@ -112,6 +112,19 @@ internal fun settingsContourSeed(
     )
 }
 
+/**
+ * The one contour an outline-less origin contributes: the control's own rounded bounds, invisible at
+ * first so the destination group's outline and fill arrive with it.
+ */
+internal fun settingsOriginContour(
+    origin: Rect,
+    viewport: Rect,
+    key: Int,
+): SettingsContour {
+    val radius = minOf(origin.width, origin.height) / 2f
+    return SettingsContour(origin, RoundRect(origin, radius, radius), viewport, Color.Transparent, 0f, key = key)
+}
+
 /** An unmatched divider retracts to the real perimeter at its own relative row height. */
 private fun absentSettingsSeam(
     seam: SettingsContourSeam,

@@ -274,6 +274,27 @@ class SettingsPageMorphTest {
         assertEquals(listOf(first, second), page.renderedContours(1f).map { it.bounds })
     }
 
+    @Test fun outlineLessOriginOpensOneContourInsteadOfFanningOutFromAPoint() {
+        val page = SettingsPageMorph()
+        page.begin("chats", true, false, host)
+        val origin = Rect(12f, 12f, 52f, 52f)
+        page.pendingOrigin = origin
+        assertTrue(page.begin("settings", true, true, host))
+        reportGroup(page, first)
+        reportGroup(page, second)
+        assertTrue(page.admitDestination())
+        val start = page.renderedContours(0f)
+        assertEquals(origin, start.single().bounds)
+        val key = start.single().key
+        for (time in listOf(0.05f, 0.3f, 0.6f, 0.9f)) {
+            val frame = page.renderedContours(time)
+            assertEquals(lerp(origin, first, AppMotionOpenEasing.transform(time)), frame.single { it.key == key }.bounds)
+            // Every other group stays at its native bounds; none grows out of a zero-size seed.
+            assertTrue(frame.filter { it.key != key }.all { it.bounds == second })
+        }
+        assertEquals(listOf(first, second), page.renderedContours(1f).map { it.bounds })
+    }
+
     @Test fun backFoldsIntoTheAnchorOutline() {
         val page = openedFromAnchor()
         page.finish()

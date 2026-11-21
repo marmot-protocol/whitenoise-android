@@ -1,10 +1,12 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.graphics.Picture
+import androidx.compose.animation.core.Easing
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
@@ -17,6 +19,24 @@ import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 
 private const val CONTENT_HANDOFF_FRACTION = 0.5f
+
+/** Linear clock time over which the outgoing body fades out before the handoff and the incoming one in after it. */
+private const val CONTENT_HANDOFF_FADE = 0.1f
+
+/** Clock time at which [easing] reaches the geometry handoff. */
+private fun handoffTime(easing: Easing): Float {
+    var low = 0f
+    var high = 1f
+    repeat(HANDOFF_SEARCH_STEPS) {
+        val mid = (low + high) / 2f
+        if (easing.transform(mid) < CONTENT_HANDOFF_FRACTION) low = mid else high = mid
+    }
+    return high
+}
+
+private const val HANDOFF_SEARCH_STEPS = 24
+private val OpenHandoffTime = handoffTime(AppMotionOpenEasing)
+private val CloseHandoffTime = handoffTime(AppMotionCloseEasing)
 
 /** One route clock owns continuous opaque chrome and the separately permitted content picture. */
 @Suppress("TooManyFunctions")
@@ -149,6 +169,10 @@ internal class SettingsPageMorph {
                 ?: native
         }
 
+    /** The activating control's bounds for [next], as [begin] will resolve it; null without a measured click. */
+    internal fun pendingOriginFor(next: Any?): Rect? =
+        if (pendingEndpoint != null) pendingEndpoint?.takeIf { it.destination == next }?.bounds else pendingOrigin
+
     internal fun outgoingPresence(time: Float): Float {
         val hasOutgoingFrame = active && !entryOnly && exitStart > 0f
         return if (hasOutgoingFrame && geometryFraction(time) < CONTENT_HANDOFF_FRACTION) 1f else 0f
@@ -157,6 +181,19 @@ internal class SettingsPageMorph {
     internal fun incomingPresence(time: Float): Float {
         if (!active || entryOnly || entryStart > 0f) return 1f
         return if (geometryFraction(time) >= CONTENT_HANDOFF_FRACTION) 1f else 0f
+    }
+
+    /**
+     * Paint alpha for the two bodies around the handoff: the outgoing picture fades out just before it
+     * and the incoming native body fades in just after it, so they never overlap at native positions.
+     */
+    private fun handoffAlpha(
+        time: Float,
+        incoming: Boolean,
+    ): Float {
+        val handoff = if (opening) OpenHandoffTime else CloseHandoffTime
+        val offset = if (incoming) time - handoff else handoff - time
+        return (offset / CONTENT_HANDOFF_FADE).coerceIn(0f, 1f)
     }
 
     private fun geometryFraction(time: Float): Float {
@@ -272,7 +309,15 @@ internal class SettingsPageMorph {
                 ?.invoke()
                 ?.takeIf { it.bounds.validIn(host) }
                 ?.copy(key = anchorGroupKeys.getOrPut(next) { nextGroupKey++ }, viewport = host)
-        if (anchorSource != null) correspondenceKey = anchorSource.key
+        // Without an outline to leave from, the measured origin itself is the one source contour,
+        // so a single group grows out of it instead of every group growing from a point.
+        val outlineLessOrigin = anchorSource == null && forward && eligible && current?.isEmpty() == true
+        val originSource =
+            selected
+                ?.takeIf { outlineLessOrigin && visibleSelection?.visibleIn(host) == true }
+                ?.let { settingsOriginContour(it, host, anchorGroupKeys.getOrPut(next) { nextGroupKey++ }) }
+        val emptySource = anchorSource ?: originSource
+        if (emptySource != null) correspondenceKey = emptySource.key
         if (forward) {
             if (eligible &&
                 selected != null &&
@@ -291,7 +336,7 @@ internal class SettingsPageMorph {
             leaving = frame
             outgoingTarget = target
         }
-        sourceContours = anchorSource?.let(::listOf) ?: current.orEmpty()
+        sourceContours = emptySource?.let(::listOf) ?: current.orEmpty()
         targetContours = null
         correspondence = null
         rebaseTime = 0f
@@ -422,8 +467,26 @@ internal class SettingsPageMorph {
                 unoutlinedBodyMask.takeIf { showUnoutlinedBody },
                 showNativeBody,
             )
-        clipPath(live) {
-            clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }
+        val bodyAlpha =
+            if (!showNativeBody || borderlessEntry || entryOnly || entryStart > 0f) 1f else handoffAlpha(time, true)
+        if (bodyAlpha >= 1f) {
+            clipPath(live) {
+                clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }
+            }
+        } else {
+            // The fixed header stays opaque while the arriving body fades in after the handoff.
+            val chrome = Rect(Offset.Zero, size).nativeLiveBodyMask(bodyCoverage, bodyMask, interiors, null, false)
+            clipPath(chrome) {
+                clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }
+            }
+            val body = Path().apply { op(live, chrome, PathOperation.Difference) }
+            clipPath(body) {
+                clipPath(mask, ClipOp.Difference) {
+                    drawIntoCanvas { it.saveLayer(Rect(Offset.Zero, size), Paint().apply { alpha = bodyAlpha }) }
+                    this@draw.drawContent()
+                    drawIntoCanvas { it.restore() }
+                }
+            }
         }
         clipPath(interiors) { this@draw.drawOutgoingInk(host, time) }
         contours.forEach { drawContinuousContour(it, host) }
@@ -521,15 +584,18 @@ internal class SettingsPageMorph {
     ) {
         val frame = leaving ?: return
         val body = frame.body
-        val alpha = outgoingPresence(time)
-        if (alpha <= 0f) return
+        if (outgoingPresence(time) <= 0f) return
+        val alpha = handoffAlpha(time, false)
         val chrome = leavingMask ?: nativeChromeMask(frame.contours, host).also { leavingMask = it }
         // The source and destination's measured body edges leave both native headers untouched.
         clipRect(top = (maxOf(frame.bodyTop, bodyTop) - host.top).coerceAtLeast(0f)) {
             clipPath(body) {
                 clipPath(chrome, ClipOp.Difference) {
                     drawIntoCanvas { canvas ->
+                        val layered = alpha < 1f
+                        if (layered) canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { this.alpha = alpha })
                         canvas.nativeCanvas.drawPicture(frame.picture)
+                        if (layered) canvas.restore()
                     }
                 }
             }
