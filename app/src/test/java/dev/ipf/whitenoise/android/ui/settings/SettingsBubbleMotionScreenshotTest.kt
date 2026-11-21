@@ -2,10 +2,13 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,7 +22,9 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -97,6 +102,21 @@ class SettingsBubbleMotionScreenshotTest {
         capture("settings_bubble_close_settled_dark")
     }
 
+    @Test fun measuredAmoledAvatarOpensAndClosesTheContainer() {
+        render(dark = true, largeRtl = false, start = 0, measuredAvatar = true)
+        composeRule.onNodeWithTag(AVATAR_TAG).performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        advanceFrames(48)
+        capture("settings_bubble_avatar_open_amoled")
+        advanceFrames(SETTLE_MILLIS)
+        composeRule.onRoot().captureToImage()
+
+        update { depth.value = 0 }
+        composeRule.mainClock.advanceTimeByFrame()
+        advanceFrames(192)
+        capture("settings_bubble_avatar_close_amoled")
+    }
+
     @Test fun reducedMotionSwitchesAtOnce() {
         render(dark = false, largeRtl = false, start = 0)
         update { animations.value = false }
@@ -126,6 +146,7 @@ class SettingsBubbleMotionScreenshotTest {
         dark: Boolean,
         largeRtl: Boolean,
         start: Int,
+        measuredAvatar: Boolean = false,
     ) {
         depth.value = start
         composeRule.mainClock.autoAdvance = false
@@ -135,7 +156,7 @@ class SettingsBubbleMotionScreenshotTest {
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 LocalDensity provides Density(density.density, if (largeRtl) 1.6f else 1f),
             ) {
-                WhiteNoiseTheme(darkTheme = dark) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = measuredAvatar) {
                     Surface(Modifier.fillMaxSize()) {
                         SettingsRouteMotion(
                             target = depth.value,
@@ -143,7 +164,10 @@ class SettingsBubbleMotionScreenshotTest {
                             ownerKey = "account",
                             animationsEnabled = animations.value,
                             topLevelBubble = true,
-                        ) { route -> Route(route) }
+                            cardMorph = measuredAvatar,
+                        ) { route ->
+                            Route(route, showAvatar = measuredAvatar && route == 0) { depth.value = 1 }
+                        }
                     }
                 }
             }
@@ -176,10 +200,24 @@ class SettingsBubbleMotionScreenshotTest {
 }
 
 @androidx.compose.runtime.Composable
-private fun Route(route: Int) {
+private fun Route(
+    route: Int,
+    showAvatar: Boolean,
+    onOpen: () -> Unit,
+) {
     val rows = if (route == 0) CHAT_ROWS else SETTINGS_ROWS
     Surface(Modifier.fillMaxSize().testTag("route.$route")) {
         Column(Modifier.padding(16.dp)) {
+            if (showAvatar) {
+                val (origin, open) = rememberSettingsRouteClick(onOpen)
+                Surface(
+                    modifier = Modifier.size(40.dp).then(origin).testTag(AVATAR_TAG).clickable(onClick = open),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                ) {
+                    Text("N", Modifier.padding(10.dp))
+                }
+            }
             Text(
                 if (route == 0) "Chats" else "Settings",
                 style = MaterialTheme.typography.headlineSmall,
@@ -193,6 +231,7 @@ private fun Route(route: Int) {
     }
 }
 
+private const val AVATAR_TAG = "motion.avatar"
 private const val SETTLE_MILLIS = 1_000L
 private const val FRAME_MILLIS = 16L
 private val CHAT_ROWS = listOf("Alice", "Book club", "Bob", "Family", "Weekend plans", "Carol")

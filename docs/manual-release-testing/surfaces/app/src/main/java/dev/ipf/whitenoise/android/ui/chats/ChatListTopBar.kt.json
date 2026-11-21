@@ -217,6 +217,14 @@
         "test_ids": [
           "CHL-037"
         ]
+      },
+      {
+        "surface": "The chat-list avatar is Settings' container origin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": ".settingsCardMorph(SettingsHomeOriginAnchor, avatarInset)",
+        "test_ids": [
+          "SET-060"
+        ]
       }
     ]
   },

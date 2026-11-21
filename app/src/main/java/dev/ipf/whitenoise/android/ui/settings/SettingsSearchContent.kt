@@ -60,7 +60,8 @@ internal fun SettingsSearchResults(
             Modifier
                 .animateItem(
                     fadeInSpec = if (animationsEnabled && rank > 0) tween(SETTINGS_SEARCH_MEMBERSHIP_MILLIS) else null,
-                    placementSpec = if (animationsEnabled && rank > 0) tween(SETTINGS_ROUTE_MOTION_MILLIS) else null,
+                    placementSpec =
+                        if (animationsEnabled && rank > 0) tween(SETTINGS_SEARCH_PLACEMENT_MILLIS) else null,
                     fadeOutSpec = null,
                 ).zIndex(-rank.toFloat())
         },
@@ -94,6 +95,9 @@ internal fun SettingsSearchResults(
 }
 
 private const val SETTINGS_SEARCH_MEMBERSHIP_MILLIS = 120
+
+/** Search results settle into their new ranks on this clock. */
+private const val SETTINGS_SEARCH_PLACEMENT_MILLIS = 200
 
 /** A result borrows its hub category's glyph; categories outside the hub fall back to search. */
 @DrawableRes

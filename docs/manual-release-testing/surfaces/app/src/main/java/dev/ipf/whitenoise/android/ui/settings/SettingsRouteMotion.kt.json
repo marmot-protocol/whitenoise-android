@@ -8,7 +8,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsRouteMotion.kt",
         "anchor": "fun <T> SettingsRouteMotion(",
         "test_ids": [
-          "SET-039"
+          "SET-039",
+          "SET-060",
+          "SET-061"
         ]
       },
       {
@@ -17,7 +19,8 @@
         "anchor": "fun <T> rememberRouteMotionModifier(",
         "test_ids": [
           "SET-041",
-          "CON-037"
+          "CON-037",
+          "SET-060"
         ]
       }
     ],
