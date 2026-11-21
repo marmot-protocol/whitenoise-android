@@ -27,6 +27,7 @@ import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -154,7 +155,9 @@ class PollScreenshotTest {
     @Config(qualifiers = "en-w360dp-h1000dp-mdpi")
     fun tallCreateDialogUsesAvailableHeight() {
         composeRule.setContent {
-            WhiteNoiseTheme { PollCreateDialog({}, { _, _, _, _, _ -> }) }
+            CompositionLocalProvider(LocalSystemAnimationsEnabled provides false) {
+                WhiteNoiseTheme { PollCreateDialog({}, { _, _, _, _, _ -> }) }
+            }
         }
         val form = composeRule.onNodeWithTag("poll.create.form").fetchSemanticsNode()
         assertTrue(form.boundsInRoot.height > 400f)
