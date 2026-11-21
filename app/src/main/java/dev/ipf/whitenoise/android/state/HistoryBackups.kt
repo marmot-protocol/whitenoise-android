@@ -195,7 +195,11 @@ internal class HistoryBackupsController(
                         }
                     } catch (retired: CancellationException) {
                         // MDK may hold words this screen will never show; forget them before a replacement can begin.
-                        if (reachedMdk) withContext(dispatcher + NonCancellable) { runCatching { marmot.cancelRecoveryWords(accountRef) } }
+                        if (reachedMdk) {
+                            withContext(dispatcher + NonCancellable) {
+                                runCatching { marmot.cancelRecoveryWords(accountRef) }
+                            }
+                        }
                         throw retired
                     }
                 }
