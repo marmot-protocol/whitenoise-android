@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.SystemClock
@@ -38,6 +37,7 @@ import dev.ipf.whitenoise.android.diagnostics.AndroidFramePerformanceReporter
 import dev.ipf.whitenoise.android.diagnostics.FramePerformanceCallbackGuard
 import dev.ipf.whitenoise.android.notifications.NotificationInboundState
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
+import dev.ipf.whitenoise.android.notifications.NotificationProfileTileRoute
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapGate
@@ -86,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         set(value) {
             notificationInboundState.requestId = value
         }
+    private val notificationProfileTileRoute = NotificationProfileTileRoute()
     private var inboundAppUpdateTap by mutableIntStateOf(0)
 
     /** Pending launcher capabilities belong to this task's retained owner, never saved instance state. */
@@ -253,6 +254,7 @@ class MainActivity : AppCompatActivity() {
                 appFont = state.appFont,
             ) {
                 ProvideWindowLayout {
+                    notificationProfileTileRoute.Content(state)
                     WhiteNoiseApp(
                         appState = state,
                         mainShellStateHolder = mainShellStateHolder,
@@ -397,6 +399,10 @@ class MainActivity : AppCompatActivity() {
         retainPendingShareOnRecreation: Boolean = false,
         lifecycleClass: WarmResumeLifecycleClass = warmResumeLifecycleClass,
     ) {
+        if (notificationProfileTileRoute.accept(intent)) {
+            setIntent(Intent(this, MainActivity::class.java))
+            return
+        }
         if (AppUpdateNavigation.isUpdateTap(intent)) {
             pinTapGate.supersede()
             inboundAppUpdateTap += 1
@@ -865,28 +871,6 @@ internal fun shouldRetainSystemSplash(
                 (phase == AppPhase.Bootstrapping || (phase == AppPhase.Ready && !firstUsefulFrameReady))
     }
 
-internal fun preComposeThemeFor(
-    themeMode: AppThemeMode,
-    systemDarkTheme: Boolean,
-): Int =
-    when (themeMode) {
-        AppThemeMode.System -> if (systemDarkTheme) R.style.Theme_WhiteNoise_Dark else R.style.Theme_WhiteNoise_Light
-        AppThemeMode.Light -> R.style.Theme_WhiteNoise_Light
-        AppThemeMode.Dark -> R.style.Theme_WhiteNoise_Dark
-        AppThemeMode.Amoled -> R.style.Theme_WhiteNoise_Amoled
-    }
-
-internal fun preComposeWindowBackgroundFor(
-    themeMode: AppThemeMode,
-    systemDarkTheme: Boolean,
-): Int =
-    when (themeMode) {
-        AppThemeMode.System -> if (systemDarkTheme) PRE_COMPOSE_BACKGROUND_DARK else PRE_COMPOSE_BACKGROUND_LIGHT
-        AppThemeMode.Light -> PRE_COMPOSE_BACKGROUND_LIGHT
-        AppThemeMode.Dark -> PRE_COMPOSE_BACKGROUND_DARK
-        AppThemeMode.Amoled -> Color.BLACK
-    }
-
 private val Configuration.isNightModeActive: Boolean
     get() = (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
@@ -894,8 +878,6 @@ private const val APP_PREFERENCES_NAME = "whitenoise"
 private const val THEME_MODE_KEY = "theme_mode"
 internal const val BENCHMARK_RECREATE_ACTIVITY_EXTRA =
     "dev.ipf.whitenoise.android.extra.BENCHMARK_RECREATE_ACTIVITY"
-private const val PRE_COMPOSE_BACKGROUND_LIGHT = 0xFFECEEEE.toInt()
-private const val PRE_COMPOSE_BACKGROUND_DARK = 0xFF0F1112.toInt()
 private val appUnlockHostIds = AtomicLong()
 private const val APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS = 5_000L
 

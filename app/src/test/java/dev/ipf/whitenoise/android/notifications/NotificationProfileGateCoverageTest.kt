@@ -24,7 +24,7 @@ class NotificationProfileGateCoverageTest {
         assertTrue("the gate reads the live profile", gate.contains("notificationProfiles.active()"))
         assertTrue(
             "the gate applies the evaluator",
-            gate.contains("notificationProfileSuppresses(active.profile, update)"),
+            gate.contains("notificationProfileSuppresses(profile, update)"),
         )
     }
 
