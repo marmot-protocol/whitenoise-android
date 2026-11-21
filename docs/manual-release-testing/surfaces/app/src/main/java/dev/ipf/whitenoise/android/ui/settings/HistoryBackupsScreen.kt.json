@@ -1,0 +1,76 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "HistoryBackupsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "fun HistoryBackupsScreen(",
+        "test_ids": [
+          "SET-070",
+          "SET-071"
+        ]
+      },
+      {
+        "surface": "HistoryBackupsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "fun HistoryBackupsContent(",
+        "test_ids": [
+          "SET-070",
+          "SET-071"
+        ]
+      },
+      {
+        "surface": "HistoryBackupsStatusGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "fun HistoryBackupsStatusGroup(",
+        "test_ids": [
+          "SET-070"
+        ]
+      },
+      {
+        "surface": "HistoryRestoreGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "fun HistoryRestoreGroup(",
+        "test_ids": [
+          "SET-071"
+        ]
+      },
+      {
+        "surface": "RecoveryWordsSetupContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "fun RecoveryWordsSetupContent(",
+        "test_ids": [
+          "SET-070"
+        ]
+      },
+      {
+        "surface": "RecoveryWordsGrid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "fun RecoveryWordsGrid(",
+        "test_ids": [
+          "SET-070"
+        ]
+      },
+      {
+        "surface": "SetupButtons",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "fun SetupButtons(",
+        "test_ids": [
+          "SET-070"
+        ]
+      },
+      {
+        "surface": "RecoveryWordsInput",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "fun RecoveryWordsInput(",
+        "test_ids": [
+          "SET-070",
+          "SET-071"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

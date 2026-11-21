@@ -772,6 +772,10 @@
           "represented_by": "home.ProfileKeys"
         },
         {
+          "declaration": "\"history_backups\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
           "declaration": "\"relays\"",
           "represented_by": "home.Relays"
         },
@@ -842,6 +846,30 @@
         {
           "declaration": "\"app_updates\"",
           "represented_by": "Home.update_controls"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"status\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
+          "declaration": "\"turn_on\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
+          "declaration": "\"new_words\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
+          "declaration": "\"turn_off\"",
+          "represented_by": "home.HistoryBackups"
+        },
+        {
+          "declaration": "\"retry\"",
+          "represented_by": "home.HistoryBackups"
         }
       ]
     }
@@ -964,6 +992,9 @@
     },
     "NotificationDelivery": {
       "catalog_id": "home.NotificationDelivery"
+    },
+    "HistoryBackups": {
+      "catalog_id": "home.HistoryBackups"
     }
   },
   "exclusions": {
