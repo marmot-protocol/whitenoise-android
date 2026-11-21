@@ -85,18 +85,25 @@ internal fun <T> rememberPageHandoff(
     return Modifier
         .clipToBounds()
         .drawBehind { if (moving) drawRect(backplate) }
-        .semantics { if (moving) hideFromAccessibility() }
-        .onPreviewKeyEvent { moving && it.key != Key.Back && it.key != Key.Escape }
-        .pointerInput(offset) {
-            awaitPointerEventScope {
-                while (true) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                    if (moving) event.changes.forEach { it.consume() }
-                }
-            }
-        }.graphicsLayer {
+        .blockMovingPageInput(offset) { moving }
+        .graphicsLayer {
             translationX = travelPx * offset.value
             presented.translationPx = translationX
             presented.inFlight = offset.value != 0f
         }
 }
+
+private fun Modifier.blockMovingPageInput(
+    animationKey: Any,
+    moving: () -> Boolean,
+): Modifier =
+    semantics { if (moving()) hideFromAccessibility() }
+        .onPreviewKeyEvent { moving() && it.key != Key.Back && it.key != Key.Escape }
+        .pointerInput(animationKey) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    if (moving()) event.changes.forEach { it.consume() }
+                }
+            }
+        }

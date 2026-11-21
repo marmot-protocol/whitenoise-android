@@ -225,7 +225,12 @@ class SettingsRouteMotionTest {
         rule.mainClock.advanceTimeByFrame()
         val page = rule.onNodeWithTag("page.0")
         val returning = page.fetchSemanticsNode().positionInRoot.x
-        assertEquals("The replacement must keep the last drawn pixel translation", requireNotNull(beforeReplacement), returning, 0.5f)
+        assertEquals(
+            "The replacement must keep the last drawn pixel translation",
+            requireNotNull(beforeReplacement),
+            returning,
+            0.5f,
+        )
         rule.mainClock.advanceTimeBy(96)
         assertTrue(page.fetchSemanticsNode().positionInRoot.x in 0f..returning)
         rule.mainClock.advanceTimeBy(300)
@@ -265,7 +270,9 @@ class SettingsRouteMotionTest {
         }
         rule.onNodeWithText("Open").performClick()
         rule.mainClock.advanceTimeBy(64)
-        rule.runOnIdle { assertEquals("Candidate began, then lost its measured match", listOf(true, false), contourDecisions) }
+        rule.runOnIdle {
+            assertEquals("Candidate began, then lost its measured match", listOf(true, false), contourDecisions)
+        }
         val page = rule.onNodeWithTag("plain")
         val moving = page.getUnclippedBoundsInRoot().left.value
         assertTrue("Rejected contour should hand off to the native page", moving > 0f && moving <= AppPageTravel.value)

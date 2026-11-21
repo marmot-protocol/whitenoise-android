@@ -209,7 +209,9 @@ class SettingsCardMorphScreenshotTest {
                             SideEffect { morph = owner }
                             Route(
                                 target,
-                                Modifier.testTag("route.header").onGloballyPositioned { headerBounds = it.boundsInRoot() },
+                                Modifier
+                                    .testTag("route.header")
+                                    .onGloballyPositioned { headerBounds = it.boundsInRoot() },
                                 onNavigate = { route.value = 1 },
                             )
                         }

@@ -56,7 +56,8 @@ class ChatsSettingsTransitionFramesTest {
         amoled: Boolean,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val originalScale = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        val originalScale =
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
         setAnimatorScale(context, 1f)
         val fixture = ReturnFixture()
         val app = fixture.appState
@@ -120,13 +121,14 @@ class ChatsSettingsTransitionFramesTest {
         opening: Boolean,
     ) {
         val control = rule.onNodeWithTag(tag, useUnmergedTree = true)
+        val controls = rule.onAllNodesWithTag(tag, useUnmergedTree = true)
         var firstPresented: DpRect? = null
         repeat(FRAME_COUNT) { index ->
             rule.mainClock.advanceTimeByFrame()
             shadowOf(Looper.getMainLooper()).idle()
             writeFrame(directory, index + 1)
             // System Back may commit on a later frame than a Compose click. Keep every frame in the clip.
-            if (firstPresented == null && rule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
+            if (firstPresented == null && controls.fetchSemanticsNodes().isNotEmpty()) {
                 firstPresented = control.getUnclippedBoundsInRoot()
             }
         }
@@ -137,7 +139,7 @@ class ChatsSettingsTransitionFramesTest {
             "Expected bounded page travel at $tag, observed $travel dp",
             travel > 0f && travel <= AppPageTravel.value + 1f,
         )
-        assertEquals("Native width at $tag", (settled.right - settled.left).value, (first.right - first.left).value, 0.5f)
+        assertEquals("Native width at $tag", settled.width.value, first.width.value, 0.5f)
         assertEquals("Native vertical position at $tag", settled.top.value, first.top.value, 0.5f)
     }
 
