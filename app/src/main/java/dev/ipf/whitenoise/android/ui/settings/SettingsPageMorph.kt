@@ -52,7 +52,6 @@ internal class SettingsPageMorph {
 
     /** The live outline of the control an anchor-only route, such as a chat, opens from. */
     internal var anchorContour: (() -> SettingsContour?)? = null
-    internal var closingAnchorContour: (() -> SettingsContour?)? = null
     private var exitStart = 1f
     private var entryStart = 0f
     private var entryOnly = false
@@ -146,16 +145,11 @@ internal class SettingsPageMorph {
     }
 
     /** Closing to a route without groups folds into the outline it opened from, when that is on screen. */
-    private fun closingTarget(native: List<SettingsContour>?): List<SettingsContour>? =
-        if (opening || native?.isEmpty() != true) {
-            native
-        } else {
-            (closingAnchorContour ?: anchorContour)
-                ?.invoke()
-                ?.takeIf { it.bounds.validIn(transitionHost) }
-                ?.let { listOf(it.copy(key = targetAnchorKey ?: correspondenceKey ?: 0, viewport = transitionHost)) }
-                ?: native
-        }
+    private fun closingTarget(native: List<SettingsContour>?): List<SettingsContour>? {
+        if (opening || native?.isEmpty() != true) return native
+        val anchor = anchorContour?.invoke()?.takeIf { it.bounds.validIn(transitionHost) } ?: return native
+        return listOf(anchor.copy(key = targetAnchorKey ?: correspondenceKey ?: 0, viewport = transitionHost))
+    }
 
     internal fun outgoingPresence(time: Float): Float {
         val hasOutgoingFrame = active && !entryOnly && exitStart > 0f

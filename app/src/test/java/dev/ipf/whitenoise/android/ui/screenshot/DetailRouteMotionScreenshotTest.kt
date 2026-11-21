@@ -759,7 +759,6 @@ class DetailRouteMotionScreenshotTest {
         profile: Boolean,
     ) {
         val frames = if (captureFrames) File("build/detail-route-motion/$name").apply { mkdirs() } else null
-        var firstNativeBody: Bitmap? = null
         var intermediate: Bitmap? = null
         var settled: Bitmap? = null
         // Only AMOLED cards draw outlines, so only there do details cards visibly fold into the composer.
@@ -787,7 +786,7 @@ class DetailRouteMotionScreenshotTest {
                 exportTransitionFrame(frames, name, frame, bitmap)
                 if (frame == 0) {
                     if (borderlessPage) {
-                        firstNativeBody = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                        assertPageBackplate(name, bitmap)
                     } else {
                         assertFirstFrameBackplate(name, bitmap)
                     }
@@ -800,20 +799,16 @@ class DetailRouteMotionScreenshotTest {
             }
             rule.mainClock.advanceTimeBy(16)
         }
-        firstNativeBody?.let { first ->
-            assertNativeBodyEdgeContinuity(name, first, checkNotNull(settled))
-        }
         if (profile || borderlessPage) {
-            // Borderless themes hand off their body once; no synthetic contour or dissolve is required.
             org.junit.Assert.assertFalse(
                 "$name must replace its source body at the destination",
                 checkNotNull(settled).sameAs(transitionSources.getValue(name)),
             )
         }
-        if (morphs) {
+        if (morphs || borderlessPage) {
             assertIntermediateMotion(name, checkNotNull(intermediate), checkNotNull(settled))
         }
-        if (name.startsWith("composer_") && name.endsWith("_entry")) {
+        if (morphs && name.startsWith("composer_") && name.endsWith("_entry")) {
             assertNativeComposerHeader(name, checkNotNull(intermediate), checkNotNull(settled))
         }
     }
@@ -833,16 +828,18 @@ class DetailRouteMotionScreenshotTest {
         )
     }
 
-    private fun assertNativeBodyEdgeContinuity(
+    /** A full-size page exposes the themed root along its trailing edge on Back and leading edge on entry. */
+    private fun assertPageBackplate(
         name: String,
-        first: Bitmap,
-        settled: Bitmap,
+        bitmap: Bitmap,
     ) {
-        for (y in listOf(first.height / 4, first.height / 2, first.height * 3 / 4)) {
+        val exposedLeft = name.endsWith("_back") == name.contains("_rtl")
+        val edge = if (exposedLeft) 1 else bitmap.width - 2
+        for (y in listOf(bitmap.height / 4, bitmap.height / 2, bitmap.height * 3 / 4)) {
             assertEquals(
-                "$name must preserve each native surface at entry",
-                settled.getPixel(1, y),
-                first.getPixel(1, y),
+                "$name must expose the themed page backplate",
+                checkNotNull(routeBackground),
+                bitmap.getPixel(edge, y),
             )
         }
     }

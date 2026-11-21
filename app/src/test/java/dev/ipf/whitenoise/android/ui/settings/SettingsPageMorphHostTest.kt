@@ -1252,7 +1252,6 @@ class SettingsPageMorphHostTest {
         val freeBody = Any()
         val contour = outlinedContour(composer, host)
         page.anchorContour = { contour }
-        page.closingAnchorContour = { contour }
         page.begin("chat", true, false, host)
         page.pendingOrigin = composer
         assertTrue(page.begin("details", true, true, host))
@@ -1300,7 +1299,6 @@ class SettingsPageMorphHostTest {
         val token = Any()
         val contour = outlinedContour(composer, host)
         page.anchorContour = { contour }
-        page.closingAnchorContour = { contour }
         page.begin("chat", true, false, host)
         page.pendingOrigin = composer
         assertTrue(page.begin("details", true, true, host))

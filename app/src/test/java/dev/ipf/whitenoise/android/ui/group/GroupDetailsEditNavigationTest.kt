@@ -7,7 +7,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -23,6 +22,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -245,12 +245,22 @@ class GroupDetailsEditNavigationTest {
         val sourceBounds = composeRule.onNodeWithTag("chat_info.add_people").fetchSemanticsNode().boundsInRoot
         composeRule.mainClock.autoAdvance = false
         composeRule.onNodeWithTag("chat_info.add_people").performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeByFrame()
-        val first = composeRule.onRoot().captureToImage().asAndroidBitmap()
+        // This picker has a borderless body. Its handoff starts after the shared-outline
+        // candidate inspects the destination. Sample the title through admission and travel.
+        val title = composeRule.onAllNodesWithText(context.getString(R.string.add_member), useUnmergedTree = true)
+        val positions =
+            buildList {
+                repeat(12) {
+                    composeRule.mainClock.advanceTimeByFrame()
+                    title.fetchSemanticsNodes().singleOrNull()?.let { add(it.positionInRoot.x) }
+                }
+            }
         composeRule.mainClock.advanceTimeBy(400)
-        val settled = composeRule.onRoot().captureToImage().asAndroidBitmap()
-        assertTrue("Manual picker must grow from its activating row", !first.sameAs(settled))
+        val settled = addMembersTitleLeft()
+        assertTrue(
+            "Manual picker must enter from the logical end: $positions, settled $settled",
+            positions.any { it > settled + 1f },
+        )
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.mainClock.advanceTimeBy(400)
         composeRule.onNodeWithTag("chat_info.add_people").assertIsDisplayed()
