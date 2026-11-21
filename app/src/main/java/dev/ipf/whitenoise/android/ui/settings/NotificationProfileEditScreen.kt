@@ -29,10 +29,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.allLoadedFolderChats
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.notificationProfiles
+import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
-import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import kotlinx.coroutines.Dispatchers

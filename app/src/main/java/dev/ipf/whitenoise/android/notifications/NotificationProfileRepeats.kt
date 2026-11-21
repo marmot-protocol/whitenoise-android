@@ -17,7 +17,12 @@ internal class NotificationProfileRepeats(
         context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
 ) {
     private val lock = Any()
-    private data class RepeatState(val at: Long, val held: String, val admitted: String)
+
+    private data class RepeatState(
+        val at: Long,
+        val held: String,
+        val admitted: String,
+    )
 
     private val entries = load()
 
@@ -81,7 +86,10 @@ internal class NotificationProfileRepeats(
         profileId: String,
         update: NotificationUpdateFfi,
     ): String? {
-        val sender = update.sender.accountIdHex.trim().lowercase(Locale.ROOT)
+        val sender =
+            update.sender.accountIdHex
+                .trim()
+                .lowercase(Locale.ROOT)
         if (update.accountRef.isEmpty() || sender.isEmpty()) return null
         return "${sha256Hex(update.accountRef)}.${sha256Hex(profileId)}.${sha256Hex(sender)}"
     }

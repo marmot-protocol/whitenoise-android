@@ -76,8 +76,7 @@ internal fun notificationProfileTileAppLockRequired(context: Context): Boolean {
 }
 
 /** The app's main settings file, as WhiteNoiseAppState opens it. */
-private fun appPreferences(context: Context) =
-    context.applicationContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+private fun appPreferences(context: Context) = context.applicationContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
 
 /** How a request to add the tile ended. */
 internal enum class NotificationProfileTileAddOutcome { ADDED, DECLINED, FAILED }

@@ -103,7 +103,12 @@ class NotificationProfilePresetsTest {
         val preferences = fresh()
         val store = store(preferences)
         assertFalse(store.state.value.showInChatList)
-        assertTrue(store.save(store.state.value.profiles[0].copy(name = "Night")))
+        assertTrue(
+            store.save(
+                store.state.value.profiles[0]
+                    .copy(name = "Night"),
+            ),
+        )
         assertTrue(store.turnOn("preset-focus", null))
         assertFalse(store.state.value.showInChatList)
         assertTrue(store.setShowInChatList(true))

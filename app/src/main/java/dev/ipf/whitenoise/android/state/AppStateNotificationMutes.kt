@@ -106,7 +106,8 @@ private fun WhiteNoiseAppState.suppressedByNotificationProfile(update: Notificat
     val active = notificationProfiles.active() ?: return false
     val profile = active.profile
     if (!notificationProfileSuppresses(profile, update)) return false
-    if (profile.allowRepeatedMessages && isNotificationProfileMessage(update) &&
+    if (profile.allowRepeatedMessages &&
+        isNotificationProfileMessage(update) &&
         notificationProfileRepeats.admit(profile.id, update, System.currentTimeMillis())
     ) {
         return false

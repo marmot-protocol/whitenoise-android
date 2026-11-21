@@ -24,8 +24,12 @@ internal class NotificationProfileTileRoute {
     @Suppress("FunctionNaming")
     fun Content(state: WhiteNoiseAppState) {
         if (
-            pending && state.phase == AppPhase.Ready && state.appInForeground &&
-            !state.appLock.screenVisible && !state.appLock.evaluationPending && state.activeAccountRef != null
+            pending &&
+            state.phase == AppPhase.Ready &&
+            state.appInForeground &&
+            !state.appLock.screenVisible &&
+            !state.appLock.evaluationPending &&
+            state.activeAccountRef != null
         ) {
             NotificationProfileQuickSheet(state, onDismiss = { pending = false })
         }

@@ -72,7 +72,13 @@ class NotificationProfilePostGateTest {
             assertFalse(state.shouldPostNotification(profileTestUpdate(sender = "efgh", groupIdHex = "other"), false))
             assertTrue(state.shouldPostNotification(first.copy(messageIdHex = "second"), false))
 
-            assertTrue(profiles.save(profiles.state.value.profiles.first { it.id == "focus" }.copy(allowRepeatedMessages = false)))
+            assertTrue(
+                profiles.save(
+                    profiles.state.value.profiles
+                        .first { it.id == "focus" }
+                        .copy(allowRepeatedMessages = false),
+                ),
+            )
             assertFalse(state.shouldPostNotification(first.copy(messageIdHex = "third"), false))
         } finally {
             state.mutationsScope.cancel()

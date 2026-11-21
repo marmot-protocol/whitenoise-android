@@ -127,7 +127,10 @@ class NotificationProfileInteractionTest {
             composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertDoesNotExist()
             composeRule.runOnIdle { assertTrue(store.setShowInChatList(true)) }
             composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertIsDisplayed()
-            composeRule.runOnIdle { store.state.value.profiles.forEach { assertTrue(store.delete(it.id)) } }
+            composeRule.runOnIdle {
+                store.state.value.profiles
+                    .forEach { assertTrue(store.delete(it.id)) }
+            }
             composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertDoesNotExist()
         } finally {
             app.mutationsScope.cancel()

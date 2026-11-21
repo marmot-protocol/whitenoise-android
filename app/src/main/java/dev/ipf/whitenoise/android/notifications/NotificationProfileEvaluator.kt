@@ -110,7 +110,10 @@ internal fun notificationProfileSuppresses(
 ): Boolean {
     if (active == null || update.isFromSelf) return false
     val chat = NotificationProfileChat(update.accountRef, update.groupIdHex.lowercase(Locale.ROOT))
-    val sender = update.sender.accountIdHex.trim().lowercase(Locale.ROOT)
+    val sender =
+        update.sender.accountIdHex
+            .trim()
+            .lowercase(Locale.ROOT)
     val person = NotificationProfilePerson(update.accountRef, sender)
     val message = isNotificationProfileMessage(update)
     val allowed =
