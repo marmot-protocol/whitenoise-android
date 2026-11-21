@@ -901,6 +901,14 @@
       "assertions": "Key Packages opens its real native-backed content and Back restores Developer Tools; no package is published.",
       "postcondition": "none"
     },
+    "settings-history-backups": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-070"
+      ],
+      "assertions": "History backups opens from the Account hub with its status row and Back restores the hub; no words are generated and no backup or restore starts.",
+      "postcondition": "none"
+    },
     "developer-quarantine": {
       "suite": "developer",
       "manual_ids": [

@@ -317,6 +317,7 @@ private fun SettingsDetailRoute(
                 onPictureActionsOpened = onProfilePictureActionsOpened,
             )
         SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = onBack)
+        SettingsDetail.HistoryBackups -> HistoryBackupsScreen(appState, onBack = onBack)
         SettingsDetail.Relays -> RelaysScreen(appState, onBack = onBack)
         SettingsDetail.Support ->
             SupportScreen(
@@ -325,12 +326,7 @@ private fun SettingsDetailRoute(
                 onOpenSupportChat = onOpenSupportChat,
                 onRelays = { onDetailChange(SettingsDetail.SupportRelays) },
             )
-        SettingsDetail.SupportRelays ->
-            RelaysScreen(
-                appState,
-                onBack = onBack,
-                destination = SettingsDetail.SupportRelays,
-            )
+        SettingsDetail.SupportRelays -> RelaysScreen(appState, onBack = onBack, destination = SettingsDetail.SupportRelays)
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = onBack)
         SettingsDetail.QuarantinedGroups -> {
             if (appState.developerMode) {

@@ -101,6 +101,16 @@ internal fun AccountHubGroup(
                 leading = { SettingsLeadingIcon(R.drawable.ic_settings_key) },
             )
         }
+        row("history_backups") { context ->
+            SettingsLink(
+                context = context,
+                title = stringResource(R.string.history_backups),
+                routeKey = SettingsDetail.HistoryBackups,
+                explanation = stringResource(R.string.explanation_organize_hub_history_backups),
+                onClick = { onOpenDetail(SettingsDetail.HistoryBackups) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
+            )
+        }
         row("relays") { context ->
             SettingsLink(
                 context = context,
