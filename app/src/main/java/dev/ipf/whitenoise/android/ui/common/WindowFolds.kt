@@ -4,7 +4,9 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -92,26 +94,21 @@ internal fun windowFolds(
 /** Follows the activity window's folds; [WindowFolds.None] outside an activity or before the first report. */
 @Composable
 internal fun rememberWindowFolds(): WindowFolds {
-    val activity = LocalActivity.current
+    val activity = LocalActivity.current ?: return WindowFolds.None
     val density = LocalDensity.current
     val windowSize = LocalWindowInfo.current.containerSize
-    val folds by
-        produceState(initialValue = WindowFolds.None, activity, density, windowSize) {
-            if (activity == null) return@produceState
+    // Keep the platform observation in pixels so resizing can re-evaluate it immediately.
+    val features by key(activity) {
+        produceState(emptyList<FoldingFeature>()) {
             WindowInfoTracker
                 .getOrCreate(activity)
                 .windowLayoutInfo(activity)
                 // A device without window extensions keeps the regular layout.
-                .catch { value = WindowFolds.None }
-                .collect { info ->
-                    value =
-                        windowFolds(
-                            features = info.displayFeatures.filterIsInstance<FoldingFeature>(),
-                            windowWidthPx = windowSize.width,
-                            windowHeightPx = windowSize.height,
-                            density = density,
-                        )
-                }
+                .catch { value = emptyList() }
+                .collect { info -> value = info.displayFeatures.filterIsInstance<FoldingFeature>() }
         }
-    return folds
+    }
+    return remember(features, windowSize, density) {
+        windowFolds(features, windowSize.width, windowSize.height, density)
+    }
 }
