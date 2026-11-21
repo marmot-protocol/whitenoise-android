@@ -1,12 +1,19 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.app.AlertDialog
+import android.app.PendingIntent
+import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import java.time.ZoneId
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -22,14 +29,18 @@ class NotificationProfileTileService : TileService() {
     private val handler = Handler(Looper.getMainLooper())
     private val refresh = Runnable { updateTile() }
     private val writes: ExecutorService = Executors.newSingleThreadExecutor()
+    private var listening: Job? = null
     private val store get() = NotificationProfilePreferences.forContext(this)
 
     override fun onStartListening() {
         super.onStartListening()
-        updateTile()
+        listening?.cancel()
+        listening = CoroutineScope(Dispatchers.Main.immediate).launch { store.state.collect { updateTile() } }
     }
 
     override fun onStopListening() {
+        listening?.cancel()
+        listening = null
         handler.removeCallbacks(refresh)
         super.onStopListening()
     }
@@ -45,6 +56,8 @@ class NotificationProfileTileService : TileService() {
     }
 
     override fun onDestroy() {
+        listening?.cancel()
+        listening = null
         handler.removeCallbacks(refresh)
         writes.shutdown()
         super.onDestroy()
@@ -53,8 +66,20 @@ class NotificationProfileTileService : TileService() {
     override fun onClick() {
         super.onClick()
         if (currentModel() == NotificationProfileTileModel.Unavailable) return
-        if (isLocked && (isSecure || notificationProfileTileAppLockRequired(this))) {
-            unlockAndRun(::showChooser)
+        if (isLocked) unlockAndRun(::openChooser) else openChooser()
+    }
+
+    /** Hand off to the normal app entry point when its lock protects profile names and controls. */
+    @Suppress("DEPRECATION")
+    private fun openChooser() {
+        if (currentModel() == NotificationProfileTileModel.Unavailable) return
+        if (notificationProfileTileAppLockRequired(this)) {
+            val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startActivityAndCollapse(PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE))
+            } else {
+                startActivityAndCollapse(intent)
+            }
         } else {
             showChooser()
         }
@@ -76,7 +101,15 @@ class NotificationProfileTileService : TileService() {
                 .setSingleChoiceItems(choices.labels.toTypedArray(), choices.checked) { shown, which ->
                     shown.dismiss()
                     val profileId = choices.profileIds.getOrNull(which)
-                    write { if (profileId != null) store.turnOn(profileId, null) else store.turnOff() }
+                    write {
+                        if (notificationProfileTileAppLockRequired(this) || !notificationProfileTileSignedIn(this)) {
+                            false
+                        } else if (profileId != null) {
+                            store.turnOn(profileId, null)
+                        } else {
+                            store.turnOff()
+                        }
+                    }
                 }.setNegativeButton(R.string.cancel, null)
                 .create()
         showDialog(dialog)
@@ -86,7 +119,6 @@ class NotificationProfileTileService : TileService() {
         runCatching {
             writes.execute {
                 runCatching(change)
-                handler.post(refresh)
             }
         }
     }

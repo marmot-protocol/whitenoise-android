@@ -2,7 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,14 +22,15 @@ class NotificationProfileRepeatsTest {
         val now = System.currentTimeMillis()
         val update = profileTestUpdate(sender = "ABCD")
         val first = NotificationProfileRepeats(context, preferences)
-        assertNull(first.heldAtMs(update, now))
-        first.recordHeld(update, now)
-        assertEquals(now, first.heldAtMs(profileTestUpdate(groupIdHex = "elsewhere", sender = "abcd"), now + 1_000L))
-        assertNull(first.heldAtMs(update, now + NOTIFICATION_PROFILE_REPEAT_WINDOW_MS))
-        assertNull(first.heldAtMs(profileTestUpdate(accountRef = "account-b", sender = "abcd"), now))
-
+        assertFalse(first.admit("sleep", update, now))
+        assertFalse(first.admit("sleep", update, now + 1))
+        val reply = profileTestUpdate(groupIdHex = "elsewhere", sender = "abcd", messageId = "second")
         val reopened = NotificationProfileRepeats(context, preferences)
-        assertEquals(now, reopened.heldAtMs(update, now + 1_000L))
+        assertTrue(reopened.admit("sleep", reply, now + 2))
+        assertTrue(reopened.admit("sleep", reply, now + 3))
+        assertFalse(reopened.admit("focus", reply, now + 4))
+        assertFalse(reopened.admit("sleep", reply.copy(accountRef = "account-b"), now + 4))
+        assertFalse(reopened.admit("sleep", reply.copy(messageIdHex = "third"), now + 5))
         assertTrue(preferences.all.keys.none { it.contains("abcd") || it.contains("account-a") })
     }
 
@@ -37,15 +38,15 @@ class NotificationProfileRepeatsTest {
     fun oldAndForgottenAccountsArePrunedAndTheRecordStaysBounded() {
         val now = System.currentTimeMillis()
         val repeats = NotificationProfileRepeats(context, preferences)
-        repeats.recordHeld(profileTestUpdate(sender = "old"), now - NOTIFICATION_PROFILE_REPEAT_WINDOW_MS)
-        repeat(80) { repeats.recordHeld(profileTestUpdate(sender = "s$it"), now + it) }
-        assertNull(repeats.heldAtMs(profileTestUpdate(sender = "old"), now))
-        assertNull(repeats.heldAtMs(profileTestUpdate(sender = "s0"), now + 80))
-        assertEquals(now + 79, repeats.heldAtMs(profileTestUpdate(sender = "s79"), now + 80))
+        val old = profileTestUpdate(sender = "old")
+        assertFalse(repeats.admit("sleep", old, now - NOTIFICATION_PROFILE_REPEAT_WINDOW_MS))
+        assertFalse(repeats.admit("sleep", old.copy(messageIdHex = "late"), now))
+        repeat(80) { repeats.admit("sleep", profileTestUpdate(sender = "s$it"), now + it) }
+        assertFalse(repeats.admit("sleep", profileTestUpdate(sender = "s0", messageId = "next"), now + 80))
+        assertTrue(repeats.admit("sleep", profileTestUpdate(sender = "s79", messageId = "next"), now + 80))
         assertEquals(64, preferences.all.size)
 
         repeats.retainAccounts(listOf("account-b"))
         assertTrue(preferences.all.isEmpty())
-        assertNull(repeats.heldAtMs(profileTestUpdate(sender = "s79"), now + 80))
     }
 }

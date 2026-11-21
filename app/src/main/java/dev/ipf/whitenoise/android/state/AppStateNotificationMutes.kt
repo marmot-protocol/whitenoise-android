@@ -105,15 +105,14 @@ internal val WhiteNoiseAppState.notificationProfileRepeats: NotificationProfileR
 private fun WhiteNoiseAppState.suppressedByNotificationProfile(update: NotificationUpdateFfi): Boolean {
     val active = notificationProfiles.active() ?: return false
     val profile = active.profile
-    val nowMs = System.currentTimeMillis()
-    val tracksRepeats = profile.allowRepeatedMessages && isNotificationProfileMessage(update)
-    val repeated = tracksRepeats && notificationProfileRepeats.heldAtMs(update, nowMs) != null
-    val suppressed = notificationProfileSuppresses(profile, update, repeated)
-    if (suppressed) {
-        if (tracksRepeats) notificationProfileRepeats.recordHeld(update, nowMs)
-        appStateDebug { "notification suppressed_by=notification_profile source=${active.source.name.lowercase()}" }
+    if (!notificationProfileSuppresses(profile, update)) return false
+    if (profile.allowRepeatedMessages && isNotificationProfileMessage(update) &&
+        notificationProfileRepeats.admit(profile.id, update, System.currentTimeMillis())
+    ) {
+        return false
     }
-    return suppressed
+    appStateDebug { "notification suppressed_by=notification_profile source=${active.source.name.lowercase()}" }
+    return true
 }
 
 /** Whether [memberIdHex] is silenced for [accountRef] inside [groupIdHex]. */

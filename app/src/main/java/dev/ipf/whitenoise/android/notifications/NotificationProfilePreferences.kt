@@ -23,8 +23,6 @@ internal class NotificationProfilePreferences(
     private val preferences: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
     private val clock: () -> Long = System::currentTimeMillis,
-    /** Runs after each published change; production asks the Quick Settings tile to refresh. */
-    private val onChanged: () -> Unit = {},
 ) {
     private val mutationLock = Any()
     private val _state = MutableStateFlow(load(context))
@@ -134,7 +132,6 @@ internal class NotificationProfilePreferences(
             preferences.edit().putString(STATE_KEY, encode(updated).toString()).apply()
             _state.value = updated
         }
-        onChanged()
     }
 
     /** Applies [change] to the current state and commits it; a null result rejects the change. */
@@ -148,7 +145,6 @@ internal class NotificationProfilePreferences(
                 }.getOrDefault(false)
             if (committed) {
                 _state.value = updated
-                onChanged()
             } else {
                 // commit can change SharedPreferences memory before its disk write fails.
                 runCatching { preferences.edit().putString(STATE_KEY, encode(current).toString()).apply() }
@@ -195,7 +191,7 @@ internal class NotificationProfilePreferences(
             val app = context.applicationContext
             return synchronized(instanceLock) {
                 instance?.takeIf { it.first === app }?.second
-                    ?: NotificationProfilePreferences(app, onChanged = { requestNotificationProfileTileUpdate(app) })
+                    ?: NotificationProfilePreferences(app)
                         .also { instance = app to it }
             }
         }

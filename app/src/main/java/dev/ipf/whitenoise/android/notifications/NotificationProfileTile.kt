@@ -5,7 +5,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.graphics.drawable.Icon
 import android.os.Build
-import android.service.quicksettings.TileService
 import androidx.annotation.RequiresApi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
@@ -60,13 +59,6 @@ internal fun notificationProfileTileChoices(
     val activeId = activeNotificationProfile(state, nowMs, zone)?.profile?.id
     val checked = ids.indexOf(activeId).takeIf { it >= 0 } ?: ids.size
     return NotificationProfileTileChoices(ids, state.profiles.map { it.label } + offLabel, checked)
-}
-
-/** Asks Android to refresh the tile after a change; harmless when the tile is not in the panel. */
-internal fun requestNotificationProfileTileUpdate(context: Context) {
-    runCatching {
-        TileService.requestListeningState(context, ComponentName(context, NotificationProfileTileService::class.java))
-    }
 }
 
 /** Whether an account is signed in, from the running app when there is one, else from its saved choice. */

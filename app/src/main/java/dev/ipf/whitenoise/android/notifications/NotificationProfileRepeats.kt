@@ -7,7 +7,7 @@ import java.util.Locale
 
 /**
  * When each person's latest message was held back by a notification profile, so a second message within
- * [NOTIFICATION_PROFILE_REPEAT_WINDOW_MS] can notify. Keys are hashes of the account and sender; only times
+ * [NOTIFICATION_PROFILE_REPEAT_WINDOW_MS] can notify. Keys are hashes of the account, profile and sender; only entries
  * inside the window are kept and at most [MAX_ENTRIES] people. The gate reads and records in memory and the
  * write goes to disk in the background; a cold process reloads the entries that are still recent.
  */
@@ -17,30 +17,36 @@ internal class NotificationProfileRepeats(
         context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
 ) {
     private val lock = Any()
-    private val heldAt: MutableMap<String, Long> = load()
+    private data class RepeatState(val at: Long, val held: String, val admitted: String)
 
-    /** When the last held-back message from [update]'s sender arrived, if inside the window at [nowMs]. */
-    fun heldAtMs(
+    private val entries = load()
+
+    /** Returns whether a distinct follow-up may notify, and atomically consumes its held message. */
+    fun admit(
+        profileId: String,
         update: NotificationUpdateFfi,
         nowMs: Long,
-    ): Long? {
-        val key = key(update) ?: return null
-        return synchronized(lock) { heldAt[key]?.takeIf { notificationProfileRepeatOpen(it, nowMs) } }
-    }
-
-    /** Remembers that a message from [update]'s sender was held back at [nowMs]. */
-    fun recordHeld(
-        update: NotificationUpdateFfi,
-        nowMs: Long,
-    ) {
-        val key = key(update) ?: return
-        synchronized(lock) {
-            heldAt[key] = nowMs
-            heldAt.entries.removeAll { !notificationProfileRepeatOpen(it.value, nowMs) }
-            while (heldAt.size > MAX_ENTRIES) heldAt.remove(heldAt.minBy { it.value }.key)
+    ): Boolean {
+        val key = key(profileId, update) ?: return false
+        val messageId = update.messageIdHex?.takeIf(String::isNotBlank) ?: return false
+        val message = sha256Hex(messageId)
+        return synchronized(lock) {
+            val previous = entries[key]?.takeIf { notificationProfileRepeatOpen(it.at, nowMs) }
+            if (previous?.admitted == message) return@synchronized true
+            if (previous?.held == message) return@synchronized false
+            val allowed = !previous?.held.isNullOrEmpty()
+            entries[key] =
+                if (allowed) {
+                    RepeatState(nowMs, "", message)
+                } else {
+                    RepeatState(nowMs, message, previous?.admitted.orEmpty())
+                }
+            entries.entries.removeAll { !notificationProfileRepeatOpen(it.value.at, nowMs) }
+            while (entries.size > MAX_ENTRIES) entries.remove(entries.minBy { it.value.at }.key)
             val editor = preferences.edit().clear()
-            heldAt.forEach { (entry, at) -> editor.putLong(entry, at) }
+            entries.forEach { (entry, state) -> editor.putString(entry, "${state.at}:${state.held}:${state.admitted}") }
             runCatching { editor.apply() }
+            allowed
         }
     }
 
@@ -48,29 +54,36 @@ internal class NotificationProfileRepeats(
     fun retainAccounts(accountRefs: Collection<String>) {
         val prefixes = accountRefs.map { "${sha256Hex(it)}." }
         synchronized(lock) {
-            val removed = heldAt.keys.filter { key -> prefixes.none(key::startsWith) }
+            val removed = entries.keys.filter { key -> prefixes.none(key::startsWith) }
             if (removed.isEmpty()) return
-            removed.forEach(heldAt::remove)
+            removed.forEach(entries::remove)
             val editor = preferences.edit()
             removed.forEach(editor::remove)
             runCatching { editor.apply() }
         }
     }
 
-    private fun load(): MutableMap<String, Long> {
+    private fun load(): MutableMap<String, RepeatState> {
         val now = System.currentTimeMillis()
         val stored = runCatching { preferences.all }.getOrNull().orEmpty()
-        val recent = HashMap<String, Long>()
+        val recent = HashMap<String, RepeatState>()
         stored.forEach { (key, value) ->
-            if (value is Long && notificationProfileRepeatOpen(value, now)) recent[key] = value
+            val fields = (value as? String)?.split(':') ?: return@forEach
+            val at = fields.firstOrNull()?.toLongOrNull()
+            if (fields.size == 3 && at != null && notificationProfileRepeatOpen(at, now)) {
+                recent[key] = RepeatState(at, fields[1], fields[2])
+            }
         }
         return recent
     }
 
-    private fun key(update: NotificationUpdateFfi): String? {
+    private fun key(
+        profileId: String,
+        update: NotificationUpdateFfi,
+    ): String? {
         val sender = update.sender.accountIdHex.trim().lowercase(Locale.ROOT)
         if (update.accountRef.isEmpty() || sender.isEmpty()) return null
-        return "${sha256Hex(update.accountRef)}.${sha256Hex(sender)}"
+        return "${sha256Hex(update.accountRef)}.${sha256Hex(profileId)}.${sha256Hex(sender)}"
     }
 
     companion object {
