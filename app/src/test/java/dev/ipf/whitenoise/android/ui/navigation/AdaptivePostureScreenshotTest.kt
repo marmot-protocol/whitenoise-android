@@ -83,9 +83,10 @@ class AdaptivePostureScreenshotTest {
     @Config(sdk = [36], qualifiers = "en-w340dp-h360dp-mdpi")
     fun flipCoverScreenChatLargeText() = captureLargeText("posture_flip_cover_chat_large_text")
 
-    private fun bookFold(size: DpSize) = WindowFolds(
-        upright = listOf(WindowFold(size.width / 2, size.width / 2, separating = true)),
-    )
+    private fun bookFold(size: DpSize): WindowFolds {
+        val hinge = size.width / 2
+        return WindowFolds(upright = listOf(WindowFold(hinge, hinge, separating = true)))
+    }
 
     private fun captureLargeText(name: String) {
         RuntimeEnvironment.setFontScale(LARGE_FONT_SCALE)
