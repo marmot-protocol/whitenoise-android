@@ -22,12 +22,54 @@ class ChatsControllerInvitationSettlementTest {
         assertTrue(invitationSettlementDisagrees(rowPendingConfirmation = true, cachedPendingConfirmation = false))
     }
 
-    /** A row and record that agree, or a chat with no cached record, need no read. */
+    /** A row and record that agree, or an answered chat with no cached record, need no read. */
     @Test
     fun agreeingOrUncachedChatsNeedNoRead() {
         assertFalse(invitationSettlementDisagrees(rowPendingConfirmation = true, cachedPendingConfirmation = true))
         assertFalse(invitationSettlementDisagrees(rowPendingConfirmation = false, cachedPendingConfirmation = false))
         assertFalse(invitationSettlementDisagrees(rowPendingConfirmation = false, cachedPendingConfirmation = null))
+    }
+
+    /** A pending row with no cached record reads as "Checking invitation…", so it needs the read that settles it. */
+    @Test
+    fun aPendingRowWithoutARecordNeedsARead() {
+        assertTrue(invitationSettlementDisagrees(rowPendingConfirmation = true, cachedPendingConfirmation = null))
+    }
+
+    /**
+     * A chat another device added can list a pending row whose record never reaches the chats stream. Once the
+     * group snapshot is in, one read caches MDK's record, so the row stops reading as checked and shows its
+     * invitation instead. Before the snapshot, the snapshot settles such rows and nothing is read.
+     */
+    @Test
+    fun aPendingRowWithoutARecordSettlesFromOneRead() {
+        val data = InviteAcceptanceTestData
+        val chats = ChatsController(data.appState(), data.ACCOUNT) { _, _ -> emptyList() }
+        val row = data.chatListRow(true)
+        val record = data.group(true, data.OLD_WELCOME)
+        var reads = 0
+        val read: suspend (String, String) -> AppGroupRecordFfi = { _, _ ->
+            reads++
+            record
+        }
+        try {
+            chats.chatRowsByGroup[data.GROUP_ID] = row
+            assertTrue(chatListItemFromProjection(row, group = null).checkingInvitation)
+            chats.settleInvitationFromMdk(row, read)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals("no read before the group snapshot", 0, reads)
+
+            chats.groupRecordsLoaded = true
+            chats.settleInvitationFromMdk(row, read)
+            chats.settleInvitationFromMdk(row, read)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(1, reads)
+            assertEquals(record, chats.groupRecordsById[data.GROUP_ID])
+            val settled = chatListItemFromProjection(row, group = chats.groupRecordsById[data.GROUP_ID])
+            assertFalse(settled.checkingInvitation)
+        } finally {
+            chats.onCleared()
+        }
     }
 
     /** Duplicate snapshots share a read; a newer Welcome keeps its own decision when the old read returns. */

@@ -505,6 +505,9 @@ class ChatsController private constructor(
     internal val invitationReads = mutableMapOf<String, InvitationSettlementRead>()
     internal var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
+    /** Whether [groupRecordsById] holds a group snapshot for the bound account, so a missing record is real. */
+    internal var groupRecordsLoaded = false
+
     // Holds a locally committed rename on its row until the subscription agrees (#2696). A clear
     // stays held until the group record agrees too, because a blank row falls back to its name.
     internal val localGroupNames = LocalGroupFieldAuthority(holdClearAfterAgreement = true)
@@ -834,6 +837,7 @@ class ChatsController private constructor(
                         }.associateBy { it.groupIdHex }
                     if (!isActiveBindEpoch(epoch)) break
                     groupRecordsById = initialGroups.mapValues { (_, group) -> withRetainedName(group) }
+                    groupRecordsLoaded = true
                     chatRows.forEach { settleInvitationFromMdk(it) }
                     groupRecordsById.values.forEach(::requestGroupProfiles)
                     seedInitialMemberIdProjection(accountRef, epoch)
@@ -2004,6 +2008,7 @@ class ChatsController private constructor(
         selectedPreviewsByGroup = emptyMap()
         selectedActionsByGroup = emptyMap()
         groupRecordsById = emptyMap()
+        groupRecordsLoaded = false
         invitationReads.clear()
         activitySequenceByGroup.clear()
         nextActivitySequence = 0uL
@@ -2131,6 +2136,7 @@ class ChatsController private constructor(
         boundAccountRef = snapshot.accountRef
         snapshot.presentedRows?.let(::replacePresentedChatRows) ?: replaceChatRows(snapshot.rows)
         groupRecordsById = snapshot.groups.associateBy { it.groupIdHex }
+        groupRecordsLoaded = true
         applyInitialMemberIdProjections(
             projections = snapshot.memberIds,
             activeAccountIdHex = snapshot.activeAccountIdHex,

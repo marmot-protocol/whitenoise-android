@@ -6,17 +6,18 @@ import kotlinx.coroutines.launch
 
 /**
  * Whether a chat's row and the group record cached for it disagree on the invitation being answered. The list
- * shows such a chat as still being checked, because neither snapshot alone can establish consent. A chat with no
- * cached record has nothing to disagree with.
+ * shows such a chat as still being checked, because neither snapshot alone can establish consent. A pending row
+ * with no cached record is shown as checked too, so it needs the same read: a chat another of the account's
+ * devices adds can arrive in the list without its record ever reaching the chats stream.
  */
 internal fun invitationSettlementDisagrees(
     rowPendingConfirmation: Boolean,
     cachedPendingConfirmation: Boolean?,
-): Boolean = cachedPendingConfirmation != null && cachedPendingConfirmation != rowPendingConfirmation
+): Boolean = cachedPendingConfirmation?.let { it != rowPendingConfirmation } ?: rowPendingConfirmation
 
-/** One outstanding native read for a row and its disagreeing cached group. */
+/** One outstanding native read for a row and the cached group it disagreed with, null when none was cached. */
 internal class InvitationSettlementRead(
-    val cached: AppGroupRecordFfi,
+    val cached: AppGroupRecordFfi?,
 ) {
     var superseded = false
 }
@@ -30,11 +31,12 @@ internal fun ChatsController.settleInvitationFromMdk(
 ) {
     val account = accountRef ?: return
     val key = chatRowKey(row.groupIdHex)
-    val cached =
-        groupRecordsById[row.groupIdHex]?.takeIf {
-            invitationSettlementDisagrees(row.pendingConfirmation, it.pendingConfirmation)
-        }
-    val request = claimInvitationRead(key, cached) ?: return
+    val cached = groupRecordsById[row.groupIdHex]
+    // Before the group snapshot arrives every row lacks its record, and the snapshot settles those rows itself.
+    val disagrees =
+        (cached != null || groupRecordsLoaded) &&
+            invitationSettlementDisagrees(row.pendingConfirmation, cached?.pendingConfirmation)
+    val request = claimInvitationRead(key, cached, disagrees) ?: return
     val epoch = bindEpoch
     recomputeScope.launch {
         try {
@@ -63,16 +65,20 @@ private fun AppGroupRecordFfi.settlesRow(
         pendingConfirmation == requested.pendingConfirmation &&
         pendingConfirmation == current?.pendingConfirmation
 
-/** Keeps one reader per group and remembers whether a later stream update retired its evidence. */
+/**
+ * Keeps one reader per group and remembers whether a later stream update retired its evidence: the row and record
+ * now agree, or the cached record changed.
+ */
 private fun ChatsController.claimInvitationRead(
     key: String,
     cached: AppGroupRecordFfi?,
+    disagrees: Boolean,
 ): InvitationSettlementRead? {
     val active = invitationReads[key]
     return if (active == null) {
-        cached?.let { InvitationSettlementRead(it) }?.also { invitationReads[key] = it }
+        InvitationSettlementRead(cached).takeIf { disagrees }?.also { invitationReads[key] = it }
     } else {
-        if (active.cached != cached) active.superseded = true
+        if (!disagrees || active.cached != cached) active.superseded = true
         null
     }
 }
