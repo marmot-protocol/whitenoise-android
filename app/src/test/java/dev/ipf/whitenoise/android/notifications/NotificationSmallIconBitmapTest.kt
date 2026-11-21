@@ -55,20 +55,27 @@ class NotificationSmallIconBitmapTest {
                     file.outputStream().use { expected.compress(Bitmap.CompressFormat.PNG, 100, it) }
                     continue
                 }
-                val shipped = checkNotNull(BitmapFactory.decodeFile(file.path)) { "Missing $file" }
-                assertEquals("$file width", size, shipped.width)
-                assertEquals("$file height", size, shipped.height)
-                for (y in 0 until size) {
-                    for (x in 0 until size) {
-                        val pixel = shipped.getPixel(x, y)
-                        val drift = abs(Color.alpha(pixel) - Color.alpha(expected.getPixel(x, y)))
-                        if (Color.alpha(pixel) != 0) {
-                            val darkest = minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
-                            assertTrue("$file pixel ($x, $y) must be white", darkest >= WHITE_MIN_CHANNEL)
-                        }
-                        assertTrue("$file pixel ($x, $y) alpha differs by $drift", drift <= ALPHA_TOLERANCE)
-                    }
+                assertMatchesArtwork(file, expected)
+            }
+        }
+    }
+
+    private fun assertMatchesArtwork(
+        file: File,
+        expected: Bitmap,
+    ) {
+        val shipped = checkNotNull(BitmapFactory.decodeFile(file.path)) { "Missing $file" }
+        assertEquals("$file width", expected.width, shipped.width)
+        assertEquals("$file height", expected.height, shipped.height)
+        for (y in 0 until expected.height) {
+            for (x in 0 until expected.width) {
+                val pixel = shipped.getPixel(x, y)
+                val drift = abs(Color.alpha(pixel) - Color.alpha(expected.getPixel(x, y)))
+                if (Color.alpha(pixel) != 0) {
+                    val darkest = minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+                    assertTrue("$file pixel ($x, $y) must be white", darkest >= WHITE_MIN_CHANNEL)
                 }
+                assertTrue("$file pixel ($x, $y) alpha differs by $drift", drift <= ALPHA_TOLERANCE)
             }
         }
     }
@@ -145,7 +152,9 @@ class NotificationSmallIconBitmapTest {
             val attribute = attributes.item(index)
             val androidAttribute = attribute.namespaceURI == ANDROID_NS && attribute.localName in allowed
             val namespaceDeclaration = attribute.namespaceURI == javax.xml.XMLConstants.XMLNS_ATTRIBUTE_NS_URI
-            check(androidAttribute || namespaceDeclaration) { "Unsupported attribute ${attribute.nodeName} on <$tagName>" }
+            check(androidAttribute || namespaceDeclaration) {
+                "Unsupported attribute ${attribute.nodeName} on <$tagName>"
+            }
         }
     }
 
