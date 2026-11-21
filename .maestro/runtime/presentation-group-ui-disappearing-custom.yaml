@@ -4,16 +4,12 @@ name: presentation-group-ui-disappearing-custom
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
     text: Disappearing messages
-- scrollUntilVisible:
-    element:
-      text: Custom time
-    direction: DOWN
 - tapOn: Custom time
 - assertVisible:
     text: Set
-- tapOn: Cancel
+- tapOn: Back
 - assertVisible:
     text: Disappearing messages
-- tapOn: Cancel
+- back
 - assertVisible:
     id: presentation.complete

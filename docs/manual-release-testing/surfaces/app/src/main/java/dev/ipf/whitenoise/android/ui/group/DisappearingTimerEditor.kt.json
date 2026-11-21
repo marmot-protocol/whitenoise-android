@@ -2,35 +2,6 @@
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerEditor.kt",
   "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
   "categories": {
-    "settings_controls": [
-      {
-        "surface": "string:disappearing_confirm_button",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerEditor.kt",
-        "anchor": "R.string.disappearing_confirm_button",
-        "test_ids": [
-          "GRP-001",
-          "SET-058"
-        ]
-      },
-      {
-        "surface": "string:disappearing_confirm_message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerEditor.kt",
-        "anchor": "R.string.disappearing_confirm_message",
-        "test_ids": [
-          "GRP-001",
-          "SET-058"
-        ]
-      },
-      {
-        "surface": "string:disappearing_confirm_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerEditor.kt",
-        "anchor": "R.string.disappearing_confirm_title",
-        "test_ids": [
-          "GRP-001",
-          "SET-058"
-        ]
-      }
-    ],
     "composable_surfaces": [
       {
         "surface": "DisappearingTimerEditor",
@@ -38,6 +9,7 @@
         "anchor": "fun DisappearingTimerEditor(",
         "test_ids": [
           "GRP-001",
+          "GRP-043",
           "SET-058"
         ]
       }

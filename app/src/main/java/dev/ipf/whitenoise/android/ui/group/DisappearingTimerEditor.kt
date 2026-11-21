@@ -4,16 +4,11 @@ package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.res.stringResource
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.updateMessageRetention
-import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 
 /** Whether this person may change the group's settings, including the disappearing-messages timer. */
 internal val ConversationController.canEditGroupSettings: Boolean
@@ -47,8 +42,9 @@ internal fun disappearingPickOutcome(
     }
 
 /**
- * The disappearing-messages picker and its destructive confirmation, shared by chat details and the header
- * timer. [onApply] runs the retention mutation; [resetKeys] drop a pending confirmation on account/runtime change.
+ * The disappearing-messages sheet, shared by chat details and the header timer. A pick that prunes history asks
+ * inside the same sheet; everything else applies on tap. [onApply] runs the retention mutation; [resetKeys] drop
+ * the open sheet and any pending confirmation on account/runtime change.
  */
 @Composable
 @Suppress("LongParameterList")
@@ -61,41 +57,27 @@ internal fun DisappearingTimerEditor(
     onDismiss: () -> Unit,
     onApply: (Long) -> Unit,
 ) {
-    var pendingSecs by remember(*resetKeys) { mutableStateOf<Long?>(null) }
+    val latestSecs by rememberUpdatedState(currentSecs)
     val currentEditable by rememberUpdatedState(editable)
     val currentOnApply by rememberUpdatedState(onApply)
     if (open) {
-        DisappearingMessagesPickerDialog(
-            currentSecs = currentSecs,
-            onDismiss = onDismiss,
-            onPick = { secs ->
-                onDismiss()
-                when (disappearingPickOutcome(currentSecs, secs)) {
-                    DisappearingPick.Skip -> Unit
-                    DisappearingPick.Confirm -> pendingSecs = secs
-                    DisappearingPick.Apply -> onApply(secs)
-                }
-            },
-        )
-    }
-    pendingSecs?.let { secs ->
-        val request = remember(secs) { Any() }
-        ConfirmDialog(
-            ownerKey = resetKeys.toList() to request,
-            title = stringResource(R.string.disappearing_confirm_title),
-            message = stringResource(R.string.disappearing_confirm_message, disappearingMessagesLabel(secs)),
-            confirmLabel = stringResource(R.string.disappearing_confirm_button),
-            onConfirm = {
-                if (pendingSecs == secs) {
-                    pendingSecs = null
-                    if (currentEditable) currentOnApply(secs)
-                }
-            },
-            onDismiss = { if (pendingSecs == secs) pendingSecs = null },
-            destructive = true,
-            identity = identity,
-            confirmEnabled = editable,
-        )
+        key(resetKeys.toList(), currentSecs) {
+            DisappearingMessagesPickerSheet(
+                currentSecs = currentSecs,
+                onDismiss = onDismiss,
+                onPick = { secs ->
+                    // A changed timer invalidates any choice made against the previous value.
+                    if (currentEditable && latestSecs == currentSecs && secs != currentSecs) {
+                        currentOnApply(secs)
+                    }
+                },
+                requiresConfirmation = { secs ->
+                    disappearingPickOutcome(currentSecs, secs) == DisappearingPick.Confirm
+                },
+                confirmIdentity = identity,
+                confirmEnabled = editable,
+            )
+        }
     }
 }
 

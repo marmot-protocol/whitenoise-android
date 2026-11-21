@@ -19,9 +19,12 @@ import kotlin.math.abs
 /** Guards the status-bar small icons' occupied area, clearance and tint-only artwork. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "mdpi")
+@Config(sdk = [36], qualifiers = "xxxhdpi")
 class NotificationSmallIconScreenshotTest {
-    /** Records both icons at status-bar sizes, tinted for dark and light status bars. */
+    /**
+     * Shows tint and geometry at representative slot sizes with a shared xxxhdpi source.
+     * This sheet does not emulate SystemUI or compare device-density filtering.
+     */
     @Test
     fun smallIconsAtStatusBarSizes() {
         val icons = listOf(R.drawable.ic_stat_whitenoise, R.drawable.ic_stat_dictation)

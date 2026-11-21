@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Notification small icon for an active dictation session: the White Noise
-    mark with exactly the same path as ic_stat_whitenoise, so the logo has the
+    mark with exactly the same path as ic_conversation_shortcut_mark (the
+    artwork of ic_stat_whitenoise), so the logo has the
     same size and position as the message icon in the status bar, plus a
     microphone in the bottom-right corner within the same 52-unit margin. The
     clip path cuts the gap around the microphone, and the corner of the mark
     beside it, out of the mark; its outer square and inner outline wind in
     opposite directions so the nonzero clip excludes the outline. Must stay
     alpha-only white: the system tints small icons itself.
+
+    Source artwork only; the app ships drawable-*dpi/ic_stat_dictation.png,
+    rendered from this file by NotificationSmallIconBitmapTest.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"

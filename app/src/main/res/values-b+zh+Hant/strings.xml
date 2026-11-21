@@ -1503,7 +1503,6 @@
     <string name="disappearing_1_day">1 天</string>
     <string name="disappearing_90_days">3 個月</string>
     <string name="disappearing_custom">自訂時間</string>
-    <string name="disappearing_custom_value">自訂時間：%1$s</string>
     <string name="disappearing_days_format">%1$d 天</string>
     <string name="disappearing_hours_format">%1$d 小時</string>
     <string name="disappearing_minutes_format">%1$d 分鐘</string>
@@ -1522,11 +1521,9 @@
     <plurals name="disappearing_years_count">
         <item quantity="other">%d 年</item>
     </plurals>
-    <string name="toast_disappearing_messages_updated">已更新閱後即焚訊息</string>
     <string name="toast_couldnt_update_disappearing">無法更新閱後即焚訊息</string>
     <string name="save">儲存</string>
 
-    <string name="disappearing_confirm_title">設定閱後即焚計時器？</string>
     <string name="disappearing_confirm_message">早於 %1$s 的訊息將對所有人永久刪除。</string>
     <string name="disappearing_confirm_button">設定</string>
 
@@ -1549,6 +1546,8 @@
     <string name="disappearing_seconds_format">%1$d 秒</string>
     <string name="disappearing_unit_seconds">秒</string>
     <string name="disappearing_set">設定</string>
+    <string name="disappearing_custom_decrease">縮短</string>
+    <string name="disappearing_custom_increase">延長</string>
 
     <string name="contacts">聯絡人</string>
     <string name="next">下一步</string>

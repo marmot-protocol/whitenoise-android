@@ -11,7 +11,7 @@ name: groups-retention-cancel
 - tapOn: "Disappearing"
 - assertVisible:
     text: "Disappearing messages"
-- tapOn: "Cancel"
+- back
 - assertNotVisible:
     text: "Disappearing messages"
 - assertVisible:

@@ -1,0 +1,16 @@
+{
+  "source": "app/src/main/res/drawable-xxxhdpi/ic_stat_dictation.png",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Dictation notification small icon is the White Noise logo with a microphone, drawn from per-density PNGs so it stays sharp",
+        "source": "app/src/main/res/drawable-xxxhdpi/ic_stat_dictation.png",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

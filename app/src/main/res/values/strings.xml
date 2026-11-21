@@ -1804,7 +1804,6 @@
     <string name="disappearing_1_day">1 day</string>
     <string name="disappearing_90_days">3 months</string>
     <string name="disappearing_custom">Custom time</string>
-    <string name="disappearing_custom_value">Custom time: %1$s</string>
     <string name="disappearing_days_format">%1$d days</string>
     <string name="disappearing_hours_format">%1$d hours</string>
     <string name="disappearing_minutes_format">%1$d minutes</string>
@@ -1826,11 +1825,9 @@
         <item quantity="one">%d year</item>
         <item quantity="other">%d years</item>
     </plurals>
-    <string name="toast_disappearing_messages_updated">Disappearing messages updated</string>
     <string name="toast_couldnt_update_disappearing">Couldn\'t update disappearing messages</string>
     <string name="save">Save</string>
 
-    <string name="disappearing_confirm_title">Set disappearing timer?</string>
     <string name="disappearing_confirm_message">Messages older than %1$s will be permanently removed for everyone.</string>
     <string name="disappearing_confirm_button">Set timer</string>
 
@@ -1849,10 +1846,12 @@
     <string name="disappearing_1_hour">1 hour</string>
     <string name="disappearing_5_minutes">5 minutes</string>
     <string name="disappearing_30_seconds">30 seconds</string>
-    <string name="disappearing_explainer">Unread messages you receive start their timer when you read them. Other new messages are permanently deleted for everyone after your chosen duration.</string>
+    <string name="disappearing_explainer">New messages are deleted for everyone after this time. Unread messages start counting once read.</string>
     <string name="disappearing_seconds_format">%1$d seconds</string>
     <string name="disappearing_unit_seconds">Seconds</string>
     <string name="disappearing_set">Set</string>
+    <string name="disappearing_custom_decrease">Shorter</string>
+    <string name="disappearing_custom_increase">Longer</string>
 
     <string name="contacts">Contacts</string>
     <string name="next">Next</string>

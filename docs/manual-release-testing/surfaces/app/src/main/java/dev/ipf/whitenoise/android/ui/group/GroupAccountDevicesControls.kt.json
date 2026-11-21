@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
         "anchor": "R.string.group_account_devices_confirm",
         "test_ids": [
-          "GRP-043"
+          "GRP-044"
         ]
       },
       {
@@ -16,7 +16,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
         "anchor": "R.string.group_account_devices_confirm_message",
         "test_ids": [
-          "GRP-043"
+          "GRP-044"
         ]
       },
       {
@@ -24,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
         "anchor": "R.string.group_account_devices_confirm_title",
         "test_ids": [
-          "GRP-043"
+          "GRP-044"
         ]
       },
       {
@@ -32,7 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
         "anchor": "R.string.group_account_devices_enable",
         "test_ids": [
-          "GRP-043"
+          "GRP-044"
         ]
       },
       {
@@ -40,7 +40,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
         "anchor": "R.string.group_account_devices_enable_detail",
         "test_ids": [
-          "GRP-043"
+          "GRP-044"
         ]
       },
       {
@@ -48,7 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
         "anchor": "R.string.group_account_devices_enabled",
         "test_ids": [
-          "GRP-043"
+          "GRP-044"
         ]
       },
       {
@@ -56,7 +56,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
         "anchor": "R.string.linked_devices",
         "test_ids": [
-          "GRP-043"
+          "GRP-044"
         ]
       },
       {
@@ -64,7 +64,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupAccountDevicesControls.kt",
         "anchor": "fun GroupAccountDevicesConfirmDialog(",
         "test_ids": [
-          "GRP-043"
+          "GRP-044"
         ]
       }
     ]

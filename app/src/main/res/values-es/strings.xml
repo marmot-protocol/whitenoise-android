@@ -1520,7 +1520,6 @@
     <string name="disappearing_1_day">1 día</string>
     <string name="disappearing_90_days">3 meses</string>
     <string name="disappearing_custom">Tiempo personalizado</string>
-    <string name="disappearing_custom_value">Tiempo personalizado: %1$s</string>
     <string name="disappearing_days_format">%1$d días</string>
     <string name="disappearing_hours_format">%1$d horas</string>
     <string name="disappearing_minutes_format">%1$d minutos</string>
@@ -1542,11 +1541,9 @@
         <item quantity="one">%d año</item>
         <item quantity="other">%d años</item>
     </plurals>
-    <string name="toast_disappearing_messages_updated">Mensajes temporales actualizados</string>
     <string name="toast_couldnt_update_disappearing">No se pudieron actualizar los mensajes temporales</string>
     <string name="save">Guardar</string>
 
-    <string name="disappearing_confirm_title">¿Activar el temporizador de mensajes?</string>
     <string name="disappearing_confirm_message">Los mensajes con más de %1$s se eliminarán permanentemente para todos.</string>
     <string name="disappearing_confirm_button">Activar</string>
 
@@ -1569,6 +1566,8 @@
     <string name="disappearing_seconds_format">%1$d segundos</string>
     <string name="disappearing_unit_seconds">Segundos</string>
     <string name="disappearing_set">Establecer</string>
+    <string name="disappearing_custom_decrease">Acortar</string>
+    <string name="disappearing_custom_increase">Alargar</string>
 
     <string name="contacts">Contactos</string>
     <string name="next">Siguiente</string>
