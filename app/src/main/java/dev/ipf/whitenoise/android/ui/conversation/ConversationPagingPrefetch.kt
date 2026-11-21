@@ -2,9 +2,9 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.snapshotFlow
-import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
+import dev.ipf.whitenoise.android.state.conversationRenderedTimeline
 import dev.ipf.whitenoise.android.state.markPagingEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
@@ -140,7 +140,7 @@ private fun olderPageLandingRunway(
     listState: LazyListState,
     edgeItemKey: String?,
 ): Int? {
-    val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+    val rendered = conversationRenderedTimeline(controller.timeline)
     val edgeTimelineIndex = rendered.indexOfFirst { it.id == edgeItemKey }
     if (edgeItemKey == null || edgeTimelineIndex <= 0) return null
     val oldestVisibleKey =

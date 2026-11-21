@@ -1,0 +1,65 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AgentActivityLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
+        "anchor": "fun AgentActivityLabel(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "AgentActivityLine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
+        "anchor": "fun AgentActivityLine(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "AgentActivityTrailing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
+        "anchor": "fun AgentActivityTrailing(",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_item_running",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
+        "anchor": "R.string.agent_item_running",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_tool_exit_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
+        "anchor": "R.string.agent_tool_exit_code",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.group_system_hide_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
+        "anchor": "R.string.group_system_hide_details",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.group_system_show_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentActivityLine.kt",
+        "anchor": "R.string.group_system_show_details",
+        "test_ids": [
+          "CON-052"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

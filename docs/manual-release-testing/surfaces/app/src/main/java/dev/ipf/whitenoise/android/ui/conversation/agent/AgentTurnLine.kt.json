@@ -1,0 +1,139 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AgentSessionDivider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "fun AgentSessionDivider(",
+        "test_ids": [
+          "CON-052",
+          "CON-054"
+        ]
+      },
+      {
+        "surface": "AgentStopButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "fun AgentStopButton(",
+        "test_ids": [
+          "CON-054"
+        ]
+      },
+      {
+        "surface": "AgentTurnLine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "fun AgentTurnLine(",
+        "test_ids": [
+          "CON-052",
+          "CON-054"
+        ]
+      },
+      {
+        "surface": "R.string.agent_duration_hours",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_duration_hours",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_duration_minutes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_duration_minutes",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_duration_seconds",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_duration_seconds",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_session_model",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_session_model",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_session_started",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_session_started",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_turn_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_turn_failed",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_turn_finished",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_turn_finished",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_turn_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_turn_stop",
+        "test_ids": [
+          "CON-054"
+        ]
+      },
+      {
+        "surface": "R.string.agent_turn_stop_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_turn_stop_description",
+        "test_ids": [
+          "CON-054"
+        ]
+      },
+      {
+        "surface": "R.string.agent_turn_stopped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_turn_stopped",
+        "test_ids": [
+          "CON-054"
+        ]
+      },
+      {
+        "surface": "R.string.agent_turn_stopping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_turn_stopping",
+        "test_ids": [
+          "CON-054"
+        ]
+      },
+      {
+        "surface": "R.string.agent_turn_worked_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_turn_worked_for",
+        "test_ids": [
+          "CON-052"
+        ]
+      },
+      {
+        "surface": "R.string.agent_turn_working",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/agent/AgentTurnLine.kt",
+        "anchor": "R.string.agent_turn_working",
+        "test_ids": [
+          "CON-052"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
