@@ -7,7 +7,8 @@ import dev.ipf.whitenoise.android.ui.devices.DeviceLinkReminder
 
 /**
  * Persistent chat-list notices shown above the list body, below the temporary top notices: the active
- * notification profile (#3601), then any account history notice, then the reminder to link this device. Search and
+ * notification profile (#3601), then any account history notice, then the reminder to link this device, then what
+ * is still arriving from the account's other devices. [hasChats] says whether the list has rows. Search and
  * attachment browsing hide all of them.
  */
 @Suppress("FunctionNaming")
@@ -16,6 +17,7 @@ internal fun ChatListPersistentNotices(
     appState: WhiteNoiseAppState,
     historyNotices: AccountHistoryNotices?,
     visible: Boolean,
+    hasChats: Boolean,
 ) {
     if (!visible) return
     NotificationProfileChatListNotice(appState)
@@ -26,4 +28,5 @@ internal fun ChatListPersistentNotices(
         )
     }
     DeviceLinkReminder(appState)
+    ChatsArrivingNotice(appState, hasChats)
 }

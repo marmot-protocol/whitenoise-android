@@ -21,9 +21,12 @@ import dev.ipf.marmotkit.DeviceLinkEndReasonFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.marmotkit.LinkChatProgressFfi
 import dev.ipf.marmotkit.NewDeviceLinkStateFfi
+import dev.ipf.whitenoise.android.state.ChatHistoryTransfer
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.state.LinkedDeviceRoster
 import dev.ipf.whitenoise.android.state.LinkedDeviceRosterState
+import dev.ipf.whitenoise.android.ui.chats.ChatsArriving
+import dev.ipf.whitenoise.android.ui.chats.ChatsArrivingBanner
 import dev.ipf.whitenoise.android.ui.chats.EmptyChats
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkAvailability
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferDialog
@@ -170,6 +173,23 @@ class DeviceLinkScreenshotTest {
         compose.onRoot().captureRoboImage("src/test/snapshots/device_link_chats_arriving_short_window.png")
         button.performClick()
         compose.runOnIdle { assertTrue(created) }
+    }
+
+    /** A linked device's chat list while chats are still joining shows MDK's count above the rows. */
+    @Test
+    fun chatsJoiningBannerLight() {
+        show(Look()) { ChatsArrivingBanner(ChatsArriving.Joining(LinkChatProgressFfi("this", true, 12u, 5u))) }
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_chats_joining_banner_light.png")
+    }
+
+    /** History still arriving stays readable in dark mode with large RTL text. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h900dp-mdpi")
+    fun historyArrivingBannerDarkRtl() {
+        show(Look(dark = true, rtl = true)) {
+            ChatsArrivingBanner(ChatsArriving.History(ChatHistoryTransfer.Receiving))
+        }
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_history_arriving_banner_dark_rtl.png")
     }
 
     /** Replacing the unlinked profile requires explicit local deletion and sign-in consent. */

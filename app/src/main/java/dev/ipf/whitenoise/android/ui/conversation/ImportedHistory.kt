@@ -52,6 +52,19 @@ internal fun rememberChatHistoryImport(
     accountRef: String,
     groupIdHex: String,
 ): () -> ChatHistoryImportStateFfi? {
+    val imports = rememberChatHistoryImports(appState, accountRef)
+    return remember(imports, groupIdHex) { { imports.state(groupIdHex) } }
+}
+
+/**
+ * MDK's history imports for every chat of [accountRef], followed while the caller's lifecycle is started. A new
+ * holder on each account or runtime change keeps the list scoped to the current profile.
+ */
+@Composable
+internal fun rememberChatHistoryImports(
+    appState: WhiteNoiseAppState,
+    accountRef: String,
+): ChatHistoryImports {
     val runtimeGeneration = appState.runtimeGeneration
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val imports =
@@ -67,7 +80,7 @@ internal fun rememberChatHistoryImport(
             if (nextEvent == null) imports.refresh() else imports.observe(nextEvent)
         }
     }
-    return remember(imports, groupIdHex) { { imports.state(groupIdHex) } }
+    return imports
 }
 
 /**

@@ -2631,7 +2631,9 @@ internal fun ChatsScreen(
                         )
                     }
                 },
-                notice = { ChatListPersistentNotices(appState, historyNotices, showChatListNotices) },
+                notice = {
+                    ChatListPersistentNotices(appState, historyNotices, showChatListNotices, sourceList.isNotEmpty())
+                },
             ) {
                 val unreadOwnerAvailable =
                     appState.activeAccountRef != null &&
