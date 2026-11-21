@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextField
@@ -51,35 +52,35 @@ internal fun ProseTextField(
             }
         }
     }
-    if (filled) {
-        TextField(
-            field,
-            change,
-            modifier.emojiSheetFieldAnchor(emojiAnchor),
-            enabled = enabled,
-            label = label,
-            placeholder = placeholder,
-            leadingIcon = emoji,
-            singleLine = singleLine,
-            maxLines = maxLines,
-            minLines = minLines,
-            isError = isError,
-            colors = colors ?: TextFieldDefaults.colors(),
-        )
-    } else {
-        OutlinedTextField(
-            field,
-            change,
-            modifier.emojiSheetFieldAnchor(emojiAnchor),
-            enabled = enabled,
-            label = label,
-            placeholder = placeholder,
-            leadingIcon = emoji,
-            singleLine = singleLine,
-            maxLines = maxLines,
-            minLines = minLines,
-            isError = isError,
-            colors = colors ?: OutlinedTextFieldDefaults.colors(),
-        )
+    Box(modifier.emojiSheetFieldAnchor(emojiAnchor), propagateMinConstraints = true) {
+        if (filled) {
+            TextField(
+                field,
+                change,
+                enabled = enabled,
+                label = label,
+                placeholder = placeholder,
+                leadingIcon = emoji,
+                singleLine = singleLine,
+                maxLines = maxLines,
+                minLines = minLines,
+                isError = isError,
+                colors = colors ?: TextFieldDefaults.colors(),
+            )
+        } else {
+            OutlinedTextField(
+                field,
+                change,
+                enabled = enabled,
+                label = label,
+                placeholder = placeholder,
+                leadingIcon = emoji,
+                singleLine = singleLine,
+                maxLines = maxLines,
+                minLines = minLines,
+                isError = isError,
+                colors = colors ?: OutlinedTextFieldDefaults.colors(),
+            )
+        }
     }
 }
