@@ -106,6 +106,8 @@ class RemoteSignerPresentationTest {
         assertEquals(RemoteSignerHealth.Unreachable, accounts.status("b")?.health)
         assertNull("an unresolved account has no handle", accounts.session("b"))
 
+        assertNull("a replaced runtime cannot reach this store's handle", accounts.session(Any(), "a"))
+        assertTrue(accounts.session(runtime, "a") === session)
         accounts.retainRuntime(Any())
         assertNull("a replaced runtime drops every handle", accounts.session("a"))
         assertFalse(accounts.isRemote("b"))

@@ -182,5 +182,7 @@ internal suspend fun WhiteNoiseAppState.repairRemoteSigner(
 }
 
 /** MDK's account reference (its label) for [accountIdHex]; the hex itself when the account is not listed. */
-internal fun WhiteNoiseAppState.accountRefFor(accountIdHex: String): String =
-    accounts.firstOrNull { it.accountIdHex == accountIdHex }?.label ?: accountIdHex
+internal fun WhiteNoiseAppState.accountRefFor(accountIdHex: String): String {
+    val account = accounts.firstOrNull { it.accountIdHex == accountIdHex }
+    return account?.label ?: accountIdHex
+}

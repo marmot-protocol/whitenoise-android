@@ -33,6 +33,13 @@ internal class RemoteSignerAccounts {
     @Synchronized
     fun session(accountIdHex: String?): Nip46SessionFfiInterface? = accountIdHex?.let { sessions[it] }
 
+    /** [accountIdHex]'s handle only while [runtime] still owns this store; a replaced runtime gets nothing. */
+    @Synchronized
+    fun session(
+        runtime: Any,
+        accountIdHex: String,
+    ): Nip46SessionFfiInterface? = sessions[accountIdHex].takeIf { owner === runtime }
+
     @Synchronized
     fun hasSessions(): Boolean = sessions.isNotEmpty()
 
