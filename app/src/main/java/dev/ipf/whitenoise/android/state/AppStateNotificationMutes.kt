@@ -36,15 +36,12 @@ internal val WhiteNoiseAppState.conversationAlertPreferences: ConversationAlertP
                 ?: ConversationAlertPreferences(appContext).also { alertPreferenceHolder = appContext to it }
         }
 
-private var notificationProfileHolder: Pair<Context, NotificationProfilePreferences>? = null
-
-/** One process-wide store of this device's notification profiles (#3601), read by the UI and the post gate. */
+/**
+ * One process-wide store of this device's notification profiles (#3601), read by the UI, the post gate and the
+ * Quick Settings tile.
+ */
 internal val WhiteNoiseAppState.notificationProfiles: NotificationProfilePreferences
-    get() =
-        synchronized(memberMuteLock) {
-            notificationProfileHolder?.takeIf { it.first === appContext }?.second
-                ?: NotificationProfilePreferences(appContext).also { notificationProfileHolder = appContext to it }
-        }
+    get() = NotificationProfilePreferences.forContext(appContext)
 
 /**
  * The process-wide per-member group mute store (#2782).

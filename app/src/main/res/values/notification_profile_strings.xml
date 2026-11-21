@@ -89,4 +89,12 @@
         <item quantity="one">%1$d person</item>
         <item quantity="other">%1$d people</item>
     </plurals>
+    <string name="notification_profile_tile_label">Notification profile</string>
+    <string name="notification_profiles_quick_access">Quick access</string>
+    <string name="notification_profile_show_in_chat_list">Show in chat list</string>
+    <string name="notification_profile_show_in_chat_list_detail">Adds a button to the chat list for switching profiles.</string>
+    <string name="notification_profile_add_tile">Add to Quick Settings</string>
+    <string name="notification_profile_add_tile_detail">Switch profiles from your Quick Settings panel.</string>
+    <string name="notification_profile_add_tile_failed">Couldn\'t add the tile. Add it from your Quick Settings edit screen.</string>
+    <string name="notification_profile_tile_hint">To switch profiles from Quick Settings, add the Notification profile tile from its edit screen.</string>
 </resources>

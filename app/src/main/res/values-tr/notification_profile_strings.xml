@@ -73,4 +73,12 @@
         <item quantity="one">%1$d kişi</item>
         <item quantity="other">%1$d kişi</item>
     </plurals>
+    <string name="notification_profile_tile_label">Bildirim profili</string>
+    <string name="notification_profiles_quick_access">Hızlı erişim</string>
+    <string name="notification_profile_show_in_chat_list">Sohbet listesinde göster</string>
+    <string name="notification_profile_show_in_chat_list_detail">Sohbet listesine profil değiştirmek için bir düğme ekler.</string>
+    <string name="notification_profile_add_tile">Hızlı Ayarlar\'a ekle</string>
+    <string name="notification_profile_add_tile_detail">Profilleri Hızlı Ayarlar panelinden değiştirin.</string>
+    <string name="notification_profile_add_tile_failed">Kutucuk eklenemedi. Hızlı Ayarlar düzenleme ekranından ekleyin.</string>
+    <string name="notification_profile_tile_hint">Profilleri Hızlı Ayarlar\'dan değiştirmek için Bildirim profili kutucuğunu düzenleme ekranından ekleyin.</string>
 </resources>

@@ -75,4 +75,12 @@
         <item quantity="many">%1$d человек</item>
         <item quantity="other">%1$d человека</item>
     </plurals>
+    <string name="notification_profile_tile_label">Профиль уведомлений</string>
+    <string name="notification_profiles_quick_access">Быстрый доступ</string>
+    <string name="notification_profile_show_in_chat_list">Показывать в списке чатов</string>
+    <string name="notification_profile_show_in_chat_list_detail">Добавляет в список чатов кнопку для смены профиля.</string>
+    <string name="notification_profile_add_tile">Добавить в быстрые настройки</string>
+    <string name="notification_profile_add_tile_detail">Меняйте профиль из панели быстрых настроек.</string>
+    <string name="notification_profile_add_tile_failed">Не удалось добавить плитку. Добавьте её в режиме изменения быстрых настроек.</string>
+    <string name="notification_profile_tile_hint">Чтобы менять профиль из быстрых настроек, добавьте плитку «Профиль уведомлений» в режиме их изменения.</string>
 </resources>

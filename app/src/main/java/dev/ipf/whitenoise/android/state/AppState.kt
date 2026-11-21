@@ -8411,7 +8411,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     companion object {
-        private const val ACTIVE_ACCOUNT_KEY = "active_account"
+        internal const val ACTIVE_ACCOUNT_KEY = "active_account"
         private const val DEVELOPER_MODE_KEY = "developer_mode"
         private const val STREAMING_DEBUG_MODE_KEY = "streaming_debug_mode"
         private const val FORCE_INCOGNITO_KEYBOARD_KEY = "force_incognito_keyboard"

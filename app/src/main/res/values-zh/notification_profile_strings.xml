@@ -72,4 +72,12 @@
     <plurals name="notification_profile_people_count">
         <item quantity="other">%1$d 人</item>
     </plurals>
+    <string name="notification_profile_tile_label">通知模式</string>
+    <string name="notification_profiles_quick_access">快捷访问</string>
+    <string name="notification_profile_show_in_chat_list">在聊天列表中显示</string>
+    <string name="notification_profile_show_in_chat_list_detail">在聊天列表中添加一个切换模式的按钮。</string>
+    <string name="notification_profile_add_tile">添加到快捷设置</string>
+    <string name="notification_profile_add_tile_detail">从快捷设置面板切换模式。</string>
+    <string name="notification_profile_add_tile_failed">无法添加图块。请在快捷设置的编辑界面中添加。</string>
+    <string name="notification_profile_tile_hint">要从快捷设置切换模式，请在其编辑界面中添加“通知模式”图块。</string>
 </resources>

@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.ui.chats.NotificationProfileTapClock
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditActions
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditContent
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfileEditFormState
+import dev.ipf.whitenoise.android.ui.settings.NotificationProfileQuickAccess
 import dev.ipf.whitenoise.android.ui.settings.NotificationProfilesContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -74,6 +75,7 @@ class NotificationProfilesScreenshotTest {
                 setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY, DayOfWeek.WEDNESDAY),
             ),
         )
+    private val quickAccess = NotificationProfileQuickAccess(false, {}, onAddTile = {}, tileHint = false)
     private val active =
         ActiveNotificationProfile(
             sleep,
@@ -91,14 +93,14 @@ class NotificationProfilesScreenshotTest {
         captureList("notification_profiles_empty_rtl_large_font", emptyList(), Theme.LightRtlLarge)
     }
 
-    @Test fun presetsLight() = captureList("notification_profiles_presets_light", presets(), Theme.Light)
+    @Test fun presetsLight() = capturePresets("notification_profiles_presets_light", Theme.Light)
 
-    @Test fun presetsDark() = captureList("notification_profiles_presets_dark", presets(), Theme.Dark)
+    @Test fun presetsDark() = capturePresets("notification_profiles_presets_dark", Theme.Dark)
 
-    @Test fun presetsAmoled() = captureList("notification_profiles_presets_amoled", presets(), Theme.Amoled)
+    @Test fun presetsAmoled() = capturePresets("notification_profiles_presets_amoled", Theme.Amoled)
 
     @Test fun presetsRtlLargeFont() {
-        captureList("notification_profiles_presets_rtl_large_font", presets(), Theme.LightRtlLarge)
+        capturePresets("notification_profiles_presets_rtl_large_font", Theme.LightRtlLarge)
     }
 
     @Test fun listLight() = captureList("notification_profiles_list_light", allProfiles(), Theme.Light, active)
@@ -209,13 +211,21 @@ class NotificationProfilesScreenshotTest {
             allowRepeatedMessages = true,
         )
 
+    private fun capturePresets(
+        name: String,
+        theme: Theme,
+    ) {
+        captureList(name, presets(), theme, quickAccess = quickAccess)
+    }
+
     private fun captureList(
         name: String,
         profiles: List<NotificationProfile>,
         theme: Theme,
         active: ActiveNotificationProfile? = null,
+        quickAccess: NotificationProfileQuickAccess? = null,
     ) {
-        render(theme) { NotificationProfilesContent(profiles, active, {}, {}, {}, {}, zone) }
+        render(theme) { NotificationProfilesContent(profiles, active, {}, {}, {}, {}, zone, quickAccess) }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 

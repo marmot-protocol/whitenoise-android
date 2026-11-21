@@ -73,4 +73,12 @@
         <item quantity="one">%1$d personne</item>
         <item quantity="other">%1$d personnes</item>
     </plurals>
+    <string name="notification_profile_tile_label">Profil de notification</string>
+    <string name="notification_profiles_quick_access">Accès rapide</string>
+    <string name="notification_profile_show_in_chat_list">Afficher dans la liste des discussions</string>
+    <string name="notification_profile_show_in_chat_list_detail">Ajoute un bouton à la liste des discussions pour changer de profil.</string>
+    <string name="notification_profile_add_tile">Ajouter aux réglages rapides</string>
+    <string name="notification_profile_add_tile_detail">Changez de profil depuis le panneau des réglages rapides.</string>
+    <string name="notification_profile_add_tile_failed">Impossible d\'ajouter la vignette. Ajoutez-la depuis l\'écran de modification des réglages rapides.</string>
+    <string name="notification_profile_tile_hint">Pour changer de profil depuis les réglages rapides, ajoutez la vignette Profil de notification depuis leur écran de modification.</string>
 </resources>

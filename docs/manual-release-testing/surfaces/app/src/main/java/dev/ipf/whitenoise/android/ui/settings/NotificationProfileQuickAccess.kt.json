@@ -1,0 +1,83 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NotificationProfileQuickAccessSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+        "anchor": "fun NotificationProfileQuickAccessSection(",
+        "test_ids": [
+          "NTF-058"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:notification_profile_add_tile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+        "anchor": "R.string.notification_profile_add_tile",
+        "test_ids": [
+          "NTF-058"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_add_tile_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+        "anchor": "R.string.notification_profile_add_tile_detail",
+        "test_ids": [
+          "NTF-058"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_add_tile_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+        "anchor": "R.string.notification_profile_add_tile_failed",
+        "test_ids": [
+          "NTF-058"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_change_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+        "anchor": "R.string.notification_profile_change_failed",
+        "test_ids": [
+          "NTF-058"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_show_in_chat_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+        "anchor": "R.string.notification_profile_show_in_chat_list",
+        "test_ids": [
+          "NTF-058"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_show_in_chat_list_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+        "anchor": "R.string.notification_profile_show_in_chat_list_detail",
+        "test_ids": [
+          "NTF-058"
+        ]
+      },
+      {
+        "surface": "string:notification_profile_tile_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+        "anchor": "R.string.notification_profile_tile_hint",
+        "test_ids": [
+          "NTF-058"
+        ]
+      },
+      {
+        "surface": "string:notification_profiles_quick_access",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileQuickAccess.kt",
+        "anchor": "R.string.notification_profiles_quick_access",
+        "test_ids": [
+          "NTF-058"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

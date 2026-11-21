@@ -23,6 +23,8 @@ internal class NotificationProfilePreferences(
     private val preferences: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Runs after each published change; production asks the Quick Settings tile to refresh. */
+    private val onChanged: () -> Unit = {},
 ) {
     private val mutationLock = Any()
     private val _state = MutableStateFlow(load(context))
@@ -67,7 +69,7 @@ internal class NotificationProfilePreferences(
                 current.manual is NotificationProfileManual.Paused &&
                     previous != saved.schedule &&
                     listOfNotNull(previous, saved.schedule).any { scheduleWindowContaining(it, nowMs, zone) != null }
-            current.copy(profiles = profiles, manual = if (endsPause) null else current.manual, engaged = true)
+            current.copy(profiles = profiles, manual = if (endsPause) null else current.manual)
         }
 
     /** Removes [profileId] and any manual choice that names it; call off the main thread. */
@@ -87,7 +89,7 @@ internal class NotificationProfilePreferences(
         mutate { current ->
             val valid = current.profiles.any { it.id == profileId } && (untilMs == null || untilMs > nowMs)
             if (!valid) return@mutate null
-            current.copy(manual = NotificationProfileManual.On(profileId, untilMs), engaged = true)
+            current.copy(manual = NotificationProfileManual.On(profileId, untilMs))
         }
 
     /**
@@ -105,6 +107,12 @@ internal class NotificationProfilePreferences(
                     .maxOfOrNull { it.endMs }
             current.copy(manual = openUntil?.let(NotificationProfileManual::Paused))
         }
+
+    /** Shows or hides the chat-list profile button; call off the main thread. */
+    fun setShowInChatList(show: Boolean): Boolean = mutate { it.copy(showInChatList = show) }
+
+    /** Records whether the Quick Settings tile is in the user's panel, so the add offer can step aside. */
+    fun setTileAdded(added: Boolean): Boolean = mutate { it.copy(tileAdded = added) }
 
     /**
      * Drops allowed chats and people of local accounts that no longer exist; profiles themselves stay. Publishes
@@ -126,6 +134,7 @@ internal class NotificationProfilePreferences(
             preferences.edit().putString(STATE_KEY, encode(updated).toString()).apply()
             _state.value = updated
         }
+        onChanged()
     }
 
     /** Applies [change] to the current state and commits it; a null result rejects the change. */
@@ -139,6 +148,7 @@ internal class NotificationProfilePreferences(
                 }.getOrDefault(false)
             if (committed) {
                 _state.value = updated
+                onChanged()
             } else {
                 // commit can change SharedPreferences memory before its disk write fails.
                 runCatching { preferences.edit().putString(STATE_KEY, encode(current).toString()).apply() }
@@ -174,6 +184,21 @@ internal class NotificationProfilePreferences(
     companion object {
         const val PREFERENCES_NAME = "whitenoise.notification_profiles"
         private const val STATE_KEY = "state.v1"
+        private val instanceLock = Any()
+        private var instance: Pair<Context, NotificationProfilePreferences>? = null
+
+        /**
+         * The one store of this process, shared by the app, the notification gate and the Quick Settings tile so
+         * a change from any of them is seen by all. Keyed by application context, like the other shared stores.
+         */
+        fun forContext(context: Context): NotificationProfilePreferences {
+            val app = context.applicationContext
+            return synchronized(instanceLock) {
+                instance?.takeIf { it.first === app }?.second
+                    ?: NotificationProfilePreferences(app, onChanged = { requestNotificationProfileTileUpdate(app) })
+                        .also { instance = app to it }
+            }
+        }
     }
 }
 
@@ -203,7 +228,8 @@ private fun NotificationProfilesState.withoutExpiredManual(nowMs: Long): Notific
 private fun encode(state: NotificationProfilesState): JSONObject =
     JSONObject()
         .put("profiles", JSONArray(state.profiles.map(::encodeProfile)))
-        .put("engaged", state.engaged)
+        .put("showInChatList", state.showInChatList)
+        .put("tileAdded", state.tileAdded)
         .put("presetsSeeded", state.presetsSeeded)
         .apply {
             when (val manual = state.manual) {
@@ -267,7 +293,8 @@ private fun decode(json: JSONObject): NotificationProfilesState {
     return NotificationProfilesState(
         profiles = profiles,
         manual = json.optJSONObject("manual")?.let(::decodeManual),
-        engaged = json.optBoolean("engaged", false),
+        showInChatList = json.optBoolean("showInChatList", false),
+        tileAdded = json.optBoolean("tileAdded", false),
         presetsSeeded = json.optBoolean("presetsSeeded", false),
     )
 }

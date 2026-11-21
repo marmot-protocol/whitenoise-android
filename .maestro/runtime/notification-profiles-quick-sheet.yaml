@@ -7,6 +7,19 @@ name: notification-profiles-quick-sheet
     id: "notification-profile.save"
 - assertVisible:
     id: "notification-profiles.list"
+# The chat-list button is opt-in under Quick access.
+- scrollUntilVisible:
+    element:
+      id: "notification-profiles.show-in-chat-list"
+    direction: DOWN
+- assertVisible:
+    id: "notification-profiles.show-in-chat-list"
+    checked: false
+- tapOn:
+    id: "notification-profiles.show-in-chat-list"
+- assertVisible:
+    id: "notification-profiles.show-in-chat-list"
+    checked: true
 - tapOn: "Back"
 - assertVisible:
     id: "notifications.profiles"

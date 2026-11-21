@@ -48,7 +48,8 @@ class NotificationProfilePresetsTest {
         assertTrue(state.profiles.none { it.allowGroupChanges })
         assertTrue(state.profiles.all { it.allowedChats.isEmpty() && it.allowedPeople.isEmpty() })
         assertTrue(state.presetsSeeded)
-        assertFalse(state.engaged)
+        assertFalse(state.showInChatList)
+        assertFalse(state.tileAdded)
         assertNull(state.manual)
     }
 
@@ -98,25 +99,20 @@ class NotificationProfilePresetsTest {
     }
 
     @Test
-    fun onlyASaveOrATurnOnCountsAsUsingProfiles() {
+    fun theChatListButtonAndTileAreExplicitOptInsThatPersist() {
         val preferences = fresh()
         val store = store(preferences)
-        assertTrue(store.turnOff())
-        assertTrue(store.delete("preset-work"))
-        assertFalse(store.state.value.engaged)
+        assertFalse(store.state.value.showInChatList)
+        assertTrue(store.save(store.state.value.profiles[0].copy(name = "Night")))
         assertTrue(store.turnOn("preset-focus", null))
-        assertTrue(store.state.value.engaged)
-        assertTrue(store(preferences).state.value.engaged)
-
-        val saving = store(fresh("notification-profile-presets-save"))
-        val sleep = saving.state.value.profiles[0]
-        assertTrue(saving.save(sleep.copy(name = "Night")))
-        assertTrue(saving.state.value.engaged)
-        assertEquals(
-            "Night",
-            saving.state.value.profiles[0]
-                .name,
-        )
+        assertFalse(store.state.value.showInChatList)
+        assertTrue(store.setShowInChatList(true))
+        assertTrue(store.setTileAdded(true))
+        val reopened = store(preferences).state.value
+        assertTrue(reopened.showInChatList)
+        assertTrue(reopened.tileAdded)
+        assertTrue(store.setShowInChatList(false))
+        assertFalse(store(preferences).state.value.showInChatList)
     }
 
     @Test

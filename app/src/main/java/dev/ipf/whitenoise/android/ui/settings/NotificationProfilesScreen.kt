@@ -94,6 +94,7 @@ private fun NotificationProfilesSession(
                 if (!saved) appState.present(R.string.notification_profile_change_failed)
             }
         },
+        quickAccess = rememberNotificationProfileQuickAccess(appState, state),
     )
 }
 
@@ -108,6 +109,7 @@ internal fun NotificationProfilesContent(
     onEdit: (String) -> Unit,
     onTurnOff: () -> Unit,
     zone: ZoneId = ZoneId.systemDefault(),
+    quickAccess: NotificationProfileQuickAccess? = null,
 ) {
     val createLabel = stringResource(R.string.notification_profile_create)
     SettingsScaffold(
@@ -136,6 +138,7 @@ internal fun NotificationProfilesContent(
                 }
                 item(key = "profiles") { ProfileListGroup(profiles, active, zone, onEdit) }
                 item(key = "explainer") { SettingsExplainer(stringResource(R.string.notification_profiles_explainer)) }
+                quickAccess?.let { item(key = "quick_access") { NotificationProfileQuickAccessSection(it) } }
             }
         }
     }

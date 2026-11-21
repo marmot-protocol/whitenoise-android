@@ -73,4 +73,12 @@
         <item quantity="one">%1$d Person</item>
         <item quantity="other">%1$d Personen</item>
     </plurals>
+    <string name="notification_profile_tile_label">Benachrichtigungsprofil</string>
+    <string name="notification_profiles_quick_access">Schnellzugriff</string>
+    <string name="notification_profile_show_in_chat_list">In der Chatliste anzeigen</string>
+    <string name="notification_profile_show_in_chat_list_detail">Fügt der Chatliste eine Schaltfläche zum Wechseln der Profile hinzu.</string>
+    <string name="notification_profile_add_tile">Zu den Schnelleinstellungen hinzufügen</string>
+    <string name="notification_profile_add_tile_detail">Wechsle Profile über deine Schnelleinstellungen.</string>
+    <string name="notification_profile_add_tile_failed">Die Kachel konnte nicht hinzugefügt werden. Füge sie im Bearbeitungsmodus der Schnelleinstellungen hinzu.</string>
+    <string name="notification_profile_tile_hint">Um Profile über die Schnelleinstellungen zu wechseln, füge dort im Bearbeitungsmodus die Kachel Benachrichtigungsprofil hinzu.</string>
 </resources>

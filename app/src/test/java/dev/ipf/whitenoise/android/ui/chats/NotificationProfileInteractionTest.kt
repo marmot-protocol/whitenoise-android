@@ -108,7 +108,7 @@ class NotificationProfileInteractionTest {
     }
 
     @Test
-    fun theChatListButtonAppearsOnlyAfterTheUserSavesOrTurnsOnAProfile() {
+    fun theChatListButtonAppearsOnlyAfterTheUserOptsIn() {
         val context = RuntimeEnvironment.getApplication()
         val app =
             WhiteNoiseAppState(
@@ -123,15 +123,12 @@ class NotificationProfileInteractionTest {
             composeRule.setContent { WhiteNoiseTheme(darkTheme = false) { NotificationProfileQuickAction(app) } }
             assertEquals(3, store.state.value.profiles.size)
             composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertDoesNotExist()
-            composeRule.runOnIdle {
-                assertTrue(
-                    store.save(
-                        store.state.value.profiles[0]
-                            .copy(name = "Night"),
-                    ),
-                )
-            }
+            composeRule.runOnIdle { assertTrue(store.turnOn("preset-focus", null)) }
+            composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertDoesNotExist()
+            composeRule.runOnIdle { assertTrue(store.setShowInChatList(true)) }
             composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertIsDisplayed()
+            composeRule.runOnIdle { store.state.value.profiles.forEach { assertTrue(store.delete(it.id)) } }
+            composeRule.onNodeWithTag(NOTIFICATION_PROFILE_QUICK_ACTION_TAG).assertDoesNotExist()
         } finally {
             app.mutationsScope.cancel()
         }
