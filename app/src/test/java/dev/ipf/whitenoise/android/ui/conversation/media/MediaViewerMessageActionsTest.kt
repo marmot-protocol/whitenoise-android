@@ -116,6 +116,7 @@ class MediaViewerMessageActionsTest {
     private fun item(): TimelineMessage {
         val record =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = "album",
                 direction = "received",
                 groupIdHex = "group",

@@ -94,6 +94,7 @@ class KeptMediaCardDeviceTest {
         TimelineMessage(
             "msg:synthetic-message",
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = "synthetic-message",
                 direction = "received",
                 groupIdHex = "synthetic-group",

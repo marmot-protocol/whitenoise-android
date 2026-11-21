@@ -2138,6 +2138,7 @@
     <string name="setup_action_retry">Erneut versuchen</string>
     <string name="setup_action_continue_without">Nicht jetzt</string>
     <string name="setup_action_use_recommended_relays">Relay-Einrichtung korrigieren</string>
+    <string name="setup_action_remove_unusable_relays">Nicht nutzbare Relays entfernen</string>
     <string name="setup_action_edit_relays">Relays prüfen</string>
     <string name="setup_action_edit_profile">Profil bearbeiten</string>
     <string name="setup_action_edit_follows">Kontaktliste bearbeiten</string>
@@ -2759,4 +2760,5 @@
     <string name="nostr_git_copy_url">URL kopieren: %1$s</string>
     <string name="nostr_git_open_url">URL öffnen: %1$s</string>
     <string name="dictation_continue_recording">Den nächsten Teil diktieren</string>
+    <string name="setup_repair_inconclusive_warning">Einige Quellen haben bei dieser Prüfung nicht geantwortet. Es könnte eine neuere Liste geben, die dieses Gerät nicht sehen konnte, und deine aktuellen Relays funktionieren in anderen Apps vielleicht weiterhin. Speichere nur, wenn du dieses Risiko akzeptierst.</string>
 </resources>

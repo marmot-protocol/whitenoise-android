@@ -237,6 +237,7 @@ class GroupSystemProfileLinkScreenshotTest {
     /** The engine-synthesized system record carrying the event. */
     private fun record() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = "cc".repeat(32),
             direction = "system",
             groupIdHex = "bb".repeat(32),

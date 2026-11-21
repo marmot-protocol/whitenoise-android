@@ -323,6 +323,7 @@ class TtsRichLeafPlacementAndroidTest {
         plaintext: String,
         document: MarkdownDocumentFfi,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = MESSAGE_ID,
         direction = "received",
         groupIdHex = GROUP_ID,

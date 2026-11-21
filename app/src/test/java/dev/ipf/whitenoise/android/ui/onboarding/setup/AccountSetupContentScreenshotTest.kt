@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayCapabilityFfi
+import dev.ipf.marmotkit.OnboardingRelayRemovalReasonFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
 import dev.ipf.marmotkit.OnboardingRelayTagChangeFfi
 import dev.ipf.marmotkit.OnboardingRelayTagDispositionFfi
@@ -112,6 +113,23 @@ class AccountSetupContentScreenshotTest {
     /** Records the exact declaration and native change labels before consent. */
     @Test fun relayRepairPreview() = capture("relay_repair_preview", AccountSetupState(snapshot = relayDiffSnapshot()))
 
+    /** Show an unanswered source before consent to publishing the repair. */
+    @Test fun inconclusiveRepairDarkRtl() {
+        val snapshot = relayDiffSnapshot().apply { checkNotNull(proposal).inconclusive = true }
+        capture(
+            "inconclusive_repair_dark_rtl",
+            AccountSetupState(snapshot = snapshot),
+            theme = SetupScreenshotTheme.DARK,
+            rtl = true,
+        )
+    }
+
+    /** The new native action offers to remove only unusable relays before the repair review. */
+    @Test fun removeUnusableRelaysChoice() {
+        val snapshot = setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS))
+        capture("remove_unusable_relays_choice", AccountSetupState(snapshot = snapshot))
+    }
+
     /** Exact native declarations and content remain readable in the AMOLED palette. */
     @Test fun relayRepairPreviewAmoled() =
         capture(
@@ -147,6 +165,7 @@ class AccountSetupContentScreenshotTest {
                         tag.endpoint,
                         tag.role,
                         OnboardingRelayCapabilityFfi.NONE,
+                        OnboardingRelayRemovalReasonFfi.NONE,
                     )
                 }
         }
@@ -519,6 +538,7 @@ class AccountSetupContentScreenshotTest {
                                 read.endpoint,
                                 read.role,
                                 OnboardingRelayCapabilityFfi.NONE,
+                                OnboardingRelayRemovalReasonFfi.NONE,
                             ),
                             OnboardingRelayTagChangeFfi(
                                 OnboardingRelayTagDispositionFfi.REMOVED,
@@ -528,6 +548,7 @@ class AccountSetupContentScreenshotTest {
                                 old.endpoint,
                                 old.role,
                                 OnboardingRelayCapabilityFfi.NONE,
+                                OnboardingRelayRemovalReasonFfi.NONE,
                             ),
                             OnboardingRelayTagChangeFfi(
                                 OnboardingRelayTagDispositionFfi.ADDED,
@@ -537,6 +558,7 @@ class AccountSetupContentScreenshotTest {
                                 added.endpoint,
                                 added.role,
                                 OnboardingRelayCapabilityFfi.WRITE,
+                                OnboardingRelayRemovalReasonFfi.NONE,
                             ),
                         ),
                 )

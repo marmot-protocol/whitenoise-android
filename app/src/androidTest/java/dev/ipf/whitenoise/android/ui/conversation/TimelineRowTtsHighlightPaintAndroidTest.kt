@@ -287,6 +287,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
     /** Builds a received message whose body is a rich markdown document for highlight painting. */
     private fun richRecord() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = MESSAGE_B,
             direction = "received",
             groupIdHex = GROUP_ID,
@@ -412,6 +413,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
         messageIdHex: String,
         plaintext: String,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = messageIdHex,
         direction = "received",
         groupIdHex = GROUP_ID,

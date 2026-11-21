@@ -277,6 +277,7 @@ class PendingTextForwardCoverageTest {
             kind: ULong = 9uL,
             tags: List<MessageTagFfi> = emptyList(),
         ) = AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "sent",
             groupIdHex = "source-group",

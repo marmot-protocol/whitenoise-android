@@ -397,6 +397,7 @@ class ProjectedPreviewTextTest {
         plaintext: String,
         tags: List<MessageTagFfi> = emptyList(),
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "latest-message",
         direction = "received",
         groupIdHex = "group-a",

@@ -105,6 +105,7 @@ class ComposerAcceptedCollapseTest {
     /** A minimal received message for the composer to reply to. */
     private fun replyRecord() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = "1".repeat(64),
             direction = "received",
             groupIdHex = "group",

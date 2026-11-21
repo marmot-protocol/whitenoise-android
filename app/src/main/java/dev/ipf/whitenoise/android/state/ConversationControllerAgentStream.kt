@@ -120,6 +120,7 @@ private fun ConversationController.appendStreamDebugEvent(
     val id = "$STREAM_DEBUG_ID_PREFIX$streamId:$now:${streamDebugEventSequence.toString().padStart(20, '0')}"
     val record =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = STREAM_DEBUG_DIRECTION,
             groupIdHex = group.groupIdHex,
@@ -176,6 +177,7 @@ private fun ConversationController.updateStreamPreview(
     val record =
         (
             existing ?: AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = "stream-$streamId",
                 direction = "received",
                 groupIdHex = group.groupIdHex,

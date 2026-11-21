@@ -170,7 +170,9 @@ private suspend fun ConversationController.declinePendingInvite(
     appState.withGroupCommitLock(account, groupIdHex) {
         if (!stillPending()) return@withGroupCommitLock InviteDeclineOutcome.STALE
         try {
-            appState.marmotIo { declineGroupInvite(account, groupIdHex) }
+            appState.runGroupChange(account, groupIdHex, stillWanted = stillPending, actionLabel = R.string.decline) {
+                appState.marmotIo { declineGroupInvite(account, groupIdHex) }
+            }
         } catch (refusal: MarmotKitException.AdminCannotSelfRemove) {
             if (!refusal.groupIdHex.equals(groupIdHex, ignoreCase = true)) throw refusal
             if (!stepDownAgreed) return@withGroupCommitLock InviteDeclineOutcome.NEEDS_STEP_DOWN_CONSENT

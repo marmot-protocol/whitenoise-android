@@ -217,6 +217,7 @@ class ForwardMenuHandoffTest {
     /** Builds a synthetic received text record in the requested group. */
     private fun forwardRecord(group: String) =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = "33".repeat(32),
             direction = "received",
             groupIdHex = group,

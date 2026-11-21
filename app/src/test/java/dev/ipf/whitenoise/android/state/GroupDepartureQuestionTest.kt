@@ -43,6 +43,53 @@ class GroupDepartureQuestionTest {
     // Native timing callbacks may append while assertions inspect the recorded call sequence.
     private val calls = CopyOnWriteArrayList<String>()
 
+    /** The 0.18 capability selects one native leave, even if a separate demotion would be refused. */
+    @Test
+    fun aCoAdminLeavesWithOneNativeChange() =
+        runBlocking {
+            val state = appState(catchingUpRuntime(atomicLeave = true))
+            val result = state.leaveAsAdmin(checkNotNull(state.activeAccountRef), GROUP) { error("A separate demotion would strand the admin") }
+            assertTrue(result)
+            val operations = listOf("groupManagementState", "leaveGroup")
+            assertEquals(operations, calls.filter { it in operations })
+        }
+
+    /** The atomic leave retries only the acknowledged caution and never sends a separate role change. */
+    @Test
+    fun atomicLeaveAsksBeforeOverridingANativeCaution() =
+        runBlocking {
+            checkAtomicDecision(MarmotKitException.GroupCatchingUp(GROUP), "acknowledgeGroupCatchingUp", true)
+            checkAtomicDecision(MarmotKitException.GroupCommitUndelivered(GROUP), "acknowledgeGroupCommitUndelivered", true)
+            checkAtomicDecision(MarmotKitException.GroupCatchingUp(GROUP), "acknowledgeGroupCatchingUp", false)
+        }
+
+    private suspend fun checkAtomicDecision(
+        refusal: MarmotKitException,
+        acknowledgement: String,
+        proceed: Boolean,
+    ) {
+        calls.clear()
+        val state = appState(catchingUpRuntime(atomicLeave = true, refusal = refusal))
+        val owner = checkNotNull(state.activeAccountRef)
+        val leave =
+            CoroutineScope(Job()).async(start = CoroutineStart.UNDISPATCHED) {
+                state.leaveAsAdmin(owner, GROUP) { error("Unexpected demotion") }
+            }
+        try {
+            awaitWithMainLooper { state.groupChangeConfirmations.pending != null }
+            assertEquals(1, calls.count { it == "leaveGroup" })
+            state.groupChangeConfirmations.pending!!.answer(proceed)
+            awaitWithMainLooper { leave.isCompleted }
+            assertEquals(!proceed, leave.isCancelled)
+            if (proceed) assertTrue(leave.await())
+            assertEquals(if (proceed) 1 else 0, calls.count { it == acknowledgement })
+            assertEquals(if (proceed) 2 else 1, calls.count { it == "leaveGroup" })
+            assertFalse("selfDemoteAdminDetailed" in calls)
+        } finally {
+            leave.cancel()
+        }
+    }
+
     /** Cancelling the leave while its question is open withdraws the question; no demotion or leave follows. */
     @Test
     fun cancellingTheLeaveWithdrawsItsQuestion() =
@@ -374,7 +421,10 @@ class GroupDepartureQuestionTest {
     }
 
     /** Answers the roster read and refuses every self-demotion as catching up; anything else is unexpected. */
-    private fun catchingUpRuntime(): MarmotInterface =
+    private fun catchingUpRuntime(
+        atomicLeave: Boolean = false,
+        refusal: MarmotKitException? = null,
+    ): MarmotInterface =
         Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) {
             _,
             method,
@@ -383,6 +433,18 @@ class GroupDepartureQuestionTest {
             val name = method.name.substringBefore('-')
             calls += name
             when (name) {
+                "groupManagementState" ->
+                    promoted().managementState.copy(
+                        canLeave = atomicLeave,
+                        requiresSelfDemoteBeforeLeave = !atomicLeave,
+                    )
+                "acknowledgeGroupCatchingUp", "acknowledgeGroupCommitUndelivered" -> true
+                "leaveGroup" ->
+                    if (refusal != null && calls.count { it == "leaveGroup" } == 1) {
+                        failSuspendedNativeCall(arguments, refusal)
+                    } else {
+                        promoted().summary
+                    }
                 "groupMembers" -> roster()
                 "npub" -> null
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED

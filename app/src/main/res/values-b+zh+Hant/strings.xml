@@ -2087,6 +2087,7 @@
     <string name="setup_action_retry">重試</string>
     <string name="setup_action_continue_without">暫時略過</string>
     <string name="setup_action_use_recommended_relays">修復中繼站設定</string>
+    <string name="setup_action_remove_unusable_relays">移除無法使用的中繼</string>
     <string name="setup_action_edit_relays">檢查中繼站</string>
     <string name="setup_action_edit_profile">編輯個人檔案</string>
     <string name="setup_action_edit_follows">編輯追蹤清單</string>
@@ -2701,4 +2702,5 @@
     <string name="nostr_git_copy_url">複製網址：%1$s</string>
     <string name="nostr_git_open_url">開啟網址：%1$s</string>
     <string name="dictation_continue_recording">聽寫下一段</string>
+    <string name="setup_repair_inconclusive_warning">部分來源未回應此次檢查。可能存在此裝置未能看到的較新清單，而你目前的中繼在其他應用程式中可能仍然可用。僅在你接受此風險時儲存。</string>
 </resources>

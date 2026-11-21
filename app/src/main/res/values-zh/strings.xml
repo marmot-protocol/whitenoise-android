@@ -2086,6 +2086,7 @@
     <string name="setup_action_retry">重试</string>
     <string name="setup_action_continue_without">暂时跳过</string>
     <string name="setup_action_use_recommended_relays">修复中继设置</string>
+    <string name="setup_action_remove_unusable_relays">移除无法使用的中继</string>
     <string name="setup_action_edit_relays">检查中继</string>
     <string name="setup_action_edit_profile">编辑个人资料</string>
     <string name="setup_action_edit_follows">编辑关注列表</string>
@@ -2701,4 +2702,5 @@
     <string name="nostr_git_copy_url">复制网址：%1$s</string>
     <string name="nostr_git_open_url">打开网址：%1$s</string>
     <string name="dictation_continue_recording">听写下一段</string>
+    <string name="setup_repair_inconclusive_warning">部分来源未响应此次检查。可能存在此设备未能看到的更新列表，而你当前的中继在其他应用中可能仍然可用。仅在你接受此风险时保存。</string>
 </resources>

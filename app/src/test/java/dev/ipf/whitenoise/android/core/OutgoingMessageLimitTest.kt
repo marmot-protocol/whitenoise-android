@@ -68,6 +68,7 @@ class OutgoingMessageLimitTest {
         plaintext: String,
         tags: List<MessageTagFfi> = emptyList(),
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "message",
         direction = "received",
         groupIdHex = "group",

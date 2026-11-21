@@ -96,6 +96,7 @@ internal fun speakablePaintRecord(
     groupIdHex: String,
     sender: String,
 ) = AppMessageRecordFfi(
+    invalidated = false,
     messageIdHex = messageIdHex,
     direction = "received",
     groupIdHex = groupIdHex,

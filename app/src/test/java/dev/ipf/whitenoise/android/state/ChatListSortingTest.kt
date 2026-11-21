@@ -681,6 +681,7 @@ class ChatListSortingTest {
         plaintext: String = "hello",
         tags: List<MessageTagFfi> = emptyList(),
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "message-$groupId",
         direction = "received",
         groupIdHex = groupId,

@@ -778,6 +778,7 @@ class NotificationFirstPostIntegrationTest {
     /** Creates one history record used by captionless-media fallback detection. */
     private fun messageRecord(tags: List<MessageTagFfi>): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = "message-a",
             direction = "received",
             groupIdHex = GROUP_ID,

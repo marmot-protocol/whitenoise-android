@@ -229,6 +229,7 @@ class SharedMediaVisibilityTest {
     ): TimelineMessage {
         val record =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = id,
                 direction = "received",
                 groupIdHex = "group",

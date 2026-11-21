@@ -376,6 +376,7 @@ class GroupSystemRetentionScreenshotTest {
     /** Builds a system record announcing the disappearing timer changing from off to five minutes. */
     private fun retentionChangeRecord() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = MESSAGE_ID,
             direction = "system",
             groupIdHex = GROUP_ID,

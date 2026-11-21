@@ -308,7 +308,7 @@ internal class LoopbackNostrRelay(
                     // Acknowledged like a relay that will store it eventually; nobody can see it yet.
                     withholdNextPublicationOfKind = null
                     withheld = JSONObject(event.toString())
-                } else if (accepted) {
+                } else if (accepted && withheld?.getString("id") != event.getString("id")) {
                     if (event.getInt("kind") in authAfterPublicationKinds) {
                         authRequiredKinds += event.getInt("kind")
                     }

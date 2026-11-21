@@ -2195,6 +2195,7 @@
     <string name="setup_action_retry">Повторить</string>
     <string name="setup_action_continue_without">Не сейчас</string>
     <string name="setup_action_use_recommended_relays">Исправить настройку реле</string>
+    <string name="setup_action_remove_unusable_relays">Удалить непригодные ретрансляторы</string>
     <string name="setup_action_edit_relays">Проверить реле</string>
     <string name="setup_action_edit_profile">Изменить профиль</string>
     <string name="setup_action_edit_follows">Изменить подписки</string>
@@ -2832,4 +2833,5 @@
     <string name="nostr_git_copy_url">Копировать URL: %1$s</string>
     <string name="nostr_git_open_url">Открыть URL: %1$s</string>
     <string name="dictation_continue_recording">Продиктовать следующую часть</string>
+    <string name="setup_repair_inconclusive_warning">Некоторые источники не ответили на эту проверку. Может существовать более новый список, который это устройство не смогло увидеть, а текущие ретрансляторы могут по-прежнему работать в других приложениях. Сохраняйте, только если принимаете этот риск.</string>
 </resources>

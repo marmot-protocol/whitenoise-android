@@ -861,6 +861,7 @@ class MessageProjectorTest {
         retentionExpiresAt: ULong? = null,
         sticker: StickerRefFfi? = null,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = id,
         direction = direction,
         groupIdHex = "group",
