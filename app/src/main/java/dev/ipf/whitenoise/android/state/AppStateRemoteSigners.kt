@@ -17,11 +17,12 @@ internal fun WhiteNoiseAppState.reconnectRemoteSigner(accountIdHex: String) {
     val runtime = marmotOrNull() ?: return
     launchMutation {
         if (marmotOrNull() !== runtime) return@launchMutation
-        if (remoteSigners.session(accountIdHex) == null) {
+        if (remoteSigners.session(runtime, accountIdHex) == null) {
             resumeRemoteSigner(runtime, accountRefFor(accountIdHex), accountIdHex)
         }
-        val session = remoteSigners.session(accountIdHex)
-        runCatchingCancellable { session?.connect() }
+        if (marmotOrNull() !== runtime) return@launchMutation
+        val session = remoteSigners.session(runtime, accountIdHex) ?: return@launchMutation
+        runCatchingCancellable { session.connect() }
             .onFailure { appStateDebug { "remote signer reconnect failed: ${it.readableMessage()}" } }
         remoteSigners.refresh()
         watchRemoteSigners()
@@ -75,9 +76,8 @@ internal fun WhiteNoiseAppState.watchRemoteSigners() {
     if (remoteSigners.watcher?.isActive == true) return
     remoteSigners.watcher =
         mutationsScope.launch(Dispatchers.Default) {
+            // Refresh only. Startup and session registration manage runtime ownership.
             while (isActive && remoteSigners.hasSessions()) {
-                // Handles stay with their accounts; only a replaced runtime drops them.
-                remoteSigners.retainRuntime(marmotOrNull())
                 runCatchingCancellable { remoteSigners.refresh() }
                 delay(REMOTE_SIGNER_STATUS_INTERVAL_MS)
             }
