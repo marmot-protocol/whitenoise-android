@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.Nip46PermissionsFfi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -83,7 +84,7 @@ internal fun WhiteNoiseAppState.watchRemoteSigners() {
             // Refresh only. Startup and session registration manage runtime ownership.
             while (isActive && remoteSigners.hasSessions()) {
                 // Sleeps while no screen shows a signer status; MDK's status is local, so a late read loses nothing.
-                remoteSigners.awaitObserver()
+                remoteSigners.observers.first { it > 0 }
                 runCatchingCancellable { remoteSigners.refresh() }
                 delay(REMOTE_SIGNER_STATUS_INTERVAL_MS)
             }
