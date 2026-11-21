@@ -11,6 +11,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession as RecognitionSession
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -28,8 +29,9 @@ class ConversationDictationFollowUpTest {
         controller.complete(fixture.target)
 
         assertEquals(1, fixture.platform.recognizers)
-        assertEquals(TextRange(0), controller.state.target?.capturedDraft?.selection)
-        assertEquals("First part", controller.state.target?.capturedDraft?.text)
+        val capturedDraft = requireNotNull(controller.state.target).capturedDraft
+        assertEquals(TextRange(0), capturedDraft.selection)
+        assertEquals("First part", capturedDraft.text)
         assertNull(controller.followUp.pending)
     }
 
@@ -117,11 +119,9 @@ class ConversationDictationFollowUpTest {
 
         override fun callerAudioHasPending() = true
 
-        override fun createSession(
-            listener: ConversationDictationRecognitionListener,
-        ): ConversationDictationRecognitionSession {
+        override fun createSession(listener: ConversationDictationRecognitionListener): RecognitionSession {
             recognizers++
-            return object : ConversationDictationRecognitionSession {
+            return object : RecognitionSession {
                 override fun start() = Unit
 
                 override fun stop() = Unit
