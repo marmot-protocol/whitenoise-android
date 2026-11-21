@@ -46,4 +46,5 @@
     <string name="history_backups_problem_restore_busy">Zaten bir geri yükleme sürüyor.</string>
     <string name="history_backups_problem_expired">Bu kelimeler artık geçerli değil. Yeni kelimeler almak için baştan başla.</string>
     <string name="history_backups_problem_failed">Bir sorun oluştu. Tekrar dene.</string>
+    <string name="history_backups_chat_hint">Bir yedekte bu sohbetin daha eski mesajları var. Bunları getirmek için aynı kurtarma kelimelerini Ayarlar → Profil → Geçmiş yedekleri bölümüne yeniden gir.</string>
 </resources>

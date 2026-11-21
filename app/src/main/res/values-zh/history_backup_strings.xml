@@ -46,4 +46,5 @@
     <string name="history_backups_problem_restore_busy">已有恢复正在进行。</string>
     <string name="history_backups_problem_expired">这些词已失效。请重新开始以获取新的恢复词。</string>
     <string name="history_backups_problem_failed">出了点问题。请重试。</string>
+    <string name="history_backups_chat_hint">某个备份中有此聊天更早的消息。要导入它们，请在“设置 → 个人资料 → 历史记录备份”中再次输入相同的恢复词。</string>
 </resources>

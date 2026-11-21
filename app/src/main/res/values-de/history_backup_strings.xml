@@ -46,4 +46,5 @@
     <string name="history_backups_problem_restore_busy">Es läuft bereits eine Wiederherstellung.</string>
     <string name="history_backups_problem_expired">Diese Wörter sind nicht mehr gültig. Beginne neu, um neue Wörter zu erhalten.</string>
     <string name="history_backups_problem_failed">Etwas ist schiefgelaufen. Versuche es erneut.</string>
+    <string name="history_backups_chat_hint">Eine Sicherung enthält ältere Nachrichten für diesen Chat. Gib dieselben Wiederherstellungswörter erneut unter Einstellungen → Profil → Verlaufssicherungen ein, um sie zu übernehmen.</string>
 </resources>

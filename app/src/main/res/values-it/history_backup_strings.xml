@@ -46,4 +46,5 @@
     <string name="history_backups_problem_restore_busy">Un ripristino è già in corso.</string>
     <string name="history_backups_problem_expired">Queste parole non sono più valide. Ricomincia per ottenere nuove parole.</string>
     <string name="history_backups_problem_failed">Qualcosa è andato storto. Riprova.</string>
+    <string name="history_backups_chat_hint">Un backup contiene messaggi meno recenti di questa chat. Per recuperarli, inserisci di nuovo le stesse parole di recupero in Impostazioni → Profilo → Backup della cronologia.</string>
 </resources>

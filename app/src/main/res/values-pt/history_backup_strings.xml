@@ -46,4 +46,5 @@
     <string name="history_backups_problem_restore_busy">Já há uma restauração em andamento.</string>
     <string name="history_backups_problem_expired">Estas palavras já não são válidas. Comece de novo para obter novas palavras.</string>
     <string name="history_backups_problem_failed">Algo deu errado. Tente novamente.</string>
+    <string name="history_backups_chat_hint">Um backup tem mensagens mais antigas desta conversa. Para trazê-las, digite novamente as mesmas palavras de recuperação em Configurações → Perfil → Backups do histórico.</string>
 </resources>

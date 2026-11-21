@@ -46,4 +46,5 @@
     <string name="history_backups_problem_restore_busy">Ya hay una restauración en curso.</string>
     <string name="history_backups_problem_expired">Estas palabras ya no son válidas. Empieza de nuevo para obtener palabras nuevas.</string>
     <string name="history_backups_problem_failed">Algo salió mal. Inténtalo de nuevo.</string>
+    <string name="history_backups_chat_hint">Una copia tiene mensajes anteriores de este chat. Para recuperarlos, vuelve a escribir las mismas palabras de recuperación en Configuración → Perfil → Copias del historial.</string>
 </resources>

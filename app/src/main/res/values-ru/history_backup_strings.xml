@@ -46,4 +46,5 @@
     <string name="history_backups_problem_restore_busy">Восстановление уже идёт.</string>
     <string name="history_backups_problem_expired">Эти слова больше не действуют. Начните заново, чтобы получить новые.</string>
     <string name="history_backups_problem_failed">Что-то пошло не так. Попробуйте ещё раз.</string>
+    <string name="history_backups_chat_hint">В резервной копии есть более старые сообщения этого чата. Чтобы вернуть их, снова введите те же слова восстановления в разделе Настройки → Профиль → Резервные копии истории.</string>
 </resources>

@@ -1321,6 +1321,7 @@ internal fun GroupDetailsScreen(
                 }
             }
             leaveBlockedNotice(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            ChatHistoryBackupHint(appState, controller, Modifier.padding(16.dp, 8.dp))
         }
         val memberContent: @Composable () -> Unit = {
             if (!isDm) {

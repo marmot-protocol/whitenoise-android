@@ -46,4 +46,5 @@
     <string name="history_backups_problem_restore_busy">A restore is already running.</string>
     <string name="history_backups_problem_expired">These words are no longer valid. Start again to get new words.</string>
     <string name="history_backups_problem_failed">Something went wrong. Try again.</string>
+    <string name="history_backups_chat_hint">A backup has older messages for this chat. To bring them in, enter the same recovery words again in Settings → Account → History backups.</string>
 </resources>

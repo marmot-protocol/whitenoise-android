@@ -46,4 +46,5 @@
     <string name="history_backups_problem_restore_busy">Une restauration est déjà en cours.</string>
     <string name="history_backups_problem_expired">Ces mots ne sont plus valides. Recommencez pour obtenir de nouveaux mots.</string>
     <string name="history_backups_problem_failed">Une erreur s’est produite. Réessayez.</string>
+    <string name="history_backups_chat_hint">Une sauvegarde contient des messages plus anciens de cette discussion. Pour les récupérer, saisissez à nouveau les mêmes mots de récupération dans Paramètres → Profil → Sauvegardes de l’historique.</string>
 </resources>

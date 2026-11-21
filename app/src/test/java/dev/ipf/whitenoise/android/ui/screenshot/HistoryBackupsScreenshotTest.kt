@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -14,6 +17,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.BackupRestorePhaseFfi
 import dev.ipf.whitenoise.android.state.HistoryBackupAction
@@ -22,6 +26,7 @@ import dev.ipf.whitenoise.android.state.HistoryBackupStatus
 import dev.ipf.whitenoise.android.state.HistoryBackupsState
 import dev.ipf.whitenoise.android.state.HistoryRestoreProgress
 import dev.ipf.whitenoise.android.state.RecoveryWordsSetup
+import dev.ipf.whitenoise.android.ui.group.ChatHistoryBackupHintCard
 import dev.ipf.whitenoise.android.ui.settings.HistoryBackupsActions
 import dev.ipf.whitenoise.android.ui.settings.HistoryBackupsContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -114,6 +119,31 @@ class HistoryBackupsScreenshotTest {
             ),
             rtl = true,
         )
+
+    @Test fun chatInfoHintLight() = captureHint("history_backups_chat_hint_light", dark = false, rtl = false)
+
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
+    fun chatInfoHintDarkLargeRtl() = captureHint("history_backups_chat_hint_dark_rtl_large", dark = true, rtl = true)
+
+    private fun captureHint(
+        name: String,
+        dark: Boolean,
+        rtl: Boolean,
+    ) {
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, if (rtl) 2f else density.fontScale),
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark) {
+                    Surface { ChatHistoryBackupHintCard(Modifier.padding(16.dp)) }
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
 
     /** Typed restore words are handed over once, then cleared, and never come back from saved state. */
     @Test fun restoreWordsAreClearedAndNeverRestoredFromSavedState() {
