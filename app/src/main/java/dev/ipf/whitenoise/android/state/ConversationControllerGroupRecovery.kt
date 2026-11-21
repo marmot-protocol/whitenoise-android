@@ -223,10 +223,10 @@ private suspend fun ConversationController.watchGroupConvergenceEvents(
     invalidateEligibility: () -> Boolean,
 ) {
     while (currentCoroutineContext().isActive && ownsStream()) {
-        val event = stream.next() ?: break
+        val event = stream.next() ?: return
         val groupUpdated = event.isGroupStateUpdateFor(account, groupId)
         if (groupUpdated || event.isAccountDevicesEpochChange(account, groupId)) {
-            if (!invalidateEligibility()) break
+            if (!invalidateEligibility()) return
             if (groupUpdated) requestGroupConvergenceRead()
         }
     }

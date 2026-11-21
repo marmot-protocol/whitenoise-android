@@ -226,7 +226,7 @@ class StalenessGuardCoverageTest {
                         "watchGroupConvergenceEvents(stream, account, groupId, ::ownsStream, ::invalidateEligibility)",
                     ),
                 "ConversationController.kt:watchGroupConvergenceEvents" to
-                    listOf("stream.next()", "if (!invalidateEligibility()) break", "requestGroupConvergenceRead()"),
+                    listOf("stream.next()", "if (!invalidateEligibility()) return", "requestGroupConvergenceRead()"),
                 "ConversationController.kt:refreshGroupRecoveryStatus" to
                     listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
                 "ConversationController.kt:confirmGroupRejoin" to
