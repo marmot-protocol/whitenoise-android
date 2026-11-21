@@ -79,6 +79,15 @@ class WindowFoldsTest {
         assertEquals(WindowFolds.None, folds(horizontal(HEIGHT - short, HEIGHT - short, true)))
     }
 
+    @Test
+    fun sameHingeIsReevaluatedWhenTheWindowShrinks() {
+        val hinge = upright(800, 820, separating = true)
+
+        assertEquals(listOf(WindowFold(400.dp, 410.dp, separating = true)), folds(hinge).upright)
+        assertEquals(WindowFolds.None, folds(hinge, width = 1400))
+        assertEquals(listOf(WindowFold(400.dp, 410.dp, separating = true)), folds(hinge).upright)
+    }
+
     private fun folds(
         vararg features: FoldingFeature,
         width: Int = WIDTH,
