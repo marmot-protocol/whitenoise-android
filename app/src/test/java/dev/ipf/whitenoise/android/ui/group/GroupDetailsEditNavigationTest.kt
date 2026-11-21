@@ -109,14 +109,17 @@ class GroupDetailsEditNavigationTest {
 
         composeRule.onNodeWithText(context.getString(R.string.quick_action_audio)).assertDoesNotExist()
         composeRule.onNodeWithText(context.getString(R.string.quick_action_video)).assertDoesNotExist()
+        val addMembers = composeRule.onNodeWithContentDescription(context.getString(R.string.add_member))
         val mute = composeRule.onNodeWithContentDescription(context.getString(R.string.mute))
         val timer = composeRule.onNodeWithContentDescription(context.getString(R.string.disappearing))
         val search = composeRule.onNodeWithContentDescription(context.getString(R.string.quick_action_search))
-        listOf(mute, timer, search).forEach { it.assertIsDisplayed().assertHeightIsAtLeast(56.dp) }
-        val bounds = listOf(mute, timer, search).map { it.fetchSemanticsNode().boundsInRoot }
-        assertEquals(bounds[0].width, bounds[1].width, 1f)
-        assertEquals(bounds[1].width, bounds[2].width, 1f)
-        assertTrue(bounds[0].right <= bounds[1].left && bounds[1].right <= bounds[2].left)
+        val actions = listOf(addMembers, mute, timer, search)
+        actions.forEach { it.assertIsDisplayed().assertHeightIsAtLeast(56.dp) }
+        val bounds = actions.map { it.fetchSemanticsNode().boundsInRoot }
+        bounds.zipWithNext().forEach { (first, second) ->
+            assertEquals(first.width, second.width, 1f)
+            assertTrue(first.right <= second.left)
+        }
         composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().assertIsDisplayed()
     }
 
@@ -158,7 +161,10 @@ class GroupDetailsEditNavigationTest {
         }
 
         composeRule.onNodeWithText("Open details").performClick()
-        composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().performClick()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.add_member))
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).assertIsDisplayed()
 
         restorationTester.emulateSavedInstanceStateRestore()

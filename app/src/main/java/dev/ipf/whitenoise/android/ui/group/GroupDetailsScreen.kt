@@ -114,7 +114,6 @@ import dev.ipf.whitenoise.android.state.updateCollapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.updateMessageRetention
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.abandonmentAccountName
-import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
@@ -411,6 +410,10 @@ internal fun GroupDetailsScreen(
                 memberAdministrationPresentable(controller.memberRosterState, controller.seededSelfMember)
         val mutationOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, reviewRuntime)
         val mutationsBlocked = activeMutation != null || controller.mutationInFlight || !mutationOwnerCurrent
+        val openAddMembers = {
+            addMemberAutoOpened = false
+            showAddMember = true
+        }
         val detailsOpenedAtMs = remember(controller.group.groupIdHex) { SystemClock.elapsedRealtime() }
         var administrationLatencyReported by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         LaunchedEffect(canAdministerMembers) {
@@ -1728,53 +1731,20 @@ internal fun GroupDetailsScreen(
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (isDm && dmPeerNpub != null) {
-                            val profileLaunch =
-                                dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
-                                    appState.presentProfile(dmPeerNpub, origin = origin)
-                                }
-                            QuickInfoAction(
-                                label = stringResource(R.string.about),
-                                icon = R.drawable.ic_person,
-                                onClick = profileLaunch.second,
-                                modifier = Modifier.weight(1f),
-                                buttonModifier = profileLaunch.first,
-                            )
-                        }
-                        QuickInfoAction(
-                            label = stringResource(muteControl.labelRes),
-                            icon = muteControl.iconRes,
-                            enabled = !muteControl.pending,
-                            explanation = chatsExplanation(muteControl.labelRes, muteControl.explanationRes),
-                            onClick = muteControl::toggle,
-                            modifier = Modifier.weight(1f),
-                        )
-                        QuickInfoAction(
-                            label = stringResource(R.string.disappearing),
-                            icon = R.drawable.ic_timer,
-                            state = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
-                            enabled = disappearingTimerEditable(canEdit, mutationsBlocked),
-                            explanation =
-                                chatsExplanation(
-                                    R.string.disappearing,
-                                    R.string.explanation_chat_info_disappearing,
-                                ),
-                            onClick = { showDisappearingPicker = true },
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (onOpenSearch != null) {
-                            QuickInfoAction(
-                                label = stringResource(R.string.quick_action_search),
-                                icon = R.drawable.ic_search,
-                                onClick = onOpenSearch,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
+                    ChatInfoQuickActions(
+                        onOpenProfile =
+                            dmPeerNpub?.takeIf { isDm }?.let { npub ->
+                                { origin -> appState.presentProfile(npub, origin = origin) }
+                            },
+                        onAddMembers = openAddMembers.takeIf { !isDm && canEdit },
+                        addMembersEnabled = canAdministerMembers && !mutationsBlocked,
+                        muteControl = muteControl,
+                        disappearingState =
+                            disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
+                        disappearingEnabled = disappearingTimerEditable(canEdit, mutationsBlocked),
+                        onOpenDisappearing = { showDisappearingPicker = true },
+                        onOpenSearch = onOpenSearch,
+                    )
                     if (isDm && dmPeerAccountIdHex != null && dmPeerNpub != null) {
                         SettingsSection(stringResource(R.string.profile_actions))
                         SettingsGroup(modifier = Modifier.testTag("chat_info.group_actions")) {
@@ -1865,17 +1835,9 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.add_member),
                                     routeKey = "add-members",
-                                    onClick = {
-                                        addMemberAutoOpened = false
-                                        showAddMember = true
-                                    },
+                                    onClick = openAddMembers,
                                     modifier = Modifier.testTag("chat_info.add_people"),
-                                    enabled =
-                                        memberAdministrationPresentable(
-                                            controller.memberRosterState,
-                                            controller.seededSelfMember,
-                                        ) &&
-                                            !mutationsBlocked,
+                                    enabled = canAdministerMembers && !mutationsBlocked,
                                     leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                                 )
                             }

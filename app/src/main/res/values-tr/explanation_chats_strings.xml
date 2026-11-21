@@ -8,6 +8,7 @@
     <string name="explanation_chat_info_mute">Bu sohbetteki sıradan mesaj uyarılarını sessize alır. Doğrudan bahsetmeler yine de seni uyarabilir ve tüm mesajları almaya devam edersin.</string>
     <string name="explanation_chat_info_copy_peer_public_key">Bu kişinin genel anahtarını panoya kopyalar. Genel anahtarı, diğer kişilerin onu bulmak ve onunla bağlantı kurmak için kullandığı adrestir; bu yüzden paylaşmak güvenlidir. Özel anahtarını asla içermez.</string>
     <string name="explanation_chat_info_unmute">Bu sohbetin bildirimlerini yeniden açar.</string>
+    <string name="explanation_chat_info_add_members">Bu gruba kişi davet edebilmen için üye seçiciyi açar.</string>
     <string name="explanation_chat_info_disappearing">Bu sohbetteki yeni mesajların seçilen süre sonunda kaybolup kaybolmayacağını belirler. Gönderilmiş mesajlar değişmez.</string>
     <string name="explanation_chat_info_copy_chat_link">Bu sohbetin bağlantısını kopyalar; başkalarının katılma isteği göndermesi için paylaşabilirsin.</string>
     <string name="explanation_chat_info_relays">Bu grubun mesaj göndermek ve almak için kullandığı röleleri gösterir ve düzenler. Değişiklikler tüm gruba uygulanır.</string>

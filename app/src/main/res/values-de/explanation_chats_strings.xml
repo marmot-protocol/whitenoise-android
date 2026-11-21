@@ -8,6 +8,7 @@
     <string name="explanation_chat_info_mute">Schaltet gewöhnliche Nachrichtenhinweise aus diesem Chat stumm. Direkte Erwähnungen können dich weiterhin benachrichtigen, und du erhältst weiterhin alle Nachrichten.</string>
     <string name="explanation_chat_info_copy_peer_public_key">Kopiert den öffentlichen Schlüssel dieser Person in die Zwischenablage. Ihr öffentlicher Schlüssel ist die Adresse, über die andere sie finden und sich mit ihr verbinden, daher kann er bedenkenlos geteilt werden. Er enthält nie ihren privaten Schlüssel.</string>
     <string name="explanation_chat_info_unmute">Schaltet Benachrichtigungen für diesen Chat wieder ein.</string>
+    <string name="explanation_chat_info_add_members">Öffnet die Mitgliederauswahl, damit du Personen in diese Gruppe einladen kannst.</string>
     <string name="explanation_chat_info_disappearing">Legt fest, ob neue Nachrichten in diesem Chat nach einer gewählten Zeit verschwinden. Bereits gesendete Nachrichten bleiben unverändert.</string>
     <string name="explanation_chat_info_copy_chat_link">Kopiert einen Link zu diesem Chat, den du teilen kannst, damit andere um Beitritt bitten können.</string>
     <string name="explanation_chat_info_relays">Zeigt und bearbeitet die Relays, über die diese Gruppe Nachrichten sendet und empfängt. Änderungen gelten für die ganze Gruppe.</string>

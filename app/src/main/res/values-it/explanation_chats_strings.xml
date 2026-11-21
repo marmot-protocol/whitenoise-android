@@ -8,6 +8,7 @@
     <string name="explanation_chat_info_mute">Silenzia gli avvisi dei messaggi ordinari di questa chat. Le menzioni dirette possono comunque avvisarti e continui a ricevere tutti i messaggi.</string>
     <string name="explanation_chat_info_copy_peer_public_key">Copia la chiave pubblica di questa persona negli appunti. La sua chiave pubblica è l\'indirizzo che gli altri usano per trovarla e connettersi con lei, quindi è sicura da condividere. Non include mai la sua chiave privata.</string>
     <string name="explanation_chat_info_unmute">Riattiva le notifiche di questa chat.</string>
+    <string name="explanation_chat_info_add_members">Apre la selezione dei membri per invitare persone in questo gruppo.</string>
     <string name="explanation_chat_info_disappearing">Imposta se i nuovi messaggi di questa chat scompaiono dopo un tempo scelto. I messaggi già inviati non cambiano.</string>
     <string name="explanation_chat_info_copy_chat_link">Copia un link a questa chat che puoi condividere perché altri chiedano di unirsi.</string>
     <string name="explanation_chat_info_relays">Mostra e modifica i relay che questo gruppo usa per inviare e ricevere messaggi. Le modifiche valgono per tutto il gruppo.</string>
