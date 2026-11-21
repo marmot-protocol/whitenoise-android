@@ -141,7 +141,11 @@ internal fun changedDurableAvatarSelections(
             val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
             val previous = shown[item.group.groupIdHex.lowercase()]?.takeIf(AvatarAssetFfi::isRenderable)
             val unchanged = previous?.cacheKey(accountRef) == key
-            if (unchanged || AvatarImageLoader.cachedImage(key) != null) null else asset to chatListAvatarDomain(item, accountRef)
+            if (unchanged || AvatarImageLoader.cachedImage(key) != null) {
+                null
+            } else {
+                asset to chatListAvatarDomain(item, accountRef)
+            }
         }.distinctBy { (asset, _) -> asset.reference to asset.contentRevision }
         .take(FIRST_FRAME_DURABLE_AVATAR_ROWS)
         .toList()

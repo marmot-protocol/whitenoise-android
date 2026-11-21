@@ -89,14 +89,19 @@ internal fun chatListDisplayGroup(
  * the new one. A row without any avatar signal is a transient projection state and proves nothing.
  */
 internal fun ConversationPresentationFfi.selectsSupersededGroupPicture(row: ChatListRowFfi): Boolean {
-    if (resolution != PresentationResolutionFfi.LAST_KNOWN || avatarSource != PresentationSourceFfi.GROUP) return false
     val rowImage = row.avatar
     val rowUrl = ProfileSanitizer.protocolImageUrl(row.avatarUrl)
-    if (rowImage == null && rowUrl == null) return false
+    if (resolution != PresentationResolutionFfi.LAST_KNOWN ||
+        avatarSource != PresentationSourceFfi.GROUP ||
+        (rowImage == null && rowUrl == null)
+    ) {
+        return false
+    }
     return when (val selected = avatar) {
         is SelectedAvatarFfi.EncryptedGroupImage ->
             !selected.image.imageHashHex.equals(rowImage?.imageHashHex, ignoreCase = true)
-        is SelectedAvatarFfi.RemoteImage -> rowImage != null || ProfileSanitizer.protocolImageUrl(selected.url) != rowUrl
+        is SelectedAvatarFfi.RemoteImage ->
+            rowImage != null || ProfileSanitizer.protocolImageUrl(selected.url) != rowUrl
         is SelectedAvatarFfi.Placeholder -> false
     }
 }

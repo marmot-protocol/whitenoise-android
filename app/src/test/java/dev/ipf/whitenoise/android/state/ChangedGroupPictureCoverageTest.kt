@@ -114,7 +114,8 @@ class ChangedGroupPictureCoverageTest {
         assertTrue(dirtyImage.selectsSupersededGroupPicture(urlRow))
         assertTrue(dirtyUrl.selectsSupersededGroupPicture(urlRow))
         assertTrue(dirtyUrl.selectsSupersededGroupPicture(groupRow(NEW_HASH)))
-        assertFalse(dirtyUrl.selectsSupersededGroupPicture(groupRow(null).copy(avatarUrl = "https://example.invalid/old.png")))
+        val unchangedUrlRow = urlRow.copy(avatarUrl = "https://example.invalid/old.png")
+        assertFalse(dirtyUrl.selectsSupersededGroupPicture(unchangedUrlRow))
     }
 
     /** Only shown rows whose renderable picture changed, and whose pixels are not decoded, are prepared. */
@@ -157,8 +158,11 @@ class ChangedGroupPictureCoverageTest {
         )
 
         assertTrue(
-            changedDurableAvatarSelections(listOf(presented(GROUP, asset("new"))), ACCOUNT, mapOf(GROUP to asset("old")))
-                .isEmpty(),
+            changedDurableAvatarSelections(
+                listOf(presented(GROUP, asset("new"))),
+                ACCOUNT,
+                mapOf(GROUP to asset("old")),
+            ).isEmpty(),
         )
     }
 
@@ -278,7 +282,8 @@ class ChangedGroupPictureCoverageTest {
                 lastMessage = null,
             )
 
-        fun image(hash: String) = ChatListAvatarFfi(hash, "1c".repeat(32), "2d".repeat(12), "3e".repeat(32), "image/png")
+        fun image(hash: String) =
+            ChatListAvatarFfi(hash, "1c".repeat(32), "2d".repeat(12), "3e".repeat(32), "image/png")
 
         /** MDK's group presentation selecting the encrypted picture [hash]. */
         fun groupPresentation(
