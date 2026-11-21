@@ -156,6 +156,7 @@ class DisappearingReadAnchorTest {
         kind: ULong = 9uL,
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = direction,
             groupIdHex = "group",

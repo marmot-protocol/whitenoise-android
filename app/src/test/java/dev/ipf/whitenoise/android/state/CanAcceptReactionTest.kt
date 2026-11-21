@@ -460,6 +460,7 @@ class CanAcceptReactionTest {
         target: String,
         recordedAt: ULong,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = id,
         direction = "sent",
         groupIdHex = "group",

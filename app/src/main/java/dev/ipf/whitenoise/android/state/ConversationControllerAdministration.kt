@@ -151,6 +151,7 @@ private fun ConversationController.inviteReplyNeedsReconciliation(throwable: Thr
         is MarmotKitException.DirectoryLookupIncomplete,
         is MarmotKitException.GroupCatchingUp,
         is MarmotKitException.GroupCommitUndelivered,
+        is MarmotKitException.GroupCommitPending,
         -> false
         else -> true
     }

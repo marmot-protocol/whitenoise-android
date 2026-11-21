@@ -234,6 +234,7 @@ class ContentReportScreenshotTest {
     /** Builds the received spam message record being reported. */
     private fun record() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = "aa".repeat(32),
             direction = "received",
             groupIdHex = "bb".repeat(32),

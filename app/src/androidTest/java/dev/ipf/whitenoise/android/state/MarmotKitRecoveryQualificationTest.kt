@@ -203,9 +203,8 @@ class MarmotKitRecoveryQualificationTest {
     /**
      * Once an admin's device knows its group moved on without it, MDK refuses that admin's group change as catching up,
      * and after one acknowledgement the same change goes through (MDK #2273). This is the refusal runGroupChange turns
-     * into the app-level question. The receiver's newest-events query is the signal that MDK recorded the gap, so no
-     * change is attempted before it; the acknowledged change then commits on the device's own epoch, which is fine for
-     * a disposable group.
+     * into the app-level question. A successful acknowledgement proves the receiver recorded its gap. Reopening that
+     * receiver clears its process-local consent, so the first real change must be refused again.
      */
     @Test
     fun catchingUpRefusalIsAcknowledgedForOneChange() =
@@ -215,39 +214,34 @@ class MarmotKitRecoveryQualificationTest {
             val receiver = group.receiver
             sender.runtime.promoteAdminDetailed(sender.account.label, group.id, receiver.account.accountIdHex)
             awaitAdmin(receiver, group.id)
-            val queriesBefore = relay.answeredQueries(GROUP_MESSAGE_KIND).size
-
+            // Near-Welcome traffic may be old history. Wait before creating the signed future-epoch messages.
+            delay(WELCOME_CLOCK_SKEW_MILLIS + 1_000L)
             relay.withholdNextPublicationOfKind = GROUP_MESSAGE_KIND
             sender.runtime.updateGroupProfile(sender.account.label, group.id, RENAMED, null)
             checkNotNull(relay.withheldEventId()) { "the rename commit was not withheld" }
             (1..POST_COMMIT_MESSAGES).forEach { sender.runtime.sendText(sender.account.label, group.id, "ahead-$it") }
-            val gapFetched =
+            val label = receiver.account.label
+            // Only this query inspects the native refusal ledger for this group and epoch. Its consent is
+            // process-local. Reopen with the commit still withheld to exercise the actual unconsented change.
+            val detected =
                 withTimeoutOrNull(CATCHING_UP_TIMEOUT_MILLIS) {
-                    while (relay.answeredQueries(GROUP_MESSAGE_KIND).drop(queriesBefore).none { (filters, _) ->
-                            filters.any { it.has("limit") && it.has("until") }
-                        }
-                    ) {
-                        delay(POLL_MILLIS)
-                    }
+                    while (!receiver.runtime.acknowledgeGroupCatchingUp(label, group.id)) delay(POLL_MILLIS)
                     true
                 }
-            assertTrue(
-                "the receiver never looked for the missing commit: ${diagnose(receiver, group.id)}",
-                gapFetched == true,
-            )
-
-            val label = receiver.account.label
-            val rename = suspend { receiver.runtime.updateGroupProfile(label, group.id, BEHIND_NAME, null) }
+            assertTrue("no epoch gap for this receiver: ${diagnose(receiver, group.id)}", detected == true)
+            close(receiver)
+            val resumed = reopen(receiver)
+            val rename = suspend { resumed.runtime.updateGroupProfile(label, group.id, BEHIND_NAME, null) }
             val refusal = runCatching { rename() }.exceptionOrNull()
             assertTrue("a change while behind was not refused as catching up: $refusal", refusal.isCatchingUp())
             assertTrue(
                 "acknowledging must find the group catching up",
-                receiver.runtime.acknowledgeGroupCatchingUp(receiver.account.label, group.id),
+                resumed.runtime.acknowledgeGroupCatchingUp(receiver.account.label, group.id),
             )
             rename()
             assertEquals(
                 BEHIND_NAME,
-                receiver.runtime
+                resumed.runtime
                     .groupDetails(receiver.account.label, group.id)
                     .group.name,
             )
@@ -519,6 +513,7 @@ class MarmotKitRecoveryQualificationTest {
         const val REPLAY_MESSAGES_PER_SENDER = 100
         const val BEHIND_NAME = "Renamed while behind"
         const val LONG_OFFLINE_MILLIS = 150_000L
+        const val WELCOME_CLOCK_SKEW_MILLIS = 300_000L
         const val CATCHING_UP_TIMEOUT_MILLIS = 60_000L
         const val SINGLE_SENDER_MESSAGES = 600
 

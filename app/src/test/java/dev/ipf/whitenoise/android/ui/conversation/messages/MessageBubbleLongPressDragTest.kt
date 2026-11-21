@@ -463,6 +463,7 @@ class MessageBubbleLongPressDragTest {
             id = "msg:$messageId",
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = messageId,
                     direction = if (mine) "sent" else "received",
                     groupIdHex = GROUP_ID,

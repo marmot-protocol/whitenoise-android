@@ -636,6 +636,7 @@ class ConversationVideoRotationAndroidTest {
             id = "msg:$MESSAGE_ID",
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = MESSAGE_ID,
                     direction = "received",
                     groupIdHex = GROUP_ID,

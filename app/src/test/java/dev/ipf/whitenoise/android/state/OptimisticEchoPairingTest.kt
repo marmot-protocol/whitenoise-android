@@ -76,6 +76,7 @@ class OptimisticEchoPairingTest {
         plaintext: String,
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "sent",
             groupIdHex = "group",

@@ -1172,6 +1172,11 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
+                "groupManagementState" -> testGroupMutationResult(
+                    projection.group.admins,
+                    projection.group.admins,
+                    self = projection.group.admins.first(),
+                ).managementState
                 "groupDetails", "promoteAdminDetailed", "selfDemoteAdminDetailed" ->
                     lifecycleAdminCommand(method.name.substringBefore('-'), projection, calls, arguments)
                 "listMedia" -> emptyList<Any>()

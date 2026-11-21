@@ -129,6 +129,7 @@ internal fun chatListItemFromProjection(
 private fun chatListLatestMessage(row: ChatListRowFfi): AppMessageRecordFfi? =
     row.lastMessage?.let { preview ->
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = preview.messageIdHex,
             direction = "received",
             groupIdHex = row.groupIdHex,

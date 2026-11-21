@@ -1857,6 +1857,7 @@ class ConversationController(
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, group.disappearingMessageSecs)
         val optimistic =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = tempId,
                 direction = "sent",
                 groupIdHex = group.groupIdHex,
@@ -2974,17 +2975,24 @@ class ConversationController(
             }
             var demotedBeforeLeave = false
             runCatching {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    if (soleMember) {
-                        appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
-                    } else {
-                        if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, liveMemberCount)) {
-                            demoteThenLeave(account) { demotedBeforeLeave = true }
-                        } else {
-                            appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+                val left =
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        when {
+                            soleMember -> {
+                                appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
+                                true
+                            }
+                            GroupProjector.isAdminRef(group, activeAccountIdHex) ->
+                                appState.leaveAsAdmin(account, group.groupIdHex) {
+                                    demoteThenLeave(account) { demotedBeforeLeave = true }
+                                }
+                            else -> {
+                                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+                                true
+                            }
                         }
                     }
-                }
+                if (!left) return@runCatching false
                 appState.removeComposerExpansionForGroup(account, group.groupIdHex)
                 // Authoritative local self-leave: record it before the
                 // synchronous snapshot drop so any subsequent
@@ -3028,27 +3036,6 @@ class ConversationController(
                 false
             }
         }
-
-    /**
-     * Steps [account] down as admin, then leaves, asking first if MDK holds the step-down back. The question stays
-     * cancellable; once the step-down starts, it, [onDemoted] and the leave run to completion together.
-     */
-    private suspend fun demoteThenLeave(
-        account: String,
-        onDemoted: () -> Unit,
-    ) {
-        appState.runGroupChange(account, group.groupIdHex, actionLabel = R.string.group_action_step_down_and_leave) {
-            withContext(NonCancellable) {
-                val demoteResult =
-                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                        selfDemoteAdminDetailed(account, group.groupIdHex)
-                    }
-                onDemoted()
-                applyMutationDetails(account, demoteResult.details)
-                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-            }
-        }
-    }
 
     suspend fun dismissConversationNotifications() {
         val account = conversationAccountRef ?: return

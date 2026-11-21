@@ -28,6 +28,7 @@ class CompareTimelineMessagesTest {
         id = id,
         record =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = id,
                 direction = "received",
                 groupIdHex = "g",

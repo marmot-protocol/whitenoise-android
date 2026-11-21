@@ -154,6 +154,7 @@ class BatchDeleteFailureNoticeScreenshotTest {
     ): BatchDeleteAttempt {
         val record =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = id,
                 direction = "received",
                 groupIdHex = "group",

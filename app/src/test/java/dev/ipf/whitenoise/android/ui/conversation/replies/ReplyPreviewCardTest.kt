@@ -84,6 +84,7 @@ class ReplyPreviewCardTest {
     fun pollPreviewUsesLocalizedSafeCopyAndRemainsNavigable() {
         val original =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = "poll-id",
                 direction = "received",
                 groupIdHex = "group",

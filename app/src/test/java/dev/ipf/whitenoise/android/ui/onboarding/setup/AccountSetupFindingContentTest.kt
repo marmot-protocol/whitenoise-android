@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
 import dev.ipf.marmotkit.OnboardingFindingContextFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayCapabilityFfi
+import dev.ipf.marmotkit.OnboardingRelayRemovalReasonFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
 import dev.ipf.marmotkit.OnboardingRelayTagChangeFfi
 import dev.ipf.marmotkit.OnboardingRelayTagDispositionFfi
@@ -68,6 +69,7 @@ class AccountSetupFindingContentTest {
                     endpoint,
                     tag.role,
                     OnboardingRelayCapabilityFfi.READ_AND_WRITE,
+                    OnboardingRelayRemovalReasonFfi.NONE,
                 ),
             )
         snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =

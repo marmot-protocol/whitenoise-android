@@ -295,6 +295,7 @@ class MessageBubbleEditedMarkdownTest {
     /** Builds a received record whose original body renders bold markdown, for edit tests. */
     private fun editedRecord() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = MESSAGE_ID,
             direction = "received",
             groupIdHex = "group",

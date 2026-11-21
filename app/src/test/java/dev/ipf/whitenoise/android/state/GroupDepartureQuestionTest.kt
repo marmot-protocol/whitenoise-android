@@ -43,6 +43,17 @@ class GroupDepartureQuestionTest {
     // Native timing callbacks may append while assertions inspect the recorded call sequence.
     private val calls = CopyOnWriteArrayList<String>()
 
+    /** The 0.18 capability selects one native leave, even if a separate demotion would be refused. */
+    @Test
+    fun aCoAdminLeavesWithOneNativeChange() =
+        runBlocking {
+            val state = appState(catchingUpRuntime(atomicLeave = true))
+            val result = state.leaveAsAdmin(SELF, GROUP) { error("A separate demotion would strand the admin") }
+            assertTrue(result)
+            val operations = listOf("groupManagementState", "leaveGroup")
+            assertEquals(operations, calls.filter { it in operations })
+        }
+
     /** Cancelling the leave while its question is open withdraws the question; no demotion or leave follows. */
     @Test
     fun cancellingTheLeaveWithdrawsItsQuestion() =
@@ -374,7 +385,7 @@ class GroupDepartureQuestionTest {
     }
 
     /** Answers the roster read and refuses every self-demotion as catching up; anything else is unexpected. */
-    private fun catchingUpRuntime(): MarmotInterface =
+    private fun catchingUpRuntime(atomicLeave: Boolean = false): MarmotInterface =
         Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) {
             _,
             method,
@@ -383,6 +394,11 @@ class GroupDepartureQuestionTest {
             val name = method.name.substringBefore('-')
             calls += name
             when (name) {
+                "groupManagementState" -> promoted().managementState.copy(
+                    canLeave = atomicLeave,
+                    requiresSelfDemoteBeforeLeave = !atomicLeave,
+                )
+                "leaveGroup" -> promoted().summary
                 "groupMembers" -> roster()
                 "npub" -> null
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED

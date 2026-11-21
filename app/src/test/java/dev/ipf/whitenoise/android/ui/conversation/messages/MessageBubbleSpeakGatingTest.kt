@@ -145,6 +145,7 @@ class MessageBubbleSpeakGatingTest {
         plaintext: String,
         tags: List<MessageTagFfi> = emptyList(),
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = id,
         direction = "received",
         groupIdHex = "group",

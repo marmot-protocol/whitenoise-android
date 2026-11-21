@@ -136,6 +136,7 @@ class TtsSpeakableProjectionContractTest {
         plaintext: String,
         contentTokens: MarkdownDocumentFfi,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "message",
         direction = "received",
         groupIdHex = "group",

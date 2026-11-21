@@ -24,7 +24,7 @@ internal suspend fun reportUpgradePending(
     }
     runCatching {
         val account = receipt.getString("sender")
-        val group = receipt.getString("group")
+        val group = receipt.optString("pendingGroup", receipt.getString("group"))
         val message = receipt.getString("pendingMessage")
         val query = qualificationTimelineQuery(group, 100u)
         val matches = runtime.timelineMessages(account, query).messages.filter { it.messageIdHex == message }

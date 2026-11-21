@@ -358,6 +358,7 @@ class ReplyTaggedSendsTest {
         /** A received chat message with [id], the shape the composer keeps as its reply selection. */
         fun record(id: String) =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = id,
                 direction = "received",
                 groupIdHex = GROUP_ID,
