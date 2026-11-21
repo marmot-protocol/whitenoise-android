@@ -21,15 +21,18 @@ class ShellShadowRule : TestRule {
             /** Runs the test, then records and asserts its shadow comparisons. */
             override fun evaluate() {
                 ShellShadowLog.reset()
-                base.evaluate()
+                try {
+                    base.evaluate()
+                } finally {
+                    println(
+                        "shell-shadow ${description.className}#${description.methodName} " +
+                            "comparisons=${ShellShadowLog.comparisons} mismatches=${ShellShadowLog.mismatchCount} " +
+                            "origins=${ShellShadowLog.originCounts}",
+                    )
+                    ShellShadowLog.mismatches.forEach { println("shell-shadow-mismatch $it") }
+                }
                 val comparisons = ShellShadowLog.comparisons
                 val mismatches = ShellShadowLog.mismatches
-                println(
-                    "shell-shadow ${description.className}#${description.methodName} " +
-                        "comparisons=$comparisons mismatches=${ShellShadowLog.mismatchCount} " +
-                        "origins=${ShellShadowLog.originCounts}",
-                )
-                mismatches.forEach { println("shell-shadow-mismatch $it") }
                 assertTrue("no shadow comparison ran", comparisons > 0)
                 assertEquals("shadow mismatches", emptyList<ShellShadowMismatch>(), mismatches)
             }

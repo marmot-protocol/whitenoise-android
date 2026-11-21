@@ -40,20 +40,26 @@ internal class MountedContractShell(
         width: MutableState<Dp>,
         fixture: ReturnFixture = ReturnFixture(),
         exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
-    ) = withMountedShell(width, fixture, { MainShell(appState = fixture.appState, stateHolder = it) }, exercise)
+    ) = withMountedShell(
+        width = width,
+        fixture = fixture,
+        shell = { MainShell(appState = fixture.appState, stateHolder = it) },
+        exercise = exercise,
+    )
 
     /**
      * Mounts the shell through the test's own [shell] call, for a test that feeds it an inbound route, and always
-     * releases its jobs.
+     * releases its jobs. [savedState] is the holder's Activity saved state, empty unless a test restores one.
      */
     fun withMountedShell(
         width: MutableState<Dp>,
         fixture: ReturnFixture,
         shell: @Composable (MainShellStateHolder) -> Unit,
+        savedState: SavedStateHandle = SavedStateHandle(),
         exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
     ) {
         val mounted = mutableStateOf(true)
-        val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
+        val holder = MainShellStateHolder(fixture.appState, savedState)
         val controller =
             holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
         fixture.appState.setAppInForeground(true)
