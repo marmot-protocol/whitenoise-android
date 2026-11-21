@@ -15,7 +15,8 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class NotificationProfileRepeatsTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
-    private val preferences get() = context.getSharedPreferences("notification-profile-repeats-test", Context.MODE_PRIVATE)
+    private val preferences
+        get() = context.getSharedPreferences("notification-profile-repeats-test", Context.MODE_PRIVATE)
 
     @Test
     fun aHeldSenderIsRememberedForThreeMinutesAcrossARestart() {

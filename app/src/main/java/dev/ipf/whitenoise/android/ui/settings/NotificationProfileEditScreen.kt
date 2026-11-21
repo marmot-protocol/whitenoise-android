@@ -63,7 +63,8 @@ private val ProfilePeopleSaver =
         restore = { saved ->
             saved
                 .mapNotNull { key ->
-                    key.split(CHAT_KEY_SEPARATOR).takeIf { it.size == 2 }?.let { NotificationProfilePerson(it[0], it[1]) }
+                    val parts = key.split(CHAT_KEY_SEPARATOR)
+                    if (parts.size == 2) NotificationProfilePerson(parts[0], parts[1]) else null
                 }.toSet()
         },
     )

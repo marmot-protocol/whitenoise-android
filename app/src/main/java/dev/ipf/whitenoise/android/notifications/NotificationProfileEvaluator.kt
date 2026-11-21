@@ -77,8 +77,6 @@ private fun scheduledNotificationProfile(
 }
 
 /** How long after a held-back message a second one from the same person may notify. */
-internal const val NOTIFICATION_PROFILE_REPEAT_WINDOW_MS = 3L * 60L * 1_000L
-
 private val GroupChangeTriggers =
     setOf(
         NotificationTriggerFfi.GROUP_INVITE,
@@ -90,12 +88,6 @@ private val GroupChangeTriggers =
 /** A new text message rather than a reaction or a membership event: the only kind that counts as repeated. */
 internal fun isNotificationProfileMessage(update: NotificationUpdateFfi): Boolean =
     update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !LocalNotificationFormatter.isReaction(update)
-
-/** True when [heldAtMs], the last held-back message from the same person, is recent enough at [nowMs]. */
-internal fun notificationProfileRepeatOpen(
-    heldAtMs: Long?,
-    nowMs: Long,
-): Boolean = heldAtMs != null && nowMs >= heldAtMs && nowMs - heldAtMs < NOTIFICATION_PROFILE_REPEAT_WINDOW_MS
 
 /**
  * Whether an active profile keeps [update] from being posted. Own messages are left to the existing policy.

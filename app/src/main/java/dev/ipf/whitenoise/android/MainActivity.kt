@@ -1,9 +1,7 @@
 package dev.ipf.whitenoise.android
 
-import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
@@ -187,7 +185,7 @@ class MainActivity : AppCompatActivity() {
         pinTapGate.replayWhenDecided(lifecycleScope, ::consumeIntent)
         installAppUnlockPrompt()
         enableEdgeToEdge()
-        applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
+        window.applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
         installComposeContent()
         appState.recordHostPerformanceSince(
             HostPerformanceOperationFfi.WINDOW_INIT,
@@ -242,7 +240,7 @@ class MainActivity : AppCompatActivity() {
             // icons must follow the resolved app theme. Left on the edge-to-edge
             // default, dark icons land on a black background and disappear.
             DisposableEffect(state.themeMode, systemDarkTheme) {
-                applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
+                window.applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
                 onDispose { }
             }
             SideEffect { syncSystemBarsAndHostReadiness(darkTheme) }
@@ -284,7 +282,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun firstFrameTheme(): AppThemeMode = RuntimePolicyHooks.allowThreadDiskReads(::readPersistedThemeMode)
+    private fun firstFrameTheme(): AppThemeMode = RuntimePolicyHooks.allowThreadDiskReads(this::readPersistedThemeMode)
 
     private fun handleNotificationTarget(
         handledTarget: NotificationTarget,
@@ -399,15 +397,12 @@ class MainActivity : AppCompatActivity() {
         retainPendingShareOnRecreation: Boolean = false,
         lifecycleClass: WarmResumeLifecycleClass = warmResumeLifecycleClass,
     ) {
-        if (notificationProfileTileRoute.accept(intent)) {
-            setIntent(Intent(this, MainActivity::class.java))
-            return
-        }
-        if (AppUpdateNavigation.isUpdateTap(intent)) {
-            pinTapGate.supersede()
-            inboundAppUpdateTap += 1
-            // One-shot, like the notification tap below: clear the stored intent so
-            // activity recreation cannot replay the same update tap.
+        val opensProfileChooser = notificationProfileTileRoute.accept(intent)
+        if (opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
+            if (!opensProfileChooser) {
+                pinTapGate.supersede()
+                inboundAppUpdateTap += 1
+            }
             setIntent(Intent(this, MainActivity::class.java))
             return
         }
@@ -835,18 +830,6 @@ class MainActivity : AppCompatActivity() {
             recentsPreferenceSecureFlagRetained = false
         }
     }
-
-    private fun readPersistedThemeMode(): AppThemeMode =
-        AppThemeMode.fromPreference(
-            getSharedPreferences(APP_PREFERENCES_NAME, Context.MODE_PRIVATE).getString(THEME_MODE_KEY, null),
-        )
-
-    private fun applyPreComposeWindowBackground(
-        themeMode: AppThemeMode,
-        systemDarkTheme: Boolean,
-    ) {
-        window.setBackgroundDrawable(ColorDrawable(preComposeWindowBackgroundFor(themeMode, systemDarkTheme)))
-    }
 }
 
 internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 300L
@@ -874,8 +857,6 @@ internal fun shouldRetainSystemSplash(
 private val Configuration.isNightModeActive: Boolean
     get() = (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
-private const val APP_PREFERENCES_NAME = "whitenoise"
-private const val THEME_MODE_KEY = "theme_mode"
 internal const val BENCHMARK_RECREATE_ACTIVITY_EXTRA =
     "dev.ipf.whitenoise.android.extra.BENCHMARK_RECREATE_ACTIVITY"
 private val appUnlockHostIds = AtomicLong()

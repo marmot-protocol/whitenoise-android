@@ -127,7 +127,7 @@ internal fun NotificationProfilesContent(
                 IconButton(onClick = onSwitchProfile, modifier = Modifier.testTag("notification-profiles.switch")) {
                     Icon(
                         painterResource(R.drawable.ic_notifications_paused),
-                        contentDescription = stringResource(R.string.notification_profile_switch),
+                        contentDescription = stringResource(R.string.notification_profiles_title),
                     )
                 }
             }
@@ -238,10 +238,11 @@ private fun ProfileListGroup(
                     modifier = Modifier.testTag("notification-profiles.row.${profile.id}"),
                     leading = {
                         val scheme = MaterialTheme.colorScheme
+                        val fallback =
+                            if (scheduled && !isActive) R.drawable.ic_schedule else R.drawable.ic_notifications_paused
                         NotificationProfileLeading(
                             emoji = profile.emoji,
-                            fallback =
-                                if (scheduled && !isActive) R.drawable.ic_schedule else R.drawable.ic_notifications_paused,
+                            fallback = fallback,
                             tint = if (isActive) scheme.primary else scheme.onSurfaceVariant,
                         )
                     },

@@ -33,8 +33,9 @@ internal class NotificationProfileRepeats(
         update: NotificationUpdateFfi,
         nowMs: Long,
     ): Boolean {
-        val senderKey = senderKey(profileId, update) ?: return false
-        val messageId = update.messageIdHex?.takeIf(String::isNotBlank) ?: return false
+        val senderKey = senderKey(profileId, update)
+        val messageId = update.messageIdHex
+        if (senderKey == null || messageId.isNullOrBlank()) return false
         val key = "$senderKey.${sha256Hex(messageId)}"
         return synchronized(lock) {
             val previous = entries[key]?.takeIf { notificationProfileRepeatOpen(it.at, nowMs) }
@@ -74,10 +75,10 @@ internal class NotificationProfileRepeats(
         val stored = runCatching { preferences.all }.getOrNull().orEmpty()
         val recent = HashMap<String, RepeatState>()
         stored.forEach { (key, value) ->
-            val fields = (value as? String)?.split(':') ?: return@forEach
+            val fields = (value as? String)?.split(':', limit = 2) ?: return@forEach
             val at = fields.firstOrNull()?.toLongOrNull()
             val decision = Decision.entries.firstOrNull { it.name == fields.getOrNull(1) }
-            if (fields.size == 2 && at != null && decision != null && notificationProfileRepeatOpen(at, now)) {
+            if (at != null && decision != null && notificationProfileRepeatOpen(at, now)) {
                 recent[key] = RepeatState(at, decision)
             }
         }
@@ -101,3 +102,11 @@ internal class NotificationProfileRepeats(
         private const val MAX_ENTRIES = 64
     }
 }
+
+internal const val NOTIFICATION_PROFILE_REPEAT_WINDOW_MS = 3L * 60L * 1_000L
+
+/** True when [heldAtMs], the last held-back message from the same person, is recent enough at [nowMs]. */
+internal fun notificationProfileRepeatOpen(
+    heldAtMs: Long?,
+    nowMs: Long,
+): Boolean = heldAtMs != null && nowMs >= heldAtMs && nowMs - heldAtMs < NOTIFICATION_PROFILE_REPEAT_WINDOW_MS

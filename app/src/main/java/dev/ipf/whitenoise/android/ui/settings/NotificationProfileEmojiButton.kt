@@ -46,10 +46,9 @@ internal fun NotificationProfileEmojiButton(
     onRemove: () -> Unit,
 ) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
-    val description =
-        stringResource(
-            if (emoji == null) R.string.notification_profile_emoji_choose else R.string.notification_profile_emoji_change,
-        )
+    val descriptionId =
+        if (emoji == null) R.string.notification_profile_emoji_choose else R.string.notification_profile_emoji_change
+    val description = stringResource(descriptionId)
     Box {
         Surface(
             onClick = { if (emoji == null) onChoose() else menuOpen = true },

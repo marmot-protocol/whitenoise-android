@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android
 
+import android.content.Context
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.view.Window
 import dev.ipf.whitenoise.android.state.AppThemeMode
 
 private const val PRE_COMPOSE_BACKGROUND_LIGHT = 0xFFECEEEE.toInt()
@@ -27,3 +30,19 @@ internal fun preComposeWindowBackgroundFor(
         AppThemeMode.Dark -> PRE_COMPOSE_BACKGROUND_DARK
         AppThemeMode.Amoled -> Color.BLACK
     }
+
+/** Applies the app theme while the first Compose frame is still preparing. */
+internal fun Window.applyPreComposeWindowBackground(
+    themeMode: AppThemeMode,
+    systemDarkTheme: Boolean,
+) {
+    setBackgroundDrawable(ColorDrawable(preComposeWindowBackgroundFor(themeMode, systemDarkTheme)))
+}
+
+internal fun Context.readPersistedThemeMode(): AppThemeMode =
+    AppThemeMode.fromPreference(
+        getSharedPreferences(APP_PREFERENCES_NAME, Context.MODE_PRIVATE).getString(THEME_MODE_KEY, null),
+    )
+
+private const val APP_PREFERENCES_NAME = "whitenoise"
+private const val THEME_MODE_KEY = "theme_mode"

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.PendingIntent
 import android.content.Intent
@@ -70,6 +71,7 @@ class NotificationProfileTileService : TileService() {
     }
 
     /** Hand off to the normal app entry point when its lock protects profile names and controls. */
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     @Suppress("DEPRECATION")
     private fun openChooser() {
         if (currentModel() == NotificationProfileTileModel.Unavailable) return

@@ -35,8 +35,9 @@ internal fun notificationProfileTileModel(
     zone: ZoneId,
 ): NotificationProfileTileModel {
     if (!signedIn || state.profiles.isEmpty()) return NotificationProfileTileModel.Unavailable
-    val active = activeNotificationProfile(state, nowMs, zone) ?: return NotificationProfileTileModel.Off
-    return NotificationProfileTileModel.On(active.profile.label.takeUnless { hideNames })
+    val active = activeNotificationProfile(state, nowMs, zone)
+    return active?.let { NotificationProfileTileModel.On(it.profile.label.takeUnless { hideNames }) }
+        ?: NotificationProfileTileModel.Off
 }
 
 /**
@@ -76,7 +77,9 @@ internal fun notificationProfileTileAppLockRequired(context: Context): Boolean {
 }
 
 /** The app's main settings file, as WhiteNoiseAppState opens it. */
-private fun appPreferences(context: Context) = context.applicationContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+private fun appPreferences(context: Context): android.content.SharedPreferences =
+    context.applicationContext
+        .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
 
 /** How a request to add the tile ended. */
 internal enum class NotificationProfileTileAddOutcome { ADDED, DECLINED, FAILED }

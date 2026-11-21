@@ -16,18 +16,27 @@ class NotificationProfileTileTest {
     @Test
     fun theTileIsUnavailableOffOrOnLikeTheGate() {
         val none = NotificationProfilesState()
-        assertEquals(NotificationProfileTileModel.Unavailable, notificationProfileTileModel(none, true, false, now, utc))
+        assertEquals(
+            NotificationProfileTileModel.Unavailable,
+            notificationProfileTileModel(none, true, false, now, utc),
+        )
         assertEquals(
             NotificationProfileTileModel.Unavailable,
             notificationProfileTileModel(profiles, false, false, now, utc),
         )
         val outside = localMs("2026-11-23T12:00", utc)
-        assertEquals(NotificationProfileTileModel.Off, notificationProfileTileModel(profiles, true, false, outside, utc))
+        assertEquals(
+            NotificationProfileTileModel.Off,
+            notificationProfileTileModel(profiles, true, false, outside, utc),
+        )
         assertEquals(
             NotificationProfileTileModel.On("🌙 Sleep"),
             notificationProfileTileModel(profiles, true, false, now, utc),
         )
-        assertEquals(NotificationProfileTileModel.On(null), notificationProfileTileModel(profiles, true, true, now, utc))
+        assertEquals(
+            NotificationProfileTileModel.On(null),
+            notificationProfileTileModel(profiles, true, true, now, utc),
+        )
         val manual = profiles.copy(manual = NotificationProfileManual.On("focus", null))
         assertEquals(
             NotificationProfileTileModel.On("Focus"),

@@ -7,14 +7,6 @@ name: notification-profiles-quick-sheet
     id: "notification-profile.save"
 - assertVisible:
     id: "notification-profiles.list"
-# Switching from Settings works before any shortcut is enabled.
-- tapOn:
-    id: "notification-profiles.switch"
-- assertVisible:
-    id: "chats.notificationProfileSheet"
-- back
-- assertVisible:
-    id: "notification-profiles.list"
 # The chat-list button is opt-in under Quick access.
 - scrollUntilVisible:
     element:

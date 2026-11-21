@@ -51,7 +51,6 @@
     <string name="notification_profile_banner_on_until">%1$s is on until %2$s</string>
     <string name="notification_profile_banner_detail">Only allowed chats notify you.</string>
     <string name="notification_profile_banner_detail_mentions">Only allowed chats and mentions notify you.</string>
-    <string name="notification_profile_switch">Switch notification profile</string>
     <string name="notification_profile_turn_on">Turn on</string>
     <!-- %1$s is the profile name. -->
     <string name="notification_profile_turn_off_named">Turn off %1$s</string>
