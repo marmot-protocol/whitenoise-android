@@ -68,9 +68,12 @@ class NotificationProfilePostGateTest {
             assertTrue(profiles.save(testProfile("focus", allowMentions = false).copy(allowRepeatedMessages = true)))
             assertTrue(profiles.turnOn("focus", null))
             val first = profileTestUpdate(groupIdHex = "other", sender = "abcd")
-            assertFalse(state.shouldPostNotification(first, false))
-            assertFalse(state.shouldPostNotification(profileTestUpdate(sender = "efgh", groupIdHex = "other"), false))
-            assertTrue(state.shouldPostNotification(first.copy(messageIdHex = "second"), false))
+            assertFalse(state.shouldPostNotification(first, engineMuted = false, reserveRepeat = true))
+            val otherSender = profileTestUpdate(sender = "efgh", groupIdHex = "other")
+            val second = first.copy(messageIdHex = "second")
+            assertFalse(state.shouldPostNotification(otherSender, engineMuted = false, reserveRepeat = true))
+            assertFalse(state.shouldPostNotification(second, engineMuted = false))
+            assertTrue(state.shouldPostNotification(second, engineMuted = false, reserveRepeat = true))
 
             assertTrue(
                 profiles.save(
