@@ -37,8 +37,9 @@ class ConversationTabletopTest {
     /** The bottom bar reserves from the top of the hinge down, keeping the hinge gap empty. */
     @Test
     fun reserveStartsAtTheTopOfTheHinge() {
-        assertEquals(TabletopReserve(0.dp, 0.dp), tabletopReserve(null, 900.dp))
-        assertEquals(TabletopReserve(450.dp, 10.dp), tabletopReserve(WindowFold(450.dp, 460.dp, true), 900.dp))
+        assertEquals(ConversationTabletop(0.dp, 0.dp), conversationTabletop(null, 900.dp))
+        val gapped = WindowFold(450.dp, 460.dp, separating = true)
+        assertEquals(ConversationTabletop(450.dp, 10.dp), conversationTabletop(gapped, 900.dp))
     }
 
     /**
@@ -55,7 +56,8 @@ class ConversationTabletopTest {
             windowHeight = LocalWindowInfo.current.containerDpSize.height
             val folds =
                 if (tabletop.value) {
-                    WindowFolds(tabletop = WindowFold(windowHeight / 2 - GAP, windowHeight / 2 + GAP, separating = true))
+                    val hinge = WindowFold(windowHeight / 2 - GAP, windowHeight / 2 + GAP, separating = true)
+                    WindowFolds(tabletop = hinge)
                 } else {
                     WindowFolds.None
                 }
