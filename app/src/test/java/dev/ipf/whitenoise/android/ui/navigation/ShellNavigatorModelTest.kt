@@ -17,7 +17,9 @@ import kotlin.random.Random
  * conversation and the one chat-details screen open over it), and changes those fields by the plan's rules, written
  * out here without calling any production predicate. It restates the plan, not master's code: where the plan
  * documents a deliberate difference from master (a landing early open drops the Settings section, NAV-5), the oracle
- * follows the plan, so an error shared by the plan and the reducer would pass both. The production side is driven the way the shell drives it: owner rebinds
+ * follows the plan, so an error shared by the plan and the reducer would pass both.
+ *
+ * The production side is driven the way the shell drives it: owner rebinds
  * go through the same order as the process state and the section state (the owner event first, then the section's
  * bind and its one-time restore), Settings-only events go through the section state's owner gate, an account switch
  * is the rebind followed by the switch event, and process death is a fresh navigator and section state over the
