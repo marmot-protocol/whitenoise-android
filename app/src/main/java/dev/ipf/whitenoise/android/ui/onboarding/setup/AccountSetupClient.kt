@@ -199,7 +199,7 @@ internal class MarmotAccountSetupClient(
                 OnboardingActionFfi.RETRY -> marmot.retryOnboardingStep(account, step)
                 OnboardingActionFfi.CONTINUE_WITHOUT -> marmot.continueOnboardingWithout(account, step)
                 // A preview never signs; reset is a separately reviewed, explicit full replacement.
-                OnboardingActionFfi.USE_RECOMMENDED_RELAYS ->
+                OnboardingActionFfi.USE_RECOMMENDED_RELAYS, OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS ->
                     proposeRelayRepair(request)
                 OnboardingActionFfi.EDIT_RELAYS ->
                     marmot.proposeOnboardingRelays(

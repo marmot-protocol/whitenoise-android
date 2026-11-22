@@ -6,19 +6,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.removeUnlinkedAccount
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
+import dev.ipf.whitenoise.android.ui.devices.UnlinkedProfileRemovalDialog
 import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
 import dev.ipf.whitenoise.android.ui.onboarding.SignInStep
 import dev.ipf.whitenoise.android.ui.onboarding.importIdentityErrorRes
+import dev.ipf.whitenoise.android.ui.onboarding.signInAfterRemovalConsent
 import dev.ipf.whitenoise.android.ui.onboarding.signInStepFor
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 
@@ -50,6 +56,8 @@ internal fun AddIdentitySheet(
                 onDismiss = { dismiss() },
             )
         }
+    val identity = session.key.text.toString()
+    var removalRef by remember(session, identity) { mutableStateOf<String?>(null) }
     val amberSignerAvailable = remember(appState) { appState.isAmberSignerInstalled() }
     DisposableEffect(session) { onDispose { session.dispose() } }
     LaunchedEffect(
@@ -90,18 +98,39 @@ internal fun AddIdentitySheet(
     }
 
     /** Imports the entered key. */
-    fun startImport() {
+    fun startImport(confirmedRemoval: String? = null) {
         val submitted = session.key.text.toString()
-        if (submitted.isBlank()) return
+        if (submitted.isBlank() || submitted != identity) return
+
+        fun reportError(message: Int) {
+            if (confirmedRemoval != null && !session.ownsEntry()) appState.present(message) else session.error(message)
+        }
         start(OnboardingAction.Importing) {
-            when (val step = signInStepFor(appState.importIdentity(submitted), submitted)) {
+            val step =
+                if (confirmedRemoval == null) {
+                    signInStepFor(appState.importIdentity(submitted), submitted)
+                } else {
+                    signInAfterRemovalConsent(
+                        confirmedRemoval,
+                        submitted,
+                        appState::removeUnlinkedAccount,
+                        appState::importIdentity,
+                    )
+                }
+            when (step) {
                 SignInStep.SignedIn, SignInStep.SetupStarted -> {
                     clearSubmittedIdentityClipboard(context, submitted)
                     session.dismiss()
                 }
                 // Recovery requires its existing dedicated consent route; adding a profile never implies that grant.
-                SignInStep.AskRecoveryConsent -> session.error(importIdentityErrorRes(submitted))
-                is SignInStep.InlineError -> session.error(step.messageRes)
+                SignInStep.AskRecoveryConsent -> reportError(importIdentityErrorRes(submitted))
+                is SignInStep.AskRemovalConsent ->
+                    if (session.ownsEntry()) {
+                        removalRef = step.accountRef
+                    } else {
+                        reportError(R.string.unlinked_account_remove_failed)
+                    }
+                is SignInStep.InlineError -> reportError(step.messageRes)
             }
         }
     }
@@ -137,11 +166,23 @@ internal fun AddIdentitySheet(
             onLoginWithAmber = { start(OnboardingAction.AmberLogin) { appState.loginWithAmber() } },
             onIdentityChange = session::edit,
             onErrorChange = session::error,
-            onImport = ::startImport,
+            onImport = { startImport() },
             privateKeyState = session.key,
             amberSignInStage = appState.amberSignInStage,
             onBack = this.dismiss,
         )
+        removalRef?.let { label ->
+            UnlinkedProfileRemovalDialog(
+                signingIn = true,
+                onCancel = { removalRef = null },
+                onRemove = {
+                    if (removalRef == label) {
+                        removalRef = null
+                        startImport(label)
+                    }
+                },
+            )
+        }
         session.feedback?.let { AddProfileFeedbackDialog(it, session::dismissFeedback) }
     }
 }

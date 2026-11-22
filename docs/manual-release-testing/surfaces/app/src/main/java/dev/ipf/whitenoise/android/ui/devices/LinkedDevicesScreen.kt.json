@@ -1,0 +1,201 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.explanation_linked_device_row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.explanation_linked_device_row",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_detail",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_empty",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_judged_inactive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_judged_inactive",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_last_active",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_last_active",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_linked_by",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_linked_by",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_linked_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_linked_on",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_load_failed",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_loading",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_no_activity_seen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_no_activity_seen",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_no_others",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_no_others",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_other_devices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_other_devices",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_removal_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_removal_pending",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_removing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_removing",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_status_inactive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_status_inactive",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_status_leaving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_status_leaving",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_status_moved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_status_moved",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_this_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_this_device",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_unnamed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.linked_devices_unnamed",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "LinkedDevicesContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "fun LinkedDevicesContent(",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_adding_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_adding_chats",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_joining_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+        "anchor": "R.string.link_device_joining_chats",
+        "test_ids": [
+          "SET-067"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

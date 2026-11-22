@@ -294,7 +294,7 @@ class InviteConfirmationReconciliationTest {
             assertTrue(controller.inviteAcceptanceResolutionPending)
             assertEquals(GroupRosterLoadState.FAILED, controller.inviteAcceptanceResolutionState)
             assertFalse(controller.acceptInvite(notify = false))
-            assertFalse(controller.declineInvite())
+            assertFalse(controller.declineInviteWithConsent(null))
             available = true
             controller.retryInviteAcceptanceAuthority()
             assertFalse(controller.inviteAcceptanceResolutionPending)
@@ -467,7 +467,7 @@ class InviteConfirmationReconciliationTest {
         assertFalse(controller.group.pendingConfirmation)
         assertFalse(controller.canSendMessages)
         assertFalse(controller.acceptInvite(notify = false))
-        assertFalse(controller.declineInvite())
+        assertFalse(controller.declineInviteWithConsent(null))
         controller.retryInviteAcceptanceAuthority()
         assertFalse(controller.inviteAcceptanceResolutionPending)
         assertEquals(GroupRosterLoadState.READY, controller.inviteAcceptanceResolutionState)

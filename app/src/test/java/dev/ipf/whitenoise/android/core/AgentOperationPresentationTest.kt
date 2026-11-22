@@ -105,6 +105,7 @@ class AgentOperationPresentationTest {
         plaintext: String,
         tags: List<MessageTagFfi> = emptyList(),
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "operation-1",
         direction = "received",
         groupIdHex = "group",

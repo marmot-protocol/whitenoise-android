@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.whitenoise.android.core.isSentFromThisDevice
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.firstUnreadReceivedIndex
 import dev.ipf.whitenoise.android.state.isUnreadEligible
@@ -29,7 +30,7 @@ internal fun shouldShowConversationEntryUnreadDivider(
         !dividerRetired &&
         messageId == firstUnreadMessageId
 
-/** A reply newer than the frozen entry boundary makes an unread marker misleading. */
+/** Only sending on this device retires the frozen unread marker. */
 internal fun hasSentMessageAfterUnreadBoundary(
     timeline: List<TimelineMessage>,
     firstUnreadMessageId: String?,
@@ -40,7 +41,7 @@ internal fun hasSentMessageAfterUnreadBoundary(
             ?.let { id -> timeline.indexOfFirst { it.record.messageIdHex == id } }
             ?.takeIf { it >= 0 }
             ?: return false
-    return timeline.drop(boundaryIndex + 1).any { it.record.direction == "sent" }
+    return timeline.drop(boundaryIndex + 1).any { it.record.isSentFromThisDevice() }
 }
 
 internal fun conversationReadAnchorCandidateIndex(
@@ -87,7 +88,7 @@ internal fun firstUnreadAfterReadAnchor(
         else ->
             timeline
                 .drop(anchorIndex + 1)
-                .firstOrNull { it.record.isUnreadEligible() }
+                .firstOrNull { it.isUnreadEligible() }
                 ?.record
                 ?.messageIdHex
                 ?.takeIf { it.isNotBlank() }

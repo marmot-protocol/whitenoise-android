@@ -60,6 +60,7 @@ internal fun chatListItemTitle(
             copy = copy,
             conversationKind = item.projection?.conversationKind,
             soleSelfMember = item.presentationActiveAccountIsSoleMember,
+            selfAccountIdHex = item.ownerAccountIdHex,
         )
     }
 

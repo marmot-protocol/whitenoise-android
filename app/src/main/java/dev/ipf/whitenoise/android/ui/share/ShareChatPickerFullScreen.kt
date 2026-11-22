@@ -601,6 +601,7 @@ private fun shareTargetPresentation(
             copy = groupTitleCopy,
             conversationKind = item.projection?.conversationKind,
             soleSelfMember = item.presentationActiveAccountIsSoleMember,
+            selfAccountIdHex = item.ownerAccountIdHex,
         )
     val title =
         when {
@@ -646,7 +647,7 @@ private fun shareTargetAccountIds(
             item.group.welcomerAccountIdHex?.let(::add)
             item.latest?.sender?.let(::add)
         }
-    }.filter { it.isNotBlank() && it != selectedAccountIdHex }.distinct()
+    }.filter { it.isNotBlank() && !it.equals(selectedAccountIdHex, ignoreCase = true) }.distinct()
 
 @Composable
 @Suppress("LongMethod") // Centralizes request-keyed Compose state and controller ownership.

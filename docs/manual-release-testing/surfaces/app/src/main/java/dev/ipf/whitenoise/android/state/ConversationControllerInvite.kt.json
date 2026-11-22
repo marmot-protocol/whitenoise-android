@@ -42,6 +42,24 @@
         "test_ids": [
           "GRP-030"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerInvite.kt",
+        "surface": "A refused decline waits for a fresh tap after sync",
+        "anchor": "R.string.invite_decline_wait_for_sync",
+        "test_ids": [
+          "SET-068",
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerInvite.kt",
+        "surface": "A refused decline preserves the existing group delivery warning",
+        "anchor": "R.string.invite_decline_check_delivery",
+        "test_ids": [
+          "SET-068",
+          "GRP-030"
+        ]
       }
     ],
     "composable_surfaces": [

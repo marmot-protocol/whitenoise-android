@@ -81,7 +81,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
@@ -795,6 +794,7 @@ class ConversationController(
     private val initialTimeline =
         initialConversationTimeline(
             preview = initialTimelinePreview,
+            accountIdHex = conversationAccountIdHex,
             groupIdHex = initialGroup.groupIdHex,
             pendingConfirmation = group.pendingConfirmation || initialInviteConfirmationUnresolved,
             optimisticMessages = optimisticMessages.values,
@@ -820,10 +820,7 @@ class ConversationController(
     var hasPublishedAuthoritativeTimeline by mutableStateOf(false)
         internal set
 
-    /**
-     * Test-only seam: navigation promotes a chat-list tap only after the authoritative page publishes, and
-     * screen-level tests can't run the FFI subscription that flips this in production.
-     */
+    /** Screen tests promote a tapped chat once the first native page would have published. */
     @VisibleForTesting
     internal fun markAuthoritativeTimelinePublishedForTest() {
         hasPublishedAuthoritativeTimeline = true
@@ -850,6 +847,9 @@ class ConversationController(
     var groupRecoveryStatus by mutableStateOf<GroupRecoveryStatusFfi?>(null)
         internal set
     internal val groupRecoveryLifetime = StalenessGuard()
+
+    // staleness-exempt: raw group-state edges invalidate the details screen’s advisory capability read.
+    internal var accountDevicesGroupRevision by mutableLongStateOf(0L)
 
     /** Whether the latest recovery-status read failed while prior evidence stays inspectable. */
     var groupRecoveryReadFailed by mutableStateOf(false)
@@ -921,8 +921,9 @@ class ConversationController(
     internal val pendingProjectionsAwaitingBridge =
         appState.pendingProjectionsAwaitingBridge(conversationAccountRef, initialGroup.groupIdHex)
     internal val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
-    internal val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
+    internal val unprojectedOwnReactions = mutableSetOf<Pair<String, String>>()
     internal val reactionIntentConflator = ReactionIntentConflator()
+    internal val reactionTapAdmissions = KeyedMutexPool()
     internal val groupCommitRefusal = GroupCommitRefusalState()
     internal val window = ConversationWindowState()
     internal val timelineSession =
@@ -1064,14 +1065,14 @@ class ConversationController(
             copy = copy,
             conversationKind = latestConversationKind,
             soleSelfMember = GroupProjector.isSelfSoleMember(members, conversationAccountIdHex),
+            selfAccountIdHex = conversationAccountIdHex,
         )
     }
 
     val inviteAccount: String?
         get() {
             val me = conversationAccountIdHex
-            val other = GroupProjector.otherMemberAccount(members, me)
-            return GroupProjector.inviteAccount(group, other)
+            return GroupProjector.inviteAccount(group, GroupProjector.otherMemberAccount(members, me), me)
         }
 
     /**
@@ -1082,13 +1083,13 @@ class ConversationController(
      */
     val avatarAccount: String?
         get() {
-            val identity =
+            val peer =
                 conversationIdentityProjection(
                     members = members,
                     activeAccountIdHex = conversationAccountIdHex,
                     acceptedInvitePeerAccount = acceptedInvitePeerAccount,
                 )
-            return GroupProjector.avatarAccount(group, identity.otherMemberAccount, identity.memberCount)
+            return GroupProjector.avatarAccount(group, peer.otherMemberAccount, peer.memberCount, boundAccountIdHex)
         }
 
     /**
@@ -1843,8 +1844,7 @@ class ConversationController(
         }
         val replyTarget = replyTargetForSend(replyingTo?.messageIdHex?.takeIf { consumeReply }).getOrElse { return }
         val sendHostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEND)
-        val outboundVisibleAttempt =
-            appState.beginHostPerformance(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE)
+        val outboundVisibleAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.OUTBOUND_MESSAGE_VISIBLE)
 
         // WNPerf assigns an opaque process-local operation id only while the
         // user has explicitly enabled the bounded diagnostic session.
@@ -1857,6 +1857,7 @@ class ConversationController(
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, group.disappearingMessageSecs)
         val optimistic =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = tempId,
                 direction = "sent",
                 groupIdHex = group.groupIdHex,
@@ -2317,18 +2318,13 @@ class ConversationController(
                     return
                 }
         val key = target.lowercase() to emoji
-        val desiredMine = reactions[target].orEmpty().none { it.emoji == emoji && it.mine }
+        val owner = ReactionMutationTarget(account, target, stillAvailable)
+        val initialMine = admitReactionTap(owner, emoji, onLocalIntent) ?: return
         val optimisticId = reactionIntentOverlayId(target, emoji)
-        optimisticReactionChanges[optimisticId] = OptimisticReactionChange(target, emoji, add = desiredMine)
-        recomputeReactions(setOf(target))
-        val submission = reactionIntentConflator.submit(key, desiredMine)
-        // Local presentation acceptance is distinct from native/remote completion.
-        onLocalIntent(desiredMine)
-        if (!submission.shouldDrain) return
 
         val outcome =
             try {
-                convergeReactionIntent(ReactionMutationTarget(account, target, stillAvailable), emoji, key)
+                convergeReactionIntent(owner, emoji, key, initialMine)
             } catch (cancel: CancellationException) {
                 recomputeReactions(optimisticReactionChanges.clearReactionIntent(optimisticId, target))
                 throw cancel
@@ -2974,17 +2970,11 @@ class ConversationController(
             }
             var demotedBeforeLeave = false
             runCatching {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    if (soleMember) {
-                        appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
-                    } else {
-                        if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, liveMemberCount)) {
-                            demoteThenLeave(account) { demotedBeforeLeave = true }
-                        } else {
-                            appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-                        }
+                val left =
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        leaveWithRoster(account, soleMember, activeAccountIdHex) { demotedBeforeLeave = true }
                     }
-                }
+                if (!left) return@runCatching false
                 appState.removeComposerExpansionForGroup(account, group.groupIdHex)
                 // Authoritative local self-leave: record it before the
                 // synchronous snapshot drop so any subsequent
@@ -3028,27 +3018,6 @@ class ConversationController(
                 false
             }
         }
-
-    /**
-     * Steps [account] down as admin, then leaves, asking first if MDK holds the step-down back. The question stays
-     * cancellable; once the step-down starts, it, [onDemoted] and the leave run to completion together.
-     */
-    private suspend fun demoteThenLeave(
-        account: String,
-        onDemoted: () -> Unit,
-    ) {
-        appState.runGroupChange(account, group.groupIdHex, actionLabel = R.string.group_action_step_down_and_leave) {
-            withContext(NonCancellable) {
-                val demoteResult =
-                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                        selfDemoteAdminDetailed(account, group.groupIdHex)
-                    }
-                onDemoted()
-                applyMutationDetails(account, demoteResult.details)
-                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-            }
-        }
-    }
 
     suspend fun dismissConversationNotifications() {
         val account = conversationAccountRef ?: return
@@ -3145,11 +3114,10 @@ class ConversationController(
     }
 
     /**
-     * Declines the current pending Welcome. Declining counts as leaving, and MDK will not let an admin leave until
-     * they step down, which the group's members see, so an admin invitee is asked first instead of being stepped
-     * down silently. A non-admin invitee declines at once.
+     * Declines the rendered Welcome in one native operation. If MDK requires a separate admin step-down,
+     * the controller asks for consent before changing roles.
      */
-    suspend fun declineInvite(): Boolean = declineInviteWithConsent(stepDownConsent = null)
+    internal suspend fun declineInvite(rendered: InviteAcceptanceGeneration) = declineInviteWithConsent(null, rendered)
 
     /**
      * Steps down and declines the invitation the user agreed to, but only while it is still the one shown. The
@@ -3737,12 +3705,11 @@ class ConversationController(
         readAnchoredAtSeconds.retainTimelineWindow()
         pruneConfirmedOptimisticMessages()
         retentionAtSendByMessageId.retainTimelineWindow()
-        pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
         pruneRetainedTimelineRows(prepared)
         val reactionReferenceChanges = installWindowFrame(installed?.frame)
-        // A replacement rebuilt every row, so every tally is stale. An extended window only changed the
-        // rows it added, altered or dropped, plus rows whose sidecar reactions moved under them (#2990).
+        pruneConfirmedOptimisticReactions()
+        // A replacement invalidates every tally. An extension updates changed rows and reaction references (#2990).
         if (prepared.mode == WindowApplyMode.REPLACE) {
             recomputeReactions()
         } else {
@@ -3889,17 +3856,10 @@ class ConversationController(
     internal var loggedTimelineOrderingInversionPairs = emptySet<Pair<String, String>>()
 
     /** Reads and maps a complete canonical reaction snapshot off the UI thread for this conversation. */
-    internal suspend fun loadReactionParticipants(targetMessageId: String): List<ReactionParticipant> {
-        val account = requireNotNull(conversationAccountRef)
-        check(acceptsConversationActionOwner(account, group.groupIdHex))
-        val participants =
-            appState.marmotIo {
-                messageReactions(account, group.groupIdHex, targetMessageId)
-                    .map { ReactionParticipant(sender = it.sender, emoji = it.emoji, reactedAt = it.reactedAt) }
-            }
-        check(acceptsConversationActionOwner(account, group.groupIdHex))
-        return participants
-    }
+    internal suspend fun loadReactionParticipants(targetMessageId: String): List<ReactionParticipant> =
+        readReactionRecords(targetMessageId) { rows ->
+            rows.map { ReactionParticipant(sender = it.sender, emoji = it.emoji, reactedAt = it.reactedAt) }
+        }
 
     /** Overlays pending own mutations onto a complete snapshot; never expands the chip preview. */
     internal fun reactionParticipantsFor(

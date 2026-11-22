@@ -1019,6 +1019,7 @@
     <string name="toast_couldnt_sign_in_account">Couldn\'t sign in to account</string>
     <string name="toast_couldnt_export_nsec">Couldn\'t export secret key</string>
     <string name="wipe">Wipe</string>
+    <string name="wipe_media_ownership_unknown">Some cached files have no profile owner. Encrypted media, thumbnails, or temporary voice, video, document, attachment, paste or upload files remain on this device.</string>
     <string name="wipe_media_cleanup_failed">Some local media files or sharing permissions could not be removed.</string>
     <string name="toast_signed_out_and_wiped">Account wiped from this device</string>
     <string name="toast_couldnt_wipe_account">Couldn\'t wipe account</string>
@@ -1249,6 +1250,8 @@
     <string name="invite_decline_step_down_title">Step down and decline?</string>
     <string name="invite_decline_step_down_message">This invitation makes you an admin. To decline, you’ll step down as admin first, and the group’s members will see that you stepped down.</string>
     <string name="invite_decline_step_down_confirm">Step down and decline</string>
+    <string name="invite_decline_all_devices_title">Decline on all your devices?</string>
+    <string name="invite_decline_all_devices_message">Declining removes you from this chat on all your linked devices, even if you already joined on one. You’ll need a new invitation to rejoin.</string>
     <string name="toast_chat_archived">Chat archived</string>
     <string name="toast_chat_restored">Chat restored</string>
     <string name="toast_couldnt_update_chat">Couldn\'t update chat</string>
@@ -2242,13 +2245,11 @@
     <string name="setup_continue_without_profile">Continue without a profile</string>
     <string name="setup_review_suggested_changes">Review suggested changes</string>
     <string name="setup_chats_on_this_device">Chats on this device</string>
-    <string name="setup_device_none_found">We didn’t find messaging keys from another app or device.</string>
-    <string name="setup_device_unchecked">We couldn’t check whether this account uses another app or device for messaging.</string>
-    <string name="setup_device_found_on_date">We found messaging keys this account published from another app or device, most recently on %1$s.</string>
-    <string name="setup_device_found">We found messaging keys this account published from another app or device.</string>
-    <string name="setup_device_separate_chats">This device will have its own separate chats. Chats in the other app stay there and won’t appear here.</string>
-    <string name="setup_device_new_chats_either_app">When someone starts a new chat with you, it may arrive in either app.</string>
-    <string name="setup_device_separate_chats_if_other_app">If you use another app for messaging, this device will have its own separate chats, and chats in that app won’t appear here.</string>
+    <string name="setup_device_none_found">We didn’t find signs you’ve signed in on another device or in another app.</string>
+    <string name="setup_device_unchecked">We couldn’t finish checking for other sign-ins.</string>
+    <string name="setup_device_found_on_date">It looks like you’ve signed in to this account before, on another device or in another app.</string>
+    <string name="setup_device_found">It looks like you’ve signed in to this account before, on another device or in another app.</string>
+    <string name="setup_device_separate_chats_if_other_app">If you have chats in another app, they won’t appear here automatically.</string>
     <string name="setup_device_stage">Device use</string>
     <string name="setup_approval_saved_pending">Your approval is saved. The change is still pending.</string>
     <string name="setup_profile_scope_help">This updates your profile in other Nostr apps.</string>
@@ -2294,6 +2295,7 @@
     <string name="setup_device_unknown">Couldn’t check for other devices.</string>
     <string name="setup_profile_publish_help">This updates your profile in other Nostr apps.</string>
     <string name="setup_replacement_warning">Recommended relays keep existing entries. A custom list removes entries you leave out and affects other Nostr apps.</string>
+    <string name="setup_repair_inconclusive_warning">Some sources didn\'t answer this check. A newer list may exist that this device couldn\'t see, and your current relays may still work in other apps. Save only if you accept that risk.</string>
     <string name="setup_inbox_list">Inbox relays</string>
     <string name="setup_read_list">Read relays</string>
     <string name="setup_write_list">Write relays</string>
@@ -2322,6 +2324,7 @@
     <string name="setup_action_continue_without">Continue without a profile</string>
     <string name="setup_action_use_recommended_relays">Review suggested changes</string>
     <string name="setup_action_edit_relays">Edit relays</string>
+    <string name="setup_action_remove_unusable_relays">Remove relays that can\'t be used</string>
     <string name="setup_action_edit_profile">Add profile</string>
     <string name="setup_action_edit_follows">Edit follows</string>
     <string name="setup_action_approve_repair">Save</string>

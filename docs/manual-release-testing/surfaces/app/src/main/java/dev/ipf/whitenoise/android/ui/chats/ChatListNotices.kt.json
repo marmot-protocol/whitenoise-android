@@ -8,6 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListNotices.kt",
         "anchor": "fun ChatListPersistentNotices(",
         "test_ids": [
+          "ACC-025",
           "CHL-018",
           "NTF-049"
         ]

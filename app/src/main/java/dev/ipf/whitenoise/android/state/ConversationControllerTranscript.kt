@@ -20,7 +20,7 @@ internal suspend fun ConversationController.exportConversationTranscriptFile(cac
     // One timestamp for the whole export so the JSON `exported_at` and the
     // file name stamp match instead of drifting across two now() reads.
     val exportedAt = Instant.now()
-    val writePermit = captureSharedPlaintextWrite()
+    val writePermit = captureSharedPlaintextWrite(account)
     return runCatchingCancellable {
         val messages =
             withContext(Dispatchers.Default) {

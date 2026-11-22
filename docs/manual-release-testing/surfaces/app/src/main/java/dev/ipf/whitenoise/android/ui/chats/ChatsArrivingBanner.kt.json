@@ -1,0 +1,59 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatsArrivingBanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
+        "anchor": "fun ChatsArrivingBanner(",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "ChatsArrivingNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
+        "anchor": "fun ChatsArrivingNotice(",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "Linked devices: rememberAwaitingChatCount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
+        "anchor": "fun rememberAwaitingChatCount(",
+        "test_ids": [
+          "SET-067"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.history_receiving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
+        "anchor": "R.string.history_receiving",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "R.string.history_retrying",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
+        "anchor": "R.string.history_retrying",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "R.string.chats_arriving_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsArrivingBanner.kt",
+        "anchor": "R.string.chats_arriving_detail",
+        "test_ids": [
+          "SET-067"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

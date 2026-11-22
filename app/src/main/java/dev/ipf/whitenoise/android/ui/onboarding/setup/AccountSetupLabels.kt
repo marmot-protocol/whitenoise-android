@@ -35,6 +35,7 @@ internal fun setupActionTitle(value: OnboardingActionFfi): Int =
         OnboardingActionFfi.RETRY -> R.string.setup_action_retry
         OnboardingActionFfi.CONTINUE_WITHOUT -> R.string.setup_continue_without_profile
         OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> R.string.setup_review_suggested_changes
+        OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS -> R.string.setup_action_remove_unusable_relays
         OnboardingActionFfi.EDIT_RELAYS -> R.string.setup_action_edit_relays
         OnboardingActionFfi.EDIT_PROFILE -> R.string.setup_action_edit_profile
         OnboardingActionFfi.EDIT_FOLLOWS -> R.string.setup_action_edit_follows

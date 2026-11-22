@@ -41,6 +41,7 @@ internal fun setupDeviceNotice(
                     publishedAt = seconds,
                     expiresAt = null,
                     usable = true,
+                    client = null,
                 )
             },
         discoveryComplete = true,

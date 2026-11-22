@@ -121,6 +121,7 @@ object TimelineProjector {
     /** Converts a native timeline row into the message record Android renders, carrying its sticker reference. */
     fun toAppMessageRecord(record: TimelineMessageRecordFfi): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = record.messageIdHex,
             direction = record.direction,
             groupIdHex = record.groupIdHex,
@@ -299,6 +300,7 @@ object TimelineProjector {
     /** Reshapes a reply preview into the record the body projector reads, keeping its sticker reference. */
     private fun TimelineReplyPreviewFfi.toAppMessageRecord(): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = messageIdHex,
             direction = "received",
             groupIdHex = "",

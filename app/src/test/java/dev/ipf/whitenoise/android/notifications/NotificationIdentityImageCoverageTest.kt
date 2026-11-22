@@ -224,7 +224,7 @@ class NotificationIdentityImageCoverageTest {
         val rule = avatars.declaration("internal fun ChatListItem.privatePictureContact(")
         assertTrue(
             "the row's peer, as the chat row names it",
-            ".avatarAccount(group, presentationOtherMemberAccount, presentationMemberCount)" in rule,
+            "avatarAccount" in rule,
         )
         assertTrue("unless the group owns its picture", "GroupProjector.ownsGroupPicture(this)" in rule)
         assertTrue(

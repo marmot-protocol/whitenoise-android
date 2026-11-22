@@ -18,6 +18,14 @@
         "test_ids": [
           "INT-010"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.error_account_unlinked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ErrorPresentation.kt",
+        "anchor": "R.string.error_account_unlinked",
+        "test_ids": [
+          "SET-066"
+        ]
       }
     ]
   },

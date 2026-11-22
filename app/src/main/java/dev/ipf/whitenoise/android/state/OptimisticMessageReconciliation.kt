@@ -126,7 +126,10 @@ internal fun invalidatedProjectionIdsMatchingMessage(
                 )
         }.map { it.messageIdHex }
 
-/** Finds only unresolved local sends; peer-confirmed history must remain visible. */
+/**
+ * Finds only unresolved sends from this installation. Peer-confirmed history must remain visible, and so must the
+ * account's rows from another device or imported history, which have no source event but were never local sends.
+ */
 internal fun unpublishedProjectionIdsMatchingMessage(
     timelineRecords: Map<String, TimelineMessageRecordFfi>,
     message: AppMessageRecordFfi,
@@ -135,6 +138,7 @@ internal fun unpublishedProjectionIdsMatchingMessage(
     timelineRecords.values
         .filter { projected ->
             !projected.deleted &&
+                projected.direction == "sent" &&
                 projected.invalidationStatus == null &&
                 projected.sourceMessageIdHex == null &&
                 !projected.recipientConfirmed &&

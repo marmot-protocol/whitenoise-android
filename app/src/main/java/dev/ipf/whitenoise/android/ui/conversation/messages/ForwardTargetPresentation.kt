@@ -28,12 +28,7 @@ import java.util.Locale
  */
 private const val FORWARD_MEMBER_PREVIEW_LIMIT = 6
 
-internal fun forwardTargetAvatarAccount(item: ChatListItem): String? =
-    GroupProjector.avatarAccount(
-        group = item.group,
-        otherMemberAccount = item.presentationOtherMemberAccount,
-        memberCount = item.presentationMemberCount,
-    )
+internal fun forwardTargetAvatarAccount(item: ChatListItem): String? = item.avatarAccount
 
 internal fun forwardTargetMembersPreview(
     item: ChatListItem,
@@ -114,5 +109,6 @@ internal fun forwardTargetDisplayTitle(
                 copy = copy,
                 conversationKind = item.projection?.conversationKind,
                 soleSelfMember = item.presentationActiveAccountIsSoleMember,
+                selfAccountIdHex = item.ownerAccountIdHex,
             )
     }

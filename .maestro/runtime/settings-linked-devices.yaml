@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: settings-linked-devices
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
+- tapOn: "Linked devices"
+- assertVisible:
+    id: "linked_devices.list"
+- assertVisible:
+    id: "linked_devices.empty"
+- assertVisible: "No devices are linked to this account yet."
+- back
+- assertVisible:
+    id: "settings.account.group"
+- back
+- assertVisible: "Settings"

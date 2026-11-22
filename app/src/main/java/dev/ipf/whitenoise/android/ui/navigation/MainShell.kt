@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -47,7 +46,6 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
 import dev.ipf.whitenoise.android.state.conversationEntryChatListRow
@@ -75,12 +73,12 @@ import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalRetainedGroupAvatarPixels
-import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.WindowWidthClass
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.common.rememberRetainedGroupAvatarPreparation
+import dev.ipf.whitenoise.android.ui.conversation.ConversationScope
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.canonicalMessageId
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
@@ -2007,9 +2005,10 @@ internal fun MainShell(
                             )
                             // Banners scoped to this conversation render only in slots inside it, including the
                             // group details and modals it opens (#3312).
-                            CompositionLocalProvider(
-                                LocalTopNoticeScope provides
-                                    ConversationNoticeDestination(content.accountRef, chat.group.groupIdHex),
+                            ConversationScope(
+                                appState,
+                                content.accountRef,
+                                chat.group.groupIdHex,
                                 LocalRetainedGroupAvatarPixels provides retainedAvatarPreparation,
                             ) {
                                 ConversationScreen(

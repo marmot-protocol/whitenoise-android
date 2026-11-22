@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayCapabilityFfi
+import dev.ipf.marmotkit.OnboardingRelayRemovalReasonFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
 import dev.ipf.marmotkit.OnboardingRelayTagChangeFfi
 import dev.ipf.marmotkit.OnboardingRelayTagDispositionFfi
@@ -147,6 +148,7 @@ class AccountSetupContentScreenshotTest {
                         tag.endpoint,
                         tag.role,
                         OnboardingRelayCapabilityFfi.NONE,
+                        OnboardingRelayRemovalReasonFfi.NONE,
                     )
                 }
         }
@@ -407,7 +409,7 @@ class AccountSetupContentScreenshotTest {
             ),
         )
 
-    /** Names the day another installation last published messaging keys, then explains its separate chats. */
+    /** A record with a publication date shows the same undated sign-in finding. */
     @Test fun singleDeviceFoundOnDate() =
         capture(
             "device_found_on_date",
@@ -417,7 +419,6 @@ class AccountSetupContentScreenshotTest {
                         it.singleDeviceNotice =
                             setupDeviceNotice(
                                 OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE,
-                                // Noon UTC, so the day reads 15 March 2026 anywhere from UTC−11 to UTC+11.
                                 publishedAt = listOf(1_773_576_000uL),
                             )
                     },
@@ -519,6 +520,7 @@ class AccountSetupContentScreenshotTest {
                                 read.endpoint,
                                 read.role,
                                 OnboardingRelayCapabilityFfi.NONE,
+                                OnboardingRelayRemovalReasonFfi.NONE,
                             ),
                             OnboardingRelayTagChangeFfi(
                                 OnboardingRelayTagDispositionFfi.REMOVED,
@@ -528,6 +530,7 @@ class AccountSetupContentScreenshotTest {
                                 old.endpoint,
                                 old.role,
                                 OnboardingRelayCapabilityFfi.NONE,
+                                OnboardingRelayRemovalReasonFfi.NONE,
                             ),
                             OnboardingRelayTagChangeFfi(
                                 OnboardingRelayTagDispositionFfi.ADDED,
@@ -537,6 +540,7 @@ class AccountSetupContentScreenshotTest {
                                 added.endpoint,
                                 added.role,
                                 OnboardingRelayCapabilityFfi.WRITE,
+                                OnboardingRelayRemovalReasonFfi.NONE,
                             ),
                         ),
                 )

@@ -890,6 +890,8 @@
     <string name="invite_decline_step_down_title">退出管理员身份并拒绝？</string>
     <string name="invite_decline_step_down_message">此邀请让你成为管理员。要拒绝，你会先退出管理员身份，群组成员会看到你已退出。</string>
     <string name="invite_decline_step_down_confirm">退出管理员并拒绝</string>
+    <string name="invite_decline_all_devices_title">在你的所有设备上拒绝？</string>
+    <string name="invite_decline_all_devices_message">拒绝后，你会在所有关联设备上退出此聊天，即使你已经在其中一台设备上加入。要重新加入，需要新的邀请。</string>
     <string name="toast_chat_archived">聊天记录已存档</string>
     <string name="toast_chat_restored">聊天已恢复</string>
     <string name="toast_couldnt_update_chat">无法更新聊天</string>
@@ -1443,6 +1445,7 @@
     <string name="wipe_outcome_key_packages_deleted">已移除 %1$d 个邀请密钥</string>
     <string name="wipe_outcome_local_wipe_done">本地数据已清除</string>
     <string name="wipe_outcome_local_wipe_incomplete">本地数据未完全清除</string>
+    <string name="wipe_media_ownership_unknown">部分缓存文件无法确定所属的个人资料。此设备上仍有加密媒体、缩略图，或语音、视频、文档、附件、粘贴内容或上传内容的临时文件。</string>
     <string name="wipe_media_cleanup_failed">部分本地媒体文件无法删除，或部分共享权限无法撤销。</string>
     <string name="export_nsec">导出 nsec</string>
     <string name="share_secret_key">分享密钥</string>
@@ -2007,13 +2010,11 @@
     <string name="setup_continue_without_profile">不添加个人资料，继续</string>
     <string name="setup_review_suggested_changes">查看建议的更改</string>
     <string name="setup_chats_on_this_device">此设备上的聊天</string>
-    <string name="setup_device_none_found">我们没有发现来自其他应用或设备的消息密钥。</string>
-    <string name="setup_device_unchecked">我们无法确认此账号是否在其他应用或设备上收发消息。</string>
-    <string name="setup_device_found_on_date">我们发现此账号曾从其他应用或设备发布消息密钥，最近一次发布于 %1$s。</string>
-    <string name="setup_device_found">我们发现此账号曾从其他应用或设备发布消息密钥。</string>
-    <string name="setup_device_separate_chats">此设备将拥有自己独立的聊天。另一个应用中的聊天会留在那里，不会显示在这里。</string>
-    <string name="setup_device_new_chats_either_app">当有人与你开始新的聊天时，聊天可能出现在任一应用中。</string>
-    <string name="setup_device_separate_chats_if_other_app">如果你使用其他应用收发消息，此设备将拥有自己独立的聊天，那个应用中的聊天不会显示在这里。</string>
+    <string name="setup_device_none_found">我们没有发现你在其他设备或应用上登录过的迹象。</string>
+    <string name="setup_device_unchecked">未能完成对其他登录记录的检查。</string>
+    <string name="setup_device_found_on_date">你似乎曾在其他设备或应用上登录过这个账号。</string>
+    <string name="setup_device_found">你似乎曾在其他设备或应用上登录过这个账号。</string>
+    <string name="setup_device_separate_chats_if_other_app">其他应用里的聊天不会自动出现在这里。</string>
     <string name="setup_device_stage">设备使用</string>
     <string name="setup_approval_saved_pending">您的批准已保存。变更仍在等待中。</string>
     <string name="setup_profile_scope_help">这会更新您在其他 Nostr 应用程序中的个人资料。</string>
@@ -2059,6 +2060,7 @@
     <string name="setup_device_unknown">无法确定是否存在另一处安装。仅在你想使用此设备时继续。</string>
     <string name="setup_profile_publish_help">将此资料保存到你的 Nostr 账号。</string>
     <string name="setup_replacement_warning">推荐方案会保留所有现有中继条目，包括此处未显示的条目。自定义列表会移除未包含的中继。更改也会影响你的其他 Nostr 应用。</string>
+    <string name="setup_repair_inconclusive_warning">部分来源未响应此次检查。可能存在此设备未能看到的更新列表，而你当前的中继在其他应用中可能仍然可用。仅在你接受此风险时保存。</string>
     <string name="setup_inbox_list">收件箱中继器</string>
     <string name="setup_read_list">读取中继器</string>
     <string name="setup_write_list">写入中继器</string>
@@ -2087,6 +2089,7 @@
     <string name="setup_action_continue_without">暂时跳过</string>
     <string name="setup_action_use_recommended_relays">修复中继设置</string>
     <string name="setup_action_edit_relays">检查中继</string>
+    <string name="setup_action_remove_unusable_relays">移除无法使用的中继</string>
     <string name="setup_action_edit_profile">编辑个人资料</string>
     <string name="setup_action_edit_follows">编辑关注列表</string>
     <string name="setup_action_approve_repair">保存更改</string>

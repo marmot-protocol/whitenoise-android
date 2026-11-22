@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
@@ -11,6 +12,9 @@ import dev.ipf.whitenoise.android.media.DiskByteCache
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -74,9 +78,13 @@ internal class SerializedPendingForwardRequestStore(
     ) : this({ delegate }, ioDispatcher)
 
     /** Serializes one save behind the process mutex on the IO dispatcher. */
-    suspend fun save(request: PendingForwardRequest): Boolean =
+    suspend fun save(
+        request: PendingForwardRequest,
+        requireExistingId: Boolean = false,
+    ): Boolean =
         processMutex.withLock {
             withContext(ioDispatcher) {
+                if (requireExistingId && delegate.load()?.requestId != request.requestId) return@withContext false
                 delegate.save(request).also { saved ->
                     if (!saved) delegate.clear()
                 }
@@ -93,6 +101,16 @@ internal class SerializedPendingForwardRequestStore(
     suspend fun remove(requestId: String) {
         processMutex.withLock { withContext(ioDispatcher) { delegate.remove(requestId) } }
     }
+
+    /** Removes the still-current entry under the save lock only after its owner predicate authorizes deletion. */
+    suspend fun removeIf(shouldRemove: (PendingForwardRequest) -> Boolean): Boolean =
+        processMutex.withLock {
+            withContext(ioDispatcher) {
+                val request = delegate.load()?.takeIf(shouldRemove) ?: return@withContext false
+                delegate.remove(request.requestId)
+                true
+            }
+        }
 
     /** Serializes an unconditional clear behind the process mutex. */
     suspend fun clear() {
@@ -115,6 +133,10 @@ internal class ForwardRequestPersistence(
     private val scope: CoroutineScope,
     private val storeProvider: () -> SerializedPendingForwardRequestStore,
 ) {
+    private val changes = MutableStateFlow(0L)
+    val revision = changes.asStateFlow()
+    val openPickerIds = mutableSetOf<String>()
+
     private var overrideStore: SerializedPendingForwardRequestStore? = null
 
     private val store: SerializedPendingForwardRequestStore
@@ -126,20 +148,68 @@ internal class ForwardRequestPersistence(
     }
 
     /** Mirrors one unresolved forward request into encrypted no-backup storage. */
-    fun persist(request: PendingForwardRequest) {
-        scope.launch { store.save(request) }
+    fun persist(
+        request: PendingForwardRequest,
+        restored: Boolean = false,
+    ) {
+        scope.launch {
+            store.save(request, requireExistingId = restored)
+            changes.update { it + 1 }
+        }
     }
 
     /** Discards an unresolved forward request after explicit dismissal or acceptance. */
     fun discard(requestId: String) {
-        scope.launch { store.remove(requestId) }
+        scope.launch {
+            store.remove(requestId)
+            changes.update { it + 1 }
+        }
     }
 
     /** Loads the unresolved forward request, if any, for process-recreation restore. */
     suspend fun load(): PendingForwardRequest? = store.load()
 
-    /** Drops any unresolved request, used by destructive account wipes. */
-    suspend fun clear() = store.clear()
+    /** Retires both ends of a forward involving the removed profile without interrupting another profile's forward. */
+    suspend fun removeForAccount(account: String) {
+        val removed =
+            store.removeIf { request ->
+                request.sourceAccountRef == account || request.destinationAccountRef == account
+            }
+        if (removed) changes.update { it + 1 }
+    }
+
+    /**
+     * Reconciles the encrypted entry with an authoritative account inventory. This also completes cleanup when the
+     * process died between native deletion and Android cleanup. An absent or superseded inventory cannot retire it.
+     */
+    suspend fun retainAccounts(
+        saved: Set<String>,
+        current: () -> Boolean,
+    ) {
+        val removed =
+            store.removeIf { request ->
+                val missingDestination = request.destinationAccountRef?.let { it !in saved } == true
+                current() && (request.sourceAccountRef !in saved || missingDestination)
+            }
+        if (removed) changes.update { it + 1 }
+    }
+
+    /** Drops any unresolved request when the active session is retired. */
+    suspend fun clear() {
+        store.clear()
+        changes.update { it + 1 }
+    }
+}
+
+/** Uses only an accepted account list to repair durable forwards left by a process killed during a wipe. */
+internal suspend fun WhiteNoiseAppState.reconcilePendingForwardOwners(
+    accounts: List<AccountSummaryFfi>,
+    generation: Long,
+) {
+    val saved = accounts.mapTo(mutableSetOf(), AccountSummaryFfi::label)
+    runCatchingCancellable {
+        forwardRequestPersistence.retainAccounts(saved) { accountListLifetime.isCurrent(generation) }
+    }.onFailure { appStateDebug(it) { "pending forward cleanup will retry after the next account read" } }
 }
 
 internal class EncryptedPendingForwardRequestStore(

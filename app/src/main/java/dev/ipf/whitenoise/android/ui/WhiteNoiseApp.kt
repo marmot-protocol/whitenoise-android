@@ -61,7 +61,6 @@ import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.ownsGroupChange
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
@@ -84,7 +83,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalPendingCameraCaptureFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
-import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.NotificationFirstFrameWatchdog
@@ -837,21 +835,13 @@ internal fun WhiteNoiseApp(
                 }
             }
         }
+        // Inside the scope, so the device-name field of a link request also honours the incognito keyboard.
+        AppQuestionHosts(appState)
     }
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
     }
     TtsPlaybackTrustWarningHost(appState)
-    // A refused group change waits for the user's answer wherever it was started, even after its screen closed, but
-    // only while its account and runtime are current: after a switch it is withdrawn as Wait, never shown to another.
-    val groupChangeQuestion = appState.groupChangeConfirmations.pending
-    val groupChangeQuestionOwned = groupChangeQuestion?.let { appState.ownsGroupChange(it.target) } == true
-    LaunchedEffect(groupChangeQuestion, groupChangeQuestionOwned) {
-        if (!groupChangeQuestionOwned) groupChangeQuestion?.answer(proceed = false)
-    }
-    if (!appState.appLock.screenVisible && groupChangeQuestion != null && groupChangeQuestionOwned) {
-        GroupChangeConfirmationDialog(groupChangeQuestion, appState)
-    }
     if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(
             offlineSpeechToText = dictationState.usesOfflineSpeechToText,

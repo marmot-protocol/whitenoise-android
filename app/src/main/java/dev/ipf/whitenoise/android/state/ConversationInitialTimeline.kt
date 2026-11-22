@@ -21,6 +21,7 @@ internal fun initialConversationTimeline(
     groupIdHex: String,
     pendingConfirmation: Boolean,
     optimisticMessages: Collection<TimelineMessage>,
+    accountIdHex: String? = null,
 ): List<TimelineMessage> {
     if (pendingConfirmation) return emptyList()
     val byMessageId = linkedMapOf<String, TimelineMessage>()
@@ -29,7 +30,7 @@ internal fun initialConversationTimeline(
         if (messageId.isNotBlank()) byMessageId[messageId] = message
     }
     preview
-        ?.toInitialTimelineMessage(groupIdHex)
+        ?.toInitialTimelineMessage(groupIdHex, accountIdHex)
         ?.let { seed -> byMessageId.putIfAbsent(seed.record.messageIdHex.lowercase(), seed) }
     return byMessageId.values.sortedWith(::compareTimelineMessages)
 }
@@ -63,11 +64,15 @@ private fun initialSeedStatus(deliveryState: ChatListMessageDeliveryStateFfi): M
     }
 
 /** Seeds a first-frame timeline message from a chat-list preview, or returns null when it cannot be rendered. */
-private fun ChatListMessagePreviewFfi.toInitialTimelineMessage(groupIdHex: String): TimelineMessage? {
+private fun ChatListMessagePreviewFfi.toInitialTimelineMessage(
+    groupIdHex: String,
+    accountIdHex: String?,
+): TimelineMessage? {
     val status = initialSeedStatus(deliveryState)
     if (status == null || !isRenderableInitialSeed(groupIdHex)) return null
     val record =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = messageIdHex,
             direction = if (deliveryState == ChatListMessageDeliveryStateFfi.NOT_APPLICABLE) "received" else "sent",
             groupIdHex = groupIdHex,
@@ -83,10 +88,12 @@ private fun ChatListMessagePreviewFfi.toInitialTimelineMessage(groupIdHex: Strin
             receivedAt = timelineAt,
             sticker = sticker,
         )
+    val sibling = status == MessageStatus.Received && sender.equals(accountIdHex, ignoreCase = true)
     return TimelineMessage(
         id = "msg:$messageIdHex",
         record = record,
-        status = status,
+        status = if (sibling) MessageStatus.Sent else status,
+        fromOtherOwnDevice = sibling,
     )
 }
 

@@ -40,7 +40,7 @@ class SharedPlaintextWipeCoverageTest {
             val oldScoped = share(MediaCacheDirs.SHARED, legacySharedPlaintextPrefix("alice") + "share_fixture.pdf")
             val other = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(application, "bob") + "message_2.pdf")
             val profileCard = share(MediaCacheDirs.SHARED, "profile_card_1.png")
-            val staleWriter = captureSharedPlaintextWrite()
+            val staleWriter = captureSharedPlaintextWrite("alice")
 
             wipeSharedPlaintext(context, "alice") { _, error -> throw AssertionError(error) }
 
@@ -48,6 +48,28 @@ class SharedPlaintextWipeCoverageTest {
             assertTrue(listOf(owned, transcript, legacy, oldScoped).none(File::exists))
             assertTrue(listOf(other, profileCard).all(File::exists))
             val stale = runCatching { withSharedPlaintextWrite<Unit>(staleWriter) { error("stale writer ran") } }
+            assertTrue(stale.exceptionOrNull() is CancellationException)
+        }
+
+    /** An inactive removal fences only its owner's writer and keeps the surviving profile's unscoped legacy share. */
+    @Test
+    fun inactiveWipeLeavesOtherExportsUsable() =
+        runBlocking {
+            val context = RecordingRevocations(application)
+            val removed = captureSharedPlaintextWrite("bob")
+            val active = captureSharedPlaintextWrite("alice")
+            val legacy = share(MediaCacheDirs.SHARED, "legacy-in-use.pdf")
+            val owned = share(MediaCacheDirs.SHARED, sharedPlaintextPrefix(context, "bob") + "document.pdf")
+            assertTrue(recordSharedPlaintextWipe(context, "bob", includeUnscoped = false))
+
+            wipeSharedPlaintext(context, "bob", includeUnscoped = false) { _, error ->
+                throw AssertionError(error)
+            }
+
+            assertTrue(legacy.exists())
+            assertFalse(owned.exists())
+            assertTrue(withSharedPlaintextWrite(active) { true })
+            val stale = runCatching { withSharedPlaintextWrite<Unit>(removed) { error("retired writer ran") } }
             assertTrue(stale.exceptionOrNull() is CancellationException)
         }
 

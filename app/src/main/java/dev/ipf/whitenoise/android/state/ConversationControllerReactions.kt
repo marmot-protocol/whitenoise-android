@@ -1,9 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
-import android.util.Log
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
 import kotlinx.coroutines.CancellationException
@@ -32,7 +29,7 @@ internal fun ConversationController.reactionAccountIfAccepted(): String? {
     return accountRef
 }
 
-/** Commits an add and retains its exact event id for an immediate queued removal. */
+/** Publishes an add and tracks its ownership until the conversation reference catches up. */
 @Suppress("LongMethod") // Resolution, upload and publication share one owner.
 private suspend fun ConversationController.commitReactionAdd(
     owner: ReactionMutationTarget,
@@ -75,181 +72,62 @@ private suspend fun ConversationController.commitReactionAdd(
                 }
             }
         }
-        val summary =
-            if (artwork.isEmpty()) {
-                publishLock { appState.marmot().reactToMessage(account, group.groupIdHex, target, emoji) }
-            } else {
-                appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
-                    sendReactionWithCustomEmoji(
-                        account,
-                        group.groupIdHex,
-                        target,
-                        emoji,
-                        artwork,
-                        appState.emojiUploads,
-                        ensureCurrent = { withContext(controllerContext) { ensureCurrent() } },
-                        publishLock = publishLock,
-                    )
-                }
+        if (artwork.isEmpty()) {
+            publishLock { appState.marmot().reactToMessage(account, group.groupIdHex, target, emoji) }
+        } else {
+            appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
+                sendReactionWithCustomEmoji(
+                    account,
+                    group.groupIdHex,
+                    target,
+                    emoji,
+                    artwork,
+                    appState.emojiUploads,
+                    ensureCurrent = { withContext(controllerContext) { ensureCurrent() } },
+                    publishLock = publishLock,
+                )
             }
-        val messageIdHex = summary.messageIds.firstOrNull()?.takeIf(String::isNotBlank)
-        // A committed add remains present while older bindings/projections have no exact event id yet.
-        unprojectedOwnReactionEventIds[key] = messageIdHex.orEmpty()
+        }
+        if (window.references(target)?.reactions?.viewerReactedTo(emoji) != true) {
+            unprojectedOwnReactions.add(key)
+        }
     } finally {
         appState.untrackInFlightMediaUpload(account, group.groupIdHex, uploadKey, uploadJob)
     }
 }
 
-/** Commits a removal, using history when a just-added reaction did not return an event id. */
+/** Retracts every matching own event, including duplicates from linked devices, in one native mutation. */
 private suspend fun ConversationController.commitReactionRemoval(
     owner: ReactionMutationTarget,
     emoji: String,
-    ownEmojisBeforeMutation: Set<String>,
-    removeBeforeProjection: Boolean,
 ) {
-    val account = owner.account
     val target = owner.messageId
-    val key = target.lowercase() to emoji
-    val preferredEventId =
-        if (removeBeforeProjection) {
-            unprojectedOwnReactionEventIds[key]
-        } else {
-            null
+    appState.withGroupCommitLock(owner.account, group.groupIdHex) {
+        owner.requireAvailable()
+        try {
+            appState.marmotIo { unreactFromMessageMatching(owner.account, group.groupIdHex, target, emoji) }
+        } catch (absent: MarmotKitException.ReactionNotFound) {
+            // A sibling may have removed it already. Confirm absence on this device before settling the tap.
+            if (readOwnReaction(target, emoji)) throw absent
         }
-    if (removeBeforeProjection && preferredEventId.isNullOrBlank()) {
-        // This is only a visibility barrier. retractOwnReaction deliberately rereads history
-        // under the group commit lock before choosing event-scoped delete versus unreact.
-        awaitReactionEventHistory(emoji) {
-            resolveActiveOwnReactionEventIds(account, target, requireNotNull(conversationAccountIdHex))
-        }
-    }
-    appState.withGroupCommitLock(account, group.groupIdHex) {
-        retractOwnReaction(owner, emoji, ownEmojisBeforeMutation, preferredEventId)
+        unprojectedOwnReactions.remove(target.lowercase() to emoji)
     }
 }
-
-/** Resolves active own reaction ids from Marmot's authoritative local event history. */
-private suspend fun ConversationController.resolveActiveOwnReactionEventIds(
-    account: String,
-    target: String,
-    activeAccountIdHex: String,
-): Map<String, String>? =
-    runCatchingCancellable {
-        appState.marmotIo {
-            messages(
-                account,
-                group.groupIdHex,
-                null,
-                listOf(MARMOT_DELETE_EVENT_KIND, MARMOT_REACTION_EVENT_KIND),
-            )
-        }
-    }.onFailure {
-        if (BuildConfig.DEBUG) Log.w("DMConversation", "reaction event lookup failed", it)
-    }.getOrNull()
-        ?.let { records -> activeOwnReactionEventIdsByEmoji(records, activeAccountIdHex, target) }
-
-/** Removes the tapped own reaction without clearing a different emoji when several are active. */
-private suspend fun ConversationController.retractOwnReaction(
-    owner: ReactionMutationTarget,
-    emoji: String,
-    ownEmojisBeforeMutation: Set<String>,
-    preferredEventId: String? = null,
-) {
-    val account = owner.account
-    val target = owner.messageId
-    // Retract just the tapped emoji by deleting its own reaction event; the
-    // FFI target-only unreact would drop the wrong emoji when the user holds
-    // more than one reaction on the same message.
-    val me = conversationAccountIdHex ?: error("no active account to retract reaction")
-    val projectedEventIdByEmoji = projectedOwnReactionEventIds(timelineRecords[target], me)
-    val preferredReactionEventId = preferredEventId?.takeIf(String::isNotBlank)
-    val requiresAuthoritativeHistory =
-        preferredReactionEventId == null &&
-            (ownEmojisBeforeMutation == setOf(emoji) || projectedEventIdByEmoji[emoji].isNullOrBlank())
-    val authoritativeEventIds =
-        if (requiresAuthoritativeHistory) {
-            resolveActiveOwnReactionEventIds(account, target, me)
-        } else {
-            null
-        }
-    val knownEventIdByEmoji =
-        knownReactionEventIds(
-            projectedEventIds = projectedEventIdByEmoji,
-            emoji = emoji,
-            unprojectedEventId = unprojectedOwnReactionEventIds[target.lowercase() to emoji],
-            authoritativeEventIds = authoritativeEventIds,
-        )
-    val authoritativeOwnEmojis =
-        when {
-            authoritativeEventIds != null -> authoritativeEventIds.keys
-            ownEmojisBeforeMutation.size > 1 -> ownEmojisBeforeMutation
-            else -> null
-        }
-    val plan =
-        planOwnReactionRetraction(
-            emoji = emoji,
-            knownEventIdByEmoji = knownEventIdByEmoji,
-            authoritativeOwnEmojis = authoritativeOwnEmojis,
-            preferredEventId = preferredReactionEventId,
-        )
-    // History reads and lock admission can suspend after the reaction's quiet period.
-    owner.requireAvailable()
-    when (plan) {
-        is OwnReactionRetractionPlan.DeleteReactionMessage -> {
-            appState.marmotIo { deleteMessage(account, group.groupIdHex, plan.messageIdHex) }
-            unprojectedOwnReactionEventIds.remove(target.lowercase() to emoji)
-        }
-        OwnReactionRetractionPlan.UnreactTarget -> {
-            appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
-            unprojectedOwnReactionEventIds.keys.removeAll { (messageId, _) ->
-                messageId.equals(target, ignoreCase = true)
-            }
-        }
-        OwnReactionRetractionPlan.Unavailable -> error("no reaction event to retract for $emoji")
-    }
-}
-
-/** Own reactions known by projection plus locally committed additions awaiting projection. */
-private fun ConversationController.authoritativeOwnReactionEmojis(target: String): Set<String> =
-    conversationAccountIdHex?.let { me ->
-        projectedOwnReactionEmojis(window.references(target), timelineRecords[target], me)
-            .includeUnprojectedReactionEmojis(target, unprojectedOwnReactionEventIds.keys)
-    } ?: emptySet()
 
 /** Drives native state toward the newest intent without blocking later optimistic taps. */
 internal suspend fun ConversationController.convergeReactionIntent(
     owner: ReactionMutationTarget,
     emoji: String,
     key: Pair<String, String>,
-): ReactionIntentDrainOutcome {
-    val target = owner.messageId
-    val ownEmojis = authoritativeOwnReactionEmojis(target).toMutableSet()
-    var addedBeforeProjection = key in unprojectedOwnReactionEventIds
-    return drainReactionIntent(
-        key = key,
-        conflator = reactionIntentConflator,
-        initialMine = emoji in ownEmojis,
-    ) { commitMine ->
+    initialMine: Boolean,
+): ReactionIntentDrainOutcome =
+    drainReactionIntent(key, reactionIntentConflator, initialMine) { commitMine ->
         retryBusyReactionMutation(
             stillDesired = { reactionIntentConflator.latest(key)?.desiredMine == commitMine },
         ) {
-            if (commitMine) {
-                commitReactionAdd(owner, emoji)
-                ownEmojis += emoji
-                addedBeforeProjection = true
-            } else {
-                commitReactionRemoval(
-                    owner = owner,
-                    emoji = emoji,
-                    ownEmojisBeforeMutation = ownEmojis.toSet(),
-                    removeBeforeProjection = addedBeforeProjection,
-                )
-                ownEmojis -= emoji
-                addedBeforeProjection = false
-            }
+            if (commitMine) commitReactionAdd(owner, emoji) else commitReactionRemoval(owner, emoji)
         }
     }
-}
 
 internal fun ConversationController.recomputeReactions() {
     // Lowercased to match baseReactionSenders(): hex account-id casing can

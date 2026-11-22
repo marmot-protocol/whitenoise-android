@@ -249,8 +249,7 @@ internal fun rememberChatListGroupAvatar(
         durableAvatar = item.selectedAvatarAsset,
         accountRef = accountRef,
         fallbackPictureUrl =
-            dev.ipf.whitenoise.android.core.GroupProjector
-                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+            item.avatarAccount
                 ?.let { appState.privateContactAvatarSource(it, accountRef) }
                 ?: fallbackPictureUrl,
         firstFrameAvatar = item.firstFrameAvatar,

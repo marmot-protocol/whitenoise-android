@@ -98,11 +98,7 @@ internal fun globalSearchFilterOptions(
             chats =
                 chatChoices.map { item ->
                     val peer =
-                        GroupProjector.avatarAccount(
-                            item.group,
-                            item.presentationOtherMemberAccount,
-                            item.presentationMemberCount,
-                        )
+                        item.avatarAccount
                     WhiteNoisePickerItem(
                         id = canonicalChatListGroupId(item.group.groupIdHex),
                         title =

@@ -149,6 +149,7 @@ class GroupChangeAdmissionCoverageTest {
                 "selfDemoteAdmin",
                 "selfDemoteAdminDetailed",
                 "enableGroupDisbanding",
+                "enableAccountDevices",
                 "disbandGroup",
                 "updateAppComponent",
                 "updateMessageRetention",

@@ -812,6 +812,7 @@ open class MessageBubbleFileAttachmentFixtures {
             }
         val record =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = messageId,
                 direction = direction,
                 groupIdHex = GROUP_ID,

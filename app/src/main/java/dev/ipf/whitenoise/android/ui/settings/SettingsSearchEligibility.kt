@@ -11,6 +11,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.ttsEngineChoice
@@ -71,6 +72,7 @@ internal fun settingsSearchEligibilitySnapshot(
                 add("AccountKeys.export_encrypted")
                 add("AccountKeys.export_raw")
             }
+            if (!linkedDevicesAvailable()) add("Account.linked_devices")
             if (appState.accounts.size != 1) add("Home.add_profile")
             if (appState.accounts.size <= 1) add("Home.switch_profile")
             if (!BuildConfig.SELF_UPDATE_ENABLED ||

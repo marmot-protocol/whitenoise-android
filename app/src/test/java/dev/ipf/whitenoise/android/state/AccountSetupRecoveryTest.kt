@@ -31,6 +31,13 @@ class AccountSetupRecoveryTest {
         assertEquals("account-setup states must not collapse onto one outcome", 4, mapped.toSet().size)
     }
 
+    /** MDK's refusal to sign in an unlinked profile keeps its meaning instead of reading as a bad key. */
+    @Test
+    fun anUnlinkedRefusalKeepsItsMeaning() {
+        val refusal = MarmotKitException.AccountUnlinked("work")
+        assertEquals(IdentityImportOutcome.Unlinked("work"), identityImportOutcome(refusal))
+    }
+
     @Test
     fun untypedEngineFailuresStayGeneric() {
         assertEquals(

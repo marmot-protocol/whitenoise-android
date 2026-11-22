@@ -210,24 +210,22 @@ internal fun ConversationBottomBar(
                     ComposerGate.DISBANDED ->
                         DisbandedGroupComposerNotice(disbanded = controller.group.disbanded)
                     ComposerGate.INVITE ->
-                        InvitationActions(
-                            inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
-                            receivingAccount = inviteReceivingAccount(appState, controller),
-                            mutationInFlight = controller.mutationInFlight,
-                            onAccept = {
-                                appState.launchMutation {
-                                    controller.acceptInvite(
-                                        renderedGroupIdHex = renderedInviteGroupIdHex,
-                                        renderedWelcomeMessageIdHex = renderedInviteWelcomeMessageIdHex,
-                                    )
-                                }
-                            },
-                            onDecline = {
-                                appState.launchMutation {
-                                    if (controller.declineInvite()) onBack()
-                                }
-                            },
-                        )
+                        InviteDeclineGate(appState, controller, onDeclined = onBack) { onDecline ->
+                            InvitationActions(
+                                inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
+                                receivingAccount = inviteReceivingAccount(appState, controller),
+                                mutationInFlight = controller.mutationInFlight,
+                                onAccept = {
+                                    appState.launchMutation {
+                                        controller.acceptInvite(
+                                            renderedGroupIdHex = renderedInviteGroupIdHex,
+                                            renderedWelcomeMessageIdHex = renderedInviteWelcomeMessageIdHex,
+                                        )
+                                    }
+                                },
+                                onDecline = onDecline,
+                            )
+                        }
                     ComposerGate.COMPOSER -> {
                         val editingRecord =
                             controller.editingMessageId?.let { id ->
@@ -245,6 +243,7 @@ internal fun ConversationBottomBar(
                                         appState,
                                     ),
                                 replyingTo = controller.replyingTo,
+                                ownerAccountIdHex = controller.boundAccountIdHex,
                                 replyingToMedia =
                                     controller.replyingTo
                                         ?.let(controller::mediaReferencesFor)

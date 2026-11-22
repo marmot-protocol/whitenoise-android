@@ -1,0 +1,56 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "LinkThisDeviceRoute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
+        "anchor": "fun LinkThisDeviceRoute(",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "LinkedDeviceDetailRoute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
+        "anchor": "fun LinkedDeviceDetailRoute(",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "LinkedDevicesScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
+        "anchor": "fun LinkedDevicesScreen(",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "LinkedDevicesDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
+        "anchor": "fun LinkedDevicesDialogs(",
+        "test_ids": [
+          "SET-060",
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "LinkedDevicesPages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesRoute.kt",
+        "anchor": "fun LinkedDevicesPages(",
+        "test_ids": [
+          "SET-060",
+          "SET-064",
+          "SET-065"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -11,6 +11,14 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 internal const val ACCOUNT_SHARE_PREFIX = "account_"
+
+/** Legacy FileProvider copies did not identify their owner; public profile cards use the same directory. */
+internal fun isUnownedPrivateShare(name: String): Boolean {
+    val accountScoped = name.startsWith(ACCOUNT_SHARE_PREFIX)
+    val publicProfileCard = name.startsWith("profile_card_")
+    return !accountScoped && !publicProfileCard
+}
+
 private const val SHARE_KEY_NAME = "shared_plaintext_filename_key"
 private const val SHARE_KEY_BYTES = 32
 private const val UNSIGNED_BYTE_MASK = 0xff

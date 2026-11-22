@@ -113,6 +113,7 @@ internal fun TimelineRow(
                 followsGroupEvent = followsGroupEvent,
             )
         }
+        ImportedHistoryMarkers(older, item, atHistoryStart = older == null && !controller.hasMoreBefore)
         if (showUnreadDivider) {
             UnreadMessagesDivider(
                 count = entryUnreadCount,

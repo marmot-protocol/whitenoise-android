@@ -10,6 +10,23 @@
         "test_ids": [
           "ACC-009"
         ]
+      },
+      {
+        "surface": "Account-owned share leases and inactive media cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaWipe.kt",
+        "anchor": ".leases.releaseAccount(account)",
+        "test_ids": [
+          "SET-066",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Partial wipe when files without profile ownership remain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaWipe.kt",
+        "anchor": "R.string.wipe_media_ownership_unknown",
+        "test_ids": [
+          "SET-066"
+        ]
       }
     ]
   },

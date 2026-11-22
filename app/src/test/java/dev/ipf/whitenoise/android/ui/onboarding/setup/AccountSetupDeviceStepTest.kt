@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import dev.ipf.marmotkit.OnboardingActionFfi
@@ -11,33 +12,17 @@ import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import org.junit.After
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.util.TimeZone
 
 /** The "Chats on this device" step states what MDK's device check found once, then what it means for chats. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class AccountSetupDeviceStepTest {
     @get:Rule val composeRule = createComposeRule()
-    private val originalTimeZone: TimeZone = TimeZone.getDefault()
-
-    /** Pins UTC, so a noon-UTC publication reads as the same calendar day on every host. */
-    @Before
-    fun pinUtc() {
-        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-    }
-
-    /** Restores the host's zone for the next suite. */
-    @After
-    fun restoreTimeZone() {
-        TimeZone.setDefault(originalTimeZone)
-    }
 
     /** A check that could not run says so, then explains that another app's chats would stay there. */
     @Test fun uncheckedDeviceCheckSaysSoAndExplainsSeparateChats() {
@@ -78,12 +63,11 @@ class AccountSetupDeviceStepTest {
         composeRule.onAllNodesWithText(UNCHECKED_NOTE).assertCountEquals(1)
     }
 
-    /** On the routine step, found keys are stated once and explained as a separate installation with its own chats. */
+    /** On the routine step, found keys are stated once and explained as a device that can be linked after sign-in. */
     @Test fun foundKeysAreStatedOnceOnTheRoutineStep() {
         show(AccountSetupState(snapshot = foundSignInsSnapshot()))
         composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(1)
-        composeRule.onNodeWithText(SEPARATE_CHATS_HELP).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(EITHER_APP_HELP).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(LINK_NEXT_HELP).performScrollTo().assertIsDisplayed()
     }
 
     /** When the step shows its native finding, the notice does not repeat the same sentence. */
@@ -92,8 +76,8 @@ class AccountSetupDeviceStepTest {
         composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(1)
     }
 
-    /** Found keys name the day another installation last published them. */
-    @Test fun foundKeysNameTheirLatestPublicationDate() {
+    /** A dated record gives the same sign-in finding as an undated record. */
+    @Test fun datedRecordsDoNotDateTheSignIn() {
         val snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY))
         snapshot.singleDeviceNotice =
             setupDeviceNotice(
@@ -101,22 +85,26 @@ class AccountSetupDeviceStepTest {
                 publishedAt = listOf(NOON_UTC_2025_11_02, NOON_UTC_2026_03_15),
             )
         show(AccountSetupState(snapshot = snapshot))
-        composeRule.onNodeWithText("$FOUND_ON_DATE_PREFIX March 15, 2026.").performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(0)
+        composeRule.onAllNodesWithText("2026", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(1)
     }
 
-    /** In an error state a dated notice names the day once, and MDK's finding keeps its endpoint, not its sentence. */
+    /** The native row preserves its endpoint and Details does not repeat the sign-in notice. */
     @Test
-    fun aDatedNoticeKeepsItsDateBesideTheFinding() {
+    fun aDatedRecordKeepsItsEndpointAndShowsOneFinding() {
         val snapshot = foundSignInsSnapshot()
         snapshot.singleDeviceNotice =
             setupDeviceNotice(OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE, listOf(NOON_UTC_2026_03_15))
         snapshot.steps.first { it.step == OnboardingStepFfi.SINGLE_DEVICE }.findings =
             listOf(setupFinding(OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE, DEVICE_ENDPOINT))
-        show(AccountSetupState(snapshot = snapshot, error = true))
-        composeRule.onNodeWithText("$FOUND_ON_DATE_PREFIX March 15, 2026.").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(DEVICE_ENDPOINT).performScrollTo().assertIsDisplayed()
-        composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(0)
+        show(AccountSetupState(snapshot = snapshot, error = true, detailsExpanded = true))
+        composeRule.onAllNodesWithText("2026", substring = true).assertCountEquals(0)
+        composeRule
+            .onAllNodesWithText(DEVICE_ENDPOINT)
+            .onFirst()
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(1)
     }
 
     /** Shows the setup content for [state] with inert callbacks. */
@@ -137,17 +125,18 @@ class AccountSetupDeviceStepTest {
         }
 
     private companion object {
-        const val NONE_FOUND_NOTE = "We didn’t find messaging keys from another app or device."
-        const val UNCHECKED_NOTE = "We couldn’t check whether this account uses another app or device for messaging."
-        const val FOUND_NOTE = "We found messaging keys this account published from another app or device."
-        const val FOUND_ON_DATE_PREFIX =
-            "We found messaging keys this account published from another app or device, most recently on"
+        const val NONE_FOUND_NOTE =
+            "We didn’t find signs you’ve signed in on another device or in another app."
+        const val UNCHECKED_NOTE =
+            "We couldn’t finish checking for other sign-ins."
+        const val FOUND_NOTE =
+            "It looks like you’ve signed in to this account before, on another device or in another app."
         const val SEPARATE_CHATS_HELP =
             "This device will have its own separate chats. Chats in the other app stay there and won’t appear here."
-        const val EITHER_APP_HELP = "When someone starts a new chat with you, it may arrive in either app."
+        const val LINK_NEXT_HELP =
+            "After signing in, you can link this device to get chats from your other devices."
         const val IF_OTHER_APP_HELP =
-            "If you use another app for messaging, this device will have its own separate chats, " +
-                "and chats in that app won’t appear here."
+            "If you have chats in another app, they won’t appear here automatically."
         const val NOON_UTC_2025_11_02 = 1_762_084_800uL
         const val NOON_UTC_2026_03_15 = 1_773_576_000uL
         const val DEVICE_ENDPOINT = "wss://device.example"

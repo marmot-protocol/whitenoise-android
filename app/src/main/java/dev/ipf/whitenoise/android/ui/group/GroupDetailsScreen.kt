@@ -74,6 +74,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.AccountDevicesActivationFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
@@ -97,6 +98,7 @@ import dev.ipf.whitenoise.android.state.collapseLongMessagesInGroup
 import dev.ipf.whitenoise.android.state.conversationNotifyMode
 import dev.ipf.whitenoise.android.state.conversationVibrationPattern
 import dev.ipf.whitenoise.android.state.disbandGroup
+import dev.ipf.whitenoise.android.state.enableAccountDevices
 import dev.ipf.whitenoise.android.state.enableGroupDisbanding
 import dev.ipf.whitenoise.android.state.exportConversationTranscriptFile
 import dev.ipf.whitenoise.android.state.folderMemberIds
@@ -105,7 +107,6 @@ import dev.ipf.whitenoise.android.state.inviteProfileToGroups
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.profileAddableGroupsState
-import dev.ipf.whitenoise.android.state.refreshManagementState
 import dev.ipf.whitenoise.android.state.removeMember
 import dev.ipf.whitenoise.android.state.setConversationVibrationPattern
 import dev.ipf.whitenoise.android.state.stepDownAsAdmin
@@ -356,15 +357,17 @@ internal fun GroupDetailsScreen(
         var disbandConfirmOpen by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateOf(false)
         }
+        var accountDevicesConfirmOpen by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf(false)
+        }
+        val accountDevicesActivation =
+            observeGroupAccountDevicesActivation(controller) { accountDevicesConfirmOpen = false }
         // #1131: when set, the transfer-admin picker is being used as the first step
         // of a sole-admin Leave (3+ members) — picking transfers admin then leaves,
         // rather than the standalone transfer-only action. Holds the group name for
         // the leave call/toast.
         var transferThenLeaveName by remember(controller.group.groupIdHex) { mutableStateOf<String?>(null) }
-        // Disband eligibility, blockers, and any in-flight request are
-        // engine-authoritative; fetch on entry and again whenever the group
-        // record moves, so a remote admin's enable/disband lands here without
-        // reopening the screen.
+        // Follow remote admin changes while the details screen stays open.
         GroupManagementSnapshotRefreshEffect(controller)
         var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
         var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -2294,6 +2297,11 @@ internal fun GroupDetailsScreen(
                                         },
                                         onDisbandRequested = { disbandConfirmOpen = true },
                                     )
+                                    groupAccountDevicesRows(
+                                        activation = accountDevicesActivation,
+                                        enabled = !mutationsBlocked,
+                                        onEnableRequested = { accountDevicesConfirmOpen = true },
+                                    )
                                 }
                                 leaveRow()
                             }
@@ -2326,6 +2334,23 @@ internal fun GroupDetailsScreen(
                                         mutation = { controller.acknowledgeDisbandFailure() },
                                     )
                                 },
+                            )
+                        }
+                        if (accountDevicesConfirmOpen) {
+                            GroupAccountDevicesConfirmDialog(
+                                identity = ownIdentity,
+                                enabled =
+                                    !mutationsBlocked &&
+                                        actingMemberHex != null &&
+                                        accountDevicesActivation == AccountDevicesActivationFfi.ELIGIBLE,
+                                onConfirm = {
+                                    accountDevicesConfirmOpen = false
+                                    runGroupMutation(
+                                        action = GroupMutationAction.EnableAccountDevices,
+                                        mutation = { controller.enableAccountDevices() },
+                                    )
+                                },
+                                onDismiss = { accountDevicesConfirmOpen = false },
                             )
                         }
                         if (disbandConfirmOpen) {
@@ -2491,43 +2516,6 @@ private sealed class DetailsConfirm {
     data class LeaveSoleMember(
         val groupName: String,
     ) : DetailsConfirm()
-}
-
-private enum class GroupMutationAction {
-    SaveProfile,
-    InviteMember,
-    RemoveMember,
-    PromoteAdmin,
-    DemoteAdmin,
-    SelfDemoteAdmin,
-    TransferAdmin,
-    DisappearingMessages,
-    Archive,
-    Delete,
-    Reset,
-    Leave,
-    CancelLeave,
-    EnableDisbanding,
-    Disband,
-}
-
-private data class ActiveGroupMutation(
-    val action: GroupMutationAction,
-    val target: String? = null,
-)
-
-/** Visible details follow settled membership as well as metadata, without polling equal native records. */
-@Suppress("FunctionNaming") // Compose effect follows the same naming convention as other composables.
-@Composable
-internal fun GroupManagementSnapshotRefreshEffect(controller: ConversationController) {
-    LaunchedEffect(
-        controller,
-        controller.group,
-        controller.members,
-        controller.memberRosterState,
-    ) {
-        controller.refreshManagementState()
-    }
 }
 
 /** Each opening, including equal singleton actions, gets a fresh one-use presentation identity. */

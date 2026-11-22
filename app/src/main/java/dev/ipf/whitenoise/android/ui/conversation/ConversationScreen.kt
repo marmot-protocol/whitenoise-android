@@ -2136,7 +2136,7 @@ internal fun ConversationScreen(
                             val idx = audioEntry.index
                             val ref = audioEntry.value
                             scope.launch {
-                                val mine = nextMsg.record.direction != "received"
+                                val mine = controller.isMessageMine(nextMsg.record)
                                 val file =
                                     runCatching {
                                         materializeVoiceAttachment(

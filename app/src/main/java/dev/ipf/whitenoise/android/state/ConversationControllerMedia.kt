@@ -76,6 +76,7 @@ internal suspend fun ConversationController.pendingAttachmentRecord(
     replyTarget: String?,
 ): AppMessageRecordFfi =
     AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = tempId,
         direction = "sent",
         groupIdHex = group.groupIdHex,
@@ -84,9 +85,8 @@ internal suspend fun ConversationController.pendingAttachmentRecord(
         contentTokens = markdownParser(body),
         kind = 9uL,
         tags =
-            attachments.map {
-                MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
-            } + replyTarget?.let { listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it)) }.orEmpty(),
+            attachments.map { MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType)) } +
+                replyTarget?.let { listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it)) }.orEmpty(),
         sourceEpoch = null,
         retentionSeconds = null,
         retentionExpiresAt = null,

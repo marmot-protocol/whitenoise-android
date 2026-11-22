@@ -413,6 +413,7 @@ class ChatListSortingTest {
                 ),
             )
 
+        assertEquals(100uL, pinnedByActivity.previewTimestamp)
         assertEquals(300uL, pinnedByActivity.latestAt)
         val sorted = sortChatListItems(listOf(fresherMessage, pinnedByActivity))
         assertEquals(listOf("durable", "fresher"), sorted.map { it.id })
@@ -681,6 +682,7 @@ class ChatListSortingTest {
         plaintext: String = "hello",
         tags: List<MessageTagFfi> = emptyList(),
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "message-$groupId",
         direction = "received",
         groupIdHex = groupId,

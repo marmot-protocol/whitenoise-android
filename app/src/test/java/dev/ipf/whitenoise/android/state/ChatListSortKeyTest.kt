@@ -325,6 +325,7 @@ class ChatListSortKeyTest {
         groupId: String,
         recordedAt: ULong,
     ) = dev.ipf.marmotkit.AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "message-$groupId",
         direction = "received",
         groupIdHex = groupId,

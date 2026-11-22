@@ -139,6 +139,7 @@ internal fun ChatsController.foldChatRow(
         )
     }
     if (folded == current) {
+        settleInvitationFromMdk(folded)
         appState.publishConversationChatListRow(accountRef, folded)
         return
     }
@@ -162,6 +163,7 @@ internal fun ChatsController.foldChatRow(
         }
     appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
     if (membershipChanged) noteMaterializedGroupMembershipChanged(removal = MembershipRemoval.None)
+    settleInvitationFromMdk(effectivePublicationRow)
     scheduleRecompute()
 }
 
@@ -228,7 +230,9 @@ internal fun ChatsController.replaceChatRows(
                 optimisticState = optimisticChatListPreviewByGroup[key],
             )
         appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
+        settleInvitationFromMdk(effectivePublicationRow)
     }
+    invitationReads.forEach { (key, read) -> if (key !in chatRowsByGroup) read.superseded = true }
     optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
     val liveGroupIds = rows.mapTo(mutableSetOf()) { it.groupIdHex }
     presentationMembersByGroup = presentationMembersByGroup.filterKeys { it in liveGroupIds }
@@ -282,6 +286,7 @@ internal fun ChatsController.removeChatRow(
     removal: MembershipRemoval = MembershipRemoval.Ambiguous,
 ) {
     val rowKey = chatRowKey(groupIdHex)
+    invitationReads[rowKey]?.superseded = true
     val removedRow = chatRowsByGroup.remove(rowKey)
     if (removedRow != null) {
         activitySequenceByGroup.remove(rowKey)

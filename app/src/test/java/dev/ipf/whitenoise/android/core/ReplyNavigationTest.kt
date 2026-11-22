@@ -282,6 +282,7 @@ class ReplyNavigationTest {
         tags: List<MessageTagFfi> = emptyList(),
         kind: ULong = 9uL,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "reply",
         direction = "received",
         groupIdHex = "group",

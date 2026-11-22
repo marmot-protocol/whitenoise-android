@@ -1172,7 +1172,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
-                "groupDetails", "promoteAdminDetailed", "selfDemoteAdminDetailed" ->
+                "groupDetails", "promoteAdminDetailed", "selfDemoteAdminDetailed", "groupManagementState" ->
                     lifecycleAdminCommand(method.name.substringBefore('-'), projection, calls, arguments)
                 "listMedia" -> emptyList<Any>()
                 "catchUpAccounts" -> Unit
@@ -1232,6 +1232,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         arguments: Array<out Any?>?,
     ): Any =
         when (method) {
+            "groupManagementState" -> lifecycleGroupMutation(projection.group, projection.soleMember).managementState
             "groupDetails" -> {
                 if (projection.missing.returnsUnknownGroup) {
                     val target = if (projection.missing == MissingProjection.UNKNOWN_GROUP) GROUP_ID else OTHER_GROUP

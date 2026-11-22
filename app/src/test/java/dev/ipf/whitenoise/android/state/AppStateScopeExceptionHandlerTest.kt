@@ -98,6 +98,8 @@ class AppStateScopeExceptionHandlerTest {
         /** Detects unexpected shortcut teardown. */
         override suspend fun hidePreviousAccountShortcuts(): Unit = error("bootstrap must not hide shortcuts")
 
+        override suspend fun cancelOutgoingDeviceLink(label: String): Unit = error("bootstrap must not cancel a link")
+
         /** Detects unexpected active-account publication. */
         override fun publish(
             label: String,

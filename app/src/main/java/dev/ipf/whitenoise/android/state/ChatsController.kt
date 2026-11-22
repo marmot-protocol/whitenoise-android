@@ -79,6 +79,7 @@ internal fun chatListItemFromAuthoritativeGroupDetails(
     val members = applied.members
     return ChatListItem(
         group = applied.group,
+        ownerAccountIdHex = activeAccountIdHex,
         latest = null,
         otherMemberAccount = GroupProjector.otherMemberAccount(members, activeAccountIdHex),
         memberCount = GroupProjector.uniqueMemberCount(members),
@@ -86,14 +87,6 @@ internal fun chatListItemFromAuthoritativeGroupDetails(
         projection = null,
     )
 }
-
-/**
- * Build the first notification-open frame solely from the exact local row.
- * Membership enrichment is intentionally absent from this boundary because it
- * is loaded by the conversation after navigation and may be queued behind
- * account activation. The row still preserves pre-read unread state.
- */
-internal fun chatListItemFromNotificationProjection(projection: ChatListRowFfi): ChatListItem = chatListItemFromProjection(row = projection)
 
 /**
  * When a provisional open (no chat-list row yet) is already foregrounded,
@@ -509,7 +502,9 @@ class ChatsController private constructor(
     internal var selectedActionsByGroup = emptyMap<String, ChatListRowActionsFfi>()
     internal val chatRows: Collection<ChatListRowFfi>
         get() = chatRowsByGroup.values
+    internal val invitationReads = mutableMapOf<String, InvitationSettlementRead>()
     internal var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
+    internal var groupRecordsLoaded = false // groupRecordsById holds the bound account's snapshot
 
     // Holds a locally committed rename on its row until the subscription agrees (#2696). A clear
     // stays held until the group record agrees too, because a blank row falls back to its name.
@@ -723,6 +718,7 @@ class ChatsController private constructor(
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         this.boundAccountRef = accountRef
+        groupRecordsLoaded = false
         val seededLocalSnapshot =
             pendingInitialLocalSnapshot?.takeIf { snapshot -> snapshot.accountRef == accountRef }
         pendingInitialLocalSnapshot = null
@@ -840,6 +836,8 @@ class ChatsController private constructor(
                         }.associateBy { it.groupIdHex }
                     if (!isActiveBindEpoch(epoch)) break
                     groupRecordsById = initialGroups.mapValues { (_, group) -> withRetainedName(group) }
+                    groupRecordsLoaded = true
+                    chatRows.forEach { settleInvitationFromMdk(it) }
                     groupRecordsById.values.forEach(::requestGroupProfiles)
                     seedInitialMemberIdProjection(accountRef, epoch)
                     if (!isActiveBindEpoch(epoch)) break
@@ -2009,6 +2007,8 @@ class ChatsController private constructor(
         selectedPreviewsByGroup = emptyMap()
         selectedActionsByGroup = emptyMap()
         groupRecordsById = emptyMap()
+        groupRecordsLoaded = false
+        invitationReads.clear()
         activitySequenceByGroup.clear()
         nextActivitySequence = 0uL
         optimisticChatListPreviewByGroup.clear()

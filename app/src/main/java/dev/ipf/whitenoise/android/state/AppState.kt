@@ -194,20 +194,6 @@ internal const val NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS = 10_000L
 private const val AUTOMATIC_ADMISSION_ATTEMPTS = 2
 internal const val INCOMING_ATTACHMENT_TAG = "DMAttachmentReceipt"
 
-/**
- * How inviting one profile to several groups went: of [attempted] groups, [failures] failed and in [waited] the user
- * chose to wait on a group-change question, so those groups were not invited either.
- */
-internal data class ProfileGroupInviteOutcome(
-    val attempted: Int,
-    val failures: Int,
-    val firstFailure: AppText? = null,
-    val waited: Int = 0,
-) {
-    val delivered: Int = attempted - failures - waited
-    val completedSuccessfully: Boolean = attempted > 0 && failures == 0 && waited == 0
-}
-
 internal fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
 internal data class AppMarmotRuntime(
@@ -1381,8 +1367,7 @@ class WhiteNoiseAppState private constructor(
      * ends; any other waits (#3308). A failed read clears it, since the list it leaves behind says nothing about
      * which accounts survive, so a surviving account's work is never ended by a refresh that did not complete.
      */
-    @Volatile
-    internal var accountListLoaded = initialAccounts.isNotEmpty()
+    internal var accountListLoaded by mutableStateOf(initialAccounts.isNotEmpty())
 
     internal val accountUnreadStore = AccountUnreadStore()
     internal val runtimeMirrors = RuntimeMirrors()
@@ -1580,6 +1565,11 @@ class WhiteNoiseAppState private constructor(
 
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
         private set
+
+    internal val deviceLinkRequests by runtimeLinkRequests()
+
+    /** Account and runtime of a locally started link awaiting this user's consent. Guarded by account lifetime. */
+    internal var unconfirmedLinkOwner: Pair<String, Int>? = null
 
     // staleness-exempt: observable process identity serialized through destructive-wipe state transitions.
     var runtimeGeneration by mutableIntStateOf(0)
@@ -3059,7 +3049,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Restores account and notification state after a wipe fails before commit. */
     private suspend fun restoreAfterFailedDestructiveAccountWipe(
-        accountRef: String,
+        accountRef: String?,
         restartNotifications: Boolean,
     ) {
         applyDestructiveWipeRuntimeState(
@@ -3327,8 +3317,7 @@ class WhiteNoiseAppState private constructor(
         title: String,
     ): PinnedConversationPresentation {
         val peer =
-            GroupProjector
-                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+            item.avatarAccount
                 ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
         return PinnedConversationPresentation(
             title = title,
@@ -4713,6 +4702,7 @@ class WhiteNoiseAppState private constructor(
                     publishedAccounts = refreshedAccounts
                 }
             if (accepted) {
+                reconcilePendingForwardOwners(refreshedAccounts, requestToken)
                 retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
             }
             if (accountListLifetime.isCurrent(requestToken)) publishedAccounts else accounts
@@ -4941,6 +4931,8 @@ class WhiteNoiseAppState private constructor(
             hideConversationShortcutsFromDirectShare()
             recordAccountSwitchMark("previous-shortcuts-hide-finished")
         }
+
+        override suspend fun cancelOutgoingDeviceLink(label: String) = cancelLinkAfterProfileSwitch(label)
 
         /** Commits the prepared projection and active label together without a suspension. */
         override fun publish(
@@ -5638,12 +5630,15 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun signOutAndWipeActiveAccountLocked(wipedRef: String): AccountWipeCompletion? {
+    internal suspend fun signOutAndWipeActiveAccountLocked(
+        wipedRef: String,
+        wipedShareAccount: String? = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex,
+    ): AccountWipeCompletion? {
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(wipedRef) {
                 admitted = true
-                finishRevokedAccountWipe(wipedRef)
+                finishRevokedAccountWipe(wipedRef, wipedShareAccount)
             }
         }.getOrElse { failure ->
             if (admitted) throw failure
@@ -5654,13 +5649,17 @@ class WhiteNoiseAppState private constructor(
 
     /** Holds launcher revocation through cleanup and publishes native removal first. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
-    private suspend fun finishRevokedAccountWipe(wipedRef: String): AccountWipeCompletion? {
-        if (!prepareSharedPlaintextWipe(wipedRef)) return null
-        val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
+    private suspend fun finishRevokedAccountWipe(
+        wipedRef: String,
+        wipedShareAccount: String?,
+    ): AccountWipeCompletion? {
+        val inView = activeAccountRef
+        val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
+        if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
         conversationDictation.onAccountUnavailable(wipedRef)
-        clearInMemoryMediaCaches()
+        if (retireSession) clearInMemoryMediaCaches()
         try {
-            val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
+            val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
                 notificationDelivery.nativePushSyncMutex.withSerializedNativePushWipe {
                     runCatching { marmotIo { signOutAndWipe(wipedRef) } }
@@ -5671,7 +5670,11 @@ class WhiteNoiseAppState private constructor(
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
                                 // Native wipe invalidates registration while the push-sync mutex is held.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)
-                                runCatching { pushTokenStore.clear() }
+                                val survivingSigner =
+                                    accounts.any { it.label != wipedRef && it.isSignedInSigningAccount() }
+                                if (retireSession && !survivingSigner) {
+                                    runCatching { pushTokenStore.clear() }
+                                }
                             }
                         }
                 }
@@ -5681,23 +5684,23 @@ class WhiteNoiseAppState private constructor(
                 appStateDebug(failure) {
                     "signOutAndWipe failed account=${wipedRef.take(8)}: ${failure.readableMessage()}"
                 }
-                restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                if (retireSession) restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
                 return null
             }
             val outcome =
                 wipeResult.getOrNull() ?: run {
-                    restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                    if (retireSession) restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
                     return null
                 }
             if (!outcome.localCleanup.completed) {
-                discardRejectedSharedPlaintextWipe(wipedRef)
+                discardRejectedSharedPlaintextWipe(wipedRef, retireSession)
                 appStateDebug {
                     "signOutAndWipe kept active account=${wipedRef.take(8)} because engine cleanup did not complete"
                 }
-                restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                if (retireSession) restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
                 return AccountWipeCompletion(outcome, wipeReport(outcome))
             }
-            val mediaWipeFailed = wipeDecryptedMediaFromDisk(wipedRef)
+            val mediaFailure = wipeDecryptedMediaFromDisk(wipedRef, retireSession)
             chatMutePreferences.removeAccount(wipedRef)
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             attachmentCollections.forgetAccount(wipedRef)
@@ -5709,16 +5712,15 @@ class WhiteNoiseAppState private constructor(
             forgetStickers(wipedRef)
             clearRevokedConversationShortcutsForAccount(
                 accountRef = wipedRef,
-                includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
+                includeUnscopedLegacy = retireSession && accounts.none { it.isSignedInSigningAccount() },
             )
-            AvatarImageLoader.clear()
-            clearCrossAccountCaches()
+            if (retireSession) {
+                AvatarImageLoader.clear()
+                clearCrossAccountCaches()
+            }
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
-            publicJpegPreviewPreferences
-                .retainAccounts(accounts.filter { it.label != wipedRef }.map { it.accountIdHex })
-                .forEach(publicJpegPreviewLoader::clearPixels)
             withContext(NonCancellable + Dispatchers.IO) {
                 val alertsCleared =
                     runCatching {
@@ -5731,30 +5733,12 @@ class WhiteNoiseAppState private constructor(
             if (!clearHiddenMessagesForAccount(wipedRef)) {
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
             }
-            withContext(NonCancellable + Dispatchers.IO) {
-                wipedShareAccount?.takeIf(String::isNotBlank)?.let { account ->
-                    runCatching {
-                        val files =
-                            dev.ipf.whitenoise.android.share
-                                .PrivateShareFiles(appContext)
-                        files.leases.releaseAccount(account)
-                    }.onFailure {
-                        appStateDebug(it) { "private share purge failed after wipe: ${it.readableMessage()}" }
-                    }
-                }
-                runCatching {
-                    if (editorSessionStore.removeAccount(wipedRef)) {
-                        editorSessionStore.sourceLeaseReferenceCounts()?.let(editorSourceStore::reconcile)
-                    }
-                }.onFailure {
-                    appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
-                }
-            }
+            purgeWipedAccountSources(wipedRef, wipedShareAccount)
             val refreshedAccountsResult =
                 runCatchingCancellable {
                     marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
                 }
-            val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
+            val refreshedAccounts = refreshedAccountsResult.getOrElse { accounts.filterNot { it.label == wipedRef } }
             val retainedAccountGeneration =
                 accountListLifetime.advance {
                     publishRefreshedAccountList(refreshedAccountsResult)
@@ -5764,6 +5748,11 @@ class WhiteNoiseAppState private constructor(
                     // transient failure must not wipe every other account's mutes (#2782 follow-up).
                     refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
                         retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+                        if (retireSession) {
+                            publicJpegPreviewPreferences
+                                .retainAccounts(successfulAccounts.map(AccountSummaryFfi::accountIdHex))
+                                .forEach(publicJpegPreviewLoader::clearPixels)
+                        }
                     }
                 }
             refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
@@ -5772,7 +5761,9 @@ class WhiteNoiseAppState private constructor(
                 }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
-            val next = signOutOutcome(refreshedAccounts, wipedRef).nextActiveRef
+            val completion = AccountWipeCompletion(outcome, wipeReport(outcome, mediaFailure))
+            if (!retireSession) return completion
+            val next = nextActiveAfterWipe(refreshedAccounts, wipedRef, inView)
             activeAccountRef = next
             preferences
                 .edit()
@@ -5789,21 +5780,21 @@ class WhiteNoiseAppState private constructor(
             notificationNetworkRecovery.resumeIfPending()
             refreshLocalNotificationSettings()
             diagnostics.refresh(marmot())
-            return AccountWipeCompletion(outcome, wipeReport(outcome, localMediaFailure(mediaWipeFailed)))
+            return completion
         } finally {
             // Backstop: the suppression bracket must not outlive this call
             // whatever throws above — a latched flag would silently disable
             // network-restore recovery until process death.
-            networkNotificationRecoverySuppressed = false
+            if (retireSession) networkNotificationRecoverySuppressed = false
         }
     }
 
     /**
-     * Publishes the account list a post-wipe read produced. A failed read leaves an empty list that is not
-     * authoritative, so surviving accounts' automatic work waits for the next successful read instead of ending.
+     * Publishes the account list a post-wipe read produced. A failed read retains the known survivors as a non-
+     * authoritative projection. Automatic work waits for the next successful read.
      */
     internal fun publishRefreshedAccountList(result: Result<List<AccountSummaryFfi>>) {
-        accounts = result.getOrDefault(emptyList())
+        result.onSuccess { accounts = it }
         accountListLoaded = result.isSuccess
     }
 
@@ -7425,13 +7416,10 @@ class WhiteNoiseAppState private constructor(
     ): Pair<String, Boolean>? {
         val existing = marmotIo { existingDirectConversation(account, contact) }?.takeIf { it.reusable } ?: return null
         val row = marmotIo { presentedChatListRow(account, existing.groupIdHex) } ?: return null
-        val item = chatListItemFromProjection(row.row, row.presentation, row.avatarAsset)
+        val owner = accounts.firstOrNull { it.label == account }?.accountIdHex
+        val item = chatListItemFromProjection(row.row, row.presentation, row.avatarAsset, activeAccountIdHex = owner)
         val peer =
-            GroupProjector.avatarAccount(
-                item.group,
-                item.presentationOtherMemberAccount,
-                item.presentationMemberCount,
-            )
+            item.avatarAccount
         if (peer != contact || row.row.groupIdHex != existing.groupIdHex) return null
         val contactIcon =
             !GroupProjector.ownsGroupPicture(item.group, row.avatarAsset, row.presentation.avatarSource.isPeerSourced())
@@ -7916,7 +7904,8 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): ChatListItem {
         val projection = loadNotificationChatListProjection(accountRef, groupIdHex)
-        return chatListItemFromNotificationProjection(projection)
+        val owner = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+        return chatListItemFromNotificationProjection(projection, owner)
     }
 
     /**

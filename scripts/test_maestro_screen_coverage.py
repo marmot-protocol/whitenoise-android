@@ -103,6 +103,33 @@ class ScreenProofTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Invalid default remaining'):
                 screen_bindings(root, [screen], cases)
 
+    def test_second_device_screen_needs_existing_manual_cases_and_no_assertions(self):
+        """A surface only a second device can open is excused by named manual cases, never by a bare flag."""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'config').mkdir()
+            (root / '.maestro').mkdir()
+            (root / '.maestro/main.yaml').write_text('appId: test\n---\n- assertVisible: Real screen\n')
+            (root / 'docs/manual-release-testing/cases').mkdir(parents=True)
+            (root / 'docs/manual-release-testing/cases/SET-060.md').write_text('case')
+            (root / 'docs/outside.md').write_text('not a case')
+            (root / 'screen.kt').write_text('fun Screen() = Unit')
+            screen = {'source': 'screen.kt', 'symbol': 'Screen'}
+            cases = {'case': {'flow': '.maestro/main.yaml'}}
+            mapping = root / 'config/maestro-screen-assertions.json'
+            def audit(row):
+                mapping.write_text(json.dumps({'schema': 1, 'screens': [{**screen, **row}]}))
+                return screen_bindings(root, [screen], cases)[0]
+            excused = {'bindings': [], 'remaining': 'Needs a linked device', 'second_device': ['SET-060']}
+            self.assertEqual(audit(excused)['second_device'], ['SET-060'])
+            self.assertEqual(audit({'bindings': [], 'remaining': 'Later'})['second_device'], [])
+            bound = [{'case': 'case', 'selector': {'text': 'Real screen'}, 'scope': 'Chrome'}]
+            for row in ({**excused, 'second_device': []}, {**excused, 'second_device': 'SET-060'},
+                        {**excused, 'second_device': ['SET-060', 'SET-060']}, {**excused, 'second_device': ['SET-999']},
+                        {**excused, 'second_device': ['../../outside']}, {**excused, 'bindings': bound}):
+                with self.subTest(row=row), self.assertRaisesRegex(ValueError, 'Second-device screen'):
+                    audit(row)
+
     def test_explicit_unbound_audit_never_inherits_unrelated_campaign_credit(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

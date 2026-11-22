@@ -1,0 +1,155 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+  "legacy_sha256": "f236effca6045539e04922efa290368f3c7a77745a43118cca33e2c51c64608c",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatListNoResults",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "fun ChatListNoResults(",
+        "test_ids": [
+          "CHL-001",
+          "CHL-007",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "EmptyArchivedChats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "fun EmptyArchivedChats(",
+        "test_ids": [
+          "CHL-001",
+          "CHL-007",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "EmptyChats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "fun EmptyChats(",
+        "test_ids": [
+          "CHL-001",
+          "CHL-007",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "Linked devices: linkChatProgressText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "linkChatProgressText",
+        "test_ids": [
+          "SET-061"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.chats_arriving_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chats_arriving_title",
+        "test_ids": [
+          "SET-061"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.chats_arriving_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chats_arriving_detail",
+        "test_ids": [
+          "SET-061"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.chat_rows_empty_folder_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chat_rows_empty_folder_detail",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.chat_rows_no_archived_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chat_rows_no_archived_detail",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.chat_rows_no_archived_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chat_rows_no_archived_title",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.chat_rows_no_chats_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chat_rows_no_chats_detail",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.chat_rows_no_chats_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chat_rows_no_chats_title",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.chat_rows_no_results_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chat_rows_no_results_detail",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.chat_rows_no_unread_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chat_rows_no_unread_detail",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.chat_rows_no_unread_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.chat_rows_no_unread_title",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.new_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.new_chat",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      },
+      {
+        "surface": "R.string.no_results",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+        "anchor": "R.string.no_results",
+        "test_ids": [
+          "CHL-001",
+          "FIND-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

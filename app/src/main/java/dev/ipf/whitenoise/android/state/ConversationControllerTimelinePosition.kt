@@ -3,9 +3,6 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 
-internal const val MARMOT_DELETE_EVENT_KIND = 5uL
-internal const val MARMOT_REACTION_EVENT_KIND = 7uL
-
 /** Delivery changes can carry the peer reaction that confirms a previously failed send. */
 internal fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
     when (this) {

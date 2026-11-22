@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,8 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.LinkChatProgressFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isJoiningChats
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.devices.linkChatProgressText
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 /** Empty filtering remains specific to query, unread folder, or the selected folder's contents. */
@@ -43,24 +49,49 @@ internal fun ChatListNoResults(
     }
 }
 
-/** Keeps the existing actionable first-chat entry while adopting the prototype's title/detail presentation. */
+/** The empty chat list for the profile in view, which says so when its chats are still arriving after linking. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun EmptyChats(
+    appState: WhiteNoiseAppState,
+    onCreate: () -> Unit,
+    onCreateOrigin: (Rect?) -> Unit = {},
+) {
+    val links = appState.deviceLinkRequests
+    val snapshot = appState.activeAccountRef?.let { links.snapshots[it] }
+    val progress = snapshot?.chatProgress?.firstOrNull { it.onNewDevice && it.isJoiningChats() }
+    val awaiting = rememberAwaitingChatCount(appState.activeAccountRef?.let { links.linkedAwaitingCount[it] })
+    EmptyChats(onCreate, progress = progress, arriving = progress != null || awaiting, onCreateOrigin = onCreateOrigin)
+}
+
+/**
+ * Keeps the existing actionable first-chat entry while adopting the prototype's title/detail presentation. While
+ * [arriving], a newly linked device says its chats are on their way instead of claiming there are none, with
+ * MDK's [progress] count once it has one.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun EmptyChats(
     onCreate: () -> Unit,
+    progress: LinkChatProgressFfi? = null,
+    arriving: Boolean = progress != null,
     onCreateOrigin: (Rect?) -> Unit = {},
 ) {
+    val title = if (arriving) R.string.chats_arriving_title else R.string.chat_rows_no_chats_title
+    val detail = if (arriving) R.string.chats_arriving_detail else R.string.chat_rows_no_chats_detail
     val (origin, create) =
         rememberMeasuredControlClick {
             onCreateOrigin(it)
             onCreate()
         }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            WhiteNoiseEmptyState(
-                title = stringResource(R.string.chat_rows_no_chats_title),
-                detail = stringResource(R.string.chat_rows_no_chats_detail),
-            )
+        Column(
+            modifier = Modifier.fadingVerticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            WhiteNoiseEmptyState(title = stringResource(title), detail = stringResource(detail))
+            progress?.let { Text(linkChatProgressText(it)) }
             Button(onClick = create, modifier = Modifier.padding(horizontal = 24.dp).then(origin)) {
                 Text(stringResource(R.string.new_chat))
             }

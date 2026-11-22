@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.state
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 
@@ -28,8 +27,7 @@ internal fun firstFrameGroupAvatarSources(
             yield(ChatListAvatarSource.ENCRYPTED_GROUP to it)
         }
         val fallback =
-            GroupProjector
-                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+            item.avatarAccount
                 ?.let(avatarUrl)
         if (fallback != null) yield(ChatListAvatarSource.FALLBACK_URL to fallback)
     }

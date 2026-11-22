@@ -38,7 +38,7 @@ internal suspend fun shareVideo(
         var stagedFile: java.io.File? = null
         try {
             val uri =
-                withSharedPlaintextWrite(captureSharedPlaintextWrite()) {
+                withSharedPlaintextWrite(captureSharedPlaintextWrite(accountRef)) {
                     val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
                     val file =
                         java.io.File.createTempFile(

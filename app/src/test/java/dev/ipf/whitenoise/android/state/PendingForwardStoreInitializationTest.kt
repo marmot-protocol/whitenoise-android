@@ -16,6 +16,40 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 class PendingForwardStoreInitializationTest {
+    /** Removing a profile clears a forward only when that profile is the source or selected destination. */
+    @Test
+    fun removingAnUnrelatedAccountPreservesThePendingForward() =
+        runBlocking {
+            var pending: PendingForwardRequest? = null
+            val delegate =
+                object : PendingForwardRequestStore {
+                    override fun save(request: PendingForwardRequest): Boolean {
+                        pending = request
+                        return true
+                    }
+
+                    override fun load(): PendingForwardRequest? = pending
+
+                    override fun remove(requestId: String) {
+                        if (pending?.requestId == requestId) pending = null
+                    }
+
+                    override fun clear() = error("An inactive account cannot clear the store")
+                }
+            val store = SerializedPendingForwardRequestStore(delegate)
+            val forwards = ForwardRequestPersistence(this) { store }
+            val active = PendingForwardRequest("1", "alice", "chat", emptyList(), null, emptyList())
+            store.save(active)
+            forwards.removeForAccount("bob")
+            assertEquals(active, store.load())
+            store.save(active.copy(destinationAccountRef = "bob"))
+            forwards.removeForAccount("bob")
+            assertNull(store.load())
+            store.save(active)
+            forwards.removeForAccount("alice")
+            assertNull(store.load())
+        }
+
     /** First access initializes the encrypted store inside its serialized background boundary. */
     @Test
     fun delegateConstructionAndOperationsStayOffCallerThread() =

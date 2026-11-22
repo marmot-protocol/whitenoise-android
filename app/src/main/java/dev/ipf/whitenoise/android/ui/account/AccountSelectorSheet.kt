@@ -21,6 +21,8 @@ import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.devices.UnlinkedProfileRemoval
+import dev.ipf.whitenoise.android.ui.devices.asksToRemoveUnlinkedProfile
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import kotlinx.coroutines.CancellationException
 
@@ -32,6 +34,8 @@ internal data class AccountSelectorAccountState(
     val isReadOnly: Boolean,
     val isSignedOut: Boolean,
     val isActive: Boolean,
+    /** Another of the account's devices unlinked this one, so the profile can only be removed here. */
+    val isUnlinked: Boolean = false,
 )
 
 internal data class AccountSelectorState(
@@ -54,6 +58,7 @@ internal fun accountSelectorState(
                     isReadOnly = !account.localSigning && !account.externalSigning,
                     isSignedOut = account.signedOut,
                     isActive = account.label == activeAccountRef,
+                    isUnlinked = account.unlinked,
                 )
             },
         refreshing = refreshing,
@@ -163,9 +168,18 @@ internal fun AccountSelectorSheet(
             enabled = terminal.acceptsInput && !appState.profileSwitcherBlocked(),
             pendingLabel = selection.pendingLabel,
             onSelectProfile = { label ->
-                selection.select(appState, label) {
-                    close()
-                    switched()
+                val unlinked = appState.accounts.filter { it.unlinked }.map { it.label }
+                if (asksToRemoveUnlinkedProfile(label, unlinked)) {
+                    // An unlinked profile cannot be switched to, and its question must not sit behind this sheet.
+                    closeWithMotion {
+                        dismiss()
+                        UnlinkedProfileRemoval.ask(label)
+                    }
+                } else {
+                    selection.select(appState, label) {
+                        close()
+                        switched()
+                    }
                 }
             },
             onAddProfileOrigin = onAddAccountOrigin,

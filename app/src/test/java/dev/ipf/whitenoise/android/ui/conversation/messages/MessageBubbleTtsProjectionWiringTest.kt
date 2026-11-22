@@ -280,6 +280,7 @@ class MessageBubbleTtsProjectionWiringTest {
     /** Builds a received message record whose original body contains bold markdown. */
     private fun editedRecord() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = MESSAGE_ID,
             direction = "received",
             groupIdHex = GROUP_ID,

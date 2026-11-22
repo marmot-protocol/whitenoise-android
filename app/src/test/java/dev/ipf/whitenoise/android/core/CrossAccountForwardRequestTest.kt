@@ -72,6 +72,7 @@ class CrossAccountForwardRequestTest {
         plaintext: String,
         tags: List<MessageTagFfi>,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = id,
         direction = "received",
         groupIdHex = "group",

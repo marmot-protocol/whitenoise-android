@@ -1,9 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
-import dev.ipf.marmotkit.MessageTagFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -194,198 +191,6 @@ class CanAcceptReactionTest {
             assertEquals(3, attempts)
         }
 
-    /** A blank immediate-add result waits for local history instead of failing on its first stale read. */
-    @Test
-    fun missingImmediateAddIdWaitsForAuthoritativeHistory() =
-        runTest {
-            var reads = 0
-
-            val resolved =
-                awaitReactionEventHistory(expectedEmoji = "👍", retryDelayMillis = 0L) {
-                    reads += 1
-                    if (reads < 3) emptyMap() else mapOf("👍" to "reaction-event")
-                }
-
-            assertEquals(mapOf("👍" to "reaction-event"), resolved)
-            assertEquals(3, reads)
-        }
-
-    /** A blank unprojected marker cannot hide the valid event id that projection later supplies. */
-    @Test
-    fun blankUnprojectedMarkerPreservesProjectedReactionEventId() {
-        val projected = mapOf("👍" to "projected-event")
-
-        assertEquals(
-            projected,
-            knownReactionEventIds(projected, "👍", unprojectedEventId = "", authoritativeEventIds = null),
-        )
-        assertEquals(
-            mapOf("👍" to "unprojected-event"),
-            knownReactionEventIds(
-                projected,
-                "👍",
-                unprojectedEventId = "unprojected-event",
-                authoritativeEventIds = null,
-            ),
-        )
-    }
-
-    /** A projected reaction event keeps removal scoped to the tapped emoji. */
-    @Test
-    fun ownReactionRetractionDeletesKnownReactionEvent() {
-        assertEquals(
-            OwnReactionRetractionPlan.DeleteReactionMessage("reaction-event"),
-            planOwnReactionRetraction(
-                emoji = "👍",
-                knownEventIdByEmoji = mapOf("👍" to "reaction-event"),
-                authoritativeOwnEmojis = setOf("👍", "🔥"),
-            ),
-        )
-    }
-
-    /** An authoritatively sole own reaction can use target-wide unreact while its event id is missing. */
-    @Test
-    fun authoritativelySoleOwnReactionFallsBackToTargetUnreactBeforeProjectionEcho() {
-        assertEquals(
-            OwnReactionRetractionPlan.UnreactTarget,
-            planOwnReactionRetraction(
-                emoji = "👍",
-                knownEventIdByEmoji = emptyMap(),
-                authoritativeOwnEmojis = setOf("👍"),
-            ),
-        )
-    }
-
-    /** A sole own reaction uses the dedicated unreact API even after its event id projects. */
-    @Test
-    fun soleOwnReactionPrefersTargetUnreactWithKnownEventId() {
-        assertEquals(
-            OwnReactionRetractionPlan.UnreactTarget,
-            planOwnReactionRetraction(
-                emoji = "👍",
-                knownEventIdByEmoji = mapOf("👍" to "reaction-event"),
-                authoritativeOwnEmojis = setOf("👍"),
-            ),
-        )
-    }
-
-    /** A stale sole projection deletes only the tapped event when history contains another emoji. */
-    @Test
-    fun authoritativeSecondEmojiPreventsTargetWideUnreact() {
-        assertEquals(
-            OwnReactionRetractionPlan.DeleteReactionMessage("thumb-event"),
-            planOwnReactionRetraction(
-                emoji = "👍",
-                knownEventIdByEmoji = mapOf("👍" to "thumb-event", "🔥" to "fire-event"),
-                authoritativeOwnEmojis = setOf("👍", "🔥"),
-            ),
-        )
-    }
-
-    /** Failed authoritative lookup still prefers a known tapped event over target-wide unreact. */
-    @Test
-    fun unknownAuthoritativeStateDeletesKnownTappedEvent() {
-        assertEquals(
-            OwnReactionRetractionPlan.DeleteReactionMessage("thumb-event"),
-            planOwnReactionRetraction(
-                emoji = "👍",
-                knownEventIdByEmoji = mapOf("👍" to "thumb-event"),
-                authoritativeOwnEmojis = null,
-            ),
-        )
-    }
-
-    /** An immediate removal deletes the exact just-created event without waiting for projection. */
-    @Test
-    fun immediateRemovalPrefersReturnedReactionEvent() {
-        assertEquals(
-            OwnReactionRetractionPlan.DeleteReactionMessage("new-reaction-event"),
-            planOwnReactionRetraction(
-                emoji = "👍",
-                knownEventIdByEmoji = emptyMap(),
-                authoritativeOwnEmojis = null,
-                preferredEventId = "new-reaction-event",
-            ),
-        )
-    }
-
-    /** Multiple own reactions never use target-wide unreact without the tapped event id. */
-    @Test
-    fun multipleOwnReactionsWithoutEventIdRemainUnavailable() {
-        assertEquals(
-            OwnReactionRetractionPlan.Unavailable,
-            planOwnReactionRetraction(
-                emoji = "👍",
-                knownEventIdByEmoji = emptyMap(),
-                authoritativeOwnEmojis = setOf("👍", "🔥"),
-            ),
-        )
-    }
-
-    /** Raw history exposes every active own emoji so sole-ness never relies on projection alone. */
-    @Test
-    fun rawHistoryFindsAllActiveOwnReactions() {
-        val records =
-            listOf(
-                rawRecord(id = "thumb-event", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 1uL),
-                rawRecord(id = "fire-event", kind = 7uL, plaintext = "🔥", target = TARGET, recordedAt = 2uL),
-            )
-
-        assertEquals(
-            mapOf("🔥" to "fire-event", "👍" to "thumb-event"),
-            activeOwnReactionEventIdsByEmoji(records, ACCOUNT, TARGET),
-        )
-    }
-
-    /** Raw history chooses the newest matching reaction while projection catches up. */
-    @Test
-    fun rawHistoryFindsNewestActiveOwnReaction() {
-        val records =
-            listOf(
-                rawRecord(id = "older-reaction", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 1uL),
-                rawRecord(id = "other-emoji", kind = 7uL, plaintext = "🔥", target = TARGET, recordedAt = 2uL),
-                rawRecord(id = "newer-reaction", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 3uL),
-            )
-
-        assertEquals(
-            "newer-reaction",
-            activeOwnReactionEventId(records, ACCOUNT, TARGET, "👍"),
-        )
-    }
-
-    /** An own delete suppresses its reaction event so stale ids are never retried. */
-    @Test
-    fun rawHistoryIgnoresDeletedOwnReaction() {
-        val records =
-            listOf(
-                rawRecord(id = "reaction-event", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 1uL),
-                rawRecord(id = "delete-event", kind = 5uL, target = "reaction-event", recordedAt = 2uL),
-            )
-
-        assertEquals(null, activeOwnReactionEventId(records, ACCOUNT, TARGET, "👍"))
-    }
-
-    /** A different sender cannot forge deletion of the active account's reaction. */
-    @Test
-    fun rawHistoryIgnoresForgedReactionDelete() {
-        val records =
-            listOf(
-                rawRecord(id = "reaction-event", kind = 7uL, plaintext = "👍", target = TARGET, recordedAt = 1uL),
-                rawRecord(
-                    id = "forged-delete",
-                    sender = "another-account",
-                    kind = 5uL,
-                    target = "reaction-event",
-                    recordedAt = 2uL,
-                ),
-            )
-
-        assertEquals(
-            "reaction-event",
-            activeOwnReactionEventId(records, ACCOUNT, TARGET, "👍"),
-        )
-    }
-
     @Test
     fun confirmedEchoPrunesOnlyItsMatchingOptimisticOverlay() {
         val optimistic =
@@ -407,6 +212,7 @@ class CanAcceptReactionTest {
                 activeAccountIdHex = ACCOUNT,
                 optimisticChanges = optimistic,
                 confirmedSendersByTarget = confirmed,
+                references = null,
             )
 
         assertEquals(setOf("mine"), confirmedKeys)
@@ -450,31 +256,6 @@ class CanAcceptReactionTest {
             confirmedSendersByEmoji = emptyMap(),
             optimisticChanges = optimistic.values,
         )
-
-    /** Builds a minimal raw Marmot record for reaction-resolution tests. */
-    private fun rawRecord(
-        id: String,
-        sender: String = ACCOUNT,
-        kind: ULong,
-        plaintext: String = "",
-        target: String,
-        recordedAt: ULong,
-    ) = AppMessageRecordFfi(
-        messageIdHex = id,
-        direction = "sent",
-        groupIdHex = "group",
-        sender = sender,
-        plaintext = plaintext,
-        contentTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
-        kind = kind,
-        tags = listOf(MessageTagFfi(listOf("e", target))),
-        sourceEpoch = null,
-        retentionSeconds = null,
-        retentionExpiresAt = null,
-        recordedAt = recordedAt,
-        receivedAt = recordedAt,
-        sticker = null,
-    )
 
     private companion object {
         const val ACCOUNT = "abcdef"

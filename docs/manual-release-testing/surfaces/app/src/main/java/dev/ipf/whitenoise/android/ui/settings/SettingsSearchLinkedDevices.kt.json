@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchLinkedDevices.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.linked_devices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchLinkedDevices.kt",
+        "anchor": "R.string.linked_devices",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchLinkedDevices.kt",
+        "anchor": "R.string.account",
+        "test_ids": [
+          "SET-060"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

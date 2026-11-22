@@ -134,8 +134,8 @@ class DurableAutomaticAttachmentAdmissionTest {
         }
 
     /**
-     * After an account was wiped, a failed account read leaves an empty list that is not authoritative, so a
-     * surviving account's queued work waits for the next read instead of finishing without downloading.
+     * With a surviving profile still cached after a wipe, a failed inventory read must defer its automatic work
+     * until a successful read confirms it is still signed in.
      */
     @Test
     fun aFailedRefreshAfterAWipeKeepsSurvivingWorkWaiting() =

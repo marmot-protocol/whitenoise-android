@@ -386,6 +386,8 @@ class MessageProjectorTest {
         assertTrue(MessageProjector.isMine(sent, myAccountId = "me"))
         assertFalse(MessageProjector.isMine(received, myAccountId = "me"))
         assertTrue(MessageProjector.isMine(receivedFromMe, myAccountId = "abc123"))
+        assertTrue(sent.isSentFromThisDevice())
+        assertFalse(receivedFromMe.isSentFromThisDevice())
         assertTrue(MessageProjector.isDeleted("m1", setOf("m1")))
         assertFalse(MessageProjector.isDeleted("m2", setOf("m1")))
     }
@@ -861,6 +863,7 @@ class MessageProjectorTest {
         retentionExpiresAt: ULong? = null,
         sticker: StickerRefFfi? = null,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = id,
         direction = direction,
         groupIdHex = "group",

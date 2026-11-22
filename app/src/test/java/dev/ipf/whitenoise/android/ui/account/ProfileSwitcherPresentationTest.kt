@@ -23,6 +23,19 @@ class ProfileSwitcherPresentationTest {
         assertEquals(true, presented[3].isReadOnly)
     }
 
+    /** A profile another device unlinked is marked, so its row can say so and offer removal instead of a switch. */
+    @Test fun anUnlinkedProfileIsMarked() {
+        val accounts =
+            listOf(
+                AccountSummaryFfi("main", "aa", true, false, false, true, false),
+                AccountSummaryFfi("old", "bb", true, false, true, false, true),
+            )
+
+        val presented = profileSwitcherPresentation(accountSelectorState(accounts, "main", false))
+
+        assertEquals(listOf(false, true), presented.map { it.isUnlinked })
+    }
+
     /** Removed active does not create a phantom profile. */
     @Test fun removedActiveDoesNotCreateAPhantomProfile() {
         val state = accountSelectorState(emptyList(), "removed", false)

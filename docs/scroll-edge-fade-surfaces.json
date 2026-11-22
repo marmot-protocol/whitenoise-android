@@ -121,6 +121,21 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "chats",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-061"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
       "calls": {
         "LazyColumn": 1
@@ -2150,6 +2165,48 @@
       "calls": {
         "verticalScroll": 1
       }
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
     }
   ],
   "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport\u2019s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."

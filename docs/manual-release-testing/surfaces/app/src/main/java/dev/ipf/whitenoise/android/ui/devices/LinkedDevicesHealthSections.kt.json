@@ -1,0 +1,107 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.devices_closed_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.devices_closed_chats",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.devices_closed_chats_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.devices_closed_chats_detail",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.devices_key_refresh_overdue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.devices_key_refresh_overdue",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.devices_leftover_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.devices_leftover_chats",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.devices_leftover_chats_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.devices_leftover_chats_detail",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.devices_repair",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.devices_repair",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.devices_repair_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.devices_repair_confirm",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.devices_stalled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.devices_stalled",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "RepairDeviceLinkDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "fun RepairDeviceLinkDialog(",
+        "test_ids": [
+          "SET-064",
+          "SET-065"
+        ]
+      },
+      {
+        "surface": "Unconfirmed device-group repair",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesHealthSections.kt",
+        "anchor": "R.string.device_repair_confirm_again",
+        "test_ids": [
+          "SET-065"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

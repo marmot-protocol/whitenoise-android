@@ -332,14 +332,6 @@
         ]
       },
       {
-        "surface": "Reviewed group action context: R.string.group_action_step_down_and_leave",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.group_action_step_down_and_leave",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
         "surface": "Reviewed group action context: R.string.remove_photo",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.remove_photo",

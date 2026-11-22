@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.state.AccountSwitchProfileSeed
@@ -23,6 +24,7 @@ import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture
 import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.PendingForwardRequestStore
 import dev.ipf.whitenoise.android.state.SerializedPendingForwardRequestStore
@@ -241,23 +243,31 @@ class ForwardMessagePickerCrossAccountUiTest {
         assertEquals(listOf(ACCOUNT_B_REF to listOf(GROUP_UNDER_B)), forwards)
     }
 
-    /** The sheet mirrors live selection into the store and discards it on dismiss. */
+    /** A fresh media-viewer request ID creates its encrypted entry and is discarded when the sheet closes. */
     @Test
-    fun sheetMirrorsSelectionIntoTheStoreAndDiscardsItOnDismiss() {
+    fun sheetMirrorsNewMediaViewerRequestIntoTheStoreAndDiscardsItOnDismiss() {
         val appState = twoAccountAppState()
         val store = InMemoryPendingForwardStore()
         appState.forwardRequestPersistence.override(
             SerializedPendingForwardRequestStore(store, ioDispatcher = Dispatchers.Main.immediate),
         )
+        val photo =
+            ForwardMessagePayload.Media(
+                sourceGroupIdHex = ORIGIN_GROUP,
+                sourceMessageIdHex = "01".repeat(32),
+                caption = "photo",
+                attachments = listOf(ForwardAttachmentSource(0, MediaDownloadIntegrationFixture.reference(1))),
+            )
         var dismissed = false
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
                 Surface {
                     ForwardMessageSheet(
                         appState = appState,
-                        payloads = listOf(textPayload()),
+                        payloads = listOf(photo),
                         sourceAccountRef = ACCOUNT_REF,
                         originGroupIdHex = ORIGIN_GROUP,
+                        newRequestId = "fresh-media-viewer-request",
                         onDismiss = { dismissed = true },
                     )
                 }
@@ -267,10 +277,11 @@ class ForwardMessagePickerCrossAccountUiTest {
         composeRule.onNodeWithText("Person A").performClick()
         composeRule.waitForIdle()
         val persisted = requireNotNull(store.entry)
+        assertEquals("fresh-media-viewer-request", persisted.requestId)
         assertEquals(ACCOUNT_REF, persisted.sourceAccountRef)
         assertEquals(ORIGIN_GROUP, persisted.originGroupIdHex)
         assertEquals(listOf(GROUP_UNDER_A), persisted.selectedGroupIds)
-        assertEquals(listOf(textPayload()), persisted.payloads)
+        assertEquals(listOf(photo), persisted.payloads)
 
         composeRule.onNodeWithContentDescription("Close").performClick()
         composeRule.waitForIdle()
@@ -295,6 +306,7 @@ class ForwardMessagePickerCrossAccountUiTest {
                 destinationAccountRef = ACCOUNT_REF,
                 selectedGroupIds = listOf(GROUP_UNDER_A),
             )
+        assertTrue(store.save(restored))
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
                 Surface {

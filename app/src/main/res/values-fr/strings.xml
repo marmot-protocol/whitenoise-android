@@ -907,6 +907,8 @@
     <string name="invite_decline_step_down_title">Quitter le rôle admin et refuser ?</string>
     <string name="invite_decline_step_down_message">Cette invitation fait de vous un admin. Pour la refuser, vous quitterez d’abord le rôle admin, et les membres du groupe le verront.</string>
     <string name="invite_decline_step_down_confirm">Quitter le rôle admin et refuser</string>
+    <string name="invite_decline_all_devices_title">Refuser sur tous vos appareils ?</string>
+    <string name="invite_decline_all_devices_message">Si vous refusez, vous quitterez cette discussion sur tous vos appareils associés, même si vous l’avez déjà rejointe sur l’un d’eux. Il vous faudra une nouvelle invitation pour la rejoindre.</string>
     <string name="toast_chat_archived">Discussion archivée</string>
     <string name="toast_chat_restored">Chat restauré</string>
     <string name="toast_couldnt_update_chat">Impossible de mettre à jour la discussion</string>
@@ -1471,6 +1473,7 @@
     <string name="wipe_outcome_key_packages_deleted">%1$d clés d’invitation retirées</string>
     <string name="wipe_outcome_local_wipe_done">Données locales effacées</string>
     <string name="wipe_outcome_local_wipe_incomplete">Effacement des données locales incomplet</string>
+    <string name="wipe_media_ownership_unknown">Certains fichiers en cache ne sont associés à aucun profil. Des médias chiffrés, des miniatures ou des fichiers temporaires de voix, de vidéos, de documents, de pièces jointes, de collage ou d’envoi restent sur cet appareil.</string>
     <string name="wipe_media_cleanup_failed">Certains fichiers multimédias locaux ou certaines autorisations de partage n’ont pas pu être supprimés.</string>
     <string name="export_nsec">Exporter le nsec</string>
     <string name="share_secret_key">Partager la clé secrète</string>
@@ -2047,13 +2050,11 @@
     <string name="setup_continue_without_profile">Continuer sans profil</string>
     <string name="setup_review_suggested_changes">Examiner les modifications suggérées</string>
     <string name="setup_chats_on_this_device">Discussions sur cet appareil</string>
-    <string name="setup_device_none_found">Nous n’avons trouvé aucune clé de messagerie provenant d’une autre app ou d’un autre appareil.</string>
-    <string name="setup_device_unchecked">Nous n’avons pas pu vérifier si ce compte utilise une autre app ou un autre appareil pour la messagerie.</string>
-    <string name="setup_device_found_on_date">Nous avons trouvé des clés de messagerie publiées par ce compte depuis une autre app ou un autre appareil, les plus récentes le %1$s.</string>
-    <string name="setup_device_found">Nous avons trouvé des clés de messagerie publiées par ce compte depuis une autre app ou un autre appareil.</string>
-    <string name="setup_device_separate_chats">Cet appareil aura ses propres discussions, séparées. Les discussions de l’autre app y restent et n’apparaîtront pas ici.</string>
-    <string name="setup_device_new_chats_either_app">Quand quelqu’un commence une nouvelle discussion avec vous, elle peut arriver dans l’une ou l’autre app.</string>
-    <string name="setup_device_separate_chats_if_other_app">Si vous utilisez une autre app de messagerie, cet appareil aura ses propres discussions, séparées, et les discussions de cette app n’apparaîtront pas ici.</string>
+    <string name="setup_device_none_found">Nous n’avons trouvé aucun indice d’une connexion sur un autre appareil ou dans une autre application.</string>
+    <string name="setup_device_unchecked">Nous n’avons pas pu terminer la recherche d’autres connexions.</string>
+    <string name="setup_device_found_on_date">Il semble que vous vous soyez déjà connecté à ce compte sur un autre appareil ou dans une autre application.</string>
+    <string name="setup_device_found">Il semble que vous vous soyez déjà connecté à ce compte sur un autre appareil ou dans une autre application.</string>
+    <string name="setup_device_separate_chats_if_other_app">Si vous avez des discussions dans une autre application, elles n’apparaîtront pas ici automatiquement.</string>
     <string name="setup_device_stage">Utilisation de l\'appareil</string>
     <string name="setup_approval_saved_pending">Votre approbation est enregistrée. Le changement est toujours en attente.</string>
     <string name="setup_profile_scope_help">Cela met à jour votre profil dans d\'autres applications Nostr.</string>
@@ -2099,6 +2100,7 @@
     <string name="setup_device_unknown">Nous n’avons pas pu déterminer si une autre installation existe. Continuez uniquement si vous souhaitez utiliser cet appareil.</string>
     <string name="setup_profile_publish_help">Enregistrez ce profil dans votre compte Nostr.</string>
     <string name="setup_replacement_warning">Les recommandations conservent toutes les entrées de relais existantes, même celles qui ne sont pas affichées ici. Une liste personnalisée supprime les relais omis. Les changements affectent aussi vos autres applications Nostr.</string>
+    <string name="setup_repair_inconclusive_warning">Certaines sources n\'ont pas répondu à cette vérification. Une liste plus récente, que cet appareil n\'a pas pu voir, existe peut-être, et vos relais actuels fonctionnent peut-être encore dans d\'autres applications. N\'enregistrez que si vous acceptez ce risque.</string>
     <string name="setup_inbox_list">Relais de réception</string>
     <string name="setup_read_list">Relais de lecture</string>
     <string name="setup_write_list">Relais d’écriture</string>
@@ -2127,6 +2129,7 @@
     <string name="setup_action_continue_without">Pas maintenant</string>
     <string name="setup_action_use_recommended_relays">Corriger la configuration des relais</string>
     <string name="setup_action_edit_relays">Vérifier les relais</string>
+    <string name="setup_action_remove_unusable_relays">Retirer les relais inutilisables</string>
     <string name="setup_action_edit_profile">Modifier le profil</string>
     <string name="setup_action_edit_follows">Modifier les abonnements</string>
     <string name="setup_action_approve_repair">Enregistrer les modifications</string>

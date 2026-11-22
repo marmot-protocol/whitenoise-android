@@ -5,7 +5,7 @@ name: presentation-setup-device
 - assertVisible: Account setup
 - tapOn:
     id: setup-step-SINGLE_DEVICE
-- assertVisible: Your chats stay here
+- assertVisible: Chats on this device
 - back
 - assertVisible: Account setup
 - back

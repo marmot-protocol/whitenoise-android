@@ -1,0 +1,97 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "UnlinkedProfileRemovalHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "fun UnlinkedProfileRemovalHost(",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "UnlinkedProfileRemovalDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "fun UnlinkedProfileRemovalDialog(",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_unlinked_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.device_unlinked_title",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_remove_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.unlinked_account_remove_detail",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_remove_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.unlinked_account_remove_confirm",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_remove_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.unlinked_account_remove_failed",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.toast_wipe_outcome_unconfirmed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.toast_wipe_outcome_unconfirmed",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.unlinked_account_removed",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_remove_sign_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.unlinked_remove_sign_in",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_remove_sign_in_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/UnlinkedProfileRemoval.kt",
+        "anchor": "R.string.unlinked_remove_sign_in_detail",
+        "test_ids": [
+          "SET-066"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
