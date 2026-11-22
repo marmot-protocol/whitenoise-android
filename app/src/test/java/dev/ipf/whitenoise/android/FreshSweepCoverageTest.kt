@@ -217,11 +217,14 @@ class FreshSweepCoverageTest {
         assertTrue(resolver.contains("recordMutationFailure("))
         assertTrue(
             invite.contains(
-                "resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: " + "return@withMutationLockResult false",
+                "resolveCanonicalInviteRefs(memberRefs, diagnostic, resolve) ?: " +
+                    "return@withMutationLockResult false",
             ),
         )
-        assertTrue(invite.contains("resolveCanonicalInviteRefs(initialAdminRefs, diagnostic) ?: return@track false"))
-        val adminResolution = invite.indexOf("resolveCanonicalInviteRefs(initialAdminRefs, diagnostic)")
+        assertTrue(
+            invite.contains("resolveCanonicalInviteRefs(initialAdminRefs, diagnostic, resolve) ?: return@track false"),
+        )
+        val adminResolution = invite.indexOf("resolveCanonicalInviteRefs(initialAdminRefs, diagnostic, resolve)")
         val recipientSuccess = "DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS"
         val acceptedRecipients = invite.indexOf(recipientSuccess, adminResolution)
         assertTrue(adminResolution >= 0)

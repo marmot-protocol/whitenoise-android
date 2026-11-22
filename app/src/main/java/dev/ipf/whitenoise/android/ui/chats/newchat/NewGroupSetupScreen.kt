@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.MarmotTraceSection
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
@@ -85,7 +86,7 @@ private suspend fun createOrRecoverNewGroup(
         submission
             .createWith { name, members, options ->
                 val result =
-                    appState.marmotIo {
+                    appState.marmotIo(MarmotTraceSection.CREATE_GROUP) {
                         owner.ensureCurrent()
                         createGroupWithOptions(account, name, members, options)
                     }
@@ -233,7 +234,7 @@ private suspend fun loadCreatedGroupForOwner(
     val accountHex = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex
     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
     val details =
-        appState.marmotIo {
+        appState.marmotIo(MarmotTraceSection.CREATED_GROUP_DETAILS) {
             owner.ensureCurrent()
             groupDetails(accountRef, groupIdHex)
         }

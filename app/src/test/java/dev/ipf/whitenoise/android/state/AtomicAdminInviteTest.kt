@@ -39,7 +39,10 @@ class AtomicAdminInviteTest {
             val fixture = Fixture()
             try {
                 fixture.controller.refreshManagementState()
+                val resolved = mutableListOf<String>()
+                fixture.onRecipientResolution = { resolved += it }
                 assertTrue(fixture.controller.inviteMembers(listOf(PEER, OTHER), initialAdminRefs = listOf(PEER)))
+                assertEquals(listOf(PEER, OTHER), resolved)
                 assertEquals(listOf(listOf(PEER, OTHER) to listOf(PEER)), fixture.invocations)
                 assertTrue(PEER in fixture.controller.group.admins)
                 assertFalse(OTHER in fixture.controller.group.admins)
@@ -104,7 +107,7 @@ class AtomicAdminInviteTest {
             val fixture = Fixture()
             try {
                 fixture.controller.refreshManagementState()
-                assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(OTHER)))
+                assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(PEER)))
                 assertTrue(fixture.invocations.isEmpty())
                 assertEquals(1, fixture.controller.members.size)
                 assertReconciliationOutcomes(emptyList())
@@ -204,7 +207,7 @@ class AtomicAdminInviteTest {
             try {
                 fixture.controller.refreshManagementState()
                 fixture.revokeOnRecipientResolution = true
-                assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(PEER)))
+                assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(OTHER)))
                 assertTrue(fixture.invocations.isEmpty())
                 assertFalse(fixture.controller.isSelfAdmin)
             } finally {
@@ -236,16 +239,16 @@ class AtomicAdminInviteTest {
                 try {
                     fixture.controller.refreshManagementState()
                     var resolutions = 0
-                    fixture.onPeerResolution = {
+                    fixture.onRecipientResolution = { ref ->
                         resolutions++
-                        if (resolutions == 2) {
+                        if (ref == OTHER) {
                             assertTrue(fixture.controller.pendingMembershipActivity != null)
                             throw failure
                         }
                     }
                     var cancelled = false
                     try {
-                        assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(PEER)))
+                        assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(OTHER)))
                     } catch (caught: CancellationException) {
                         assertTrue(caught === failure)
                         cancelled = true
@@ -298,7 +301,7 @@ class AtomicAdminInviteTest {
         val invocations = mutableListOf<Pair<List<String>, List<String>>>()
         var snapshotReads = 0
         var revokeOnRecipientResolution = false
-        var onPeerResolution: () -> Unit = {}
+        var onRecipientResolution: (String) -> Unit = {}
         var beforeReply: suspend () -> Unit = {}
 
         /** Replaces the current snapshot with a newer roster that adds the other member and makes the peer an admin. */
@@ -312,7 +315,7 @@ class AtomicAdminInviteTest {
                 context = ApplicationProvider.getApplicationContext(),
                 draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
                 accountIdHexResolver = { ref ->
-                    if (ref == PEER) onPeerResolution()
+                    if (ref == PEER || ref == OTHER) onRecipientResolution(ref)
                     if (ref == PEER && revokeOnRecipientResolution) {
                         revokeOnRecipientResolution = false
                         current = snapshot(listOf(SELF), emptyList())

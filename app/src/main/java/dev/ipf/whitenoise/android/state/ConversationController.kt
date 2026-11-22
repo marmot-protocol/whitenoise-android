@@ -315,7 +315,9 @@ class ConversationController(
     private val groupProfileUpdater: suspend (String, String, String?, String?) -> Unit =
         { account, groupIdHex, name, description ->
             appState.runGroupChange(account, groupIdHex, actionLabel = R.string.edit_group_info_title) {
-                appState.marmotIo { updateGroupProfile(account, groupIdHex, name, description) }
+                appState.marmotIo(MarmotTraceSection.UPDATE_GROUP_PROFILE) {
+                    updateGroupProfile(account, groupIdHex, name, description)
+                }
             }
         },
     internal val clockMillis: () -> Long = System::currentTimeMillis,
