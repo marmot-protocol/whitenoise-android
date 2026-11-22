@@ -11,8 +11,11 @@ internal data class ShellRouteFinding(
 
 /**
  * Process-wide record of route audits. With [ShellNavigator] the single owner there is no second route to compare
- * with, so after every event and every committed shell composition the audit checks what can still go wrong: that
- * the stack keeps its canonical shape, and that the section the Activity would save matches the stack. A finding
+ * with, so after every event and every committed shell composition the audit checks two post-conditions: that the
+ * stack keeps its canonical shape, and that the section the Activity would save matches the stack. Both are cheap
+ * guards, not evidence of parity with master: every reducer branch builds a canonical stack by construction and the
+ * mounted shell has one live section state, so a behavioural regression (a wrong event, a dropped guard) passes the
+ * audit unchanged. Parity is shown by the contract tests and the model test's independent oracle. A finding
  * never throws in production: it is counted, kept (up to a small cap) for tests to assert on, and logged at debug
  * level by route shape only, with no account, group, message id or text.
  */

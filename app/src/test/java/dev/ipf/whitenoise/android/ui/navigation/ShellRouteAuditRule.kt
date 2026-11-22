@@ -7,9 +7,13 @@ import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
 /**
- * Route-audit evidence for one test: starts a fresh [ShellRouteAudit], and after the test asserts that at least one
+ * A post-condition for one test: starts a fresh [ShellRouteAudit], and after the test asserts that at least one
  * audit of the route owner's stack ran and that none found a malformed stack or a saved section that disagrees with
  * it. The count is printed as one `shell-route-audit` line, which lands in the test's XML report.
+ *
+ * It only shows the route owner was driven and its stack stayed well formed. It is not evidence that the shell
+ * behaves as on master: the reducer builds canonical stacks by construction, so wrong events pass it, and the test's
+ * own assertions are what pin behaviour.
  */
 class ShellRouteAuditRule : TestRule {
     /** Wraps [base] with the reset before and the audit assertions after. */
