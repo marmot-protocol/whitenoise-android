@@ -67,7 +67,12 @@ internal class NotificationInteractionFactory(
     ): PendingIntent {
         val intent =
             Intent(context, NotificationActionReceiver::class.java).apply {
-                NotificationActions.applyDirectReaction(this, actionTarget, reaction)
+                NotificationActions.applyToIntent(
+                    this,
+                    NotificationActionKind.REACT,
+                    actionTarget,
+                    directReaction = reaction,
+                )
             }
         return PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
     }

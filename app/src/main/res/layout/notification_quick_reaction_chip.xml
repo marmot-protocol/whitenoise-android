@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/notification_quick_reaction_chip"
     android:layout_width="44dp"
     android:layout_height="53dp"
@@ -17,7 +18,8 @@
             android:gravity="center"
             android:maxLines="1"
             android:textColor="?android:attr/textColorPrimary"
-            android:textSize="16sp"/>
+            android:textSize="16dp"
+            tools:ignore="SpUsage"/>
         <ImageView
             android:id="@+id/notification_quick_reaction_image"
             android:layout_width="match_parent"

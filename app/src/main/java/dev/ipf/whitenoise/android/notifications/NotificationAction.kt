@@ -60,6 +60,7 @@ object NotificationActions {
         kind: NotificationActionKind,
         actionTarget: NotificationActionTarget,
         acceptsInlineReactionChoices: Boolean = false,
+        directReaction: String? = null,
     ) {
         intent.action = actionName(kind)
         intent.data = Uri.parse(actionUriString(kind, actionTarget.notificationTag))
@@ -67,22 +68,16 @@ object NotificationActions {
         intent.putExtra(EXTRA_NOTIFICATION_TAG, actionTarget.notificationTag)
         intent.putExtra(EXTRA_NOTIFICATION_ID, actionTarget.notificationId)
         if (acceptsInlineReactionChoices) intent.putExtra(EXTRA_INLINE_REACTION_CHOICES, true)
-    }
-
-    fun applyDirectReaction(
-        intent: Intent,
-        actionTarget: NotificationActionTarget,
-        reaction: String,
-    ) {
-        applyToIntent(intent, NotificationActionKind.REACT, actionTarget)
-        // PendingIntent identity excludes extras. Bind it to this message and choice,
-        // so a subsequent card cannot retarget a previously displayed chip.
-        intent.data =
-            requireNotNull(intent.data).buildUpon()
-                .appendPath(requireNotNull(actionTarget.target.messageIdHex))
-                .appendPath(reaction)
-                .build()
-        intent.putExtra(LEGACY_EXTRA_REACTION, reaction)
+        if (directReaction != null) {
+            // The URI binds the PendingIntent to the original message and choice. Extras do not affect identity.
+            intent.data =
+                requireNotNull(intent.data)
+                    .buildUpon()
+                    .appendPath(requireNotNull(actionTarget.target.messageIdHex))
+                    .appendPath(directReaction)
+                    .build()
+            intent.putExtra(LEGACY_EXTRA_REACTION, directReaction)
+        }
     }
 
     /** The action an intent carries, reading a Reply that returned a chosen chip as a reaction. */

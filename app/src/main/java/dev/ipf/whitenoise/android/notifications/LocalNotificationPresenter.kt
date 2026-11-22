@@ -780,13 +780,18 @@ class LocalNotificationPresenter(
                                             }
                                         }
                                         if (chipArtwork.isNotEmpty()) {
-                                            builder.extras.putString(EXTRA_QUICK_REACTION_TARGET, actionTarget.target.messageIdHex)
-                                            builder.extras.putParcelable(
-                                                EXTRA_QUICK_REACTION_ROWS,
-                                                notificationQuickReactionRows(context, quickReactions, chipArtwork) { reaction ->
+                                            val rows =
+                                                notificationQuickReactionRows(
+                                                    context,
+                                                    quickReactions,
+                                                    chipArtwork,
+                                                ) { reaction ->
                                                     interactions.reactionPendingIntent(actionTarget, reaction)
-                                                },
-                                            )
+                                                }
+                                            builder.extras.apply {
+                                                putString(EXTRA_QUICK_REACTION_TARGET, actionTarget.target.messageIdHex)
+                                                putParcelable(EXTRA_QUICK_REACTION_ROWS, rows)
+                                            }
                                         }
                                     }
                             }
@@ -970,7 +975,8 @@ class LocalNotificationPresenter(
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
                                             )
-                                            if (carried.isNullOrEmpty() && emojiArtifact == null &&
+                                            if (carried.isNullOrEmpty() &&
+                                                emojiArtifact == null &&
                                                 !notification.extras.containsKey(EXTRA_QUICK_REACTION_ROWS)
                                             ) {
                                                 false

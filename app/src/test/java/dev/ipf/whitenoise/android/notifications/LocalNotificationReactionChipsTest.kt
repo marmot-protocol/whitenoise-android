@@ -140,7 +140,10 @@ class LocalNotificationReactionChipsTest {
         val live = manager.activeNotifications.single().notification
 
         assertNotNull(live.bigContentView)
-        assertEquals(Notification.DecoratedCustomViewStyle::class.java.name, live.extras.getString(Notification.EXTRA_TEMPLATE))
+        assertEquals(
+            Notification.DecoratedCustomViewStyle::class.java.name,
+            live.extras.getString(Notification.EXTRA_TEMPLATE),
+        )
         assertNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(live))
         assertNull(replyAction().remoteInputs?.single()?.choices)
         assertTrue(checkNotNull(replyAction().remoteInputs?.single()).allowFreeFormInput)
@@ -150,6 +153,34 @@ class LocalNotificationReactionChipsTest {
         )
         assertFalse(live.extras.containsKey(LEGACY_EXTRA_EXPANDED_REACTION_CHOICES))
         assertFalse(live.extras.containsKey(LEGACY_EXTRA_FIXED_REACTION_TARGET))
+    }
+
+    @Test
+    fun rejectsExpandedArtworkAndRetriesWithNativeChoices() {
+        val choices = listOf(":marmot:", "👍")
+        val presenter =
+            LocalNotificationPresenter(
+                context,
+                groupReconciliation = {},
+                quickReactionChoices = { choices },
+                notificationPoster = { target, tag, id, card ->
+                    require(card.bigContentView == null)
+                    target.notify(tag, id, card)
+                },
+            ).also(LocalNotificationPresenter::ensureChannels)
+
+        postConversationCard(presenter)
+        val live = manager.activeNotifications.single().notification
+        assertNull(live.bigContentView)
+        assertFalse(live.extras.containsKey(EXTRA_QUICK_REACTION_ROWS))
+        assertEquals(
+            choices,
+            replyAction()
+                .remoteInputs
+                ?.single()
+                ?.choices
+                ?.map(CharSequence::toString),
+        )
     }
 
     /** A card left by the earlier expanded-choice build loses that layout on its next write and keeps its thread. */
