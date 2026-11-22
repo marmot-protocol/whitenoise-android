@@ -105,7 +105,10 @@ class ShellRestoreContractTest {
     }
 
     /** The Appearance screen's title. */
-    private fun appearance(): String = ApplicationProvider.getApplicationContext<Context>().getString(R.string.appearance)
+    private fun appearance(): String {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        return context.getString(R.string.appearance)
+    }
 
     /** The saved state a process-killed Activity hands back: the open conversation and Settings on Appearance. */
     private fun savedRoute(groupIdHex: String) =
