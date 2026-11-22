@@ -10,11 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -26,6 +26,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -55,8 +57,42 @@ private const val EMOJI_SHARE = 0.6f
 /** An emoji's line height relative to its size. */
 private const val EMOJI_LINE = 1.2f
 
-/** The smallest an emoji's name shrinks to fit its cell on one line, as the other apps scale theirs down. */
-private val MIN_NAME_SIZE = 8.sp
+/** The space on each side of an emoji's cell. */
+private val NAME_PADDING = 4.dp
+
+/** The share of a cell a shrunk word may fill, leaving room for rounding so it never wraps or ellipsizes. */
+private const val NAME_FIT = 0.92f
+
+/** An emoji's name as drawn: one word per line, in a style small enough for its widest word to fit. */
+private data class FittedName(
+    val text: String,
+    val lines: Int,
+    val style: TextStyle,
+)
+
+/**
+ * [description] one word per line, its label style shrunk only as far as its widest word needs to fit [available],
+ * as the other apps scale their labels down. A word never breaks and nothing is cut off. At large text sizes the
+ * longest names land near the default label size, so no floor is needed.
+ */
+@Composable
+private fun rememberFittedName(
+    description: String,
+    available: Dp,
+): FittedName {
+    val base = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.sp)
+    val measurer = rememberTextMeasurer()
+    val availablePx = with(LocalDensity.current) { available.toPx() }
+    return remember(description, base, availablePx, measurer) {
+        val words = description.split(' ').filter(String::isNotEmpty).ifEmpty { listOf(description) }
+        val widest = words.maxOf { measurer.measure(it, base, softWrap = false, maxLines = 1).size.width }
+        val room = availablePx * NAME_FIT
+        val scale = if (widest > room) room / widest else 1f
+        val style = base.copy(fontSize = base.fontSize * scale, lineHeight = base.lineHeight * scale)
+        FittedName(words.joinToString("\n"), words.size, style)
+    }
+}
+
 internal const val DEVICE_LINK_PRIMARY_TAG = "device_link.primary"
 internal const val DEVICE_LINK_SECONDARY_TAG = "device_link.secondary"
 internal const val DEVICE_LINK_FAILED_TAG = "device_link.failed"
@@ -192,7 +228,10 @@ internal fun DeviceLinkCode(
     }
 }
 
-/** One emoji of the code above its name in a cell [width] wide. Both shrink only when the cell is too narrow. */
+/**
+ * One emoji of the code above its name in a cell [width] wide. Both shrink only when the cell is too narrow, and a
+ * two-word name takes a line per word, so no name is cut off or broken inside a word.
+ */
 @Composable
 private fun DeviceLinkEmojiCell(
     emoji: DeviceLinkEmojiFfi,
@@ -209,19 +248,18 @@ private fun DeviceLinkEmojiCell(
         modifier = Modifier.width(width).clearAndSetSemantics { contentDescription = spoken },
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = NAME_PADDING, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(emoji.emoji, style = emojiStyle.copy(fontSize = emojiSize, lineHeight = emojiSize * EMOJI_LINE))
-            val nameStyle = MaterialTheme.typography.labelMedium
+            val name = rememberFittedName(emoji.description, width - NAME_PADDING * 2)
             Text(
-                text = emoji.description,
-                style = nameStyle,
+                text = name.text,
+                style = name.style,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                maxLines = 1,
+                maxLines = name.lines,
                 overflow = TextOverflow.Ellipsis,
-                autoSize = TextAutoSize.StepBased(minFontSize = MIN_NAME_SIZE, maxFontSize = nameStyle.fontSize),
             )
         }
     }

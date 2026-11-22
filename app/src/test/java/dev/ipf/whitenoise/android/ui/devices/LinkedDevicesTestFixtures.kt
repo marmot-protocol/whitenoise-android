@@ -65,6 +65,18 @@ internal fun fixtureCode(): List<DeviceLinkEmojiFfi> =
         "🔔" to "bell",
     ).map { (emoji, description) -> DeviceLinkEmojiFfi(emoji, description) }
 
+/** MDK's seven longest emoji names, which test the code's cells at large text sizes. */
+internal fun longestNameCode(): List<DeviceLinkEmojiFfi> =
+    listOf(
+        "\uD83C\uDF53" to "Strawberry",
+        "\uD83D\uDCA1" to "Light Bulb",
+        "\uD83C\uDFA7" to "Headphones",
+        "\uD83D\uDC4D" to "Thumbs Up",
+        "\u260E\uFE0F" to "Telephone",
+        "\uD83D\uDCCE" to "Paperclip",
+        "\u231B" to "Hourglass",
+    ).map { (emoji, description) -> DeviceLinkEmojiFfi(emoji, description) }
+
 /** An unrecognized sign-in waiting for an answer in [slot]. */
 internal fun signIn(
     slot: String,

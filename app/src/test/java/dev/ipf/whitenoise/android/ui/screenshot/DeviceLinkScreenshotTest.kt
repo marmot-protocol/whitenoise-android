@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.DeviceGroupMoveSiblingFfi
 import dev.ipf.marmotkit.DeviceGroupMoveStateFfi
@@ -29,6 +33,7 @@ import dev.ipf.whitenoise.android.ui.chats.ChatsArriving
 import dev.ipf.whitenoise.android.ui.chats.ChatsArrivingBanner
 import dev.ipf.whitenoise.android.ui.chats.EmptyChats
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkAvailability
+import dev.ipf.whitenoise.android.ui.devices.DeviceLinkCode
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOfferDialog
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkOtherProfileDialog
 import dev.ipf.whitenoise.android.ui.devices.DeviceLinkReminderBanner
@@ -40,6 +45,7 @@ import dev.ipf.whitenoise.android.ui.devices.UnlinkedAccountPrompt
 import dev.ipf.whitenoise.android.ui.devices.UnlinkedProfileRemovalDialog
 import dev.ipf.whitenoise.android.ui.devices.fixtureCode
 import dev.ipf.whitenoise.android.ui.devices.fixtureDevice
+import dev.ipf.whitenoise.android.ui.devices.longestNameCode
 import dev.ipf.whitenoise.android.ui.devices.newDeviceLinkStep
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -204,6 +210,15 @@ class DeviceLinkScreenshotTest {
             ChatsArrivingBanner(ChatsArriving.History(ChatHistoryTransfer.Receiving))
         }
         compose.onRoot().captureRoboImage("src/test/snapshots/device_link_history_arriving_banner_dark_rtl.png")
+    }
+
+    /** MDK's longest emoji names stay whole and readable four over three at double text size. */
+    @Test
+    fun codeWithLongestNamesLargeFont() {
+        show(Look(rtl = true)) {
+            Box(Modifier.padding(horizontal = 32.dp)) { DeviceLinkCode(longestNameCode()) }
+        }
+        compose.onRoot().captureRoboImage("src/test/snapshots/device_link_code_longest_names_large_font.png")
     }
 
     /** Replacing the unlinked profile requires explicit local deletion and sign-in consent. */
