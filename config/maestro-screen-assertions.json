@@ -4425,7 +4425,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreenHost.kt",
       "symbol": "SettingsScreen",
       "bindings": [
         {

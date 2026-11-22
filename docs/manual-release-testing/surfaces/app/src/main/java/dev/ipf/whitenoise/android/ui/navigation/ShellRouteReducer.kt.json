@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ShellRouteReducer.kt",
         "anchor": "private fun ownerReplacementKeepsRoute(",
         "test_ids": [
-          "NTF-038"
+          "NTF-038",
+          "NAV-014"
         ]
       }
     ]
