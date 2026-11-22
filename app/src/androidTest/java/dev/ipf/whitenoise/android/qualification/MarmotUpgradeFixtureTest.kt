@@ -83,9 +83,13 @@ class MarmotUpgradeFixtureTest {
                         runUpgradeFault(runtime, phase, receipt)
                         return@withTimeout
                     }
+                    if (phase in setOf("upgrade", "cold")) {
+                        verifyUpgradeAuditConsent(context, runtime, phase, auditChoiceEnabled(arguments))
+                    }
                     runtime.start()
                     if (phase == "seed") {
                         seed(runtime, relay, requireNotNull(arguments.getString("blobPort")), receipt)
+                        verifyUpgradeAuditConsent(context, runtime, phase, auditChoiceEnabled(arguments))
                         if (fileStoreBaseline()) verifyUpgradeStorage(runtime, phase, beforeStart = false)
                     } else if (phase in setOf("corrupt", "lost")) {
                         recoverDamagedMedia(runtime, root, receipt)
@@ -124,6 +128,13 @@ class MarmotUpgradeFixtureTest {
                 runtime.shutdownAndClose()
             }
             recordClosedStorage(root, receipt, phase)
+        }
+
+    private fun auditChoiceEnabled(arguments: Bundle): Boolean =
+        when (arguments.getString("qualificationAuditChoice")) {
+            "enabled" -> true
+            "declined" -> false
+            else -> error("Specify the baseline audit choice")
         }
 
     /** Validates the fixture layout and applies media damage only for the two recovery phases. */
