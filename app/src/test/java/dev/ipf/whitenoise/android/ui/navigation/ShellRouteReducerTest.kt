@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
+import dev.ipf.whitenoise.android.ui.chats.realChatListMotionRow
 import dev.ipf.whitenoise.android.ui.group.ChatDetailsDestination
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,8 +64,8 @@ class ShellRouteReducerTest {
     @Test
     fun aReconciledRowKeepsTheRoute() {
         val stack = listOf(ShellRoute.Chats, conversationA)
-        assertEquals(stack, reduce(stack, ShellNavEvent.ConversationRowReconciled(GROUP_ONE)))
-        assertEquals(CHATS_ROOT, reduce(CHATS_ROOT, ShellNavEvent.ConversationRowReconciled(GROUP_ONE)))
+        assertEquals(stack, reduce(stack, ShellNavEvent.ConversationRowReconciled(ACCOUNT_A, GROUP_ONE)))
+        assertEquals(CHATS_ROOT, reduce(CHATS_ROOT, ShellNavEvent.ConversationRowReconciled(ACCOUNT_A, GROUP_ONE)))
     }
 
     /** A system return to the chat list drops Settings and the conversation together. */
@@ -258,7 +259,7 @@ class ShellRouteReducerTest {
             listOf(ShellRoute.Chats, conversationA.copy(open = fresh)),
             reduce(withoutItem, ShellNavEvent.JumpWithin(fresh)),
         )
-        assertEquals(withoutItem, reduce(withoutItem, ShellNavEvent.ConversationRowReconciled(GROUP_ONE)))
+        assertEquals(withoutItem, reduce(withoutItem, ShellNavEvent.ConversationRowReconciled(ACCOUNT_A, GROUP_ONE)))
     }
 
     /**
@@ -314,7 +315,8 @@ class ShellRouteReducerTest {
      */
     @Test
     fun theSameGroupUnderAnotherAccountDropsTheChatDetailsScreen() {
-        val relays = listOf(ShellRoute.Chats, conversationA, ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays))
+        val screen = ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays)
+        val relays = listOf(ShellRoute.Chats, conversationA, screen)
         val opens =
             listOf(
                 ShellNavEvent.OpenConversation(sharedGroupOnB),
@@ -331,6 +333,40 @@ class ShellRouteReducerTest {
             listOf(ShellRoute.Chats, sameChat, relays.last()),
             reduce(relays, ShellNavEvent.CommitNotificationRoute(sameChat)),
         )
+    }
+
+    /**
+     * A group id is the same chat in any hex case: reselecting it in another case keeps its chat-details screen, and a
+     * row reconciled in another case still upgrades it, so the reducer and the screens above agree on the chat.
+     */
+    @Test
+    fun aGroupIdInAnotherCaseIsTheSameChat() {
+        val screen = ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays)
+        val relays = listOf(ShellRoute.Chats, conversationA, screen)
+        val upperCase = conversationA.copy(groupIdHex = GROUP_ONE.uppercase())
+        val reselected = reduce(relays, ShellNavEvent.OpenConversation(upperCase))
+        assertEquals(listOf(ShellRoute.Chats, upperCase, screen), reselected)
+        val row = realChatListMotionRow(GROUP_ONE)
+        val reconciled = reduce(relays, ShellNavEvent.ConversationRowReconciled(ACCOUNT_A, GROUP_ONE.uppercase(), row))
+        assertEquals(listOf(ShellRoute.Chats, conversationA.copy(item = row), screen), reconciled)
+    }
+
+    /**
+     * A reconciled row upgrades only the open conversation of its own account and group. A row read from another
+     * account's list for a shared group, or for another group, leaves the conversation and its screen as they are.
+     */
+    @Test
+    fun aReconciledRowFromAnotherAccountOrGroupChangesNothing() {
+        val screen = ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays)
+        val relays = listOf(ShellRoute.Chats, conversationA, screen)
+        val row = realChatListMotionRow(GROUP_ONE)
+        assertEquals(
+            listOf(ShellRoute.Chats, conversationA.copy(item = row), screen),
+            reduce(relays, ShellNavEvent.ConversationRowReconciled(ACCOUNT_A, GROUP_ONE, row)),
+        )
+        assertEquals(relays, reduce(relays, ShellNavEvent.ConversationRowReconciled(ACCOUNT_B, GROUP_ONE, row)))
+        assertEquals(relays, reduce(relays, ShellNavEvent.ConversationRowReconciled(ACCOUNT_A, GROUP_TWO, row)))
+        assertEquals(relays, reduce(relays, ShellNavEvent.ConversationRowReconciled(null, GROUP_ONE, row)))
     }
 
     /** Applies one event, so each test reads as a sequence of intents. */

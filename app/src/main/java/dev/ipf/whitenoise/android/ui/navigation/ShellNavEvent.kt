@@ -41,8 +41,14 @@ internal sealed interface ShellNavEvent {
         val item: ChatListItem? = null,
     ) : ShellNavEvent
 
-    /** A provisional open is upgraded to its authoritative chat-list row [item], without navigating. */
+    /**
+     * A provisional open is upgraded to its authoritative chat-list row [item], without navigating. [accountRef] is
+     * the account whose chat list the row was read from: the row upgrades the open conversation only when that is the
+     * conversation's own account and [groupIdHex] its group, so another account's row for a shared group never
+     * replaces it.
+     */
     data class ConversationRowReconciled(
+        val accountRef: String?,
         val groupIdHex: String,
         val item: ChatListItem? = null,
     ) : ShellNavEvent

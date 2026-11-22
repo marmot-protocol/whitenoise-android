@@ -140,7 +140,7 @@ class ShellNavigatorModelTest {
                 next != null &&
                 previous.accountRef == next.accountRef &&
                 previous.groupIdHex.equals(next.groupIdHex, ignoreCase = true)
-        return if (sameChat) null else "${event.eventName} kept a chat-details screen above $next, it was over $previous"
+        return if (sameChat) null else "${event.eventName} kept a screen above $next that was over $previous"
     }
 
     /**
@@ -184,7 +184,7 @@ class ShellNavigatorModelTest {
             1 -> ShellNavEvent.JumpToConversation(randomConversation(random))
             2 -> ShellNavEvent.CommitNotificationRoute(randomConversation(random))
             3 -> ShellNavEvent.JumpWithin(randomOpen(random))
-            4 -> ShellNavEvent.ConversationRowReconciled(root?.groupIdHex ?: GROUPS.random(random))
+            4 -> ShellNavEvent.ConversationRowReconciled(root?.accountRef, root?.groupIdHex ?: GROUPS.random(random))
             5 -> ShellNavEvent.RestoreSavedConversation(randomConversation(random))
             6 -> ShellNavEvent.CloseConversation
             7 -> ShellNavEvent.ReturnToChats

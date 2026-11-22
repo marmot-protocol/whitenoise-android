@@ -619,7 +619,7 @@ internal fun MainShell(
                             val routed = routeOf(item, openContext)
                             val reLand =
                                 conversationRoot(shellStateHolder.shellNavigator.stack)
-                                    ?.let { it.accountRef == routed.accountRef && it.groupIdHex == routed.groupIdHex }
+                                    ?.isSameChat(routed.accountRef, routed.groupIdHex)
                                     ?: false
                             settingsHomeViewport =
                                 reduceSettingsHomeViewport(
@@ -892,7 +892,8 @@ internal fun MainShell(
     ) {
         val open = selectedChat ?: return@LaunchedEffect
         reconcileProvisionalOpenChat(open, chatsController)?.let {
-            shellNav(ShellNavEvent.ConversationRowReconciled(it.group.groupIdHex, it))
+            // The row comes from the active account's list, so it upgrades only that account's conversation.
+            shellNav(ShellNavEvent.ConversationRowReconciled(chatsController.boundAccountRef, it.group.groupIdHex, it))
         }
     }
 

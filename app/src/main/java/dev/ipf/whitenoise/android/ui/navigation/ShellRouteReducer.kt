@@ -37,9 +37,8 @@ private fun reduceConversationEvent(
                 CHATS_ROOT + opened(stack, root.copy(open = event.open, item = event.item ?: root.item))
             } ?: stack
         is ShellNavEvent.ConversationRowReconciled ->
-            conversationRoot(stack)?.let { root ->
-                val upgraded = root.copy(groupIdHex = event.groupIdHex, item = event.item ?: root.item)
-                sectionOf(stack) + upgraded + conversationSegment(stack).drop(1)
+            conversationRoot(stack)?.takeIf { it.isSameChat(event.accountRef, event.groupIdHex) }?.let { root ->
+                sectionOf(stack) + root.copy(item = event.item ?: root.item) + conversationSegment(stack).drop(1)
             } ?: stack
         else -> reduceStackEvent(stack, event)
     }
@@ -54,7 +53,7 @@ private fun opened(
     conversation: ShellRoute.Conversation,
 ): List<ShellRoute> {
     val root = conversationRoot(stack)
-    val same = root != null && root.accountRef == conversation.accountRef && root.groupIdHex == conversation.groupIdHex
+    val same = root?.isSameChat(conversation.accountRef, conversation.groupIdHex) ?: false
     return listOf(conversation) + if (same) conversationSegment(stack).drop(1) else emptyList()
 }
 

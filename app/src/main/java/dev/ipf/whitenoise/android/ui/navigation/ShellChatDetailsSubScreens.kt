@@ -22,9 +22,7 @@ internal class ShellChatDetailsSubScreens(
     /** Whether this conversation is the stack's conversation root. */
     val ownsRoot: Boolean
         get() =
-            conversationRoot(holder.shellNavigator.stack)?.let {
-                it.accountRef == accountRef && it.groupIdHex.equals(groupIdHex, ignoreCase = true)
-            } ?: false
+            conversationRoot(holder.shellNavigator.stack)?.isSameChat(accountRef, groupIdHex) ?: false
 
     /** The open chat-details screen of this conversation, or the one it last showed once it has left the root. */
     override val current: ChatDetailsDestination?

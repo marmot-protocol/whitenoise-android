@@ -47,6 +47,16 @@ internal sealed interface ShellRoute {
     ) : ShellRoute
 }
 
+/**
+ * Whether this conversation is the chat of [accountRef] and [groupIdHex]: the same account and the same group, in
+ * whatever hex case the id arrived. Every same-chat decision about the stack goes through here, so the reducer and
+ * the chat-details screens above a conversation can never disagree about which chat they belong to.
+ */
+internal fun ShellRoute.Conversation.isSameChat(
+    accountRef: String?,
+    groupIdHex: String,
+): Boolean = this.accountRef == accountRef && this.groupIdHex.equals(groupIdHex, ignoreCase = true)
+
 /** The stack that holds only the chat list. */
 internal val CHATS_ROOT: List<ShellRoute> = listOf(ShellRoute.Chats)
 
