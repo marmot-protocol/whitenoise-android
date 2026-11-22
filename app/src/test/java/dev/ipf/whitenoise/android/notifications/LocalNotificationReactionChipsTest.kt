@@ -121,8 +121,8 @@ class LocalNotificationReactionChipsTest {
         val presenter = presenter(choices)
         postConversationCard(presenter, "message-a")
         val artwork = actions().filter { it.isContextual }
-        assertEquals(3, artwork.size)
-        assertEquals(listOf(":missing:"), replyAction().remoteInputs?.single()?.choices?.map(CharSequence::toString))
+        assertEquals(2, artwork.size)
+        assertEquals(listOf("👍", ":missing:"), replyAction().remoteInputs?.single()?.choices?.map(CharSequence::toString))
         val tap = artwork[1].actionIntent
         assertTrue(shadowOf(tap).isImmutable)
 
