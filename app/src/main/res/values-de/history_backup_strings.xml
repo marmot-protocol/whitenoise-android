@@ -2,7 +2,7 @@
 <resources>
     <string name="history_backups">Verlaufssicherungen</string>
     <string name="explanation_organize_hub_history_backups">Bewahre eine verschlüsselte Kopie deines Chatverlaufs auf, die mit Wiederherstellungswörtern entsperrt wird, damit du ihn bei einer Neuinstallation wiederherstellen kannst.</string>
-    <string name="history_backups_explanation">White Noise kann eine verschlüsselte Kopie deines Chatverlaufs auf deinen Relays speichern. Zwölf Wiederherstellungswörter entsperren sie, damit du den Verlauf bei einer Neuinstallation zurückholen kannst. Dein privater Schlüssel ist nie Teil einer Sicherung.</string>
+    <string name="history_backups_explanation">White Noise kann eine verschlüsselte Kopie deines Chatverlaufs online speichern. Zwölf Wiederherstellungswörter entsperren sie, damit du den Verlauf bei einer Neuinstallation zurückholen kannst. Dein privater Schlüssel ist nie Teil einer Sicherung.</string>
     <string name="history_backups_status">Sicherungen</string>
     <string name="history_backups_status_loading">Wird geprüft…</string>
     <string name="history_backups_status_unavailable">Noch nicht verfügbar</string>
@@ -18,7 +18,7 @@
     <string name="history_backups_new_words_detail">Neue Sicherungen verwenden die neuen Wörter. Ältere Sicherungen brauchen weiterhin deine alten Wörter.</string>
     <string name="history_backups_turn_off">Sicherungen deaktivieren</string>
     <string name="history_backups_turn_off_title">Sicherungen deaktivieren?</string>
-    <string name="history_backups_turn_off_message">Dein Konto speichert keine neuen Sicherungen mehr. Bereits gespeicherte Sicherungen bleiben auf deinen Relays und lassen sich weiterhin mit deinen Wiederherstellungswörtern wiederherstellen.</string>
+    <string name="history_backups_turn_off_message">Dein Konto speichert keine neuen Sicherungen mehr. Bereits gespeicherte Sicherungen bleiben online und lassen sich weiterhin mit deinen Wiederherstellungswörtern wiederherstellen.</string>
     <string name="history_backups_schedule">Dieses Gerät speichert etwa einmal täglich eine Sicherung, während es im WLAN geladen wird.</string>
     <string name="history_backups_words_title">Deine Wiederherstellungswörter</string>
     <string name="history_backups_words_message">Schreib diese 12 Wörter der Reihe nach auf Papier und bewahre sie sicher auf. Sie werden nur jetzt angezeigt. Wer sie hat, kann deinen gesicherten Verlauf lesen.</string>

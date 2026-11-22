@@ -2,7 +2,7 @@
 <resources>
     <string name="history_backups">Geçmiş yedekleri</string>
     <string name="explanation_organize_hub_history_backups">Sohbet geçmişinin kurtarma kelimeleriyle açılan şifreli bir kopyasını sakla, böylece yeni bir kurulumda geri yükleyebilirsin.</string>
-    <string name="history_backups_explanation">White Noise, sohbet geçmişinin şifreli bir kopyasını rölelerine kaydedebilir. On iki kurtarma kelimesi bu kopyayı açar, böylece geçmişi yeni bir kurulumda geri getirebilirsin. Özel anahtarın hiçbir zaman yedeğe dahil edilmez.</string>
+    <string name="history_backups_explanation">White Noise, sohbet geçmişinin şifreli bir kopyasını çevrim içi kaydedebilir. On iki kurtarma kelimesi bu kopyayı açar, böylece geçmişi yeni bir kurulumda geri getirebilirsin. Özel anahtarın hiçbir zaman yedeğe dahil edilmez.</string>
     <string name="history_backups_status">Yedekler</string>
     <string name="history_backups_status_loading">Denetleniyor…</string>
     <string name="history_backups_status_unavailable">Henüz kullanılamıyor</string>
@@ -18,7 +18,7 @@
     <string name="history_backups_new_words_detail">Yeni yedekler yeni kelimeleri kullanır. Eski yedekler için hâlâ eski kelimelerin gerekir.</string>
     <string name="history_backups_turn_off">Yedeklemeyi kapat</string>
     <string name="history_backups_turn_off_title">Yedekleme kapatılsın mı?</string>
-    <string name="history_backups_turn_off_message">Hesabın yeni yedek kaydetmeyi bırakır. Kaydedilmiş yedekler rölelerinde kalır ve kurtarma kelimelerinle hâlâ geri yüklenebilir.</string>
+    <string name="history_backups_turn_off_message">Hesabın yeni yedek kaydetmeyi bırakır. Kaydedilmiş yedekler çevrim içi kalır ve kurtarma kelimelerinle hâlâ geri yüklenebilir.</string>
     <string name="history_backups_schedule">Bu cihaz, Wi-Fi’ye bağlıyken şarj olurken günde yaklaşık bir kez yedek kaydeder.</string>
     <string name="history_backups_words_title">Kurtarma kelimelerin</string>
     <string name="history_backups_words_message">Bu 12 kelimeyi sırasıyla kâğıda yaz ve güvenli bir yerde sakla. Yalnızca şimdi gösteriliyorlar. Bu kelimelere sahip olan herkes yedeklenmiş geçmişini okuyabilir.</string>

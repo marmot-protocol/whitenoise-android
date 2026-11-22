@@ -933,14 +933,17 @@ class WhiteNoiseAppState private constructor(
         hostPerformance.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
         nativeAttachmentPermissions.invalidate(runtime)
         HistoryBackupConditions.attach(appContext, runtime.marmot)
+        scheduleHistoryBackupsIfOn(runtime.marmot)
         mutationsScope.launch {
             if (marmotRuntime === runtime) refreshNativeAttachmentPermissions()
         }
     }
 
+    /** Clears only the runtime that failed and immediately fences its permission callbacks. */
     private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) return
         StartupDiagnostics.unbindNative(runtime.marmot)
+        HistoryBackupConditions.detach(runtime.marmot)
         AvatarImageLoader.clearStoredAvatars()
         hostPerformance.clearEmitter(runtime)
         marmotRuntime = null

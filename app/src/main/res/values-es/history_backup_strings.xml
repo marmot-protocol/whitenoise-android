@@ -2,7 +2,7 @@
 <resources>
     <string name="history_backups">Copias del historial</string>
     <string name="explanation_organize_hub_history_backups">Guarda una copia cifrada de tu historial de chats, que se desbloquea con palabras de recuperación, para restaurarlo en una instalación nueva.</string>
-    <string name="history_backups_explanation">White Noise puede guardar una copia cifrada de tu historial de chats en tus relés. Doce palabras de recuperación la desbloquean para que puedas recuperar el historial en una instalación nueva. Tu clave privada nunca forma parte de una copia.</string>
+    <string name="history_backups_explanation">White Noise puede guardar en línea una copia cifrada de tu historial de chats. Doce palabras de recuperación la desbloquean para que puedas recuperar el historial en una instalación nueva. Tu clave privada nunca forma parte de una copia.</string>
     <string name="history_backups_status">Copias</string>
     <string name="history_backups_status_loading">Comprobando…</string>
     <string name="history_backups_status_unavailable">Aún no disponible</string>
@@ -18,7 +18,7 @@
     <string name="history_backups_new_words_detail">Las copias nuevas usan las palabras nuevas. Las copias anteriores siguen necesitando tus palabras antiguas.</string>
     <string name="history_backups_turn_off">Desactivar copias</string>
     <string name="history_backups_turn_off_title">¿Desactivar las copias?</string>
-    <string name="history_backups_turn_off_message">Tu cuenta deja de guardar copias nuevas. Las copias ya guardadas permanecen en tus relés y tus palabras de recuperación aún pueden restaurarlas.</string>
+    <string name="history_backups_turn_off_message">Tu cuenta deja de guardar copias nuevas. Las copias ya guardadas permanecen en línea y tus palabras de recuperación aún pueden restaurarlas.</string>
     <string name="history_backups_schedule">Este dispositivo guarda una copia aproximadamente una vez al día mientras se carga con wifi.</string>
     <string name="history_backups_words_title">Tus palabras de recuperación</string>
     <string name="history_backups_words_message">Escribe estas 12 palabras en papel, en orden, y guárdalas en un lugar seguro. Solo se muestran ahora. Cualquiera que las tenga puede leer tu historial guardado.</string>

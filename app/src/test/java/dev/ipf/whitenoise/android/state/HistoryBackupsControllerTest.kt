@@ -21,26 +21,27 @@ import org.junit.Test
 import java.lang.reflect.Proxy
 
 class HistoryBackupsControllerTest {
-    @Test fun statusFollowsMdkSettingsAndSchedulesOnlyForTheWriter() =
+    @Test fun statusFollowsMdkSettingsAndSchedulesWhileBackupsAreOn() =
         runTest {
             val fake = FakeBackups()
             var scheduled = 0
-            val controller = controller(fake, onWriting = { scheduled++ })
+            val controller = controller(fake, onBackupsOn = { scheduled++ })
             fake.settings = BackupSettingsFfi(enabled = false, thisDeviceWrites = false)
             controller.refresh()
             runCurrent()
             assertEquals(HistoryBackupStatus.Off, controller.state.value.status)
             assertEquals(0, scheduled)
+            // A device that only reads still needs visits: MDK's pass is how it takes over from a quiet writer.
             fake.settings = BackupSettingsFfi(enabled = true, thisDeviceWrites = false)
             controller.refresh()
             runCurrent()
             assertEquals(HistoryBackupStatus.On(thisDeviceWrites = false), controller.state.value.status)
-            assertEquals(0, scheduled)
+            assertEquals(1, scheduled)
             fake.settings = BackupSettingsFfi(enabled = true, thisDeviceWrites = true)
             controller.refresh()
             runCurrent()
             assertEquals(HistoryBackupStatus.On(thisDeviceWrites = true), controller.state.value.status)
-            assertEquals(1, scheduled)
+            assertEquals(2, scheduled)
         }
 
     @Test fun aBuildWithoutDeviceGroupsShowsUnavailableRatherThanAFailure() =
@@ -170,7 +171,7 @@ class HistoryBackupsControllerTest {
         runTest {
             val fake = FakeBackups()
             var scheduled = 0
-            val controller = controller(fake, onWriting = { scheduled++ })
+            val controller = controller(fake, onBackupsOn = { scheduled++ })
             controller.beginSetup()
             runCurrent()
             fake.confirmError = refused("recovery_words_mismatch")
@@ -189,7 +190,7 @@ class HistoryBackupsControllerTest {
         runTest {
             val fake = FakeBackups()
             var scheduled = 0
-            val controller = controller(fake, onWriting = { scheduled++ })
+            val controller = controller(fake, onBackupsOn = { scheduled++ })
             controller.beginSetup()
             runCurrent()
             val gate = CompletableDeferred<Unit>()
@@ -337,14 +338,14 @@ class HistoryBackupsControllerTest {
         )
     }
 
-    @Test fun backgroundVisitRunsOnlyWritersAndRetriesFailures() =
+    @Test fun backgroundVisitRunsEveryAccountWithBackupsOnAndRetriesFailures() =
         runTest {
             val fake = FakeBackups()
-            fake.settings = BackupSettingsFfi(enabled = true, thisDeviceWrites = false)
+            fake.settings = BackupSettingsFfi(enabled = false, thisDeviceWrites = false)
             assertEquals(HistoryBackupVisit.NothingToBackUp, runDueHistoryBackups(fake, listOf("a", "b"), BUDGET))
             assertTrue(fake.passes.isEmpty())
 
-            fake.settings = BackupSettingsFfi(enabled = true, thisDeviceWrites = true)
+            fake.settings = BackupSettingsFfi(enabled = true, thisDeviceWrites = false)
             assertEquals(HistoryBackupVisit.Ran, runDueHistoryBackups(fake, listOf("a", "b"), BUDGET))
             assertEquals(listOf("a", "b"), fake.passes)
 
@@ -354,12 +355,22 @@ class HistoryBackupsControllerTest {
             fake.passError = null
             fake.settingsError = MarmotKitException.Runtime("io")
             assertEquals(HistoryBackupVisit.Retry, runDueHistoryBackups(fake, listOf("a"), BUDGET))
+            assertFalse(anyHistoryBackupsOn(fake, listOf("a")))
+
+            // Device groups unavailable is MDK's answer; retrying it would only back off forever.
+            fake.settingsError = refused("roster_unsupported")
+            assertEquals(HistoryBackupVisit.NothingToBackUp, runDueHistoryBackups(fake, listOf("a"), BUDGET))
+
+            fake.settingsError = null
+            assertTrue(anyHistoryBackupsOn(fake, listOf("a")))
+            fake.settings = BackupSettingsFfi(enabled = false, thisDeviceWrites = false)
+            assertFalse(anyHistoryBackupsOn(fake, listOf("a", "b")))
         }
 
     private fun TestScope.controller(
         fake: FakeBackups,
         isCurrent: () -> Boolean = { true },
-        onWriting: () -> Unit = {},
+        onBackupsOn: () -> Unit = {},
     ): HistoryBackupsController {
         val dispatcher = StandardTestDispatcher(testScheduler)
         return HistoryBackupsController(
@@ -368,7 +379,7 @@ class HistoryBackupsControllerTest {
             scope = this,
             isCurrent = isCurrent,
             dispatcher = dispatcher,
-            onWriting = onWriting,
+            onBackupsOn = onBackupsOn,
         )
     }
 

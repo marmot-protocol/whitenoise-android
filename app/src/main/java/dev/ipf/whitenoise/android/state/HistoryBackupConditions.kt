@@ -76,6 +76,11 @@ internal object HistoryBackupConditions {
         report(app)
     }
 
+    /** Stops reporting to [marmot] once its runtime is cleared; a newer attached runtime is left alone. */
+    fun detach(marmot: MarmotInterface) {
+        if (runtime === marmot) runtime = null
+    }
+
     /** Reports the current facts to the attached runtime in the background. */
     fun report(context: Context) {
         val app = context.applicationContext

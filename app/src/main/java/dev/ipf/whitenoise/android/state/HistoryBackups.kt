@@ -5,7 +5,6 @@ import dev.ipf.marmotkit.BackupRestorePhaseFfi
 import dev.ipf.marmotkit.BackupRestoreStatusFfi
 import dev.ipf.marmotkit.BackupRestoreSubscription
 import dev.ipf.marmotkit.MarmotInterface
-import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -129,18 +128,8 @@ internal data class HistoryBackupsState(
     val problem: HistoryBackupProblem? = null,
 )
 
-private const val DEVICE_GROUP_REFUSED_PREFIX = "device group refused: "
-
-/** MDK's fixed refusal code for a backup command, or null for any other failure. */
-private fun backupRefusalCode(error: Throwable): String? =
-    (error as? MarmotKitException.Runtime)
-        ?.details
-        ?.takeIf { it.startsWith(DEVICE_GROUP_REFUSED_PREFIX) }
-        ?.removePrefix(DEVICE_GROUP_REFUSED_PREFIX)
-        ?.trim()
-
 internal fun historyBackupProblem(error: Throwable): HistoryBackupProblem =
-    when (backupRefusalCode(error)) {
+    when (deviceGroupRefusal(error)?.trim()) {
         "roster_unsupported" -> HistoryBackupProblem.Unavailable
         "recovery_words_mismatch" -> HistoryBackupProblem.WrongWords
         "recovery_words_not_started" -> HistoryBackupProblem.SetupExpired
@@ -168,8 +157,8 @@ internal class HistoryBackupsController(
     /** Whether the captured account and runtime still own this screen; late results are dropped once false. */
     private val isCurrent: () -> Boolean = { true },
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
-    /** Called when MDK reports this device writes the account's backups, so the background schedule exists. */
-    private val onWriting: () -> Unit = {},
+    /** Called when MDK reports backups on for the account, so the background schedule exists. */
+    private val onBackupsOn: () -> Unit = {},
     /** Outlives the screen so MDK still forgets unconfirmed words after the screen's own scope is cancelled. */
     private val cleanupScope: CoroutineScope = scope,
 ) {
@@ -220,7 +209,7 @@ internal class HistoryBackupsController(
                     confirmRecoveryWords(accountRef, answers.map(String::trim))
                     // Accepted words make this device the writer: schedule in the same uninterruptible step, so
                     // leaving the screen or a failed follow-up read never strands enabled backups without work.
-                    runCatching(onWriting)
+                    runCatching(onBackupsOn)
                 }
             }
             mutableState.update { it.copy(setup = null) }
@@ -257,8 +246,6 @@ internal class HistoryBackupsController(
         }
     }
 
-    fun dismissProblem() = mutableState.update { it.copy(problem = null) }
-
     /** Follows restore progress until [close]. Closing the watch never cancels a restore. */
     fun watchRestore() {
         if (watchJob?.isActive == true || closed) return
@@ -293,9 +280,8 @@ internal class HistoryBackupsController(
         watchJob?.cancel()
         val current = mutableState.value
         val pending =
-            current.setup != null ||
-                current.running == HistoryBackupAction.BeginSetup ||
-                current.running == HistoryBackupAction.Confirm
+            // beginSetup forgets words made for a retired owner itself; forgetting here could hit a newer setup.
+            current.setup != null || current.running == HistoryBackupAction.Confirm
         mutableState.update { it.copy(setup = null) }
         if (pending) forgetPendingWords()
         // An admitted setup command still settles under NonCancellable and holds the lock the cleanup waits for.
@@ -337,7 +323,7 @@ internal class HistoryBackupsController(
         val status =
             try {
                 val settings = native { backupSettings(accountRef) }
-                if (settings.enabled && settings.thisDeviceWrites) withContext(dispatcher) { runCatching(onWriting) }
+                if (settings.enabled) withContext(dispatcher) { runCatching(onBackupsOn) }
                 if (settings.enabled) HistoryBackupStatus.On(settings.thisDeviceWrites) else HistoryBackupStatus.Off
             } catch (error: CancellationException) {
                 throw error

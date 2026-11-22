@@ -22,10 +22,10 @@ import java.util.concurrent.TimeUnit
 
 /** What one background visit did, for the worker's result. */
 internal enum class HistoryBackupVisit {
-    /** No signed-in account has backups that this device writes; the schedule can stop. */
+    /** No signed-in account has backups on; the schedule can stop. */
     NothingToBackUp,
 
-    /** Each writing account's due pass was joined or found not due. */
+    /** Each account's due pass was joined or found not due. */
     Ran,
 
     /** A pass failed or ran out of time; WorkManager tries again later. */
@@ -33,31 +33,34 @@ internal enum class HistoryBackupVisit {
 }
 
 /**
- * Runs MDK's due backup pass for each signed-in account whose backups this device writes. MDK decides whether a pass
- * is due and what it writes; this only gives it time while WorkManager's constraints hold. A pass that outlives
- * [budgetMillis] is detached, not cancelled in MDK, and the next visit joins it again.
+ * Runs MDK's due backup pass for each signed-in account with backups on. MDK decides whether a pass is due and what it
+ * writes; a device that does not write still needs its pass, which is how it takes over from a writer gone quiet. This
+ * only gives MDK time while WorkManager's constraints hold. A pass that outlives [budgetMillis] is detached, not
+ * cancelled in MDK, and the next visit joins it again.
  */
+@Suppress("TooGenericExceptionCaught")
 internal suspend fun runDueHistoryBackups(
     marmot: MarmotInterface,
     accountRefs: List<String>,
     budgetMillis: Long,
 ): HistoryBackupVisit {
-    var writers = 0
+    var enabled = 0
     var retry = false
     val deadline = System.currentTimeMillis() + budgetMillis
     for (account in accountRefs) {
         currentCoroutineContext().ensureActive()
-        val writes =
+        val on =
             try {
-                marmot.backupSettings(account).let { it.enabled && it.thisDeviceWrites }
+                marmot.backupSettings(account).enabled
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Exception) {
-                retry = true
+            } catch (error: Exception) {
+                // MDK refusing (device groups unavailable) is an answer, not a transient failure worth retrying.
+                if (deviceGroupRefusal(error) == null) retry = true
                 false
             }
-        if (!writes) continue
-        writers++
+        if (!on) continue
+        enabled++
         val remaining = deadline - System.currentTimeMillis()
         val outcome =
             try {
@@ -71,17 +74,32 @@ internal suspend fun runDueHistoryBackups(
     }
     return when {
         retry -> HistoryBackupVisit.Retry
-        writers == 0 -> HistoryBackupVisit.NothingToBackUp
+        enabled == 0 -> HistoryBackupVisit.NothingToBackUp
         else -> HistoryBackupVisit.Ran
     }
 }
+
+/** Whether any of [accountRefs] has backups on. A failed read counts as off; the next start or screen asks again. */
+internal suspend fun anyHistoryBackupsOn(
+    marmot: MarmotInterface,
+    accountRefs: List<String>,
+): Boolean =
+    accountRefs.any { account ->
+        try {
+            marmot.backupSettings(account).enabled
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            false
+        }
+    }
 
 private const val TAG = "HistoryBackupWorker"
 
 /**
  * Gives MDK's account history backups a regular chance to run while the device is charging on an unmetered network
- * (#3655). The schedule starts when the user turns backups on and stops itself once no account needs it. Stopping
- * the work (constraints lost, runtime closed) detaches the wait; MDK settles any pass it already admitted.
+ * (#3655). The schedule starts when backups are on at app start or on the screen, and stops itself once no account has
+ * them on. Stopping the work (constraints lost, runtime closed) detaches the wait; MDK settles any pass it admitted.
  */
 class HistoryBackupWorker(
     appContext: Context,
@@ -112,7 +130,7 @@ class HistoryBackupWorker(
             }
         return when (visit) {
             HistoryBackupVisit.NothingToBackUp -> {
-                // A writer the screen saw during this visit asked for the schedule; keep it.
+                // Backups turned on during this visit asked for the schedule; keep it.
                 synchronized(scheduleLock) {
                     if (scheduleGeneration == startedAt) {
                         WorkManager.getInstance(applicationContext).cancelUniqueWork(UNIQUE_WORK_NAME)

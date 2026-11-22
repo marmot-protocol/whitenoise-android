@@ -2,7 +2,7 @@
 <resources>
     <string name="history_backups">Backup della cronologia</string>
     <string name="explanation_organize_hub_history_backups">Conserva una copia crittografata della cronologia delle chat, sbloccata dalle parole di recupero, per ripristinarla su una nuova installazione.</string>
-    <string name="history_backups_explanation">White Noise può salvare una copia crittografata della cronologia delle chat sui tuoi relay. Dodici parole di recupero la sbloccano, così puoi riavere la cronologia su una nuova installazione. La tua chiave privata non fa mai parte di un backup.</string>
+    <string name="history_backups_explanation">White Noise può salvare online una copia crittografata della cronologia delle chat. Dodici parole di recupero la sbloccano, così puoi riavere la cronologia su una nuova installazione. La tua chiave privata non fa mai parte di un backup.</string>
     <string name="history_backups_status">Backup</string>
     <string name="history_backups_status_loading">Verifica in corso…</string>
     <string name="history_backups_status_unavailable">Non ancora disponibile</string>
@@ -18,7 +18,7 @@
     <string name="history_backups_new_words_detail">I nuovi backup usano le nuove parole. I backup precedenti richiedono ancora le vecchie parole.</string>
     <string name="history_backups_turn_off">Disattiva backup</string>
     <string name="history_backups_turn_off_title">Disattivare i backup?</string>
-    <string name="history_backups_turn_off_message">Il tuo account smette di salvare nuovi backup. I backup già salvati restano sui tuoi relay e le parole di recupero possono ancora ripristinarli.</string>
+    <string name="history_backups_turn_off_message">Il tuo account smette di salvare nuovi backup. I backup già salvati restano online e le parole di recupero possono ancora ripristinarli.</string>
     <string name="history_backups_schedule">Questo dispositivo salva un backup circa una volta al giorno mentre è in carica e connesso al Wi-Fi.</string>
     <string name="history_backups_words_title">Le tue parole di recupero</string>
     <string name="history_backups_words_message">Scrivi queste 12 parole su carta, in ordine, e conservale in un posto sicuro. Vengono mostrate solo ora. Chiunque le abbia può leggere la cronologia salvata.</string>

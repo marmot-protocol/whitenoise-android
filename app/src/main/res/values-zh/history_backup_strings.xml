@@ -2,7 +2,7 @@
 <resources>
     <string name="history_backups">历史记录备份</string>
     <string name="explanation_organize_hub_history_backups">保存一份由恢复词解锁的加密聊天记录副本，以便在重新安装后恢复。</string>
-    <string name="history_backups_explanation">White Noise 可以将聊天记录的加密副本保存到你的中继。十二个恢复词可以解锁它，让你在重新安装后找回历史记录。你的私钥永远不会包含在备份中。</string>
+    <string name="history_backups_explanation">White Noise 可以将聊天记录的加密副本保存在线上。十二个恢复词可以解锁它，让你在重新安装后找回历史记录。你的私钥永远不会包含在备份中。</string>
     <string name="history_backups_status">备份</string>
     <string name="history_backups_status_loading">正在检查…</string>
     <string name="history_backups_status_unavailable">暂不可用</string>
@@ -18,7 +18,7 @@
     <string name="history_backups_new_words_detail">新的备份使用新的恢复词。旧的备份仍需要旧的恢复词。</string>
     <string name="history_backups_turn_off">关闭备份</string>
     <string name="history_backups_turn_off_title">要关闭备份吗？</string>
-    <string name="history_backups_turn_off_message">你的账户将停止保存新的备份。已保存的备份会保留在你的中继上，你的恢复词仍然可以恢复它们。</string>
+    <string name="history_backups_turn_off_message">你的账户将停止保存新的备份。已保存的备份会保留在线上，你的恢复词仍然可以恢复它们。</string>
     <string name="history_backups_schedule">此设备会在连接 Wi-Fi 并充电时大约每天保存一次备份。</string>
     <string name="history_backups_words_title">你的恢复词</string>
     <string name="history_backups_words_message">请按顺序把这 12 个词写在纸上，并妥善保管。它们只会在此时显示。任何拿到它们的人都能读取你备份的历史记录。</string>

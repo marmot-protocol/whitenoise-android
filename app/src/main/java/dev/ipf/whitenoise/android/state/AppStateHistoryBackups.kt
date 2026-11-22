@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.BackupHistoryAvailabilityFfi
+import dev.ipf.marmotkit.MarmotInterface
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Backups belong to a loaded, signed-in account that is not being signed out or wiped. */
@@ -28,7 +30,7 @@ internal fun WhiteNoiseAppState.historyBackupsController(scope: CoroutineScope):
         isCurrent = {
             activeAccountRef == account && ownsHostPerformanceRuntimeOwner(owner) && historyBackupsEligible(account)
         },
-        onWriting = { HistoryBackupWorker.schedule(appContext) },
+        onBackupsOn = { HistoryBackupWorker.schedule(appContext) },
         cleanupScope = mutationsScope,
     )
 }
@@ -51,5 +53,24 @@ internal suspend fun WhiteNoiseAppState.historyBackupHints(
         throw error
     } catch (_: Exception) {
         emptyList()
+    }
+}
+
+/**
+ * Starts the backup schedule when a signed-in account has backups on. MDK can make this device the writer without the
+ * screen (taking over from a writer that left), and the process can die between accepted words and scheduling, so a
+ * newly published runtime checks once; the schedule keeps an existing cadence.
+ */
+internal fun WhiteNoiseAppState.scheduleHistoryBackupsIfOn(marmot: MarmotInterface) {
+    mutationsScope.launch(Dispatchers.IO) {
+        val accounts =
+            try {
+                marmot.listAccounts().filter { it.isSignedInSigningAccount() }.map { it.label }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                return@launch
+            }
+        if (anyHistoryBackupsOn(marmot, accounts)) HistoryBackupWorker.schedule(appContext)
     }
 }
