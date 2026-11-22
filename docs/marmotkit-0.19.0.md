@@ -87,11 +87,18 @@ so a rollback needs a copy of the data taken before the upgrade. See
 [INT-010](manual-release-testing/cases/INT-010.md).
 
 The [first hosted campaign](https://github.com/marmot-protocol/whitenoise-android/actions/runs/45040792116)
-on `fd30e05ed2` passed the populated upgrade from 0.18.0, key migration, cold
-restart, the original pending upload and its restart, corrupt and lost media
-recovery and the stale-upload retry. Six of the seven recovery cases passed in
-both relay modes. `healthyAccountReceivesAfterLocalDeletionAndRestart` failed in
-both (`expected:<[healthy-incoming-0]> but was:<[]>`): receipt in a healthy chat
-after another chat is deleted locally is still
-[MDK #3264](https://github.com/marmot-protocol/mdk/issues/3264), which also failed
-the 0.17.0 control and master's own 0.17.0-to-0.18.0 runs for #3987.
+ran on `fd30e05ed2` against the then-current master `4023b6a4`, before #3987
+added the audit-choice matrix and the fixed baseline. It passed the populated
+upgrade from 0.18.0, key migration, cold restart, the original pending upload
+and its restart, corrupt and lost media recovery and the stale-upload retry. Six
+of the seven recovery cases passed in both relay modes.
+`healthyAccountReceivesAfterLocalDeletionAndRestart` failed in both
+(`expected:<[healthy-incoming-0]> but was:<[]>`): receipt in a healthy chat after
+another chat is deleted locally is still
+[MDK #3264](https://github.com/marmot-protocol/mdk/issues/3264), which the
+[0.18.0 adoption](marmotkit-0.18.0.md) also recorded on its 0.17.0 control. In
+master's own runs for #3987
+([45027349997](https://github.com/marmot-protocol/whitenoise-android/actions/runs/45027349997),
+[45032823081](https://github.com/marmot-protocol/whitenoise-android/actions/runs/45032823081)),
+one of eight recovery executions passed all seven cases and the other seven
+failed; their logs do not name the failing case.

@@ -28629,8 +28629,6 @@ SPLdev/ipf/whitenoise/android/core/TimelineProjector;->displayBody$lambda$0(Ldev
 SPLdev/ipf/whitenoise/android/core/TimelineProjector;->displayBody(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;Ldev/ipf/whitenoise/android/core/MessageTextCopy;)Ljava/lang/String;
 SPLdev/ipf/whitenoise/android/core/TimelineProjector;->invalidationWarning(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;Ldev/ipf/whitenoise/android/core/MessageTextCopy;)Ljava/lang/String;
 SPLdev/ipf/whitenoise/android/core/TimelineProjector;->invalidationWarning(Ljava/lang/String;Ldev/ipf/whitenoise/android/core/MessageTextCopy;)Ljava/lang/String;
-SPLdev/ipf/whitenoise/android/core/TimelineProjector;->projectedBody-11MsVeg$default(Ldev/ipf/whitenoise/android/core/TimelineProjector;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ldev/ipf/whitenoise/android/core/MediaPreviewFallback;Ldev/ipf/whitenoise/android/core/MessageTextCopy;ILjava/lang/Object;)Ljava/lang/String;
-SPLdev/ipf/whitenoise/android/core/TimelineProjector;->projectedBody-11MsVeg(Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Ldev/ipf/whitenoise/android/core/MediaPreviewFallback;Ldev/ipf/whitenoise/android/core/MessageTextCopy;)Ljava/lang/String;
 SPLdev/ipf/whitenoise/android/core/TimelineProjector;->replyPreview(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;Ldev/ipf/whitenoise/android/core/MessageTextCopy;)Ldev/ipf/whitenoise/android/core/TimelineReplyDisplay;
 SPLdev/ipf/whitenoise/android/core/TimelineProjector;->tagsWithProjectedStructure$app(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;)Ljava/util/List;
 HSPLdev/ipf/whitenoise/android/core/TimelineProjector;->toAppMessageRecord(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;)Ldev/ipf/marmotkit/AppMessageRecordFfi;
@@ -33873,7 +33871,6 @@ SPLdev/ipf/whitenoise/android/state/ConversationController;->warmLaterPageEventC
 SPLdev/ipf/whitenoise/android/state/ConversationController;->withOptimisticEditStatus(Ldev/ipf/whitenoise/android/state/TimelineMessage;)Ldev/ipf/whitenoise/android/state/TimelineMessage;
 Ldev/ipf/whitenoise/android/state/ConversationControllerCopy;
 SPLdev/ipf/whitenoise/android/state/ConversationControllerCopy;-><clinit>()V
-SPLdev/ipf/whitenoise/android/state/ConversationControllerCopy;-><init>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 SPLdev/ipf/whitenoise/android/state/ConversationControllerCopy;->hashCode()I
 Ldev/ipf/whitenoise/android/state/ConversationDictationMediaHandoff;
 SPLdev/ipf/whitenoise/android/state/ConversationDictationMediaHandoff;-><clinit>()V
@@ -38066,7 +38063,6 @@ SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->performanceSample(Ldev/i
 SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->planCommit(Ldev/ipf/whitenoise/android/state/PreparedWindowApply;Ldev/ipf/whitenoise/android/state/WindowApplySnapshot;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;)Ldev/ipf/whitenoise/android/state/WindowApplyCommitPlan;
 HSPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->prepareWindowApply(Ldev/ipf/marmotkit/TimelinePageFfi;Ldev/ipf/whitenoise/android/state/WindowApplySnapshot;ZZ)Ldev/ipf/whitenoise/android/state/PreparedWindowApply;
 SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->prepareWindowApplyOn(Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/jvm/functions/Function0;Ldev/ipf/marmotkit/TimelinePageFfi;Ldev/ipf/whitenoise/android/state/WindowApplySnapshot;ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->preparedProjectedItemId(Ljava/lang/String;Ldev/ipf/marmotkit/AppMessageRecordFfi;)Ljava/lang/String;
 SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->refreshAuthoritativeOrder(Ldev/ipf/whitenoise/android/state/ConversationController;Ldev/ipf/marmotkit/TimelinePageFfi;)V
 SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->shiftedOrder(ILjava/lang/Long;)J
 SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->windowOrderShift(Ldev/ipf/marmotkit/TimelinePageFfi;Ljava/util/Map;)Ljava/lang/Long;

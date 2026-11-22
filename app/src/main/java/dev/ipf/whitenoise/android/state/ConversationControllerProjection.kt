@@ -396,6 +396,7 @@ private fun ConversationController.describeTimelineInversionRow(
         "orderOverride=${source.messageIdHex in localTimelineOrderOverrides} " +
         "optimisticPreserve=${source.messageIdHex in optimisticSendPositionPreserves}"
 
+/** Drops the rows for [messageIds] from the display index without forgetting their records. */
 internal fun ConversationController.suppressProjectedTimelineItems(messageIds: List<String>) {
     messageIds.forEach { messageIdHex ->
         val itemId = "msg:$messageIdHex"
