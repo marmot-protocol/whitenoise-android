@@ -106,18 +106,6 @@
         ]
       },
       {
-        "surface": "SettingsScreen",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "fun SettingsScreen(",
-        "test_ids": [
-          "SET-001",
-          "SET-039",
-          "SET-042",
-          "SET-043",
-          "SET-044"
-        ]
-      },
-      {
         "surface": "SignOutGroup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SignOutGroup(",
