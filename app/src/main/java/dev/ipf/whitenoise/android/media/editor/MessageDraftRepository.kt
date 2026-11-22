@@ -1,177 +1,12 @@
 package dev.ipf.whitenoise.android.media.editor
 
-import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
-import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
-import dev.ipf.marmotkit.SelectedMessageDraftFfi
-import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-
-internal interface MessageDraftGateway {
-    fun read(
-        accountRef: String,
-        groupIdHex: String,
-    ): MessageDraftFfi?
-
-    fun save(
-        accountRef: String,
-        groupIdHex: String,
-        content: String,
-        replyToMessageIdHex: String?,
-        mediaAttachments: List<MessageDraftAttachmentFfi>,
-    ): MessageDraftFfi
-
-    fun delete(
-        accountRef: String,
-        groupIdHex: String,
-    )
-
-    fun summaries(accountRef: String): List<MessageDraftSummaryFfi>
-
-    /** The selected draft with its opaque revision, or null when this gateway cannot write revision-safely. */
-    fun selected(
-        accountRef: String,
-        groupIdHex: String,
-    ): SelectedMessageDraftFfi? = null
-
-    /** Writes only while the store still holds [revision]; gateways without revisions save unconditionally. */
-    fun saveIfRevision(
-        accountRef: String,
-        groupIdHex: String,
-        revision: MessageDraftRevisionFfi,
-        content: String,
-        replyToMessageIdHex: String?,
-        mediaAttachments: List<MessageDraftAttachmentFfi>,
-    ): MessageDraftFfi = save(accountRef, groupIdHex, content, replyToMessageIdHex, mediaAttachments)
-
-    /** Clears only while the store still holds [revision]; gateways without revisions delete unconditionally. */
-    fun clearIfRevision(
-        accountRef: String,
-        groupIdHex: String,
-        revision: MessageDraftRevisionFfi,
-    ) = delete(accountRef, groupIdHex)
-}
-
-internal class MarmotMessageDraftGateway(
-    private val marmot: () -> MarmotInterface,
-) : MessageDraftGateway {
-    override fun read(
-        accountRef: String,
-        groupIdHex: String,
-    ): MessageDraftFfi? = marmot().messageDraft(accountRef, groupIdHex)
-
-    override fun save(
-        accountRef: String,
-        groupIdHex: String,
-        content: String,
-        replyToMessageIdHex: String?,
-        mediaAttachments: List<MessageDraftAttachmentFfi>,
-    ): MessageDraftFfi =
-        marmot().saveMessageDraft(
-            accountRef = accountRef,
-            groupIdHex = groupIdHex,
-            content = content,
-            replyToMessageIdHex = replyToMessageIdHex,
-            mediaAttachments = mediaAttachments,
-        )
-
-    override fun delete(
-        accountRef: String,
-        groupIdHex: String,
-    ) = marmot().deleteMessageDraft(accountRef, groupIdHex)
-
-    override fun summaries(accountRef: String): List<MessageDraftSummaryFfi> = marmot().messageDrafts(accountRef)
-
-    /** Reads MDK's selected draft and revision for the group. */
-    override fun selected(
-        accountRef: String,
-        groupIdHex: String,
-    ): SelectedMessageDraftFfi = marmot().selectedMessageDraft(accountRef, groupIdHex)
-
-    /**
-     * Revision-safe upsert; a changed selected draft surfaces as `MessageDraftRevisionConflict`. MDK returns
-     * descriptors only, so the hydrated draft is rebuilt from the bytes this write submitted.
-     */
-    override fun saveIfRevision(
-        accountRef: String,
-        groupIdHex: String,
-        revision: MessageDraftRevisionFfi,
-        content: String,
-        replyToMessageIdHex: String?,
-        mediaAttachments: List<MessageDraftAttachmentFfi>,
-    ): MessageDraftFfi {
-        val saved =
-            marmot().saveMessageDraftIfRevision(accountRef, revision, content, replyToMessageIdHex, mediaAttachments)
-        val now = System.currentTimeMillis()
-        return MessageDraftFfi(
-            groupIdHex = groupIdHex,
-            content = content,
-            replyToMessageIdHex = replyToMessageIdHex,
-            mediaAttachments = mediaAttachments,
-            createdAtMs = saved.draft?.createdAtMs ?: now,
-            updatedAtMs = saved.draft?.updatedAtMs ?: now,
-        )
-    }
-
-    /** Revision-safe clear; a changed selected draft surfaces as `MessageDraftRevisionConflict`. */
-    override fun clearIfRevision(
-        accountRef: String,
-        groupIdHex: String,
-        revision: MessageDraftRevisionFfi,
-    ) {
-        marmot().clearMessageDraftIfRevision(accountRef, revision)
-    }
-}
-
-internal sealed interface MessageDraftMutationResult {
-    data class Success(
-        val draft: MessageDraftFfi?,
-        val previousEditorSession: EditorAttachmentSession? = null,
-        val editorSessionRecoveryPending: Boolean = false,
-    ) : MessageDraftMutationResult
-
-    data object MissingAttachment : MessageDraftMutationResult
-
-    data object StaleAttachment : MessageDraftMutationResult
-
-    data object DuplicateAttachment : MessageDraftMutationResult
-
-    data object InvalidEditorSession : MessageDraftMutationResult
-
-    data object SessionPersistenceFailed : MessageDraftMutationResult
-
-    data class Failure(
-        val cause: Throwable,
-    ) : MessageDraftMutationResult
-}
-
-internal sealed interface MessageDraftConditionalDeleteResult {
-    data class Applied(
-        val result: MessageDraftMutationResult,
-    ) : MessageDraftConditionalDeleteResult
-
-    data object Superseded : MessageDraftConditionalDeleteResult
-}
-
-/** Outcome of a draft save that only writes while its generation is still authoritative. */
-internal sealed interface MessageDraftConditionalSaveResult {
-    data class Applied(
-        val result: MessageDraftMutationResult,
-    ) : MessageDraftConditionalSaveResult
-
-    data object Superseded : MessageDraftConditionalSaveResult
-}
-
-internal data class MessageDraftGeneration(
-    val value: Long,
-)
 
 /**
  * The only Android-side mutation boundary for hydrated MDK message drafts.
@@ -564,38 +399,6 @@ internal class MessageDraftCoordinatedOperations(
         }
 }
 
-internal class MessageDraftMutationGenerations {
-    private val lock = Any()
-    private val lifetimes = mutableMapOf<DraftKey, StalenessGuard>()
-
-    /** Accepts a new mutation for [key] and returns its guarded generation. */
-    fun advance(key: DraftKey): MessageDraftGeneration =
-        synchronized(lock) {
-            MessageDraftGeneration(lifetime(key).advance())
-        }
-
-    /** Atomically accepts a mutation only while [expected] still owns [key]. */
-    fun advanceIfCurrent(
-        key: DraftKey,
-        expected: MessageDraftGeneration,
-    ): MessageDraftGeneration? =
-        synchronized(lock) {
-            lifetime(key).advanceIfCurrent(expected.value)?.let(::MessageDraftGeneration)
-        }
-
-    /** Captures the mutation generation currently visible for [key]. */
-    fun current(key: DraftKey) = synchronized(lock) { MessageDraftGeneration(lifetime(key).capture()) }
-
-    /** Reports whether [generation] remains the newest accepted mutation for [key]. */
-    fun isCurrent(
-        key: DraftKey,
-        generation: MessageDraftGeneration,
-    ): Boolean = synchronized(lock) { lifetime(key).isCurrent(generation.value) }
-
-    /** Returns the single staleness primitive assigned to one draft key. */
-    private fun lifetime(key: DraftKey): StalenessGuard = lifetimes.getOrPut(key, ::StalenessGuard)
-}
-
 @Suppress("TooGenericExceptionCaught") // Repository boundary converts non-cancellation gateway failures to results.
 private suspend fun runDraftMutation(block: suspend () -> MessageDraftMutationResult): MessageDraftMutationResult =
     try {
@@ -778,39 +581,6 @@ private fun finishAttachmentCommit(
         draft = saved,
         previousEditorSession = previousSession,
         editorSessionRecoveryPending = recoveryPending,
-    )
-}
-
-internal data class DraftKey(
-    val accountRef: String,
-    val groupIdHex: String,
-)
-
-internal class MessageDraftLocks {
-    private val tableGuard = Any()
-    private val table = mutableMapOf<DraftKey, DraftLock>()
-
-    suspend fun <T> withLock(
-        key: DraftKey,
-        block: suspend () -> T,
-    ): T {
-        val entry =
-            synchronized(tableGuard) {
-                table.getOrPut(key) { DraftLock() }.also { it.users += 1 }
-            }
-        return try {
-            entry.mutex.withLock { block() }
-        } finally {
-            synchronized(tableGuard) {
-                entry.users -= 1
-                if (entry.users == 0 && table[key] === entry) table.remove(key)
-            }
-        }
-    }
-
-    private class DraftLock(
-        val mutex: Mutex = Mutex(),
-        var users: Int = 0,
     )
 }
 
