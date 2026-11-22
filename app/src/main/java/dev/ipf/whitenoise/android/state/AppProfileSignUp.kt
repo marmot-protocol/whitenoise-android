@@ -129,10 +129,8 @@ internal class AppProfileSignUp(
                             appState.presentFailure(R.string.toast_couldnt_publish_profile, "ACCOUNT_SETUP_WAIT", it)
                         }.getOrThrow()
                         // The last readiness read can suspend across an account switch or teardown.
-                        val initialProfile =
-                            pending?.acceptedIdentity
-                                ?.takeIf { it.label == account }
-                                ?.let { creatingRuntimes[it]?.initialProfile }
+                        val accepted = pending?.acceptedIdentity?.takeIf { it.label == account }
+                        val initialProfile = accepted?.let { creatingRuntimes[it]?.initialProfile }
                         // NetworkReady confirms MDK already published its initial profile.
                         owned() && (initialProfile == metadata || appState.publishProfile(metadata))
                     } else {
