@@ -12,10 +12,12 @@ import org.junit.Test
 import kotlin.random.Random
 
 /**
- * Model-based check of the route owner against an independent oracle. The oracle, [MasterShell], keeps the route the
- * way master kept it, as separate fields (the owner, the section and its Settings detail, the selected conversation
- * and the one chat-details screen open over it), and changes those fields by the plan's rules, written out here
- * without calling any production predicate. The production side is driven the way the shell drives it: owner rebinds
+ * Model-based check of the route owner against an oracle written apart from it. The oracle, [MasterShell], keeps
+ * the route in master's shape, as separate fields (the owner, the section and its Settings detail, the selected
+ * conversation and the one chat-details screen open over it), and changes those fields by the plan's rules, written
+ * out here without calling any production predicate. It restates the plan, not master's code: where the plan
+ * documents a deliberate difference from master (a landing early open drops the Settings section, NAV-5), the oracle
+ * follows the plan, so an error shared by the plan and the reducer would pass both. The production side is driven the way the shell drives it: owner rebinds
  * go through the same order as the process state and the section state (the owner event first, then the section's
  * bind and its one-time restore), Settings-only events go through the section state's owner gate, an account switch
  * is the rebind followed by the switch event, and process death is a fresh navigator and section state over the
@@ -228,7 +230,7 @@ private class ShellUnderTest {
 }
 
 /**
- * The oracle: the route as master kept it, in separate fields, changed by the plan's rules. [owner] and [runtime] are
+ * The oracle: the route in master's field shape, changed by the plan's rules. [owner] and [runtime] are
  * the process owner, [sectionOwner] and [sectionRuntime] what the section was saved for, and [screen] the one
  * chat-details screen open over [chat]. Nothing here calls a production rule.
  */
@@ -321,7 +323,8 @@ private data class MasterShell(
 
     /**
      * Contract 1: a switch keeps only the conversation that is pinned to the arriving account and carries exactly the
-     * early-open request that is landing, which is never 0. Everything else goes.
+     * early-open request that is landing, which is never 0. Everything else goes, the Settings section included even
+     * on a landing: that is the plan's documented difference from master, which left the section as it was (NAV-5).
      */
     private fun switched(event: ShellNavEvent.AccountSwitched): MasterShell {
         val open = chat?.open
