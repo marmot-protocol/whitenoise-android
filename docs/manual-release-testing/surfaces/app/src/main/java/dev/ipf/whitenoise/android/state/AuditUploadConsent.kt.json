@@ -18,6 +18,14 @@
         "test_ids": [
           "STB-004"
         ]
+      },
+      {
+        "surface": "Audit acknowledgement and recorder startup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AuditUploadConsent.kt",
+        "anchor": "suspend fun prepare(",
+        "test_ids": [
+          "STB-004"
+        ]
       }
     ]
   },

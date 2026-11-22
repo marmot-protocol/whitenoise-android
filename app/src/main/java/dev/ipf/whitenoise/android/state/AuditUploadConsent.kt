@@ -103,23 +103,28 @@ internal class AuditUploadConsent(
         DmCreationDiagnostics.setEnabled(false)
         startupUploadConfigured = false
         runtime.configureAuditRuntime(uploadConsentGranted = false)
-        if (!granted && runtime.auditLogSettings().enabled) {
-            check(preferences.edit().putBoolean(renewalKey, true).commit()) {
-                "Could not save audit disclosure renewal"
+        val settings = runCatchingCancellable { runtime.auditLogSettings() }.getOrNull() ?: return
+        val acknowledged = granted
+        if (settings.enabled && !acknowledged) {
+            val declined = preferences.getInt(revisionKey, -1) == 0
+            if (!declined) {
+                check(preferences.edit().putBoolean(renewalKey, true).commit()) {
+                    "Could not save audit disclosure renewal"
+                }
+                requiresChoice = true
             }
-            requiresChoice = true
-            runtime.setAuditLogSettings(runtime.auditLogSettings().copy(enabled = false))
+            runtime.setAuditLogSettings(settings.copy(enabled = false))
         }
-        if (granted) {
+        val recording = settings.enabled && acknowledged
+        if (recording) {
             startupUploadConfigured =
                 tryEnableAuditUploadAtStartup(
                     configureUpload = { runtime.configureAuditRuntime(uploadConsentGranted = it) },
                     reportRejected = { Log.w("WhiteNoiseAudit", "v5 audit upload unavailable; retaining local logs") },
                 )
         }
-        val recording = runCatchingCancellable { runtime.auditLogSettings().enabled }.getOrDefault(false)
-        DictationDiagnostics.setEnabled(recording && granted)
-        DmCreationDiagnostics.setEnabled(recording && granted)
+        DictationDiagnostics.setEnabled(recording)
+        DmCreationDiagnostics.setEnabled(recording)
     }
 }
 

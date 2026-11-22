@@ -204,7 +204,7 @@ def isolate_fixture_public_network():
     return uid
 
 
-def usable_chat(name):
+def usable_chat(name, *, consent_settled=False):
     """Observe production MainActivity after real bootstrap, then open retained synthetic conversation history."""
     print(f'{name}: opening retained conversation through MainActivity', flush=True)
     adb('shell', 'pm', 'grant', APP, 'android.permission.POST_NOTIFICATIONS')
@@ -218,6 +218,9 @@ def usable_chat(name):
         conversation = any(n.get('resource-id', '').endswith('composer-pill-surface') for n in nodes)
         chat_list = any(n.get('resource-id', '').endswith('chats.scope.chats') for n in nodes)
         consent = any(n.get('text') == 'Help Improve White Noise' for n in nodes)
+        if consent and consent_settled:
+            (REPORTS / f'{name}-window.xml').write_text(xml)
+            raise RuntimeError(f'{name}: startup prompted despite settled diagnostic choices')
         for node in nodes:
             text = node.get('text', '')
             if 'Retained qualification history' in text and conversation and not chat_list:
@@ -286,7 +289,11 @@ def main():
              'api': adb('shell', 'getprop', 'ro.build.version.sdk').strip(),
              'abi': adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),
              'package': APP, 'exact_signed_preview_qualified': False, 'phases': {}}
-    ports = ('-e', 'relayPort', str(relay.port), '-e', 'blobPort', str(blob.server_port),
+    audit_choice = os.environ.get('QUALIFICATION_AUDIT_CHOICE', 'enabled')
+    if audit_choice not in {'enabled', 'declined'}:
+        raise ValueError('Unsupported audit qualification choice')
+    facts['audit_choice'] = audit_choice
+    ports = ('-e', 'qualificationAuditChoice', audit_choice, '-e', 'relayPort', str(relay.port), '-e', 'blobPort', str(blob.server_port),
              '-e', 'fileStoreBaseline', 'true')
     started_servers = []
     try:
@@ -304,7 +311,7 @@ def main():
             backup = adb('exec-out', 'run-as', APP, 'tar', '-cf', '-', 'files', binary=True)
             (private / 'baseline-root.tar').write_bytes(backup)
             facts['baseline_root_sha256'] = hashlib.sha256(backup).hexdigest()
-            usable_chat('baseline-ready')
+            usable_chat('baseline-ready', consent_settled=True)
             stop()
             facts['phases']['baseline'] = 'passed'
             blob.acquisition_unavailable.set()
@@ -318,13 +325,13 @@ def main():
             instrument('upgrade-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
                        (*ports, '-e', 'qualificationPhase', 'upgrade'))
             stop()
-            usable_chat('upgrade-ready')
+            usable_chat('upgrade-ready', consent_settled=True)
             facts['phases']['upgrade'] = 'passed'
             stop()
             instrument('key-migration', KEY_MIGRATION, {'migratedAccountsPreserveRetentionAndSalts'}, ports)
             facts['phases']['key_migration'] = 'passed'
             stop()
-            usable_chat('cold-ready')
+            usable_chat('cold-ready', consent_settled=True)
             stop()
             instrument('cold-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
                        (*ports, '-e', 'qualificationPhase', 'cold'))

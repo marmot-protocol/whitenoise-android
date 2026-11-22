@@ -87,6 +87,8 @@ class AuditUploadConsentTest {
             reopened.prepare(native.runtime)
             assertTrue(reopened.granted)
             assertFalse(native.enabled)
+            assertFalse(reopened.startupUploadConfigured)
+            assertEquals(listOf(false), native.auditUploadAttempts)
             reopened.choose(false)
             assertFalse(AuditUploadConsent(preferences).granted)
         }
@@ -118,13 +120,13 @@ class AuditUploadConsentTest {
             AuditUploadConsent(preferences).choose(false)
             val receipt = preferences.all.toMap()
             repeat(2) {
-                val native = Native(enabled = false)
+                val native = Native(enabled = true)
                 val updated = AuditUploadConsent(preferences)
                 updated.prepare(native.runtime)
                 assertFalse(updated.granted)
                 assertFalse(updated.requiresChoice)
                 assertFalse(native.enabled)
-                assertFalse(native.mutations.contains("allow-upload"))
+                assertEquals(listOf("clear-upload", "disable"), native.mutations)
                 assertEquals(receipt, preferences.all)
             }
         }
@@ -141,6 +143,8 @@ class AuditUploadConsentTest {
             updated.prepare(native.runtime)
             assertTrue(updated.granted)
             assertFalse(updated.requiresChoice)
+            assertFalse(updated.startupUploadConfigured)
+            assertEquals(listOf(false), native.auditUploadAttempts)
             assertEquals(receipt, preferences.all)
         }
 

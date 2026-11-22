@@ -6,6 +6,8 @@ gradle.beforeProject { project ->
                 android.productFlavors.getByName('dev').applicationIdSuffix = '.mdkqualification'
                 android.productFlavors.getByName('dev').manifestPlaceholders['appName'] = 'MDK Qualification'
                 android.buildTypes.getByName('debug').buildConfigField('boolean', 'ENABLE_PERFORMANCE_TEST_SELECTORS', 'true')
+                android.buildTypes.getByName('debug').buildConfigField('String', 'WHITENOISE_AUDIT_OTLP_ENDPOINT', '"https://qualification.invalid/v1/logs"')
+                android.buildTypes.getByName('debug').buildConfigField('String', 'WHITENOISE_AUDIT_OTLP_AUTH_TOKEN', '"qualification-fixture"')
                 android.defaultConfig.testInstrumentationRunner = 'dev.ipf.whitenoise.android.qualification.QualificationRunner'
             }
         }
