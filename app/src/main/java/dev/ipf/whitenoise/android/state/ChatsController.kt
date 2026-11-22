@@ -718,6 +718,7 @@ class ChatsController private constructor(
         chatsDebug { "bind account=${accountRef?.take(8)}" }
         this.accountRef = accountRef
         this.boundAccountRef = accountRef
+        groupRecordsLoaded = false
         val seededLocalSnapshot =
             pendingInitialLocalSnapshot?.takeIf { snapshot -> snapshot.accountRef == accountRef }
         pendingInitialLocalSnapshot = null
@@ -2134,7 +2135,6 @@ class ChatsController private constructor(
         boundAccountRef = snapshot.accountRef
         snapshot.presentedRows?.let(::replacePresentedChatRows) ?: replaceChatRows(snapshot.rows)
         groupRecordsById = snapshot.groups.associateBy { it.groupIdHex }
-        groupRecordsLoaded = true
         applyInitialMemberIdProjections(
             projections = snapshot.memberIds,
             activeAccountIdHex = snapshot.activeAccountIdHex,

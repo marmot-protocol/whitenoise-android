@@ -37,6 +37,37 @@ class ChatsControllerInvitationSettlementTest {
     }
 
     /**
+     * A cold start or account switch seeds rows without any group records. Those rows wait for the chats stream's
+     * group snapshot, so nothing is read for them before it lands.
+     */
+    @Test
+    fun aSeededSnapshotReadsNothingBeforeTheGroupSnapshot() {
+        val data = InviteAcceptanceTestData
+        val row = data.chatListRow(true)
+        val seeded =
+            AccountSwitchLocalSnapshot(
+                accountRef = data.ACCOUNT,
+                activeAccountIdHex = "a".repeat(64),
+                rows = listOf(row),
+                groups = emptyList(),
+                memberIds = emptyList(),
+                profiles = emptyList(),
+            )
+        val chats = ChatsController(data.appState(), data.ACCOUNT, seeded) { _, _ -> emptyList() }
+        var reads = 0
+        try {
+            chats.settleInvitationFromMdk(row) { _, _ ->
+                reads++
+                data.group(true, data.OLD_WELCOME)
+            }
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(0, reads)
+        } finally {
+            chats.onCleared()
+        }
+    }
+
+    /**
      * A chat another device added can list a pending row whose record never reaches the chats stream. Once the
      * group snapshot is in, one read caches MDK's record, so the row stops reading as checked and shows its
      * invitation instead. Before the snapshot, the snapshot settles such rows and nothing is read.
