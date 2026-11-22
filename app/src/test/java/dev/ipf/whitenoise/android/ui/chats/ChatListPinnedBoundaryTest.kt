@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.boundsInRoot
@@ -270,7 +271,7 @@ class ChatListPinnedBoundaryTest {
         var lineColor = 0
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
-                lineColor = MaterialTheme.colorScheme.outlineVariant.toArgb()
+                lineColor = if (amoled) Color(0xFF3D3D3D).toArgb() else MaterialTheme.colorScheme.outlineVariant.toArgb()
                 CompositionLocalProvider(
                     LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
