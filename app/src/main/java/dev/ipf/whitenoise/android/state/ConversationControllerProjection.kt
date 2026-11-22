@@ -398,7 +398,7 @@ private fun ConversationController.describeTimelineInversionRow(
 
 internal fun ConversationController.suppressProjectedTimelineItems(messageIds: List<String>) {
     messageIds.forEach { messageIdHex ->
-        val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
+        val itemId = "msg:$messageIdHex"
         timelineItemsById.remove(itemId)
         timelineOrder.remove(itemId)
     }

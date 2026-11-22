@@ -2710,8 +2710,8 @@ internal fun ConversationScreen(
 
     // In-chat search match set. Computed over the currently-loaded, rendered
     // (edit-filtered) timeline only — no relay fetch, no full-history preload.
-    // Reactions / deletes / group-system rows carry no
-    // user-typed body and are excluded by `MessageSearch.isSearchable`. As
+    // Reactions / deletes / group-system rows carry no user-typed body and
+    // are excluded by `ChatListMessageSearch.isEligibleMatch`. As
     // older pages load, `renderedTimeline` grows and the match set expands
     // naturally. Keyed on `controller.timeline` (not just `renderedTimeline`'s
     // edges/size) so a kind-1009 edit — which changes the body returned by

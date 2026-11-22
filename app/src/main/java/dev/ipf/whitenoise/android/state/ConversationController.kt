@@ -1220,14 +1220,10 @@ class ConversationController(
     }
 
     /**
-     * The retained timeline row for the raw message id [messageId]. The row map is keyed by item id
-     * (`msg:<hex>`), so the id is resolved the way [removeProjectedRecord] resolves it. Null when the
+     * The retained timeline row for the raw message id [messageId], whose item id is `msg:<hex>`. Null when the
      * bounded window no longer holds the row.
      */
-    internal fun retainedTimelineItem(messageId: String): TimelineMessage? {
-        val itemId = timelineRecords[messageId]?.let(::projectedItemId) ?: "msg:$messageId"
-        return timelineItemsById[itemId]
-    }
+    internal fun retainedTimelineItem(messageId: String): TimelineMessage? = timelineItemsById["msg:$messageId"]
 
     /** Resolves a current visible action target, including local sends, without trusting a stale Compose row. */
     internal fun currentActionTimelineItem(messageId: String): TimelineMessage? {
@@ -3761,7 +3757,7 @@ class ConversationController(
 
     /** Removes one projection and every controller-owned index keyed to it. */
     internal fun removeProjectedRecord(messageIdHex: String) {
-        val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
+        val itemId = "msg:$messageIdHex"
         timelineRecords.remove(messageIdHex)
         authoritativeTimelineOrderByMessageId.remove(messageIdHex)
         projectedMessageIds.remove(messageIdHex)

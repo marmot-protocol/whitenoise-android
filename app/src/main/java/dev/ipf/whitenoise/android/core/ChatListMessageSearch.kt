@@ -16,10 +16,11 @@ import java.util.Locale
 object ChatListMessageSearch {
     // Kinds whose plaintext body is user-authored conversation text and is
     // therefore searchable. Per the issue's scope decision: kind:1 (legacy
-    // note), kind:9 (chat), kind:1209 (agent stream final). Everything else --
-    // reactions (7), deletes (5), edits (1009), and
-    // group-system events (1210) -- is excluded so search never matches on
-    // machine-authored content or raw JSON the user never typed.
+    // note), kind:9 (chat), kind:1209 (agent stream final), plus kind:1111
+    // thread messages MDK places under a parent ([isThreadMessage]). Everything
+    // else -- reactions (7), deletes (5), edits (1009), group-system events
+    // (1210) and a kind 1111 without a parent -- is excluded so search never
+    // matches on machine-authored content or raw JSON the user never typed.
     private val SearchableBodyKinds: Set<ULong> = setOf(1uL, 9uL, 1209uL)
 
     /** Whether records of [kind] are user-authored conversation text that search can list, thread messages included. */

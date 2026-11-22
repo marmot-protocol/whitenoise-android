@@ -33423,8 +33423,6 @@ SPLdev/ipf/whitenoise/android/state/ConversationController$LaterPageCardCandidat
 Ldev/ipf/whitenoise/android/state/ConversationController$applyTimelinePage$1;
 SPLdev/ipf/whitenoise/android/state/ConversationController$applyTimelinePage$1;-><init>(Ldev/ipf/whitenoise/android/state/ConversationController;Lkotlin/coroutines/Continuation;)V
 SPLdev/ipf/whitenoise/android/state/ConversationController$applyTimelinePage$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
-Ldev/ipf/whitenoise/android/state/ConversationController$applyTimelinePage$streamIdsToLaunch$1;
-SPLdev/ipf/whitenoise/android/state/ConversationController$applyTimelinePage$streamIdsToLaunch$1;-><init>(Ljava/lang/Object;)V
 Ldev/ipf/whitenoise/android/state/ConversationController$awaitForegroundDisappearingSweepSchedule$1;
 SPLdev/ipf/whitenoise/android/state/ConversationController$awaitForegroundDisappearingSweepSchedule$1;-><init>(Ldev/ipf/whitenoise/android/state/ConversationController;Lkotlin/coroutines/Continuation;)V
 SPLdev/ipf/whitenoise/android/state/ConversationController$awaitForegroundDisappearingSweepSchedule$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
@@ -33480,12 +33478,6 @@ SPLdev/ipf/whitenoise/android/state/ConversationController$optimisticGroupRoster
 Ldev/ipf/whitenoise/android/state/ConversationController$publishInitialTimelineSnapshot$1;
 SPLdev/ipf/whitenoise/android/state/ConversationController$publishInitialTimelineSnapshot$1;-><init>(Ldev/ipf/whitenoise/android/state/ConversationController;Lkotlin/coroutines/Continuation;)V
 SPLdev/ipf/whitenoise/android/state/ConversationController$publishInitialTimelineSnapshot$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
-Ldev/ipf/whitenoise/android/state/ConversationController$publishInitialTimelineSnapshot$streamIds$1;
-SPLdev/ipf/whitenoise/android/state/ConversationController$publishInitialTimelineSnapshot$streamIds$1;-><init>(Ldev/ipf/whitenoise/android/state/ConversationController;Ldev/ipf/marmotkit/TimelinePageFfi;Lkotlin/coroutines/Continuation;)V
-SPLdev/ipf/whitenoise/android/state/ConversationController$publishInitialTimelineSnapshot$streamIds$1;->create(Lkotlin/coroutines/Continuation;)Lkotlin/coroutines/Continuation;
-SPLdev/ipf/whitenoise/android/state/ConversationController$publishInitialTimelineSnapshot$streamIds$1;->invoke(Ljava/lang/Object;)Ljava/lang/Object;
-SPLdev/ipf/whitenoise/android/state/ConversationController$publishInitialTimelineSnapshot$streamIds$1;->invoke(Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-SPLdev/ipf/whitenoise/android/state/ConversationController$publishInitialTimelineSnapshot$streamIds$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
 Ldev/ipf/whitenoise/android/state/ConversationController$publishTimelinePageBeforeMarkdownHydration$hydration$1;
 SPLdev/ipf/whitenoise/android/state/ConversationController$publishTimelinePageBeforeMarkdownHydration$hydration$1;-><init>(Ljava/lang/Object;)V
 SPLdev/ipf/whitenoise/android/state/ConversationController$publishTimelinePageBeforeMarkdownHydration$hydration$1;->invoke()Ljava/lang/Object;
@@ -33598,16 +33590,6 @@ SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscripti
 SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$received$1;->invoke(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$received$1;->invoke(Lkotlinx/coroutines/CoroutineScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$received$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
-Ldev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1$$ExternalSyntheticLambda0;
-SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1$$ExternalSyntheticLambda0;-><init>(Lkotlin/jvm/internal/Ref$BooleanRef;Ldev/ipf/whitenoise/android/state/ConversationTimelineHandoff;Ljava/util/List;)V
-SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1$$ExternalSyntheticLambda0;->invoke()Ljava/lang/Object;
-Ldev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1;
-SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1;-><init>(Ldev/ipf/whitenoise/android/state/ConversationController;Ldev/ipf/marmotkit/TimelinePageFfi;Lkotlin/jvm/internal/Ref$BooleanRef;Ldev/ipf/whitenoise/android/state/ConversationTimelineHandoff;Ljava/util/List;Lkotlin/coroutines/Continuation;)V
-SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1;->create(Lkotlin/coroutines/Continuation;)Lkotlin/coroutines/Continuation;
-SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1;->invoke(Ljava/lang/Object;)Ljava/lang/Object;
-SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1;->invoke(Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1;->invokeSuspend$lambda$0(Lkotlin/jvm/internal/Ref$BooleanRef;Ldev/ipf/whitenoise/android/state/ConversationTimelineHandoff;Ljava/util/List;)Lkotlin/Unit;
-SPLdev/ipf/whitenoise/android/state/ConversationController$runTimelineSubscriptionPipeline$streamIdsLaunched$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
 Ldev/ipf/whitenoise/android/state/ConversationController$start$1;
 SPLdev/ipf/whitenoise/android/state/ConversationController$start$1;-><init>(Ldev/ipf/whitenoise/android/state/ConversationController;Ljava/lang/String;Lkotlin/coroutines/Continuation;)V
 SPLdev/ipf/whitenoise/android/state/ConversationController$start$1;->create(Lkotlin/coroutines/Continuation;)Lkotlin/coroutines/Continuation;
@@ -33801,7 +33783,6 @@ SPLdev/ipf/whitenoise/android/state/ConversationController;->pendingAttachmentsL
 SPLdev/ipf/whitenoise/android/state/ConversationController;->pendingEditKey(Ljava/lang/String;)Ljava/lang/String;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->pendingTimelineAtForeground$app()Lkotlinx/coroutines/CompletableDeferred;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->preserveOptimisticDisplayPosition(Ljava/lang/String;Ljava/lang/String;)V
-SPLdev/ipf/whitenoise/android/state/ConversationController;->preserveStreamFinalDisplayPosition(Ljava/lang/String;Ldev/ipf/marmotkit/AppMessageRecordFfi;Ljava/util/Set;)V
 SPLdev/ipf/whitenoise/android/state/ConversationController;->projectedItemId(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;)Ljava/lang/String;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->pruneConfirmedOptimisticMessages()V
 SPLdev/ipf/whitenoise/android/state/ConversationController;->pruneConfirmedOptimisticReactions()V
@@ -33829,7 +33810,6 @@ PLdev/ipf/whitenoise/android/state/ConversationController;->refreshManagementSta
 PLdev/ipf/whitenoise/android/state/ConversationController;->refreshManagementState(Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->refreshMembers$default(Ldev/ipf/whitenoise/android/state/ConversationController;ILkotlinx/coroutines/Deferred;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->refreshMembers(ILkotlinx/coroutines/Deferred;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-SPLdev/ipf/whitenoise/android/state/ConversationController;->refreshStreamingDebugPresentation()V
 SPLdev/ipf/whitenoise/android/state/ConversationController;->releaseInitialPageEventCardHold()V
 SPLdev/ipf/whitenoise/android/state/ConversationController;->releaseOrphanedOptimisticSendPreserves()Z
 SPLdev/ipf/whitenoise/android/state/ConversationController;->replyPreview(Ldev/ipf/whitenoise/android/state/TimelineMessage;Ldev/ipf/whitenoise/android/core/MessageTextCopy;)Ldev/ipf/whitenoise/android/core/TimelineReplyDisplay;
@@ -36002,7 +35982,6 @@ SPLdev/ipf/whitenoise/android/state/TimelinePageOutcome$Advanced;->getPage()Ldev
 Ldev/ipf/whitenoise/android/state/TimelinePageOutcome;
 Ldev/ipf/whitenoise/android/state/TimelineRecordRenderEqualityKt;
 SPLdev/ipf/whitenoise/android/state/TimelineRecordRenderEqualityKt;->markdownDocumentsRenderEqual(Ldev/ipf/marmotkit/MarkdownDocumentFfi;Ldev/ipf/marmotkit/MarkdownDocumentFfi;)Z
-SPLdev/ipf/whitenoise/android/state/TimelineRecordRenderEqualityKt;->pollAndAgentContentEqual(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;Ldev/ipf/marmotkit/TimelineMessageRecordFfi;)Z
 HSPLdev/ipf/whitenoise/android/state/TimelineRecordRenderEqualityKt;->timelineRecordContentEqual(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;Ldev/ipf/marmotkit/TimelineMessageRecordFfi;)Z
 SPLdev/ipf/whitenoise/android/state/TimelineRecordRenderEqualityKt;->timelineRecordEnvelopeEqual(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;Ldev/ipf/marmotkit/TimelineMessageRecordFfi;)Z
 SPLdev/ipf/whitenoise/android/state/TimelineRecordRenderEqualityKt;->timelineRecordsRenderEqual(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;Ldev/ipf/marmotkit/TimelineMessageRecordFfi;)Z

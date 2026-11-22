@@ -64,13 +64,16 @@ which turn those inputs into `--features otlp-export` and
   and `saveMessageDraftIfRevision`, which still replace the list, so draft
   behaviour does not change.
 
-Not adopted in this change: `sendThreadMessage` and a thread view. These
-still treat only kind 9 as chat, so a thread message misses them: showing an
-author's edit (the bubble keeps the original text), the Markdown fallback
-parse, the edit, forward, speak, translate, share and "show less" actions,
-multi-select, the files and media library, and its streaming-debug label. Device-group and multi-device APIs stay as 0.18.0 left them;
-linked devices now resend invitation decisions after losing a device-group fork
-without Android doing anything.
+Not adopted in this change: `sendThreadMessage` and a thread view. Several
+surfaces still treat only kind 9 as chat, so a thread message misses them: the
+"Edited" label on an author's edit (the bubble shows the edited text, which MDK
+supplies), the Markdown fallback parse, the edit, forward, speak, translate,
+share and "show less" actions, multi-select, the files and media library, the
+TalkBack announcement of a newly arrived message and the chat-list attachment
+glyph. With streaming debug on, a thread message renders as an unknown-kind debug
+row instead of its bubble. Device-group and multi-device APIs stay as 0.18.0
+left them; linked devices now resend invitation decisions after losing a
+device-group fork without Android doing anything.
 
 ## Upgrade
 
@@ -82,3 +85,13 @@ replies stay. The shared and directory databases keep their 0.18.0 schemas (5
 and 3). The upgrade is one way: a 0.18.0 build cannot reopen a migrated account,
 so a rollback needs a copy of the data taken before the upgrade. See
 [INT-010](manual-release-testing/cases/INT-010.md).
+
+The [first hosted campaign](https://github.com/marmot-protocol/whitenoise-android/actions/runs/45040792116)
+on `fd30e05ed2` passed the populated upgrade from 0.18.0, key migration, cold
+restart, the original pending upload and its restart, corrupt and lost media
+recovery and the stale-upload retry. Six of the seven recovery cases passed in
+both relay modes. `healthyAccountReceivesAfterLocalDeletionAndRestart` failed in
+both (`expected:<[healthy-incoming-0]> but was:<[]>`): receipt in a healthy chat
+after another chat is deleted locally is still
+[MDK #3264](https://github.com/marmot-protocol/mdk/issues/3264), which also failed
+the 0.17.0 control and master's own 0.17.0-to-0.18.0 runs for #3987.
