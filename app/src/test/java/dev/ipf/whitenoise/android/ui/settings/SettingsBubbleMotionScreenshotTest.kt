@@ -2,13 +2,17 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -16,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -45,9 +50,8 @@ import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
 
 /**
- * Chats and Settings: from a measured avatar a thin outline bubble grows into the nearest Settings
- * card and Back shrinks it into the avatar again; without an origin the page simply cross-fades over
- * the live Chats route. Deeper routes keep the slide, and reduced motion settles both directions at once.
+ * Chats and Settings on the top-level route. The measured avatar and pen travel independently.
+ * With neither measured control the page fades over Chats, and reduced motion settles at once.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -102,19 +106,29 @@ class SettingsBubbleMotionScreenshotTest {
         capture("settings_bubble_close_settled_dark")
     }
 
-    @Test fun measuredAmoledAvatarGrowsTheOutlineIntoTheNearestCardAndBack() {
-        render(dark = true, largeRtl = false, start = 0, measuredAvatar = true)
+    @Test fun measuredAmoledAvatarAndPenCarryThePageInAndBack() = measuredRoundTrip("amoled")
+
+    @Test fun measuredLightAvatarAndPenCarryThePageInAndBack() = measuredRoundTrip("light", dark = false)
+
+    @Test fun measuredLargeRtlAvatarAndPenCarryThePageInAndBack() = measuredRoundTrip("large_rtl", largeRtl = true)
+
+    private fun measuredRoundTrip(
+        variant: String,
+        dark: Boolean = true,
+        largeRtl: Boolean = false,
+    ) {
+        render(dark = dark, largeRtl = largeRtl, start = 0, measuredAvatar = true)
         composeRule.onNodeWithTag(AVATAR_TAG).performClick()
         composeRule.mainClock.advanceTimeByFrame()
         advanceFrames(48)
-        capture("settings_bubble_avatar_open_amoled")
+        capture("settings_bubble_avatar_open_$variant")
         advanceFrames(SETTLE_MILLIS)
         composeRule.onRoot().captureToImage()
 
         update { depth.value = 0 }
         composeRule.mainClock.advanceTimeByFrame()
         advanceFrames(128)
-        capture("settings_bubble_avatar_close_amoled")
+        capture("settings_bubble_avatar_close_$variant")
     }
 
     @Test fun reducedMotionSwitchesAtOnce() {
@@ -156,7 +170,7 @@ class SettingsBubbleMotionScreenshotTest {
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 LocalDensity provides Density(density.density, if (largeRtl) 1.6f else 1f),
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = measuredAvatar) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = dark && measuredAvatar) {
                     Surface(Modifier.fillMaxSize()) {
                         SettingsRouteMotion(
                             target = depth.value,
@@ -206,49 +220,85 @@ private fun Route(
     onOpen: () -> Unit,
 ) {
     if (measured && route == 1) {
-        // Measured Settings cards: the outline lands on the nearest one.
-        Surface(Modifier.fillMaxSize().testTag("route.$route")) {
-            Column(Modifier.padding(vertical = 72.dp)) {
-                SETTINGS_ROWS.chunked(3).forEach { group ->
-                    SettingsGroup(Modifier.padding(bottom = 16.dp)) {
-                        group.forEach { title ->
-                            row(title) { SettingsGroupPanel(it) { Text(title, Modifier.padding(16.dp)) } }
-                        }
-                    }
-                }
-            }
-        }
+        MeasuredSettings()
         return
     }
     val rows = if (route == 0) CHAT_ROWS else SETTINGS_ROWS
     Surface(Modifier.fillMaxSize().testTag("route.$route")) {
-        Column(Modifier.padding(16.dp)) {
-            if (measured) {
-                val (origin, open) = rememberSettingsRouteClick(onOpen)
-                Surface(
-                    modifier =
-                        Modifier
-                            .size(40.dp)
-                            .then(origin)
-                            .testTag(AVATAR_TAG)
-                            .clickable(onClick = open),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                ) {
-                    Text("N", Modifier.padding(10.dp))
+        Box(Modifier.fillMaxSize()) {
+            Column(Modifier.padding(16.dp)) {
+                if (measured) {
+                    val (origin, open) = rememberSettingsRouteClick(onOpen)
+                    Surface(
+                        modifier =
+                            Modifier
+                                .size(40.dp)
+                                .then(origin)
+                                .settingsCardMorph(SettingsHomeOriginAnchor)
+                                .settingsAvatarFlightSource(0.dp)
+                                .testTag(AVATAR_TAG)
+                                .clickable(onClick = open),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) { Text("N") }
+                    }
+                }
+                Text(
+                    if (route == 0) "Chats" else "Settings",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                rows.forEach { row ->
+                    Text(row, Modifier.fillMaxWidth().padding(vertical = 14.dp))
+                    HorizontalDivider()
                 }
             }
-            Text(
-                if (route == 0) "Chats" else "Settings",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(bottom = 12.dp),
-            )
-            rows.forEach { row ->
-                Text(row, Modifier.fillMaxWidth().padding(vertical = 14.dp))
-                HorizontalDivider()
+            if (measured) ScreenshotPen(Modifier.align(Alignment.BottomEnd))
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun MeasuredSettings() {
+    Surface(Modifier.fillMaxSize().testTag("route.1")) {
+        Column(Modifier.padding(vertical = 72.dp)) {
+            SettingsGroup(Modifier.padding(bottom = 16.dp)) {
+                row("Profile") {
+                    SettingsGroupPanel(it) {
+                        Surface(
+                            Modifier.padding(16.dp).size(56.dp).settingsAvatarFlightTarget(),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) { Text("N") }
+                        }
+                    }
+                }
+                row("Account") { SettingsGroupPanel(it) { Text("Account", Modifier.padding(16.dp)) } }
+            }
+            SettingsGroup {
+                SETTINGS_ROWS.drop(1).forEach { title ->
+                    row(title) { SettingsGroupPanel(it) { Text(title, Modifier.padding(16.dp)) } }
+                }
             }
         }
     }
+}
+
+@androidx.compose.runtime.Composable
+private fun ScreenshotPen(modifier: Modifier) {
+    val fill = MaterialTheme.colorScheme.surfaceContainerHigh
+    val border = MaterialTheme.colorScheme.outline
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier
+            .padding(8.dp)
+            .size(48.dp)
+            .settingsPenSource(true, 16.dp, fill, border)
+            .background(fill, shape)
+            .border(1.dp, border, shape),
+    )
 }
 
 private const val AVATAR_TAG = "motion.avatar"

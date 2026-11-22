@@ -64,19 +64,22 @@ internal class SettingsAvatarFlight(
     val layerBounds: Rect,
     val from: Rect,
     val to: Rect,
+    val profileFill: Color,
 )
 
-/** What one top-level frame draws besides the fading page: up to two bubbles and the flying avatar. */
+/** The measured elements that draw independently of the Settings stack. */
 internal class SettingsBubbleScene(
-    val bubbles: List<SettingsBubbleGeometry> = emptyList(),
+    val pen: SettingsBubbleGeometry? = null,
+    val origin: SettingsBubbleGeometry? = null,
     val flight: SettingsAvatarFlight? = null,
-)
+) {
+    val isEmpty: Boolean get() = pen == null && origin == null && flight == null
+}
 
 /**
- * The top-level scene in [host] coordinates. An [origin] that is the chat-list avatar flies it into
- * the profile card's [avatarTarget] while that card's outline grows around it; any other origin grows
- * into its nearest card. The pen, when on screen, morphs into the bottom-most visible card unless the
- * origin already lands there. Without a pen that card just fades in place.
+ * The top-level scene in [host] coordinates. A measured [origin] flies the avatar into its profile
+ * slot or grows an outline into the nearest card. The pen takes the lowest visible card unless the
+ * activated control already claims it. With no pen landing, the Settings stack fades in place.
  */
 internal fun settingsBubbleScene(
     host: Rect,
@@ -85,30 +88,40 @@ internal fun settingsBubbleScene(
     handoff: SettingsTopLevelHandoff?,
     avatarTarget: Rect?,
 ): SettingsBubbleScene {
+    val start = origin?.takeIf { it.visibleIn(host) } ?: return SettingsBubbleScene()
     val visible = cards.filter { it.visibleBounds.visibleIn(host) }
-    val avatar = handoff?.avatar?.takeIf { origin != null && it.bounds.contains(origin.center) }
-    val target = avatarTarget?.takeIf { avatar != null && it.visibleIn(host) }
-    val profile = target?.let { t -> visible.firstOrNull { it.visibleBounds.contains(t.center) } }
-    val originCard = profile ?: origin?.let { nearestSettingsBubbleCard(visible, it, host) }
-    val bottom = visible.maxByOrNull { it.visibleBounds.bottom }?.takeIf { it != originCard }
-    val pen = handoff?.pen?.takeIf { bottom != null && it.bounds.visibleIn(host) }
+    val avatar = handoff?.avatar?.takeIf { it.bounds.visibleIn(host) && it.bounds.contains(start.center) }
+    val alternateCard = if (avatar == null) nearestSettingsBubbleCard(visible, start, host) else null
+    val bottom = visible.maxByOrNull { it.visibleBounds.bottom }?.takeUnless { it == alternateCard }
+    val pen = handoff?.pen?.takeIf { it.bounds.visibleIn(host) }
     val shift = -host.topLeft
-    val bubbles =
-        listOfNotNull(
-            originCard?.let { SettingsBubbleGeometry(checkNotNull(origin).translate(shift), it.translate(shift)) },
-            pen?.let {
-                val control = SettingsBubbleControl(it.radius, it.fill, it.border)
-                SettingsBubbleGeometry(it.bounds.translate(shift), checkNotNull(bottom).translate(shift), control)
-            },
-        )
-    val flight =
-        if (avatar != null && target != null && profile != null) {
-            val layerBounds = avatar.layerBounds.translate(shift)
-            SettingsAvatarFlight(avatar.layer, layerBounds, avatar.bounds.translate(shift), target.translate(shift))
+    val penLanding =
+        if (bottom != null && pen != null) {
+            val control = SettingsBubbleControl(pen.radius, pen.fill, pen.border)
+            SettingsBubbleGeometry(pen.bounds.translate(shift), bottom.translate(shift), control)
         } else {
             null
         }
-    return SettingsBubbleScene(bubbles, flight)
+    val flight = avatar?.flightTo(avatarTarget, visible, host)
+    val alternate = alternateCard?.let { SettingsBubbleGeometry(start.translate(shift), it.translate(shift)) }
+    return SettingsBubbleScene(pen = penLanding, origin = alternate, flight = flight)
+}
+
+private fun SettingsAvatarSource.flightTo(
+    avatarTarget: Rect?,
+    cards: List<SettingsBubbleCard>,
+    host: Rect,
+): SettingsAvatarFlight? {
+    val target = avatarTarget?.takeIf { it.visibleIn(host) } ?: return null
+    val profile = cards.firstOrNull { it.visibleBounds.contains(target.center) } ?: return null
+    val shift = -host.topLeft
+    return SettingsAvatarFlight(
+        layer = layer,
+        layerBounds = layerBounds.translate(shift),
+        from = bounds.translate(shift),
+        to = target.translate(shift),
+        profileFill = profile.fill,
+    )
 }
 
 /** The flying avatar's circle at [presence], moving and scaling on the bubble's clock. */

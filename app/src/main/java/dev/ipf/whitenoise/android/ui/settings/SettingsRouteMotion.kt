@@ -112,8 +112,8 @@ internal fun <T> SettingsRouteMotion(
         history.target = target
         history.depth = depth
     }
-    // Chats and top-level Settings are a shared avatar and outline bubbles from the activating control
-    // and the pen into their Settings cards (see settingsBubbleScene), never a multi-group contour morph.
+    // The top-level pair owns the flying avatar and the Settings stack anchored to the pen contour.
+    // A measured alternate control can claim its own card (see settingsBubbleScene).
     val topLevelPair = topLevelBubble && morph?.page != null && usesSettingsBubble(previousDepth, depth)
     // Read before the page host consumes the click's measured origin and clears the leaving cards.
     val topLevelOrigin = remember(ownerKey, target) { morph?.page?.pendingOrigin?.takeIf { topLevelPair && forward } }
@@ -339,7 +339,7 @@ internal fun <T> rememberRouteMotionModifier(
         SideEffect {
             // The live avatar and pen stay out of sight while this leg draws them.
             hooks.handoff?.hideAvatar = { motion && progress.value < 1f && scene().flight != null }
-            hooks.handoff?.hidePen = { motion && progress.value < 1f && scene().bubbles.any { it.control != null } }
+            hooks.handoff?.hidePen = { motion && progress.value < 1f && scene().pen != null }
         }
         return Modifier
             .onGloballyPositioned { host[0] = it.settingsMorphBounds(view) }

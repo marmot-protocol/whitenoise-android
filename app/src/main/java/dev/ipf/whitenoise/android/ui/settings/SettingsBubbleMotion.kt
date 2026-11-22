@@ -5,15 +5,20 @@ import androidx.compose.animation.core.Easing
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Canvas
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.draw
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
@@ -47,6 +52,8 @@ internal class SettingsCardSnapshot {
 }
 
 private const val MIN_SHRINK_FROM = 0.001f
+private const val SETTINGS_STACK_START_SCALE = 0.56f
+private const val SETTINGS_FADE_START = 0.35f
 
 /** A container growing from a measured control rectangle keeps that control's rounded-row corners at first. */
 private val SettingsRowContainerCornerRadius = 20.dp
@@ -163,20 +170,15 @@ internal fun Modifier.recordSettingsCard(
 ): Modifier = drawWithContent { if (settled()) drawAndRecord(snapshot) else drawContent() }
 
 /**
- * The top-level Chats/Settings pair. Opening, the live Settings destination arrives over the live
- * Chats route beneath it, all on one clock ([scene]): the chat-list avatar flies into the profile
- * card's avatar while that card's thin outline bubble grows around it (any other origin grows into
- * its nearest card), and the New message pen morphs into the bottom-most card. Each card's content
- * cross-fades in at its final size inside its bubble while the header and the other cards fade in in
- * place and the [colors] backplate covers Chats quickly. There is no scrim and no page content is
- * scaled or moved. Closing never retains the Settings composition: Chats is live at once and only
- * [closingPicture], an inert picture of the last permitted Settings frame, runs the exact reverse
- * over it; without a picture the bare bubbles and the avatar still return. A reversed leg continues
- * the Settings ink it turned around with ([resume]), so reopening from a close that drew none brings
- * the ink in from none and turning back again keeps it. Without bubbles the page just cross-fades.
- * The shapes and every alpha are functions of presence alone, so a reversal continues from the drawn
- * frame. Chats itself is never captured: its avatar travels as its live display list, and only this
- * route's content is recorded, into [snapshot] and only while [recording] allows it.
+ * The top-level Chats/Settings pair. Settings scales out from the pen contour, with the landing
+ * card fading in inside its own outline. The avatar flies independently into its profile slot.
+ * An alternate measured origin gets its own outline. When the pen has no measured landing, the
+ * remaining Settings content fades in place. The backplate quickly covers the live Chats underlay.
+ *
+ * Back runs the same scene in reverse over live Chats using [closingPicture], a copy of the last
+ * permitted Settings frame. The moving elements still return without a picture. Interrupted legs
+ * pick up the Settings ink they turned around with ([resume]). [recording] applies to Settings;
+ * the Chats avatar uses its live display list.
  */
 @Suppress("LongParameterList")
 internal fun Modifier.settingsBubbleMotion(
@@ -201,7 +203,7 @@ internal fun Modifier.settingsBubbleMotion(
             val presence = progress().coerceIn(0f, 1f)
             drawRect(colors.backplate, alpha = settingsBubbleUnderlayCover(presence))
             val ink = settingsBubbleInk(presence, opening = true, resume)
-            drawSettingsBubbleFrame(scene(), presence, colors, ink) { this@drawWithContent.drawContent() }
+            drawSettingsArrival(scene(), presence, colors, ink) { this@drawWithContent.drawContent() }
         }
     } else {
         drawWithContent {
@@ -211,14 +213,73 @@ internal fun Modifier.settingsBubbleMotion(
             val picture = closingPicture()
             val drawn = scene()
             // Without a picture, a bubble or the avatar there is nothing of Settings left to reverse.
-            if (picture == null && drawn.bubbles.isEmpty() && drawn.flight == null) return@drawWithContent
+            if (picture == null && drawn.isEmpty) {
+                return@drawWithContent
+            }
             drawRect(colors.backplate, alpha = settingsBubbleUnderlayCover(presence))
             val content: (DrawScope.() -> Unit)? =
                 picture?.let { frame -> { drawIntoCanvas { it.nativeCanvas.drawPicture(frame) } } }
             val ink = settingsBubbleInk(presence, opening = false, resume)
-            drawSettingsBubbleFrame(drawn, presence, colors, ink, content)
+            drawSettingsArrival(drawn, presence, colors, ink, content)
         }
     }
+
+/** The pen contour and the stack share an anchor; the avatar follows its own path. */
+internal fun DrawScope.drawSettingsArrival(
+    scene: SettingsBubbleScene,
+    presence: Float,
+    colors: SettingsBubbleColors,
+    ink: Float,
+    content: (DrawScope.() -> Unit)?,
+) {
+    val flight = scene.flight
+    val page: (DrawScope.() -> Unit)? =
+        content?.let { drawPage ->
+            {
+                drawPage()
+                if (flight != null) {
+                    // Cover the avatar and its antialiased edge with the surrounding card fill.
+                    val slot = flight.to.inflate(1f)
+                    drawRect(flight.profileFill, slot.topLeft, slot.size)
+                }
+            }
+        }
+    val alpha = settingsStackAlpha(presence, scene.pen != null) * ink
+    if (page != null && alpha > 0f) drawSettingsStack(scene, presence, alpha, page)
+    scene.origin?.let { drawClippedBubble(it, presence, colors, ink, page) }
+    scene.pen?.let { drawClippedBubble(it, presence, colors, ink, page) }
+    flight?.let { drawSettingsAvatarFlight(it, presence) }
+}
+
+private fun settingsStackAlpha(
+    presence: Float,
+    fromPen: Boolean,
+): Float = if (fromPen) presence else ((presence - SETTINGS_FADE_START) / (1f - SETTINGS_FADE_START)).coerceAtLeast(0f)
+
+private fun DrawScope.drawSettingsStack(
+    scene: SettingsBubbleScene,
+    presence: Float,
+    alpha: Float,
+    content: DrawScope.() -> Unit,
+) {
+    val viewport = Rect(Offset.Zero, size)
+    val landing = scene.pen
+    val holes =
+        Path().apply {
+            scene.origin?.let { addRect(it.card.visibleBounds) }
+            landing?.let { addRect(it.card.visibleBounds) }
+        }
+    val stack: DrawScope.() -> Unit = { drawAtAlpha(viewport, alpha) { clipPath(holes, ClipOp.Difference, content) } }
+    if (landing == null) {
+        stack()
+        return
+    }
+    val pivot = landing.card.bounds.topCenter
+    val outline = settingsBubbleShape(landing, presence)
+    val offset = Offset((outline.left + outline.right) / 2f, outline.top) - pivot
+    val stackScale = SETTINGS_STACK_START_SCALE + (1f - SETTINGS_STACK_START_SCALE) * presence
+    translate(offset.x, offset.y) { scale(stackScale, pivot, stack) }
+}
 
 /** Records this route's current frame into [snapshot] without drawing it. */
 private fun ContentDrawScope.record(snapshot: SettingsCardSnapshot) {

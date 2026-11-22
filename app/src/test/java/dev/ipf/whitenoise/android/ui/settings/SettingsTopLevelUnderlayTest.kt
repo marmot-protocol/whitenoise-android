@@ -140,12 +140,10 @@ class SettingsTopLevelUnderlayTest {
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag(AVATAR).performClick()
         repeat(MID_OPEN_FRAMES) { step() }
-        println("INKDBG open ${ink(frame())}")
         assertTrue("Settings ink shows mid-open", ink(frame()) > MID_OPEN_INK)
 
         update { section.value = 0 }
         repeat(2) { step() }
-        println("INKDBG close ${ink(frame())}")
         assertTrue("the pictureless close draws no Settings ink", ink(frame()) < NO_INK)
 
         rule.onNodeWithTag(AVATAR).performClick()
@@ -153,7 +151,6 @@ class SettingsTopLevelUnderlayTest {
         repeat(REOPEN_FRAMES) {
             step()
             val next = ink(frame())
-            println("INKDBG reopen $next")
             assertTrue("reopened ink grows gradually: $drawn -> $next", next - drawn <= MAX_INK_STEP)
             drawn = next
         }

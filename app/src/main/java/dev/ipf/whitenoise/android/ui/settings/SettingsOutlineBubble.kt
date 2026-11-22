@@ -10,7 +10,6 @@ import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -27,9 +26,6 @@ private const val SETTINGS_BUBBLE_UNDERLAY_FADE_END = 0.5f
 /** The landing card's own content cross-fades in, at its final size inside the bubble, over this presence. */
 private const val BUBBLE_CARD_FADE_START = 0.25f
 private const val BUBBLE_CARD_FADE_END = 0.8f
-
-/** The rest of Settings (its header and the other cards) fades in in place from this presence. */
-private const val SETTINGS_BUBBLE_PAGE_FADE_START = 0.35f
 
 /** A control bubble's pen is gone by this presence, as the pen's is entering the composer. */
 private const val SETTINGS_BUBBLE_GLYPH_FADE_END = 0.5f
@@ -117,9 +113,6 @@ internal fun settingsBubbleUnderlayCover(presence: Float): Float = ramp(presence
 /** The landing card's own content inside the bubble. */
 internal fun settingsBubbleCardAlpha(presence: Float) = ramp(presence, BUBBLE_CARD_FADE_START, BUBBLE_CARD_FADE_END)
 
-/** Everything else in Settings, at its final position. */
-internal fun settingsBubblePageAlpha(presence: Float): Float = ramp(presence, SETTINGS_BUBBLE_PAGE_FADE_START, 1f)
-
 /** The bubble at [presence]: the origin's circle at 0 and the card's resting outline at 1, on one clock. */
 internal fun settingsBubbleShape(
     geometry: SettingsBubbleGeometry,
@@ -134,51 +127,11 @@ internal fun settingsBubbleShape(
 }
 
 /**
- * One frame of the top-level pair over the backplate. Settings [content] outside the [scene]'s
- * landing cards fades in in place while each bubble carries its card, and the flying avatar lands in
- * the profile card's avatar, which stays out of the content until it lands. [ink] scales every
- * Settings ink alpha (a reopen after a close that drew none).
- */
-internal fun DrawScope.drawSettingsBubbleFrame(
-    scene: SettingsBubbleScene,
-    presence: Float,
-    colors: SettingsBubbleColors,
-    ink: Float,
-    content: (DrawScope.() -> Unit)?,
-) {
-    val page = settingsBubblePageAlpha(presence) * ink
-    val whole = Rect(Offset.Zero, size)
-    if (content != null && page > 0f) {
-        val outside =
-            Path().apply {
-                fillType = PathFillType.EvenOdd
-                addRect(whole)
-                scene.bubbles.forEach { addRect(it.card.visibleBounds) }
-            }
-        clipPath(outside) { drawAtAlpha(whole, page, content) }
-    }
-    val landing = scene.flight?.to
-    val cardContent: (DrawScope.() -> Unit)? =
-        content?.let { draw ->
-            if (landing == null) {
-                draw
-            } else {
-                {
-                    val hole = Path().apply { addOval(landing) }
-                    clipPath(hole, ClipOp.Difference) { draw() }
-                }
-            }
-        }
-    scene.bubbles.forEach { drawClippedBubble(it, presence, colors, ink, cardContent) }
-    scene.flight?.let { drawSettingsAvatarFlight(it, presence) }
-}
-
-/**
  * One bubble, clipped like its card. A card its viewport partly clips keeps that clip at rest; the
  * bubble leaves it as it leaves the card, and the card's hidden strips stay hidden throughout, so no
  * frame paints its chrome over the header.
  */
-private fun DrawScope.drawClippedBubble(
+internal fun DrawScope.drawClippedBubble(
     geometry: SettingsBubbleGeometry,
     presence: Float,
     colors: SettingsBubbleColors,
@@ -257,7 +210,15 @@ private fun DrawScope.drawSettingsBubble(
     val resting = if (card.outline.isSpecified) card.outline else colors.edge
     val color = if (control != null) lerp(control.border, resting, p) else resting
     if (handover < 1f) drawControlMorphOutline(bounds, shape.topLeftCornerRadius.x, color, card.stroke, 1f - handover)
-    val glyph = colors.glyph?.takeIf { control != null } ?: return
+    if (control != null) drawSettingsPen(bounds, presence, colors)
+}
+
+private fun DrawScope.drawSettingsPen(
+    bounds: Rect,
+    presence: Float,
+    colors: SettingsBubbleColors,
+) {
+    val glyph = colors.glyph ?: return
     val glyphAlpha = 1f - ramp(presence, 0f, SETTINGS_BUBBLE_GLYPH_FADE_END)
     if (glyphAlpha <= 0f) return
     val glyphSize = SettingsBubbleGlyphSize.toPx()

@@ -27,6 +27,16 @@
           "SET-069"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Measured pen, profile avatar and alternate Settings landings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsTopLevelHandoff.kt",
+        "anchor": "fun settingsBubbleScene(",
+        "test_ids": [
+          "SET-069"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []
