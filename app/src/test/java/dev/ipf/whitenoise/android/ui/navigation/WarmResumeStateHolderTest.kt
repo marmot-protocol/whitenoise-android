@@ -5,6 +5,9 @@ import android.os.Bundle
 import android.os.Parcel
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
@@ -594,6 +597,40 @@ class WarmResumeStateHolderTest {
         restoredHolder.release()
     }
 
+    /**
+     * Clearing the holder's ViewModel, as the system does when its Activity is finished, stops the process-retained
+     * navigator from writing into that Activity's saved state, while the route itself goes on.
+     */
+    @Test
+    fun aClearedHolderNoLongerSavesTheSection() {
+        val state = appState()
+        val processState = MainShellProcessState(state)
+        val saved = SavedStateHandle()
+        val store = ViewModelStore()
+        val factory =
+            object : ViewModelProvider.Factory {
+                /** Builds the one holder under test over [saved] and the shared process state. */
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = MainShellStateHolder(state, saved, processState) as T
+            }
+        val holder = ViewModelProvider(store, factory)[MainShellStateHolder::class.java]
+        holder.chatsController(ACCOUNT_REF, state.runtimeGeneration)
+        holder.dispatchShellNav(ShellNavEvent.OpenSettings(SettingsDetail.Appearance))
+        // Saving works before the clear, so its absence afterwards is the clear's doing.
+        assertEquals(SettingsDetail.Appearance.name, saved.get<String>(SECTION_DETAIL_KEY))
+
+        store.clear()
+        processState.shellNavigator.dispatch(ShellNavEvent.ChangeSettingsDetail(SettingsDetail.Relays))
+
+        assertEquals(SettingsDetail.Relays.name, holder.sectionState.settingsDetailName)
+        assertEquals(
+            "a cleared holder's saved state is no longer written",
+            SettingsDetail.Appearance.name,
+            saved.get<String>(SECTION_DETAIL_KEY),
+        )
+        processState.release()
+    }
+
     /** Recreates a Bundle through Android's parcel wire format before owner restoration. */
     private fun Bundle.parcelRoundTrip(): Bundle {
         val parcel = Parcel.obtain()
@@ -703,5 +740,6 @@ class WarmResumeStateHolderTest {
         const val ACCOUNT_REF = "warm-resume-account"
         const val SECOND_ACCOUNT_REF = "second-account"
         val GROUP_ID = "1".repeat(64)
+        const val SECTION_DETAIL_KEY = "main_shell_section_detail"
     }
 }
