@@ -6,8 +6,11 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -63,7 +66,7 @@ private val NAME_PADDING = 4.dp
 /** The share of a cell a shrunk word may fill, leaving room for rounding so it never wraps or ellipsizes. */
 private const val NAME_FIT = 0.92f
 
-/** An emoji's name as drawn: one word per line, in a style small enough for its widest word to fit. */
+/** An emoji's name as drawn: on one line, or one word per line when the whole name does not fit. */
 private data class FittedName(
     val text: String,
     val lines: Int,
@@ -71,25 +74,29 @@ private data class FittedName(
 )
 
 /**
- * [description] one word per line, its label style shrunk only as far as its widest word needs to fit [available],
- * as the other apps scale their labels down. A word never breaks and nothing is cut off. At large text sizes the
- * longest names land near the default label size, so no floor is needed.
+ * The code's [descriptions] in one shared label style, shrunk only as far as the widest single word needs to fit
+ * [available], as the other apps scale their labels down. A name stays on one line when it fits at that size, and
+ * otherwise takes a line per word, so a word never breaks, nothing is cut off and every name reads the same size.
  */
 @Composable
-private fun rememberFittedName(
-    description: String,
+private fun rememberFittedNames(
+    descriptions: List<String>,
     available: Dp,
-): FittedName {
+): List<FittedName> {
     val base = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.sp)
     val measurer = rememberTextMeasurer()
     val availablePx = with(LocalDensity.current) { available.toPx() }
-    return remember(description, base, availablePx, measurer) {
-        val words = description.split(' ').filter(String::isNotEmpty).ifEmpty { listOf(description) }
-        val widest = words.maxOf { measurer.measure(it, base, softWrap = false, maxLines = 1).size.width }
+    return remember(descriptions, base, availablePx, measurer) {
+        fun width(text: String) = measurer.measure(text, base, softWrap = false, maxLines = 1).size.width
         val room = availablePx * NAME_FIT
-        val scale = if (widest > room) room / widest else 1f
+        val words = descriptions.map { name -> name.split(' ').filter(String::isNotEmpty).ifEmpty { listOf(name) } }
+        val widestWord = words.flatten().maxOfOrNull(::width) ?: 0
+        val scale = if (widestWord > room) room / widestWord else 1f
         val style = base.copy(fontSize = base.fontSize * scale, lineHeight = base.lineHeight * scale)
-        FittedName(words.joinToString("\n"), words.size, style)
+        descriptions.zip(words) { name, parts ->
+            val oneLine = parts.size == 1 || width(name) * scale <= room
+            if (oneLine) FittedName(name, 1, style) else FittedName(parts.joinToString("\n"), parts.size, style)
+        }
     }
 }
 
@@ -215,12 +222,16 @@ internal fun DeviceLinkCode(
     BoxWithConstraints(modifier.fillMaxWidth().testTag(DEVICE_LINK_CODE_TAG)) {
         val spacing = WhiteNoiseSpacing.Related
         val cellWidth = (maxWidth - spacing * (DEVICE_LINK_CODE_COLUMNS - 1)) / DEVICE_LINK_CODE_COLUMNS
+        val names = rememberFittedNames(code.map { it.description }, cellWidth - NAME_PADDING * 2)
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing)) {
             code.chunked(DEVICE_LINK_CODE_COLUMNS).forEachIndexed { row, emojis ->
-                Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(spacing, Alignment.CenterHorizontally)) {
+                Row(
+                    Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                    Arrangement.spacedBy(spacing, Alignment.CenterHorizontally),
+                ) {
                     emojis.forEachIndexed { column, emoji ->
-                        val position = row * DEVICE_LINK_CODE_COLUMNS + column + 1
-                        DeviceLinkEmojiCell(emoji, position, code.size, cellWidth)
+                        val index = row * DEVICE_LINK_CODE_COLUMNS + column
+                        DeviceLinkEmojiCell(emoji, names[index], index + 1, code.size, cellWidth)
                     }
                 }
             }
@@ -229,12 +240,13 @@ internal fun DeviceLinkCode(
 }
 
 /**
- * One emoji of the code above its name in a cell [width] wide. Both shrink only when the cell is too narrow, and a
- * two-word name takes a line per word, so no name is cut off or broken inside a word.
+ * One emoji of the code above its fitted [name] in a cell [width] wide, as tall as the tallest cell in its row. The
+ * emoji shrinks only when the cell is too narrow.
  */
 @Composable
 private fun DeviceLinkEmojiCell(
     emoji: DeviceLinkEmojiFfi,
+    name: FittedName,
     position: Int,
     count: Int,
     width: Dp,
@@ -245,14 +257,13 @@ private fun DeviceLinkEmojiCell(
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.width(width).clearAndSetSemantics { contentDescription = spoken },
+        modifier = Modifier.width(width).fillMaxHeight().clearAndSetSemantics { contentDescription = spoken },
     ) {
         Column(
             modifier = Modifier.padding(horizontal = NAME_PADDING, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(emoji.emoji, style = emojiStyle.copy(fontSize = emojiSize, lineHeight = emojiSize * EMOJI_LINE))
-            val name = rememberFittedName(emoji.description, width - NAME_PADDING * 2)
             Text(
                 text = name.text,
                 style = name.style,
