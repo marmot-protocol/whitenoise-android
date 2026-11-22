@@ -6052,8 +6052,8 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-      "symbol": "ChatFolderEditSession",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+      "symbol": "ChatFolderDiscardDialog",
       "bindings": [
         {
           "case": "folders-description-keep-editing",
