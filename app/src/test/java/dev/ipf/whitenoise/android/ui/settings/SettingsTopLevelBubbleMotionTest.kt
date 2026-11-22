@@ -468,8 +468,10 @@ class SettingsTopLevelBubbleMotionTest {
         )
 
     private fun Rect.containsRect(other: Rect): Boolean =
-        left <= other.left && top <= other.top &&
-            right >= other.right && bottom >= other.bottom
+        left <= other.left &&
+            top <= other.top &&
+            right >= other.right &&
+            bottom >= other.bottom
 
     private fun handoff(pen: Boolean): SettingsTopLevelHandoff {
         var layer: GraphicsLayer? = null

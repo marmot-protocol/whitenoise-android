@@ -113,15 +113,17 @@ private fun SettingsAvatarSource.flightTo(
     host: Rect,
 ): SettingsAvatarFlight? {
     val target = avatarTarget?.takeIf { it.visibleIn(host) } ?: return null
-    val profile = cards.firstOrNull { it.visibleBounds.contains(target.center) } ?: return null
+    val profile = cards.firstOrNull { it.visibleBounds.contains(target.center) }
     val shift = -host.topLeft
-    return SettingsAvatarFlight(
-        layer = layer,
-        layerBounds = layerBounds.translate(shift),
-        from = bounds.translate(shift),
-        to = target.translate(shift),
-        profileFill = profile.fill,
-    )
+    return profile?.let {
+        SettingsAvatarFlight(
+            layer = layer,
+            layerBounds = layerBounds.translate(shift),
+            from = bounds.translate(shift),
+            to = target.translate(shift),
+            profileFill = it.fill,
+        )
+    }
 }
 
 /** The flying avatar's circle at [presence], moving and scaling on the bubble's clock. */
