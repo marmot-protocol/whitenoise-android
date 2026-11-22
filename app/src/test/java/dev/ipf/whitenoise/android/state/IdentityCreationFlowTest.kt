@@ -59,7 +59,9 @@ class IdentityCreationFlowTest {
     fun profileSaveWaitsForReadinessWithoutHoldingTheAccountLifetime() {
         val adapter = appStateSource("AppProfileSignUp.kt").readText()
         val publish = adapter.substringAfter("publish = { account, metadata ->").substringBefore("finish =")
-        assertTrue(publish.indexOf("awaitOwnedNetworkReadiness(account)") in 0 until publish.indexOf("publishProfile("))
+        val reuse = "initialProfile == metadata || appState.publishProfile(metadata)"
+        assertTrue(publish.indexOf("awaitOwnedNetworkReadiness(account)") in 0 until publish.indexOf(reuse))
+        assertTrue(adapter.functionBody("createOwnedIdentity").contains("owner.copy(initialProfile = receipt?.profile)"))
         val wait = adapter.functionBody("awaitOwnedNetworkReadiness")
         assertFalse(wait.contains("withAccountLifetime"))
         assertTrue(wait.contains("ownerAvailable()"))

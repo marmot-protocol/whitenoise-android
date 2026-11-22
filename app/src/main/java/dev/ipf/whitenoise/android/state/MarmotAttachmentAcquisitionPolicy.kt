@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AccountSetupReadinessFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
+import dev.ipf.marmotkit.IdentityCreationResultFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -61,9 +62,9 @@ internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): Accoun
  * key-derived default name before the chosen one (mdk#2216). Unlike [createIdentityWithBootstrapRelays] it
  * returns at local readiness, so the caller retains the receipt before [awaitAccountNetworkReady].
  */
-internal suspend fun MarmotInterface.createNamedIdentity(profile: UserProfileMetadataFfi): AccountSummaryFfi {
+internal suspend fun MarmotInterface.createNamedIdentity(profile: UserProfileMetadataFfi): IdentityCreationResultFfi {
     val relays = MarmotClient.bootstrapRelays
-    return createIdentityWithInitialProfile(profile, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays).account
+    return createIdentityWithInitialProfile(profile, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)
 }
 
 /**
