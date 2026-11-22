@@ -611,7 +611,10 @@ class WarmResumeStateHolderTest {
             object : ViewModelProvider.Factory {
                 /** Builds the one holder under test over [saved] and the shared process state. */
                 @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T = MainShellStateHolder(state, saved, processState) as T
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    val built = MainShellStateHolder(state, saved, processState)
+                    return built as T
+                }
             }
         val holder = ViewModelProvider(store, factory)[MainShellStateHolder::class.java]
         holder.chatsController(ACCOUNT_REF, state.runtimeGeneration)
