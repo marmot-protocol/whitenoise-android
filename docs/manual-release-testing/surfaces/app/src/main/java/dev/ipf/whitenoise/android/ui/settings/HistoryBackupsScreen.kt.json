@@ -54,6 +54,14 @@
         ]
       },
       {
+        "surface": "CopyRecoveryWordsButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "fun CopyRecoveryWordsButton(",
+        "test_ids": [
+          "SET-070"
+        ]
+      },
+      {
         "surface": "SetupButtons",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "fun SetupButtons(",
@@ -440,6 +448,22 @@
         "anchor": "R.string.history_restore_unavailable",
         "test_ids": [
           "SET-071"
+        ]
+      },
+      {
+        "surface": "R.string.history_backups_copy_words",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "R.string.history_backups_copy_words",
+        "test_ids": [
+          "SET-070"
+        ]
+      },
+      {
+        "surface": "R.string.copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "SET-070"
         ]
       }
     ]

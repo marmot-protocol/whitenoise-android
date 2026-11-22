@@ -21,8 +21,9 @@
     <string name="history_backups_turn_off_message">Your account stops saving new backups. Backups already saved stay online, and your recovery words can still restore them.</string>
     <string name="history_backups_schedule">This device saves a backup about once a day while it is charging on Wi-Fi.</string>
     <string name="history_backups_words_title">Your recovery words</string>
-    <string name="history_backups_words_message">Write these 12 words on paper, in order, and keep them somewhere safe. They are shown only now. Anyone who has them can read your backed-up history.</string>
-    <string name="history_backups_words_written">I wrote them down</string>
+    <string name="history_backups_words_message">Write these 12 words down in order, or save them in a password manager. They are shown only now. Anyone who has them can read your backed-up history.</string>
+    <string name="history_backups_words_written">I saved them</string>
+    <string name="history_backups_copy_words">Copy words</string>
     <string name="history_backups_confirm_title">Confirm your words</string>
     <string name="history_backups_confirm_message">Type word %1$d and word %2$d from your list. If you didn’t write them down, cancel and start again for new words.</string>
     <string name="history_backups_word_label">Word %1$d</string>

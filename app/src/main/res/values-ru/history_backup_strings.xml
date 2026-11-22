@@ -21,8 +21,9 @@
     <string name="history_backups_turn_off_message">Аккаунт перестанет сохранять новые копии. Уже сохранённые копии останутся в сети, и слова восстановления по-прежнему смогут их восстановить.</string>
     <string name="history_backups_schedule">Это устройство сохраняет копию примерно раз в день, когда заряжается и подключено к Wi-Fi.</string>
     <string name="history_backups_words_title">Ваши слова восстановления</string>
-    <string name="history_backups_words_message">Запишите эти 12 слов на бумаге по порядку и храните в надёжном месте. Они показываются только сейчас. Любой, у кого они есть, сможет прочитать сохранённую историю.</string>
-    <string name="history_backups_words_written">Слова записаны</string>
+    <string name="history_backups_words_message">Запишите эти 12 слов по порядку или сохраните их в менеджере паролей. Они показываются только сейчас. Любой, у кого они есть, сможет прочитать сохранённую историю.</string>
+    <string name="history_backups_words_written">Слова сохранены</string>
+    <string name="history_backups_copy_words">Скопировать слова</string>
     <string name="history_backups_confirm_title">Подтвердите слова</string>
     <string name="history_backups_confirm_message">Введите слово %1$d и слово %2$d из своего списка. Если вы их не записали, отмените и начните заново, чтобы получить новые слова.</string>
     <string name="history_backups_word_label">Слово %1$d</string>

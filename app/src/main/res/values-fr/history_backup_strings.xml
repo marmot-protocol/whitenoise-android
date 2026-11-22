@@ -21,8 +21,9 @@
     <string name="history_backups_turn_off_message">Votre compte n’enregistre plus de nouvelles sauvegardes. Celles déjà enregistrées restent en ligne et vos mots de récupération peuvent toujours les restaurer.</string>
     <string name="history_backups_schedule">Cet appareil enregistre une sauvegarde environ une fois par jour lorsqu’il est en charge et connecté au Wi-Fi.</string>
     <string name="history_backups_words_title">Vos mots de récupération</string>
-    <string name="history_backups_words_message">Notez ces 12 mots sur papier, dans l’ordre, et rangez-les en lieu sûr. Ils ne s’affichent que maintenant. Quiconque les possède peut lire votre historique sauvegardé.</string>
-    <string name="history_backups_words_written">Je les ai notés</string>
+    <string name="history_backups_words_message">Notez ces 12 mots dans l’ordre ou enregistrez-les dans un gestionnaire de mots de passe. Ils ne s’affichent que maintenant. Quiconque les possède peut lire votre historique sauvegardé.</string>
+    <string name="history_backups_words_written">Je les ai enregistrés</string>
+    <string name="history_backups_copy_words">Copier les mots</string>
     <string name="history_backups_confirm_title">Confirmez vos mots</string>
     <string name="history_backups_confirm_message">Saisissez le mot %1$d et le mot %2$d de votre liste. Si vous ne les avez pas notés, annulez et recommencez pour obtenir de nouveaux mots.</string>
     <string name="history_backups_word_label">Mot %1$d</string>

@@ -21,8 +21,9 @@
     <string name="history_backups_turn_off_message">Il tuo account smette di salvare nuovi backup. I backup già salvati restano online e le parole di recupero possono ancora ripristinarli.</string>
     <string name="history_backups_schedule">Questo dispositivo salva un backup circa una volta al giorno mentre è in carica e connesso al Wi-Fi.</string>
     <string name="history_backups_words_title">Le tue parole di recupero</string>
-    <string name="history_backups_words_message">Scrivi queste 12 parole su carta, in ordine, e conservale in un posto sicuro. Vengono mostrate solo ora. Chiunque le abbia può leggere la cronologia salvata.</string>
-    <string name="history_backups_words_written">Le ho annotate</string>
+    <string name="history_backups_words_message">Annota queste 12 parole in ordine o salvale in un gestore di password. Vengono mostrate solo ora. Chiunque le abbia può leggere la cronologia salvata.</string>
+    <string name="history_backups_words_written">Le ho salvate</string>
+    <string name="history_backups_copy_words">Copia parole</string>
     <string name="history_backups_confirm_title">Conferma le parole</string>
     <string name="history_backups_confirm_message">Digita la parola %1$d e la parola %2$d dal tuo elenco. Se non le hai annotate, annulla e ricomincia per ottenere nuove parole.</string>
     <string name="history_backups_word_label">Parola %1$d</string>

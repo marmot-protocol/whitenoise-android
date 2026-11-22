@@ -21,8 +21,9 @@
     <string name="history_backups_turn_off_message">你的帳號將停止儲存新的備份。已儲存的備份會保留在線上，你的復原詞仍然可以還原它們。</string>
     <string name="history_backups_schedule">此裝置會在連接 Wi-Fi 並充電時大約每天儲存一次備份。</string>
     <string name="history_backups_words_title">你的復原詞</string>
-    <string name="history_backups_words_message">請按順序把這 12 個詞寫在紙上，並妥善保管。它們只會在此時顯示。任何拿到它們的人都能讀取你備份的歷史記錄。</string>
-    <string name="history_backups_words_written">我已抄寫</string>
+    <string name="history_backups_words_message">請按順序抄下這 12 個詞，或儲存到密碼管理器。它們只會在此時顯示。任何拿到它們的人都能讀取你備份的歷史記錄。</string>
+    <string name="history_backups_words_written">我已儲存</string>
+    <string name="history_backups_copy_words">複製詞語</string>
     <string name="history_backups_confirm_title">確認復原詞</string>
     <string name="history_backups_confirm_message">請輸入清單中的第 %1$d 個詞和第 %2$d 個詞。如果你沒有抄寫下來，請取消並重新開始以取得新的復原詞。</string>
     <string name="history_backups_word_label">第 %1$d 個詞</string>

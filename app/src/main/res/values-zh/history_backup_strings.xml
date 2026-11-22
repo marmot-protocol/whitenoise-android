@@ -21,8 +21,9 @@
     <string name="history_backups_turn_off_message">你的账户将停止保存新的备份。已保存的备份会保留在线上，你的恢复词仍然可以恢复它们。</string>
     <string name="history_backups_schedule">此设备会在连接 Wi-Fi 并充电时大约每天保存一次备份。</string>
     <string name="history_backups_words_title">你的恢复词</string>
-    <string name="history_backups_words_message">请按顺序把这 12 个词写在纸上，并妥善保管。它们只会在此时显示。任何拿到它们的人都能读取你备份的历史记录。</string>
-    <string name="history_backups_words_written">我已抄写</string>
+    <string name="history_backups_words_message">请按顺序抄下这 12 个词，或保存到密码管理器。它们只会在此时显示。任何拿到它们的人都能读取你备份的历史记录。</string>
+    <string name="history_backups_words_written">我已保存</string>
+    <string name="history_backups_copy_words">复制词语</string>
     <string name="history_backups_confirm_title">确认恢复词</string>
     <string name="history_backups_confirm_message">请输入列表中的第 %1$d 个词和第 %2$d 个词。如果你没有抄写下来，请取消并重新开始以获取新的恢复词。</string>
     <string name="history_backups_word_label">第 %1$d 个词</string>

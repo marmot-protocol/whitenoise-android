@@ -21,8 +21,9 @@
     <string name="history_backups_turn_off_message">Tu cuenta deja de guardar copias nuevas. Las copias ya guardadas permanecen en línea y tus palabras de recuperación aún pueden restaurarlas.</string>
     <string name="history_backups_schedule">Este dispositivo guarda una copia aproximadamente una vez al día mientras se carga con wifi.</string>
     <string name="history_backups_words_title">Tus palabras de recuperación</string>
-    <string name="history_backups_words_message">Escribe estas 12 palabras en papel, en orden, y guárdalas en un lugar seguro. Solo se muestran ahora. Cualquiera que las tenga puede leer tu historial guardado.</string>
-    <string name="history_backups_words_written">Ya las anoté</string>
+    <string name="history_backups_words_message">Anota estas 12 palabras en orden o guárdalas en un gestor de contraseñas. Solo se muestran ahora. Cualquiera que las tenga puede leer tu historial guardado.</string>
+    <string name="history_backups_words_written">Ya las guardé</string>
+    <string name="history_backups_copy_words">Copiar palabras</string>
     <string name="history_backups_confirm_title">Confirma tus palabras</string>
     <string name="history_backups_confirm_message">Escribe la palabra %1$d y la palabra %2$d de tu lista. Si no las anotaste, cancela y empieza de nuevo para obtener otras palabras.</string>
     <string name="history_backups_word_label">Palabra %1$d</string>

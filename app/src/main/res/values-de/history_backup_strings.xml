@@ -21,8 +21,9 @@
     <string name="history_backups_turn_off_message">Dein Konto speichert keine neuen Sicherungen mehr. Bereits gespeicherte Sicherungen bleiben online und lassen sich weiterhin mit deinen Wiederherstellungswörtern wiederherstellen.</string>
     <string name="history_backups_schedule">Dieses Gerät speichert etwa einmal täglich eine Sicherung, während es im WLAN geladen wird.</string>
     <string name="history_backups_words_title">Deine Wiederherstellungswörter</string>
-    <string name="history_backups_words_message">Schreib diese 12 Wörter der Reihe nach auf Papier und bewahre sie sicher auf. Sie werden nur jetzt angezeigt. Wer sie hat, kann deinen gesicherten Verlauf lesen.</string>
-    <string name="history_backups_words_written">Ich habe sie aufgeschrieben</string>
+    <string name="history_backups_words_message">Schreib diese 12 Wörter der Reihe nach auf oder speichere sie in einem Passwortmanager. Sie werden nur jetzt angezeigt. Wer sie hat, kann deinen gesicherten Verlauf lesen.</string>
+    <string name="history_backups_words_written">Ich habe sie gespeichert</string>
+    <string name="history_backups_copy_words">Wörter kopieren</string>
     <string name="history_backups_confirm_title">Wörter bestätigen</string>
     <string name="history_backups_confirm_message">Gib Wort %1$d und Wort %2$d aus deiner Liste ein. Falls du sie nicht aufgeschrieben hast, brich ab und beginne neu, um neue Wörter zu erhalten.</string>
     <string name="history_backups_word_label">Wort %1$d</string>

@@ -21,8 +21,9 @@
     <string name="history_backups_turn_off_message">Hesabın yeni yedek kaydetmeyi bırakır. Kaydedilmiş yedekler çevrim içi kalır ve kurtarma kelimelerinle hâlâ geri yüklenebilir.</string>
     <string name="history_backups_schedule">Bu cihaz, Wi-Fi’ye bağlıyken şarj olurken günde yaklaşık bir kez yedek kaydeder.</string>
     <string name="history_backups_words_title">Kurtarma kelimelerin</string>
-    <string name="history_backups_words_message">Bu 12 kelimeyi sırasıyla kâğıda yaz ve güvenli bir yerde sakla. Yalnızca şimdi gösteriliyorlar. Bu kelimelere sahip olan herkes yedeklenmiş geçmişini okuyabilir.</string>
-    <string name="history_backups_words_written">Not aldım</string>
+    <string name="history_backups_words_message">Bu 12 kelimeyi sırasıyla not al ya da bir parola yöneticisine kaydet. Yalnızca şimdi gösteriliyorlar. Bu kelimelere sahip olan herkes yedeklenmiş geçmişini okuyabilir.</string>
+    <string name="history_backups_words_written">Kaydettim</string>
+    <string name="history_backups_copy_words">Kelimeleri kopyala</string>
     <string name="history_backups_confirm_title">Kelimelerini doğrula</string>
     <string name="history_backups_confirm_message">Listendeki %1$d. ve %2$d. kelimeyi yaz. Not almadıysan iptal edip yeni kelimeler için baştan başla.</string>
     <string name="history_backups_word_label">%1$d. kelime</string>
