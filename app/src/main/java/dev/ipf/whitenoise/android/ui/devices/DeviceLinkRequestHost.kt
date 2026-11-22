@@ -19,7 +19,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
 import dev.ipf.whitenoise.android.R
@@ -117,9 +119,9 @@ internal data class DeviceLinkReview(
 /**
  * Shows the presented [request]: on the active profile its comparison ([activeRequest]), on another profile only
  * the notice, whose Review runs [onReview] to activate that profile and re-read its prompt. Until a read made after
- * Review has succeeded, the request shows as being checked, with Not now and nothing to answer, and its profile is
- * read again every [DEVICE_LINK_REVIEW_RETRY_MS]: a failed read raises no event and the watcher keeps no timer, so
- * neither a slow read nor a failed one can show the cached prompt or strand the request.
+ * Review has succeeded, the request shows as being checked, with Not now and nothing to answer, and while the app is
+ * started its profile is read again every [DEVICE_LINK_REVIEW_RETRY_MS]: a failed read raises no event and the
+ * watcher keeps no timer, so neither a slow read nor a failed one can show the cached prompt or strand the request.
  */
 @Composable
 internal fun DeviceLinkRequestPresentation(
@@ -132,15 +134,19 @@ internal fun DeviceLinkRequestPresentation(
     activeRequest: @Composable () -> Unit,
 ) {
     var review by remember(watcher) { mutableStateOf<DeviceLinkReview?>(null) }
+    val currentBlocked by rememberUpdatedState(blocked)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     if (request.accountRef == activeAccountRef) {
         val pending = review?.takeIf { it.accountRef == request.accountRef }?.awaits(watcher.successfulReads) == true
         if (!pending) {
             activeRequest()
         } else {
-            LaunchedEffect(review) {
-                while (true) {
-                    delay(DEVICE_LINK_REVIEW_RETRY_MS)
-                    watcher.reread(request.accountRef, blocked)
+            LaunchedEffect(review, lifecycle) {
+                lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                    while (true) {
+                        delay(DEVICE_LINK_REVIEW_RETRY_MS)
+                        watcher.reread(request.accountRef, currentBlocked)
+                    }
                 }
             }
             if (!blocked) DeviceLinkReviewPendingDialog(onNotNow = { watcher.hidePresented(blocked) })

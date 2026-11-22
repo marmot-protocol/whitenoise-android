@@ -116,7 +116,9 @@ internal data class DeviceLinkRequestQueue(
  * Watches link requests on every signed-in profile for the app shell. It only reads MDK's snapshots: nothing is
  * answered here, and a request on a profile that is not active waits until the user activates that profile. Reads
  * happen when observation starts (which is each time the app returns to the foreground) and when MDK reports a
- * change, never on a timer, so an expired request is never revived or extended by the host.
+ * change, never on a timer of the watcher's own, so an expired request is never revived or extended by the host. The
+ * one timed read is Review's: while a reviewed request is unchecked and the app is started, its profile is read
+ * again until one read succeeds.
  */
 @Stable
 internal class DeviceLinkRequestWatcher(

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.devices
 
+import android.content.Context
 import android.os.Looper
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -10,9 +11,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.DeviceLinkPromptFfi
 import dev.ipf.marmotkit.DeviceLinkPromptStateFfi
 import dev.ipf.marmotkit.DeviceLinkSnapshotFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DeviceLinkRequestWatcher
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -31,6 +34,8 @@ import java.time.Duration
 @Config(sdk = [36])
 class DeviceLinkReviewGateTest {
     @get:Rule val compose = createComposeRule()
+
+    private val context: Context = ApplicationProvider.getApplicationContext()
 
     private val accounts = listOf("a", "b")
     private val withPrompt = DeviceLinkSnapshotFfi(null, listOf(prompt()), emptyList())
@@ -74,6 +79,22 @@ class DeviceLinkReviewGateTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(DEVICE_LINK_REVIEW_RETRY_MS + 100L))
         compose.waitForIdle()
         compose.onNodeWithText(COMPARISON).assertExists()
+    }
+
+    /** Not now on a request still being checked puts it off without answering or showing the comparison. */
+    @Test
+    fun notNowPutsOffARequestBeingChecked() {
+        val held = CompletableDeferred<DeviceLinkSnapshotFfi>()
+        showRequestOnB()
+        nextReadOfB = { held.await() }
+
+        compose.onNodeWithTag(DEVICE_LINK_REVIEW_TAG).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText(context.getString(R.string.link_request_not_now)).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag(DEVICE_LINK_REVIEW_PENDING_TAG).assertDoesNotExist()
+        compose.onNodeWithText(COMPARISON).assertDoesNotExist()
+        held.complete(withPrompt)
     }
 
     /** A request already on the active profile shows its comparison without waiting. */
