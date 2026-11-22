@@ -767,7 +767,7 @@ class LocalNotificationPresenter(
                                                     builder.addAction(
                                                         interactions.replyNotificationAction(
                                                             actionTarget,
-                                                            quickReactions.filterNot(chipArtwork::containsKey),
+                                                            quickReactions,
                                                         ),
                                                     )
                                                 // Reaction choices ride on Reply's RemoteInput so SystemUI
@@ -779,10 +779,14 @@ class LocalNotificationPresenter(
                                                     )
                                             }
                                         }
-                                        quickReactions.forEach { reaction ->
-                                            chipArtwork[reaction]?.let { artwork ->
-                                                builder.addAction(interactions.reactionNotificationAction(actionTarget, reaction, artwork))
-                                            }
+                                        if (chipArtwork.isNotEmpty()) {
+                                            builder.extras.putString(EXTRA_QUICK_REACTION_TARGET, actionTarget.target.messageIdHex)
+                                            builder.extras.putParcelable(
+                                                EXTRA_QUICK_REACTION_ROWS,
+                                                notificationQuickReactionRows(context, quickReactions, chipArtwork) { reaction ->
+                                                    interactions.reactionPendingIntent(actionTarget, reaction)
+                                                },
+                                            )
                                         }
                                     }
                             }
@@ -966,7 +970,9 @@ class LocalNotificationPresenter(
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
                                             )
-                                            if (carried.isNullOrEmpty() && emojiArtifact == null) {
+                                            if (carried.isNullOrEmpty() && emojiArtifact == null &&
+                                                !notification.extras.containsKey(EXTRA_QUICK_REACTION_ROWS)
+                                            ) {
                                                 false
                                             } else {
                                                 if (!profileAllowsPost() || !showGenerationAllowsPost()) {
@@ -984,6 +990,8 @@ class LocalNotificationPresenter(
                                                         messageIdHex = update.messageIdHex,
                                                     ),
                                                 )
+                                                builder.extras.remove(EXTRA_QUICK_REACTION_ROWS)
+                                                builder.extras.remove(EXTRA_QUICK_REACTION_TARGET)
                                                 val cleanNotification = buildSettled(true)
                                                 val retryResult =
                                                     publisher.postNotificationSafely(

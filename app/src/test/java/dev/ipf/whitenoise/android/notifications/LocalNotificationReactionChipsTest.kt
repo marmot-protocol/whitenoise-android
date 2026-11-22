@@ -120,10 +120,10 @@ class LocalNotificationReactionChipsTest {
         val choices = listOf(":marmot:", ":wn:", "👍", ":missing:")
         val presenter = presenter(choices)
         postConversationCard(presenter, "message-a")
-        val artwork = actions().filter { it.isContextual }
-        assertEquals(2, artwork.size)
-        assertEquals(listOf("👍", ":missing:"), replyAction().remoteInputs?.single()?.choices?.map(CharSequence::toString))
-        val tap = artwork[1].actionIntent
+        val initial = manager.activeNotifications.single()
+        val target = NotificationActions.targetFromUpdate(update("message-a"), initial.tag, initial.id)
+        val factory = NotificationInteractionFactory(context, NotificationTapTokens.create(context))
+        val tap = factory.reactionPendingIntent(checkNotNull(target), ":wn:")
         assertTrue(shadowOf(tap).isImmutable)
 
         postConversationCard(presenter, "message-b")
@@ -134,14 +134,16 @@ class LocalNotificationReactionChipsTest {
         assertNull(notificationReactionChoice(tapped, choices - ":wn:"))
     }
 
-    /** Built-in choices keep Android's conversation card: no custom expanded view, Reply and Mark as read stay. */
     @Test
-    fun builtInChoicesKeepTheStandardConversationCard() {
+    fun artworkUsesAnExpandedRowAndKeepsReplyMarkReadAndMessageHistory() {
         postConversationCard(presenter(listOf(":marmot:", ":wn:", "👍")))
         val live = manager.activeNotifications.single().notification
 
-        assertNull(live.bigContentView)
-        assertEquals(Notification.MessagingStyle::class.java.name, live.extras.getString(Notification.EXTRA_TEMPLATE))
+        assertNotNull(live.bigContentView)
+        assertEquals(Notification.DecoratedCustomViewStyle::class.java.name, live.extras.getString(Notification.EXTRA_TEMPLATE))
+        assertNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(live))
+        assertNull(replyAction().remoteInputs?.single()?.choices)
+        assertTrue(checkNotNull(replyAction().remoteInputs?.single()).allowFreeFormInput)
         assertEquals(
             listOf(context.getString(R.string.reply), context.getString(R.string.chat_row_action_mark_read)),
             actions().filterNot { it.isContextual }.map { it.title.toString() },
@@ -153,7 +155,7 @@ class LocalNotificationReactionChipsTest {
     /** A card left by the earlier expanded-choice build loses that layout on its next write and keeps its thread. */
     @Test
     fun earlierExpandedChoiceCardReturnsToTheStandardCardOnItsNextWrite() {
-        val presenter = presenter(listOf(":marmot:", ":wn:", "👍"))
+        val presenter = presenter(defaultChoices())
         postConversationCard(presenter, "message-a")
         val posted = manager.activeNotifications.single()
         val legacy =
