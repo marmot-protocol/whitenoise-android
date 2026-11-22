@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -37,6 +36,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,7 +50,11 @@ private data class UserGuide(val id: String, val title: String, val body: String
 private fun AssetManager.readUserGuides(): List<UserGuide> =
     list(GUIDE_DIRECTORY).orEmpty().filter { it.endsWith(".md") }.map { file ->
         val contents = open("$GUIDE_DIRECTORY/$file").bufferedReader().use { it.readText() }
-        UserGuide(file.removeSuffix(".md"), contents.lineSequence().first().removePrefix("# "), contents.substringAfter('\n'))
+        UserGuide(
+            id = file.removeSuffix(".md"),
+            title = contents.lineSequence().first().removePrefix("# "),
+            body = contents.substringAfter('\n'),
+        )
     }.sortedBy { it.title }
 
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
@@ -93,7 +97,8 @@ internal fun DocumentationScreen(
                 target != null
             }
         } else {
-            val results = guides?.filter { it.title.contains(query.trim(), true) || it.body.contains(query.trim(), true) }
+            val term = query.trim()
+            val results = guides?.filter { it.title.contains(term, true) || it.body.contains(term, true) }
             SettingsList {
                 item {
                     OutlinedTextField(
@@ -111,7 +116,11 @@ internal fun DocumentationScreen(
                         Text(
                             text =
                                 stringResource(
-                                    if (guides.isNullOrEmpty()) R.string.documentation_unavailable else R.string.no_results,
+                                    if (guides.isNullOrEmpty()) {
+                                        R.string.documentation_unavailable
+                                    } else {
+                                        R.string.no_results
+                                    },
                                 ),
                             modifier = Modifier.padding(16.dp),
                         )
@@ -119,7 +128,10 @@ internal fun DocumentationScreen(
                 } else {
                     items(results.size, key = { results[it].id }) { index ->
                         val guide = results[index]
-                        TextButton(onClick = { selectedId = guide.id }, modifier = Modifier.padding(horizontal = 16.dp)) {
+                        TextButton(
+                            onClick = { selectedId = guide.id },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        ) {
                             Text(guide.title)
                         }
                     }
@@ -143,7 +155,7 @@ private fun GuideArticle(
     }
     key(guide.id) {
         Column(
-            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
+            modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (guide.id == "using-profiles-android") {
@@ -172,7 +184,7 @@ internal fun LearnWhiteNoiseScreen(onBack: () -> Unit, onOpenDocumentation: () -
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
                 Column(
-                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(8.dp),
+                    Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(stringResource(titles[page]), style = MaterialTheme.typography.headlineSmall)

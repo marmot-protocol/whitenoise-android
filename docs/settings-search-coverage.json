@@ -764,6 +764,14 @@
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt": {
       "controls": [
         {
+          "declaration": "\"learn_white_noise\"",
+          "represented_by": "home.LearnWhiteNoise"
+        },
+        {
+          "declaration": "\"documentation\"",
+          "represented_by": "home.Documentation"
+        },
+        {
           "declaration": "\"profile\"",
           "represented_by": "home.Profile"
         },
