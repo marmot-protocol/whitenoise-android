@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +42,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DeviceLinkCommand
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.settings.SettingsCallout
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -226,7 +226,7 @@ internal fun DeviceLinkCode(
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing)) {
             code.chunked(DEVICE_LINK_CODE_COLUMNS).forEachIndexed { row, emojis ->
                 Row(
-                    Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                    Modifier.fillMaxWidth().boundedIntrinsicHeight(IntrinsicSize.Max),
                     Arrangement.spacedBy(spacing, Alignment.CenterHorizontally),
                 ) {
                     emojis.forEachIndexed { column, emoji ->
