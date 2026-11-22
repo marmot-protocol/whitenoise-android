@@ -10,11 +10,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -110,9 +110,9 @@ private fun IdentityQrCode(
 }
 
 /**
- * 48 dp copy target around a 240 dp capsule that shows a middle-ellipsized identifier and a copy glyph, which turns
- * into a check while [copied]. [explanationRes] defaults to the wording for the user's own key. The whole target is
- * the button; the capsule is the visual.
+ * The collapsed 240 dp capsule shows an abbreviated identifier beside a copy glyph. On copy, the capsule uses
+ * the available width to display the grouped key, and the glyph turns into a check while [copied].
+ * [explanationRes] defaults to the wording for the user's own key.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -136,7 +136,6 @@ internal fun IdentifierCopyCapsule(
     Box(
         modifier =
             modifier
-                .widthIn(max = IdentityCodeDefaults.CapsuleMaxWidth)
                 .heightIn(min = IdentityCodeDefaults.CapsuleMinHeight)
                 .explainOnLongPress(
                     Explanation(
@@ -162,7 +161,7 @@ internal fun IdentifierCopyCapsule(
         Row(
             modifier =
                 Modifier
-                    .width(IdentityCodeDefaults.CapsuleWidth)
+                    .then(if (expanded) Modifier.fillMaxWidth() else Modifier.width(IdentityCodeDefaults.CapsuleWidth))
                     .testTag(visualTestTag)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -193,7 +192,6 @@ internal fun IdentifierCopyCapsule(
 /** Geometry the identity surfaces share: capsule width and the QR surface's size band. */
 internal object IdentityCodeDefaults {
     val CapsuleWidth = 240.dp
-    val CapsuleMaxWidth = 360.dp
     val CapsuleMinHeight = 48.dp
     val CapsuleIconSize = 16.dp
     val QrSurfaceInset = 12.dp

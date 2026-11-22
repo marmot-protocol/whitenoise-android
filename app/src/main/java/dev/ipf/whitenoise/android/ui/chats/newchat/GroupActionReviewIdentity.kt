@@ -177,18 +177,17 @@ private fun GroupReviewKeyText(
     compact: Boolean = false,
 ) {
     Text(
-        if (expanded) publicKeyDisplayGroups(npub).joinToString(" ") else groupReviewNpubLabel(npub, compact),
+        text =
+            if (expanded) {
+                publicKeyDisplayGroups(npub).joinToString(" ")
+            } else {
+                IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8)
+            },
         modifier = Modifier.animatePublicKeyExpansion(expanded),
         style = MaterialTheme.typography.bodySmall,
         fontFamily = if (expanded) FontFamily.Monospace else null,
     )
 }
-
-/** The shortened npub shown beside a name; the full value is spoken and copied. */
-private fun groupReviewNpubLabel(
-    npub: String,
-    compact: Boolean = false,
-): String = IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8)
 
 /**
  * A row of at least 48dp that copies the full [npub], announced once as [description] with a Copy action.
