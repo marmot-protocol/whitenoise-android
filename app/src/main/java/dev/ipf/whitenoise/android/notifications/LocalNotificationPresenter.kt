@@ -757,6 +757,7 @@ class LocalNotificationPresenter(
                                     } else {
                                         emptyList()
                                     }
+                                val chipArtwork = notificationReactionChipArtwork(context, quickReactions)
                                 NotificationActions
                                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                                     ?.let { actionTarget ->
@@ -766,7 +767,7 @@ class LocalNotificationPresenter(
                                                     builder.addAction(
                                                         interactions.replyNotificationAction(
                                                             actionTarget,
-                                                            quickReactions,
+                                                            quickReactions.filterNot(chipArtwork::containsKey),
                                                         ),
                                                     )
                                                 // Reaction choices ride on Reply's RemoteInput so SystemUI
@@ -776,6 +777,11 @@ class LocalNotificationPresenter(
                                                     builder.addAction(
                                                         interactions.markReadNotificationAction(actionTarget),
                                                     )
+                                            }
+                                        }
+                                        quickReactions.forEach { reaction ->
+                                            chipArtwork[reaction]?.let { artwork ->
+                                                builder.addAction(interactions.reactionNotificationAction(actionTarget, reaction, artwork))
                                             }
                                         }
                                     }

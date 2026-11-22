@@ -1,0 +1,13 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionChips.kt",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "aligned custom and Unicode reaction chips in the native notification shade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionChips.kt",
+        "anchor": "internal suspend fun notificationReactionChipArtwork(",
+        "test_ids": ["NTF-034"]
+      }
+    ]
+  }
+}

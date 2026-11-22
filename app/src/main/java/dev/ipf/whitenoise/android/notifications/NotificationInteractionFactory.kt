@@ -3,12 +3,18 @@ package dev.ipf.whitenoise.android.notifications
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
+import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.chats.chatReadIcon
 
 /** Builds notification actions and navigation intents using the presenter's existing tap-token owner. */
@@ -57,6 +63,28 @@ internal class NotificationInteractionFactory(
             ).addRemoteInput(remoteInput)
             .setAllowGeneratedReplies(false)
             .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+            .setShowsUserInterface(false)
+            .build()
+    }
+
+    fun reactionNotificationAction(
+        actionTarget: NotificationActionTarget,
+        reaction: String,
+        artwork: Bitmap,
+    ): NotificationCompat.Action {
+        val intent =
+            Intent(context, NotificationActionReceiver::class.java).apply {
+                NotificationActions.applyDirectReaction(this, actionTarget, reaction)
+            }
+        val pendingIntent =
+            PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        val title = SpannableString(EmojiShortcodes.plainLabel(reaction, context.resources))
+        // Keep the title in the accessibility tree while drawing only the emoji.
+        title.setSpan(RelativeSizeSpan(0f), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        return NotificationCompat.Action
+            .Builder(IconCompat.createWithBitmap(artwork), title, pendingIntent)
+            .setContextual(true)
+            .setAuthenticationRequired(true)
             .setShowsUserInterface(false)
             .build()
     }

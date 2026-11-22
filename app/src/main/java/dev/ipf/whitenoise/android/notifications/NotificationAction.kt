@@ -69,6 +69,22 @@ object NotificationActions {
         if (acceptsInlineReactionChoices) intent.putExtra(EXTRA_INLINE_REACTION_CHOICES, true)
     }
 
+    fun applyDirectReaction(
+        intent: Intent,
+        actionTarget: NotificationActionTarget,
+        reaction: String,
+    ) {
+        applyToIntent(intent, NotificationActionKind.REACT, actionTarget)
+        // PendingIntent identity excludes extras. Bind it to this message and choice,
+        // so a subsequent card cannot retarget a previously displayed chip.
+        intent.data =
+            requireNotNull(intent.data).buildUpon()
+                .appendPath(requireNotNull(actionTarget.target.messageIdHex))
+                .appendPath(reaction)
+                .build()
+        intent.putExtra(LEGACY_EXTRA_REACTION, reaction)
+    }
+
     /** The action an intent carries, reading a Reply that returned a chosen chip as a reaction. */
     fun parse(intent: Intent?): NotificationAction? {
         intent ?: return null
@@ -94,8 +110,7 @@ object NotificationActions {
     }
 
     /**
-     * The direct value carried by cards from earlier app versions: the old emoji action and the expanded
-     * image choices. Both keep working across an in-place update, still subject to the receiver's allowlist.
+     * The direct value carried by artwork actions and earlier cards, subject to the receiver's allowlist.
      */
     internal fun legacyReaction(intent: Intent): String? =
         normalizeNotificationReaction(
