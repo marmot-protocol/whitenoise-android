@@ -314,7 +314,16 @@ internal class ReturnFixture(
                 },
             )
         } else {
-            ScriptedConversationLiveSubscriptions(timelineScripts, conversationTimelineTestGroup()).subscriptions
+            // The shared-group fixture still passes every open through the hook, so a held open stays held.
+            val scripted =
+                ScriptedConversationLiveSubscriptions(timelineScripts, conversationTimelineTestGroup()).subscriptions
+            ConversationLiveSubscriptions(
+                openTimeline = { account, groupIdHex, limit ->
+                    beforeTimelineOpen(timelineOpens.getAndIncrement())
+                    scripted.openTimeline(account, groupIdHex, limit)
+                },
+                openGroupState = scripted.openGroupState,
+            )
         }
     val appState: WhiteNoiseAppState =
         conversationTimelineTestAppState(
