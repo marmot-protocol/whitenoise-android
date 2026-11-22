@@ -188,42 +188,6 @@
         ]
       },
       {
-        "surface": "setting:folder_discard",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.folder_discard",
-        "test_ids": [
-          "SET-009",
-          "FLD-001",
-          "FLD-002",
-          "ACC-017",
-          "FLD-003"
-        ]
-      },
-      {
-        "surface": "setting:folder_discard_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.folder_discard_detail",
-        "test_ids": [
-          "SET-009",
-          "FLD-001",
-          "FLD-002",
-          "ACC-017",
-          "FLD-003"
-        ]
-      },
-      {
-        "surface": "setting:folder_discard_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.folder_discard_title",
-        "test_ids": [
-          "SET-009",
-          "FLD-001",
-          "FLD-002",
-          "ACC-017",
-          "FLD-003"
-        ]
-      },
-      {
         "surface": "setting:folder_edit",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "R.string.folder_edit",
@@ -239,18 +203,6 @@
         "surface": "setting:folder_included_chats",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "R.string.folder_included_chats",
-        "test_ids": [
-          "SET-009",
-          "FLD-001",
-          "FLD-002",
-          "ACC-017",
-          "FLD-003"
-        ]
-      },
-      {
-        "surface": "setting:folder_keep_editing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.folder_keep_editing",
         "test_ids": [
           "SET-009",
           "FLD-001",
@@ -356,18 +308,6 @@
         ]
       },
       {
-        "surface": "setting:save",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.save",
-        "test_ids": [
-          "SET-009",
-          "FLD-001",
-          "FLD-002",
-          "ACC-017",
-          "FLD-003"
-        ]
-      },
-      {
         "surface": "setting:folder_delete_action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "R.string.folder_delete_action",
@@ -446,14 +386,6 @@
         ]
       },
       {
-        "surface": "R.string.explanation_organize_folder_discard",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.explanation_organize_folder_discard",
-        "test_ids": [
-          "SET-057"
-        ]
-      },
-      {
         "surface": "R.string.explanation_organize_folder_groups_only",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "R.string.explanation_organize_folder_groups_only",
@@ -513,14 +445,6 @@
         "surface": "R.string.explanation_organize_folder_preview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "R.string.explanation_organize_folder_preview",
-        "test_ids": [
-          "SET-057"
-        ]
-      },
-      {
-        "surface": "R.string.explanation_organize_folder_save",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.explanation_organize_folder_save",
         "test_ids": [
           "SET-057"
         ]

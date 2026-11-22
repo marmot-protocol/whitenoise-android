@@ -1470,6 +1470,8 @@
     <string name="folder_keep_editing">Продолжайте редактировать</string>
     <string name="folder_unavailable">Эта папка больше не доступна.</string>
     <string name="folder_save_failed">Не удалось сохранить. Изменения всё ещё здесь; попробуйте снова.</string>
+    <string name="folder_autosave_failed">Не удалось сохранить последние изменения. Измените ещё раз или вернитесь назад, чтобы повторить.</string>
+    <string name="folder_name_required">Введите имя папки. Сохраняется последнее сохранённое имя.</string>
     <string name="folder_search">Поиск</string>
     <string name="no_results">Нет результатов</string>
     <string name="done">Готово</string>

@@ -1418,6 +1418,8 @@
     <string name="folder_keep_editing">Weiter bearbeiten</string>
     <string name="folder_unavailable">Dieser Ordner ist nicht mehr verfügbar.</string>
     <string name="folder_save_failed">Speichern fehlgeschlagen. Deine Änderungen sind noch da; versuche es erneut.</string>
+    <string name="folder_autosave_failed">Deine letzten Änderungen konnten nicht gespeichert werden. Bearbeite erneut oder gehe zurück, um es nochmal zu versuchen.</string>
+    <string name="folder_name_required">Gib einen Ordnernamen ein. Der zuletzt gespeicherte Name bleibt erhalten.</string>
     <string name="folder_search">Suchen</string>
     <string name="no_results">Keine Ergebnisse</string>
     <string name="done">Fertig</string>

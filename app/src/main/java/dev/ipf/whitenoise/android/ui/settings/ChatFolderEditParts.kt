@@ -15,8 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatFolderSort
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
@@ -44,6 +46,67 @@ internal data class ChatFolderEditFormState(
     val sort: ChatFolderSort = ChatFolderSort.RECENT,
     val includeAll: Boolean = false,
 )
+
+/** Everything an existing folder autosaves, compared with what the store last accepted. */
+internal data class FolderDraft(
+    val name: String,
+    val description: String,
+    val rule: ChatFolderRule,
+    val manualChatIds: Set<String>,
+    val showWhenEmpty: Boolean,
+    val sort: ChatFolderSort,
+)
+
+/** Save for a new folder; existing folders autosave instead. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun ChatFolderSaveAction(
+    enabled: Boolean,
+    onSave: () -> Unit,
+) {
+    TextButton(
+        enabled = enabled,
+        onClick = onSave,
+        modifier =
+            Modifier
+                .testTag("folder.save")
+                .explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.save),
+                        stringResource(R.string.explanation_organize_folder_save),
+                    ),
+                ),
+    ) { Text(stringResource(R.string.save)) }
+}
+
+/** Confirms leaving a new folder draft; dismissing keeps editing. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun ChatFolderDiscardDialog(
+    onDiscard: () -> Unit,
+    onKeepEditing: () -> Unit,
+) {
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onKeepEditing,
+        title = { Text(stringResource(R.string.folder_discard_title)) },
+        text = { Text(stringResource(R.string.folder_discard_detail)) },
+        confirmButton = {
+            TextButton(
+                onClick = onDiscard,
+                modifier =
+                    Modifier.explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.folder_discard),
+                            stringResource(R.string.explanation_organize_folder_discard),
+                        ),
+                    ),
+            ) { Text(stringResource(R.string.folder_discard)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onKeepEditing) { Text(stringResource(R.string.folder_keep_editing)) }
+        },
+    )
+}
 
 /** Optional metadata is revealed only when needed; existing descriptions remain visible. */
 @Composable

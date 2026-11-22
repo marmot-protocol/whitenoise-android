@@ -1422,6 +1422,8 @@
     <string name="folder_keep_editing">Continua a modificare</string>
     <string name="folder_unavailable">Questa cartella non è più disponibile.</string>
     <string name="folder_save_failed">Salvataggio non riuscito. Le modifiche sono ancora qui; riprova.</string>
+    <string name="folder_autosave_failed">Impossibile salvare le ultime modifiche. Modifica di nuovo o torna indietro per riprovare.</string>
+    <string name="folder_name_required">Inserisci un nome per la cartella. Viene mantenuto l’ultimo nome salvato.</string>
     <string name="folder_search">Cerca</string>
     <string name="no_results">Nessun risultato</string>
     <string name="done">Fine</string>

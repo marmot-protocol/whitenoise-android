@@ -1422,6 +1422,8 @@
     <string name="folder_keep_editing">Continuer la modification</string>
     <string name="folder_unavailable">Ce dossier n’est plus disponible.</string>
     <string name="folder_save_failed">Échec de l’enregistrement. Vos modifications sont toujours là ; réessayez.</string>
+    <string name="folder_autosave_failed">Impossible d’enregistrer vos dernières modifications. Modifiez à nouveau ou revenez en arrière pour réessayer.</string>
+    <string name="folder_name_required">Saisissez un nom de dossier. Le dernier nom enregistré est conservé.</string>
     <string name="folder_search">Rechercher</string>
     <string name="no_results">Aucun résultat</string>
     <string name="done">Terminé</string>

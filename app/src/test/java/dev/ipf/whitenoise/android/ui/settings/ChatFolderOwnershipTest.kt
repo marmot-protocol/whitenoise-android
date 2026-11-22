@@ -229,6 +229,54 @@ class ChatFolderOwnershipTest {
     /** A failed autosave is shown; the first Back stays to show it and retries, so the edit is not lost. */
     @Test fun autosaveFailureIsShownAndBackRetries() {
         val state = appState()
+        val preferences = failingFolderPreferences(state)
+        val store = state.chatFolderPreferences
+        var closed = 0
+        showEditor(state, UNREAD, onClose = { closed++ })
+        composeRule.runOnIdle { preferences.failNext = true }
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Retry rename")
+        composeRule.onNodeWithText(app.getString(R.string.folder_autosave_failed)).assertExists()
+        assertEquals("", store.foldersFor(A).first { it.id == UNREAD }.name)
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        assertEquals(1, closed)
+        assertEquals("Retry rename", ChatFolderPreferences(app).foldersFor(A).first { it.id == UNREAD }.name)
+    }
+
+    /** A Back whose retry also fails keeps the editor open with the draft; only a second Back leaves. */
+    @Test fun failedBackRetryKeepsEditorOpenOnce() {
+        val state = appState()
+        val preferences = failingFolderPreferences(state)
+        var closed = 0
+        showEditor(state, UNREAD, onClose = { closed++ })
+        composeRule.runOnIdle { preferences.failNext = true }
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Kept rename")
+        composeRule.runOnIdle { preferences.failNext = true }
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        assertEquals(0, closed)
+        composeRule.onNodeWithText("Kept rename").assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.folder_autosave_failed)).assertExists()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        assertEquals(1, closed)
+    }
+
+    /** An edit the store rejected is still unsaved after a configuration change, so leaving retries it. */
+    @Test fun rejectedEditIsRetriedAfterRecreation() {
+        val state = appState()
+        val preferences = failingFolderPreferences(state)
+        val restoration = StateRestorationTester(composeRule)
+        restoration.setContent { WhiteNoiseTheme { ChatFolderEditScreen(state, A, UNREAD, {}) } }
+        composeRule.runOnIdle { preferences.failNext = true }
+        composeRule.onNodeWithTag("folder.showWhenEmpty").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_autosave_failed)).assertExists()
+        // The outgoing composition's exit save fails too, so only the recreated editor can persist the edit.
+        composeRule.runOnIdle { preferences.failNext = true }
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.waitForIdle()
+        assertTrue(ChatFolderPreferences(app).foldersFor(A).first { it.id == UNREAD }.showWhenEmpty)
+    }
+
+    /** Installs a folder store whose next preference write can be made to fail. */
+    private fun failingFolderPreferences(state: WhiteNoiseAppState): FolderCommitRecordingPreferences {
         val preferences =
             FolderCommitRecordingPreferences(
                 app.getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE),
@@ -239,15 +287,7 @@ class ChatFolderOwnershipTest {
             .getDeclaredField("chatFolderPreferences")
             .apply { isAccessible = true }
             .set(state, store)
-        var closed = 0
-        showEditor(state, UNREAD, onClose = { closed++ })
-        composeRule.runOnIdle { preferences.failNext = true }
-        composeRule.onNodeWithTag("folder.name").performTextReplacement("Retry rename")
-        composeRule.onNodeWithText(app.getString(R.string.folder_autosave_failed)).assertExists()
-        assertEquals("", store.foldersFor(A).first { it.id == UNREAD }.name)
-        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
-        assertEquals(1, closed)
-        assertEquals("Retry rename", ChatFolderPreferences(app).foldersFor(A).first { it.id == UNREAD }.name)
+        return preferences
     }
 
     /** A failed real preference transaction keeps the draft and re-enables Save for an explicit retry. */

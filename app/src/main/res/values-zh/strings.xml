@@ -1397,6 +1397,8 @@
     <string name="folder_keep_editing">继续编辑</string>
     <string name="folder_unavailable">此文件夹已不可用。</string>
     <string name="folder_save_failed">无法保存。你的更改仍在，请重试。</string>
+    <string name="folder_autosave_failed">无法保存你最近的更改。请再次编辑或返回以重试。</string>
+    <string name="folder_name_required">请输入文件夹名称。将保留上次保存的名称。</string>
     <string name="folder_search">搜索</string>
     <string name="no_results">无结果</string>
     <string name="done">完成</string>

@@ -1407,6 +1407,8 @@
     <string name="folder_keep_editing">Düzenlemeye Devam Edin</string>
     <string name="folder_unavailable">Bu klasör artık mevcut değil.</string>
     <string name="folder_save_failed">Kaydedilemedi. Değişiklikleriniz duruyor; tekrar deneyin.</string>
+    <string name="folder_autosave_failed">Son değişiklikleriniz kaydedilemedi. Yeniden düzenleyin veya tekrar denemek için geri dönün.</string>
+    <string name="folder_name_required">Bir klasör adı girin. Son kaydedilen ad korunur.</string>
     <string name="folder_search">Ara</string>
     <string name="no_results">Sonuç Yok</string>
     <string name="done">Bitti</string>

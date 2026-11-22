@@ -1397,6 +1397,8 @@
     <string name="folder_keep_editing">繼續編輯</string>
     <string name="folder_unavailable">此資料夾已無法使用。</string>
     <string name="folder_save_failed">無法儲存。你的變更仍在，請再試一次。</string>
+    <string name="folder_autosave_failed">無法儲存最新的變更。請再編輯一次或返回以重試。</string>
+    <string name="folder_name_required">請輸入資料夾名稱。將保留上次儲存的名稱。</string>
     <string name="folder_search">搜尋</string>
     <string name="no_results">沒有結果</string>
     <string name="done">完成</string>
