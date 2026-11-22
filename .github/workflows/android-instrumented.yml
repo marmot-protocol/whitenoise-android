@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       mdk_qualification:
-        description: Populated current-master runtime upgrade, cold restart and both recovery modes
+        description: Populated MarmotKit 0.18.0 upgrade, cold restart and both recovery modes
         required: false
         type: boolean
         default: false
@@ -1043,8 +1043,14 @@ jobs:
 
   mdk-qualification:
     needs: changes
-    name: Populated MarmotKit upgrade and recovery (emulator)
+    name: Populated MarmotKit upgrade and recovery (audit ${{ matrix.audit-choice }})
     if: ${{ !cancelled() && needs.changes.outputs.media_trace_allowed == 'true' && (github.event_name == 'workflow_dispatch' && inputs.mdk_qualification && !inputs.mdk_preview_qualification) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        audit-choice: [enabled, declined]
+    env:
+      QUALIFICATION_AUDIT_CHOICE: ${{ matrix.audit-choice }}
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -1089,7 +1095,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: mdk-qualification-${{ github.sha }}
+          name: mdk-qualification-${{ github.sha }}-${{ matrix.audit-choice }}
           path: build/mdk-qualification/
           if-no-files-found: error
           retention-days: 30
@@ -1097,7 +1103,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: mdk-qualification-apks-${{ github.sha }}
+          name: mdk-qualification-apks-${{ github.sha }}-${{ matrix.audit-choice }}
           path: build/mdk-pair/
           if-no-files-found: warn
           retention-days: 30

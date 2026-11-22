@@ -1406,6 +1406,8 @@
     <string name="folder_keep_editing">Continuar editando</string>
     <string name="folder_unavailable">Esta pasta não está mais disponível.</string>
     <string name="folder_save_failed">Não foi possível salvar. Suas alterações continuam aqui; tente novamente.</string>
+    <string name="folder_autosave_failed">Não foi possível salvar suas últimas alterações. Edite novamente ou volte para tentar de novo.</string>
+    <string name="folder_name_required">Digite um nome para a pasta. O último nome salvo é mantido.</string>
     <string name="folder_search">Pesquisar</string>
     <string name="no_results">Nenhum resultado</string>
     <string name="done">Concluído</string>
@@ -2283,7 +2285,6 @@
     <string name="chat_rows_no_archived_detail">As conversas arquivadas aparecerão aqui.</string>
     <string name="quick_account_switching">Troca rápida de conta</string>
     <string name="quick_account_switching_detail">Mostra outras contas ao lado do seu avatar. Toque em uma para trocar.</string>
-    <string name="quick_account_switched">Mudou para %1$s</string>
     <string name="add_profile">Adicionar perfil</string>
     <string name="switch_profile">Mudar de perfil</string>
     <string name="folder_new_title">Nova pasta</string>

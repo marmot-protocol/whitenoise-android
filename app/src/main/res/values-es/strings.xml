@@ -1406,6 +1406,8 @@
     <string name="folder_keep_editing">Seguir editando</string>
     <string name="folder_unavailable">Esta carpeta ya no está disponible.</string>
     <string name="folder_save_failed">No se pudo guardar. Tus cambios siguen aquí; inténtalo de nuevo.</string>
+    <string name="folder_autosave_failed">No se pudieron guardar tus últimos cambios. Edita de nuevo o vuelve atrás para reintentarlo.</string>
+    <string name="folder_name_required">Escribe un nombre para la carpeta. Se conserva el último nombre guardado.</string>
     <string name="folder_search">Buscar</string>
     <string name="no_results">Sin resultados</string>
     <string name="done">Listo</string>
@@ -2283,7 +2285,6 @@
     <string name="chat_rows_no_archived_detail">Los chats que archives aparecerán aquí.</string>
     <string name="quick_account_switching">Cambio rápido de cuenta</string>
     <string name="quick_account_switching_detail">Muestra otras cuentas junto a tu avatar. Toca para cambiar.</string>
-    <string name="quick_account_switched">Se ha cambiado a %1$s</string>
     <string name="add_profile">Añadir perfil</string>
     <string name="switch_profile">Cambiar de perfil</string>
     <string name="folder_new_title">Nueva carpeta</string>

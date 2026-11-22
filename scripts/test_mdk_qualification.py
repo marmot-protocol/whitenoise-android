@@ -374,6 +374,36 @@ class QualificationUiTest(unittest.TestCase):
                 self.assertEqual(taps, [('20', '20'), ('60', '60')])
                 self.assertEqual((Path(directory) / 'fixture.png').read_bytes(), b'image')
 
+    def test_settled_startup_diagnostics_sheet_fails_without_dismissing_it(self):
+        window = '<hierarchy><node text="Help Improve White Noise"/></hierarchy>'
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', side_effect=['', '', '', window]) as adb:
+                with self.assertRaisesRegex(RuntimeError, 'startup prompted'):
+                    campaign.usable_chat('upgraded', consent_settled=True)
+                self.assertEqual(adb.call_count, 4)
+                self.assertEqual((Path(directory) / 'upgraded-window.xml').read_text(), window)
+
+    def test_usable_chat_recovers_from_a_missing_ui_dump(self):
+        window = ('<hierarchy><node resource-id="composer-pill-surface"/>'
+                  '<node text="Retained qualification history 0"/></hierarchy>')
+        missing = subprocess.CalledProcessError(1, 'adb shell cat')
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign.time, 'sleep'), \
+                    patch.object(campaign, 'adb', side_effect=['', '', '', missing, '', window, b'image']):
+                campaign.usable_chat('upgraded', consent_settled=True)
+                self.assertEqual((Path(directory) / 'upgraded-window.xml').read_text(), window)
+
+    def test_audit_readiness_uses_the_main_activity_pid(self):
+        for choice, log in (('enabled', 'WHITENOISE_AUDIT_READY_V1 {}'), ('declined', '')):
+            with self.subTest(choice=choice), tempfile.TemporaryDirectory() as directory:
+                with patch.object(campaign, 'REPORTS', Path(directory)), \
+                        patch.object(campaign, 'adb', side_effect=['123', log]) as adb:
+                    campaign.verify_audit_startup('upgraded', choice)
+                    adb.assert_called_with('logcat', '-d', '--pid=123', '-s', 'WhiteNoiseAudit:I')
+                    evidence = json.loads((Path(directory) / 'upgraded-audit.json').read_text())
+                    self.assertEqual(evidence['upload_ready'], choice == 'enabled')
+
     def test_restored_conversation_header_is_not_a_chat_list_row(self):
         """An already-open retained conversation must pass without tapping its identically named group header."""
         window = ('<hierarchy><node text="Nightly upgrade qualification" bounds="[0,0][120,40]"/>'

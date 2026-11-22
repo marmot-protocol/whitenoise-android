@@ -1413,6 +1413,8 @@
     <string name="folder_keep_editing">Weiter bearbeiten</string>
     <string name="folder_unavailable">Dieser Ordner ist nicht mehr verfügbar.</string>
     <string name="folder_save_failed">Speichern fehlgeschlagen. Deine Änderungen sind noch da; versuche es erneut.</string>
+    <string name="folder_autosave_failed">Deine letzten Änderungen konnten nicht gespeichert werden. Bearbeite erneut oder gehe zurück, um es nochmal zu versuchen.</string>
+    <string name="folder_name_required">Gib einen Ordnernamen ein. Der zuletzt gespeicherte Name bleibt erhalten.</string>
     <string name="folder_search">Suchen</string>
     <string name="no_results">Keine Ergebnisse</string>
     <string name="done">Fertig</string>
@@ -2295,7 +2297,6 @@
     <string name="chat_rows_no_archived_detail">Archivierte Chats werden hier angezeigt.</string>
     <string name="quick_account_switching">Schneller Kontowechsel</string>
     <string name="quick_account_switching_detail">Zeigt andere Konten neben deinem Avatar. Zum Wechseln antippen.</string>
-    <string name="quick_account_switched">Zu %1$s gewechselt</string>
     <string name="add_profile">Profil hinzufügen</string>
     <string name="switch_profile">Profil wechseln</string>
     <string name="folder_new_title">Neuer Ordner</string>

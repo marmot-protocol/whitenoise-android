@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditOtlpConfigV5Ffi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
+import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsCloseState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
@@ -87,6 +88,8 @@ class AuditUploadConsentTest {
             reopened.prepare(native.runtime)
             assertTrue(reopened.granted)
             assertFalse(native.enabled)
+            assertFalse(reopened.startupUploadConfigured)
+            assertEquals(listOf(false), native.auditUploadAttempts)
             reopened.choose(false)
             assertFalse(AuditUploadConsent(preferences).granted)
         }
@@ -118,14 +121,57 @@ class AuditUploadConsentTest {
             AuditUploadConsent(preferences).choose(false)
             val receipt = preferences.all.toMap()
             repeat(2) {
-                val native = Native(enabled = false)
+                val native = Native(enabled = true)
                 val updated = AuditUploadConsent(preferences)
                 updated.prepare(native.runtime)
                 assertFalse(updated.granted)
                 assertFalse(updated.requiresChoice)
                 assertFalse(native.enabled)
-                assertFalse(native.mutations.contains("allow-upload"))
+                assertEquals(listOf("clear-upload", "disable"), native.mutations)
                 assertEquals(receipt, preferences.all)
+            }
+        }
+
+    @Test
+    fun staleRenewalDoesNotOverrideAStoredDecline() =
+        runTest {
+            AuditUploadConsent(preferences).choose(false)
+            preferences.edit().putBoolean("audit_upload_disclosure_pending", true).commit()
+            val native = Native(enabled = true)
+            val consent = AuditUploadConsent(preferences)
+            assertFalse(consent.requiresChoice)
+            consent.prepare(native.runtime)
+            assertFalse(consent.requiresChoice)
+            assertEquals(listOf("clear-upload", "disable"), native.mutations)
+        }
+
+    @Test
+    fun closingUsageOnlyPromptKeepsBothSettledAuditChoices() =
+        runTest {
+            for (enabled in listOf(true, false)) {
+                preferences.edit().clear().commit()
+                AuditUploadConsent(preferences).choose(enabled)
+                val receipt = preferences.all.toMap()
+                val native = Native(enabled)
+                val consent = AuditUploadConsent(preferences)
+                consent.prepare(native.runtime)
+
+                val owner = StartupDiagnosticsCloseState()
+                val attempt = checkNotNull(owner.begin(auditRequired = consent.requiresChoice, usageRequired = true))
+                var usageSaved = false
+                owner.save(
+                    attempt,
+                    current = { true },
+                    audit = { error("A usage-only prompt cannot save an audit choice") },
+                    usage = {
+                        usageSaved = true
+                        true
+                    },
+                )
+                assertTrue(usageSaved)
+                assertEquals(receipt, preferences.all)
+                assertEquals(enabled, native.enabled)
+                assertFalse(owner.failed)
             }
         }
 
@@ -141,7 +187,36 @@ class AuditUploadConsentTest {
             updated.prepare(native.runtime)
             assertTrue(updated.granted)
             assertFalse(updated.requiresChoice)
+            assertFalse(updated.startupUploadConfigured)
+            assertEquals(listOf(false), native.auditUploadAttempts)
             assertEquals(receipt, preferences.all)
+        }
+
+    @Test
+    fun unavailableRecorderWithOldDisclosureBlocksStartupUntilRenewalCanBePrepared() =
+        runTest {
+            preferences
+                .edit()
+                .clear()
+                .putInt("audit_upload_disclosure_revision", 1)
+                .commit()
+            val receipt = preferences.all.toMap()
+            val native = Native(enabled = true, failSettingsRead = true)
+            val consent = AuditUploadConsent(preferences)
+            try {
+                consent.prepare(native.runtime)
+                fail("Expected the unsafe recorder startup to be blocked")
+            } catch (_: IllegalStateException) {
+                assertFalse(consent.startupUploadConfigured)
+                assertEquals(listOf(false), native.auditUploadAttempts)
+                assertEquals(receipt, preferences.all)
+            }
+
+            native.failSettingsRead = false
+            consent.prepare(native.runtime)
+            assertTrue(consent.requiresChoice)
+            assertFalse(native.enabled)
+            assertEquals(listOf(false, false), native.auditUploadAttempts)
         }
 
     /** Native rejection leaves a consented recorder local and cannot assert upload readiness. */
@@ -470,7 +545,7 @@ class AuditUploadConsentTest {
         var enabled: Boolean,
         val failDisable: Boolean = false,
         val failSecondV5Set: Boolean = false,
-        val failSettingsRead: Boolean = false,
+        var failSettingsRead: Boolean = false,
     ) {
         var productConfigured = false
         val mutations = mutableListOf<String>()

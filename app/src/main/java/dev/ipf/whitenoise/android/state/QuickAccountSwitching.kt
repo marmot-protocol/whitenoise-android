@@ -51,32 +51,13 @@ internal fun WhiteNoiseAppState.chatsAvatarOpensSelector(): Boolean {
 
 /**
  * Re-resolve the tapped account, then let the existing quick-switch/native activation owner decide whether to
- * commit. Completion copy is emitted only by the native local-ready callback and must still identify that
- * account and runtime, so a target removed between the tap and the callback confirms nothing.
+ * commit, so a target removed since the last frame starts no activation. The switched avatar and account
+ * contents are the confirmation; no separate success notice is shown.
  */
 internal fun WhiteNoiseAppState.requestQuickAccountSwitchTo(
     targetLabel: String,
-    requestSwitch: (String, () -> Unit) -> Unit,
-    onSwitched: (String) -> Unit,
+    requestSwitch: (String) -> Unit,
 ) {
     val target = quickSwitchAvatarAccounts().firstOrNull { it.label == targetLabel } ?: return
-    // Name the account while its presentation is still warm, which is exactly what the avatar the user
-    // tapped was showing. Activation clears cross-account presentation before the local-ready callback,
-    // so resolving the title inside that callback degrades to the account ref and, once the label is an
-    // identity fallback with no cached npub, all the way to the unknown placeholder.
-    val targetTitle = accountDisplayNameCached(target.accountIdHex)
-    val runtime = runtimeGeneration
-    requestSwitch(target.label) {
-        val actual = activeAccount
-        val runtimeAvailable = runtimeGeneration == runtime && !signOutInProgress && !wipeInProgress
-        val sameAccount =
-            actual != null &&
-                actual.label == target.label &&
-                actual.accountIdHex.equals(target.accountIdHex, ignoreCase = true)
-        if (runtimeAvailable && sameAccount && actual != null) {
-            if (actual.isSignedInSigningAccount() && accountSetup.eligible(actual)) {
-                onSwitched(targetTitle)
-            }
-        }
-    }
+    requestSwitch(target.label)
 }
