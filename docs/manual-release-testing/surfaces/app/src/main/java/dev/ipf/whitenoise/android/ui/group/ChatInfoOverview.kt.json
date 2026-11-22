@@ -54,6 +54,14 @@
         "test_ids": [
           "GRP-042"
         ]
+      },
+      {
+        "surface": "Muted member row dividers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "Modifier.connectedRowBorder(",
+        "test_ids": [
+          "GRP-001"
+        ]
       }
     ],
     "settings_controls": [
