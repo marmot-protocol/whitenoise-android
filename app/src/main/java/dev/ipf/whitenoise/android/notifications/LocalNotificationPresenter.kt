@@ -760,7 +760,12 @@ class LocalNotificationPresenter(
                                 NotificationActions
                                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                                     ?.let { actionTarget ->
-                                        interactions.addMessageActions(builder, actionTarget, decision.actions, quickReactions)
+                                        interactions.addMessageActions(
+                                            builder,
+                                            actionTarget,
+                                            decision.actions,
+                                            quickReactions,
+                                        )
                                     }
                             }
                             messagingPost =
