@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AuditOtlpConfigV5Ffi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
+import dev.ipf.whitenoise.android.ui.settings.StartupDiagnosticsCloseState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
@@ -131,6 +132,36 @@ class AuditUploadConsentTest {
             }
         }
 
+    @Test
+    fun closingUsageOnlyPromptKeepsBothSettledAuditChoices() =
+        runTest {
+            for (enabled in listOf(true, false)) {
+                preferences.edit().clear().commit()
+                AuditUploadConsent(preferences).choose(enabled)
+                val receipt = preferences.all.toMap()
+                val native = Native(enabled)
+                val consent = AuditUploadConsent(preferences)
+                consent.prepare(native.runtime)
+
+                val owner = StartupDiagnosticsCloseState()
+                val attempt = checkNotNull(owner.begin(auditRequired = consent.requiresChoice, usageRequired = true))
+                var usageSaved = false
+                owner.save(
+                    attempt,
+                    current = { true },
+                    audit = { error("A usage-only prompt cannot save an audit choice") },
+                    usage = {
+                        usageSaved = true
+                        true
+                    },
+                )
+                assertTrue(usageSaved)
+                assertEquals(receipt, preferences.all)
+                assertEquals(enabled, native.enabled)
+                assertFalse(owner.failed)
+            }
+        }
+
     /** A failed recorder read after an update neither clears a valid acknowledgement nor asks again. */
     @Test
     fun failedRecorderReadAfterUpdateKeepsTheAcknowledgement() =
@@ -146,6 +177,29 @@ class AuditUploadConsentTest {
             assertFalse(updated.startupUploadConfigured)
             assertEquals(listOf(false), native.auditUploadAttempts)
             assertEquals(receipt, preferences.all)
+        }
+
+    @Test
+    fun unavailableRecorderWithOldDisclosureBlocksStartupUntilRenewalCanBePrepared() =
+        runTest {
+            preferences.edit().clear().putInt("audit_upload_disclosure_revision", 1).commit()
+            val receipt = preferences.all.toMap()
+            val native = Native(enabled = true, failSettingsRead = true)
+            val consent = AuditUploadConsent(preferences)
+            try {
+                consent.prepare(native.runtime)
+                fail("Expected the unsafe recorder startup to be blocked")
+            } catch (_: IllegalStateException) {
+                assertFalse(consent.startupUploadConfigured)
+                assertEquals(listOf(false), native.auditUploadAttempts)
+                assertEquals(receipt, preferences.all)
+            }
+
+            native.failSettingsRead = false
+            consent.prepare(native.runtime)
+            assertTrue(consent.requiresChoice)
+            assertFalse(native.enabled)
+            assertEquals(listOf(false, false), native.auditUploadAttempts)
         }
 
     /** Native rejection leaves a consented recorder local and cannot assert upload readiness. */
@@ -474,7 +528,7 @@ class AuditUploadConsentTest {
         var enabled: Boolean,
         val failDisable: Boolean = false,
         val failSecondV5Set: Boolean = false,
-        val failSettingsRead: Boolean = false,
+        var failSettingsRead: Boolean = false,
     ) {
         var productConfigured = false
         val mutations = mutableListOf<String>()

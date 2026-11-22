@@ -103,8 +103,14 @@ internal class AuditUploadConsent(
         DmCreationDiagnostics.setEnabled(false)
         startupUploadConfigured = false
         runtime.configureAuditRuntime(uploadConsentGranted = false)
-        val settings = runCatchingCancellable { runtime.auditLogSettings() }.getOrNull() ?: return
         val acknowledged = granted
+        // An unreadable recorder may still need to be stopped before an unacknowledged runtime starts.
+        val settings =
+            if (acknowledged) {
+                runCatchingCancellable { runtime.auditLogSettings() }.getOrNull() ?: return
+            } else {
+                runtime.auditLogSettings()
+            }
         if (settings.enabled && !acknowledged) {
             val declined = preferences.getInt(revisionKey, -1) == 0
             if (!declined) {

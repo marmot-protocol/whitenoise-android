@@ -245,6 +245,18 @@ def usable_chat(name, *, consent_settled=False):
     raise RuntimeError(f'{name}: retained conversation did not become usable')
 
 
+def verify_audit_startup(name, audit_choice):
+    """Use the production readiness marker for the current MainActivity process."""
+    pid = adb('shell', 'pidof', APP).strip()
+    if not pid.isdecimal():
+        raise RuntimeError(f'{name}: MainActivity process unavailable')
+    logs = adb('logcat', '-d', f'--pid={pid}', '-s', 'WhiteNoiseAudit:I')
+    ready = 'WHITENOISE_AUDIT_READY_V1 ' in logs
+    if ready != (audit_choice == 'enabled'):
+        raise RuntimeError(f'{name}: unexpected audit upload readiness for {audit_choice}')
+    (REPORTS / f'{name}-audit.json').write_text(json.dumps({'audit_choice': audit_choice, 'upload_ready': ready}) + '\n')
+
+
 def post_upgrade_campaigns(ports, blob, facts):
     """Keep pending-upload failure separate from recovery of the already-qualified original receiver file."""
     if facts['phases'].get('cold_restart') != 'passed':
@@ -312,6 +324,7 @@ def main():
             (private / 'baseline-root.tar').write_bytes(backup)
             facts['baseline_root_sha256'] = hashlib.sha256(backup).hexdigest()
             usable_chat('baseline-ready', consent_settled=True)
+            verify_audit_startup('baseline-ready', audit_choice)
             stop()
             facts['phases']['baseline'] = 'passed'
             blob.acquisition_unavailable.set()
@@ -322,16 +335,18 @@ def main():
             # Current master already uses retained attachment files. The byte-pinned 0113 fault hooks
             # belong to the older SQL-body upgrade; they cannot run against this different library.
             verify_fixture_transports((relay, blob), 'before-upgrade')
+            usable_chat('upgrade-ready', consent_settled=True)
+            verify_audit_startup('upgrade-ready', audit_choice)
+            stop()
             instrument('upgrade-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
                        (*ports, '-e', 'qualificationPhase', 'upgrade'))
-            stop()
-            usable_chat('upgrade-ready', consent_settled=True)
             facts['phases']['upgrade'] = 'passed'
             stop()
             instrument('key-migration', KEY_MIGRATION, {'migratedAccountsPreserveRetentionAndSalts'}, ports)
             facts['phases']['key_migration'] = 'passed'
             stop()
             usable_chat('cold-ready', consent_settled=True)
+            verify_audit_startup('cold-ready', audit_choice)
             stop()
             instrument('cold-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
                        (*ports, '-e', 'qualificationPhase', 'cold'))
