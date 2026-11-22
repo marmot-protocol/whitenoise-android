@@ -127,6 +127,33 @@ class ShellLiftedChatDetailsScreenContractTest(
         }
     }
 
+    /**
+     * Chat details can close by a path other than the screen's own Back: while the mutation owner is closed (here a
+     * sign-out in progress) details composes only a Back handler that closes details and leaves the screen on the
+     * stack. The screen goes with details, as on master, so reopening details shows the details list, not the screen.
+     */
+    @Test
+    fun theScreenIsDroppedWhenDetailsCloseAnotherWay() {
+        shell.withMountedShell(mutableStateOf(COMPACT_WIDTH), messageFixture()) { fixture, holder ->
+            openScreen(fixture, holder, shell::awaitCondition)
+
+            composeRule.runOnIdle { fixture.appState.signOutInProgress = true }
+            shell.awaitCondition { !screen.shown(composeRule) }
+            Espresso.pressBack()
+            shell.settle()
+            composeRule.runOnIdle { fixture.appState.signOutInProgress = false }
+            shell.awaitCondition { reads(CONVERSATION_MESSAGE) }
+            assertEquals(fixture.target.groupIdHex, holder.selectedChat.value?.id)
+
+            composeRule.onNode(conversationHeader()).performClick()
+            shell.awaitCondition { shown(DETAILS_TAG) || screen.shown(composeRule) }
+            shell.settle()
+            assertTrue("reopened details shows the details list", shown(DETAILS_TAG))
+            assertFalse("the ${screen.name} screen closed with details", screen.shown(composeRule))
+            assertTrue(holder.shellNavigator.stack.last() is ShellRoute.Conversation)
+        }
+    }
+
     /** Opens the target conversation, its details and then this screen, checking each step is on screen. */
     private fun openScreen(
         fixture: ReturnFixture,
