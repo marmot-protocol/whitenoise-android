@@ -19,7 +19,7 @@ private fun WhiteNoiseAppState.ensureAccountSwitchRequestIsCurrent(generation: L
 }
 
 /** Prepares both independent local reads before the coordinator's fenced publication. */
-internal suspend fun WhiteNoiseAppState.loadAccountActivationProjection(
+internal suspend fun WhiteNoiseAppState.projectActivation(
     request: AccountSessionActivationRequest,
     generation: Long,
     switchingAccounts: Boolean,

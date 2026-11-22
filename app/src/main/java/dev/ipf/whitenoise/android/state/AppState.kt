@@ -4907,8 +4907,7 @@ class WhiteNoiseAppState private constructor(
             generation: Long,
             switchingAccounts: Boolean,
             restored: PreparedAccountSessionActivation,
-        ): PreparedAccountSessionActivation =
-            loadAccountActivationProjection(request, generation, switchingAccounts, restored)
+        ): PreparedAccountSessionActivation = projectActivation(request, generation, switchingAccounts, restored)
 
         /** Rejects revoked identities, replacement runtimes and publication during destructive account teardown. */
         override fun canPublish(

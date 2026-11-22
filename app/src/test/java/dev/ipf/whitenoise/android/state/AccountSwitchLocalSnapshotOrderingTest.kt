@@ -123,10 +123,10 @@ class AccountSwitchLocalSnapshotOrderingTest {
     fun targetLocalSnapshotIsLoadedAndGenerationFencedBeforeAccountPublication() {
         val source = appStateSource().readText()
         val restore = source.kotlinFunctionBody("prepare")
-        val projection = accountSwitchPreloadSource().readText().kotlinFunctionBody("loadAccountActivationProjection")
+        val projection = accountSwitchPreloadSource().readText().kotlinFunctionBody("projectActivation")
         assertTrue(
             "the activation facade forwards its generation unchanged",
-            "loadAccountActivationProjection(request, generation, switchingAccounts, restored)" in
+            "projectActivation(request, generation, switchingAccounts, restored)" in
                 source
                     .substringAfter("override suspend fun loadLocalProjection(")
                     .substringBefore("override fun canPublish("),
@@ -353,7 +353,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     /** Interactive selectors load only authoritative rows before activation. */
     @Test
     fun interactiveSelectorsLoadOnlyAuthoritativeRowsBeforeActivation() {
-        val projection = accountSwitchPreloadSource().readText().kotlinFunctionBody("loadAccountActivationProjection")
+        val projection = accountSwitchPreloadSource().readText().kotlinFunctionBody("projectActivation")
         val selector = source("ui/account/ProfileSwitcherSelection.kt").readText().kotlinFunctionBody("select")
         val mainShell = source("ui/navigation/MainShell.kt").readText()
         val quickSwitchStart =
