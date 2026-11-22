@@ -91,6 +91,30 @@ class IdentityCreationFlowTest {
             assertEquals(listOf("created", "created", "created"), asked)
         }
 
+    @Test
+    fun fastSetupCompletesWithoutWaitingForTheSteadyPollInterval() =
+        runTest {
+            val reads = mutableListOf<Long>()
+            awaitAccountNetworkReady("created") {
+                val now = testScheduler.currentTime
+                reads += now
+                if (now >= 40) AccountSetupReadinessFfi.NETWORK_READY else AccountSetupReadinessFfi.PUBLISHING
+            }
+            assertEquals(listOf(0L, 50L), reads)
+        }
+
+    @Test
+    fun slowSetupReturnsToTheSteadyPollInterval() =
+        runTest {
+            val reads = mutableListOf<Long>()
+            awaitAccountNetworkReady("created") {
+                val now = testScheduler.currentTime
+                reads += now
+                if (now >= 700) AccountSetupReadinessFfi.NETWORK_READY else AccountSetupReadinessFfi.PUBLISHING
+            }
+            assertEquals(listOf(0L, 50L, 150L, 250L, 500L, 750L), reads)
+        }
+
     /** Recovery is MDK's typed setup failure, never a ready account. */
     @Test
     fun recoveryRequiredFailsTheWait() =

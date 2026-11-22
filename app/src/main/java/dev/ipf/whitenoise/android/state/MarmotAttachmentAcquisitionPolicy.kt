@@ -84,11 +84,15 @@ internal suspend fun awaitAccountNetworkReady(
 ) {
     if (resume != null && readiness(accountRef) in RESUMABLE_SETUP) resume()
     withTimeoutOrNull(timeoutMillis) {
+        val initialDelays = INITIAL_ACCOUNT_NETWORK_READY_DELAYS_MILLIS.iterator()
         while (true) {
             when (readiness(accountRef)) {
                 AccountSetupReadinessFfi.NETWORK_READY -> return@withTimeoutOrNull
                 AccountSetupReadinessFfi.RECOVERY_REQUIRED -> throw MarmotKitException.AccountSetupRecoveryRequired()
-                else -> delay(ACCOUNT_NETWORK_READY_POLL_MILLIS)
+                else -> {
+                    val pollMillis = if (initialDelays.hasNext()) initialDelays.next() else ACCOUNT_NETWORK_READY_POLL_MILLIS
+                    delay(pollMillis)
+                }
             }
         }
     } ?: throw MarmotKitException.AccountSetupRetryRequired()
@@ -96,4 +100,6 @@ internal suspend fun awaitAccountNetworkReady(
 
 private val RESUMABLE_SETUP = setOf(AccountSetupReadinessFfi.LOCAL_READY, AccountSetupReadinessFfi.PUBLISHING)
 internal const val ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS = 60_000L
+// Include the original 250 ms boundary so later polls don't drift past it.
+private val INITIAL_ACCOUNT_NETWORK_READY_DELAYS_MILLIS = listOf(50L, 100L, 100L)
 private const val ACCOUNT_NETWORK_READY_POLL_MILLIS = 250L
