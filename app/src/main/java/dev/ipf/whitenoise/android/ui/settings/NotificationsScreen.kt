@@ -206,7 +206,10 @@ internal fun NotificationSoundsScreen(
     SettingsScaffold(title = stringResource(R.string.notification_sounds_vibration), onBack = onBack) {
         SettingsList {
             item(key = "search.NotificationSounds.1") {
-                SettingsSection(stringResource(R.string.notification_categories))
+                SettingsSection(
+                    title = stringResource(R.string.notification_categories),
+                    explanation = stringResource(R.string.notification_categories_detail),
+                )
             }
             item(key = "search.NotificationSounds.2") {
                 GlobalNotificationCategories(
@@ -215,14 +218,13 @@ internal fun NotificationSoundsScreen(
                     destination = SettingsDetail.NotificationSounds,
                 )
             }
-            item(key = "search.NotificationSounds.3") {
-                SettingsExplainer(stringResource(R.string.notification_categories_detail))
+            item(key = "search.NotificationSounds.4") {
+                SettingsSection(
+                    title = stringResource(R.string.notification_tones),
+                    explanation = stringResource(R.string.notification_tone_scope),
+                )
             }
-            item(key = "search.NotificationSounds.4") { SettingsSection(stringResource(R.string.notification_tones)) }
             item(key = "search.NotificationSounds.5") { NotificationToneControl() }
-            item(key = "search.NotificationSounds.6") {
-                SettingsExplainer(stringResource(R.string.notification_tone_scope))
-            }
             item(key = "search.NotificationSounds.7") { SpokenAudioAlertControl() }
         }
     }

@@ -303,9 +303,8 @@ internal fun VoiceLanguageScreen(
 }
 
 /** Help & support hub: guides, the support chat, donations and the developer tools. */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
-@Suppress("LongMethod") // The hub groups related navigational rows.
 internal fun HelpSupportScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,

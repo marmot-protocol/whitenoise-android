@@ -207,6 +207,8 @@ Screen security, Incognito keyboard and device authentication are device setting
 
 ## Data & storage
 
+Touch and hold a storage or download setting for details. Removal warnings and confirmations appear when you choose an action.
+
 **Data & storage** controls downloads, sent media quality and the space attachments use on this device.
 
 ### Manage storage
@@ -246,6 +248,8 @@ Use **AI Agents** to connect an assistant that runs on a computer or server you 
 
 | Row | Effect |
 |---|---|
+| Learn White Noise | Opens the optional walkthrough. |
+| Documentation | Searches and opens the bundled Android guides offline. |
 | Help > Report a bug | Opens a review screen. Nothing is attached, and GitHub issues are public, so review what you add. Tap **Open GitHub** to open the issue form in your browser. See [Report a problem](/docs/troubleshooting/report-problem#android-bug-report-screen). |
 | Help > About & licenses | Shows the version, build and MarmotKit version, open source licenses and the privacy policy. |
 | Chat with support | Starts a chat with White Noise Support. It appears only while a profile is active, and that profile needs a published receiving relay first. If it lacks one, tap **Open Relays**. |

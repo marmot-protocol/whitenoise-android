@@ -212,9 +212,6 @@ private fun LazyListScope.storageChatActionItems(
                 )
             }
         }
-        Box(Modifier.padding(top = WhiteNoiseSpacing.Related, bottom = WhiteNoiseSpacing.Related)) {
-            SettingsExplainer(stringResource(R.string.storage_removal_help))
-        }
     }
 }
 

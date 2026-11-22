@@ -139,7 +139,6 @@ internal fun LazyListScope.storageFreeUpItems(
             }
         }
     }
-    item(key = "search.ManageStorage.4") { SettingsExplainer(stringResource(R.string.storage_removal_help)) }
 }
 
 /** The account's Keep media window and what changing it does. */
@@ -167,7 +166,6 @@ internal fun LazyListScope.storageKeepMediaItems(
             }
         }
     }
-    item(key = "search.ManageStorage.7") { SettingsExplainer(stringResource(R.string.storage_keep_media_help)) }
 }
 
 /** What the Keep media row shows before its window is known. */
@@ -183,7 +181,12 @@ internal fun LazyListScope.storageChatItems(
     state: ManageStorageUiState,
     actions: ManageStorageActions,
 ) {
-    item(key = "search.ManageStorage.8") { SettingsSection(stringResource(R.string.storage_chats)) }
+    item(key = "search.ManageStorage.8") {
+        SettingsSection(
+            title = stringResource(R.string.storage_chats),
+            explanation = stringResource(R.string.storage_chats_help),
+        )
+    }
     if (state.chats.isNotEmpty()) {
         item(key = "storage.chats") {
             SettingsGroup(modifier = Modifier.testTag("storage.chats")) {
@@ -210,7 +213,7 @@ internal fun LazyListScope.storageChatItems(
                 LaunchedEffect(state.chats.size) { actions.onLoadMoreChats() }
                 StorageLoadingRow()
             }
-            else -> SettingsExplainer(stringResource(R.string.storage_chats_help))
+            else -> Unit
         }
     }
 }
