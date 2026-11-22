@@ -123,7 +123,12 @@ class AccountSwitchLocalSnapshotOrderingTest {
     fun targetLocalSnapshotIsLoadedAndGenerationFencedBeforeAccountPublication() {
         val source = appStateSource().readText()
         val restore = source.kotlinFunctionBody("prepare")
-        val projection = source.kotlinFunctionBody("loadLocalProjection")
+        val projection = accountSwitchPreloadSource().readText().kotlinFunctionBody("loadAccountActivationProjection")
+        assertTrue(
+            "the activation facade forwards its generation unchanged",
+            "loadAccountActivationProjection(request, generation, switchingAccounts, restored)" in
+                source.kotlinFunctionBody("loadLocalProjection"),
+        )
         val publish = source.kotlinFunctionBody("publish")
         assertTrue(
             "native projection reads retain their request token",
@@ -346,7 +351,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     /** Interactive selectors load only authoritative rows before activation. */
     @Test
     fun interactiveSelectorsLoadOnlyAuthoritativeRowsBeforeActivation() {
-        val setActiveAccount = setActiveAccountSection()
+        val projection = accountSwitchPreloadSource().readText().kotlinFunctionBody("loadAccountActivationProjection")
         val selector = source("ui/account/ProfileSwitcherSelection.kt").readText().kotlinFunctionBody("select")
         val mainShell = source("ui/navigation/MainShell.kt").readText()
         val quickSwitchStart =
@@ -377,11 +382,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         assertTrue(
             "setActiveAccount must execute the tested preload plan",
-            "if (plan.loadLocalRows)" in setActiveAccount,
+            "if (plan.loadLocalRows)" in projection,
         )
         assertTrue(
             "setActiveAccount must hand the tested plan itself to the loader",
-            "loadAccountSwitchLocalSnapshot(request.label, generation, plan)" in setActiveAccount,
+            "loadAccountSwitchLocalSnapshot(request.label, generation, plan)" in projection,
         )
         assertTrue(
             "the Settings selector must use the interactive local-row boundary",
@@ -567,14 +572,6 @@ class AccountSwitchLocalSnapshotOrderingTest {
     private fun accountSwitchSnapshotSource(): File = source("state/AccountSwitchLocalSnapshot.kt")
 
     private fun connectivityRuntimeSource(): File = source("state/ChatListConnectivityRuntime.kt")
-
-    private fun setActiveAccountSection(): String {
-        val source = appStateSource().readText()
-        val start = source.indexOf("suspend fun setActiveAccount(")
-        val end = source.indexOf("internal fun recordAccountSwitchLocalRowsReady", startIndex = start)
-        check(start >= 0 && end > start) { "Missing setActiveAccount section" }
-        return source.substring(start, end)
-    }
 
     private fun accountSelectorSource(): File = source("ui/account/AccountSelectorSheet.kt")
 

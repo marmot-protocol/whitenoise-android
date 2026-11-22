@@ -35,7 +35,13 @@ internal suspend fun WhiteNoiseAppState.loadAccountActivationProjection(
             } else {
                 null
             }
-        val profile = preloadStartupSelfProfile(request.preloadPolicy, target?.accountIdHex, wanted, ::loadAccountSwitchProfileSeed)
+        val profile =
+            preloadStartupSelfProfile(
+                policy = request.preloadPolicy,
+                accountIdHex = target?.accountIdHex,
+                activationWanted = wanted,
+                loadProfile = ::loadAccountSwitchProfileSeed,
+            )
         restored.copy(profilePresentation = profile, snapshot = snapshot?.await())
     }
 
