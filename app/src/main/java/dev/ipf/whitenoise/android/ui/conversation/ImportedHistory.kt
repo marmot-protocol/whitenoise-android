@@ -84,10 +84,10 @@ internal fun rememberChatHistoryImports(
 }
 
 /**
- * What a timeline row draws above itself for imported history. At the top of the loaded history, a transfer still
- * under way says so. Where the rows before this one were imported and this one was not, a label names where they
- * came from. Both are drawn inside the row, like the day separator, so no row is added, removed or reordered and
- * scroll position is unaffected while history arrives.
+ * What a timeline row draws above itself for imported history, ahead of its day separator. At the top of the loaded
+ * history, a transfer still under way says so. Where the rows before this one were imported and this one was not, a
+ * label names where they came from, directly under them. Both are drawn inside the row, like the day separator, so
+ * no row is added, removed or reordered and scroll position is unaffected while history arrives.
  */
 @Composable
 internal fun ImportedHistoryMarkers(

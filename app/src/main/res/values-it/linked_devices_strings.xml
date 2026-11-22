@@ -36,9 +36,9 @@
     <string name="error_account_unlinked">Questo dispositivo è stato scollegato da questo account, quindi non può accedere qui. Rimuovi l’account da questo dispositivo, poi accedi di nuovo per collegarlo nuovamente.</string>
     <string name="wipe_report_left_to_other_devices">Chat che completeranno gli altri tuoi dispositivi: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Non è stato possibile chiedere agli altri tuoi dispositivi di completare la disconnessione di questo. Potrebbero continuare a elencarlo finché non lo rimuovi da uno di essi.</string>
-    <string name="history_imported_from_device">Importato da %1$s</string>
-    <string name="history_imported_from_another_device">Importato da un altro dispositivo</string>
-    <string name="history_restored_from_backup">Ripristinato da un backup</string>
+    <string name="history_imported_from_device">I messaggi qui sopra provengono da %1$s</string>
+    <string name="history_imported_from_another_device">I messaggi qui sopra provengono da un altro dispositivo</string>
+    <string name="history_restored_from_backup">I messaggi qui sopra sono stati ripristinati da un backup</string>
     <string name="history_receiving">Ricezione dei messaggi precedenti da un altro dei tuoi dispositivi…</string>
     <string name="history_retrying">Impossibile caricare i messaggi precedenti. Riproveremo automaticamente.</string>
     <string name="link_device_this_title">Collega questo dispositivo</string>

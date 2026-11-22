@@ -36,9 +36,9 @@
     <string name="error_account_unlinked">Это устройство отвязано от этой учётной записи, поэтому войти здесь нельзя. Удалите учётную запись с этого устройства, затем войдите снова, чтобы заново связать его.</string>
     <string name="wipe_report_left_to_other_devices">Чатов, выход из которых завершат другие ваши устройства: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Не удалось попросить другие ваши устройства завершить выход этого устройства. Они могут продолжать показывать его, пока вы не удалите его с одного из них.</string>
-    <string name="history_imported_from_device">Импортировано с устройства %1$s</string>
-    <string name="history_imported_from_another_device">Импортировано с другого устройства</string>
-    <string name="history_restored_from_backup">Восстановлено из резервной копии</string>
+    <string name="history_imported_from_device">Сообщения выше получены с устройства %1$s</string>
+    <string name="history_imported_from_another_device">Сообщения выше получены с другого устройства</string>
+    <string name="history_restored_from_backup">Сообщения выше восстановлены из резервной копии</string>
     <string name="history_receiving">Получение прежних сообщений с другого вашего устройства…</string>
     <string name="history_retrying">Не удалось загрузить предыдущие сообщения. Мы автоматически попробуем ещё раз.</string>
     <string name="link_device_this_title">Связать это устройство</string>

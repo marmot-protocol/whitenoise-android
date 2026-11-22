@@ -101,6 +101,8 @@ internal fun TimelineRow(
                 messageId = item.record.messageIdHex,
                 firstUnreadMessageId = entryFirstUnreadMessageId,
             )
+        // Ahead of the day separator, so the import line closes the imported rows instead of opening the next day.
+        ImportedHistoryMarkers(older, item, atHistoryStart = older == null && !controller.hasMoreBefore)
         if (daySeparatorLabel != null) {
             val hasLeadingHeader =
                 controller.hasMoreBefore ||
@@ -113,7 +115,6 @@ internal fun TimelineRow(
                 followsGroupEvent = followsGroupEvent,
             )
         }
-        ImportedHistoryMarkers(older, item, atHistoryStart = older == null && !controller.hasMoreBefore)
         if (showUnreadDivider) {
             UnreadMessagesDivider(
                 count = entryUnreadCount,
