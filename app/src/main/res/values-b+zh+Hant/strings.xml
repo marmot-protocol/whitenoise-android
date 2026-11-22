@@ -1397,6 +1397,8 @@
     <string name="folder_keep_editing">繼續編輯</string>
     <string name="folder_unavailable">此資料夾已無法使用。</string>
     <string name="folder_save_failed">無法儲存。你的變更仍在，請再試一次。</string>
+    <string name="folder_autosave_failed">無法儲存最新的變更。請再編輯一次或返回以重試。</string>
+    <string name="folder_name_required">請輸入資料夾名稱。將保留上次儲存的名稱。</string>
     <string name="folder_search">搜尋</string>
     <string name="no_results">沒有結果</string>
     <string name="done">完成</string>
@@ -2249,7 +2251,6 @@
     <string name="chat_rows_no_archived_detail">已封存的聊天會顯示在這裡。</string>
     <string name="quick_account_switching">快速切換帳戶</string>
     <string name="quick_account_switching_detail">在頭像旁顯示其他帳戶。輕觸其中一個即可切換。</string>
-    <string name="quick_account_switched">已切換至 %1$s</string>
     <string name="add_profile">新增個人資料</string>
     <string name="switch_profile">切換個人資料</string>
     <string name="folder_new_title">新增資料夾</string>

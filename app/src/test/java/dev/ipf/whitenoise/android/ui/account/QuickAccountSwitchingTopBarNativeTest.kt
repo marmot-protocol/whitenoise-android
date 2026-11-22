@@ -10,8 +10,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -34,10 +36,17 @@ import java.util.concurrent.atomic.AtomicInteger
 class QuickAccountSwitchingTopBarNativeTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** Native generation fencing prevents repeated pending taps from producing duplicate or premature success. */
-    @Suppress("LongMethod")
+    /** The top bar's own fallback switch lands on the tapped account without a success toast. */
     @Test
-    fun repeatedPendingTapUsesNativeFenceAndOneActualDestinationToast() {
+    fun fallbackSwitchReachesOneDestinationWithoutToast() = assertRepeatedTapSwitchesSilently(callerHandler = false)
+
+    /** A caller-supplied switch handler, as the main shell passes, lands on the tapped account without a toast. */
+    @Test
+    fun callerHandlerSwitchReachesOneDestinationWithoutToast() = assertRepeatedTapSwitchesSilently(callerHandler = true)
+
+    /** Native generation fencing keeps a repeated pending tap to one destination; neither path shows a toast. */
+    @Suppress("LongMethod")
+    private fun assertRepeatedTapSwitchesSilently(callerHandler: Boolean) {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val release = CountDownLatch(1)
         val reads = AtomicInteger()
@@ -50,7 +59,6 @@ class QuickAccountSwitchingTopBarNativeTest {
                         AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true, false),
                     ),
                 emitStartupNotification = false,
-                onDisplayName = { _, accountId -> if (accountId == "bb".repeat(32)) "Bea" else "Alice" },
                 onPresentedChatList = { account ->
                     if (account == "b") {
                         reads.incrementAndGet()
@@ -62,14 +70,6 @@ class QuickAccountSwitchingTopBarNativeTest {
         try {
             runBlocking { fixture.bootstrap() }
             val app = fixture.appState
-            // Start with a distinct hydrated name. Activation clears cross-account presentation state
-            // before its local-ready callback, so the notice must carry the name captured at the tap.
-            runBlocking {
-                fixture.runWithMainLooperPumping {
-                    app.warmProfilePresentationsBlocking(listOf("aa".repeat(32), "bb".repeat(32)))
-                }
-            }
-            assertEquals("Bea", app.accountDisplayNameCached("bb".repeat(32)))
             app.updateQuickAccountSwitching(true)
             ShadowToast.reset()
             composeRule.setContent {
@@ -85,6 +85,7 @@ class QuickAccountSwitchingTopBarNativeTest {
                         {},
                         {},
                         {},
+                        onSwitchToAccount = if (callerHandler) { label -> callerSwitch(app, label) } else null,
                         selfUpdateEnabled = false,
                     )
                 }
@@ -100,27 +101,30 @@ class QuickAccountSwitchingTopBarNativeTest {
                 reads.get() >= 2
             }
             assertEquals("a", app.activeAccountRef)
-            assertEquals(0, ShadowToast.shownToastCount())
             release.countDown()
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
-                app.activeAccountRef == "b" && ShadowToast.shownToastCount() == 1
+                app.activeAccountRef == "b"
             }
-            assertEquals(
-                context.getString(R.string.quick_account_switched, "Bea"),
-                ShadowToast.getTextOfLatestToast(),
-            )
-            composeRule.waitUntil(5_000) {
-                shadowOf(Looper.getMainLooper()).idle()
-                app.accountDisplayNameCached("bb".repeat(32)) == "Bea"
-            }
-            // The name survives the activation window rather than degrading to the account ref, and the
-            // returning presentation neither emits a second notice nor rewrites the first one.
-            assertEquals(1, ShadowToast.shownToastCount())
-            assertEquals(context.getString(R.string.quick_account_switched, "Bea"), ShadowToast.getTextOfLatestToast())
+            composeRule.waitForIdle()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals("b", app.activeAccountRef)
+            assertEquals(0, ShadowToast.shownToastCount())
         } finally {
             release.countDown()
             fixture.close()
+        }
+    }
+
+    /** Mirrors the main shell: re-resolve the target, then hand it to the native activation owner. */
+    private fun callerSwitch(
+        app: WhiteNoiseAppState,
+        targetLabel: String,
+    ) {
+        app.requestQuickAccountSwitchTo(targetLabel) { target ->
+            app.launchMutation {
+                app.setActiveAccount(target, preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS)
+            }
         }
     }
 }

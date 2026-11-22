@@ -88,11 +88,11 @@ class QuickAccountSwitchingStateTest {
         app.updateQuickAccountSwitching(true)
         app.wipeInProgress = true
         assertEquals(emptyList<AccountSummaryFfi>(), app.quickSwitchAvatarAccounts())
-        app.requestQuickAccountSwitchTo(B.label, { _, _ -> error("Wipe must reject") }, { error("No activation") })
+        app.requestQuickAccountSwitchTo(B.label) { error("Wipe must reject") }
         app.wipeInProgress = false
         app.signOutInProgress = true
         assertEquals(emptyList<AccountSummaryFfi>(), app.quickSwitchAvatarAccounts())
-        app.requestQuickAccountSwitchTo(B.label, { _, _ -> error("Sign out must reject") }, { error("No activation") })
+        app.requestQuickAccountSwitchTo(B.label) { error("Sign out must reject") }
     }
 
     /** A label that is not an offered account never reaches the native switch owner. */
@@ -101,8 +101,8 @@ class QuickAccountSwitchingStateTest {
         val app = WhiteNoiseAppState(context, DraftStore.forContext(context), { null }, listOf(A, B), A.label)
         app.updateQuickAccountSwitching(true)
 
-        app.requestQuickAccountSwitchTo("removed", { _, _ -> error("Unknown target must reject") }, { error("None") })
-        app.requestQuickAccountSwitchTo(A.label, { _, _ -> error("Active account must reject") }, { error("None") })
+        app.requestQuickAccountSwitchTo("removed") { error("Unknown target must reject") }
+        app.requestQuickAccountSwitchTo(A.label) { error("Active account must reject") }
     }
 
     private companion object {

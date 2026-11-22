@@ -1470,6 +1470,8 @@
     <string name="folder_keep_editing">Продолжайте редактировать</string>
     <string name="folder_unavailable">Эта папка больше не доступна.</string>
     <string name="folder_save_failed">Не удалось сохранить. Изменения всё ещё здесь; попробуйте снова.</string>
+    <string name="folder_autosave_failed">Не удалось сохранить последние изменения. Измените ещё раз или вернитесь назад, чтобы повторить.</string>
+    <string name="folder_name_required">Введите имя папки. Сохраняется последнее сохранённое имя.</string>
     <string name="folder_search">Поиск</string>
     <string name="no_results">Нет результатов</string>
     <string name="done">Готово</string>
@@ -2357,7 +2359,6 @@
     <string name="chat_rows_no_archived_detail">Архивированные чаты появятся здесь.</string>
     <string name="quick_account_switching">Быстрое переключение аккаунтов</string>
     <string name="quick_account_switching_detail">Показывает другие аккаунты рядом с аватаром. Нажмите на один, чтобы переключиться.</string>
-    <string name="quick_account_switched">Выбран аккаунт %1$s</string>
     <string name="add_profile">Добавить профиль</string>
     <string name="switch_profile">Переключить профиль</string>
     <string name="folder_new_title">Новая папка</string>

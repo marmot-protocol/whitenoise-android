@@ -42,7 +42,7 @@ class ChatFolderManageRouteTest {
     /** System Back follows the same Home return route as the visible Back button. */
     @Test fun systemBackReturnsHomeAndPreservesSelectedNativeFolder() = route(teardown = false, systemBack = true)
 
-    /** Existing-folder drafts consume Back before the manager returns Home. */
+    /** Existing-folder edits autosave; Back returns to the manager, which stays open above Home. */
     @Test
     fun existingFolderDraftBackKeepsManagerOpen() = route(teardown = false, systemBack = true, editExisting = true)
 
@@ -108,17 +108,23 @@ class ChatFolderManageRouteTest {
                 }
                 composeRule.onNodeWithTag("folder.name").performTextReplacement("Unsaved name")
                 composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
-                composeRule.onNodeWithText(context.getString(R.string.folder_discard_title)).assertExists()
-                composeRule.onNodeWithText(context.getString(R.string.folder_discard)).performClick()
+                if (!editExisting) {
+                    composeRule.onNodeWithText(context.getString(R.string.folder_discard_title)).assertExists()
+                    composeRule.onNodeWithText(context.getString(R.string.folder_discard)).performClick()
+                }
+                composeRule.onNodeWithText(context.getString(R.string.folder_discard_title)).assertDoesNotExist()
                 composeRule.onNodeWithTag(CHAT_FOLDERS_CONTENT_TAG).assertExists()
                 assertEquals(
-                    "Work",
+                    if (editExisting) "Unsaved name" else "Work",
                     app.chatFolderPreferences
                         .foldersFor("a")
                         .first { it.id == folder.id }
                         .name,
                 )
-                assertFalse(app.chatFolderPreferences.foldersFor("a").any { it.name == "Unsaved name" })
+                assertEquals(
+                    if (editExisting) 1 else 0,
+                    app.chatFolderPreferences.foldersFor("a").count { it.name == "Unsaved name" },
+                )
             }
             if (teardown) {
                 composeRule.runOnIdle { app.wipeInProgress = true }
