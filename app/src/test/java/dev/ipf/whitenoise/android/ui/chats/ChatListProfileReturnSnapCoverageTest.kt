@@ -41,7 +41,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val onPresentProfileBlock =
             mainShell.requiredSection(
                 start = "onPresentProfile = {",
-                end = "MainSection.Settings ->",
+                end = "is ShellRoute.Settings ->",
             )
         assertTrue(
             "chat-list profile presentation must arm the list-bound snapshot",
@@ -284,7 +284,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val chatsScreenWiring =
             mainShell.requiredSection(
                 start = "ChatsScreen(",
-                end = "MainSection.Settings ->",
+                end = "is ShellRoute.Settings ->",
             )
         assertTrue(
             "ChatsScreen must receive the published head from the state machine",
