@@ -88,7 +88,12 @@ internal fun ConversationDictationController.promoteFollowUp(previousDelivered: 
     if (pending.phase == Phase.Arming) {
         dequeueFollowUpHead()
         if (draft != null) {
-            requestStart(queuedTarget.accountRef, queuedTarget.groupIdHex, draft.value, queuedTarget.replyToMessageIdHex)
+            requestStart(
+                queuedTarget.accountRef,
+                queuedTarget.groupIdHex,
+                draft.value,
+                queuedTarget.replyToMessageIdHex,
+            )
         }
         return
     }
