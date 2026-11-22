@@ -1,15 +1,21 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.DestructiveAccountWipeRuntimeState
+import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.timelinePage
+import dev.ipf.whitenoise.android.state.timelineRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -42,7 +48,11 @@ class ShellRestoreContractTest {
      */
     @Test
     fun processDeathRestoresTheSettingsScreenAndTheConversationAboveIt() {
-        val fixture = ReturnFixture()
+        val message =
+            timelineRecord("ab".repeat(32), 1uL)
+                .copy(groupIdHex = ConversationTimelineTestIds.GROUP_ID, plaintext = MESSAGE)
+        val scripts = List(OPEN_SCRIPTS) { ScriptedConversationTimelineSubscription(timelinePage(message)) }
+        val fixture = ReturnFixture(timelineScripts = scripts)
         val saved = savedRoute(fixture.target.groupIdHex)
         shell.withMountedShell(mutableStateOf(COMPACT_WIDTH), fixture, { MainShell(fixture.appState, it) }, saved) {
             _,
@@ -53,11 +63,16 @@ class ShellRestoreContractTest {
             assertEquals(MainSection.Settings.name, holder.sectionState.sectionName)
             assertEquals(SettingsDetail.Appearance.name, holder.sectionState.settingsDetailName)
             assertEquals(ConversationOpenContext(), holder.selectedChatOpenContext.value)
+            shell.awaitCondition { reads(MESSAGE) }
 
             Espresso.pressBack()
             shell.awaitCondition { holder.selectedChat.value == null }
+            shell.settle()
             assertEquals(MainSection.Settings.name, holder.sectionState.sectionName)
             assertEquals(SettingsDetail.Appearance.name, holder.sectionState.settingsDetailName)
+            assertTrue("Back shows the restored Appearance screen", reads(appearance()))
+            assertFalse("the conversation has left the screen", reads(MESSAGE))
+            assertFalse("Back does not land on the chat list", reads("Return chat 0"))
             assertFalse(composeRule.activity.isFinishing)
         }
     }
@@ -82,6 +97,15 @@ class ShellRestoreContractTest {
             assertTrue(composeRule.onAllNodes(hasText("Return chat 0")).fetchSemanticsNodes().isNotEmpty())
         }
     }
+
+    /** True while any composed node, merged or not, carries [text]. */
+    private fun reads(text: String): Boolean {
+        val carriers = composeRule.onAllNodes(hasText(text, substring = true), useUnmergedTree = true)
+        return carriers.fetchSemanticsNodes().isNotEmpty()
+    }
+
+    /** The Appearance screen's title. */
+    private fun appearance(): String = ApplicationProvider.getApplicationContext<Context>().getString(R.string.appearance)
 
     /** The saved state a process-killed Activity hands back: the open conversation and Settings on Appearance. */
     private fun savedRoute(groupIdHex: String) =
@@ -116,5 +140,7 @@ class ShellRestoreContractTest {
     private companion object {
         val COMPACT_WIDTH = 839.dp
         val TWO_PANE_WIDTH = 1_000.dp
+        const val MESSAGE = "restore contract only message"
+        const val OPEN_SCRIPTS = 3
     }
 }

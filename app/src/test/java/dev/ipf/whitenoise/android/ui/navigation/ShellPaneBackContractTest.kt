@@ -1,11 +1,19 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
+import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
+import dev.ipf.whitenoise.android.state.timelinePage
+import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.settings.DIAGNOSTICS_CONTENT_TAG
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,11 +44,13 @@ class ShellPaneBackContractTest {
     /** Diagnostics beside a conversation goes Back to Developer, then Help & support, and the chat stays open. */
     @Test
     fun backFromDiagnosticsBesideAConversationKeepsTheConversationOpen() {
-        shell.withMountedShell(mutableStateOf(EXPANDED_WIDTH)) { fixture, holder ->
+        shell.withMountedShell(mutableStateOf(EXPANDED_WIDTH), messageFixture()) { fixture, holder ->
             shell.openTarget(fixture, holder)
+            shell.awaitCondition { reads(MESSAGE) }
             composeRule.runOnIdle { holder.restoreSection(MainSection.Diagnostics, SettingsDetail.Developer) }
             shell.awaitCondition { shown(DIAGNOSTICS_CONTENT_TAG) }
             assertEquals(fixture.target.groupIdHex, holder.selectedChat.value?.id)
+            assertFalse(reads(string(R.string.developer_mode)))
 
             Espresso.pressBack()
             shell.settle()
@@ -49,13 +59,37 @@ class ShellPaneBackContractTest {
             assertEquals(SettingsDetail.Developer.name, holder.sectionState.settingsDetailName)
             val open = holder.selectedChat.value?.id
             assertEquals("the conversation beside it stays open", fixture.target.groupIdHex, open)
+            assertTrue("the list pane shows Developer", reads(string(R.string.developer_mode)))
+            assertTrue("the conversation beside it is still on screen", reads(MESSAGE))
 
             Espresso.pressBack()
             shell.settle()
             assertEquals(SettingsDetail.HelpSupport.name, holder.sectionState.settingsDetailName)
             assertEquals(fixture.target.groupIdHex, holder.selectedChat.value?.id)
             assertTrue(shown(TWO_PANE_LIST_TAG))
+            assertTrue("the list pane shows Help & support", reads(string(R.string.settings_help_support)))
+            assertFalse(reads(string(R.string.developer_mode)))
+            assertTrue("the conversation beside it is still on screen", reads(MESSAGE))
         }
+    }
+
+    /** True while any composed node, merged or not, carries [text]. */
+    private fun reads(text: String): Boolean {
+        val carriers = composeRule.onAllNodes(hasText(text, substring = true), useUnmergedTree = true)
+        return carriers.fetchSemanticsNodes().isNotEmpty()
+    }
+
+    /** The app's string for [id]. */
+    private fun string(id: Int): String = ApplicationProvider.getApplicationContext<Context>().getString(id)
+
+    /** A conversation whose one message tells it apart from the list. */
+    private fun messageFixture(): ReturnFixture {
+        val message =
+            timelineRecord("ab".repeat(32), 1uL)
+                .copy(groupIdHex = ConversationTimelineTestIds.GROUP_ID, plaintext = MESSAGE)
+        return ReturnFixture(
+            timelineScripts = List(OPEN_SCRIPTS) { ScriptedConversationTimelineSubscription(timelinePage(message)) },
+        )
     }
 
     /** True while a node carrying [tag] is composed. */
@@ -63,5 +97,7 @@ class ShellPaneBackContractTest {
 
     private companion object {
         val EXPANDED_WIDTH = 840.dp
+        const val MESSAGE = "pane back contract only message"
+        const val OPEN_SCRIPTS = 3
     }
 }
