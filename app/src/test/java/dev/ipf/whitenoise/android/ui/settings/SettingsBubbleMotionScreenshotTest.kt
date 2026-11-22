@@ -25,6 +25,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.navigation.CHATS_ROOT
+import dev.ipf.whitenoise.android.ui.navigation.ShellNavDisplay
+import dev.ipf.whitenoise.android.ui.navigation.ShellRoute
+import dev.ipf.whitenoise.android.ui.navigation.ShellSectionMotion
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -137,13 +141,20 @@ class SettingsBubbleMotionScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark) {
                     Surface(Modifier.fillMaxSize()) {
-                        SettingsRouteMotion(
-                            target = depth.value,
-                            depth = depth.value,
-                            ownerKey = "account",
-                            animationsEnabled = animations.value,
-                            topLevelBubble = true,
-                        ) { route -> Route(route) }
+                        // The shell's own list pane: its route display, with the section motion as its frame.
+                        val stack = if (depth.value == 0) CHATS_ROOT else CHATS_ROOT + ShellRoute.Settings(null)
+                        ShellNavDisplay(
+                            stack = stack,
+                            frame = { route, entry ->
+                                ShellSectionMotion(
+                                    route = route,
+                                    ownerKey = "account",
+                                    suppressMotion = false,
+                                    animationsEnabled = animations.value,
+                                    content = entry,
+                                )
+                            },
+                        ) { route -> Route(if (route == ShellRoute.Chats) 0 else 1) }
                     }
                 }
             }

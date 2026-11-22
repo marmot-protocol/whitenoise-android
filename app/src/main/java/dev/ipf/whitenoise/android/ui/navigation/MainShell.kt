@@ -92,8 +92,8 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Settings
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewportEvent
+import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
 import dev.ipf.whitenoise.android.ui.settings.reduceSettingsHomeViewport
-import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteRenderer
 import dev.ipf.whitenoise.android.ui.share.ShareChatPickerFullScreen
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -1750,63 +1750,22 @@ internal fun MainShell(
             // One movable list route, so its screen state survives moving between the side pane and the
             // full-width slot when the window crosses the two-pane width.
             val mainRoute: @Composable () -> Unit = {
-                // Navigation 3 renders the list pane's routes from the navigator's stack. The Settings state
-                // above the entries stays in one place while each Settings screen is its own entry.
-                val settingsRoute =
-                    if (section == MainSection.Settings) {
-                        rememberSettingsRouteRenderer(
-                            appState = appState,
-                            suppressMotion =
-                                routingNotification ||
-                                    routingShare ||
-                                    routingAppUpdate ||
-                                    pendingTtsDestinationNavigation != null,
-                            onBackToChats = {
-                                shellNav(ShellNavEvent.ExitSettings)
-                                settingsHomeViewport =
-                                    reduceSettingsHomeViewport(
-                                        settingsHomeViewport,
-                                        SettingsHomeViewportEvent.ExitSettings,
-                                    )
-                            },
-                            onOpenDiagnostics = {
-                                // Diagnostics opens above the Settings screen it came from, so
-                                // backing out of it returns to Developer (its only entry point)
-                                // rather than the Settings home, restoring the breadcrumb
-                                // the user walked in on (#412).
-                                settingsHomeViewport =
-                                    reduceSettingsHomeViewport(
-                                        settingsHomeViewport,
-                                        SettingsHomeViewportEvent.OpenDiagnostics,
-                                    )
-                                shellNav(ShellNavEvent.OpenDiagnostics)
-                            },
-                            onOpenSupportChat = { item ->
-                                // Land in the conversation itself, not the chat list; no
-                                // list scroll state exists to snapshot from Settings.
-                                commitExplicitConversationOpen(item.group.groupIdHex)
-                                selectedChatOpenedAsDmHint = false
-                                shellNav(
-                                    ShellNavEvent.JumpToConversation(
-                                        routeOf(item, selectedChatOpenContext),
-                                    ),
-                                )
-                                settingsHomeViewport =
-                                    reduceSettingsHomeViewport(
-                                        settingsHomeViewport,
-                                        SettingsHomeViewportEvent.OpenConversation,
-                                    )
-                            },
-                            detail = settingsDetail,
-                            onDetailChange = { shellNav(ShellNavEvent.ChangeSettingsDetail(it)) },
-                            homeViewport = settingsHomeViewport,
-                            onHomeViewportChange = { settingsHomeViewport = it },
-                        )
-                    } else {
-                        null
-                    }
+                // Navigation 3 renders the list pane's routes from the navigator's stack, inside master's section
+                // motion. Settings is one composition across its screens, which slide and morph inside it.
+                val suppressRouteMotion =
+                    routingNotification || routingShare || routingAppUpdate || pendingTtsDestinationNavigation != null
                 if (!appState.appLock.screenVisible) {
-                    ShellNavDisplay(CHATS_ROOT + sectionEntries(section, settingsDetail)) { route ->
+                    ShellNavDisplay(
+                        stack = CHATS_ROOT + sectionEntries(section, settingsDetail),
+                        frame = { route, entry ->
+                            ShellSectionMotion(
+                                route = route,
+                                ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
+                                suppressMotion = suppressRouteMotion,
+                                content = entry,
+                            )
+                        },
+                    ) { route ->
                         when (route) {
                             ShellRoute.Chats -> {
                                 WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
@@ -1911,7 +1870,51 @@ internal fun MainShell(
                                     },
                                 )
                             }
-                            is ShellRoute.Settings -> settingsRoute?.invoke(route.detail)
+                            is ShellRoute.Settings ->
+                                SettingsScreen(
+                                    appState = appState,
+                                    suppressMotion = suppressRouteMotion,
+                                    onBackToChats = {
+                                        shellNav(ShellNavEvent.ExitSettings)
+                                        settingsHomeViewport =
+                                            reduceSettingsHomeViewport(
+                                                settingsHomeViewport,
+                                                SettingsHomeViewportEvent.ExitSettings,
+                                            )
+                                    },
+                                    onOpenDiagnostics = {
+                                        // Diagnostics opens above the Settings screen it came from, so
+                                        // backing out of it returns to Developer (its only entry point)
+                                        // rather than the Settings home, restoring the breadcrumb
+                                        // the user walked in on (#412).
+                                        settingsHomeViewport =
+                                            reduceSettingsHomeViewport(
+                                                settingsHomeViewport,
+                                                SettingsHomeViewportEvent.OpenDiagnostics,
+                                            )
+                                        shellNav(ShellNavEvent.OpenDiagnostics)
+                                    },
+                                    onOpenSupportChat = { item ->
+                                        // Land in the conversation itself, not the chat list; no
+                                        // list scroll state exists to snapshot from Settings.
+                                        commitExplicitConversationOpen(item.group.groupIdHex)
+                                        selectedChatOpenedAsDmHint = false
+                                        shellNav(
+                                            ShellNavEvent.JumpToConversation(
+                                                routeOf(item, selectedChatOpenContext),
+                                            ),
+                                        )
+                                        settingsHomeViewport =
+                                            reduceSettingsHomeViewport(
+                                                settingsHomeViewport,
+                                                SettingsHomeViewportEvent.OpenConversation,
+                                            )
+                                    },
+                                    detail = route.detail,
+                                    onDetailChange = { shellNav(ShellNavEvent.ChangeSettingsDetail(it)) },
+                                    homeViewport = settingsHomeViewport,
+                                    onHomeViewportChange = { settingsHomeViewport = it },
+                                )
                             else ->
                                 DiagnosticsScreen(
                                     appState = appState,
