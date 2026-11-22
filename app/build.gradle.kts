@@ -1259,6 +1259,7 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.emoji2.emojipicker)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.window)
     implementation("net.java.dev.jna:jna:5.19.1@aar")
     implementation(libs.zxing.core)
     implementation(libs.androidx.camera.camera2)
