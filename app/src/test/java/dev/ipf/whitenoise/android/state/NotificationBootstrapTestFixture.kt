@@ -41,6 +41,7 @@ import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.Nip46ErrorFfi
+import dev.ipf.marmotkit.Nip46SessionFfi
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -132,6 +133,7 @@ internal class NotificationBootstrapTestFixture(
     private val signInFailure: Throwable? = null,
     private val onSignInAccount: ((String) -> Unit)? = null,
     initialNotificationSettings: NotificationSettingsFfi? = null,
+    private val onNip46Resume: ((String) -> Nip46SessionFfi?)? = null,
     // Optional behavior hooks so worker/reconciliation tests can steer the FFI
     // boundary per call; every default preserves the fixture's original shape.
     private val onOnboardingSnapshot: (() -> OnboardingSnapshotFfi?)? = null,
@@ -646,7 +648,13 @@ internal class NotificationBootstrapTestFixture(
                     onDisplayName?.invoke(call, accountIdHex) ?: localDisplayName
                 }
                 "nip46Resume" -> {
-                    failSuspendedNativeCall(arguments, MarmotKitException.Nip46(Nip46ErrorFfi.Unavailable()))
+                    val accountRef = arguments?.first() as String
+                    try {
+                        onNip46Resume?.invoke(accountRef)
+                            ?: failSuspendedNativeCall(arguments, MarmotKitException.Nip46(Nip46ErrorFfi.Unavailable()))
+                    } catch (error: MarmotKitException.Nip46) {
+                        failSuspendedNativeCall(arguments, error)
+                    }
                 }
                 "registerExternalSigner" -> {
                     signerRegistrationCalls.incrementAndGet()

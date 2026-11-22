@@ -4,6 +4,14 @@
   "categories": {
     "settings_controls": [
       {
+        "surface": "Remote signer: R.string.error_account_unlinked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
+        "anchor": "R.string.error_account_unlinked",
+        "test_ids": [
+          "ONB-027"
+        ]
+      },
+      {
         "surface": "R.string.remote_signer_error_declined",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerFailure.kt",
         "anchor": "R.string.remote_signer_error_declined",

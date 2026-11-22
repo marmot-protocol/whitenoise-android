@@ -5630,6 +5630,7 @@ class WhiteNoiseAppState private constructor(
         wipedShareAccount: String?,
     ): AccountWipeCompletion? {
         val inView = activeAccountRef
+        val wipedAccountId = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
         if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
         conversationDictation.onAccountUnavailable(wipedRef)
@@ -5641,6 +5642,7 @@ class WhiteNoiseAppState private constructor(
                     runCatching { marmotIo { signOutAndWipe(wipedRef) } }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
+                                wipedAccountId?.let { rememberRemoteSignerAccount(it, remote = false) }
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }

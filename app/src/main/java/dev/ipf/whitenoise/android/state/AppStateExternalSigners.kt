@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
  */
 internal suspend fun WhiteNoiseAppState.reregisterExternalSigners() {
     val remote = restoreRemoteSignerAccounts()
-    accounts.filter { it.externalSigning && it.accountIdHex !in remote }.forEach { account ->
+    accounts.filter { it.externalSigning && !it.unlinked && it.accountIdHex !in remote }.forEach { account ->
         runCatchingCancellable {
             marmotIo { registerExternalSigner(account.label, amberSigner.buildSigner(account.accountIdHex)) }
         }.onFailure {
@@ -74,18 +74,19 @@ internal suspend fun WhiteNoiseAppState.reconnectSetupSigner(
  * Claims every external account MDK knows as a remote-signer account and returns their ids; none of them may get an
  * Amber callback. MDK's answer that an account has no NIP-46 credentials (`Unavailable`) leaves it an Amber account
  * unless it signed in with a remote signer here, whose pairing was then ended. Any other resume failure keeps the
- * account unresolved, shown as unreachable with a retry.
+ * remembered account unresolved, shown as unreachable with a retry.
  */
 private suspend fun WhiteNoiseAppState.restoreRemoteSignerAccounts(): Set<String> {
     val runtime = marmotOrNull() ?: return emptySet()
     remoteSigners.retainRuntime(runtime)
     val remembered = rememberedRemoteSignerAccounts()
     val claimed = HashSet<String>()
-    accounts.filter { it.externalSigning }.forEach { account ->
-        when (val outcome = resumeRemoteSigner(runtime, account.label, account.accountIdHex)) {
+    accounts.filter { it.externalSigning && !it.unlinked }.forEach { account ->
+        val knownRemote = account.accountIdHex in remembered
+        when (val outcome = resumeRemoteSigner(runtime, account.label, account.accountIdHex, knownRemote)) {
             // Disconnecting or signing out erases MDK's pairing; such an account still waits to be paired again.
             RemoteSignerResume.Absent ->
-                if (account.accountIdHex in remembered && marmotOrNull() === runtime) {
+                if (knownRemote && marmotOrNull() === runtime) {
                     claimed += account.accountIdHex
                     remoteSigners.markWithoutSession(runtime, account.accountIdHex, RemoteSignerHealth.PairingEnded)
                 }
@@ -94,7 +95,7 @@ private suspend fun WhiteNoiseAppState.restoreRemoteSignerAccounts(): Set<String
                 rememberRemoteSignerAccount(account.accountIdHex, remote = true)
             }
             is RemoteSignerResume.Unresolved -> {
-                claimed += account.accountIdHex
+                if (knownRemote) claimed += account.accountIdHex
                 val label = account.label.take(8)
                 appStateDebug { "remote signer restore failed for $label: ${outcome.error.readableMessage()}" }
             }
@@ -120,6 +121,7 @@ internal suspend fun WhiteNoiseAppState.resumeRemoteSigner(
     runtime: MarmotInterface,
     accountRef: String,
     accountIdHex: String,
+    showResumeFailure: Boolean = true,
 ): RemoteSignerResume =
     runCatchingCancellable { withContext(Dispatchers.IO) { runtime.nip46Resume(accountRef) } }.fold(
         onSuccess = { session ->
@@ -131,7 +133,7 @@ internal suspend fun WhiteNoiseAppState.resumeRemoteSigner(
             if (error is MarmotKitException.Nip46 && error.reason is Nip46ErrorFfi.Unavailable) {
                 RemoteSignerResume.Absent
             } else {
-                if (marmotOrNull() === runtime) {
+                if (showResumeFailure && marmotOrNull() === runtime) {
                     remoteSigners.markWithoutSession(runtime, accountIdHex, RemoteSignerHealth.Unreachable)
                 }
                 RemoteSignerResume.Unresolved(error)
@@ -217,6 +219,7 @@ internal fun WhiteNoiseAppState.rememberRemoteSignerAccount(
     accountIdHex: String,
     remote: Boolean,
 ) = synchronized(remoteSigners) {
+    if (!remote) remoteSigners.forget(accountIdHex)
     val current = rememberedRemoteSignerAccounts()
     val next = if (remote) current + accountIdHex else current - accountIdHex
     if (next != current) preferences.edit().putStringSet(REMOTE_SIGNER_ACCOUNTS_KEY, next).apply()

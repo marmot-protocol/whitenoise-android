@@ -3,6 +3,12 @@ package dev.ipf.whitenoise.android.state
 import android.app.Application
 import android.content.Context
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.Nip46ErrorFfi
+import dev.ipf.marmotkit.Nip46SessionFfi
+import dev.ipf.marmotkit.Nip46StateFfi
+import dev.ipf.marmotkit.Nip46StatusFfi
+import dev.ipf.marmotkit.NoPointer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -58,6 +64,30 @@ class SignedOutStartupTest {
                 }
             } finally {
                 preferences.edit().remove("remote_signer_accounts").commit()
+            }
+        }
+
+    @Test
+    fun restoredRemoteSignerKeepsItsSessionWhenAmberResumeFails() =
+        runBlocking {
+            val session =
+                object : Nip46SessionFfi(NoPointer) {
+                    override fun status() = Nip46StatusFfi(Nip46StateFfi.UNAVAILABLE, null, null, null, 0u)
+                }
+            val accounts = listOf(account("amber", external = true), account("remote", external = true))
+            withFixture(
+                accounts,
+                onNip46Resume = { accountRef ->
+                    if (accountRef == "remote") {
+                        session
+                    } else {
+                        throw MarmotKitException.Nip46(Nip46ErrorFfi.Storage())
+                    }
+                },
+            ) { fixture ->
+                assertEquals(1, fixture.signerRegistrationCalls.get())
+                assertEquals(RemoteSignerHealth.Paired, fixture.appState.remoteSigners.status("remote")?.health)
+                assertNull(fixture.appState.remoteSigners.status("amber"))
             }
         }
 
@@ -194,6 +224,7 @@ class SignedOutStartupTest {
         selected: String? = accounts.first().label,
         signInFailure: Throwable? = null,
         onSignInAccount: ((String) -> Unit)? = null,
+        onNip46Resume: ((String) -> Nip46SessionFfi?)? = null,
         block: suspend (NotificationBootstrapTestFixture) -> Unit,
     ) {
         val context: Application = RuntimeEnvironment.getApplication()
@@ -213,13 +244,14 @@ class SignedOutStartupTest {
                 emitStartupNotification = false,
                 signInFailure = signInFailure,
                 onSignInAccount = onSignInAccount,
+                onNip46Resume = onNip46Resume,
             )
         try {
             fixture.bootstrap()
             block(fixture)
         } finally {
             fixture.close()
-            preferences.edit().remove("active_account").commit()
+            preferences.edit().remove("active_account").remove("remote_signer_accounts").commit()
         }
     }
 

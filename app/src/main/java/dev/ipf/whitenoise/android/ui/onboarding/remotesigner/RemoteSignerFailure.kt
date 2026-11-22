@@ -15,6 +15,7 @@ internal enum class RemoteSignerFailure(
     Unreachable(R.string.remote_signer_error_unreachable),
     NotSaved(R.string.remote_signer_error_storage),
     SignInFailed(R.string.remote_signer_error_sign_in),
+    Unlinked(R.string.error_account_unlinked, startOver = true),
     WrongAccount(R.string.remote_signer_error_wrong_account, startOver = true),
     Unsupported(R.string.remote_signer_error_unsupported, startOver = true),
     Ended(R.string.remote_signer_error_ended, startOver = true),
@@ -26,6 +27,7 @@ internal fun remoteSignerFailureFor(error: Throwable): RemoteSignerFailure? =
     when (error) {
         is Nip46ErrorFfi -> nip46Failure(error)
         is MarmotKitException.Nip46 -> nip46Failure(error.reason)
+        is MarmotKitException.AccountUnlinked -> RemoteSignerFailure.Unlinked
         is MarmotKitException.ExternalSignerRejected -> RemoteSignerFailure.Declined
         is MarmotKitException.ExternalSignerMismatch -> RemoteSignerFailure.WrongAccount
         else -> RemoteSignerFailure.SignInFailed

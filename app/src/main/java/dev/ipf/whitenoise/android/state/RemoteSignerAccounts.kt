@@ -68,6 +68,12 @@ internal class RemoteSignerAccounts {
         publish(accountIdHex, RemoteSignerAccountStatus(health))
     }
 
+    @Synchronized
+    fun forget(accountIdHex: String) {
+        sessions.remove(accountIdHex)
+        published.update { it - accountIdHex }
+    }
+
     /** Drops every handle once a different, live [runtime] replaced theirs; a momentarily absent runtime keeps them. */
     @Synchronized
     fun retainRuntime(runtime: Any?) {
