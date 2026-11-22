@@ -5,18 +5,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.nativeCanvas
 import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
-
-private const val CONTENT_HANDOFF_FRACTION = 0.5f
 
 /** One route clock owns continuous opaque chrome and the separately permitted content picture. */
 @Suppress("TooManyFunctions")
@@ -59,6 +57,9 @@ internal class SettingsPageMorph {
     internal var captureInputs: (() -> Any?)? = null
     internal var childContours: (() -> List<SettingsContour>?)? = null
     internal var childBodyTop: (() -> Float)? = null
+
+    /** The cards the mounted child route measured, which a top-level bubble may land on. */
+    internal var childCards: (() -> List<SettingsBubbleCard>)? = null
     internal val bodyTop: Float
         get() =
             childBodyTop?.invoke()
@@ -148,6 +149,10 @@ internal class SettingsPageMorph {
                 ?.let { listOf(it.copy(key = targetAnchorKey ?: correspondenceKey ?: 0, viewport = transitionHost)) }
                 ?: native
         }
+
+    /** The activating control's bounds for [next], as [begin] will resolve it; null without a measured click. */
+    internal fun pendingOriginFor(next: Any?): Rect? =
+        if (pendingEndpoint != null) pendingEndpoint?.takeIf { it.destination == next }?.bounds else pendingOrigin
 
     internal fun outgoingPresence(time: Float): Float {
         val hasOutgoingFrame = active && !entryOnly && exitStart > 0f
@@ -272,7 +277,15 @@ internal class SettingsPageMorph {
                 ?.invoke()
                 ?.takeIf { it.bounds.validIn(host) }
                 ?.copy(key = anchorGroupKeys.getOrPut(next) { nextGroupKey++ }, viewport = host)
-        if (anchorSource != null) correspondenceKey = anchorSource.key
+        // Without an outline to leave from, the measured origin itself is the one source contour,
+        // so a single group grows out of it instead of every group growing from a point.
+        val outlineLessOrigin = anchorSource == null && forward && eligible && current?.isEmpty() == true
+        val originSource =
+            selected
+                ?.takeIf { outlineLessOrigin && visibleSelection?.visibleIn(host) == true }
+                ?.let { settingsOriginContour(it, host, anchorGroupKeys.getOrPut(next) { nextGroupKey++ }) }
+        val emptySource = anchorSource ?: originSource
+        if (emptySource != null) correspondenceKey = emptySource.key
         if (forward) {
             if (eligible &&
                 selected != null &&
@@ -291,7 +304,7 @@ internal class SettingsPageMorph {
             leaving = frame
             outgoingTarget = target
         }
-        sourceContours = anchorSource?.let(::listOf) ?: current.orEmpty()
+        sourceContours = emptySource?.let(::listOf) ?: current.orEmpty()
         targetContours = null
         correspondence = null
         rebaseTime = 0f
@@ -384,7 +397,7 @@ internal class SettingsPageMorph {
         return host.takeIf { active }
     }
 
-    @Suppress("LongMethod", "LongParameterList")
+    @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
     fun ContentDrawScope.draw(
         host: Rect,
         time: Float,
@@ -422,8 +435,15 @@ internal class SettingsPageMorph {
                 unoutlinedBodyMask.takeIf { showUnoutlinedBody },
                 showNativeBody,
             )
-        clipPath(live) {
-            clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }
+        val enteringFromOrigin = entryOnly || entryStart > 0f
+        val bodyAlpha =
+            if (!showNativeBody || borderlessEntry || enteringFromOrigin) {
+                1f
+            } else {
+                settingsPageHandoffAlpha(opening, time, true)
+            }
+        drawNativeLiveBody(live, mask, bodyAlpha) {
+            Rect(Offset.Zero, size).nativeLiveBodyMask(bodyCoverage, bodyMask, interiors, null, false)
         }
         clipPath(interiors) { this@draw.drawOutgoingInk(host, time) }
         contours.forEach { drawContinuousContour(it, host) }
@@ -521,15 +541,18 @@ internal class SettingsPageMorph {
     ) {
         val frame = leaving ?: return
         val body = frame.body
-        val alpha = outgoingPresence(time)
-        if (alpha <= 0f) return
+        if (outgoingPresence(time) <= 0f) return
+        val alpha = settingsPageHandoffAlpha(opening, time, false)
         val chrome = leavingMask ?: nativeChromeMask(frame.contours, host).also { leavingMask = it }
         // The source and destination's measured body edges leave both native headers untouched.
         clipRect(top = (maxOf(frame.bodyTop, bodyTop) - host.top).coerceAtLeast(0f)) {
             clipPath(body) {
                 clipPath(chrome, ClipOp.Difference) {
                     drawIntoCanvas { canvas ->
+                        val layered = alpha < 1f
+                        if (layered) canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { this.alpha = alpha })
                         canvas.nativeCanvas.drawPicture(frame.picture)
+                        if (layered) canvas.restore()
                     }
                 }
             }
@@ -568,28 +591,4 @@ internal class SettingsPageMorph {
             externalSource = null
         }
     }
-
-    /** Include free-form controls and margins inside the actual measured scroll body, never headers. */
-    private fun measuredBodyCoverage(
-        native: List<SettingsContour>,
-        host: Rect,
-    ): Path =
-        activeNativeBody(native, host).apply {
-            viewports.values.forEach { viewport ->
-                val visible = viewport.intersect(host)
-                if (!visible.isEmpty) addRect(visible.translate(-host.topLeft))
-            }
-        }
-
-    private fun activeNativeBody(
-        native: List<SettingsContour>,
-        host: Rect,
-    ): Path =
-        nativeBodyMask(native, host).apply {
-            // Unoutlined native bodies participate in the reveal without inventing a border.
-            destinations.values.filter { !it.outline.isSpecified }.forEach { endpoint ->
-                val visible = endpoint.bounds.intersect(viewports[endpoint.viewportToken] ?: host).intersect(host)
-                if (!visible.isEmpty) addRect(visible.translate(-host.topLeft))
-            }
-        }
 }

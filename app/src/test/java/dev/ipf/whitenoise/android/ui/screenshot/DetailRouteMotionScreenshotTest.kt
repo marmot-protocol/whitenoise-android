@@ -516,9 +516,9 @@ class DetailRouteMotionScreenshotTest {
         action.performClick()
         rule.mainClock.advanceTimeByFrame()
         val protectedDestination = rule.onNodeWithText(destinationTitle, useUnmergedTree = profile)
-        // Borderless destinations are immediately visible; AMOLED contour entry holds its child.
+        // A container entry from the tapped row (contour or borderless) holds its child until it settles.
         // Lock removal below must hold for either presentation phase.
-        if (profile || !amoled) protectedDestination.assertExists() else protectedDestination.assertDoesNotExist()
+        if (profile) protectedDestination.assertExists() else protectedDestination.assertDoesNotExist()
         // Real observable lock state removes the protected route immediately, even mid-flight.
         rule.runOnIdle {
             state.appLock.javaClass
@@ -800,8 +800,12 @@ class DetailRouteMotionScreenshotTest {
             }
             rule.mainClock.advanceTimeBy(16)
         }
-        firstNativeBody?.let { first ->
-            assertNativeBodyEdgeContinuity(name, first, checkNotNull(settled))
+        firstNativeBody?.let {
+            // Borderless themes move the route (a container from its control, or a slide back) instead of cutting.
+            org.junit.Assert.assertFalse(
+                "$name must move instead of cutting",
+                checkNotNull(intermediate).sameAs(checkNotNull(settled)),
+            )
         }
         if (profile || borderlessPage) {
             // Borderless themes hand off their body once; no synthetic contour or dissolve is required.
@@ -831,20 +835,6 @@ class DetailRouteMotionScreenshotTest {
             "$name must contain intermediate motion before settling",
             middle.sameAs(settled),
         )
-    }
-
-    private fun assertNativeBodyEdgeContinuity(
-        name: String,
-        first: Bitmap,
-        settled: Bitmap,
-    ) {
-        for (y in listOf(first.height / 4, first.height / 2, first.height * 3 / 4)) {
-            assertEquals(
-                "$name must preserve each native surface at entry",
-                settled.getPixel(1, y),
-                first.getPixel(1, y),
-            )
-        }
     }
 
     private fun assertNativeComposerHeader(

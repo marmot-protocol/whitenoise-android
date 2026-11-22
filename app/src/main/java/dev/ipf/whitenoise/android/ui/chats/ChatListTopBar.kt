@@ -77,6 +77,8 @@ import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
+import dev.ipf.whitenoise.android.ui.settings.SettingsHomeOriginAnchor
+import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -99,6 +101,7 @@ internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-accoun
 
 /** Separates the active avatar from the stacked other accounts without breaking the avatar cluster. */
 private val CHAT_LIST_ACCOUNT_AVATAR_SIZE = 40.dp
+private val CHAT_LIST_ACCOUNT_AVATAR_TOUCH_TARGET = 48.dp
 private val CHAT_LIST_ACCOUNT_AVATAR_GAP = 8.dp
 
 /** Stable test tag for a folder pill. */
@@ -135,6 +138,11 @@ internal fun ChatListTopBar(
     val profileState by appState.notificationProfiles.state.collectAsState()
     val showProfileAction = profileState.showInChatList && profileState.profiles.isNotEmpty()
     val switchNotice = rememberQuickAccountSwitchNotice()
+    // The avatar is where top-level Settings opens from and closes into, also via the account selector.
+    val avatarInset = (CHAT_LIST_ACCOUNT_AVATAR_TOUCH_TARGET - CHAT_LIST_ACCOUNT_AVATAR_SIZE) / 2
+    val (settingsOrigin, openSettings) =
+        dev.ipf.whitenoise.android.ui.settings
+            .rememberSettingsRouteClick(onOpenSettings, originInset = avatarInset)
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
             showSelector = false
@@ -241,9 +249,6 @@ internal fun ChatListTopBar(
                             }
                         else -> {
                             val active = appState.activeAccount
-                            val (settingsOrigin, openSettings) =
-                                dev.ipf.whitenoise.android.ui.settings
-                                    .rememberSettingsRouteClick(onOpenSettings)
                             val avatarExplanation =
                                 if (appState.chatsAvatarOpensSelector()) {
                                     chatsExplanation(
@@ -267,7 +272,7 @@ internal fun ChatListTopBar(
                                     seed = active?.accountIdHex ?: "whitenoise",
                                     pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
                                     size = CHAT_LIST_ACCOUNT_AVATAR_SIZE,
-                                    touchTargetSize = 48.dp,
+                                    touchTargetSize = CHAT_LIST_ACCOUNT_AVATAR_TOUCH_TARGET,
                                     actionDescription =
                                         stringResource(
                                             if (appState.chatsAvatarOpensSelector()) {
@@ -290,6 +295,7 @@ internal fun ChatListTopBar(
                                             .padding(start = 8.dp)
                                             .testTag("chats.switchProfile")
                                             .then(settingsOrigin)
+                                            .settingsCardMorph(SettingsHomeOriginAnchor, avatarInset)
                                             .explainOnLongPress(avatarExplanation),
                                     // Per-account dot: light only when the active account
                                     // itself has unread, same shared decision the other
@@ -369,7 +375,7 @@ internal fun ChatListTopBar(
             onAccountSwitched = { showSelector = false },
             onSettings = {
                 showSelector = false
-                onOpenSettings()
+                openSettings()
             },
         )
     }

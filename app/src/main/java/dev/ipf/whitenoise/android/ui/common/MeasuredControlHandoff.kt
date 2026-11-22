@@ -518,21 +518,35 @@ private fun DrawScope.drawMorphBridge(
                 drawRoundRect(surface.fill, bounds.topLeft, bounds.size, CornerRadius(state.presentationRadius))
             }
             surface.border?.let { border ->
-                // Material's border is wholly inside the measured outer edge. Match its
-                // centerline and radius so handing chrome back cannot shift half a stroke.
-                val stroke = surface.stroke.coerceAtMost(minOf(bounds.width, bounds.height))
-                val inset = stroke / 2f
-                val strokeBounds = bounds.deflate(inset)
-                drawRoundRect(
-                    border,
-                    strokeBounds.topLeft,
-                    strokeBounds.size,
-                    CornerRadius((state.presentationRadius - inset).coerceAtLeast(0f)),
-                    style = Stroke(stroke),
-                )
+                drawControlMorphOutline(bounds, state.presentationRadius, border, surface.stroke)
             }
         }
     }
+}
+
+/**
+ * The morph's hairline edge for outer [bounds] with corner [radius]. Material's border is wholly
+ * inside the measured outer edge; matching its centerline and radius means handing chrome back
+ * cannot shift half a stroke.
+ */
+internal fun DrawScope.drawControlMorphOutline(
+    bounds: Rect,
+    radius: Float,
+    color: Color,
+    width: Float,
+    alpha: Float = 1f,
+) {
+    val stroke = width.coerceAtMost(minOf(bounds.width, bounds.height))
+    val inset = stroke / 2f
+    val strokeBounds = bounds.deflate(inset)
+    drawRoundRect(
+        color,
+        strokeBounds.topLeft,
+        strokeBounds.size,
+        CornerRadius((radius - inset).coerceAtLeast(0f)),
+        alpha = alpha,
+        style = Stroke(stroke),
+    )
 }
 
 /** Pointer, keyboard and accessibility activation all finish the same decorative transition first. */

@@ -2,10 +2,13 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,7 +22,9 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -40,9 +45,9 @@ import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
 
 /**
- * Chats and Settings switch through a bubble on the end edge: opening grows Settings out of it,
- * closing shrinks a painted bubble back into it over the live Chats route. Deeper routes keep the
- * slide, and reduced motion settles both directions at once.
+ * Chats and Settings: from a measured avatar a thin outline bubble grows into the nearest Settings
+ * card and Back shrinks it into the avatar again; without an origin the page simply cross-fades over
+ * the live Chats route. Deeper routes keep the slide, and reduced motion settles both directions at once.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -81,11 +86,11 @@ class SettingsBubbleMotionScreenshotTest {
         assertFalse(usesSettingsBubble(0, 2))
     }
 
-    @Test fun openGrowsSettingsFromTheEndEdgeLight() = open("light", dark = false, largeRtl = false)
+    @Test fun openFadesSettingsInWithoutAnOriginLight() = open("light", dark = false, largeRtl = false)
 
-    @Test fun openGrowsSettingsFromTheEndEdgeLargeRtlDark() = open("large_rtl_dark", dark = true, largeRtl = true)
+    @Test fun openFadesSettingsInWithoutAnOriginLargeRtlDark() = open("large_rtl_dark", dark = true, largeRtl = true)
 
-    @Test fun closeShrinksTheBubbleBackIntoTheEndEdgeDark() {
+    @Test fun closeFadesSettingsOutWithoutAnOriginDark() {
         render(dark = true, largeRtl = false, start = 1)
         // The paused test looper only draws on capture; draw settled Settings once like a real frame.
         composeRule.onRoot().captureToImage()
@@ -95,6 +100,21 @@ class SettingsBubbleMotionScreenshotTest {
         capture("settings_bubble_close_mid_dark")
         advanceFrames(SETTINGS_BUBBLE_CLOSE_MILLIS.toLong())
         capture("settings_bubble_close_settled_dark")
+    }
+
+    @Test fun measuredAmoledAvatarGrowsTheOutlineIntoTheNearestCardAndBack() {
+        render(dark = true, largeRtl = false, start = 0, measuredAvatar = true)
+        composeRule.onNodeWithTag(AVATAR_TAG).performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        advanceFrames(48)
+        capture("settings_bubble_avatar_open_amoled")
+        advanceFrames(SETTLE_MILLIS)
+        composeRule.onRoot().captureToImage()
+
+        update { depth.value = 0 }
+        composeRule.mainClock.advanceTimeByFrame()
+        advanceFrames(128)
+        capture("settings_bubble_avatar_close_amoled")
     }
 
     @Test fun reducedMotionSwitchesAtOnce() {
@@ -126,6 +146,7 @@ class SettingsBubbleMotionScreenshotTest {
         dark: Boolean,
         largeRtl: Boolean,
         start: Int,
+        measuredAvatar: Boolean = false,
     ) {
         depth.value = start
         composeRule.mainClock.autoAdvance = false
@@ -135,7 +156,7 @@ class SettingsBubbleMotionScreenshotTest {
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 LocalDensity provides Density(density.density, if (largeRtl) 1.6f else 1f),
             ) {
-                WhiteNoiseTheme(darkTheme = dark) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = measuredAvatar) {
                     Surface(Modifier.fillMaxSize()) {
                         SettingsRouteMotion(
                             target = depth.value,
@@ -143,7 +164,10 @@ class SettingsBubbleMotionScreenshotTest {
                             ownerKey = "account",
                             animationsEnabled = animations.value,
                             topLevelBubble = true,
-                        ) { route -> Route(route) }
+                            cardMorph = measuredAvatar,
+                        ) { route ->
+                            Route(route, measuredAvatar) { depth.value = 1 }
+                        }
                     }
                 }
             }
@@ -176,10 +200,44 @@ class SettingsBubbleMotionScreenshotTest {
 }
 
 @androidx.compose.runtime.Composable
-private fun Route(route: Int) {
+private fun Route(
+    route: Int,
+    measured: Boolean,
+    onOpen: () -> Unit,
+) {
+    if (measured && route == 1) {
+        // Measured Settings cards: the outline lands on the nearest one.
+        Surface(Modifier.fillMaxSize().testTag("route.$route")) {
+            Column(Modifier.padding(vertical = 72.dp)) {
+                SETTINGS_ROWS.chunked(3).forEach { group ->
+                    SettingsGroup(Modifier.padding(bottom = 16.dp)) {
+                        group.forEach { title ->
+                            row(title) { SettingsGroupPanel(it) { Text(title, Modifier.padding(16.dp)) } }
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
     val rows = if (route == 0) CHAT_ROWS else SETTINGS_ROWS
     Surface(Modifier.fillMaxSize().testTag("route.$route")) {
         Column(Modifier.padding(16.dp)) {
+            if (measured) {
+                val (origin, open) = rememberSettingsRouteClick(onOpen)
+                Surface(
+                    modifier =
+                        Modifier
+                            .size(40.dp)
+                            .then(origin)
+                            .testTag(AVATAR_TAG)
+                            .clickable(onClick = open),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                ) {
+                    Text("N", Modifier.padding(10.dp))
+                }
+            }
             Text(
                 if (route == 0) "Chats" else "Settings",
                 style = MaterialTheme.typography.headlineSmall,
@@ -193,6 +251,7 @@ private fun Route(route: Int) {
     }
 }
 
+private const val AVATAR_TAG = "motion.avatar"
 private const val SETTLE_MILLIS = 1_000L
 private const val FRAME_MILLIS = 16L
 private val CHAT_ROWS = listOf("Alice", "Book club", "Bob", "Family", "Weekend plans", "Carol")
