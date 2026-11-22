@@ -182,7 +182,11 @@ class AuditUploadConsentTest {
     @Test
     fun unavailableRecorderWithOldDisclosureBlocksStartupUntilRenewalCanBePrepared() =
         runTest {
-            preferences.edit().clear().putInt("audit_upload_disclosure_revision", 1).commit()
+            preferences
+                .edit()
+                .clear()
+                .putInt("audit_upload_disclosure_revision", 1)
+                .commit()
             val receipt = preferences.all.toMap()
             val native = Native(enabled = true, failSettingsRead = true)
             val consent = AuditUploadConsent(preferences)
