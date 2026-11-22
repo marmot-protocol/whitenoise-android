@@ -271,7 +271,8 @@ class ChatListPinnedBoundaryTest {
         var lineColor = 0
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
-                lineColor = if (amoled) Color(0xFF3D3D3D).toArgb() else MaterialTheme.colorScheme.outlineVariant.toArgb()
+                val expectedColor = if (amoled) Color(0xFF3D3D3D) else MaterialTheme.colorScheme.outlineVariant
+                lineColor = expectedColor.toArgb()
                 CompositionLocalProvider(
                     LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
