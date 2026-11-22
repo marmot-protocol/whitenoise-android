@@ -91,7 +91,9 @@ internal class MountedContractShell(
     /**
      * Mounts the production shell like [withMountedShell] and hands [exercise] a way to emulate process death: the
      * composition's saved instance state and the holder's saved keys survive into a fresh holder over a fresh
-     * process state, so nothing process-retained, the route owner included, comes back. Returns the fresh holder.
+     * process state, so nothing process-retained, the route owner included, comes back. The saved section is marked
+     * as written by another process, as it is after a real process death, so the section state takes its
+     * different-process branch. Returns the fresh holder.
      */
     fun withRestartableShell(
         width: MutableState<Dp>,
@@ -118,6 +120,7 @@ internal class MountedContractShell(
             }
             val restart = {
                 saved = SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })
+                if (saved.contains(SECTION_PROCESS_KEY)) saved[SECTION_PROCESS_KEY] = DEAD_PROCESS
                 current = MainShellStateHolder(fixture.appState, saved, MainShellProcessState(fixture.appState))
                 holders += current
                 recreate()
@@ -165,5 +168,11 @@ internal class MountedContractShell(
 
     private companion object {
         val SHELL_HEIGHT = 800.dp
+
+        /** The saved key naming the process that wrote the section. */
+        const val SECTION_PROCESS_KEY = "main_shell_section_process"
+
+        /** A process epoch no live process has. */
+        const val DEAD_PROCESS = "a process that died"
     }
 }

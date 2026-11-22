@@ -48,11 +48,7 @@ class ShellRestoreContractTest {
      */
     @Test
     fun processDeathRestoresTheSettingsScreenAndTheConversationAboveIt() {
-        val message =
-            timelineRecord("ab".repeat(32), 1uL)
-                .copy(groupIdHex = ConversationTimelineTestIds.GROUP_ID, plaintext = MESSAGE)
-        val scripts = List(OPEN_SCRIPTS) { ScriptedConversationTimelineSubscription(timelinePage(message)) }
-        val fixture = ReturnFixture(timelineScripts = scripts)
+        val fixture = messageFixture()
         val saved = savedRoute(fixture.target.groupIdHex)
         shell.withMountedShell(mutableStateOf(COMPACT_WIDTH), fixture, { MainShell(fixture.appState, it) }, saved) {
             _,
@@ -75,6 +71,85 @@ class ShellRestoreContractTest {
             assertFalse("Back does not land on the chat list", reads("Return chat 0"))
             assertFalse(composeRule.activity.isFinishing)
         }
+    }
+
+    /**
+     * Process death in a new process, with the same account active again: the saved Settings screen comes back and the
+     * saved conversation reopens above it, on screen.
+     */
+    @Test
+    fun processDeathInANewProcessRestoresTheSameAccountsRoute() {
+        shell.withRestartableShell(mutableStateOf(COMPACT_WIDTH), messageFixture()) { fixture, holder, restart ->
+            openSettingsAndTheConversation(fixture, holder)
+
+            val restored = composeRule.runOnIdle { restart() }
+            shell.awaitCondition { restored.selectedChat.value?.id == fixture.target.groupIdHex }
+            shell.awaitCondition { reads(MESSAGE) }
+            Espresso.pressBack()
+            shell.awaitCondition { restored.selectedChat.value == null }
+            shell.settle()
+            assertTrue("the same account's Settings screen came back", reads(appearance()))
+        }
+    }
+
+    /**
+     * Process death in a new process while another account becomes active: nothing of the previous account's saved
+     * route comes back, neither its Settings screen nor its conversation.
+     */
+    @Test
+    fun processDeathRestoresNothingOfAnotherAccountsRoute() {
+        shell.withRestartableShell(mutableStateOf(COMPACT_WIDTH), messageFixture()) { fixture, holder, restart ->
+            openSettingsAndTheConversation(fixture, holder)
+
+            val restored =
+                composeRule.runOnIdle {
+                    fixture.appState.setActiveAccountForContract(OTHER_ACCOUNT_REF)
+                    restart()
+                }
+            shell.awaitCondition { reads("Return chat 0") }
+            shell.settle()
+
+            assertEquals(CHATS_ROOT, restored.shellNavigator.stack)
+            assertFalse("the previous account's Settings screen must not come back", reads(appearance()))
+            assertFalse("the previous account's conversation must not reopen", reads(MESSAGE))
+            assertEquals(MainSection.Chats.name, restored.sectionState.sectionName)
+        }
+    }
+
+    /** Opens Settings on Appearance and then the target conversation over it, both checked first. */
+    private fun openSettingsAndTheConversation(
+        fixture: ReturnFixture,
+        holder: MainShellStateHolder,
+    ) {
+        composeRule.runOnIdle { holder.restoreSection(MainSection.Settings, SettingsDetail.Appearance) }
+        shell.awaitCondition { reads(appearance()) }
+        composeRule.runOnIdle {
+            val runtime = fixture.appState.runtimeGeneration
+            val controller = holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, runtime)
+            holder.openForTest(controller.items.first { it.id == fixture.target.groupIdHex })
+        }
+        shell.awaitCondition { reads(MESSAGE) }
+        shell.settle()
+        assertEquals(SettingsDetail.Appearance.name, holder.sectionState.settingsDetailName)
+        assertEquals(fixture.target.groupIdHex, holder.selectedChat.value?.id)
+    }
+
+    /** A conversation whose one message tells it apart, with one ready script per open. */
+    private fun messageFixture(): ReturnFixture {
+        val message =
+            timelineRecord("ab".repeat(32), 1uL)
+                .copy(groupIdHex = ConversationTimelineTestIds.GROUP_ID, plaintext = MESSAGE)
+        return ReturnFixture(
+            timelineScripts = List(OPEN_SCRIPTS) { ScriptedConversationTimelineSubscription(timelinePage(message)) },
+        )
+    }
+
+    /** Makes [accountRef] the active account through the same private setter as the other account contracts. */
+    private fun WhiteNoiseAppState.setActiveAccountForContract(accountRef: String) {
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("setActiveAccountRef", String::class.java)
+            .apply { isAccessible = true }
+            .invoke(this, accountRef)
     }
 
     /** A same-process runtime replacement for the same account closes the open conversation and leaves Settings. */
@@ -144,6 +219,7 @@ class ShellRestoreContractTest {
         val COMPACT_WIDTH = 839.dp
         val TWO_PANE_WIDTH = 1_000.dp
         const val MESSAGE = "restore contract only message"
+        const val OTHER_ACCOUNT_REF = "other-restore-account"
         const val OPEN_SCRIPTS = 3
     }
 }
