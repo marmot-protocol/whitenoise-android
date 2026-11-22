@@ -25,7 +25,11 @@ internal suspend fun verifyUpgradeAuditConsent(
             persistSettings = { runtime.setAuditLogSettings(it) },
         )
     }
-    assertEquals("Android audit acknowledgement", if (enabled) 2 else 0, preferences.getInt("audit_upload_disclosure_revision", -1))
+    assertEquals(
+        "Android audit acknowledgement",
+        if (enabled) 2 else 0,
+        preferences.getInt("audit_upload_disclosure_revision", -1),
+    )
     assertEquals(UsageDiagnosticsDecisionFfi.DECLINED, runtime.usageDiagnosticsSettings().decision)
     assertEquals("Native audit recorder setting", enabled, runtime.auditLogSettings().enabled)
     assertEquals(enabled, consent.granted)
