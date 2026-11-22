@@ -215,6 +215,37 @@ class ShellEarlyOpenDetailsContractTest {
         assertEquals(1, composed(hasText(TARGET_ACCOUNT_MESSAGE, substring = true)))
     }
 
+    /**
+     * The held switch lands while the open conversation is still pinned to the arriving account and still carries a
+     * notification trace, but no longer the trace of the request whose early open is active: that open was superseded
+     * by another route into the same chat. The owner rebind keeps such a pinned route, so only the shell's account
+     * switch event takes it down, and master resets to the chat list with nothing of the conversation composed.
+     */
+    @Test
+    fun aSupersededEarlyOpenTakesThePrivacyResetWhenTheSwitchLands() {
+        mountShellWithTheTap()
+        awaitCondition("the conversation never opened ahead of the switch") { openedAheadOfTheSwitch() }
+        val early = holder.selectedChatOpenContext.value
+        val superseded = early.copy(notificationRouteTraceRequestId = SUPERSEDING_TRACE_ID)
+        composeRule.runOnIdle { holder.dispatchShellNav(ShellNavEvent.JumpWithin(superseded)) }
+        awaitCondition("the route never took the superseding trace") { routeCarries(SUPERSEDING_TRACE_ID) }
+        // The conversation is on screen, pinned to the arriving account, before the switch lands.
+        assertEquals(TARGET_ACCOUNT, holder.selectedChatOpenContext.value.pinnedAccountRef)
+        assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
+        assertTrue(transcriptShown())
+        assertEquals(1, composed(hasText(TARGET_ACCOUNT_MESSAGE, substring = true)))
+
+        activationHold.releaseAll()
+        awaitCondition("the switch never landed") { appState.activeAccountRef == TARGET_ACCOUNT }
+        repeat(SETTLE_PUMPS) { pump() }
+
+        assertEquals(CHATS_ROOT, holder.shellNavigator.stack)
+        assertNull(holder.selectedChat.value)
+        assertFalse("nothing of the superseded conversation stays composed", transcriptShown())
+        assertEquals(0, composed(hasText(TARGET_ACCOUNT_MESSAGE, substring = true)))
+        assertEquals(0, composed(hasText(SOURCE_ACCOUNT_MESSAGE, substring = true)))
+    }
+
     /** True once the open conversation was committed by notification request [requestId]. */
     private fun routeCarries(requestId: Long): Boolean {
         val committedBy = holder.selectedChatOpenContext.value.notificationRouteTraceRequestId
@@ -322,6 +353,9 @@ class ShellEarlyOpenDetailsContractTest {
 
         /** Any request id other than the first tap's. */
         const val REPEAT_REQUEST_ID = 1_001L
+
+        /** A notification trace that belongs to no early open, the trace of the route that superseded it. */
+        const val SUPERSEDING_TRACE_ID = 2_002L
 
         /** About a second of held switch, long enough for a late draw of details to show. */
         const val HELD_PUMPS = 25
