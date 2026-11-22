@@ -175,6 +175,8 @@
     <string name="folder_keep_editing">Keep Editing</string>
     <string name="folder_unavailable">This folder is no longer available.</string>
     <string name="folder_save_failed">Couldn’t save. Your changes are still here; try again.</string>
+    <string name="folder_autosave_failed">Couldn’t save your latest changes. Edit again or go back to retry.</string>
+    <string name="folder_name_required">Enter a folder name. The last saved name is kept.</string>
     <string name="folder_search">Search</string>
     <string name="no_results">No Results</string>
     <string name="done">Done</string>
@@ -2457,7 +2459,6 @@
     <string name="chat_rows_no_archived_detail">Chats you archive will appear here.</string>
     <string name="quick_account_switching">Quick account switching</string>
     <string name="quick_account_switching_detail">Shows other accounts beside your avatar. Tap one to switch.</string>
-    <string name="quick_account_switched">Switched to %1$s</string>
     <string name="add_profile">Add Profile</string>
     <string name="switch_profile">Switch Profile</string>
     <string name="folder_new_title">New Folder</string>

@@ -204,20 +204,29 @@ def isolate_fixture_public_network():
     return uid
 
 
-def usable_chat(name):
+def usable_chat(name, *, consent_settled=False):
     """Observe production MainActivity after real bootstrap, then open retained synthetic conversation history."""
     print(f'{name}: opening retained conversation through MainActivity', flush=True)
     adb('shell', 'pm', 'grant', APP, 'android.permission.POST_NOTIFICATIONS')
     adb('shell', 'am', 'start', '-W', '-n', APP + '/dev.ipf.whitenoise.android.MainActivity')
     deadline = time.monotonic() + 120
     opened = False
+    xml = ''
     while time.monotonic() < deadline:
-        adb('shell', 'uiautomator', 'dump', '/sdcard/qualification-window.xml')
-        xml = adb('shell', 'cat', '/sdcard/qualification-window.xml')
-        nodes = list(ET.fromstring(xml).iter('node'))
+        try:
+            adb('shell', 'rm -f /sdcard/qualification-window.xml && uiautomator dump /sdcard/qualification-window.xml')
+            xml = adb('shell', 'cat', '/sdcard/qualification-window.xml')
+            nodes = list(ET.fromstring(xml).iter('node'))
+        except (subprocess.CalledProcessError, ET.ParseError):
+            # UIAutomator may temporarily find no idle window during bootstrap.
+            time.sleep(2)
+            continue
         conversation = any(n.get('resource-id', '').endswith('composer-pill-surface') for n in nodes)
         chat_list = any(n.get('resource-id', '').endswith('chats.scope.chats') for n in nodes)
         consent = any(n.get('text') == 'Help Improve White Noise' for n in nodes)
+        if consent and consent_settled:
+            (REPORTS / f'{name}-window.xml').write_text(xml)
+            raise RuntimeError(f'{name}: startup prompted despite settled diagnostic choices')
         for node in nodes:
             text = node.get('text', '')
             if 'Retained qualification history' in text and conversation and not chat_list:
@@ -240,6 +249,18 @@ def usable_chat(name):
     (REPORTS / f'{name}-window.xml').write_text(xml)
     (REPORTS / f'{name}.png').write_bytes(adb('exec-out', 'screencap', '-p', binary=True))
     raise RuntimeError(f'{name}: retained conversation did not become usable')
+
+
+def verify_audit_startup(name, audit_choice):
+    """Use the production readiness marker for the current MainActivity process."""
+    pid = adb('shell', 'pidof', APP).strip()
+    if not pid.isdecimal():
+        raise RuntimeError(f'{name}: MainActivity process unavailable')
+    logs = adb('logcat', '-d', f'--pid={pid}', '-s', 'WhiteNoiseAudit:I')
+    ready = 'WHITENOISE_AUDIT_READY_V1 ' in logs
+    if ready != (audit_choice == 'enabled'):
+        raise RuntimeError(f'{name}: unexpected audit upload readiness for {audit_choice}')
+    (REPORTS / f'{name}-audit.json').write_text(json.dumps({'audit_choice': audit_choice, 'upload_ready': ready}) + '\n')
 
 
 def post_upgrade_campaigns(ports, blob, facts):
@@ -286,7 +307,11 @@ def main():
              'api': adb('shell', 'getprop', 'ro.build.version.sdk').strip(),
              'abi': adb('shell', 'getprop', 'ro.product.cpu.abi').strip(),
              'package': APP, 'exact_signed_preview_qualified': False, 'phases': {}}
-    ports = ('-e', 'relayPort', str(relay.port), '-e', 'blobPort', str(blob.server_port),
+    audit_choice = os.environ.get('QUALIFICATION_AUDIT_CHOICE', 'enabled')
+    if audit_choice not in {'enabled', 'declined'}:
+        raise ValueError('Unsupported audit qualification choice')
+    facts['audit_choice'] = audit_choice
+    ports = ('-e', 'qualificationAuditChoice', audit_choice, '-e', 'relayPort', str(relay.port), '-e', 'blobPort', str(blob.server_port),
              '-e', 'fileStoreBaseline', 'true')
     started_servers = []
     try:
@@ -304,7 +329,8 @@ def main():
             backup = adb('exec-out', 'run-as', APP, 'tar', '-cf', '-', 'files', binary=True)
             (private / 'baseline-root.tar').write_bytes(backup)
             facts['baseline_root_sha256'] = hashlib.sha256(backup).hexdigest()
-            usable_chat('baseline-ready')
+            usable_chat('baseline-ready', consent_settled=True)
+            verify_audit_startup('baseline-ready', audit_choice)
             stop()
             facts['phases']['baseline'] = 'passed'
             blob.acquisition_unavailable.set()
@@ -315,16 +341,18 @@ def main():
             # Current master already uses retained attachment files. The byte-pinned 0113 fault hooks
             # belong to the older SQL-body upgrade; they cannot run against this different library.
             verify_fixture_transports((relay, blob), 'before-upgrade')
+            usable_chat('upgrade-ready', consent_settled=True)
+            verify_audit_startup('upgrade-ready', audit_choice)
+            stop()
             instrument('upgrade-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
                        (*ports, '-e', 'qualificationPhase', 'upgrade'))
-            stop()
-            usable_chat('upgrade-ready')
             facts['phases']['upgrade'] = 'passed'
             stop()
             instrument('key-migration', KEY_MIGRATION, {'migratedAccountsPreserveRetentionAndSalts'}, ports)
             facts['phases']['key_migration'] = 'passed'
             stop()
-            usable_chat('cold-ready')
+            usable_chat('cold-ready', consent_settled=True)
+            verify_audit_startup('cold-ready', audit_choice)
             stop()
             instrument('cold-read', UPGRADE, {'retainedAccountHistoryAndMedia'},
                        (*ports, '-e', 'qualificationPhase', 'cold'))

@@ -1422,6 +1422,8 @@
     <string name="folder_keep_editing">Continuer la modification</string>
     <string name="folder_unavailable">Ce dossier n’est plus disponible.</string>
     <string name="folder_save_failed">Échec de l’enregistrement. Vos modifications sont toujours là ; réessayez.</string>
+    <string name="folder_autosave_failed">Impossible d’enregistrer vos dernières modifications. Modifiez à nouveau ou revenez en arrière pour réessayer.</string>
+    <string name="folder_name_required">Saisissez un nom de dossier. Le dernier nom enregistré est conservé.</string>
     <string name="folder_search">Rechercher</string>
     <string name="no_results">Aucun résultat</string>
     <string name="done">Terminé</string>
@@ -2288,7 +2290,6 @@
     <string name="chat_rows_no_archived_detail">Les discussions archivées apparaîtront ici.</string>
     <string name="quick_account_switching">Changement rapide de compte</string>
     <string name="quick_account_switching_detail">Affiche les autres comptes près de votre avatar. Touchez pour changer.</string>
-    <string name="quick_account_switched">Compte actif : %1$s</string>
     <string name="add_profile">Ajouter un profil</string>
     <string name="switch_profile">Changer de profil</string>
     <string name="folder_new_title">Nouveau dossier</string>

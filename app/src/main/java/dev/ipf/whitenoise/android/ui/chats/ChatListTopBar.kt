@@ -59,7 +59,6 @@ import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.account.RetainedTopBarAccountAvatar
-import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoffHost
@@ -137,7 +136,6 @@ internal fun ChatListTopBar(
     var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
     val profileState by appState.notificationProfiles.state.collectAsState()
     val showProfileAction = profileState.showInChatList && profileState.profiles.isNotEmpty()
-    val switchNotice = rememberQuickAccountSwitchNotice()
     // The avatar is where top-level Settings opens from and closes into, also via the account selector.
     val avatarInset = (CHAT_LIST_ACCOUNT_AVATAR_TOUCH_TARGET - CHAT_LIST_ACCOUNT_AVATAR_SIZE) / 2
     val (settingsOrigin, openSettings) =
@@ -160,19 +158,14 @@ internal fun ChatListTopBar(
         if (onSwitchToAccount != null) {
             onSwitchToAccount(targetLabel)
         } else {
-            appState.requestQuickAccountSwitchTo(
-                targetLabel = targetLabel,
-                requestSwitch = { target, activated ->
-                    appState.launchMutation {
-                        appState.setActiveAccount(
-                            label = target,
-                            preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
-                            onActivated = activated,
-                        )
-                    }
-                },
-                onSwitched = switchNotice::show,
-            )
+            appState.requestQuickAccountSwitchTo(targetLabel) { target ->
+                appState.launchMutation {
+                    appState.setActiveAccount(
+                        label = target,
+                        preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+                    )
+                }
+            }
         }
     }
     LaunchedEffect(appState.accounts, appState.runtimeGeneration) {

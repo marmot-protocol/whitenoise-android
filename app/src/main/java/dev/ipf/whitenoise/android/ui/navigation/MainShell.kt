@@ -67,7 +67,6 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.stageInboundShareForFirstFrame
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
-import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.account.rememberRetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
@@ -417,7 +416,6 @@ internal fun MainShell(
         return transition.createOpenAccepted
     }
     val context = LocalContext.current
-    val switchNotice = rememberQuickAccountSwitchNotice()
     val importState =
         shareImport ?: dev.ipf.whitenoise.android.share.rememberInboundShareImport(
             context,
@@ -1815,13 +1813,9 @@ internal fun MainShell(
                                 showPlaybackTransport = playbackInChatList && !conversationBesideList,
                                 onQuickSwitchAccount = { requestQuickAccountSwitch(it) },
                                 onQuickSwitchToAccount = { targetLabel ->
-                                    appState.requestQuickAccountSwitchTo(
-                                        targetLabel = targetLabel,
-                                        requestSwitch = { target, activated ->
-                                            requestQuickAccountSwitch(target, activated)
-                                        },
-                                        onSwitched = switchNotice::show,
-                                    )
+                                    appState.requestQuickAccountSwitchTo(targetLabel) { target ->
+                                        requestQuickAccountSwitch(target)
+                                    }
                                 },
                                 onGroupCreateSubmitted = onGroupCreateSubmitted,
                                 onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,

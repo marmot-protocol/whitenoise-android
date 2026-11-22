@@ -239,6 +239,41 @@ class PlaybackTransportOwnershipTest {
         assertTrue(appState.chatFolderPreferences.foldersFor("personal").none { it.name == "Unsaved folder" })
     }
 
+    /** Opening the source from an edited existing folder leaves directly and keeps the autosaved edit. */
+    @Test fun editedExistingFolderLeavesDirectlyForSourceReturn() {
+        val appState = appState()
+        setVoice()
+        var opened = 0
+        val folder = appState.chatFolderPreferences.createFolder("personal", "Work")!!
+        val host = ShellPlaybackHost(appState) { opened++ }
+        rule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalShellPlaybackHost provides host) {
+                    androidx.compose.foundation.layout.Column {
+                        PlaybackTransportBar(appState, onBodyClick = { host.requestOpenSource() })
+                        dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen(
+                            appState,
+                            "personal",
+                            folder.id,
+                            onClose = {},
+                        )
+                    }
+                }
+            }
+        }
+        rule.onNodeWithTag("folder.name").performTextReplacement("Edited folder")
+        rule.onNodeWithText("Maya").performClick()
+        rule.onNodeWithText(context.getString(dev.ipf.whitenoise.android.R.string.folder_discard)).assertDoesNotExist()
+        assertEquals(1, opened)
+        assertEquals(
+            "Edited folder",
+            appState.chatFolderPreferences
+                .foldersFor("personal")
+                .first { it.id == folder.id }
+                .name,
+        )
+    }
+
     /** Speech without canonical source metadata cannot dismiss an unrelated modal through its body label. */
     @Test fun sourceLessSpeechKeepsModalOpenAndTransportControlsAvailable() {
         val appState = appState()
