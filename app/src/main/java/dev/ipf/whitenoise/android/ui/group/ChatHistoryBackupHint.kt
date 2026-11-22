@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.historyBackupHints
+import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /**
@@ -40,7 +41,8 @@ internal fun ChatHistoryBackupHint(
     val hinted by produceState(false, accountRef, groupIdHex, appState.runtimeGeneration) {
         value = appState.historyBackupHints(accountRef, groupIdHex).isNotEmpty()
     }
-    if (hinted) ChatHistoryBackupHintCard(modifier)
+    // Aligned with the overview's other notices under its error banner.
+    if (hinted) ChatHistoryBackupHintCard(modifier.padding(horizontal = Dimens.spaceLg).padding(top = 8.dp))
 }
 
 @Suppress("FunctionNaming")

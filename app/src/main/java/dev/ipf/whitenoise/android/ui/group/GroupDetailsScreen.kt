@@ -1321,7 +1321,6 @@ internal fun GroupDetailsScreen(
                 }
             }
             leaveBlockedNotice(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            ChatHistoryBackupHint(appState, controller, Modifier.padding(16.dp, 8.dp))
         }
         val memberContent: @Composable () -> Unit = {
             if (!isDm) {
@@ -1806,13 +1805,11 @@ internal fun GroupDetailsScreen(
                     }
                     controller.lastMutationError?.let { error ->
                         Box(Modifier.padding(horizontal = Dimens.spaceLg)) {
-                            GroupMutationErrorBanner(
-                                error = error,
-                                onDismiss = { controller.clearLastMutationError() },
-                            )
+                            GroupMutationErrorBanner(error = error, onDismiss = { controller.clearLastMutationError() })
                         }
                     }
                     leaveBlockedNotice(Modifier.padding(horizontal = Dimens.spaceLg).padding(top = 8.dp))
+                    ChatHistoryBackupHint(appState, controller)
 
                     memberContent()
 

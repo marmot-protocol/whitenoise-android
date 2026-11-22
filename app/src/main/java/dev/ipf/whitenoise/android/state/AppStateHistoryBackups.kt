@@ -18,15 +18,15 @@ internal fun WhiteNoiseAppState.historyBackupsEligible(account: String? = active
  */
 internal fun WhiteNoiseAppState.historyBackupsController(scope: CoroutineScope): HistoryBackupsController? {
     val account = activeAccountRef?.takeIf { historyBackupsEligible(it) }
-    val runtime = captureHostPerformanceRuntimeOwner()?.runtime
-    if (account == null || runtime == null) return null
-    val generation = runtimeGeneration
+    // One capture binds the runtime and its generation together; isCurrent checks both.
+    val owner = captureHostPerformanceRuntimeOwner()
+    if (account == null || owner == null) return null
     return HistoryBackupsController(
-        marmot = runtime.marmot,
+        marmot = owner.runtime.marmot,
         accountRef = account,
         scope = scope,
         isCurrent = {
-            activeAccountRef == account && runtimeGeneration == generation && historyBackupsEligible(account)
+            activeAccountRef == account && ownsHostPerformanceRuntimeOwner(owner) && historyBackupsEligible(account)
         },
         onWriting = { HistoryBackupWorker.schedule(appContext) },
         cleanupScope = mutationsScope,
