@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import dev.ipf.whitenoise.android.audio.ConversationDictationController.Companion.MAX_SESSION_MILLIS
+import dev.ipf.whitenoise.android.audio.ConversationDictationFollowUpOwner.Pending
 import dev.ipf.whitenoise.android.audio.ConversationDictationFollowUpOwner.Phase
 
 /** Cancel during the overlap discards only the newest recording. */
@@ -52,9 +53,7 @@ internal fun ConversationDictationController.forgetAccountAudio(accountRef: Stri
     discardFollowUps("account_unavailable") { it.target.accountRef.equals(accountRef, ignoreCase = true) }
 }
 
-private fun ConversationDictationController.discardFollowUpCapture(
-    pending: ConversationDictationFollowUpOwner.Pending,
-) {
+private fun ConversationDictationController.discardFollowUpCapture(pending: Pending) {
     followUp.discardsClosing += 1
     val closed: () -> Unit = {
         finishPlaybackInterruption(pending.sessionId)
@@ -123,14 +122,16 @@ internal fun ConversationDictationController.promoteFollowUp(previousDelivered: 
 
 internal fun ConversationDictationController.clearConsumedFollowUpReply(target: ConversationDictationTarget) {
     val reply = target.replyToMessageIdHex ?: return
-    followUp.queue = followUp.queue.map { pending ->
-        val queued = pending.target
-        if (queued.matchesConversation(target.accountRef, target.groupIdHex) && queued.replyToMessageIdHex == reply) {
-            pending.copy(target = queued.copy(replyToMessageIdHex = null))
-        } else {
-            pending
+    val key = ConversationDictationKey.from(target.accountRef, target.groupIdHex)
+    followUp.queue =
+        followUp.queue.map { pending ->
+            val queued = pending.target
+            if (pending.key == key && queued.replyToMessageIdHex == reply) {
+                pending.copy(target = queued.copy(replyToMessageIdHex = null))
+            } else {
+                pending
+            }
         }
-    }
 }
 
 private fun ConversationDictationController.dequeueFollowUpHead() {
@@ -139,7 +140,7 @@ private fun ConversationDictationController.dequeueFollowUpHead() {
 }
 
 private fun ConversationDictationController.startPromotedFollowUp(
-    pending: ConversationDictationFollowUpOwner.Pending,
+    pending: Pending,
     target: ConversationDictationTarget,
     sendBlocked: Boolean,
 ) {

@@ -16,7 +16,9 @@ internal fun ConversationDictationController.followUpRecordingFor(
     accountRef: String,
     groupIdHex: String,
 ): Boolean =
-    followUp.pending?.let { it.phase != Phase.Sealed && it.target.matchesConversation(accountRef, groupIdHex) } == true
+    followUp.pending?.let { pending ->
+        pending.phase != Phase.Sealed && pending.target.matchesConversation(accountRef, groupIdHex)
+    } == true
 
 /** The active dictation's conversation; Continue records into it. */
 internal val ConversationDictationController.continueTarget: ConversationDictationTarget?

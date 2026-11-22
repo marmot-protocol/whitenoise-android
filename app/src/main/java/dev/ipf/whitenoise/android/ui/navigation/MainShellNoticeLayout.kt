@@ -148,7 +148,7 @@ internal fun MainShellNoticeLayout(
                 DictationControlExit(
                     owner = dictationControlOwner,
                     state = dictationController.state,
-                    facts = dictationController.controlFactsFor(dictationComposerRoute),
+                    facts = dictationController.controlFacts(dictationComposerRoute),
                     motionAllowed = dictationMotionAllowed,
                     morphActive = { dictationMotion.active },
                 ) { renderedState, renderedFacts, exitModifier ->

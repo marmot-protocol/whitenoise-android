@@ -349,6 +349,7 @@ internal abstract class DictationNavigationRenderFixture {
         var callerAudio = false
 
         override fun followUpCaptureSupported() = callerAudio
+
         lateinit var listener: ConversationDictationRecognitionListener
 
         override fun hasRecordAudioPermission() = true

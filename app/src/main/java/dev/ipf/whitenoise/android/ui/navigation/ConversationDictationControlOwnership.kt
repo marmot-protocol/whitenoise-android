@@ -6,9 +6,9 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.continueTarget
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
-import dev.ipf.whitenoise.android.ui.conversation.composer.DictationControlFacts
 import dev.ipf.whitenoise.android.ui.conversation.composer.controlFacts
 import dev.ipf.whitenoise.android.ui.shouldShowConversationDictationPersistentControl
+import dev.ipf.whitenoise.android.ui.conversation.composer.DictationControlFacts as ControlFacts
 
 /** Presentation ownership only; this must never become a dictation delivery destination. */
 internal enum class ConversationDictationControlOwner {
@@ -67,9 +67,7 @@ internal fun conversationDictationOriginComposerVisible(
  * Continue records into the active dictation's chat. While another chat's composer is on screen the
  * control leaves it out, and Dictate in that composer queues a recording for that chat instead.
  */
-internal fun ConversationDictationController.controlFactsFor(
-    route: ConversationDictationComposerRoute,
-): DictationControlFacts {
+internal fun ConversationDictationController.controlFacts(route: ConversationDictationComposerRoute): ControlFacts {
     val facts = controlFacts
     val target = continueTarget ?: return facts
     val otherChatOnScreen =
