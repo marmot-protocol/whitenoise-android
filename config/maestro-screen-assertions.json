@@ -5239,6 +5239,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+      "symbol": "VoiceDiscardConfirmation",
+      "bindings": [],
+      "remaining": "Record a voice note of at least ten seconds, stop into review and open Discard. Assert the dialog appears, Cancel returns to the same draft, and Discard clears it."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewRecoveryMarker.kt",
       "symbol": "VoiceReviewUnavailableNotice",
       "bindings": [
