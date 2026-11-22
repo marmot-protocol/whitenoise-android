@@ -116,7 +116,8 @@ class ShellSettingsJumpContractTest(
                 shell.awaitCondition { composed(returnToSource()) }
                 composeRule.onNode(returnToSource()).performClick()
             }
-            SettingsJump.SupportChat -> composeRule.onNode(hasTestTag(SUPPORT_START_TAG)).performScrollTo().performClick()
+            SettingsJump.SupportChat ->
+                composeRule.onNode(hasTestTag(SUPPORT_START_TAG)).performScrollTo().performClick()
         }
         shell.awaitCondition { holder.selectedChat.value?.id == fixture.target.groupIdHex }
         shell.awaitCondition { composed(hasText(CONVERSATION_MESSAGE, substring = true)) }
@@ -131,13 +132,13 @@ class ShellSettingsJumpContractTest(
         width: Dp,
         exercise: (ReturnFixture, MainShellStateHolder) -> Unit,
     ) {
-        val message =
+        val page =
             timelineRecord("cd".repeat(32), 1uL)
                 .copy(groupIdHex = ConversationTimelineTestIds.GROUP_ID, plaintext = CONVERSATION_MESSAGE)
         val fixture =
             ReturnFixture(
                 customizeRow = { index, row -> if (index == TARGET_ROW) row.copy(groupName = "") else row },
-                timelineScripts = List(OPEN_SCRIPTS) { ScriptedConversationTimelineSubscription(timelinePage(message)) },
+                timelineScripts = List(OPEN_SCRIPTS) { ScriptedConversationTimelineSubscription(timelinePage(page)) },
             )
         WhiteNoiseAppState::class.java
             .getDeclaredMethod("setPhase", AppPhase::class.java)
@@ -219,7 +220,10 @@ class ShellSettingsJumpContractTest(
     }
 
     /** True while any node satisfies [matcher]. */
-    private fun composed(matcher: SemanticsMatcher): Boolean = composeRule.onAllNodes(matcher, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+    private fun composed(matcher: SemanticsMatcher): Boolean {
+        val nodes = composeRule.onAllNodes(matcher, useUnmergedTree = true)
+        return nodes.fetchSemanticsNodes().isNotEmpty()
+    }
 
     /** One route from Settings into a conversation, with the Settings screen it starts on. */
     enum class SettingsJump(

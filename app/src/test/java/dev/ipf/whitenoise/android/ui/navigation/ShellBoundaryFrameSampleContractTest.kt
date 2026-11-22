@@ -55,7 +55,8 @@ class ShellBoundaryFrameSampleContractTest {
             app.openTarget(fixture, holder)
             app.awaitCondition { composed(hasText(MESSAGE, substring = true)) }
 
-            val leaked = framesAfter({ fixture.appState.setAppLockScreenVisibleForTest(true) }) { conversationComposed() }
+            val lock = { fixture.appState.setAppLockScreenVisibleForTest(true) }
+            val leaked = framesAfter(lock) { conversationComposed() }
 
             assertEquals("frames under the lock that composed the conversation", emptyList<Int>(), leaked)
             app.unlock(fixture.appState)
@@ -145,7 +146,10 @@ class ShellBoundaryFrameSampleContractTest {
     private fun relaysComposed(): Boolean = composed(hasTestTag(GROUP_RELAYS_SCREEN_TAG))
 
     /** True while any node satisfies [matcher], counted in the unmerged tree so no parent can hide one. */
-    private fun composed(matcher: SemanticsMatcher): Boolean = composeRule.onAllNodes(matcher, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+    private fun composed(matcher: SemanticsMatcher): Boolean {
+        val nodes = composeRule.onAllNodes(matcher, useUnmergedTree = true)
+        return nodes.fetchSemanticsNodes().isNotEmpty()
+    }
 
     /** The conversation header, the one clickable heading on the conversation, which opens its details. */
     private fun conversationHeader() = hasClickAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
