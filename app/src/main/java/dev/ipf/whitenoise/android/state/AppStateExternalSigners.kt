@@ -101,7 +101,7 @@ private suspend fun WhiteNoiseAppState.restoreRemoteSignerAccounts(): Set<String
             }
         }
     }
-    if (remoteSigners.hasSessions()) watchRemoteSigners()
+    if (remoteSigners.hasSessions) watchRemoteSigners()
     return claimed
 }
 

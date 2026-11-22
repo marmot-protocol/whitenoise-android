@@ -42,6 +42,8 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.Nip46ErrorFfi
 import dev.ipf.marmotkit.Nip46SessionFfi
+import dev.ipf.marmotkit.Nip46StateFfi
+import dev.ipf.marmotkit.Nip46StatusFfi
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -133,7 +135,7 @@ internal class NotificationBootstrapTestFixture(
     private val signInFailure: Throwable? = null,
     private val onSignInAccount: ((String) -> Unit)? = null,
     initialNotificationSettings: NotificationSettingsFfi? = null,
-    private val onNip46Resume: ((String) -> Nip46SessionFfi?)? = null,
+    private val onNip46Resume: ((String) -> Boolean)? = null,
     // Optional behavior hooks so worker/reconciliation tests can steer the FFI
     // boundary per call; every default preserves the fixture's original shape.
     private val onOnboardingSnapshot: (() -> OnboardingSnapshotFfi?)? = null,
@@ -650,8 +652,11 @@ internal class NotificationBootstrapTestFixture(
                 "nip46Resume" -> {
                     val accountRef = arguments?.first() as String
                     try {
-                        onNip46Resume?.invoke(accountRef)
-                            ?: failSuspendedNativeCall(arguments, MarmotKitException.Nip46(Nip46ErrorFfi.Unavailable()))
+                        if (onNip46Resume?.invoke(accountRef) == true) {
+                            allocateWithoutConstructor(FixtureRemoteSignerSession::class.java)
+                        } else {
+                            failSuspendedNativeCall(arguments, MarmotKitException.Nip46(Nip46ErrorFfi.Unavailable()))
+                        }
                     } catch (error: MarmotKitException.Nip46) {
                         failSuspendedNativeCall(arguments, error)
                     }
@@ -763,6 +768,12 @@ internal class NotificationBootstrapTestFixture(
         val field = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }
         val unsafe = field.get(null)
         return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, type) as T
+    }
+
+    private class FixtureRemoteSignerSession : Nip46SessionFfi(NoPointer) {
+        override fun status() = Nip46StatusFfi(Nip46StateFfi.UNAVAILABLE, null, null, null, 0u)
+
+        override fun close() = Unit
     }
 
     /** One immutable attachment history generation that owns no native handle. */

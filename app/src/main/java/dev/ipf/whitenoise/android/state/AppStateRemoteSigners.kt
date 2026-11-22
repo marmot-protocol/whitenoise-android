@@ -82,7 +82,7 @@ internal fun WhiteNoiseAppState.watchRemoteSigners() {
     remoteSigners.watcher =
         mutationsScope.launch(Dispatchers.Default) {
             // Refresh only. Startup and session registration manage runtime ownership.
-            while (isActive && remoteSigners.hasSessions()) {
+            while (isActive && remoteSigners.hasSessions) {
                 // Sleeps while no screen shows a signer status; MDK's status is local, so a late read loses nothing.
                 remoteSigners.observers.first { it > 0 }
                 runCatchingCancellable { remoteSigners.refresh() }

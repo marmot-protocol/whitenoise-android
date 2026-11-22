@@ -41,8 +41,9 @@ internal class RemoteSignerAccounts {
         accountIdHex: String,
     ): Nip46SessionFfiInterface? = sessions[accountIdHex].takeIf { owner === runtime }
 
-    @Synchronized
-    fun hasSessions(): Boolean = sessions.isNotEmpty()
+    @get:Synchronized
+    val hasSessions: Boolean
+        get() = sessions.isNotEmpty()
 
     /** Records [session] for [accountIdHex] on current [runtime]; a new runtime first drops the previous handles. */
     @Synchronized

@@ -62,7 +62,8 @@ internal fun accountSelectorState(
                     isSignedOut = account.signedOut,
                     isActive = account.label == activeAccountRef,
                     isUnlinked = account.unlinked,
-                    signerNeedsAttention = !account.unlinked && !account.signedOut && signerNeedsAttention(account.accountIdHex),
+                    signerNeedsAttention =
+                        !account.unlinked && !account.signedOut && signerNeedsAttention(account.accountIdHex),
                 )
             },
         refreshing = refreshing,

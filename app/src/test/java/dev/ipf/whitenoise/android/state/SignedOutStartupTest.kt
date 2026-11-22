@@ -5,10 +5,6 @@ import android.content.Context
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.Nip46ErrorFfi
-import dev.ipf.marmotkit.Nip46SessionFfi
-import dev.ipf.marmotkit.Nip46StateFfi
-import dev.ipf.marmotkit.Nip46StatusFfi
-import dev.ipf.marmotkit.NoPointer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -70,16 +66,12 @@ class SignedOutStartupTest {
     @Test
     fun restoredRemoteSignerKeepsItsSessionWhenAmberResumeFails() =
         runBlocking {
-            val session =
-                object : Nip46SessionFfi(NoPointer) {
-                    override fun status() = Nip46StatusFfi(Nip46StateFfi.UNAVAILABLE, null, null, null, 0u)
-                }
             val accounts = listOf(account("amber", external = true), account("remote", external = true))
             withFixture(
                 accounts,
                 onNip46Resume = { accountRef ->
                     if (accountRef == "remote") {
-                        session
+                        true
                     } else {
                         throw MarmotKitException.Nip46(Nip46ErrorFfi.Storage())
                     }
@@ -224,7 +216,7 @@ class SignedOutStartupTest {
         selected: String? = accounts.first().label,
         signInFailure: Throwable? = null,
         onSignInAccount: ((String) -> Unit)? = null,
-        onNip46Resume: ((String) -> Nip46SessionFfi?)? = null,
+        onNip46Resume: ((String) -> Boolean)? = null,
         block: suspend (NotificationBootstrapTestFixture) -> Unit,
     ) {
         val context: Application = RuntimeEnvironment.getApplication()
