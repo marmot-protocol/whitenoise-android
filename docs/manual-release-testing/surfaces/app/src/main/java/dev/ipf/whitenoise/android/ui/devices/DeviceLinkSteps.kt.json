@@ -275,6 +275,14 @@
         "test_ids": [
           "SET-061"
         ]
+      },
+      {
+        "surface": "DeviceLinkEmojiCell",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",
+        "anchor": "fun DeviceLinkEmojiCell(",
+        "test_ids": [
+          "SET-061"
+        ]
       }
     ]
   },

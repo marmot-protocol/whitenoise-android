@@ -4,18 +4,20 @@ package dev.ipf.whitenoise.android.ui.devices
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -26,7 +28,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.ipf.marmotkit.DeviceLinkEmojiFfi
 import dev.ipf.marmotkit.DeviceLinkEndReasonFfi
 import dev.ipf.marmotkit.NewDeviceLinkStateFfi
@@ -42,11 +46,17 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 internal const val DEVICE_LINK_CODE_TAG = "device_link.code"
 internal const val DEVICE_LINK_STEP_TAG = "device_link.step"
 
-/**
- * Each emoji's cell is at least this wide, so the code lines up in columns as on the other apps, and grows up to
- * twice that at large text sizes so a name wraps between words instead of inside one.
- */
-private val DEVICE_LINK_EMOJI_WIDTH = 84.dp
+/** The code's emoji per row: four over three, as the other apps draw it. */
+private const val DEVICE_LINK_CODE_COLUMNS = 4
+
+/** The most of a cell's width an emoji takes, so a large font shrinks it instead of cutting it off. */
+private const val EMOJI_SHARE = 0.6f
+
+/** An emoji's line height relative to its size. */
+private const val EMOJI_LINE = 1.2f
+
+/** The smallest an emoji's name shrinks to fit its cell on one line, as the other apps scale theirs down. */
+private val MIN_NAME_SIZE = 8.sp
 internal const val DEVICE_LINK_PRIMARY_TAG = "device_link.primary"
 internal const val DEVICE_LINK_SECONDARY_TAG = "device_link.secondary"
 internal const val DEVICE_LINK_FAILED_TAG = "device_link.failed"
@@ -157,46 +167,62 @@ internal fun deviceLinkEndReason(reason: DeviceLinkEndReasonFfi): Int =
     }
 
 /**
- * MDK's comparison code as large emoji in MDK's order, each above MDK's name for it, wrapping onto more lines
- * instead of shrinking or cutting off. Each emoji is announced with its position and that name, so the order
- * survives a screen reader; the code itself is never logged or copied anywhere.
+ * MDK's comparison code as large emoji in MDK's order, each above MDK's name for it, four over three as the other
+ * apps draw it so the two screens can be compared line by line. Each emoji is announced with its position and that
+ * name, so the order survives a screen reader. The code itself is never logged or copied anywhere.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun DeviceLinkCode(
     code: List<DeviceLinkEmojiFfi>,
     modifier: Modifier = Modifier,
 ) {
-    FlowRow(
-        modifier = modifier.fillMaxWidth().testTag(DEVICE_LINK_CODE_TAG),
-        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related, Alignment.CenterHorizontally),
-        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-    ) {
-        code.forEachIndexed { index, emoji ->
-            val spoken = stringResource(R.string.link_device_emoji_position, index + 1, code.size, emoji.description)
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.clearAndSetSemantics { contentDescription = spoken },
-            ) {
-                Column(
-                    modifier =
-                        Modifier
-                            .widthIn(min = DEVICE_LINK_EMOJI_WIDTH, max = DEVICE_LINK_EMOJI_WIDTH * 2)
-                            .padding(horizontal = 4.dp, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(emoji.emoji, style = MaterialTheme.typography.displaySmall)
-                    Text(
-                        text = emoji.description,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+    BoxWithConstraints(modifier.fillMaxWidth().testTag(DEVICE_LINK_CODE_TAG)) {
+        val spacing = WhiteNoiseSpacing.Related
+        val cellWidth = (maxWidth - spacing * (DEVICE_LINK_CODE_COLUMNS - 1)) / DEVICE_LINK_CODE_COLUMNS
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing)) {
+            code.chunked(DEVICE_LINK_CODE_COLUMNS).forEachIndexed { row, emojis ->
+                Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(spacing, Alignment.CenterHorizontally)) {
+                    emojis.forEachIndexed { column, emoji ->
+                        val position = row * DEVICE_LINK_CODE_COLUMNS + column + 1
+                        DeviceLinkEmojiCell(emoji, position, code.size, cellWidth)
+                    }
                 }
             }
+        }
+    }
+}
+
+/** One emoji of the code above its name in a cell [width] wide. Both shrink only when the cell is too narrow. */
+@Composable
+private fun DeviceLinkEmojiCell(
+    emoji: DeviceLinkEmojiFfi,
+    position: Int,
+    count: Int,
+    width: Dp,
+) {
+    val spoken = stringResource(R.string.link_device_emoji_position, position, count, emoji.description)
+    val emojiStyle = MaterialTheme.typography.displaySmall
+    val emojiSize = with(LocalDensity.current) { minOf(emojiStyle.fontSize.toDp(), width * EMOJI_SHARE).toSp() }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.width(width).clearAndSetSemantics { contentDescription = spoken },
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(emoji.emoji, style = emojiStyle.copy(fontSize = emojiSize, lineHeight = emojiSize * EMOJI_LINE))
+            val nameStyle = MaterialTheme.typography.labelMedium
+            Text(
+                text = emoji.description,
+                style = nameStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                autoSize = TextAutoSize.StepBased(minFontSize = MIN_NAME_SIZE, maxFontSize = nameStyle.fontSize),
+            )
         }
     }
 }
