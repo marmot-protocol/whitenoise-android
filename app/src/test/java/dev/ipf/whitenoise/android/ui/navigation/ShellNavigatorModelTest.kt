@@ -51,6 +51,7 @@ class ShellNavigatorModelTest {
         shapeFailure(after)
             ?: boundaryFailure(before, event, after)
             ?: conjuredConversationFailure(before, event, after)
+            ?: chatDetailsOwnerFailure(before, event, after)
             ?: savedSectionFailure(after)
 
     /**
@@ -119,6 +120,27 @@ class ShellNavigatorModelTest {
             previous.accountRef != next.accountRef -> "${event.eventName} moved the conversation to another account"
             else -> null
         }
+    }
+
+    /**
+     * A chat-details screen belongs to the conversation it was opened above: one is left on the stack only while the
+     * conversation root keeps the same account and group across the event. Two accounts can share a group, so the
+     * group alone does not name the conversation.
+     */
+    private fun chatDetailsOwnerFailure(
+        before: List<ShellRoute>,
+        event: ShellNavEvent,
+        after: List<ShellRoute>,
+    ): String? {
+        if (conversationSegment(after).none { it is ShellRoute.ChatDetailsScreen }) return null
+        val previous = conversationRoot(before)
+        val next = conversationRoot(after)
+        val sameChat =
+            previous != null &&
+                next != null &&
+                previous.accountRef == next.accountRef &&
+                previous.groupIdHex.equals(next.groupIdHex, ignoreCase = true)
+        return if (sameChat) null else "${event.eventName} kept a chat-details screen above $next, it was over $previous"
     }
 
     /**

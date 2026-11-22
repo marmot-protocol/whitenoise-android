@@ -308,6 +308,31 @@ class ShellRouteReducerTest {
         assertEquals(CHATS_ROOT, reduce(stack, ShellNavEvent.OwnerLost(RUNTIME)))
     }
 
+    /**
+     * The same group under another account is another conversation: every event that opens it drops the screen the
+     * first account's conversation had open, so nothing of one account's details sits above the other's chat.
+     */
+    @Test
+    fun theSameGroupUnderAnotherAccountDropsTheChatDetailsScreen() {
+        val relays = listOf(ShellRoute.Chats, conversationA, ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays))
+        val opens =
+            listOf(
+                ShellNavEvent.OpenConversation(sharedGroupOnB),
+                ShellNavEvent.JumpToConversation(sharedGroupOnB),
+                ShellNavEvent.CommitNotificationRoute(sharedGroupOnB),
+                ShellNavEvent.RestoreSavedConversation(sharedGroupOnB),
+            )
+        opens.forEach { event ->
+            assertEquals(event.eventName, listOf(ShellRoute.Chats, sharedGroupOnB), reduce(relays, event))
+        }
+        // The same account and group keeps it, so the drop above is the account's doing alone.
+        val sameChat = conversationA.copy(open = ConversationOpenContext(notificationOpenRequestId = 3L))
+        assertEquals(
+            listOf(ShellRoute.Chats, sameChat, relays.last()),
+            reduce(relays, ShellNavEvent.CommitNotificationRoute(sameChat)),
+        )
+    }
+
     /** Applies one event, so each test reads as a sequence of intents. */
     private fun reduce(
         stack: List<ShellRoute>,
@@ -332,5 +357,8 @@ class ShellRouteReducerTest {
         const val EARLY_OPEN = 7L
         val conversationA = ShellRoute.Conversation(ACCOUNT_A, GROUP_ONE, ConversationOpenContext())
         val conversationB = ShellRoute.Conversation(ACCOUNT_A, GROUP_TWO, ConversationOpenContext())
+
+        /** Account B's conversation in the group [conversationA] shows for account A. */
+        val sharedGroupOnB = ShellRoute.Conversation(ACCOUNT_B, GROUP_ONE, ConversationOpenContext())
     }
 }
