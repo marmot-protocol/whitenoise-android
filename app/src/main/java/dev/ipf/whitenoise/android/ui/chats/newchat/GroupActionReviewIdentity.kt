@@ -211,8 +211,7 @@ internal fun GroupReviewCopyRow(
             .clickable(onClickLabel = copyLabel, role = Role.Button) {
                 clipboard.setText(AnnotatedString(npub))
                 expanded = true
-            }
-            .semantics(mergeDescendants = true) { contentDescription = description },
+            }.semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = horizontalArrangement,
     ) { content(expanded) }
