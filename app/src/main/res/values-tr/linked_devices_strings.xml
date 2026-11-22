@@ -36,9 +36,9 @@
     <string name="error_account_unlinked">Bu cihazın bu hesapla bağlantısı kaldırıldı, bu yüzden burada oturum açamaz. Hesabı bu cihazdan kaldırın, ardından bu cihazı yeniden bağlamak için tekrar oturum açın.</string>
     <string name="wipe_report_left_to_other_devices">Diğer cihazlarınızın tamamlayacağı sohbetler: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Diğer cihazlarınızdan bu cihazın oturumunu kapatmayı tamamlamaları istenemedi. Birinden kaldırana kadar bu cihazı listelemeye devam edebilirler.</string>
-    <string name="history_imported_from_device">%1$s cihazından içe aktarıldı</string>
-    <string name="history_imported_from_another_device">Başka bir cihazdan içe aktarıldı</string>
-    <string name="history_restored_from_backup">Yedekten geri yüklendi</string>
+    <string name="history_imported_from_device">Yukarıdaki mesajlar %1$s cihazından geldi</string>
+    <string name="history_imported_from_another_device">Yukarıdaki mesajlar başka bir cihazdan geldi</string>
+    <string name="history_restored_from_backup">Yukarıdaki mesajlar yedekten geri yüklendi</string>
     <string name="history_receiving">Önceki mesajlar başka bir cihazınızdan alınıyor…</string>
     <string name="history_retrying">Önceki mesajlar yüklenemedi. Otomatik olarak tekrar deneyeceğiz.</string>
     <string name="link_device_this_title">Bu cihazı bağla</string>

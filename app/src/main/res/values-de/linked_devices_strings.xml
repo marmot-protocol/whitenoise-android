@@ -36,9 +36,9 @@
     <string name="error_account_unlinked">Dieses Gerät wurde von diesem Konto getrennt und kann sich hier nicht anmelden. Entferne das Konto von diesem Gerät und melde dich dann erneut an, um dieses Gerät neu zu verknüpfen.</string>
     <string name="wipe_report_left_to_other_devices">Chats, die deine anderen Geräte abschließen: %1$d</string>
     <string name="wipe_report_other_devices_not_reached">Deine anderen Geräte konnten nicht gebeten werden, die Abmeldung dieses Geräts abzuschließen. Sie führen dieses Gerät möglicherweise weiter auf, bis du es von einem von ihnen entfernst.</string>
-    <string name="history_imported_from_device">Importiert von %1$s</string>
-    <string name="history_imported_from_another_device">Von einem anderen Gerät importiert</string>
-    <string name="history_restored_from_backup">Aus Backup wiederhergestellt</string>
+    <string name="history_imported_from_device">Die Nachrichten darüber stammen von %1$s</string>
+    <string name="history_imported_from_another_device">Die Nachrichten darüber stammen von einem anderen Gerät</string>
+    <string name="history_restored_from_backup">Die Nachrichten darüber wurden aus einem Backup wiederhergestellt</string>
     <string name="history_receiving">Frühere Nachrichten werden von einem anderen deiner Geräte empfangen…</string>
     <string name="history_retrying">Frühere Nachrichten konnten nicht geladen werden. Wir versuchen es automatisch erneut.</string>
     <string name="link_device_this_title">Dieses Gerät verknüpfen</string>
