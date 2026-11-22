@@ -172,7 +172,12 @@ class DirectMessageAdminFfiIntegrationTest {
             seconds: ULong,
         ) {
             val snapshot = native.groupConversationSnapshot(account.label, group)
-            assertEquals(admins, snapshot.details.members.filter { it.isAdmin }.map { it.memberIdHex }.toSet())
+            val actualAdmins =
+                snapshot.details.members
+                    .filter { it.isAdmin }
+                    .map { it.memberIdHex }
+                    .toSet()
+            assertEquals(admins, actualAdmins)
             assertEquals(account.accountIdHex in admins, snapshot.managementState.isSelfAdmin)
             assertEquals(seconds, snapshot.details.group.disappearingMessageSecs)
         }
