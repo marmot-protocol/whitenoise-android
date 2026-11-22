@@ -261,4 +261,3 @@ Use **AI Agents** to connect an assistant that runs on a computer or server you 
 - **Quarantined groups** lists groups that couldn't be loaded safely. **Retry recovery** keeps your history and leaves your group membership unchanged.
 - **Streaming debug** shows agent-stream and MLS signaling events inside conversations.
 - **Diagnostics** shows relay health and performance logs. See [Android diagnostics](/docs/settings/android/diagnostics).
-

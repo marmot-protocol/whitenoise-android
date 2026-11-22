@@ -6,7 +6,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -21,6 +22,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,10 +37,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
-import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 private const val GUIDE_DIRECTORY = "user-guides"
 private const val DOCS_URL = "https://www.whitenoise.chat/docs/"
@@ -51,7 +53,7 @@ private fun AssetManager.readUserGuides(): List<UserGuide> =
         UserGuide(file.removeSuffix(".md"), contents.lineSequence().first().removePrefix("# "), contents.substringAfter('\n'))
     }.sortedBy { it.title }
 
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 internal fun DocumentationScreen(
     appState: WhiteNoiseAppState,
@@ -73,13 +75,19 @@ internal fun DocumentationScreen(
             }
     }
     val selected = guides?.firstOrNull { it.id == selectedId }
-    val back = { if (selectedId == null) onBack() else selectedId = null }
+    val back: () -> Unit = {
+        if (selectedId == null) onBack() else selectedId = null
+    }
     BackHandler(enabled = selectedId != null, onBack = back)
     SettingsScaffold(title = selected?.title ?: stringResource(R.string.user_documentation), onBack = back) {
         if (selected != null) {
             GuideArticle(appState, selected, onOpenShare) { url ->
-                val linkedId = url.takeIf { it.startsWith(DOCS_URL) }
-                    ?.removePrefix(DOCS_URL)?.substringBefore('#')?.trimEnd('/')?.replace('/', '-')
+                val linkedId =
+                    url.takeIf { it.startsWith(DOCS_URL) }
+                        ?.removePrefix(DOCS_URL)
+                        ?.substringBefore('#')
+                        ?.trimEnd('/')
+                        ?.replace('/', '-')
                 val target = guides?.firstOrNull { it.id == linkedId }
                 if (target != null) selectedId = target.id
                 target != null
@@ -101,8 +109,11 @@ internal fun DocumentationScreen(
                 } else if (results.isEmpty()) {
                     item {
                         Text(
-                            stringResource(if (guides.isNullOrEmpty()) R.string.documentation_unavailable else R.string.no_results),
-                            Modifier.padding(16.dp),
+                            text =
+                                stringResource(
+                                    if (guides.isNullOrEmpty()) R.string.documentation_unavailable else R.string.no_results,
+                                ),
+                            modifier = Modifier.padding(16.dp),
                         )
                     }
                 } else {
@@ -130,7 +141,7 @@ private fun GuideArticle(
     LaunchedEffect(appState, guide) {
         document = appState.parseMarkdownOrEmpty(guide.body.replace("](/docs/", "]($DOCS_URL"))
     }
-    androidx.compose.runtime.key(guide.id) {
+    key(guide.id) {
         Column(
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -148,7 +159,7 @@ private fun GuideArticle(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Suppress("FunctionNaming")
 @Composable
 internal fun LearnWhiteNoiseScreen(onBack: () -> Unit, onOpenDocumentation: () -> Unit) {
@@ -183,7 +194,7 @@ internal fun LearnWhiteNoiseScreen(onBack: () -> Unit, onOpenDocumentation: () -
                 }
             }
             Text(stringResource(R.string.learn_page_number, pager.currentPage + 1, titles.size))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(
                     enabled = pager.currentPage > 0,
                     onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) } },
