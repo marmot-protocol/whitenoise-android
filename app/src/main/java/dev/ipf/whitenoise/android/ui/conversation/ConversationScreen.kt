@@ -562,10 +562,6 @@ internal fun ConversationScreen(
     }
     notificationReadThroughEffect()
     val collapseLongMessages = appState.collapseLongMessagesInGroup(chat.group.groupIdHex)
-    ConversationStreamingDebugRefreshEffect(
-        controller = controller,
-        streamingDebugEnabled = appState.streamingDebugEnabled,
-    )
     // Keyed on the controller as well as chat.id so the same shared group under
     // another account cannot inherit this account's details route.
     var showDetails by presentationState.showDetails
@@ -1487,8 +1483,8 @@ internal fun ConversationScreen(
         }
     // Unread messages (after the read anchor) that mention the active account,
     // oldest first — drives the in-conversation jump-to-mention chip. Mirrors
-    // countUnreadIncoming's anchor logic; kind-9 only, matching the engine's
-    // mention classification, reusing the #414 per-message detection.
+    // countUnreadIncoming's anchor logic; kind-9 rows and thread messages, matching
+    // the engine's mention classification, reusing the #414 per-message detection.
     val selfAccountIdHex = conversationSelfAccountIdHex
     val mentionDetectionCache = remember(controller, chat.id, selfAccountIdHex) { MentionDetectionCache() }
     val unreadMentionMessageIds by remember(controller, chat.id, selfAccountIdHex, mentionDetectionCache) {
@@ -2714,7 +2710,7 @@ internal fun ConversationScreen(
 
     // In-chat search match set. Computed over the currently-loaded, rendered
     // (edit-filtered) timeline only — no relay fetch, no full-history preload.
-    // Reactions / deletes / group-system / agent-stream rows carry no
+    // Reactions / deletes / group-system rows carry no
     // user-typed body and are excluded by `MessageSearch.isSearchable`. As
     // older pages load, `renderedTimeline` grows and the match set expands
     // naturally. Keyed on `controller.timeline` (not just `renderedTimeline`'s

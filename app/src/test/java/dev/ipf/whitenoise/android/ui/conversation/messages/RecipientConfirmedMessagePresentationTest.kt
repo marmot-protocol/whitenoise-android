@@ -56,7 +56,7 @@ class RecipientConfirmedMessagePresentationTest {
     fun deletionStillTakesPrecedenceAfterPeerConfirmation() {
         val fixture = fixture(Shape.Text)
         val deleted = confirmed(requireNotNull(fixture.item.projected)).copy(deleted = true)
-        fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(deleted)))
+        fixture.controller.testApplyLiveTimelineChanges(listOf(upsert(deleted)))
         composeRule.setContent { SwipeTestBubbleHost(fixture.copy(item = fixture.controller.timeline.single())) }
 
         composeRule
@@ -75,7 +75,7 @@ class RecipientConfirmedMessagePresentationTest {
                 recipientConfirmed = false,
                 invalidationStatus = "LosingBranch",
             )
-        fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(invalidated)))
+        fixture.controller.testApplyLiveTimelineChanges(listOf(upsert(invalidated)))
         composeRule.setContent { SwipeTestBubbleHost(fixture.copy(item = fixture.controller.timeline.single())) }
 
         composeRule
@@ -96,7 +96,7 @@ class RecipientConfirmedMessagePresentationTest {
         assertWarningState(confirmed = false)
 
         composeRule.runOnIdle {
-            fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(confirmed(failed))))
+            fixture.controller.testApplyLiveTimelineChanges(listOf(upsert(confirmed(failed))))
         }
         assertWarningState(confirmed = true)
         composeRule.runOnIdle {
@@ -105,7 +105,7 @@ class RecipientConfirmedMessagePresentationTest {
         }
 
         composeRule.runOnIdle {
-            fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(failed)))
+            fixture.controller.testApplyLiveTimelineChanges(listOf(upsert(failed)))
         }
         assertWarningState(confirmed = false)
     }

@@ -102,15 +102,10 @@ internal fun <T> newestMatchingController(
 ): T? = controllers.lastOrNull(matches)
 
 data class ConversationControllerCopy(
-    val waitingForStream: String = "Waiting for stream...",
-    val streamFailedFormat: String = "Stream failed: %1\$s",
-    val tryAgain: String = "Try again.",
     val couldntAddMemberDuplicateFormat: String =
         "Couldn't add %1\$s. They're already a member, or their signing key conflicts with an existing member.",
     val groupRosterChanged: String = "Group membership changed. Review the group and try again.",
 ) {
-    fun streamFailed(): String = String.format(streamFailedFormat, tryAgain)
-
     fun couldntAddMemberDuplicate(name: String): String = String.format(couldntAddMemberDuplicateFormat, name)
 }
 
@@ -131,14 +126,6 @@ internal fun duplicateSignatureKeyDisplayName(
     refs: List<String>,
     displayName: (String) -> String,
 ): String = refs.firstOrNull()?.let(displayName).orEmpty()
-
-internal fun agentStreamFailureText(
-    throwable: Throwable,
-    copy: ConversationControllerCopy,
-): String {
-    if (throwable is CancellationException) throw throwable
-    return copy.streamFailed()
-}
 
 // Cap on how many subscription windows one coalesced batch can absorb. A
 // runaway producer shouldn't be able to wedge the UI behind an unbounded
@@ -785,7 +772,6 @@ class ConversationController(
     internal val timelineItemsById = linkedMapOf<String, TimelineMessage>()
     internal val timelineOrder = mutableListOf<String>()
     internal val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
-    internal val durableStreamDisplayParentByMessageId = mutableMapOf<String, String>()
     internal val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
     internal val optimisticSendPhases =
         appState.optimisticSendPhases(conversationAccountRef, initialGroup.groupIdHex)
@@ -894,11 +880,11 @@ class ConversationController(
     internal val localTimelineTimestampOverrides =
         appState.timelineTimestampOverrides(conversationAccountRef, initialGroup.groupIdHex)
 
-    // Subset of the preserves above that came from an optimistic *send* handoff
-    // (not a stream-final live preview). These are transient and get released
-    // once their optimistic bubble is gone, so a stale one can't pin a confirmed
-    // row above a newer neighbour (#1578). Ownership lives in AppState alongside
-    // the overrides so a replacement controller can finish the cleanup.
+    // The optimistic *send* handoffs that wrote the overrides above.
+    // These are transient and get released once their optimistic bubble is gone,
+    // so a stale one can't pin a confirmed row above a newer neighbour (#1578).
+    // Ownership lives in AppState alongside the overrides so a replacement
+    // controller can finish the cleanup.
     internal val optimisticSendPositionPreserves =
         appState.optimisticSendPositionPreserves(conversationAccountRef, initialGroup.groupIdHex)
     internal val retentionAtSendByMessageId =
@@ -909,8 +895,6 @@ class ConversationController(
     // replacement so the eventual projection settles the exact bubble.
     internal val acceptedPendingTextOptimisticIds =
         appState.acceptedPendingTextOptimisticIds(conversationAccountRef, initialGroup.groupIdHex)
-    internal val preservedTimelinePositionOverrideIds = mutableSetOf<String>()
-    internal val durableStreamPositionOverrideIds = mutableSetOf<String>()
 
     // Holding pen for media projection echoes that arrive while their
     // matching bridge is still mid-`sendMediaAttachments`. Shared via
@@ -988,25 +972,8 @@ class ConversationController(
     internal var inboundVisibleHostGeneration by mutableLongStateOf(0L)
         private set
     private val outboundVisibleHostAttempts = HostPerformanceAttemptRegistry()
-    internal val activeStreamIds = mutableSetOf<String>()
     internal val foregroundSweepScheduleSignals = Channel<Unit>(Channel.CONFLATED)
     internal var lastForegroundSweepStartedAtMillis = 0L
-
-    // Transient streaming-debug rows keyed by their synthetic timeline id.
-    // Lifecycle-scoped UI state for the live agent-stream watch — NOT a
-    // persistent cache of protocol data (AGENTS.md): they exist only while the
-    // developer toggle is on, are never written to the White Noise store, and
-    // are dropped wholesale when the toggle turns off. Bounded so a long-lived
-    // agent-heavy conversation can't grow them without limit.
-    internal val streamDebugTimelineItems = linkedMapOf<String, TimelineMessage>()
-
-    // staleness-exempt: ordered synthetic debug-row identifier, not a latest-wins guard.
-    internal var streamDebugEventSequence: ULong = 0uL
-
-    // Bounded LRU set: tombstones are capped so an agent-heavy conversation
-    // kept open for a long time can't grow memory or per-batch filter cost
-    // without bound. See #200.
-    internal val removedStreamIds = BoundedStreamTombstones()
     internal var hasLoadedOlderPages = false
 
     // Snapshot of message ids in the deliberately-loaded history window after the
@@ -1254,8 +1221,8 @@ class ConversationController(
 
     /**
      * The retained timeline row for the raw message id [messageId]. The row map is keyed by item id
-     * (`msg:<hex>`, or `stream:<id>` for stream starts), so the id is resolved the way [removeProjectedRecord]
-     * resolves it. Null when the bounded window no longer holds the row.
+     * (`msg:<hex>`), so the id is resolved the way [removeProjectedRecord] resolves it. Null when the
+     * bounded window no longer holds the row.
      */
     internal fun retainedTimelineItem(messageId: String): TimelineMessage? {
         val itemId = timelineRecords[messageId]?.let(::projectedItemId) ?: "msg:$messageId"
@@ -1500,13 +1467,10 @@ class ConversationController(
      * Cancel controller-owned scopes that outlive a single [start] call. The
      * conversation screen calls this once when it disposes the controller.
      *
-     * [inviteStreamScope] launches post-accept warm-up and agent-stream watchers
-     * from [acceptInvite], invoked from a separate mutation scope that can fire
-     * after [start]'s loops have ended while the invite screen is still composed.
-     * Cancelling it in [start]'s teardown left a dead scope, so the accepted
-     * invite's agent-stream watchers never launched yet were marked active in
-     * [activeStreamIds] and never retried — the streaming previews stayed stuck
-     * (#279).
+     * [inviteStreamScope] launches post-accept warm-up from [acceptInvite],
+     * invoked from a separate mutation scope that can fire after [start]'s loops
+     * have ended while the invite screen is still composed, so it must outlive
+     * [start]'s teardown (#279).
      */
     fun onCleared() {
         cancelMessageEdit()
@@ -1596,11 +1560,8 @@ class ConversationController(
         }
     }
 
-    /** Consumes authoritative MDK windows and publishes only the newest coalesced window. */
-    internal suspend fun CoroutineScope.runTimelineSubscriptionPipeline(
-        account: String,
-        timelineStream: ConversationTimelineSubscriptionHandle,
-    ) {
+    /** Consumes authoritative MDK windows from [feed] and publishes only the newest coalesced window. */
+    internal suspend fun CoroutineScope.runTimelineSubscriptionPipeline(feed: ConversationTimelineSubscriptionHandle) {
         val timelineWindows = Channel<RecoveryStampedTimelineWindow>(capacity = Channel.BUFFERED)
         val handoff = ConversationTimelineHandoff()
         timelineSession.installHandoff(handoff)
@@ -1615,7 +1576,7 @@ class ConversationController(
                         val received =
                             runCatchingCancellable {
                                 withContext(Dispatchers.IO) {
-                                    timelineStream.nextWindow()?.let { page -> page to handoff.received() }
+                                    feed.nextWindow()?.let { page -> page to handoff.received() }
                                 }
                             }.getOrNull() ?: break
                         timelineWindows.send(
@@ -1692,20 +1653,19 @@ class ConversationController(
                 var batchCommitted = false
                 // Cards are read before the apply timing starts, so TIMELINE_APPLY stays the apply alone.
                 val newestPage = warmLaterPageEventCards(newest.page)
-                val streamIdsLaunched =
-                    appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
-                        applyTimelinePage(
-                            newestPage,
-                            replaceWindow = false,
-                            updatePagination = true,
-                            reconcileNewExtendedRecords = true,
-                            onCommitted = {
-                                batchCommitted = true
-                                handoff.settled(batch.map { it.foregroundHandoff }, applied = true)
-                            },
-                        )
-                    }
-                publishReadyTimelineSubscription(timelineStream)
+                appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
+                    applyTimelinePage(
+                        newestPage,
+                        replaceWindow = false,
+                        updatePagination = true,
+                        reconcileNewExtendedRecords = true,
+                        onCommitted = {
+                            batchCommitted = true
+                            handoff.settled(batch.map { it.foregroundHandoff }, applied = true)
+                        },
+                    )
+                }
+                publishReadyTimelineSubscription(feed)
                 // Older recovery is revision-gated inside the commit: a queued command echo must
                 // not release its own failed attempt. Preserve forward prefetch's arrival budget.
                 automaticPaging.newer.reset()
@@ -1713,11 +1673,6 @@ class ConversationController(
                 if (!batchCommitted) handoff.settled(batch.map { it.foregroundHandoff }, applied = false)
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
-                streamIdsLaunched.forEach { streamId ->
-                    if (activeStreamIds.add(streamId)) {
-                        launch { watchAgentTextStream(account, streamId) }
-                    }
-                }
             }
         } finally {
             timelineSession.retireHandoff(handoff)
@@ -3081,13 +3036,7 @@ class ConversationController(
                     steps =
                         listOf(
                             "members" to { refreshMembers() },
-                            "timeline" to {
-                                refreshCurrentTimeline(account).forEach { streamId ->
-                                    if (activeStreamIds.add(streamId)) {
-                                        inviteStreamScope.launch { watchAgentTextStream(account, streamId) }
-                                    }
-                                }
-                            },
+                            "timeline" to { refreshCurrentTimeline(account) },
                             "read-state" to { initializeReadState(account) },
                         ),
                     onFailure = { step, throwable ->
@@ -3563,14 +3512,14 @@ class ConversationController(
         }
     }
 
+    /** Test seam: refreshes the whole window through the production path with [pageLoader]'s page. */
     internal suspend fun testRefreshCurrentTimeline(
         account: String,
         pageLoader: suspend () -> TimelinePageFfi,
-    ): List<String> = refreshCurrentTimeline(account, pageLoader)
+    ) = refreshCurrentTimeline(account, pageLoader)
 
-    internal fun testApplyLiveTimelineChangesAndRegisterStreams(changes: List<TimelineMessageChangeFfi>) {
-        applyTimelineChanges(changes).forEach(activeStreamIds::add)
-    }
+    /** Test seam: applies live subscription [changes] through the production path. */
+    internal fun testApplyLiveTimelineChanges(changes: List<TimelineMessageChangeFfi>) = applyTimelineChanges(changes)
 
     /**
      * Resolved reply target as (sender pubkey, display body). Returns the raw
@@ -3629,7 +3578,7 @@ class ConversationController(
         updatePagination: Boolean,
         reconcileNewExtendedRecords: Boolean = false,
         onCommitted: (() -> Unit)? = null,
-    ): List<String> {
+    ) {
         val preparationGeneration = timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
         // A newer installed window keeps the Markdown parsed for [page]'s cards before this call (#2238).
@@ -3646,7 +3595,7 @@ class ConversationController(
                 reconcileNewExtendedRecords = reconcileNewExtendedRecords,
             )
         val prepared = preparation.value
-        if (!timelineWindowGeneration.isCurrent(preparationGeneration)) return emptyList()
+        if (!timelineWindowGeneration.isCurrent(preparationGeneration)) return
         assertMainThread { "applyTimelinePage commit" }
         val commitStartedAt = windowApplyNanoTime()
         val commitPlan =
@@ -3659,7 +3608,6 @@ class ConversationController(
         commitPlan.departedIds.forEach(::removeProjectedRecord)
         if (prepared.mode == WindowApplyMode.REPLACE) trimStateForWindowReplacement()
         installAuthoritativeOrder(prepared)
-        val streamIds = mutableListOf<String>()
         val appliedRecords = ArrayList<TimelineMessageRecordFfi>(prepared.rows.size)
         prepared.rows.forEach { row ->
             val record = row.record
@@ -3667,25 +3615,19 @@ class ConversationController(
             appliedRecords.add(record)
             val reconcilesOptimistic =
                 row.reconcilesOptimistic || (reconcileNewExtendedRecords && record.messageIdHex !in timelineRecords)
-            val actionRecord =
-                if (record.messageIdHex in commitPlan.projectIds) {
-                    upsertProjectedRecord(
-                        record,
-                        reconcileOptimistic = reconcilesOptimistic,
-                        allowDelayedProjection = reconcilesOptimistic,
-                        preparedAction = row.actionRecord,
-                    )
-                } else {
-                    row.actionRecord
-                }
-            actionRecord.takeIf(MessageProjector::isStreamStart)?.let(MessageProjector::streamId)?.let(streamIds::add)
+            if (record.messageIdHex in commitPlan.projectIds) {
+                upsertProjectedRecord(
+                    record,
+                    reconcileOptimistic = reconcilesOptimistic,
+                    allowDelayedProjection = reconcilesOptimistic,
+                    preparedAction = row.actionRecord,
+                )
+            }
             if (record.deleted) {
                 deletedMessageIds = deletedMessageIds - record.messageIdHex
             }
-            retireFinishedStream(actionRecord)
         }
         appState.requestProfiles(prepared.profileIds)
-        applyDurableStreamPositions(durableStreamDisplayPositions(timelineRecords.values.toList()))
         if (updatePagination) {
             hasMoreBefore = applied.hasMoreBefore
             hasMoreAfter = applied.hasMoreAfter
@@ -3742,12 +3684,10 @@ class ConversationController(
             markInitialPresentationReady = preparingInitialPresentation,
         )
         recordPagePublicationUnlessHeld()
-        val streamIdsToLaunch = windowStreamIdsToLaunch(streamIds, removedStreamIds::contains)
         onWindowApplyMeasured(
             preparation.performanceSample(prepared, commitPlan.projectIds.size, commitStartedAt, windowApplyNanoTime()),
         )
         onCommitted?.invoke()
-        return streamIdsToLaunch
     }
 
     /** Reads cards through the conversation-owned presentation pipeline before committing later pages. */
@@ -3824,13 +3764,10 @@ class ConversationController(
         val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
         timelineRecords.remove(messageIdHex)
         authoritativeTimelineOrderByMessageId.remove(messageIdHex)
-        durableStreamDisplayParentByMessageId.remove(messageIdHex)
         projectedMessageIds.remove(messageIdHex)
         localTimelineOrderOverrides.remove(messageIdHex)
         localTimelineTimestampOverrides.remove(messageIdHex)
-        preservedTimelinePositionOverrideIds.remove(messageIdHex)
         optimisticSendPositionPreserves.remove(messageIdHex)
-        durableStreamPositionOverrideIds.remove(messageIdHex)
         retentionAtSendByMessageId.remove(messageIdHex)
         readAnchoredAtSeconds.remove(messageIdHex)
         deletedMessageIds = deletedMessageIds - messageIdHex
@@ -3898,45 +3835,11 @@ class ConversationController(
     /** Drops entries for messages that left the loaded window and have no in-flight optimistic record. */
     internal fun MutableMap<String, *>.retainTimelineWindow() = retainWindowMessageKeys(this, timelineRecords.keys, optimisticMessages.values)
 
-    /**
-     * Re-publish the timeline after the streaming-debug toggle may have changed.
-     * Clears the transient debug rows when the effective toggle is off so they
-     * don't linger once the developer turns it back off. Called from the
-     * conversation screen on the `streamingDebugEnabled` transition. When on,
-     * this is a plain republish.
-     */
-    fun refreshStreamingDebugPresentation() {
-        if (!appState.streamingDebugEnabled) {
-            if (streamDebugTimelineItems.isEmpty()) return
-            streamDebugTimelineItems.clear()
-            streamDebugEventSequence = 0uL
-        }
-        publishTimelineFromIndexes()
-    }
-
     init {
         if (startOnConstruction) start()
     }
 
     companion object {
-        // Streaming-debug rows. Synthetic timeline ids carry this prefix so the
-        // conversation can render them as StreamDebugEventRow and so they
-        // sort/key distinctly from real messages.
-        internal const val STREAM_DEBUG_ID_PREFIX = "dbg:stream:"
-
-        // Synthetic `direction` for debug rows: anything other than "received"
-        // keeps them out of unread counts (firstUnreadReceivedIndex /
-        // countUnreadIncoming only tally "received" rows).
-        internal const val STREAM_DEBUG_DIRECTION = "debug"
-
-        // Sentinel kind for debug-row synthetic records. ULong.MAX_VALUE is not a
-        // real Nostr kind; these records are identified by their id prefix and
-        // never round-trip to the engine, so the value is display-only.
-        internal const val STREAM_DEBUG_KIND: ULong = ULong.MAX_VALUE
-
-        // Cap retained transient debug rows while the toggle stays on, oldest-first.
-        internal const val MAX_STREAM_DEBUG_ROWS = 200
-
         /**
          * 32 MiB cap on retained compressed bytes for in-flight/failed
          * uploads. A few failed images stay retryable without letting an

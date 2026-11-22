@@ -43,6 +43,7 @@ import org.robolectric.annotation.GraphicsMode
 class ConversationPendingMembershipIntegrationTest {
     @get:Rule val rule = createComposeRule()
 
+    /** A held removal stays pending above the composer after leaving details, and a remote event cannot settle it. */
     @Test
     fun returningFromDetailsShowsHeldRemovalAndRemoteEventCannotSettleIt() =
         runBlocking {
@@ -75,8 +76,8 @@ class ConversationPendingMembershipIntegrationTest {
                         ),
                     )
                 rule.runOnIdle {
-                    controller.testApplyLiveTimelineChangesAndRegisterStreams(changes)
-                    controller.testApplyLiveTimelineChangesAndRegisterStreams(changes)
+                    controller.testApplyLiveTimelineChanges(changes)
+                    controller.testApplyLiveTimelineChanges(changes)
                 }
                 assertEquals(identity, controller.pendingMembershipActivity?.id)
                 assertEquals(1, controller.timeline.count { it.record.messageIdHex == REMOTE_ROW_ID })
@@ -136,6 +137,7 @@ class ConversationPendingMembershipIntegrationTest {
         assertTrue("The pending row must remain inside the screen", pending.top.value >= 0f)
     }
 
+    /** History pages and snapshot refreshes record no membership latency; each new live event records it once. */
     @Test
     fun historyAndRefreshDoNotEmitLiveMembershipLatency() =
         runBlocking {
@@ -146,7 +148,7 @@ class ConversationPendingMembershipIntegrationTest {
                 assertEquals(0, membershipArrivalCount())
                 controller.applyTimelinePage(timelinePage(remoteEvent()), replaceWindow = true, updatePagination = true)
                 assertEquals(0, membershipArrivalCount())
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                controller.testApplyLiveTimelineChanges(
                     listOf(
                         TimelineMessageChangeFfi.Upsert(
                             TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
@@ -155,7 +157,7 @@ class ConversationPendingMembershipIntegrationTest {
                     ),
                 )
                 assertEquals(0, membershipArrivalCount())
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                controller.testApplyLiveTimelineChanges(
                     listOf(
                         TimelineMessageChangeFfi.Upsert(
                             TimelineUpdateTriggerFfi.GROUP_SYSTEM,
@@ -166,7 +168,7 @@ class ConversationPendingMembershipIntegrationTest {
                     ),
                 )
                 assertEquals(1, membershipArrivalCount())
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                controller.testApplyLiveTimelineChanges(
                     listOf(
                         TimelineMessageChangeFfi.Upsert(
                             TimelineUpdateTriggerFfi.GROUP_SYSTEM,
@@ -177,7 +179,7 @@ class ConversationPendingMembershipIntegrationTest {
                     ),
                 )
                 assertEquals(1, membershipArrivalCount())
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                controller.testApplyLiveTimelineChanges(
                     listOf(
                         TimelineMessageChangeFfi.Upsert(
                             TimelineUpdateTriggerFfi.NEW_MESSAGE,

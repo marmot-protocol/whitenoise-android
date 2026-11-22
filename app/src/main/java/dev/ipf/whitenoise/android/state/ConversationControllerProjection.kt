@@ -62,7 +62,6 @@ internal fun ConversationController.upsertProjectedRecord(
     record: TimelineMessageRecordFfi,
     reconcileOptimistic: Boolean = false,
     allowDelayedProjection: Boolean = false,
-    displayedProjectedStreamItemIds: Set<String> = emptySet(),
     preparedAction: AppMessageRecordFfi? = null,
 ): AppMessageRecordFfi {
     val reconcilesSend = reconcileOptimistic || record.recipientConfirmed
@@ -173,11 +172,6 @@ internal fun ConversationController.upsertProjectedRecord(
     timelineRecords[record.messageIdHex] = record
     projectedMessageIds.add(record.messageIdHex)
     preserveOptimisticDisplayPosition(record.messageIdHex, record.messageIdHex)
-    preserveStreamFinalDisplayPosition(
-        record.messageIdHex,
-        actionRecord,
-        displayedProjectedStreamItemIds,
-    )
     // A peer receipt proves delivery of this native row, not ownership of a same-content optimistic send.
     val reconciledOptimisticId =
         acceptedPendingOptimisticId
@@ -261,9 +255,6 @@ internal fun ConversationController.preserveOptimisticDisplayPosition(
 ) {
     val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
     timelinePresentationIds[projectedId] = optimistic.presentationId
-    durableStreamPositionOverrideIds.remove(projectedId)
-    durableStreamDisplayParentByMessageId.remove(projectedId)
-    preservedTimelinePositionOverrideIds.add(projectedId)
     optimisticSendPositionPreserves.add(projectedId)
     localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
     localTimelineTimestampOverrides[projectedId] = optimistic.record.recordedAt
@@ -315,56 +306,6 @@ internal fun ConversationController.retentionAtSendForProjection(
     return snapshot
 }
 
-/** Rebuilds durable stream overrides and their immediate rendered-parent links. */
-internal fun ConversationController.applyDurableStreamPositions(positions: Map<String, StreamFinalDisplayPosition>) {
-    val staleIds = durableStreamPositionOverrideIds + durableStreamDisplayParentByMessageId.keys - positions.keys
-    staleIds.forEach(::clearDurableStreamPosition)
-    positions.forEach { (messageId, position) ->
-        // A live preview is the row the user is already reading. Its
-        // position wins for this controller session; the durable link is
-        // the reload/cold-projection fallback.
-        val parentId = position.afterMessageId ?: return@forEach
-        val parent = timelineRecords[parentId] ?: return@forEach
-        if (
-            messageId in preservedTimelinePositionOverrideIds ||
-            messageId in optimisticSendPositionPreserves
-        ) {
-            durableStreamDisplayParentByMessageId[messageId] = parentId
-            refreshProjectedTimelinePosition(messageId)
-            return@forEach
-        }
-        if (messageId !in timelineRecords) return@forEach
-        val parentRecordedAt = localTimelineTimestampOverrides[parentId] ?: parent.timelineAt
-        val effectivePosition =
-            resolvedDurableStreamDisplayPosition(
-                candidate = position,
-                parentRecordedAt = parentRecordedAt,
-                parentTimelineOrder = localTimelineOrderOverrides[parentId] ?: 0uL,
-            ) ?: run {
-                clearDurableStreamPosition(messageId)
-                return@forEach
-            }
-
-        durableStreamDisplayParentByMessageId[messageId] = parentId
-        localTimelineOrderOverrides[messageId] = effectivePosition.timelineOrder
-        localTimelineTimestampOverrides[messageId] = effectivePosition.recordedAt
-        durableStreamPositionOverrideIds.add(messageId)
-        refreshProjectedTimelinePosition(messageId)
-    }
-}
-
-/** Releases a durable override and any parent link used only for display ordering. */
-private fun ConversationController.clearDurableStreamPosition(messageId: String) {
-    val removedOverride = durableStreamPositionOverrideIds.remove(messageId)
-    val removedParent = durableStreamDisplayParentByMessageId.remove(messageId) != null
-    if (!removedOverride && !removedParent) return
-    if (removedOverride) {
-        localTimelineOrderOverrides.remove(messageId)
-        localTimelineTimestampOverrides.remove(messageId)
-    }
-    refreshProjectedTimelinePosition(messageId)
-}
-
 /** Reprojects one indexed row after a transient display position changes. */
 private fun ConversationController.refreshProjectedTimelinePosition(messageId: String) {
     val projected = timelineRecords[messageId] ?: return
@@ -402,7 +343,6 @@ private fun ConversationController.releaseOrphanedOptimisticSendPreserves(): Boo
     orphaned.forEach { id ->
         localTimelineOrderOverrides.remove(id)
         localTimelineTimestampOverrides.remove(id)
-        preservedTimelinePositionOverrideIds.remove(id)
         refreshProjectedTimelinePosition(id)
     }
     return orphaned.isNotEmpty()
@@ -454,29 +394,7 @@ private fun ConversationController.describeTimelineInversionRow(
         "receivedAt=${source.receivedAt} order=${row.timelineOrder} authoritative=${row.authoritativeOrder} " +
         "timestampOverride=${source.messageIdHex in localTimelineTimestampOverrides} " +
         "orderOverride=${source.messageIdHex in localTimelineOrderOverrides} " +
-        "durable=${source.messageIdHex in durableStreamPositionOverrideIds} " +
         "optimisticPreserve=${source.messageIdHex in optimisticSendPositionPreserves}"
-
-/** Keeps a durable stream final at the position of the preview it replaces. */
-private fun ConversationController.preserveStreamFinalDisplayPosition(
-    projectedId: String,
-    actionRecord: AppMessageRecordFfi,
-    displayedProjectedStreamItemIds: Set<String>,
-) {
-    val streamId = MessageProjector.streamId(actionRecord) ?: return
-    val itemId = "stream:$streamId"
-    val displayedStream =
-        optimisticMessages[itemId]
-            ?: timelineItemsById[itemId]?.takeIf { itemId in displayedProjectedStreamItemIds }
-    val position = streamFinalDisplayPosition(actionRecord, displayedStream) ?: return
-    durableStreamPositionOverrideIds.remove(projectedId)
-    preservedTimelinePositionOverrideIds.add(projectedId)
-    // A stream-final live preview holds its position for the whole session, so
-    // it is not an orphan-releasable optimistic-send preserve (#1578).
-    optimisticSendPositionPreserves.remove(projectedId)
-    localTimelineOrderOverrides[projectedId] = position.timelineOrder
-    localTimelineTimestampOverrides[projectedId] = position.recordedAt
-}
 
 internal fun ConversationController.suppressProjectedTimelineItems(messageIds: List<String>) {
     messageIds.forEach { messageIdHex ->
@@ -529,19 +447,13 @@ internal fun ConversationController.timelineMessageFromProjection(
     actionRecord: AppMessageRecordFfi = TimelineProjector.toAppMessageRecord(record),
     retentionAtSendSeconds: ULong? = null,
 ): TimelineMessage {
-    val streamId = MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
-    val displayRecord =
-        if (streamId != null) {
-            actionRecord.copy(plaintext = actionRecord.plaintext.ifBlank { copy.waitingForStream })
-        } else {
-            actionRecord
-        }.withRecordedAtOverride(localTimelineTimestampOverrides[record.messageIdHex])
+    val displayRecord = actionRecord.withRecordedAtOverride(localTimelineTimestampOverrides[record.messageIdHex])
     val mine = MessageProjector.isMine(actionRecord, conversationAccountIdHex)
     return TimelineMessage(
-        id = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}",
+        id = "msg:${record.messageIdHex}",
         record = displayRecord,
         fromOtherOwnDevice = mine && !actionRecord.isSentFromThisDevice(),
-        status = projectedMessageStatus(streaming = streamId != null, mine = mine, actionRecord, record),
+        status = projectedMessageStatus(mine = mine, actionRecord, record),
         projected = record,
         timelineOrder = localTimelineOrderOverrides[record.messageIdHex] ?: 0uL,
         authoritativeOrder =
@@ -550,17 +462,13 @@ internal fun ConversationController.timelineMessageFromProjection(
                     record.messageIdHex in localTimelineOrderOverrides ||
                         record.messageIdHex in localTimelineTimestampOverrides
                 },
-        displayAfterMessageIdHex = durableStreamDisplayParentByMessageId[record.messageIdHex],
         retentionAtSendSeconds = retentionAtSendSeconds.takeIf { actionRecord.retentionSeconds == null },
         presentationId = timelinePresentationIds[record.messageIdHex] ?: projectedItemId(record),
     )
 }
 
-internal fun ConversationController.projectedItemId(record: TimelineMessageRecordFfi): String {
-    val actionRecord = TimelineProjector.toAppMessageRecord(record)
-    val streamId = MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
-    return streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}"
-}
+/** The timeline item id under which [record]'s projected row is indexed. */
+internal fun ConversationController.projectedItemId(record: TimelineMessageRecordFfi) = "msg:${record.messageIdHex}"
 
 /** Adds an item to the membership index; publication performs display ordering. */
 internal fun ConversationController.insertTimelineItemId(itemId: String) {
@@ -692,7 +600,7 @@ internal fun ConversationController.publishTimelineFromIndexesInternal() {
         .forEach(optimisticEdits::remove)
     timeline =
         orderTimelineMessagesForDisplay(
-            (visible + streamDebugTimelineItems.values).map { message ->
+            visible.map { message ->
                 message.withOptimisticEditStatus(optimisticEdits[message.record.messageIdHex])
             },
         )

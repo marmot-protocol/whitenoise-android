@@ -2190,7 +2190,7 @@ internal fun MessageBubble(
                 //   fallbacks stay hidden because the attachment is already
                 //   visible in the same bubble.
                 // - Non-media: render displayedBody (covers reactions,
-                //   deletions, agent streams, plain text).
+                //   deletions, plain text).
                 val bodyTextToRender: String? =
                     visibleTranslation ?: messageBodyTextToRender(
                         displayedBody = displayedBody,

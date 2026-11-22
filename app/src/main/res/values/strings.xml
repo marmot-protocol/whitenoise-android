@@ -528,8 +528,6 @@
     <string name="message_invalidated_preview">Didn\'t reach the group</string>
     <string name="message_partial_visibility_warning">May not be visible to everyone</string>
     <string name="message_noncanonical_history_warning">Not confirmed in the group\'s current history</string>
-    <string name="agent_stream_started">Agent stream started</string>
-    <string name="stream_finished">Stream finished</string>
     <string name="media_attachment">Media attachment</string>
     <string name="generic_message">Message</string>
     <string name="giphy_media_preview">GIF via GIPHY</string>
@@ -570,8 +568,6 @@
     <string name="group_system_you_avatar_changed">You changed the group avatar</string>
     <string name="group_system_someone">Someone</string>
     <string name="group_system_fallback">Group updated</string>
-    <string name="waiting_for_stream">Waiting for stream...</string>
-    <string name="stream_failed_format">Stream failed: %1$s</string>
     <string name="copy_text">Copy text</string>
     <string name="select_text">Select text</string>
     <string name="open_emoji_picker">Open emoji picker</string>
@@ -805,7 +801,7 @@
     <string name="copy_performance_logs">Copy performance logs</string>
     <string name="copy_performance_logs_detail">Copies privacy-safe events from the current or last session.</string>
     <string name="streaming_debug" translatable="false">Streaming debug</string>
-    <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
+    <string name="streaming_debug_subtitle" translatable="false">Show MLS signaling and other hidden events inline in conversations</string>
     <string name="ai_agents">AI Agents</string>
     <string name="ai_agents_clipboard_disclosure">Tap your agent, copy its prompt, and paste it there. Only your public key is shared.</string>
     <string name="ai_agents_connectors_title">Connectors</string>
@@ -1508,7 +1504,6 @@
     <string name="message_status_sent">Sent</string>
     <string name="message_status_received">Received</string>
     <string name="message_status_failed">Failed</string>
-    <string name="message_status_streaming">Streaming</string>
     <string name="toast_couldnt_decode_image">Couldn\'t decode that image</string>
     <string name="toast_couldnt_prepare_image">Couldn\'t download or prepare that image.</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>

@@ -27181,7 +27181,6 @@ SPLdev/ipf/marmotkit/TimelineMessageRecordFfi;-><clinit>()V
 HSPLdev/ipf/marmotkit/TimelineMessageRecordFfi;-><init>(Ljava/lang/String;ZLdev/ipf/marmotkit/PollProjectionFfi;Ljava/lang/String;Ljava/lang/String;Lkotlin/ULong;Lkotlin/ULong;Lkotlin/ULong;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/ipf/marmotkit/MarkdownDocumentFfi;JLjava/util/List;JJLjava/lang/String;Ldev/ipf/marmotkit/TimelineReplyPreviewFfi;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/ipf/marmotkit/GroupSystemEventFfi;Ldev/ipf/marmotkit/TimelineReactionSummaryFfi;Ldev/ipf/marmotkit/TimelineEditSummaryFfi;ZLdev/ipf/marmotkit/DeletionSourceFfi;Ljava/lang/String;Ljava/lang/String;)V
 SPLdev/ipf/marmotkit/TimelineMessageRecordFfi;-><init>(Ljava/lang/String;ZLdev/ipf/marmotkit/PollProjectionFfi;Ljava/lang/String;Ljava/lang/String;Lkotlin/ULong;Lkotlin/ULong;Lkotlin/ULong;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/ipf/marmotkit/MarkdownDocumentFfi;JLjava/util/List;JJLjava/lang/String;Ldev/ipf/marmotkit/TimelineReplyPreviewFfi;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/ipf/marmotkit/GroupSystemEventFfi;Ldev/ipf/marmotkit/TimelineReactionSummaryFfi;Ldev/ipf/marmotkit/TimelineEditSummaryFfi;ZLdev/ipf/marmotkit/DeletionSourceFfi;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 SPLdev/ipf/marmotkit/TimelineMessageRecordFfi;->equals(Ljava/lang/Object;)Z
-SPLdev/ipf/marmotkit/TimelineMessageRecordFfi;->getAgentTextStreamJson()Ljava/lang/String;
 SPLdev/ipf/marmotkit/TimelineMessageRecordFfi;->getClientToken()Ljava/lang/String;
 SPLdev/ipf/marmotkit/TimelineMessageRecordFfi;->getContentTokens()Ldev/ipf/marmotkit/MarkdownDocumentFfi;
 SPLdev/ipf/marmotkit/TimelineMessageRecordFfi;->getDeleted()Z
@@ -28491,12 +28490,9 @@ SPLdev/ipf/whitenoise/android/core/MessageProjector;->isMine(Ldev/ipf/marmotkit/
 HSPLdev/ipf/whitenoise/android/core/MessageProjector;->isPendingMedia$app(Ldev/ipf/marmotkit/AppMessageRecordFfi;)Z
 SPLdev/ipf/whitenoise/android/core/MessageProjector;->isPollKind-VKZWuLQ(J)Z
 SPLdev/ipf/whitenoise/android/core/MessageProjector;->isReaction(Ldev/ipf/marmotkit/AppMessageRecordFfi;)Z
-SPLdev/ipf/whitenoise/android/core/MessageProjector;->isStreamFinal(Ldev/ipf/marmotkit/AppMessageRecordFfi;)Z
-SPLdev/ipf/whitenoise/android/core/MessageProjector;->isStreamStart(Ldev/ipf/marmotkit/AppMessageRecordFfi;)Z
 SPLdev/ipf/whitenoise/android/core/MessageProjector;->mediaCaption(Ldev/ipf/marmotkit/AppMessageRecordFfi;Ljava/lang/String;)Ljava/lang/String;
 SPLdev/ipf/whitenoise/android/core/MessageProjector;->rendersRawBodyPreview-VKZWuLQ(J)Z
 SPLdev/ipf/whitenoise/android/core/MessageProjector;->replyTargetMessageId(Ldev/ipf/marmotkit/AppMessageRecordFfi;)Ljava/lang/String;
-HSPLdev/ipf/whitenoise/android/core/MessageProjector;->streamId(Ldev/ipf/marmotkit/AppMessageRecordFfi;)Ljava/lang/String;
 HSPLdev/ipf/whitenoise/android/core/MessageProjector;->tagValue(Ldev/ipf/marmotkit/AppMessageRecordFfi;Ljava/lang/String;)Ljava/lang/String;
 Ldev/ipf/whitenoise/android/core/MessageSearch;
 SPLdev/ipf/whitenoise/android/core/MessageSearch;-><clinit>()V
@@ -32212,15 +32208,6 @@ SPLdev/ipf/whitenoise/android/state/BoundedNpubCache;-><clinit>()V
 SPLdev/ipf/whitenoise/android/state/BoundedNpubCache;-><init>(Ldev/ipf/whitenoise/android/state/ScopedCacheRegistry;I)V
 SPLdev/ipf/whitenoise/android/state/BoundedNpubCache;->get(Ljava/lang/String;)Ljava/lang/String;
 SPLdev/ipf/whitenoise/android/state/BoundedNpubCache;->put(Ljava/lang/String;Ljava/lang/String;)V
-Ldev/ipf/whitenoise/android/state/BoundedStreamTombstones$Companion;
-SPLdev/ipf/whitenoise/android/state/BoundedStreamTombstones$Companion;-><init>()V
-SPLdev/ipf/whitenoise/android/state/BoundedStreamTombstones$Companion;-><init>(Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-Ldev/ipf/whitenoise/android/state/BoundedStreamTombstones$entries$1;
-SPLdev/ipf/whitenoise/android/state/BoundedStreamTombstones$entries$1;-><init>(Ldev/ipf/whitenoise/android/state/BoundedStreamTombstones;)V
-Ldev/ipf/whitenoise/android/state/BoundedStreamTombstones;
-SPLdev/ipf/whitenoise/android/state/BoundedStreamTombstones;-><clinit>()V
-SPLdev/ipf/whitenoise/android/state/BoundedStreamTombstones;-><init>(I)V
-SPLdev/ipf/whitenoise/android/state/BoundedStreamTombstones;-><init>(IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 Ldev/ipf/whitenoise/android/state/BubbleColorPreferences;
 SPLdev/ipf/whitenoise/android/state/BubbleColorPreferences;-><clinit>()V
 SPLdev/ipf/whitenoise/android/state/BubbleColorPreferences;-><init>()V
@@ -33673,7 +33660,6 @@ SPLdev/ipf/whitenoise/android/state/ConversationController;->access$submitVisibl
 SPLdev/ipf/whitenoise/android/state/ConversationController;->acknowledgeTimelineRemovals(Ljava/util/Set;)V
 SPLdev/ipf/whitenoise/android/state/ConversationController;->anchorReadExpiryUpTo-2TYgG_w(Ljava/lang/String;J)V
 SPLdev/ipf/whitenoise/android/state/ConversationController;->applyAuthoritativeChatListRow$app(Ljava/lang/String;Ldev/ipf/marmotkit/ChatListRowFfi;)V
-SPLdev/ipf/whitenoise/android/state/ConversationController;->applyDurableStreamPositions(Ljava/util/Map;)V
 PLdev/ipf/whitenoise/android/state/ConversationController;->applyGroupDetails(Ljava/lang/String;Ldev/ipf/marmotkit/GroupDetailsFfi;)Ldev/ipf/whitenoise/android/state/AppliedGroupDetails;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->applyGroupRoster(Ljava/lang/String;Ldev/ipf/marmotkit/GroupRosterFfi;)Ldev/ipf/whitenoise/android/state/AppliedGroupDetails;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->applyGroupState(Ldev/ipf/marmotkit/AppGroupRecordFfi;)V
@@ -33851,7 +33837,6 @@ SPLdev/ipf/whitenoise/android/state/ConversationController;->replyTargetMessageI
 SPLdev/ipf/whitenoise/android/state/ConversationController;->resolveInitialInviteConfirmation(Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->retainsTimelineRecord$app(Ljava/lang/String;)Z
 SPLdev/ipf/whitenoise/android/state/ConversationController;->retentionAtSendForProjection-K3BcsFo(Ljava/lang/String;Lkotlin/ULong;Ljava/lang/String;)Lkotlin/ULong;
-SPLdev/ipf/whitenoise/android/state/ConversationController;->retireFinishedStream(Ldev/ipf/marmotkit/AppMessageRecordFfi;)V
 SPLdev/ipf/whitenoise/android/state/ConversationController;->retryInviteAcceptanceAuthority(Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->runConversationSubscriptionIteration(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/ConversationController;->runConversationSubscriptionLoop(Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -34172,9 +34157,6 @@ SPLdev/ipf/whitenoise/android/state/ConversationStateRetention;->evictOverflow(L
 SPLdev/ipf/whitenoise/android/state/ConversationStateRetention;->promote(Ljava/lang/String;Ljava/lang/String;)Ljava/util/List;
 SPLdev/ipf/whitenoise/android/state/ConversationStateRetention;->promoteProtected(Ljava/lang/String;)V
 SPLdev/ipf/whitenoise/android/state/ConversationStateRetention;->retain(Ljava/lang/String;Ljava/lang/String;)Ljava/util/List;
-Ldev/ipf/whitenoise/android/state/ConversationStreamPresentationKt;
-SPLdev/ipf/whitenoise/android/state/ConversationStreamPresentationKt;->durableStreamDisplayPositions(Ljava/util/List;)Ljava/util/Map;
-SPLdev/ipf/whitenoise/android/state/ConversationStreamPresentationKt;->timelineTagValue(Ldev/ipf/marmotkit/TimelineMessageRecordFfi;Ljava/lang/String;)Ljava/lang/String;
 Ldev/ipf/whitenoise/android/state/ConversationTimelineHandoff;
 SPLdev/ipf/whitenoise/android/state/ConversationTimelineHandoff;-><clinit>()V
 SPLdev/ipf/whitenoise/android/state/ConversationTimelineHandoff;-><init>()V
@@ -34876,12 +34858,8 @@ SPLdev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt$runUntilFirstLiveSub
 SPLdev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt$runUntilFirstLiveSubscriptionEnds$2;->invoke(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt$runUntilFirstLiveSubscriptionEnds$2;->invoke(Lkotlinx/coroutines/CoroutineScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt$runUntilFirstLiveSubscriptionEnds$2;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
-Ldev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt$runUntilFirstLiveSubscriptionEndsWithAttemptJobs$1;
-SPLdev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt$runUntilFirstLiveSubscriptionEndsWithAttemptJobs$1;-><init>(Lkotlin/coroutines/Continuation;)V
-PLdev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt$runUntilFirstLiveSubscriptionEndsWithAttemptJobs$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
 Ldev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt;
 SPLdev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt;->runUntilFirstLiveSubscriptionEnds(Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-SPLdev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt;->runUntilFirstLiveSubscriptionEndsWithAttemptJobs(Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 SPLdev/ipf/whitenoise/android/state/LiveSubscriptionRetryKt;->shouldRetryLiveSubscriptionForAccount(Ljava/lang/String;Ljava/lang/String;)Z
 Ldev/ipf/whitenoise/android/state/LocalDeleteNotice;
 SPLdev/ipf/whitenoise/android/state/LocalDeleteNotice;-><clinit>()V
@@ -38113,7 +38091,6 @@ SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->preparedProjectedItemId(
 SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->refreshAuthoritativeOrder(Ldev/ipf/whitenoise/android/state/ConversationController;Ldev/ipf/marmotkit/TimelinePageFfi;)V
 SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->shiftedOrder(ILjava/lang/Long;)J
 SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->windowOrderShift(Ldev/ipf/marmotkit/TimelinePageFfi;Ljava/util/Map;)Ljava/lang/Long;
-SPLdev/ipf/whitenoise/android/state/WindowApplyModeKt;->windowStreamIdsToLaunch(Ljava/util/List;Lkotlin/jvm/functions/Function1;)Ljava/util/List;
 Ldev/ipf/whitenoise/android/state/WindowApplyPerformanceSample;
 SPLdev/ipf/whitenoise/android/state/WindowApplyPerformanceSample;-><clinit>()V
 SPLdev/ipf/whitenoise/android/state/WindowApplyPerformanceSample;-><init>(IIJJ)V
@@ -43440,12 +43417,6 @@ SPLdev/ipf/whitenoise/android/ui/conversation/ConversationSeededTailState;->getC
 SPLdev/ipf/whitenoise/android/ui/conversation/ConversationSeededTailState;->getInitialTimelineAnchored()Landroidx/compose/runtime/MutableState;
 SPLdev/ipf/whitenoise/android/ui/conversation/ConversationSeededTailState;->getRecoveryVisible()Landroidx/compose/runtime/MutableState;
 SPLdev/ipf/whitenoise/android/ui/conversation/ConversationSeededTailState;->getRetryGeneration()Landroidx/compose/runtime/MutableLongState;
-Ldev/ipf/whitenoise/android/ui/conversation/ConversationStreamingDebugRefreshEffectKt$ConversationStreamingDebugRefreshEffect$1$1;
-SPLdev/ipf/whitenoise/android/ui/conversation/ConversationStreamingDebugRefreshEffectKt$ConversationStreamingDebugRefreshEffect$1$1;-><init>(Ldev/ipf/whitenoise/android/state/ConversationController;Lkotlin/coroutines/Continuation;)V
-SPLdev/ipf/whitenoise/android/ui/conversation/ConversationStreamingDebugRefreshEffectKt$ConversationStreamingDebugRefreshEffect$1$1;->create(Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Lkotlin/coroutines/Continuation;
-SPLdev/ipf/whitenoise/android/ui/conversation/ConversationStreamingDebugRefreshEffectKt$ConversationStreamingDebugRefreshEffect$1$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
-Ldev/ipf/whitenoise/android/ui/conversation/ConversationStreamingDebugRefreshEffectKt;
-SPLdev/ipf/whitenoise/android/ui/conversation/ConversationStreamingDebugRefreshEffectKt;->ConversationStreamingDebugRefreshEffect(Ldev/ipf/whitenoise/android/state/ConversationController;ZLandroidx/compose/runtime/Composer;I)V
 Ldev/ipf/whitenoise/android/ui/conversation/ConversationSurfaceState;
 SPLdev/ipf/whitenoise/android/ui/conversation/ConversationSurfaceState;-><clinit>()V
 SPLdev/ipf/whitenoise/android/ui/conversation/ConversationSurfaceState;-><init>(ZLdev/ipf/whitenoise/android/ui/chats/GlobalSearchState;)V

@@ -76,8 +76,6 @@ object DiagnosticFormatter {
                 // interpolates a relay URL, token, key, or decrypted content
                 // can't leak it in full through this screen-capturable surface.
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] error: ${redactError(event.message)}"
-            is MarmotEventFfi.AgentStreamActivity ->
-                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] agent stream activity"
             is MarmotEventFfi.EpochStallEscalated ->
                 // hex group id only — epoch and arm count carry no content.
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] epoch stall escalated in ${IdentityFormatter.short(

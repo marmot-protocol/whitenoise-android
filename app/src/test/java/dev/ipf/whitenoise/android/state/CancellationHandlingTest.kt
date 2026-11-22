@@ -151,20 +151,6 @@ class CancellationHandlingTest {
     }
 
     @Test
-    fun watchAgentTextStreamKeepsTheStreamLoopInsideCancellationSafeWrapper() {
-        val body = conversationControllerSource().functionBody("watchAgentTextStream")
-        val wrapperStart = body.indexOf("runCatchingCancellable {")
-        assertTrue("agent stream must use cancellation-safe result handling", wrapperStart >= 0)
-
-        val wrapperBrace = body.indexOf('{', wrapperStart)
-        val wrappedBlock = body.kotlinBlockFrom(wrapperBrace, "watchAgentTextStream cancellation-safe wrapper")
-        val failureHandler = body.indexOf(".onFailure", wrapperBrace + wrappedBlock.length)
-
-        assertTrue("agent stream loop must stay inside the cancellation-safe wrapper", "while (true)" in wrappedBlock)
-        assertTrue("ordinary failure handling must remain outside the wrapped loop", failureHandler >= 0)
-    }
-
-    @Test
     fun rethrowsCancellationException() {
         assertThrows(CancellationException::class.java) {
             rethrowIfCancellation(CancellationException("cancelled"))
