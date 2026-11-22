@@ -117,6 +117,37 @@ class MainShellSectionStateTest {
         assertChats(route)
     }
 
+    /**
+     * Two holders over one process-retained navigator: the newer one takes the saving over, and clearing the older
+     * one leaves the newer one saving. Once the newer one is cleared too, nothing writes into its saved state.
+     */
+    @Test
+    fun aClearedHolderDetachesOnlyItsOwnPersistence() {
+        val navigator = ShellNavigator()
+        val olderSaved = SavedStateHandle()
+        val older = MainShellSectionState(olderSaved, navigator)
+        older.bind("personal", 4)
+        val newerSaved = SavedStateHandle()
+        val newer = MainShellSectionState(newerSaved, navigator)
+        newer.bind("personal", 4)
+
+        older.detach()
+        newer.dispatchSection(ShellNavEvent.OpenSettings(SettingsDetail.Appearance))
+        assertEquals(MainSection.Settings.name, newerSaved.get<String>("main_shell_section_name"))
+        assertEquals(SettingsDetail.Appearance.name, newerSaved.get<String>("main_shell_section_detail"))
+        val olderDetail = olderSaved.get<String>("main_shell_section_detail")
+        assertNull("the older holder stopped saving when the newer one attached", olderDetail)
+
+        newer.detach()
+        navigator.dispatch(ShellNavEvent.ChangeSettingsDetail(SettingsDetail.Relays))
+        assertEquals(SettingsDetail.Relays.name, newer.settingsDetailName)
+        assertEquals(
+            "a cleared holder's saved state is no longer written",
+            SettingsDetail.Appearance.name,
+            newerSaved.get<String>("main_shell_section_detail"),
+        )
+    }
+
     @Test
     fun savedDestinationWithoutOwnershipIsDiscarded() {
         val route =

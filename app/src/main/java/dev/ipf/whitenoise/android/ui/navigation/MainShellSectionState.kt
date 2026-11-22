@@ -31,8 +31,11 @@ internal class MainShellSectionState(
     // This holder's saved section reaches the process-retained navigator once, at its first bind.
     private var restored = false
 
+    // The one listener this holder attaches, kept so it can detach exactly that one.
+    private val persistence: (List<ShellRoute>) -> Unit = { persist(it) }
+
     init {
-        navigator.attachPersistence { persist(it) }
+        navigator.attachPersistence(persistence)
     }
 
     /** The open section's name, read from the route stack. */
@@ -117,6 +120,14 @@ internal class MainShellSectionState(
             savedDetail = detail?.name
             savedState[SECTION_DETAIL_KEY] = savedDetail
         }
+    }
+
+    /**
+     * Stops saving the stack into this holder's saved state, once its Activity is gone for good. The stack and the
+     * saved keys stay as they are, so a newer holder that already took the persistence over keeps it.
+     */
+    fun detach() {
+        navigator.detachPersistence(persistence)
     }
 
     /** Terminal navigation and explicitly released holders discard the lightweight saved route. */

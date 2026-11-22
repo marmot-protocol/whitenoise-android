@@ -394,6 +394,8 @@ internal class MainShellStateHolder(
         // The Application-owned process state transfers to a fresh Activity.
         // Account/runtime replacement and process death remain its cleanup boundaries.
         composerExpansionStateSubscription.close()
+        // The process-retained navigator must not keep writing into a finished Activity's saved state.
+        sectionState.detach()
         super.onCleared()
     }
 

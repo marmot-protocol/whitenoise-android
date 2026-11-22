@@ -49,4 +49,12 @@ internal class ShellNavigator {
     fun attachPersistence(listener: (List<ShellRoute>) -> Unit) {
         stackListener = listener
     }
+
+    /**
+     * Detaches [listener] when it is still the attached persistence, as when its Activity's holder is cleared. A
+     * newer holder's persistence is left in place, so a cleared holder can never take the stack's saving with it.
+     */
+    fun detachPersistence(listener: (List<ShellRoute>) -> Unit) {
+        if (stackListener === listener) stackListener = null
+    }
 }
