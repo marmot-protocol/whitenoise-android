@@ -125,8 +125,8 @@ class ShellBoundaryFrameSampleContractTest {
             shell.openTarget(fixture, holder)
             openRelays(shell::awaitCondition)
             val root = requireNotNull(conversationRoot(holder.shellNavigator.stack))
-            val fresh =
-                ConversationOpenContext(notificationOpenRequestId = RELAND_ID, notificationRouteTraceRequestId = RELAND_ID)
+            val id = RELAND_ID
+            val fresh = ConversationOpenContext(notificationOpenRequestId = id, notificationRouteTraceRequestId = id)
 
             val relanded = { holder.dispatchShellNav(ShellNavEvent.CommitNotificationRoute(root.copy(open = fresh))) }
             val gone = framesAfter(relanded) { !relaysComposed() }
