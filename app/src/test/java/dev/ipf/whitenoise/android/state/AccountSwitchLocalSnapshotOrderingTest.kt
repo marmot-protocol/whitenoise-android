@@ -127,7 +127,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue(
             "the activation facade forwards its generation unchanged",
             "loadAccountActivationProjection(request, generation, switchingAccounts, restored)" in
-                source.kotlinFunctionBody("loadLocalProjection"),
+                source.substringAfter("override suspend fun loadLocalProjection(").substringBefore("override fun canPublish("),
         )
         val publish = source.kotlinFunctionBody("publish")
         assertTrue(
