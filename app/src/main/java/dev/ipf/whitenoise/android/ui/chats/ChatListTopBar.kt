@@ -77,6 +77,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeOriginAnchor
+import dev.ipf.whitenoise.android.ui.settings.settingsAvatarFlightSource
 import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
@@ -289,6 +290,7 @@ internal fun ChatListTopBar(
                                             .testTag("chats.switchProfile")
                                             .then(settingsOrigin)
                                             .settingsCardMorph(SettingsHomeOriginAnchor, avatarInset)
+                                            .settingsAvatarFlightSource(avatarInset)
                                             .explainOnLongPress(avatarExplanation),
                                     // Per-account dot: light only when the active account
                                     // itself has unread, same shared decision the other

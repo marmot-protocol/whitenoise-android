@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
 import dev.ipf.whitenoise.android.ui.settings.SupportRelayState
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
+import dev.ipf.whitenoise.android.ui.settings.settingsPenSource
 import dev.ipf.whitenoise.android.ui.settings.supportRelayState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -163,8 +164,9 @@ internal fun ChatsNewMessageFabContent(
     // Keep the compact home pen on its bottom action baseline under current insets.
     // The measured handoff retains the source rectangle for the morph.
     val view = LocalView.current
-    val outline =
-        if (missingRelays) amoledOutlineBorder() else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val penFill = MaterialTheme.colorScheme.surfaceContainerHigh
+    val outline = if (missingRelays) amoledOutlineBorder() else BorderStroke(1.dp, outlineVariant)
     val finishControlMorph = LocalFinishControlMorph.current
     val morphing = !missingRelays && LocalComposerFabHandoff.current?.active == true
     BoxWithConstraints {
@@ -176,6 +178,7 @@ internal fun ChatsNewMessageFabContent(
                 .floatingDictationAnchor(followsComposerFab = !missingRelays)
                 .newMessagePenOrigin()
                 .onGloballyPositioned { onBounds(it.settingsMorphBounds(view)) }
+                .settingsPenSource(!missingRelays, 16.dp, penFill, outlineVariant)
                 .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
         val chrome =
             if (morphing || outline == null) modifier else modifier.border(outline, FloatingActionButtonDefaults.shape)

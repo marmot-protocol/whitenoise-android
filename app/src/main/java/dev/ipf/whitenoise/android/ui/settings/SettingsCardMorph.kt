@@ -61,6 +61,10 @@ internal class SettingsCardMorph(
     private val parent: SettingsCardMorph? = null,
 ) {
     val page: SettingsPageMorph? = if (fullScreen) SettingsPageMorph() else null
+
+    /** The outermost route host, which owns the top-level Chats/Settings [topLevel] endpoints. */
+    internal val root: SettingsCardMorph get() = parent?.root ?: this
+    internal val topLevel = SettingsTopLevelHandoff()
     private val live = LinkedHashMap<Any, Rect>()
     private val anchorOutlines = HashMap<SettingsMorphAnchor, SettingsContour>()
     private val pictures = HashMap<Any, Picture>()

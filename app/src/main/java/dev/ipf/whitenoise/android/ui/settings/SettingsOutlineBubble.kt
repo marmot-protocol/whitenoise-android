@@ -4,14 +4,21 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.drawControlMorphOutline
 
 /** Chats is covered by the Settings backplate from this presence on: it fades out quickly. */
@@ -23,6 +30,11 @@ private const val BUBBLE_CARD_FADE_END = 0.8f
 
 /** The rest of Settings (its header and the other cards) fades in in place from this presence. */
 private const val SETTINGS_BUBBLE_PAGE_FADE_START = 0.35f
+
+/** A control bubble's pen is gone by this presence, as the pen's is entering the composer. */
+private const val SETTINGS_BUBBLE_GLYPH_FADE_END = 0.5f
+
+private val SettingsBubbleGlyphSize = 24.dp
 
 /** A card that rests without a border takes over the bubble's edge and fill over this last stretch. */
 private const val SETTINGS_BUBBLE_HANDOVER_START = 0.85f
@@ -65,16 +77,32 @@ internal fun nearestSettingsBubbleCard(
     }
 }
 
-/** One top-level leg in host coordinates: the origin control and the card the bubble lands on. */
+/** A control a bubble leaves as itself (the New message pen): its corner [radius], [fill] and [border]. */
+internal data class SettingsBubbleControl(
+    val radius: Float,
+    val fill: Color,
+    val border: Color,
+)
+
+/**
+ * One bubble in host coordinates: the origin it leaves and the card it lands on. Without a [control]
+ * it leaves the origin's circle as a bare outline; with one it starts as that control, pen and all.
+ */
 internal class SettingsBubbleGeometry(
     val origin: Rect,
     val card: SettingsBubbleCard,
+    val control: SettingsBubbleControl? = null,
 )
 
-/** Paint for the top-level pair: the Settings [backplate] and the hairline [edge] of a borderless card's bubble. */
+/**
+ * Paint for the top-level pair: the Settings [backplate], the hairline [edge] of a borderless card's
+ * bubble and the pen [glyph] a control bubble fades out.
+ */
 internal data class SettingsBubbleColors(
     val backplate: Color,
     val edge: Color,
+    val glyph: Painter? = null,
+    val glyphTint: Color = Color.Unspecified,
 )
 
 private fun ramp(
@@ -100,41 +128,70 @@ internal fun settingsBubbleShape(
     val p = presence.coerceIn(0f, 1f)
     val origin = geometry.origin
     val bounds = lerp(origin, geometry.card.bounds, p)
-    val from = minOf(origin.width, origin.height) / 2f
+    val from = geometry.control?.radius ?: (minOf(origin.width, origin.height) / 2f)
     val radius = (from + (geometry.card.radius - from) * p).coerceIn(0f, minOf(bounds.width, bounds.height) / 2f)
     return RoundRect(bounds, CornerRadius(radius))
 }
 
 /**
- * One frame of the top-level pair over the backplate. With [geometry], Settings [content] outside the
- * landing card fades in in place while the bubble carries the card itself; without it the whole page
- * fades. [ink] scales every Settings ink alpha (a reopen after a close that drew none).
+ * One frame of the top-level pair over the backplate. Settings [content] outside the [scene]'s
+ * landing cards fades in in place while each bubble carries its card, and the flying avatar lands in
+ * the profile card's avatar, which stays out of the content until it lands. [ink] scales every
+ * Settings ink alpha (a reopen after a close that drew none).
  */
 internal fun DrawScope.drawSettingsBubbleFrame(
-    geometry: SettingsBubbleGeometry?,
+    scene: SettingsBubbleScene,
     presence: Float,
-    edge: Color,
+    colors: SettingsBubbleColors,
     ink: Float,
     content: (DrawScope.() -> Unit)?,
 ) {
     val page = settingsBubblePageAlpha(presence) * ink
     val whole = Rect(Offset.Zero, size)
-    if (geometry == null) {
-        if (content != null && page > 0f) drawAtAlpha(whole, page, content)
-        return
-    }
-    val card = geometry.card.visibleBounds
     if (content != null && page > 0f) {
-        clipRect(card.left, card.top, card.right, card.bottom, ClipOp.Difference) { drawAtAlpha(whole, page, content) }
+        val outside =
+            Path().apply {
+                fillType = PathFillType.EvenOdd
+                addRect(whole)
+                scene.bubbles.forEach { addRect(it.card.visibleBounds) }
+            }
+        clipPath(outside) { drawAtAlpha(whole, page, content) }
     }
-    // A card its viewport partly clips keeps that clip at rest; the bubble leaves it as it leaves the card.
-    // The card's hidden strips stay hidden throughout, so no frame paints its chrome over the header.
-    val clip = lerp(whole, card, presence.coerceIn(0f, 1f))
+    val landing = scene.flight?.to
+    val cardContent: (DrawScope.() -> Unit)? =
+        content?.let { draw ->
+            if (landing == null) {
+                draw
+            } else {
+                {
+                    val hole = Path().apply { addOval(landing) }
+                    clipPath(hole, ClipOp.Difference) { draw() }
+                }
+            }
+        }
+    scene.bubbles.forEach { drawClippedBubble(it, presence, colors, ink, cardContent) }
+    scene.flight?.let { drawSettingsAvatarFlight(it, presence) }
+}
+
+/**
+ * One bubble, clipped like its card. A card its viewport partly clips keeps that clip at rest; the
+ * bubble leaves it as it leaves the card, and the card's hidden strips stay hidden throughout, so no
+ * frame paints its chrome over the header.
+ */
+private fun DrawScope.drawClippedBubble(
+    geometry: SettingsBubbleGeometry,
+    presence: Float,
+    colors: SettingsBubbleColors,
+    ink: Float,
+    content: (DrawScope.() -> Unit)?,
+) {
+    val card = geometry.card.visibleBounds
+    val clip = lerp(Rect(Offset.Zero, size), card, presence.coerceIn(0f, 1f))
     val full = geometry.card.bounds
     clipRect(clip.left, clip.top, clip.right, clip.bottom) {
         clipRect(full.left, full.top, full.right, card.top, ClipOp.Difference) {
             clipRect(full.left, card.bottom, full.right, full.bottom, ClipOp.Difference) {
-                drawSettingsBubble(geometry, presence, edge, ink, content)
+                drawSettingsBubble(geometry, presence, colors, ink, content)
             }
         }
     }
@@ -166,21 +223,25 @@ internal fun settingsBubbleInk(
 /**
  * The bubble itself, like the New message pen's: a hairline edge inset to the card's resting border
  * over the card's own fill, with the card's content cross-fading in at its final size clipped to the
- * bubble, never scaled. A borderless card hands its edge and fill over to the native card at rest.
+ * bubble, never scaled. A control bubble starts as the control, its pen fading out as the content
+ * fades in. A borderless card hands its edge and fill over to the native card at rest.
  */
 private fun DrawScope.drawSettingsBubble(
     geometry: SettingsBubbleGeometry,
     presence: Float,
-    edge: Color,
+    colors: SettingsBubbleColors,
     ink: Float,
     content: (DrawScope.() -> Unit)?,
 ) {
     val shape = settingsBubbleShape(geometry, presence)
     val card = geometry.card
+    val control = geometry.control
+    val p = presence.coerceIn(0f, 1f)
     val handover = if (card.outline.isSpecified) 0f else ramp(presence, SETTINGS_BUBBLE_HANDOVER_START, 1f)
     val path = Path().apply { addRoundRect(shape) }
-    val fill = settingsBubbleUnderlayCover(presence) * (1f - handover)
-    if (fill > 0f) drawPath(path, card.fill, alpha = fill)
+    val fill = (if (control != null) 1f else settingsBubbleUnderlayCover(presence)) * (1f - handover)
+    val fillColor = if (control != null) lerp(control.fill, card.fill, p) else card.fill
+    if (fill > 0f) drawPath(path, fillColor, alpha = fill)
     val cardInk = settingsBubbleCardAlpha(presence) * ink
     if (content != null && cardInk > 0f) {
         // The bubble's edge stands in for the card's own border, which stays out (antialiasing included) until rest.
@@ -193,6 +254,14 @@ private fun DrawScope.drawSettingsBubble(
         }
     }
     val bounds = Rect(shape.left, shape.top, shape.right, shape.bottom)
-    val color = if (card.outline.isSpecified) card.outline else edge
+    val resting = if (card.outline.isSpecified) card.outline else colors.edge
+    val color = if (control != null) lerp(control.border, resting, p) else resting
     if (handover < 1f) drawControlMorphOutline(bounds, shape.topLeftCornerRadius.x, color, card.stroke, 1f - handover)
+    val glyph = colors.glyph?.takeIf { control != null } ?: return
+    val glyphAlpha = 1f - ramp(presence, 0f, SETTINGS_BUBBLE_GLYPH_FADE_END)
+    if (glyphAlpha <= 0f) return
+    val glyphSize = SettingsBubbleGlyphSize.toPx()
+    translate(bounds.center.x - glyphSize / 2f, bounds.center.y - glyphSize / 2f) {
+        with(glyph) { draw(Size(glyphSize, glyphSize), glyphAlpha, ColorFilter.tint(colors.glyphTint)) }
+    }
 }

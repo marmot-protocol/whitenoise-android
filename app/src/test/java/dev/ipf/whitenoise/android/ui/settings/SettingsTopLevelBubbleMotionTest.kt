@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.os.Looper
 import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +33,8 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsMatcher
@@ -59,10 +63,11 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
 
 /**
- * The production top-level host (topLevelBubble with cardMorph and the avatar's measured origin)
- * opens Settings as ONE thin outline bubble that leaves the avatar and lands on the Settings card
- * nearest it, while the avatar and the chat list fade in place under no scrim; Back runs the same
- * bubble back into the avatar, and a reversal continues from the drawn frame.
+ * The production top-level host (topLevelBubble with cardMorph and the avatar's measured origin):
+ * the chat-list avatar flies into the Settings profile card's avatar while that card's outline grows
+ * around it, and the New message pen morphs into the bottom-most card, with the chat list fading under
+ * no scrim. Back runs both in reverse, a reversal continues from the drawn frame, and there is never
+ * a second avatar.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -83,16 +88,18 @@ class SettingsTopLevelBubbleMotionTest {
     @After
     fun restoreMotion() = setAnimatorScale(originalAnimatorScale)
 
-    @Test fun theBubbleIsTheOriginCircleAtFirstAndTheCardsRestingOutlineAtRest() {
+    @Test fun aBubbleStartsAsItsOriginAndRestsOnItsCardsOutline() {
         val avatar = Rect(12f, 12f, 52f, 52f)
-        val card = card(Rect(16f, 100f, 344f, 260f))
-        val geometry = SettingsBubbleGeometry(avatar, card)
-        val start = settingsBubbleShape(geometry, 0f)
+        val card = fixedCard(Rect(16f, 100f, 344f, 260f))
+        val start = settingsBubbleShape(SettingsBubbleGeometry(avatar, card), 0f)
         assertEquals(avatar, Rect(start.left, start.top, start.right, start.bottom))
         assertEquals(20f, start.topLeftCornerRadius.x, 0.01f)
-        val end = settingsBubbleShape(geometry, 1f)
+        val end = settingsBubbleShape(SettingsBubbleGeometry(avatar, card), 1f)
         assertEquals(card.bounds, Rect(end.left, end.top, end.right, end.bottom))
         assertEquals(16f, end.topLeftCornerRadius.x, 0.01f)
+        // The pen bubble starts as the pen's own rounded square.
+        val pen = SettingsBubbleGeometry(PEN, card, SettingsBubbleControl(12f, Color.Gray, Color.White))
+        assertEquals(12f, settingsBubbleShape(pen, 0f).topLeftCornerRadius.x, 0.01f)
         // Every alpha is a function of presence alone, so a reversal is continuous.
         assertEquals(0f, settingsBubbleUnderlayCover(0f), 0f)
         assertEquals(1f, settingsBubbleUnderlayCover(0.5f), 0f)
@@ -102,32 +109,75 @@ class SettingsTopLevelBubbleMotionTest {
         assertEquals(1f, settingsBubblePageAlpha(1f), 0f)
     }
 
-    @Test fun theBubbleLandsOnTheCardNearestItsOrigin() {
-        val host = Rect(0f, 0f, 360f, 780f)
-        val top = card(Rect(16f, 100f, 344f, 260f))
-        val middle = card(Rect(16f, 300f, 344f, 500f))
-        val bottom = card(Rect(16f, 700f, 344f, 900f)).copy(visibleBounds = Rect(16f, 700f, 344f, 780f))
-        val offscreen = card(Rect(16f, 900f, 344f, 1000f))
-        val cards = listOf(offscreen, bottom, middle, top)
-        assertEquals(top, nearestSettingsBubbleCard(cards, Rect(12f, 12f, 52f, 52f), host))
-        assertEquals(top, nearestSettingsBubbleCard(cards, Rect(300f, 12f, 340f, 52f), host))
-        assertEquals(bottom, nearestSettingsBubbleCard(cards, Rect(12f, 730f, 52f, 770f), host))
-        assertNull(nearestSettingsBubbleCard(listOf(offscreen), Rect(12f, 730f, 52f, 770f), host))
+    @Test fun theAvatarFliesIntoTheProfileCardAndThePenIntoTheBottomMostVisibleCard() {
+        val handoff = handoff(pen = true)
+        val target = Rect(32f, 196f, 88f, 252f)
+        val scene = settingsBubbleScene(HOST, AVATAR, CARDS, handoff, target)
+        val flight = checkNotNull(scene.flight)
+        assertEquals(AVATAR, flight.from)
+        assertEquals(target, flight.to)
+        assertEquals(AVATAR, settingsAvatarFlightBounds(flight, 0f))
+        assertEquals(target, settingsAvatarFlightBounds(flight, 1f))
+        val (profile, pen) = scene.bubbles
+        assertEquals("the outline grows around the avatar onto its card", PROFILE.bounds, profile.card.bounds)
+        assertEquals(AVATAR, profile.origin)
+        assertNull(profile.control)
+        assertEquals("the pen lands on the bottom-most visible card", BOTTOM.bounds, pen.card.bounds)
+        assertEquals(PEN, pen.origin)
+        assertEquals(16f, checkNotNull(pen.control).radius, 0f)
     }
 
-    @Test fun aPartlyClippedCardKeepsItsViewportClipWhileTheBubbleIsOnIt() {
-        // The viewport hides the card's top 40 px under the header; the bubble lands on its visible part only.
-        val visible = Rect(16f, 100f, 344f, 260f)
-        val card = card(Rect(16f, 60f, 344f, 260f)).copy(visibleBounds = visible, fill = Color.Blue)
-        val geometry = SettingsBubbleGeometry(Rect(12f, 12f, 52f, 52f), card)
+    @Test fun withoutAPenTheBottomCardFadesInPlace() {
+        val scene = settingsBubbleScene(HOST, AVATAR, CARDS, handoff(pen = false), Rect(32f, 196f, 88f, 252f))
+        assertEquals(listOf(PROFILE.bounds), scene.bubbles.map { it.card.bounds })
+    }
+
+    @Test fun anotherOriginGrowsIntoItsNearestCardWithoutTheAvatar() {
+        val handoff = handoff(pen = true)
+        val update = settingsBubbleScene(HOST, Rect(300f, 12f, 340f, 52f), CARDS, handoff, Rect(32f, 196f, 88f, 252f))
+        assertNull("only the avatar origin flies the avatar", update.flight)
+        assertEquals(listOf(PROFILE.bounds, BOTTOM.bounds), update.bubbles.map { it.card.bounds })
+        val low = settingsBubbleScene(HOST, Rect(12f, 730f, 52f, 770f), CARDS, handoff, null)
+        assertEquals(
+            "a low control takes the bottom card and the pen fades",
+            listOf(BOTTOM.bounds),
+            low.bubbles.map { it.card.bounds },
+        )
+    }
+
+    @Test fun theBubbleLandsOnTheCardNearestItsOrigin() {
+        val middle = fixedCard(Rect(16f, 300f, 344f, 500f))
+        val offscreen = fixedCard(Rect(16f, 900f, 344f, 1000f))
+        val cards = listOf(offscreen, BOTTOM, middle, PROFILE)
+        assertEquals(PROFILE, nearestSettingsBubbleCard(cards, Rect(12f, 12f, 52f, 52f), HOST))
+        assertEquals(BOTTOM, nearestSettingsBubbleCard(cards, Rect(12f, 730f, 52f, 770f), HOST))
+        assertNull(nearestSettingsBubbleCard(listOf(offscreen), Rect(12f, 730f, 52f, 770f), HOST))
+    }
+
+    @Test fun partlyClippedCardsKeepTheirViewportClipWhileTheBubblesAreOnThem() {
+        // The viewport hides the profile card's top under the header and the pen card's bottom below the fold.
+        val top =
+            fixedCard(Rect(16f, 60f, 344f, 260f))
+                .copy(visibleBounds = Rect(16f, 100f, 344f, 260f), fill = Color.Blue)
+        val low =
+            fixedCard(Rect(16f, 600f, 344f, 800f))
+                .copy(visibleBounds = Rect(16f, 600f, 344f, 740f), fill = Color.Blue)
+        val pen = SettingsBubbleControl(16f, Color.Blue, Color.White)
+        val scene =
+            SettingsBubbleScene(listOf(SettingsBubbleGeometry(AVATAR, top), SettingsBubbleGeometry(PEN, low, pen)))
         listOf(1f, CLOSING_PRESENCE, 0.9f, 0.6f).forEach { presence ->
             val pixels =
-                drawFrame { drawSettingsBubbleFrame(geometry, presence, Color.Red, 1f) { drawRect(Color.Green) } }
-            for (y in HIDDEN_TOP until HIDDEN_BOTTOM) {
+                drawFrame {
+                    drawSettingsBubbleFrame(scene, presence, SettingsBubbleColors(Color.Black, Color.Red), 1f) {
+                        drawRect(Color.Green)
+                    }
+                }
+            val hidden = (HIDDEN_TOP until HIDDEN_BOTTOM) + (FOLD_TOP until FOLD_BOTTOM)
+            for (y in hidden) {
                 listOf(17, 180, 343).forEach { x ->
                     val pixel = pixels[x, y]
                     val chrome = pixel.red > 0.05f || pixel.blue > 0.05f
-                    assertTrue("no card chrome over the header at $x,$y ($presence): $pixel", !chrome)
+                    assertTrue("no card chrome where the viewport hides it, $x,$y ($presence): $pixel", !chrome)
                 }
             }
         }
@@ -143,12 +193,81 @@ class SettingsTopLevelBubbleMotionTest {
         assertEquals(1f, settingsBubbleInk(0.3f, opening = false, null), 0f)
     }
 
-    @Test fun amoledOutlineLeavesTheTopAvatarForTheTopCardAndReturns() = assertSingleOutline(bottomOrigin = false)
+    @Test fun amoledAvatarFliesIntoTheProfileCardInsideItsOutlineAndBack() {
+        host(amoled = true, pen = true, rows = false)
+        val cards = measureCards()
+        val middle = (cards.first().bottom + cards.last().top) / 2f
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag(AVATAR_TAG).performClick()
+        val opening = List(OPEN_FRAMES) { step().let { frame() } }
+        rule.mainClock.advanceTimeBy(SETTLE_MILLIS)
+        step()
+        val settled = checkNotNull(singleAvatar(frame(), "settled Settings"))
+        assertNear("the avatar rests in the profile card", TARGET, settled)
+        update { section.value = 0 }
+        val closing = List(CLOSE_FRAMES) { step().let { frame() } }
+        rule.mainClock.advanceTimeBy(SETTLE_MILLIS)
+        step()
+        assertNear("the avatar is back in the top corner", AVATAR, checkNotNull(singleAvatar(frame(), "settled Chats")))
+        val flights = (opening + closing).mapIndexed { index, it -> singleAvatar(it, "frame $index") }
+        assertNear("the open starts at the top corner", AVATAR, checkNotNull(flights.first()))
+        assertNear("the close starts in the profile card", TARGET, checkNotNull(flights[OPEN_FRAMES]))
+        assertTrue("the avatar travels between them", flights.filterNotNull().any { it.top > AVATAR.bottom })
+        (opening + closing).forEachIndexed { index, frame ->
+            // Above the profile card the outline is wholly outside it, so it must enclose the avatar.
+            val avatar = flights[index]?.takeIf { it.bottom < cards.first().top - CARD_MARGIN } ?: return@forEachIndexed
+            val outline = outlineBounds(frame, cards) { it < middle } ?: return@forEachIndexed
+            assertTrue(
+                "frame $index: the profile outline surrounds the avatar ($outline, $avatar)",
+                outline.inflate(2f).containsRect(avatar),
+            )
+        }
+    }
 
-    @Test fun amoledOutlineLeavesABottomControlForTheBottomCardAndReturns() = assertSingleOutline(bottomOrigin = true)
+    @Test fun amoledPenMorphsIntoTheBottomCardAndBack() {
+        host(amoled = true, pen = true, rows = false)
+        val cards = measureCards()
+        val middle = (cards.first().bottom + cards.last().top) / 2f
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag(AVATAR_TAG).performClick()
+        val opening = List(OPEN_FRAMES) { step().let { outlineBounds(frame(), cards) { y -> y > middle } } }
+        rule.mainClock.advanceTimeBy(SETTLE_MILLIS)
+        step()
+        assertNull("settled Settings shows no bubble", outlineBounds(frame(), cards) { it > middle })
+        update { section.value = 0 }
+        val closing = List(CLOSE_FRAMES) { step().let { outlineBounds(frame(), cards) { y -> y > middle } } }
+        val span = PEN_STAND_IN.span(cards.last())
+        (opening + closing).filterNotNull().forEach { bubble ->
+            assertTrue(
+                "the pen outline stays between the pen and the bottom card: $bubble",
+                span.inflate(2f).containsRect(bubble),
+            )
+        }
+        val first = checkNotNull(opening.firstOrNull { it != null }) { "the open morphs the pen" }
+        // The pen shares rows with the bottom card, whose band is masked; its visible edges must be the pen's.
+        assertTrue("the morph leaves the pen as the pen: $first", PEN_STAND_IN.inflate(2f).containsRect(first))
+        val last = checkNotNull(closing.lastOrNull { it != null }) { "the close morphs back into the pen" }
+        assertTrue(
+            "the morph lands in the pen: $last",
+            last.inflate(PEN_SLACK).containsRect(PEN_STAND_IN) && last.width < 2 * PEN_STAND_IN.width,
+        )
+    }
 
-    @Test fun lightAvatarAndChatsFadeInPlaceWithoutAScrim() {
-        host(amoled = false, bottomOrigin = false, rows = true)
+    @Test fun amoledWithoutThePenTheBottomCardJustFades() {
+        host(amoled = true, pen = false, rows = false)
+        val cards = measureCards()
+        val middle = (cards.first().bottom + cards.last().top) / 2f
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag(AVATAR_TAG).performClick()
+        repeat(OPEN_FRAMES) { index ->
+            step()
+            val outline = outlineBounds(frame(), cards) { it > middle }
+            assertNull("open frame $index morphs nothing into the bottom card", outline)
+        }
+    }
+
+    @Test fun lightChatsFadeWithoutAScrimAndThereIsNeverASecondAvatar() {
+        host(amoled = false, pen = true, rows = true)
         val chats = frame()
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag(AVATAR_TAG).performClick()
@@ -156,16 +275,14 @@ class SettingsTopLevelBubbleMotionTest {
         rule.mainClock.advanceTimeBy(SETTLE_MILLIS)
         step()
         val settings = frame()
-        assertTrue("the avatar stays put at first", near(opening.first().getPixel(32, 32), chats.getPixel(32, 32), 40))
         opening.forEachIndexed { index, open ->
             assertBetween("open frame $index", open, chats, settings)
-            assertTrue("open frame $index carries no avatar colour away", greenOutsideAvatar(open) == 0)
+            singleAvatar(open, "open frame $index")
         }
         assertTrue(
             "the chat list is gone well before the open settles",
             near(opening[CHATS_GONE_FRAME].getPixel(FAR_X, FAR_Y), settings.getPixel(FAR_X, FAR_Y), 3),
         )
-
         update { section.value = 0 }
         val closing = List(CLOSE_FRAMES) { step().let { frame() } }
         rule.mainClock.advanceTimeBy(SETTLE_MILLIS)
@@ -173,58 +290,33 @@ class SettingsTopLevelBubbleMotionTest {
         val settled = frame()
         closing.forEachIndexed { index, close ->
             assertBetween("close frame $index", close, settled, settings)
-            assertTrue("close frame $index carries no avatar colour", greenOutsideAvatar(close) == 0)
+            singleAvatar(close, "close frame $index")
         }
         assertTrue("the avatar is back in place", near(settled.getPixel(32, 32), chats.getPixel(32, 32), 3))
     }
 
-    @Test fun reversingMidOpenContinuesFromTheDrawnBubble() {
-        host(amoled = true, bottomOrigin = false, rows = false)
-        val cards = measureCards()
+    @Test fun reversingMidOpenTurnsTheAvatarAroundFromItsDrawnPosition() {
+        host(amoled = true, pen = true, rows = false)
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag(AVATAR_TAG).performClick()
-        val opened = List(REVERSE_AFTER_FRAMES) { step().let { outlineBounds(frame(), cards) } }.filterNotNull()
+        val opened = List(REVERSE_AFTER_FRAMES) { step().let { singleAvatar(frame(), "open") } }.filterNotNull()
         update { section.value = 0 }
-        val closed = List(CLOSE_FRAMES) { step().let { outlineBounds(frame(), cards) } }.filterNotNull()
+        val closed = List(CLOSE_FRAMES) { step().let { singleAvatar(frame(), "close") } }.filterNotNull()
         val tops = opened.map { it.top.toInt() } to closed.map { it.top.toInt() }
-        assertTrue("the bubble was moving when reversed: $tops", opened.last().top > AVATAR_TOP + MAX_STEP)
+        assertTrue("the avatar was flying when reversed: $tops", opened.last().top > AVATAR.top + MAX_STEP)
         // The reversal may follow the open's clock by the one frame it already ticked, never further.
         val openStep = opened.zipWithNext().maxOf { (a, b) -> b.top - a.top }
         assertTrue(
-            "the reversal starts from the drawn bubble: $tops",
+            "the reversal starts from the drawn avatar: $tops",
             abs(closed.first().top - opened.last().top) <= openStep + MAX_STEP / 4,
         )
         closed.zipWithNext().forEach { (a, b) -> assertTrue("then heads straight back: $tops", b.top <= a.top + 1) }
-        assertTrue("and lands in the avatar: $tops", closed.last().top <= AVATAR_TOP + LANDING_SLACK)
-    }
-
-    private fun assertSingleOutline(bottomOrigin: Boolean) {
-        host(amoled = true, bottomOrigin = bottomOrigin, rows = false)
-        val cards = measureCards()
-        val near = if (bottomOrigin) cards.last() else cards.first()
-        val far = if (bottomOrigin) cards.first() else cards.last()
-        val avatar = avatarBounds(bottomOrigin)
-        rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag(AVATAR_TAG).performClick()
-        val opening = List(OPEN_FRAMES) { step().let { outlineBounds(frame(), cards) } }
-        rule.mainClock.advanceTimeBy(SETTLE_MILLIS)
-        step()
-        assertNull("settled Settings shows no bubble", outlineBounds(frame(), cards))
-        update { section.value = 0 }
-        val closing = List(CLOSE_FRAMES) { step().let { outlineBounds(frame(), cards) } }
-        (opening + closing).filterNotNull().forEach { bubble ->
-            assertTrue("the outline stays between the origin and its card: $bubble", bubble.overlapsSpan(avatar, near))
-            assertTrue("the outline never heads for another card: $bubble", !bubble.reachesInto(far))
-        }
-        val first = checkNotNull(opening.firstOrNull { it != null }) { "the open draws an outline" }
-        assertTrue("the outline leaves from the avatar: $first", first.isAround(avatar))
-        val last = checkNotNull(closing.lastOrNull { it != null }) { "the close draws an outline" }
-        assertTrue("the outline lands in the avatar: $last", last.isAround(avatar))
+        assertTrue("and lands in the corner: $tops", closed.last().top <= AVATAR.top + LANDING_SLACK)
     }
 
     private fun host(
         amoled: Boolean,
-        bottomOrigin: Boolean,
+        pen: Boolean,
         rows: Boolean,
     ) {
         rule.setContent {
@@ -236,7 +328,7 @@ class SettingsTopLevelBubbleMotionTest {
                     topLevelBubble = true,
                     cardMorph = true,
                 ) { route ->
-                    if (route == 0) ChatsStandIn(bottomOrigin, rows) { section.value = 1 } else SettingsStandIn()
+                    if (route == 0) ChatsStandIn(pen, rows) { section.value = 1 } else SettingsStandIn()
                 }
             }
         }
@@ -262,10 +354,11 @@ class SettingsTopLevelBubbleMotionTest {
         return cards
     }
 
-    /** Bounds of the light outline pixels outside both cards (the Chats and Settings stand-ins are otherwise dark). */
+    /** Bounds of the light outline pixels outside both cards in [rows] (the stand-ins are otherwise dark). */
     private fun outlineBounds(
         frame: Bitmap,
         cards: List<Rect>,
+        rows: (Float) -> Boolean = { true },
     ): Rect? {
         val excluded = cards.map { it.inflate(CARD_MARGIN) }
         var left = Int.MAX_VALUE
@@ -273,6 +366,7 @@ class SettingsTopLevelBubbleMotionTest {
         var right = -1
         var bottom = -1
         for (y in 0 until frame.height) {
+            if (!rows(y + 0.5f)) continue
             for (x in 0 until frame.width) {
                 val center = Offset(x + 0.5f, y + 0.5f)
                 if (lightGrey(frame.getPixel(x, y)) && excluded.none { it.contains(center) }) {
@@ -286,29 +380,63 @@ class SettingsTopLevelBubbleMotionTest {
         return if (right < 0) null else Rect(left.toFloat(), top.toFloat(), right + 1f, bottom + 1f)
     }
 
-    /** Within the span from [origin] to [card], allowing antialiasing. */
-    private fun Rect.overlapsSpan(
-        origin: Rect,
-        card: Rect,
-    ): Boolean {
-        val span =
-            Rect(
-                minOf(origin.left, card.left),
-                minOf(origin.top, card.top),
-                maxOf(origin.right, card.right),
-                maxOf(origin.bottom, card.bottom),
-            ).inflate(2f)
-        return span.left <= left && span.top <= top && span.right >= right && span.bottom >= bottom
+    /** The one avatar-coloured circle in [frame]; fails if the green pixels form anything but one circle. */
+    private fun singleAvatar(
+        frame: Bitmap,
+        label: String,
+    ): Rect? {
+        var left = Int.MAX_VALUE
+        var top = Int.MAX_VALUE
+        var right = -1
+        var bottom = -1
+        var count = 0
+        for (y in 0 until frame.height) {
+            for (x in 0 until frame.width) {
+                val (r, g, b) = channels(frame.getPixel(x, y))
+                if (g > r + GREEN_MARGIN && g > b + GREEN_MARGIN) {
+                    count++
+                    left = minOf(left, x)
+                    top = minOf(top, y)
+                    right = maxOf(right, x)
+                    bottom = maxOf(bottom, y)
+                }
+            }
+        }
+        if (right < 0) return null
+        val bounds = Rect(left.toFloat(), top.toFloat(), right + 1f, bottom + 1f)
+        assertTrue("$label shows one avatar, not two: $bounds", abs(bounds.width - bounds.height) <= SQUARE_SLACK)
+        val disc = count <= bounds.width * bounds.height * DISC
+        assertTrue("$label shows one avatar, not two: $count px in $bounds", disc)
+        return bounds
     }
 
-    private fun Rect.reachesInto(card: Rect) = bottom > card.top - CARD_MARGIN && top < card.bottom + CARD_MARGIN
+    private fun assertNear(
+        label: String,
+        expected: Rect,
+        actual: Rect,
+    ) {
+        val off =
+            maxOf(abs(expected.left - actual.left), abs(expected.top - actual.top), abs(expected.right - actual.right))
+        assertTrue("$label: expected $expected, drew $actual", off <= NEAR)
+    }
 
-    /** A bubble the size of the origin control, around it. */
-    private fun Rect.isAround(origin: Rect): Boolean = inflate(1f).contains(origin.center) && width < origin.width * 2
+    private fun Rect.span(other: Rect) = Rect(minOf(left, other.left), minOf(top, other.top), maxOf(right, other.right), maxOf(bottom, other.bottom))
 
-    private fun card(bounds: Rect) = SettingsBubbleCard(bounds, bounds, 16f, Color.Black, Color.White, 1f)
+    private fun Rect.containsRect(other: Rect) = left <= other.left && top <= other.top && right >= other.right && bottom >= other.bottom
 
-    private fun avatarBounds(bottom: Boolean) = if (bottom) Rect(12f, 728f, 52f, 768f) else Rect(12f, 12f, 52f, 52f)
+    private fun handoff(pen: Boolean): SettingsTopLevelHandoff {
+        var layer: GraphicsLayer? = null
+        rule.setContent { layer = rememberGraphicsLayer() }
+        rule.waitForIdle()
+        return SettingsTopLevelHandoff().apply {
+            avatar =
+                SettingsAvatarSource(checkNotNull(layer)).apply {
+                    layerBounds = AVATAR.inflate(4f)
+                    bounds = AVATAR
+                }
+            if (pen) this.pen = SettingsPenSource(PEN, 16f, Color.Gray, Color.White)
+        }
+    }
 
     private fun assertBetween(
         label: String,
@@ -325,19 +453,6 @@ class SettingsTopLevelBubbleMotionTest {
                 value >= minOf(a, b) - 3 && value <= maxOf(a, b) + 3
             }
         assertTrue("$label only fades between the chat list and Settings, no scrim", ok)
-    }
-
-    private fun greenOutsideAvatar(frame: Bitmap): Int {
-        val avatar = avatarBounds(false).inflate(2f)
-        var count = 0
-        for (y in 0 until frame.height step 2) {
-            for (x in 0 until frame.width step 2) {
-                val (r, g, b) = channels(frame.getPixel(x, y))
-                val green = g > r + GREEN_MARGIN && g > b + GREEN_MARGIN
-                if (green && !avatar.contains(Offset(x + 0.5f, y + 0.5f))) count++
-            }
-        }
-        return count
     }
 
     private fun lightGrey(color: Int): Boolean {
@@ -381,9 +496,10 @@ class SettingsTopLevelBubbleMotionTest {
     private companion object {
         const val AVATAR_TAG = "fixture.avatar"
         const val CLOSING_PRESENCE = 0.98f
-        const val HIDDEN_TOP = 60
-        const val HIDDEN_BOTTOM = 100
-        const val AVATAR_TOP = 12
+        const val HIDDEN_TOP = 62
+        const val HIDDEN_BOTTOM = 96
+        const val FOLD_TOP = 744
+        const val FOLD_BOTTOM = 778
         const val SETTLE_MILLIS = 1_000L
         const val OPEN_FRAMES = 20
         const val CLOSE_FRAMES = 18
@@ -395,16 +511,28 @@ class SettingsTopLevelBubbleMotionTest {
         const val LIGHT = 60
         const val GREY_SPREAD = 40
         const val GREEN_MARGIN = 40
+        const val SQUARE_SLACK = 4f
+        const val DISC = 0.9f
+        const val NEAR = 4f
+        const val PEN_SLACK = 12f
         const val FAR_X = 300
         const val FAR_Y = 400
+        val HOST = Rect(0f, 0f, 360f, 780f)
+        val AVATAR = Rect(12f, 12f, 52f, 52f)
+        val TARGET = Rect(32f, 196f, 88f, 252f)
+        val PEN = Rect(300f, 720f, 348f, 768f)
+        val PEN_STAND_IN = Rect(304f, 724f, 352f, 772f)
+        val PROFILE = fixedCard(Rect(16f, 180f, 344f, 326f))
+        val BOTTOM = fixedCard(Rect(16f, 626f, 344f, 740f))
+        val CARDS = listOf(PROFILE, BOTTOM, fixedCard(Rect(16f, 900f, 344f, 990f)))
     }
 }
 
-/** A chat list stand-in: the avatar wired exactly like the production top bar, at the top or the bottom. */
+/** A chat list stand-in: the avatar and the pen wired exactly like the production top bar and FAB. */
 @Composable
 @Suppress("FunctionNaming")
 private fun ChatsStandIn(
-    bottomOrigin: Boolean,
+    pen: Boolean,
     rows: Boolean,
     open: () -> Unit,
 ) {
@@ -426,38 +554,60 @@ private fun ChatsStandIn(
         }
         Box(
             Modifier
-                .align(if (bottomOrigin) Alignment.BottomStart else Alignment.TopStart)
                 .padding(8.dp)
                 .size(48.dp)
                 .then(origin)
                 .settingsCardMorph(SettingsHomeOriginAnchor, inset)
+                .settingsAvatarFlightSource(inset)
                 .testTag("fixture.avatar")
                 .clickable { click() },
             contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.size(40.dp).background(Color(0xFF2E7D32), CircleShape))
         }
+        if (pen) {
+            val fill = MaterialTheme.colorScheme.surfaceContainerHigh
+            val border = MaterialTheme.colorScheme.outline
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(48.dp)
+                    .settingsPenSource(true, 16.dp, fill, border)
+                    .background(fill, RoundedCornerShape(16.dp))
+                    .border(1.dp, border, RoundedCornerShape(16.dp)),
+            )
+        }
     }
 }
 
-/** A Settings stand-in with two production groups far apart: one near the top, one near the bottom. */
+/** A Settings stand-in: a profile card with its avatar near the top and a production group near the bottom. */
 @Composable
 @Suppress("FunctionNaming")
 private fun SettingsStandIn() {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Spacer(Modifier.height(180.dp))
-        StandInGroup()
+        SettingsGroup {
+            row("profile") { context ->
+                SettingsGroupPanel(context) {
+                    Box(
+                        Modifier
+                            .padding(16.dp)
+                            .size(56.dp)
+                            .settingsAvatarFlightTarget()
+                            .background(Color(0xFF2E7D32), CircleShape),
+                    )
+                }
+            }
+            row("account") { context -> SettingsGroupPanel(context) { Box(Modifier.height(56.dp)) } }
+        }
         Spacer(Modifier.height(300.dp))
-        StandInGroup()
-    }
-}
-
-@Composable
-@Suppress("FunctionNaming")
-private fun StandInGroup() {
-    SettingsGroup {
-        listOf("first", "second").forEach { key ->
-            row(key) { context -> SettingsGroupPanel(context) { Box(Modifier.height(56.dp)) } }
+        SettingsGroup {
+            listOf("first", "second").forEach { key ->
+                row(key) { context -> SettingsGroupPanel(context) { Box(Modifier.height(56.dp)) } }
+            }
         }
     }
 }
+
+private fun fixedCard(bounds: Rect) = SettingsBubbleCard(bounds, bounds, 16f, Color.Black, Color.White, 1f)

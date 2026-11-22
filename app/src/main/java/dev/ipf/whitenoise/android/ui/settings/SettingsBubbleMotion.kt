@@ -164,18 +164,19 @@ internal fun Modifier.recordSettingsCard(
 
 /**
  * The top-level Chats/Settings pair. Opening, the live Settings destination arrives over the live
- * Chats route beneath it: a thin outline bubble leaves the origin control (the account avatar) and
- * lands on the resting outline of the Settings card nearest it, on one clock, with that card's
- * content cross-fading in at its final size inside the bubble while the header and the other cards
- * fade in in place and the [colors] backplate covers Chats quickly. There is no scrim and nothing is
+ * Chats route beneath it, all on one clock ([scene]): the chat-list avatar flies into the profile
+ * card's avatar while that card's thin outline bubble grows around it (any other origin grows into
+ * its nearest card), and the New message pen morphs into the bottom-most card. Each card's content
+ * cross-fades in at its final size inside its bubble while the header and the other cards fade in in
+ * place and the [colors] backplate covers Chats quickly. There is no scrim and no page content is
  * scaled or moved. Closing never retains the Settings composition: Chats is live at once and only
  * [closingPicture], an inert picture of the last permitted Settings frame, runs the exact reverse
- * over it; without a picture the bare bubble still shrinks into the origin. A reversed leg
- * continues the Settings ink it turned around with ([resume]), so reopening from a close that drew
- * none brings the ink in from none and turning back again keeps it. Without an origin
- * and card ([geometry]) the page just cross-fades. The shape and every alpha are functions of
- * presence alone, so a reversal continues from the drawn frame. Chats itself is never captured:
- * only this route's content is recorded, into [snapshot] and only while [recording] allows it.
+ * over it; without a picture the bare bubbles and the avatar still return. A reversed leg continues
+ * the Settings ink it turned around with ([resume]), so reopening from a close that drew none brings
+ * the ink in from none and turning back again keeps it. Without bubbles the page just cross-fades.
+ * The shapes and every alpha are functions of presence alone, so a reversal continues from the drawn
+ * frame. Chats itself is never captured: its avatar travels as its live display list, and only this
+ * route's content is recorded, into [snapshot] and only while [recording] allows it.
  */
 @Suppress("LongParameterList")
 internal fun Modifier.settingsBubbleMotion(
@@ -185,7 +186,7 @@ internal fun Modifier.settingsBubbleMotion(
     colors: SettingsBubbleColors,
     snapshot: SettingsCardSnapshot?,
     closingPicture: () -> Picture? = { snapshot?.picture },
-    geometry: () -> SettingsBubbleGeometry? = { null },
+    scene: () -> SettingsBubbleScene = { SettingsBubbleScene() },
     recording: () -> Boolean = { true },
     resume: SettingsBubbleResume? = null,
 ): Modifier =
@@ -200,7 +201,7 @@ internal fun Modifier.settingsBubbleMotion(
             val presence = progress().coerceIn(0f, 1f)
             drawRect(colors.backplate, alpha = settingsBubbleUnderlayCover(presence))
             val ink = settingsBubbleInk(presence, opening = true, resume)
-            drawSettingsBubbleFrame(geometry(), presence, colors.edge, ink) { this@drawWithContent.drawContent() }
+            drawSettingsBubbleFrame(scene(), presence, colors, ink) { this@drawWithContent.drawContent() }
         }
     } else {
         drawWithContent {
@@ -208,14 +209,14 @@ internal fun Modifier.settingsBubbleMotion(
             if (!animating()) return@drawWithContent
             val presence = 1f - progress().coerceIn(0f, 1f)
             val picture = closingPicture()
-            val bubble = geometry()
-            // Without a picture or a bubble there is nothing of Settings left to reverse.
-            if (picture == null && bubble == null) return@drawWithContent
+            val drawn = scene()
+            // Without a picture, a bubble or the avatar there is nothing of Settings left to reverse.
+            if (picture == null && drawn.bubbles.isEmpty() && drawn.flight == null) return@drawWithContent
             drawRect(colors.backplate, alpha = settingsBubbleUnderlayCover(presence))
             val content: (DrawScope.() -> Unit)? =
                 picture?.let { frame -> { drawIntoCanvas { it.nativeCanvas.drawPicture(frame) } } }
             val ink = settingsBubbleInk(presence, opening = false, resume)
-            drawSettingsBubbleFrame(bubble, presence, colors.edge, ink, content)
+            drawSettingsBubbleFrame(drawn, presence, colors, ink, content)
         }
     }
 

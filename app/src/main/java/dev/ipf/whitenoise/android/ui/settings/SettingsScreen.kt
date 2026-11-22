@@ -759,9 +759,7 @@ private fun SettingsProfileHeader(
                         title = stringResource(R.string.settings_switch_profile),
                         onClick = onSwitchProfile,
                         modifier = Modifier.testTag("settings.switch_profile"),
-                        leading = {
-                            SettingsLeadingIcon(R.drawable.ic_settings_account_circle)
-                        },
+                        leading = { SettingsLeadingIcon(R.drawable.ic_settings_account_circle) },
                     )
                 }
             }
@@ -814,6 +812,7 @@ private fun SettingsProfileRow(
                             .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
                             .clickable(role = Role.Button, onClick = onAvatarClick)
                             .testTag("settings.active_profile_avatar")
+                            .settingsAvatarFlightTarget()
                             .semantics {
                                 contentDescription = editPictureDescription
                                 role = Role.Button

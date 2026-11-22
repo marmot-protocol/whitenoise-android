@@ -31,9 +31,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import kotlin.math.roundToInt
@@ -110,12 +112,13 @@ internal fun <T> SettingsRouteMotion(
         history.target = target
         history.depth = depth
     }
-    // Chats and top-level Settings are one outline bubble between the activating control (the account
-    // avatar) and the nearest Settings card, never a multi-group contour morph.
+    // Chats and top-level Settings are a shared avatar and outline bubbles from the activating control
+    // and the pen into their Settings cards (see settingsBubbleScene), never a multi-group contour morph.
     val topLevelPair = topLevelBubble && morph?.page != null && usesSettingsBubble(previousDepth, depth)
     // Read before the page host consumes the click's measured origin and clears the leaving cards.
     val topLevelOrigin = remember(ownerKey, target) { morph?.page?.pendingOrigin?.takeIf { topLevelPair && forward } }
     val leavingCards = remember(ownerKey, target) { morph?.page?.bubbleCards().orEmpty() }
+    val leavingAvatar = remember(ownerKey, target) { morph?.topLevel?.avatarTarget }
     // Chats stays live beneath the arriving Settings page, until the open settles.
     val opened = remember(ownerKey, target) { mutableStateOf(false) }
     val animatedOpen = topLevelBubble && motion && forward
@@ -148,6 +151,8 @@ internal fun <T> SettingsRouteMotion(
                     SettingsContainerRouteHooks(
                         onSettled = { opened.value = true },
                         cards = { if (forward) morph?.page?.bubbleCards().orEmpty() else leavingCards },
+                        avatarTarget = { if (forward) morph?.topLevel?.avatarTarget else leavingAvatar },
+                        handoff = morph?.topLevel,
                     ),
             ),
         )
@@ -216,12 +221,14 @@ private fun <T> SettingsTopLevelRouteLayers(
 
 /**
  * How the top-level pair meets its routes: [onSettled] once an open finishes, and the Settings
- * [cards] (screen coordinates) the bubble may land on, live while opening and as last reported
- * when closing.
+ * [cards] and profile [avatarTarget] (screen coordinates) the leg lands on, live while opening and as
+ * last reported when closing, with the live chat-list endpoints in [handoff].
  */
 internal class SettingsContainerRouteHooks(
     val onSettled: () -> Unit = {},
     val cards: () -> List<SettingsBubbleCard> = { emptyList() },
+    val avatarTarget: () -> Rect? = { null },
+    val handoff: SettingsTopLevelHandoff? = null,
 )
 
 /**
@@ -311,7 +318,8 @@ internal fun <T> rememberRouteMotionModifier(
     if (bubble) {
         // Settings pages rest on surfaceContainerLow; the bubble's backplate is that page surface.
         val scheme = MaterialTheme.colorScheme
-        val colors = SettingsBubbleColors(scheme.surfaceContainerLow, scheme.outlineVariant)
+        val pen = painterResource(R.drawable.ic_edit)
+        val colors = SettingsBubbleColors(scheme.surfaceContainerLow, scheme.outlineVariant, pen, scheme.onSurface)
         val localOrigin: () -> Rect? = {
             val bounds = host[0]
             val measured =
@@ -323,6 +331,16 @@ internal fun <T> rememberRouteMotionModifier(
                 }
             measured?.takeIf { it.visibleIn(bounds) }?.translate(-bounds.topLeft)
         }
+        val scene: () -> SettingsBubbleScene = {
+            val bounds = host[0]
+            val start = localOrigin()?.translate(bounds.topLeft)
+            settingsBubbleScene(bounds, start, hooks.cards(), hooks.handoff, hooks.avatarTarget())
+        }
+        SideEffect {
+            // The live avatar and pen stay out of sight while this leg draws them.
+            hooks.handoff?.hideAvatar = { motion && progress.value < 1f && scene().flight != null }
+            hooks.handoff?.hidePen = { motion && progress.value < 1f && scene().bubbles.any { it.control != null } }
+        }
         return Modifier
             .onGloballyPositioned { host[0] = it.settingsMorphBounds(view) }
             .settingsTransitionInputGate(opening && motion && progress.value < 1f)
@@ -333,14 +351,7 @@ internal fun <T> rememberRouteMotionModifier(
                 colors = colors,
                 snapshot = frame.takeIf { animationsEnabled },
                 closingPicture = { closingPicture[0] },
-                geometry = {
-                    val bounds = host[0]
-                    localOrigin()?.let { start ->
-                        nearestSettingsBubbleCard(hooks.cards(), start.translate(bounds.topLeft), bounds)?.let {
-                            SettingsBubbleGeometry(start, it.translate(-bounds.topLeft))
-                        }
-                    }
-                },
+                scene = scene,
                 recording = recording,
                 resume = resume,
             )
