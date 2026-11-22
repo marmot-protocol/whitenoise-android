@@ -1623,7 +1623,9 @@ internal fun ComposerBar(
                     dictationLauncher?.let { start ->
                         {
                             if (!configuredToolbar || canActivateToolbar()) start()
-                            controllerForDictation?.takeIf { it.heldCaptureOpenFor(accountForDictation, groupForDictation) }
+                            controllerForDictation?.takeIf {
+                                it.heldCaptureOpenFor(accountForDictation, groupForDictation)
+                            }
                         }
                     }
                 BoxWithConstraints(

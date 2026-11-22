@@ -40,7 +40,7 @@ internal fun ConversationDictationController.heldCaptureOpenFor(
     groupIdHex: String?,
 ): Boolean {
     if (accountRef == null || groupIdHex == null) return false
-    if (followUpRecordingFor(accountRef, groupIdHex)) return true
-    return isOwnedBy(accountRef, groupIdHex) &&
+    val activeHere = isOwnedBy(accountRef, groupIdHex) &&
         (captureInProgress || state is ConversationDictationState.CheckingProvider)
+    return followUpRecordingFor(accountRef, groupIdHex) || activeHere
 }

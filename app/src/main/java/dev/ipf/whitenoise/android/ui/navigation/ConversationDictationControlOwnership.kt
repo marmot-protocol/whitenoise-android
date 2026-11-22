@@ -67,7 +67,9 @@ internal fun conversationDictationOriginComposerVisible(
  * Continue records into the active dictation's chat. While another chat's composer is on screen the
  * control leaves it out, and Dictate in that composer queues a recording for that chat instead.
  */
-internal fun ConversationDictationController.controlFactsFor(route: ConversationDictationComposerRoute): DictationControlFacts {
+internal fun ConversationDictationController.controlFactsFor(
+    route: ConversationDictationComposerRoute,
+): DictationControlFacts {
     val facts = controlFacts
     val target = continueTarget ?: return facts
     val otherChatOnScreen =

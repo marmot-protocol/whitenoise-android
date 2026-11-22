@@ -101,8 +101,7 @@ internal class ConversationDictationCaptureOwner(
     }
 
     override fun adoptFollowUp(sessionId: Long): Boolean {
-        if (current != null) return false
-        val capture = followUps.remove(sessionId) ?: return false
+        val capture = (if (current == null) followUps.remove(sessionId) else null) ?: return false
         closing = null
         current = capture
         usedThisSession = true

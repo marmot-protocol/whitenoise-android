@@ -210,6 +210,23 @@ class ConversationDictationFollowUpTest {
     }
 
     @Test
+    fun removingTheDrainingChatDoesNotDropLaterRecordingsForAnotherChat() {
+        val fixture = Fixture()
+        val controller = fixture.controller
+        repeat(2) {
+            assertTrue(controller.queueDictation("account", "bob", null))
+            controller.paste()
+        }
+        fixture.failedDraftReads += "bob"
+
+        controller.onTargetRemoved("account", "group")
+
+        assertEquals("bob", controller.state.target?.groupIdHex)
+        assertEquals(listOf(2L), fixture.platform.discarded)
+        assertEquals(listOf(3L), fixture.platform.adopted)
+    }
+
+    @Test
     fun anUnavailableChatCannotQueue() {
         val fixture = Fixture()
         fixture.removed += "bob"
@@ -236,16 +253,21 @@ class ConversationDictationFollowUpTest {
         val platform = FakePlatform()
         val drafts = mutableMapOf<String, TextFieldValue>()
         val removed = mutableSetOf<String>()
+        val failedDraftReads = mutableSetOf<String>()
         var draft: TextFieldValue
             get() = drafts["group"] ?: TextFieldValue()
             set(value) {
                 drafts["group"] = value
             }
-        val target = ConversationDictationTarget("account", "group", TextFieldValue(), 0L, ConversationDictationMode.InApp)
+        val target =
+            ConversationDictationTarget("account", "group", TextFieldValue(), 0L, ConversationDictationMode.InApp)
         val controller =
             ConversationDictationController(
                 platform = platform,
-                readDraft = { _, group -> ConversationDictationDraftSnapshot(drafts[group] ?: TextFieldValue(), 0L) },
+                readDraft = { _, group ->
+                    check(!failedDraftReads.remove(group))
+                    ConversationDictationDraftSnapshot(drafts[group] ?: TextFieldValue(), 0L)
+                },
                 writeDraft = { _, group, _, value ->
                     drafts[group] = value
                     0L
