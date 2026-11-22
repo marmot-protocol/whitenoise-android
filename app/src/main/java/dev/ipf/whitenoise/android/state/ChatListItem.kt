@@ -143,19 +143,6 @@ private fun presentationMemberCount(
         ?: if (peer != null) DIRECT_CHAT_MEMBER_COUNT else roster?.memberCount ?: 0
 }
 
-/**
- * The real activity time of a chat another of the account's devices added here, or null for any other chat. MDK
- * stamps such a copy's `conversationCreatedAt` with the moment it was added, which is newer than all of its imported
- * history, so that stamp becomes `activitySortAt` and every chat on a newly linked device sorts by when it arrived
- * (mdk#3580). A conversation created after its own last message can only be such a copy, so its activity is the
- * newest message or read position instead. Remove once MDK carries the chat's own creation time.
- */
-private fun ChatListRowFfi.linkedCopyActivityAt(): ULong? {
-    val lastAt = lastMessage?.timelineAt?.takeIf { it > 0uL } ?: return null
-    val installedAfterHistory = activitySortAt == conversationCreatedAt && conversationCreatedAt > lastAt
-    return if (installedAfterHistory) maxOf(lastAt, lastReadTimelineAt ?: 0uL) else null
-}
-
 /** The chat-list row's latest message as a renderable record, or null when the row has none. */
 private fun chatListLatestMessage(row: ChatListRowFfi): AppMessageRecordFfi? =
     row.lastMessage?.let { preview ->
@@ -359,8 +346,7 @@ data class ChatListItem(
         //
         // All values use the same unix-seconds unit as `timelineAt`.
         get() =
-            projection?.linkedCopyActivityAt()
-                ?: projection?.activitySortAt?.takeIf { it > 0uL }
+            projection?.activitySortAt?.takeIf { it > 0uL }
                 ?: projection?.lastMessage?.timelineAt
                 ?: projection?.lastReadTimelineAt
                 ?: projection?.conversationCreatedAt?.takeIf { it > 0uL }
