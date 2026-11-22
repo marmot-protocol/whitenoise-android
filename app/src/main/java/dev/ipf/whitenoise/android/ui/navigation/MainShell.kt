@@ -1827,6 +1827,11 @@ internal fun MainShell(
                                     chatListReturnHeadSnap =
                                         onConversationReturnHeadHandled(chatListReturnHeadSnap)
                                 },
+                                onFirstRunHelp = { support ->
+                                    sectionName = MainSection.Settings.name
+                                    settingsDetailName =
+                                        if (support) SettingsDetail.Support.name else SettingsDetail.LearnWhiteNoise.name
+                                },
                                 onOpenSettings = {
                                     pendingConversationOpen = null
                                     supersedePendingTtsDestinationNavigation()

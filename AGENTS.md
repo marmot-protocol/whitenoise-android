@@ -19,6 +19,9 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
 
 ## Working and validation
 
+- When a change affects user instructions, update the Android [user guides](docs/user-guides.md) in the same PR.
+  Link the affected guides beside the PR’s visual evidence or record **No docs impact**.
+
 - Follow [CI request policy](docs/ci-request-policy.md): batch related fixups into
   one candidate push, reuse exact-head results and request previews only for an
   actual debugging/human-test candidate. All CI-covered compilation, tests,

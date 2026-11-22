@@ -318,6 +318,24 @@ internal fun HelpSupportScreen(
                     destination = SettingsDetail.HelpSupport,
                     surface = "help-support-controls",
                 ) {
+                    row("learn_white_noise") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.learn_white_noise),
+                            routeKey = SettingsDetail.LearnWhiteNoise,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_help) },
+                            onClick = { onOpenDetail(SettingsDetail.LearnWhiteNoise) },
+                        )
+                    }
+                    row("documentation") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.user_documentation),
+                            routeKey = SettingsDetail.Documentation,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_help) },
+                            onClick = { onOpenDetail(SettingsDetail.Documentation) },
+                        )
+                    }
                     row("help") { context ->
                         SettingsLink(
                             context = context,

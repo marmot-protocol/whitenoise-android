@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">Learn White Noise</string>
+    <string name="user_documentation">Documentation</string>
+    <string name="search_documentation">Search documentation</string>
+    <string name="documentation_unavailable">The bundled guides couldn’t be opened.</string>
+    <string name="help_open_share_connect">Open Share &amp; connect</string>
+    <string name="learn_find_title">Find someone</string>
+    <string name="learn_find_body">Open New Chat and paste the profile link they gave you, or scan their QR code. If a name search comes up empty, ask for their profile link.</string>
+    <string name="learn_share_title">Share your profile</string>
+    <string name="learn_share_body">Open Share &amp; connect to show your QR code or send your profile link. Keep your private sign-in key to yourself.</string>
+    <string name="learn_actions_title">Reply or react</string>
+    <string name="learn_actions_body">Touch and hold a message to find its actions. Try it on this example.</string>
+    <string name="learn_example_message">See you tomorrow!</string>
+    <string name="learn_show_actions">Show message actions</string>
+    <string name="learn_actions_explanation">Choose Reply to quote the message in your response, or choose an emoji to react.</string>
+    <string name="learn_page_number">%1$d of %2$d</string>
+    <string name="learn_previous">Previous</string>
+    <string name="learn_next">Next</string>
+    <string name="learn_close">Close</string>
+    <string name="learn_view_topics">View all topics</string>
+</resources>

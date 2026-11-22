@@ -47,6 +47,8 @@ internal enum class SettingsDetail {
     Chats,
     VoiceLanguage,
     HelpSupport,
+    LearnWhiteNoise,
+    Documentation,
     NotificationSounds,
     NotificationDelivery,
 }

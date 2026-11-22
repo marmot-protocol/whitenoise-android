@@ -364,6 +364,10 @@ private fun SettingsDetailRoute(
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = onBack)
         SettingsDetail.Gestures -> GestureSettingsScreen(appState, onBack = onBack)
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = onBack)
+        SettingsDetail.LearnWhiteNoise ->
+            LearnWhiteNoiseScreen(onBack, { onDetailChange(SettingsDetail.Documentation) })
+        SettingsDetail.Documentation ->
+            DocumentationScreen(appState, onBack, { onDetailChange(SettingsDetail.ShareConnect) })
         SettingsDetail.Help ->
             HelpScreen(
                 onBack = onBack,

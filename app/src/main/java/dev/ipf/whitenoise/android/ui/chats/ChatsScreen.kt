@@ -240,6 +240,7 @@ internal fun ChatsScreen(
     },
     onGroupCreateFlowSuperseded: () -> Unit = {},
     diagnosticsPrompt: @Composable () -> Unit = {},
+    onFirstRunHelp: ((Boolean) -> Unit)? = null,
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
@@ -2812,7 +2813,15 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(appState, onCreate = openNewMessageFlow) { newChatFlowOrigin = it }
+                                EmptyChats(
+                                    appState,
+                                    onCreate = openNewMessageFlow,
+                                    onFirstRunHelp =
+                                        onFirstRunHelp.takeIf {
+                                            controller.error == null && controller.archivedItems.isEmpty() &&
+                                                selectedFolderId == null && !searchOpen && !searchActive
+                                        },
+                                ) { newChatFlowOrigin = it }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
