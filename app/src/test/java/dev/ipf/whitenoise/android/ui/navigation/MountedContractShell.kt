@@ -103,7 +103,8 @@ internal class MountedContractShell(
         withGlobalSnapshotApply {
             val mounted = mutableStateOf(true)
             var saved = SavedStateHandle()
-            val holders = mutableListOf(MainShellStateHolder(fixture.appState, saved))
+            var process = MainShellProcessState(fixture.appState)
+            val holders = mutableListOf(MainShellStateHolder(fixture.appState, saved, process))
             // A plain field, read only when the restored composition is created, so a restart never recomposes.
             var current = holders.single()
             val controller =
@@ -121,9 +122,14 @@ internal class MountedContractShell(
             val restart = {
                 saved = SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })
                 if (saved.contains(SECTION_PROCESS_KEY)) saved[SECTION_PROCESS_KEY] = DEAD_PROCESS
-                current = MainShellStateHolder(fixture.appState, saved, MainShellProcessState(fixture.appState))
+                val previousProcess = process
+                process = MainShellProcessState(fixture.appState)
+                current = MainShellStateHolder(fixture.appState, saved, process)
                 holders += current
                 recreate()
+                // The old process is gone: its conversation controllers end here, not when the exercise ends. Its
+                // chats controller stays attached because this fixture shares one app state with the new process.
+                composeRule.runOnIdle { previousProcess.retainConversationControllers(emptyList()) }
                 current
             }
             try {
