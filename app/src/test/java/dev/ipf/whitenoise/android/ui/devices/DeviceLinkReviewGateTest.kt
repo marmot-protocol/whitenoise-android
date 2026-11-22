@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.devices
 
+import android.os.Looper
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +22,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 /** Review on another profile's request shows its comparison only after a read made after the switch succeeds. */
 @RunWith(RobolectricTestRunner::class)
@@ -38,7 +41,7 @@ class DeviceLinkReviewGateTest {
             if (account == "b") nextReadOfB() else DeviceLinkSnapshotFfi(null, emptyList(), emptyList())
         })
 
-    /** A read still under way after Review keeps the cached comparison down until it returns. */
+    /** A read still under way after Review shows the request as being checked, not its cached comparison. */
     @Test
     fun aSlowReadAfterReviewKeepsTheComparisonDown() {
         val held = CompletableDeferred<DeviceLinkSnapshotFfi>()
@@ -48,24 +51,27 @@ class DeviceLinkReviewGateTest {
         compose.onNodeWithTag(DEVICE_LINK_REVIEW_TAG).performClick()
         compose.waitForIdle()
         compose.onNodeWithText(COMPARISON).assertDoesNotExist()
+        compose.onNodeWithTag(DEVICE_LINK_REVIEW_PENDING_TAG).assertExists()
 
         held.complete(withPrompt)
         compose.waitForIdle()
         compose.onNodeWithText(COMPARISON).assertExists()
     }
 
-    /** A failed read after Review never shows the cached comparison; the next successful read does. */
+    /** A failed read after Review never shows the cached comparison, and the request's own retry recovers it. */
     @Test
-    fun aFailedReadAfterReviewKeepsTheComparisonDown() {
+    fun aFailedReadAfterReviewRetriesUntilARead() {
         showRequestOnB()
         nextReadOfB = { error("read failed") }
 
         compose.onNodeWithTag(DEVICE_LINK_REVIEW_TAG).performClick()
         compose.waitForIdle()
         compose.onNodeWithText(COMPARISON).assertDoesNotExist()
+        compose.onNodeWithTag(DEVICE_LINK_REVIEW_PENDING_TAG).assertExists()
 
         nextReadOfB = { withPrompt }
-        runBlocking { watcher.reread("b", blocked = false) }
+        compose.mainClock.advanceTimeBy(DEVICE_LINK_REVIEW_RETRY_MS + 100L)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(DEVICE_LINK_REVIEW_RETRY_MS + 100L))
         compose.waitForIdle()
         compose.onNodeWithText(COMPARISON).assertExists()
     }

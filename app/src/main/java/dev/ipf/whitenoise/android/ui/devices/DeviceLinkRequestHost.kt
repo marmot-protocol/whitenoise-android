@@ -33,10 +33,15 @@ import dev.ipf.whitenoise.android.state.decline
 import dev.ipf.whitenoise.android.state.link
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 internal const val DEVICE_LINK_OTHER_PROFILE_TAG = "device_link.other_profile"
 internal const val DEVICE_LINK_REVIEW_TAG = "device_link.review"
+internal const val DEVICE_LINK_REVIEW_PENDING_TAG = "device_link.review.pending"
+
+/** How long a reviewed profile waits between reads while its request is still unchecked. */
+internal const val DEVICE_LINK_REVIEW_RETRY_MS = 2_000L
 
 /**
  * The profiles whose link requests the shell watches: signed in, and signing with a key held on this device.
@@ -110,10 +115,11 @@ internal data class DeviceLinkReview(
 }
 
 /**
- * Shows the presented [request]: on the active profile its comparison ([activeRequest]); on another profile only
+ * Shows the presented [request]: on the active profile its comparison ([activeRequest]), on another profile only
  * the notice, whose Review runs [onReview] to activate that profile and re-read its prompt. Until a read made after
- * Review has succeeded, the comparison stays down, so neither a slow read nor a failed one shows the cached prompt
- * with working Link and Not now.
+ * Review has succeeded, the request shows as being checked, with Not now and nothing to answer, and its profile is
+ * read again every [DEVICE_LINK_REVIEW_RETRY_MS]: a failed read raises no event and the watcher keeps no timer, so
+ * neither a slow read nor a failed one can show the cached prompt or strand the request.
  */
 @Composable
 internal fun DeviceLinkRequestPresentation(
@@ -128,7 +134,17 @@ internal fun DeviceLinkRequestPresentation(
     var review by remember(watcher) { mutableStateOf<DeviceLinkReview?>(null) }
     if (request.accountRef == activeAccountRef) {
         val pending = review?.takeIf { it.accountRef == request.accountRef }?.awaits(watcher.successfulReads) == true
-        if (!pending) activeRequest()
+        if (!pending) {
+            activeRequest()
+        } else {
+            LaunchedEffect(review) {
+                while (true) {
+                    delay(DEVICE_LINK_REVIEW_RETRY_MS)
+                    watcher.reread(request.accountRef, blocked)
+                }
+            }
+            if (!blocked) DeviceLinkReviewPendingDialog(onNotNow = { watcher.hidePresented(blocked) })
+        }
     } else if (!blocked && request.open) {
         DeviceLinkOtherProfileDialog(
             profileName = profileName,
@@ -257,6 +273,18 @@ internal fun DeviceLinkFailureEffect(
             controller.failureShown()
         }
     }
+}
+
+/** A reviewed request whose profile has not been read again yet: it says so and can only be put off. */
+@Composable
+internal fun DeviceLinkReviewPendingDialog(onNotNow: () -> Unit) {
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onNotNow,
+        modifier = Modifier.testTag(DEVICE_LINK_REVIEW_PENDING_TAG),
+        title = { Text(stringResource(R.string.link_request_title)) },
+        text = { Text(stringResource(R.string.link_request_preparing)) },
+        confirmButton = { TextButton(onClick = onNotNow) { Text(stringResource(R.string.link_request_not_now)) } },
+    )
 }
 
 /**

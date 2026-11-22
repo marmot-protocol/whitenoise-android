@@ -98,6 +98,24 @@
         "test_ids": [
           "SET-061"
         ]
+      },
+      {
+        "surface": "DeviceLinkReviewPendingDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "fun DeviceLinkReviewPendingDialog(",
+        "test_ids": [
+          "SET-061"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.link_request_preparing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "R.string.link_request_preparing",
+        "test_ids": [
+          "SET-061"
+        ]
       }
     ]
   },
