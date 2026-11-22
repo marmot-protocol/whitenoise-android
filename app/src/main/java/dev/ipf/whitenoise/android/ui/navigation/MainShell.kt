@@ -1759,8 +1759,7 @@ internal fun MainShell(
             // One movable list route, so its screen state survives moving between the side pane and the
             // full-width slot when the window crosses the two-pane width.
             val mainRoute: @Composable () -> Unit = {
-                // Navigation 3 renders the list pane's routes from the navigator's stack. The Settings state
-                // above the entries stays in one place while each Settings screen is its own entry.
+                // NavDisplay renders the list pane's routes, the Settings state stays above its entries.
                 val settingsRoute =
                     if (section == MainSection.Settings) {
                         rememberSettingsRouteRenderer(
@@ -1944,8 +1943,9 @@ internal fun MainShell(
                     !(routingNotification || routingShare || routingAppUpdate) &&
                     pendingTtsDestinationNavigation == null
             TwoPaneChatFrame(twoPane = listBesideConversation, listPane = { movableMainRoute() }) {
-                ConversationRouteAnimatedContent(
+                ConversationRouteNavDisplay(
                     transition = routeTransition,
+                    mainRoute = null,
                     routeForwardDirection = routeForwardDirection,
                     suppressMotion =
                         routingNotification ||

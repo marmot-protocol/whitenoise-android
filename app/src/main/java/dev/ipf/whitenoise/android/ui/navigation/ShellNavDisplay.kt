@@ -6,6 +6,7 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavEntry
@@ -13,9 +14,6 @@ import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
 import androidx.navigation3.ui.NavDisplay
-
-/** The shell's decorated route entries, in stack order. */
-private typealias ShellEntries = List<NavEntry<ShellRoute>>
 
 /** No enter or exit motion: a route change replaces the rendered entry outright, as the shell's own hosts do. */
 private val NoRouteMotion: ContentTransform = EnterTransition.None togetherWith ExitTransition.None
@@ -38,25 +36,25 @@ internal fun shellEntryContentKey(route: ShellRoute): String =
  * predictive-back handling: system Back keeps reaching the shell's plain Back handlers, which send the navigator its
  * events, exactly as before.
  */
-private class ShellTopEntryScene(
-    private val entry: NavEntry<ShellRoute>,
-) : Scene<ShellRoute> {
+private class ShellTopEntryScene<T : Any>(
+    private val entry: NavEntry<T>,
+) : Scene<T> {
     override val key: Any = entry.contentKey
-    override val entries: List<NavEntry<ShellRoute>> = listOf(entry)
-    override val previousEntries: List<NavEntry<ShellRoute>> = emptyList()
+    override val entries: List<NavEntry<T>> = listOf(entry)
+    override val previousEntries: List<NavEntry<T>> = emptyList()
     override val content: @Composable () -> Unit = { entry.Content() }
 
     /** Two scenes are the same when they render the same entry instance. */
-    override fun equals(other: Any?): Boolean = other is ShellTopEntryScene && other.entry == entry
+    override fun equals(other: Any?): Boolean = other is ShellTopEntryScene<*> && other.entry == entry
 
     /** Hashes the rendered entry, matching [equals]. */
     override fun hashCode(): Int = entry.hashCode()
 }
 
-/** Places the top of the stack in a [ShellTopEntryScene]. */
-private object ShellTopEntrySceneStrategy : SceneStrategy<ShellRoute> {
+/** Places the top of the stack in a [ShellTopEntryScene], the only scene the shell's displays use. */
+internal class ShellTopEntrySceneStrategy<T : Any> : SceneStrategy<T> {
     /** The scene for the last entry of [entries]. */
-    override fun SceneStrategyScope<ShellRoute>.calculateScene(entries: ShellEntries): Scene<ShellRoute> {
+    override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T> {
         val top = entries.last()
         return ShellTopEntryScene(top)
     }
@@ -81,7 +79,7 @@ internal fun ShellNavDisplay(
         modifier = modifier,
         onBack = {},
         entryDecorators = emptyList(),
-        sceneStrategies = listOf(ShellTopEntrySceneStrategy),
+        sceneStrategies = remember { listOf(ShellTopEntrySceneStrategy()) },
         transitionSpec = { NoRouteMotion },
         popTransitionSpec = { NoRouteMotion },
         predictivePopTransitionSpec = { NoRouteMotion },
