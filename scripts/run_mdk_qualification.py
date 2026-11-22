@@ -211,10 +211,16 @@ def usable_chat(name, *, consent_settled=False):
     adb('shell', 'am', 'start', '-W', '-n', APP + '/dev.ipf.whitenoise.android.MainActivity')
     deadline = time.monotonic() + 120
     opened = False
+    xml = ''
     while time.monotonic() < deadline:
-        adb('shell', 'uiautomator', 'dump', '/sdcard/qualification-window.xml')
-        xml = adb('shell', 'cat', '/sdcard/qualification-window.xml')
-        nodes = list(ET.fromstring(xml).iter('node'))
+        try:
+            adb('shell', 'rm -f /sdcard/qualification-window.xml && uiautomator dump /sdcard/qualification-window.xml')
+            xml = adb('shell', 'cat', '/sdcard/qualification-window.xml')
+            nodes = list(ET.fromstring(xml).iter('node'))
+        except (subprocess.CalledProcessError, ET.ParseError):
+            # UIAutomator may temporarily find no idle window during bootstrap.
+            time.sleep(2)
+            continue
         conversation = any(n.get('resource-id', '').endswith('composer-pill-surface') for n in nodes)
         chat_list = any(n.get('resource-id', '').endswith('chats.scope.chats') for n in nodes)
         consent = any(n.get('text') == 'Help Improve White Noise' for n in nodes)

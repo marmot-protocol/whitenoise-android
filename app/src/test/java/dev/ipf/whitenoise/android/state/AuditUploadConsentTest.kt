@@ -133,6 +133,19 @@ class AuditUploadConsentTest {
         }
 
     @Test
+    fun staleRenewalDoesNotOverrideAStoredDecline() =
+        runTest {
+            AuditUploadConsent(preferences).choose(false)
+            preferences.edit().putBoolean("audit_upload_disclosure_pending", true).commit()
+            val native = Native(enabled = true)
+            val consent = AuditUploadConsent(preferences)
+            assertFalse(consent.requiresChoice)
+            consent.prepare(native.runtime)
+            assertFalse(consent.requiresChoice)
+            assertEquals(listOf("clear-upload", "disable"), native.mutations)
+        }
+
+    @Test
     fun closingUsageOnlyPromptKeepsBothSettledAuditChoices() =
         runTest {
             for (enabled in listOf(true, false)) {

@@ -22,7 +22,8 @@ internal class AuditUploadConsent(
     private val renewalKey = "audit_upload_disclosure_pending"
 
     val granted: Boolean get() = preferences.getInt(revisionKey, 0) == currentDisclosureRevision
-    var requiresChoice by mutableStateOf(preferences.getBoolean(renewalKey, false))
+    private val declined: Boolean get() = preferences.getInt(revisionKey, -1) == 0
+    var requiresChoice by mutableStateOf(!declined && preferences.getBoolean(renewalKey, false))
         private set
     var startupUploadConfigured = false
         private set
@@ -112,7 +113,6 @@ internal class AuditUploadConsent(
                 runtime.auditLogSettings()
             }
         if (settings.enabled && !acknowledged) {
-            val declined = preferences.getInt(revisionKey, -1) == 0
             if (!declined) {
                 check(preferences.edit().putBoolean(renewalKey, true).commit()) {
                     "Could not save audit disclosure renewal"

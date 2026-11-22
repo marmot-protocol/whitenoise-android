@@ -384,6 +384,16 @@ class QualificationUiTest(unittest.TestCase):
                 self.assertEqual(adb.call_count, 4)
                 self.assertEqual((Path(directory) / 'upgraded-window.xml').read_text(), window)
 
+    def test_usable_chat_recovers_from_a_missing_ui_dump(self):
+        window = ('<hierarchy><node resource-id="composer-pill-surface"/>'
+                  '<node text="Retained qualification history 0"/></hierarchy>')
+        missing = subprocess.CalledProcessError(1, 'adb shell cat')
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign.time, 'sleep'), \
+                    patch.object(campaign, 'adb', side_effect=['', '', '', missing, '', window, b'image']):
+                campaign.usable_chat('upgraded', consent_settled=True)
+                self.assertEqual((Path(directory) / 'upgraded-window.xml').read_text(), window)
+
     def test_audit_readiness_uses_the_main_activity_pid(self):
         for choice, log in (('enabled', 'WHITENOISE_AUDIT_READY_V1 {}'), ('declined', '')):
             with self.subTest(choice=choice), tempfile.TemporaryDirectory() as directory:
