@@ -116,7 +116,11 @@ private fun reduceSectionEvent(
 /**
  * Applies an account, owner or process boundary. Each clears synchronously to the chat list, except the two exact
  * notification routes master carries across a boundary, and then only the conversation root itself survives: every
- * screen opened above it is dropped.
+ * screen opened above it is dropped, and so is the Settings section below it.
+ *
+ * Dropping the section there is intentional and differs from master, which left the section as it was when the
+ * early open landed. It cannot be seen: while a notification routes, the list pane is covered, so Settings cannot be
+ * opened between the early open and its landing, and an owner rebind clears the section anyway.
  */
 private fun reduceBoundaryEvent(
     stack: List<ShellRoute>,
