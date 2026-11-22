@@ -62,7 +62,7 @@ class ShareConnectScreenScreenshotTest {
         capture("amoled")
     }
 
-    /** RTL at a 200 % font scale keeps the column centered and the capsule within its 240 dp visual. */
+    /** RTL at a 200 % font scale keeps the abbreviated key readable. */
     @Test
     fun shareConnectRtlLargeFont() {
         render(darkTheme = false, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
@@ -73,6 +73,7 @@ class ShareConnectScreenScreenshotTest {
     @Test
     fun shareConnectCopiedWithInvalidScan() {
         render(darkTheme = false, copied = true, scanInvalid = true)
+        composeRule.onNodeWithTag("share_connect.copy_public_key").performClick()
         capture("copied_invalid_scan")
     }
 

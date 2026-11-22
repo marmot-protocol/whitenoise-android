@@ -445,7 +445,6 @@ private fun ShareProfileContent(
     scanInvalid: Boolean,
     onCopy: () -> Unit,
 ) {
-    val copyState = stringResource(if (copied) R.string.copied else R.string.not_copied)
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize().whiteNoiseVerticalScroll(rememberScrollState()),
         contentAlignment = Alignment.TopCenter,
@@ -490,25 +489,13 @@ private fun ShareProfileContent(
                 )
             }
             SettingsSearchRowReveal("copy_public_key", modifier = Modifier.padding(top = 4.dp)) {
-                IdentifierCopyCapsule(
-                    value = profile.npub,
+                // One key: short until tapped, then copied and expanded in full for comparison (#3321).
+                CopyablePublicKey(
+                    npub = profile.npub,
                     copied = copied,
                     onCopy = onCopy,
-                    copyContentDescription = stringResource(R.string.copy_public_key),
-                    copiedContentDescription = stringResource(R.string.copied),
-                    notCopiedStateDescription = copyState,
-                    copiedStateDescription = copyState,
                     targetTestTag = "share_connect.copy_public_key",
-                    visualTestTag = "share_connect.copy_public_key.visual",
-                )
-            }
-            // The capsule abbreviates; the whole key stays readable for comparison (#3321).
-            if (profile.npub.isNotBlank()) {
-                FullPublicKey(
-                    npub = profile.npub,
-                    modifier = Modifier.padding(top = 8.dp),
-                    testTag = "share_connect.full_public_key",
-                    label = stringResource(R.string.public_key),
+                    textTestTag = "share_connect.full_public_key",
                 )
             }
             IdentityQrCodeSurface(
