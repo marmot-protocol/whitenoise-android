@@ -227,7 +227,10 @@ class ShellEarlyOpenDetailsContractTest {
         awaitCondition("the conversation never opened ahead of the switch") { openedAheadOfTheSwitch() }
         val early = holder.selectedChatOpenContext.value
         val superseded = early.copy(notificationRouteTraceRequestId = SUPERSEDING_TRACE_ID)
-        composeRule.runOnIdle { holder.dispatchShellNav(ShellNavEvent.JumpWithin(superseded)) }
+        composeRule.runOnIdle {
+            val root = requireNotNull(conversationRoot(holder.shellNavigator.stack))
+            holder.dispatchShellNav(ShellNavEvent.CommitNotificationRoute(root.copy(open = superseded)))
+        }
         awaitCondition("the route never took the superseding trace") { routeCarries(SUPERSEDING_TRACE_ID) }
         // The conversation is on screen, pinned to the arriving account, before the switch lands.
         assertEquals(TARGET_ACCOUNT, holder.selectedChatOpenContext.value.pinnedAccountRef)

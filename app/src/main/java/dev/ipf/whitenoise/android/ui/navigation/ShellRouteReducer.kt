@@ -32,10 +32,6 @@ private fun reduceConversationEvent(
         is ShellNavEvent.RestoreSavedConversation -> sectionOf(stack) + opened(stack, event.conversation)
         is ShellNavEvent.JumpToConversation -> CHATS_ROOT + opened(stack, event.conversation)
         is ShellNavEvent.CommitNotificationRoute -> CHATS_ROOT + opened(stack, event.conversation)
-        is ShellNavEvent.JumpWithin ->
-            conversationRoot(stack)?.let { root ->
-                CHATS_ROOT + opened(stack, root.copy(open = event.open, item = event.item ?: root.item))
-            } ?: stack
         is ShellNavEvent.ConversationRowReconciled ->
             conversationRoot(stack)?.takeIf { it.isSameChat(event.accountRef, event.groupIdHex) }?.let { root ->
                 sectionOf(stack) + root.copy(item = event.item ?: root.item) + conversationSegment(stack).drop(1)

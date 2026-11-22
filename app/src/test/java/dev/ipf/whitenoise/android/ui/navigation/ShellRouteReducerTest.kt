@@ -48,16 +48,13 @@ class ShellRouteReducerTest {
         )
     }
 
-    /** A same-chat re-land keeps the conversation and takes the fresh open context with its new request id. */
+    /** A same-chat re-land keeps the conversation, takes the fresh open context and leaves Settings. */
     @Test
     fun aReLandKeepsTheConversationWithTheFreshOpenContext() {
         val fresh = ConversationOpenContext(notificationOpenRequestId = 9L, notificationRouteTraceRequestId = 9L)
         val stack = listOf(ShellRoute.Chats, ShellRoute.Settings(null), conversationA)
-        assertEquals(
-            listOf(ShellRoute.Chats, conversationA.copy(open = fresh)),
-            reduce(stack, ShellNavEvent.JumpWithin(fresh)),
-        )
-        assertEquals(CHATS_ROOT, reduce(CHATS_ROOT, ShellNavEvent.JumpWithin(fresh)))
+        val relanded = conversationA.copy(open = fresh)
+        assertEquals(listOf(ShellRoute.Chats, relanded), reduce(stack, ShellNavEvent.CommitNotificationRoute(relanded)))
     }
 
     /** Reconciling the provisional row keeps the route, and without a conversation it changes nothing. */
@@ -250,15 +247,10 @@ class ShellRouteReducerTest {
         assertEquals(CHATS_ROOT, reduce(chatsBeside, ShellNavEvent.BackFrom(ShellPane.Content)))
     }
 
-    /** Re-landing or reconciling the open conversation keeps its item unless the event carries a fresh one. */
+    /** Reconciling the open conversation keeps its item unless the event carries a fresh one. */
     @Test
     fun theOpenConversationKeepsItsRowUntilAFreshOneArrives() {
         val withoutItem = listOf(ShellRoute.Chats, conversationA)
-        val fresh = ConversationOpenContext(notificationOpenRequestId = 9L)
-        assertEquals(
-            listOf(ShellRoute.Chats, conversationA.copy(open = fresh)),
-            reduce(withoutItem, ShellNavEvent.JumpWithin(fresh)),
-        )
         assertEquals(withoutItem, reduce(withoutItem, ShellNavEvent.ConversationRowReconciled(ACCOUNT_A, GROUP_ONE)))
     }
 
@@ -287,9 +279,10 @@ class ShellRouteReducerTest {
         val screen = ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays)
         val relays = listOf(ShellRoute.Chats, conversationA, screen)
         val fresh = ConversationOpenContext(notificationOpenRequestId = 5L)
+        val relanded = conversationA.copy(open = fresh)
         assertEquals(
-            listOf(ShellRoute.Chats, conversationA.copy(open = fresh), relays.last()),
-            reduce(relays, ShellNavEvent.JumpWithin(fresh)),
+            listOf(ShellRoute.Chats, relanded, relays.last()),
+            reduce(relays, ShellNavEvent.CommitNotificationRoute(relanded)),
         )
     }
 

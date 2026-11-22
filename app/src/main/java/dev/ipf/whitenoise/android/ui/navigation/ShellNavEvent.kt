@@ -27,18 +27,13 @@ internal sealed interface ShellNavEvent {
         val conversation: ShellRoute.Conversation,
     ) : ShellNavEvent
 
-    /** A notification tap commits its conversation in one atomic replace and leaves Settings. */
+    /**
+     * A notification tap commits its conversation in one atomic replace and leaves Settings. A re-land in the
+     * conversation that is already open is the same event: it takes the fresh open context and row and keeps the
+     * screens open above that conversation.
+     */
     data class CommitNotificationRoute(
         val conversation: ShellRoute.Conversation,
-    ) : ShellNavEvent
-
-    /**
-     * A notification re-lands in the conversation that is already open, with a fresh open context and, when the
-     * route read it again, the fresh chat-list [item].
-     */
-    data class JumpWithin(
-        val open: ConversationOpenContext,
-        val item: ChatListItem? = null,
     ) : ShellNavEvent
 
     /**

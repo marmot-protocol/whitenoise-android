@@ -616,11 +616,6 @@ internal fun MainShell(
                             item: ChatListItem,
                             openContext: ConversationOpenContext,
                         ) {
-                            val routed = routeOf(item, openContext)
-                            val reLand =
-                                conversationRoot(shellStateHolder.shellNavigator.stack)
-                                    ?.isSameChat(routed.accountRef, routed.groupIdHex)
-                                    ?: false
                             settingsHomeViewport =
                                 reduceSettingsHomeViewport(
                                     settingsHomeViewport,
@@ -634,13 +629,8 @@ internal fun MainShell(
                             selectedChatJustCreated = false
                             selectedChatOpenedAsDmHint = false
                             chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-                            shellNav(
-                                if (reLand) {
-                                    ShellNavEvent.JumpWithin(openContext, item)
-                                } else {
-                                    ShellNavEvent.CommitNotificationRoute(routed)
-                                },
-                            )
+                            // A re-land in the open chat keeps its screens: the reducer treats the same chat as one.
+                            shellNav(ShellNavEvent.CommitNotificationRoute(routeOf(item, openContext)))
                         }
 
                         /** Hands the acknowledgement to the Activity, which clears only a matching pending tap. */

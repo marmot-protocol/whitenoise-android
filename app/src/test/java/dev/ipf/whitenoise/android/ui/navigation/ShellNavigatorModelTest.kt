@@ -349,7 +349,6 @@ private data class MasterShell(
             is ShellNavEvent.RestoreSavedConversation -> selecting(event.conversation)
             is ShellNavEvent.JumpToConversation -> selecting(event.conversation).copy(section = MainSection.Chats)
             is ShellNavEvent.CommitNotificationRoute -> selecting(event.conversation).copy(section = MainSection.Chats)
-            is ShellNavEvent.JumpWithin -> relanded(event)
             is ShellNavEvent.ConversationRowReconciled ->
                 chat
                     ?.takeIf { sameChat(it, event.accountRef, event.groupIdHex) }
@@ -357,13 +356,6 @@ private data class MasterShell(
             is ShellNavEvent.OpenChatDetailsScreen -> if (chat == null) this else copy(screen = event.destination)
             else -> afterClosingEvent(event)
         }
-
-    /** A re-land in the open chat: a fresh open context and row, and Settings left, or nothing without a chat. */
-    private fun relanded(event: ShellNavEvent.JumpWithin): MasterShell {
-        val open = chat ?: return this
-        val next = open.copy(open = event.open, item = event.item ?: open.item)
-        return copy(chat = next, section = MainSection.Chats)
-    }
 
     /** Events that close the conversation, its screen or everything. */
     private fun afterClosingEvent(event: ShellNavEvent): MasterShell =
@@ -456,7 +448,7 @@ private class Scenarios(
             0, 1 -> ShellNavEvent.OpenConversation(ownChat(ConversationOpenContext()))
             2 -> ShellNavEvent.CommitNotificationRoute(ownChat(notificationOpen(pinned = null)))
             3 -> ShellNavEvent.JumpToConversation(ownChat(ConversationOpenContext()))
-            4 -> ShellNavEvent.JumpWithin(notificationOpen(root?.open?.pinnedAccountRef), ITEMS.random(random))
+            4 -> reLand()
             5 -> ShellNavEvent.ConversationRowReconciled(owner, reconciledGroup(), ITEMS.random(random))
             6 -> ShellNavEvent.CloseConversation
             else -> ShellNavEvent.ReturnToChats
@@ -539,6 +531,13 @@ private class Scenarios(
                 ShellRoute.Conversation(account, it.groupIdHex, ConversationOpenContext(), ITEMS.random(random))
             }
         return listOf(Step.ProcessDeath(account, runtime, restore))
+    }
+
+    /** A notification re-landing in the open chat with a fresh open context and row, or a list tap without one. */
+    private fun reLand(): ShellNavEvent {
+        val open = root ?: return ShellNavEvent.OpenConversation(ownChat(ConversationOpenContext()))
+        val fresh = notificationOpen(open.open.pinnedAccountRef)
+        return ShellNavEvent.CommitNotificationRoute(open.copy(open = fresh, item = ITEMS.random(random)))
     }
 
     /** A chat of the owner's account opened with [open], or of a random account while there is no owner. */
