@@ -164,11 +164,7 @@ class VoiceRecordingController internal constructor(
 
         val pending = finalizeJob?.takeIf { it.isActive }
         if (pending != null) {
-            // A previous take is still finalizing its tail and holds the mic and
-            // audio focus. Cut the tail to release the mic now, reuse that focus,
-            // and open the new recorder only once the old one has stopped —
-            // opening a second recorder mid-capture throws "mic busy" on devices
-            // without concurrent capture.
+            // Finish the previous recorder before opening another under the same microphone lease.
             restarting = true
             tailCut?.complete(Unit)
             VoicePlaybackController.pause()

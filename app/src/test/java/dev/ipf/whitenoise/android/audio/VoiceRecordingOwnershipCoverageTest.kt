@@ -53,7 +53,7 @@ class VoiceRecordingOwnershipCoverageTest {
         assertFalse(conversation.contains("voiceReview.release()"))
         assertFalse("no screen-owned recorder", conversation.contains("VoiceRecordingController("))
         val store = source("audio/VoiceDraftStore.kt")
-        val directory = store.functionBody("directory") + store.functionBody("accountDirectory")
+        val directory = store.functionBody("chatName") + store.functionBody("accountDirectory")
         assertTrue("draft directories are hashed", directory.contains("voiceReviewRecoveryOwner("))
         val helpers = source("state/AppStateCaptureOwners.kt")
         val account = helpers.functionBody("releaseCaptureOwners")

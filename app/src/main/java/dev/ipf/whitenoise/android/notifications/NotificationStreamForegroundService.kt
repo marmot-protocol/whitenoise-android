@@ -608,16 +608,6 @@ internal fun shouldStopAfterNativePushRegistrationSync(
         backgroundConnectionEnabled = backgroundConnectionEnabled,
     )
 
-internal fun shouldStopAfterOneShotForegroundStart(
-    oneShotRequested: Boolean,
-    backgroundConnectionEnabled: Boolean,
-): Boolean = oneShotRequested && !backgroundConnectionEnabled
-
-internal fun isOneShotForegroundStart(
-    syncNativePushRegistrationRequested: Boolean,
-    trigger: ForegroundStartTrigger,
-): Boolean = syncNativePushRegistrationRequested || trigger == ForegroundStartTrigger.PushWake
-
 internal fun shouldHoldPushWakeLock(trigger: ForegroundStartTrigger): Boolean = trigger == ForegroundStartTrigger.PushWake
 
 internal fun shouldRecordPendingPushWakeCatchUp(

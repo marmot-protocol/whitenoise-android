@@ -187,7 +187,8 @@ class VoiceAttachmentCacheStateTest {
     @Test
     fun voicePresentationAttachmentIdentityDistinguishesSiblingsAndRevisions() {
         val first = VoicePresentationAttachmentKey("message", 0, 1uL)
-        val renderer = bubbleContentBlocksSource().readText()
+        val bubbleSource = bubbleContentBlocksSource()
+        val renderer = bubbleSource.readText() + bubbleSource.resolveSibling("PendingVoiceAttachments.kt").readText()
 
         assertEquals(first, VoicePresentationAttachmentKey("message", 0, 1uL))
         assertFalse(first == VoicePresentationAttachmentKey("message", 1, 1uL))
