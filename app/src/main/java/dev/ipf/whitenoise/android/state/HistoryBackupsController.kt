@@ -117,8 +117,11 @@ internal class HistoryBackupsController(
         }
 
     /** Starts a history-only restore. The words go straight to MDK; nothing here keeps a copy. */
-    fun beginRestore(words: String) =
-        run(HistoryBackupAction.BeginRestore) { applyRestore(owned { beginRestore(words) }) }
+    fun beginRestore(words: String) {
+        run(HistoryBackupAction.BeginRestore) {
+            applyRestore(owned { beginRestore(words) })
+        }
+    }
 
     fun cancelRestore() {
         val operation = mutableState.value.restore?.operation ?: return

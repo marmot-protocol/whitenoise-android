@@ -42,7 +42,9 @@ internal class NativeHistoryBackupsAccess(
     override suspend fun turnOff() = call { turnOffBackups(account) }
 
     override suspend fun beginRestore(words: String): BackupRestoreStatusFfi =
-        call { beginBackupRestore(account, words) }
+        call {
+            beginBackupRestore(account, words)
+        }
 
     override suspend fun cancelRestore(operation: String) {
         call { cancelBackupRestore(account, operation) }
