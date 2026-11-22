@@ -72,6 +72,9 @@ class ShellAccountBoundaryFrameContractTest {
             assertEquals("frames that still composed the previous account's conversation", emptyList<Int>(), leaked)
             val stillSelected = selectedAtFrame.filterNotNull()
             assertEquals("the selection is clear from the first frame on", emptyList<String>(), stillSelected)
+            // Frame sampling cannot see a route an effect clears before the sample, the committed record can.
+            val first = shell.firstCommitFor(OTHER_ACCOUNT_REF)
+            assertEquals("the first composition after the switch composed only the list", CHATS_ROOT, first.stack)
         }
     }
 

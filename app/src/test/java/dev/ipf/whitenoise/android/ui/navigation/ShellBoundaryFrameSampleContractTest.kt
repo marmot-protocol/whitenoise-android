@@ -110,7 +110,31 @@ class ShellBoundaryFrameSampleContractTest {
                 }
 
             assertEquals("frames after the switch that composed the previous chat", emptyList<Int>(), leaked)
+            val first = shell.firstCommitFor(OTHER_ACCOUNT_REF)
+            assertEquals("the first composition after the switch composed only the list", CHATS_ROOT, first.stack)
             assertEquals("the stack is the chat list from the first frame", List(FRAMES_WATCHED) { CHATS_ROOT }, stacks)
+        }
+    }
+
+    /**
+     * The previous account's Settings screen is not in the first composition committed after a switch. Sampling
+     * frames alone cannot tell this apart from a reset done by an effect just before the first sample, so the
+     * assertion is on the first committed composition with the new account active.
+     */
+    @Test
+    fun theFirstCompositionAfterAnAccountSwitchHasNoSettingsScreen() {
+        shell.withMountedShell(mutableStateOf(COMPACT_WIDTH), messageFixture()) { fixture, holder ->
+            composeRule.runOnIdle { holder.restoreSection(MainSection.Settings, SettingsDetail.Appearance) }
+            shell.awaitCondition { composed(hasTestTag(APPEARANCE_COLORS_TAG)) }
+
+            val leaked =
+                framesAfter({ fixture.appState.replaceActiveAccount(OTHER_ACCOUNT_REF) }) {
+                    composed(hasTestTag(APPEARANCE_COLORS_TAG))
+                }
+
+            val first = shell.firstCommitFor(OTHER_ACCOUNT_REF)
+            assertEquals("the first composition after the switch composed only the list", CHATS_ROOT, first.stack)
+            assertEquals("frames after the switch that composed the previous Settings screen", emptyList<Int>(), leaked)
         }
     }
 
@@ -197,6 +221,7 @@ class ShellBoundaryFrameSampleContractTest {
         const val OTHER_ACCOUNT_REF = "other-frame-sampled-account"
         const val OPEN_SCRIPTS = 3
         const val RELAND_ID = 4_004L
+        const val APPEARANCE_COLORS_TAG = "appearance.colors.group"
 
         /** Longer than any route exit motion, so retained exit content would be seen. */
         const val FRAMES_WATCHED = 60

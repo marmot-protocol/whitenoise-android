@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
@@ -17,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
 import dev.ipf.whitenoise.android.ui.common.WindowLayout
@@ -28,6 +30,21 @@ internal class MountedContractShell(
     private val composeRule: AndroidComposeTestRule<ActivityScenarioRule<ComponentActivity>, ComponentActivity>,
 ) {
     private val restoration = StateRestorationTester(composeRule)
+    private val commits = mutableListOf<CommittedRoute>()
+
+    /**
+     * The route each committed composition of the mounted shell left behind, in commit order, with the account that
+     * was active when it was composed. Written on the main thread only.
+     */
+    val committedRoutes: List<CommittedRoute>
+        get() = commits.toList()
+
+    /**
+     * The route of the first composition committed with [accountRef] active, which is the first frame a reader can
+     * see after a switch to it. Fails when no such composition was committed.
+     */
+    fun firstCommitFor(accountRef: String): CommittedRoute =
+        requireNotNull(commits.firstOrNull { it.activeAccountRef == accountRef }) { "no commit for $accountRef" }
 
     /** Recreates the shell's composition from its saved instance state, as Activity recreation does. */
     fun recreate() {
@@ -70,6 +87,7 @@ internal class MountedContractShell(
                         LocalWindowLayout provides WindowLayout.fromSize(DpSize(width.value, SHELL_HEIGHT)),
                     ) {
                         WhiteNoiseTheme { shell(holder) }
+                        RecordCommittedRoute(fixture.appState, holder, commits)
                     }
                 }
             }
@@ -181,4 +199,28 @@ internal class MountedContractShell(
         /** A process epoch no live process has. */
         const val DEAD_PROCESS = "a process that died"
     }
+}
+
+/** One committed composition of the mounted shell: the account active then and the route stack it composed. */
+internal data class CommittedRoute(
+    val activeAccountRef: String?,
+    val stack: List<ShellRoute>,
+)
+
+/**
+ * Records, after every committed composition in which the active account or the route stack changed, the stack the
+ * shell composed with. It is composed after the shell, so it sees every route change the shell made while composing,
+ * such as an owner rebind, and since it reads the active account it also records the first frame after a switch even
+ * when the stack itself did not change in that frame.
+ */
+@Composable
+@Suppress("FunctionNaming")
+private fun RecordCommittedRoute(
+    appState: WhiteNoiseAppState,
+    holder: MainShellStateHolder,
+    commits: MutableList<CommittedRoute>,
+) {
+    val activeAccountRef = appState.activeAccountRef
+    val stack = holder.shellNavigator.stack
+    SideEffect { commits += CommittedRoute(activeAccountRef, stack) }
 }
