@@ -128,14 +128,14 @@ internal fun <T> ConversationRouteAnimatedContent(
 internal val ConversationRouteEasing = AppMotionOpenEasing
 
 /** Visibility and slot retention must finish on the same immutable timing specification. */
-internal val conversationRouteAnimationSpec =
+private val conversationRouteAnimationSpec =
     tween<Float>(
         durationMillis = CONVERSATION_ROUTE_TRANSITION_MILLIS,
         easing = ConversationRouteEasing,
     )
 
 /** Retains both full-screen slots while draw-layer progress owns visible motion. */
-internal fun <T> AnimatedContentTransitionScope<T>.routeContentTransform(suppressMotion: Boolean): ContentTransform {
+private fun <T> AnimatedContentTransitionScope<T>.routeContentTransform(suppressMotion: Boolean): ContentTransform {
     if (suppressMotion) return EnterTransition.None togetherWith ExitTransition.None
     // A non-zero delta keeps AnimatedContent's outgoing slot alive for the
     // layer animation. Visible alpha is owned by conversationRouteLayerAlpha.
