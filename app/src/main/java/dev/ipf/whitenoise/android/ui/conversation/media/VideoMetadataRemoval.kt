@@ -141,8 +141,15 @@ private fun <K> recheckPrepared(
     val refused = LinkedHashSet<K>()
     prepared.forEach { (key, attachment) ->
         val stagedVideo = attachment.sourceFile != null && isVideoMediaType(attachment.mediaType)
+        // A stored draft file was copied into the draft only after its metadata was removed, so it is sent as stored.
+        val action =
+            when {
+                attachment.draftFile != null -> DocumentVideoAction.Keep
+                stagedVideo -> DocumentVideoAction.Refuse
+                else -> actionFor(attachment)
+            }
         val checked =
-            when (if (stagedVideo) DocumentVideoAction.Refuse else actionFor(attachment)) {
+            when (action) {
                 DocumentVideoAction.Keep -> attachment
                 DocumentVideoAction.Refuse -> null
                 DocumentVideoAction.Scrub ->

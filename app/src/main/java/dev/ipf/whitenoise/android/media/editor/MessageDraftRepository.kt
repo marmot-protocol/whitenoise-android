@@ -31,6 +31,9 @@ internal class MessageDraftRepository(
             ioDispatcher = ioDispatcher,
         )
 
+    /** File-backed attachments, under the same per-draft locks and generations as every other mutation. */
+    internal val files = MessageDraftFiles(gateway, draftLocks, mutationGenerations, ioDispatcher)
+
     @Suppress("TooGenericExceptionCaught") // FFI gateway failures are returned; cancellation is rethrown first.
     suspend fun draft(
         accountRef: String,
@@ -67,6 +70,7 @@ internal class MessageDraftRepository(
             saveDraftText(gateway, accountRef, groupIdHex, content)
         }
 
+    /** Appends [incoming] to the draft text on a new line, keeping its reply and attachments. */
     suspend fun mergeText(
         accountRef: String,
         groupIdHex: String,
@@ -74,19 +78,19 @@ internal class MessageDraftRepository(
     ): MessageDraftMutationResult =
         mutate(accountRef, groupIdHex) {
             val trimmedIncoming = incoming.trim()
-            if (trimmedIncoming.isEmpty()) {
-                return@mutate MessageDraftMutationResult.Success(gateway.read(accountRef, groupIdHex))
-            }
-            val current = gateway.read(accountRef, groupIdHex)
+            val base = gateway.readRevisioned(accountRef, groupIdHex)
+            if (trimmedIncoming.isEmpty()) return@mutate MessageDraftMutationResult.Success(base.draft)
+            val current = base.draft
             val merged =
                 if (current?.content.isNullOrBlank()) {
                     trimmedIncoming
                 } else {
                     "${current.content.trimEnd()}\n$trimmedIncoming"
                 }
-            saveDraftText(gateway, accountRef, groupIdHex, merged, current)
+            saveDraftText(gateway, accountRef, groupIdHex, merged, base)
         }
 
+    /** Appends [attachment] inline; an id the draft already holds is a duplicate. */
     suspend fun addAttachment(
         accountRef: String,
         groupIdHex: String,
@@ -94,7 +98,8 @@ internal class MessageDraftRepository(
         pendingSession: EditorAttachmentSession? = null,
     ): MessageDraftMutationResult =
         mutate(accountRef, groupIdHex) {
-            val current = gateway.read(accountRef, groupIdHex)
+            val base = gateway.readRevisioned(accountRef, groupIdHex)
+            val current = base.draft
             if (current?.mediaAttachments.orEmpty().any { it.id == attachment.id }) {
                 return@mutate MessageDraftMutationResult.DuplicateAttachment
             }
@@ -106,7 +111,7 @@ internal class MessageDraftRepository(
                 editorSessions = editorSessions,
                 accountRef = accountRef,
                 groupIdHex = groupIdHex,
-                before = current,
+                base = base,
                 updatedAttachments = current?.mediaAttachments.orEmpty() + attachment,
                 changedAttachment = attachment,
                 pendingSession = pendingSession,
@@ -114,6 +119,7 @@ internal class MessageDraftRepository(
             )
         }
 
+    /** Replaces one attachment in place while it still matches [expectedDigest]. */
     suspend fun replaceAttachment(
         accountRef: String,
         groupIdHex: String,
@@ -128,7 +134,8 @@ internal class MessageDraftRepository(
             ) {
                 return@mutate MessageDraftMutationResult.InvalidEditorSession
             }
-            val current = gateway.read(accountRef, groupIdHex)
+            val base = gateway.readRevisioned(accountRef, groupIdHex)
+            val current = base.draft
             val currentAttachments =
                 current?.mediaAttachments
                     ?: return@mutate MessageDraftMutationResult.MissingAttachment
@@ -146,7 +153,7 @@ internal class MessageDraftRepository(
                 editorSessions = editorSessions,
                 accountRef = accountRef,
                 groupIdHex = groupIdHex,
-                before = current,
+                base = base,
                 updatedAttachments = updated,
                 changedAttachment = replacement,
                 pendingSession = pendingSession,
@@ -154,6 +161,7 @@ internal class MessageDraftRepository(
             )
         }
 
+    /** Removes one attachment, deleting the draft when nothing else remains in it. */
     @Suppress("TooGenericExceptionCaught") // FFI gateways can surface unchecked failures; cancellation is rethrown.
     suspend fun removeAttachment(
         accountRef: String,
@@ -162,7 +170,8 @@ internal class MessageDraftRepository(
         expectedDigest: String? = null,
     ): MessageDraftMutationResult =
         mutate(accountRef, groupIdHex) {
-            val current = gateway.read(accountRef, groupIdHex)
+            val base = gateway.readRevisioned(accountRef, groupIdHex)
+            val current = base.draft
             val attachments = current?.mediaAttachments ?: return@mutate MessageDraftMutationResult.MissingAttachment
             val target =
                 attachments.firstOrNull { it.id == attachmentId }
@@ -175,15 +184,14 @@ internal class MessageDraftRepository(
             try {
                 val saved =
                     if (deleteEmptyDraft) {
-                        gateway.deleteAgainstSelected(accountRef, groupIdHex)
+                        gateway.clearRevisioned(accountRef, groupIdHex, base)
                         null
                     } else {
-                        gateway.saveAgainstSelected(
-                            accountRef = accountRef,
-                            groupIdHex = groupIdHex,
-                            content = current.content,
-                            replyToMessageIdHex = current.replyToMessageIdHex,
-                            mediaAttachments = updated,
+                        gateway.saveRevisioned(
+                            accountRef,
+                            groupIdHex,
+                            base,
+                            MessageDraftWrite(current.content, current.replyToMessageIdHex, updated),
                         )
                     }
                 val removedSession = editorSessions.remove(accountRef, groupIdHex, attachmentId)
@@ -340,6 +348,7 @@ internal class MessageDraftCoordinatedOperations(
             }
         }
 
+    /** Merges [incoming] once per [receipt], so a retried merge does not repeat the text. */
     suspend fun mergeAcceptedText(
         accountRef: String,
         groupIdHex: String,
@@ -349,13 +358,14 @@ internal class MessageDraftCoordinatedOperations(
         withContext(ioDispatcher) {
             draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
                 runDraftMutation {
-                    val current = gateway.read(accountRef, groupIdHex)
+                    val base = gateway.readRevisioned(accountRef, groupIdHex)
+                    val current = base.draft
                     if (current != null && current.content == receipt?.proposedContent) {
                         MessageDraftMutationResult.Success(current)
                     } else {
                         val merged = mergeDraftText(current?.content.orEmpty(), incoming)
                         receipt?.proposedContent = merged
-                        saveDraftText(gateway, accountRef, groupIdHex, merged, current)
+                        saveDraftText(gateway, accountRef, groupIdHex, merged, base)
                     }
                 }
             }
@@ -399,8 +409,9 @@ internal class MessageDraftCoordinatedOperations(
         }
 }
 
+/** Runs one mutation, returning gateway failures as results and rethrowing cancellation. */
 @Suppress("TooGenericExceptionCaught") // Repository boundary converts non-cancellation gateway failures to results.
-private suspend fun runDraftMutation(block: suspend () -> MessageDraftMutationResult): MessageDraftMutationResult =
+internal suspend fun runDraftMutation(block: suspend () -> MessageDraftMutationResult): MessageDraftMutationResult =
     try {
         block()
     } catch (cancelled: CancellationException) {
@@ -429,15 +440,17 @@ private fun deleteDraft(
         }
     }
 
+/** Saves [content] against one read, keeping its reply and attachments, or clears an emptied draft. */
 @Suppress("TooGenericExceptionCaught")
 private fun saveDraftText(
     gateway: MessageDraftGateway,
     accountRef: String,
     groupIdHex: String,
     content: String,
-    alreadyRead: MessageDraftFfi? = null,
+    alreadyRead: RevisionedMessageDraft? = null,
 ): MessageDraftMutationResult {
-    val current = alreadyRead ?: gateway.read(accountRef, groupIdHex)
+    val base = alreadyRead ?: gateway.readRevisioned(accountRef, groupIdHex)
+    val current = base.draft
     val deleteEmpty =
         content.isBlank() &&
             current?.replyToMessageIdHex == null &&
@@ -445,15 +458,14 @@ private fun saveDraftText(
     return try {
         val saved =
             if (deleteEmpty) {
-                gateway.deleteAgainstSelected(accountRef, groupIdHex)
+                gateway.clearRevisioned(accountRef, groupIdHex, base)
                 null
             } else {
-                gateway.saveAgainstSelected(
-                    accountRef = accountRef,
-                    groupIdHex = groupIdHex,
-                    content = content,
-                    replyToMessageIdHex = current?.replyToMessageIdHex,
-                    mediaAttachments = current?.mediaAttachments.orEmpty(),
+                gateway.saveRevisioned(
+                    accountRef,
+                    groupIdHex,
+                    base,
+                    MessageDraftWrite(content, current?.replyToMessageIdHex, current?.mediaAttachments.orEmpty()),
                 )
             }
         MessageDraftMutationResult.Success(saved)
@@ -476,14 +488,17 @@ private fun saveDraftText(
     }
 }
 
-// Re-read after any non-cancellation gateway failure resolves commit ambiguity.
+/**
+ * Writes an attachment change against [base] and settles its editor session against what was saved. A re-read after
+ * any non-cancellation gateway failure resolves whether the write committed.
+ */
 @Suppress("TooGenericExceptionCaught")
 private fun commitDraftAttachmentMutation(
     gateway: MessageDraftGateway,
     editorSessions: EditorSessionStore,
     accountRef: String,
     groupIdHex: String,
-    before: MessageDraftFfi?,
+    base: RevisionedMessageDraft,
     updatedAttachments: List<MessageDraftAttachmentFfi>,
     changedAttachment: MessageDraftAttachmentFfi,
     pendingSession: EditorAttachmentSession?,
@@ -495,12 +510,11 @@ private fun commitDraftAttachmentMutation(
     val changedDigest = changedAttachment.editorDigest()
     return try {
         val saved =
-            gateway.saveAgainstSelected(
-                accountRef = accountRef,
-                groupIdHex = groupIdHex,
-                content = before?.content.orEmpty(),
-                replyToMessageIdHex = before?.replyToMessageIdHex,
-                mediaAttachments = updatedAttachments,
+            gateway.saveRevisioned(
+                accountRef,
+                groupIdHex,
+                base,
+                MessageDraftWrite(base.draft?.content.orEmpty(), base.draft?.replyToMessageIdHex, updatedAttachments),
             )
         finishAttachmentCommit(
             editorSessions = editorSessions,

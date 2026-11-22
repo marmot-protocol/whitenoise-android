@@ -216,8 +216,8 @@ internal class ConversationMediaSender(
                     imageSlots,
                     documentUris,
                     trimmedCaption,
-                    preparedImageAttachments,
-                    preparedDocumentAttachments,
+                    preparedImageAttachments.withoutStoredFiles(),
+                    preparedDocumentAttachments.withoutStoredFiles(),
                     pendingDraftClear,
                 )
             return startCollectionSend(request, completion, onAfterSend, sendDrafts)
@@ -491,7 +491,7 @@ internal class ConversationMediaSender(
             // The disk check asks the filesystem for free space, so it runs on the IO pool rather than Main.
             val refusal =
                 if (prepared != null && fileBacked != null) {
-                    withContext(Dispatchers.IO) { fileBacked.admit(prepared.byteCount, prepared.sourceFile == null) }
+                    withContext(Dispatchers.IO) { fileBacked.admit(prepared.byteCount, !prepared.isFileBacked) }
                 } else {
                     null
                 }
@@ -667,7 +667,7 @@ internal suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>)
         withContext(Dispatchers.Default) {
             attachments.map { attachment ->
                 val needsThumbhash =
-                    attachment.sourceFile == null &&
+                    !attachment.isFileBacked &&
                         attachment.mediaType.startsWith("image/", ignoreCase = true) &&
                         attachment.thumbhash == null
                 if (!needsThumbhash) {

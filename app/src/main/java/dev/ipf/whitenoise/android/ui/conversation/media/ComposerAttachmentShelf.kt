@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeLocalPreviewAnimation
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
+import dev.ipf.whitenoise.android.media.editor.hasInlineBody
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.ui.common.AppDivider
@@ -170,7 +171,8 @@ internal fun ComposerAttachmentShelf(
                         when {
                             item is StagedPreviewItem.Media -> ({ onPreview(index) })
                             !preparing &&
-                                preparedDocuments[item.uri]?.attachment?.let {
+                                // A stored file has no bytes here to read, so only an inline document opens.
+                                preparedDocuments[item.uri]?.attachment?.takeIf { it.hasInlineBody() }?.let {
                                     attachmentReaderTarget(it.mediaType, it.fileName)
                                 } != null -> ({ onOpenDocument(item.uri) })
                             else -> null

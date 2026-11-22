@@ -166,16 +166,7 @@ private suspend fun MarmotInterface.uploadOrAdmitComposerSubmission(
     descriptors: List<Pair<String, String>>,
     upload: suspend (send: Boolean) -> MediaUploadSubmissionFfi,
 ): DurableComposerMediaUpload {
-    recoveredLocalSend(account, group, token)?.let { recovered ->
-        return DurableComposerMediaUpload(
-            upload = MediaUploadResultFfi(emptyList(), null),
-            // The completed native send owns its projection, but an interrupted
-            // upload return did not give Android the references needed to build
-            // a truthful sent bridge. Keep the bubble pending until that echo.
-            acceptance = pendingLocalSend(recovered.messageIds),
-            recoveredWithoutUpload = true,
-        )
-    }
+    recoveredLocalSend(account, group, token)?.let { recovered -> return recoveredComposerUpload(recovered) }
     val draftBacked =
         capturedReply ||
             selectedDraftOrNull(account, group)
@@ -194,3 +185,15 @@ private suspend fun MarmotInterface.uploadOrAdmitComposerSubmission(
         recoveredWithoutUpload = false,
     )
 }
+
+/**
+ * The outcome for a submission MDK already owns. The completed native send owns its projection, but an interrupted
+ * upload return did not give Android the references needed to build a truthful sent bridge, so the bubble stays
+ * pending until that echo.
+ */
+internal fun recoveredComposerUpload(recovered: SendSummaryFfi) =
+    DurableComposerMediaUpload(
+        upload = MediaUploadResultFfi(emptyList(), null),
+        acceptance = pendingLocalSend(recovered.messageIds),
+        recoveredWithoutUpload = true,
+    )

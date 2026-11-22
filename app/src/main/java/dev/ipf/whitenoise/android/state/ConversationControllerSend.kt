@@ -67,6 +67,7 @@ private fun ConversationController.commitPublishLock(
  * Uploads a send with file-backed items through MDK's file path, with the same commit lock,
  * cancellation check, retry capture and draft/admission rules as the in-memory path. While the
  * transfer holds the lock, the user's Cancel reaches it through [RetainedMediaUpload.requestTransferCancel].
+ * A send of stored draft files uploads from the draft instead, see [uploadDraftStoredRetained].
  */
 internal suspend fun ConversationController.uploadFileBackedRetained(
     account: String,
@@ -75,6 +76,7 @@ internal suspend fun ConversationController.uploadFileBackedRetained(
     retained: RetainedMediaUpload,
     startedAtMs: Long,
 ): MediaUploadResultFfi {
+    if (retained.isDraftStored) return uploadDraftStoredRetained(account, key, tempId, retained, startedAtMs)
     val batchCiphertextBytes =
         checkNotNull(withContext(Dispatchers.IO) { fileBatchCiphertextBytes() }) {
             "file-backed upload limits unavailable"
@@ -112,6 +114,34 @@ internal suspend fun ConversationController.uploadFileBackedRetained(
                 }.upload
     }
 }
+
+/**
+ * Uploads a send of files the composer's draft stores from the draft's own copies, under the same commit lock,
+ * cancellation check, progress and retry capture as a file upload. Nothing is read from the pick again; the draft
+ * send that follows admits the references with this send's token.
+ */
+private suspend fun ConversationController.uploadDraftStoredRetained(
+    account: String,
+    key: String,
+    tempId: String,
+    retained: RetainedMediaUpload,
+    startedAtMs: Long,
+): MediaUploadResultFfi =
+    appState
+        .withGroupCommitLock(account, group.groupIdHex) {
+            requireOptimisticSendNotCancelled(key)
+            withNativeTransferControl(
+                retained::attachTransferCancel,
+                onProgress = retained::reportTransferProgress,
+            ) { control ->
+                appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                    val upload = DraftFilesUpload(retained.attachments, retained.caption)
+                    uploadComposerDraftFilesWithToken(account, group.groupIdHex, upload, control, tempId)
+                }
+            }
+        }.also { outcome ->
+            outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)
+        }.upload
 
 /** Retires host cancellation when a failed admission may already have published. */
 private fun ConversationController.recordSendAdmissionFailure(

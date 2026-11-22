@@ -115,6 +115,14 @@
           "MED-031",
           "MED-056"
         ]
+      },
+      {
+        "surface": "A stored draft file does not open in the in-app reader with an empty body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "?.takeIf { it.hasInlineBody() }",
+        "test_ids": [
+          "MED-063"
+        ]
       }
     ]
   },

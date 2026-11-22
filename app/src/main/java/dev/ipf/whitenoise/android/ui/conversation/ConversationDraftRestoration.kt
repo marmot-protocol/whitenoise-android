@@ -2,26 +2,29 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.net.Uri
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
-import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
+import dev.ipf.whitenoise.android.media.editor.RevisionedMessageDraft
 import dev.ipf.whitenoise.android.media.editor.editorDigest
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import kotlinx.coroutines.delay
 
 private const val DRAFT_RESTORATION_RETRY_DELAY_MILLIS = 250L
 
-/** One bounded retry keeps a transient initial read from stranding the document shelf. */
+/**
+ * One bounded retry keeps a transient initial read from stranding the document shelf. The read carries its
+ * revision, so a file-backed attachment's body can be streamed from the same draft state.
+ */
 internal suspend fun readDraftForRestoration(
     drafts: MessageDraftRepository,
     accountRef: String,
     groupIdHex: String,
-): Result<MessageDraftFfi?> {
-    val initial = drafts.draft(accountRef, groupIdHex)
+): Result<RevisionedMessageDraft> {
+    val initial = drafts.files.revisioned(accountRef, groupIdHex)
     if (initial.isSuccess) return initial
     delay(DRAFT_RESTORATION_RETRY_DELAY_MILLIS)
-    return drafts.draft(accountRef, groupIdHex)
+    return drafts.files.revisioned(accountRef, groupIdHex)
 }
 
 /** A native refresh cannot replace locally editable bytes or relabel freshly prepared picks. */

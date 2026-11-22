@@ -24,7 +24,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
-import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStageResult
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStager
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
@@ -33,11 +32,10 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditorCommitter
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceFailure
 import dev.ipf.whitenoise.android.media.editor.editorDigest
-import dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId
+import dev.ipf.whitenoise.android.media.editor.hasInlineBody
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
-import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAcceptanceToken
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalPendingCameraCaptureFiles
@@ -381,12 +379,13 @@ internal class ConversationMediaDraftState(
 
     fun preparedQualities(): Map<String, PreparedPhotoQuality> = preparedPhotoQualities(backedPhotos, renderer)
 
+    /** Native-owned bytes by slot; a file-backed pick has none, so its send reads the slot's file instead. */
     fun preparedAttachments() =
         backedPhotos.mapValues { (_, photo) -> photo.pendingAttachment() } +
-            preparedPhotos.mapValues { (_, photo) -> photo.pendingAttachment() }
+            preparedPhotos.sendableBodies()
 
-    /** Returns native-owned document bytes in the URI order used by the shelf. */
-    fun preparedDocumentAttachments() = preparedDocuments.mapValues { (_, document) -> document.pendingAttachment() }
+    /** Returns native-owned document bytes in the URI order used by the shelf, file-backed documents excepted. */
+    fun preparedDocumentAttachments() = preparedDocuments.sendableBodies()
 
     /**
      * Captures picker occurrences and explicit edits for a later durable send completion. Background
@@ -471,11 +470,10 @@ internal class ConversationMediaDraftState(
                 return@withLock null
             }
             val accountRef = owner.accountRef
-            val attachments =
+            val read =
                 readDraftForRestoration(appState.messageDraftRepository, accountRef, controller.group.groupIdHex)
                     .getOrElse { return@withLock null }
-                    ?.mediaAttachments
-                    .orEmpty()
+            val attachments = read.draft?.mediaAttachments.orEmpty()
             if (
                 !documentOwnerFence.isCurrent(owner) ||
                 appState.nativeComposerCleanupRevision(owner.accountRef, controller.group.groupIdHex) != cleanupRevision
@@ -495,8 +493,10 @@ internal class ConversationMediaDraftState(
                 )
             val materialized =
                 withContext(Dispatchers.IO) {
+                    val drafts = appState.messageDraftRepository
                     plan.reconciliation.unmatched.mapNotNull { attachment ->
-                        materializeDraftAttachment(context, attachment)?.let { attachment to it }
+                        materializeRestoredAttachment(context, drafts, accountRef, read, attachment)
+                            ?.let { attachment to it }
                     }
                 }
             if (
@@ -521,8 +521,8 @@ internal class ConversationMediaDraftState(
                     removedDraftAttachmentIds(accountRef),
                     messages.sourceUnavailable,
                 )
-            preparedPhotos = projection.inputs.preparedPhotos
-            preparedDocuments = projection.inputs.preparedDocuments
+            preparedPhotos = projection.inputs.preparedPhotos.withStoredSizes(read)
+            preparedDocuments = projection.inputs.preparedDocuments.withStoredSizes(read)
             activeEditor?.takeIf { it.slot.id in plan.removedPhotos }?.let(::dismissEditor)
             backedPhotos = projection.inputs.backedPhotos
             nonEditableDescriptions = projection.inputs.descriptions
@@ -553,10 +553,12 @@ internal class ConversationMediaDraftState(
         controller.clearRetainedUploads()
     }
 
+    /** Stages one shelf photo or video into the native draft unless it is already there. */
     @Suppress("LongMethod", "ReturnCount") // One slot-scoped coroutine owns stale-result and editor-open races.
     private suspend fun preparePhoto(slot: PendingMediaSlot) {
         val slotId = slot.id
         if (slotId in preparingSlotIds || slotId in nonEditableDescriptions) return
+        if (preparedPhotos[slotId]?.attachment?.hasInlineBody() == false) return clearRequestedEditor(slotId)
         val accountRef = currentAccountRef ?: return
         preparingSlotIds += slotId
         try {
@@ -614,7 +616,7 @@ internal class ConversationMediaDraftState(
         slot: PendingMediaSlot,
         accountRef: String,
     ) {
-        val pending = attachmentReader.readVisualDraft(slot.uri, slot.id) ?: return
+        val pending = attachmentReader.readVisualDraft(slot.uri, slot.id, toFile = true) ?: return
         val prepared =
             stageVisualDraft(
                 appState.messageDraftRepository,
@@ -643,7 +645,7 @@ internal class ConversationMediaDraftState(
         val accountRef = owner.accountRef
         preparingSlotIds += attachmentId
         try {
-            val pending = attachmentReader.readDocumentDraft(uri) ?: return
+            val pending = attachmentReader.readDocumentDraft(uri, toFile = true) ?: return
             val prepared =
                 stageGenericAttachment(
                     appState.messageDraftRepository,
@@ -1003,22 +1005,6 @@ private fun releaseDraftPresentationFiles(
         runCatching { File(context.cacheDir, "composer_paste/native_drafts").deleteRecursively() }
     }
 }
-
-/** Stages a visual attachment the editor cannot open as a generic native draft attachment. */
-private suspend fun stageVisualDraft(
-    drafts: MessageDraftRepository,
-    groupIdHex: String,
-    accountRef: String,
-    slot: PendingMediaSlot,
-    pending: PendingAttachment,
-): DraftPreparedPhoto? =
-    stageGenericAttachment(
-        drafts,
-        groupIdHex,
-        accountRef,
-        stagedPhotoAttachmentId(accountRef, groupIdHex, slot.id),
-        pending,
-    )
 
 /** Picks the shelf description that explains why a staged photo cannot be edited. */
 private fun nonEditablePhotoDescription(

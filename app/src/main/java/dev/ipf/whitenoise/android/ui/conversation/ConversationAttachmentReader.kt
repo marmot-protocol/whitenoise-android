@@ -449,21 +449,24 @@ internal class ConversationAttachmentReader(
     /**
      * Reads one visual [pick] through the same transform and in-memory limits used at send time, decoding in that
      * pick's draft's outgoing worker, while a read that names no pick decodes single-use. A send names the domain of
-     * each attachment it sends itself.
+     * each attachment it sends itself. With [toFile], a video too large for memory is copied to a private file with
+     * its metadata removed instead of refused, and the caller owns that file.
      */
     suspend fun readVisualDraft(
         uri: android.net.Uri,
         pick: String? = null,
+        toFile: Boolean = false,
     ): PendingAttachment? =
         withContext(Dispatchers.Default) {
-            readVisualAttachment(uri, MEDIA_ALBUM_MAX_TOTAL_BYTES, fileBacked = null, pick = pick).attachment
+            val fileBacked = if (toFile) fileBackedBudget() else null
+            readVisualAttachment(uri, MEDIA_ALBUM_MAX_TOTAL_BYTES, fileBacked = fileBacked, pick = pick).attachment
         }
 
-    /** Reads one document pick through the same MIME and byte limits used at send time. */
-    suspend fun readDocumentDraft(uri: android.net.Uri): PendingAttachment? {
-        val outcome = readPickedDocuments(listOf(uri))
-        return outcome.attachments.singleOrNull()
-    }
+    /** Reads one document pick through the same MIME and byte limits used at send time, [toFile] as above. */
+    suspend fun readDocumentDraft(
+        uri: android.net.Uri,
+        toFile: Boolean = false,
+    ): PendingAttachment? = readPickedDocuments(listOf(uri), allowFileBacked = toFile).attachments.singleOrNull()
 
     /** Reads one image or video pick; only a video may be staged to a file, and only with [fileBacked]. */
     private fun readVisualAttachment(

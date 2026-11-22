@@ -10,7 +10,9 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
+import dev.ipf.whitenoise.android.media.editor.hasInlineBody
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
@@ -24,6 +26,17 @@ internal fun materializeDraftAttachment(
     attachment: MessageDraftAttachmentFfi,
 ): Uri? =
     runCatching {
+        val file = draftPresentationFile(context, attachment) ?: return@runCatching null
+        file.writeBytes(attachment.plaintext)
+        draftPresentationUri(context, file, attachment)
+    }.getOrNull()
+
+/** The composer presentation file of one native draft attachment, named stably by its id, or null without one. */
+internal fun draftPresentationFile(
+    context: Context,
+    attachment: MessageDraftAttachmentFfi,
+): File? =
+    runCatching {
         val directory = File(context.cacheDir, "composer_paste/native_drafts").apply { mkdirs() }
         val safeExtension =
             attachment.fileName
@@ -34,8 +47,16 @@ internal fun materializeDraftAttachment(
                 .orEmpty()
         val stableName =
             UUID.nameUUIDFromBytes(attachment.id.toByteArray(StandardCharsets.UTF_8)).toString()
-        val file = File(directory, "$stableName$safeExtension")
-        file.writeBytes(attachment.plaintext)
+        File(directory, "$stableName$safeExtension")
+    }.getOrNull()
+
+/** The shelf URI of a presentation [file], shown under [attachment]'s file name. */
+internal fun draftPresentationUri(
+    context: Context,
+    file: File,
+    attachment: MessageDraftAttachmentFfi,
+): Uri? =
+    runCatching {
         FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
@@ -44,6 +65,16 @@ internal fun materializeDraftAttachment(
         )
     }.getOrNull()
 
+/**
+ * What a send carries for each prepared key: inline bytes, or a reference to the file the draft stores. A stored
+ * entry whose size is not known yet is left out, so its send reads the shelf file instead.
+ */
+internal fun <K> Map<K, DraftPreparedPhoto>.sendableBodies(): Map<K, PendingAttachment> =
+    filterValues { photo ->
+        photo.attachment.hasInlineBody() || photo.storedBytes > 0L
+    }.mapValues { (_, photo) -> photo.pendingAttachment() }
+
+/** Previews from prepared bytes; a file-backed attachment has none and previews from its shelf file instead. */
 internal fun preparedPhotoPreviews(
     backedPhotos: Map<String, DraftBackedPhoto>,
     preparedPhotos: Map<String, DraftPreparedPhoto>,
@@ -54,7 +85,7 @@ internal fun preparedPhotoPreviews(
             bytes = photo.attachment.plaintext,
         )
     } +
-        preparedPhotos.mapValues { (_, photo) ->
+        preparedPhotos.filterValues { it.attachment.hasInlineBody() }.mapValues { (_, photo) ->
             PreparedPhotoPreview(
                 revision = photo.attachmentDigest,
                 bytes = photo.attachment.plaintext,

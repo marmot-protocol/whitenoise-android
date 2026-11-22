@@ -20,7 +20,8 @@
         "anchor": "restorePersistedAttachments(",
         "test_ids": [
           "MED-003",
-          "MED-009"
+          "MED-009",
+          "MED-063"
         ]
       },
       {
@@ -59,6 +60,14 @@
         "anchor": "fun removeStagedDocumentAt(",
         "test_ids": [
           "MED-001"
+        ]
+      },
+      {
+        "surface": "A pick too large for memory is kept in the draft as a stored file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
+        "anchor": "readDocumentDraft(uri, toFile = true)",
+        "test_ids": [
+          "MED-063"
         ]
       }
     ]

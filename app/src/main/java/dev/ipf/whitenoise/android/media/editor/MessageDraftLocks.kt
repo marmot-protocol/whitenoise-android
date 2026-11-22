@@ -13,6 +13,7 @@ internal class MessageDraftLocks {
     private val tableGuard = Any()
     private val table = mutableMapOf<DraftKey, DraftLock>()
 
+    /** Runs [block] holding [key]'s lock, dropping the lock entry once no caller waits on it. */
     suspend fun <T> withLock(
         key: DraftKey,
         block: suspend () -> T,

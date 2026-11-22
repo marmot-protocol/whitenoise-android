@@ -39,7 +39,7 @@ internal class RetainedMediaUpload(
     private val singleFileBytes: Long? =
         attachments
             .singleOrNull()
-            ?.takeIf { it.sourceFile != null }
+            ?.takeIf { it.isFileBacked }
             ?.byteCount
             ?.takeIf { it > 0L }
 

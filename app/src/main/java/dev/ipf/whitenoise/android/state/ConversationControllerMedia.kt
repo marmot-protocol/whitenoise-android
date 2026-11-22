@@ -34,7 +34,7 @@ internal fun ConversationController.canQueueAttachmentBytes(
     return if (albumExceedsRetainedCap(attachments)) {
         appState.present(R.string.media_album_too_large)
         false
-    } else if (replyTarget != null && attachments.any { it.sourceFile != null }) {
+    } else if (replyTarget != null && attachments.any { it.isFileBacked }) {
         appState.present(R.string.media_file_too_large)
         false
     } else {
@@ -192,7 +192,7 @@ internal suspend fun ConversationController.performMediaUpload(
                     ?: run {
                         val startedAtMs = diagnostics.beginMediaUpload(tempId)
                         val uploaded =
-                            if (retained.isFileBacked) {
+                            if (retained.isFileBacked || retained.isDraftStored) {
                                 uploadFileBackedRetained(account, key, tempId, retained, startedAtMs)
                             } else {
                                 mediaUploader?.invoke(account, group.groupIdHex, request)
