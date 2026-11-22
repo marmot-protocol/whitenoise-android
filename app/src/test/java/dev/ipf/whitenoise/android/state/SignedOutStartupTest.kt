@@ -78,7 +78,8 @@ class SignedOutStartupTest {
                 },
             ) { fixture ->
                 assertEquals(1, fixture.signerRegistrationCalls.get())
-                assertEquals(RemoteSignerHealth.Paired, fixture.appState.remoteSigners.status("remote")?.health)
+                val remoteStatus = fixture.appState.remoteSigners.status("remote")
+                assertEquals(RemoteSignerHealth.Paired, remoteStatus?.health)
                 assertNull(fixture.appState.remoteSigners.status("amber"))
             }
         }
@@ -243,7 +244,11 @@ class SignedOutStartupTest {
             block(fixture)
         } finally {
             fixture.close()
-            preferences.edit().remove("active_account").remove("remote_signer_accounts").commit()
+            preferences
+                .edit()
+                .remove("active_account")
+                .remove("remote_signer_accounts")
+                .commit()
         }
     }
 
