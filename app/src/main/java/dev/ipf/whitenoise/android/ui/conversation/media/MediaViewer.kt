@@ -492,7 +492,7 @@ internal fun FullScreenMediaViewer(
             closing = closingMotion,
             allowMotion =
                 mediaViewerPlatformMotionAllowed(
-                    MediaReferenceSupport.isVideoMedia(currentReference),
+                    currentPageIsVideo,
                     android.os.Build.VERSION.SDK_INT,
                 ) &&
                     scale == 1f &&
@@ -515,9 +515,10 @@ internal fun FullScreenMediaViewer(
             attachmentAspectRatio = aspectRatioFromDim(currentReference.dim),
             fallbackCloseAllowed =
                 mediaViewerPlatformMotionAllowed(
-                    MediaReferenceSupport.isVideoMedia(currentReference),
+                    currentPageIsVideo,
                     android.os.Build.VERSION.SDK_INT,
                 ),
+            hasVideoSurface = currentPageIsVideo,
         ) { motionBodyModifier ->
             MediaViewerFrame(
                 senderLabel = appState.displayName(currentPage.sender),
