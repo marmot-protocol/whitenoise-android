@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +38,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.isCanonicalNpub
 
@@ -177,8 +177,7 @@ internal fun CopyablePublicKey(
                 .clearAndSetSemantics {
                     text = AnnotatedString(npub)
                     if (copyable) stateDescription = state
-                }.animateContentSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                }.padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -187,6 +186,7 @@ internal fun CopyablePublicKey(
             modifier =
                 Modifier
                     .weight(1f, fill = false)
+                    .animatePublicKeyExpansion(expanded)
                     .let { base -> textTestTag?.let(base::testTag) ?: base },
             style =
                 MaterialTheme.typography.bodySmall.copy(

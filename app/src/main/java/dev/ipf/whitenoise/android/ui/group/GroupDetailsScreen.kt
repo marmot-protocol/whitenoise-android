@@ -1571,6 +1571,7 @@ internal fun GroupDetailsScreen(
                                         R.string.invite_pending,
                                         IdentityFormatter.short(inviteNpub),
                                     ),
+                                npub = inviteNpub,
                                 avatarSeed = invite,
                                 avatarUrl = appState.contactAvatarSource(invite),
                                 onClick =

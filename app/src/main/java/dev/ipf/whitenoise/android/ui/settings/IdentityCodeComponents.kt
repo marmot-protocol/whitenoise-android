@@ -22,7 +22,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,12 +41,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.QrCodeEncoder
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 /** Black-on-white QR code on a large-corner white card sized from the available width. */
@@ -124,6 +130,7 @@ internal fun IdentifierCopyCapsule(
     @StringRes explanationRes: Int = R.string.explanation_organize_copy_public_key,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    var expanded by rememberSaveable(value) { mutableStateOf(false) }
     val actionDescription = if (copied) copiedContentDescription else copyContentDescription
     val state = if (copied) copiedStateDescription else notCopiedStateDescription
     Box(
@@ -140,7 +147,10 @@ internal fun IdentifierCopyCapsule(
                     interactionSource = interactionSource,
                     indication = null,
                     role = Role.Button,
-                    onClick = onCopy,
+                    onClick = {
+                        onCopy()
+                        expanded = true
+                    },
                 ).testTag(targetTestTag)
                 .semantics {
                     role = Role.Button
@@ -162,11 +172,12 @@ internal fun IdentifierCopyCapsule(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = value,
-                modifier = Modifier.weight(1f),
+                text = if (expanded) publicKeyDisplayGroups(value).joinToString(" ") else value,
+                modifier = Modifier.weight(1f).animatePublicKeyExpansion(expanded),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis,
+                maxLines = if (expanded) Int.MAX_VALUE else 1,
+                overflow = if (expanded) TextOverflow.Clip else TextOverflow.MiddleEllipsis,
+                fontFamily = if (expanded) FontFamily.Monospace else null,
                 style = MaterialTheme.typography.bodySmall,
             )
             Icon(

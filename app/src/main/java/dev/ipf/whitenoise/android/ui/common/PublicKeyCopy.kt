@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.common
 
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -12,11 +14,16 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -32,8 +39,10 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
 
 private const val NPUB_PREFIX = "npub1"
 private const val NPUB_LENGTH = 63
@@ -49,6 +58,8 @@ private const val BECH32_POLYMOD_MASK = 0x1ffffff
 private const val BECH32_ACCUMULATOR_MASK = 0xfff
 private const val BYTE_MASK = 0xff
 private val BECH32_GENERATORS = intArrayOf(0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+private const val PUBLIC_KEY_REVEAL_START_ALPHA = 0.65f
+private const val PUBLIC_KEY_REVEAL_DURATION_MILLIS = 160
 private const val MIN_ABBREVIATION_HEAD = 8
 private const val MIN_ABBREVIATION_TAIL = 4
 private val ELLIPSIS_PATTERN = Regex("…|\\.\\.\\.")
@@ -134,9 +145,24 @@ internal fun abbreviatesPublicKey(
     return npub.isNotBlank() && value.isNotEmpty() && (value == npub || abbreviation)
 }
 
+/** Reflow immediately, then fade in the grouped text without animating parent layout constraints. */
+@Composable
+internal fun Modifier.animatePublicKeyExpansion(expanded: Boolean): Modifier {
+    val opacity = remember { Animatable(1f) }
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            opacity.snapTo(PUBLIC_KEY_REVEAL_START_ALPHA)
+            opacity.animateTo(1f, tween(durationMillis = PUBLIC_KEY_REVEAL_DURATION_MILLIS))
+        } else {
+            opacity.snapTo(1f)
+        }
+    }
+    return graphicsLayer { alpha = opacity.value }
+}
+
 /**
- * A compact public-key [label] whose own text copies the complete canonical [npub] (#3565). The tap belongs to the
- * label alone, so a surrounding row keeps its navigation, selection or account-switch action, and a long press is
+ * A compact public-key [label] that copies the complete canonical [npub] and expands it in place. The tap belongs to
+ * the label, so a surrounding row keeps navigation, selection or account switching, and a long press is
  * left to the row. The label adds no semantics boundary: its short text stays in the row's spoken label, and the row
  * gains a Copy public key action whose label carries the full key. Without a canonical [npub], or while not
  * [enabled], it is plain text. With [keyboardFocusable] — for a row with no action of its own, or a disabled one —
@@ -156,19 +182,26 @@ internal fun PublicKeyCopyText(
     keyboardFocusable: Boolean = false,
 ) {
     val copy = rememberPublicKeyCopy(npub)
+    var expanded by rememberSaveable(npub) { mutableStateOf(false) }
+    val copyAndExpand = {
+        copy()
+        expanded = true
+    }
     val copyLabel = stringResource(R.string.public_key_copy_action_with_value, npub)
     val focusInteractions = remember { MutableInteractionSource() }
+    val animatedModifier = modifier.animatePublicKeyExpansion(expanded)
     Text(
-        label,
+        if (expanded) publicKeyDisplayGroups(npub).joinToString(" ") else label,
         modifier =
             if (enabled && isCanonicalNpub(npub)) {
-                modifier
-                    .pointerInput(npub, keyboardFocusable) { copyOnShortTap(copy, keepTouchMargin = keyboardFocusable) }
-                    .then(
+                animatedModifier
+                    .pointerInput(npub, keyboardFocusable) {
+                        copyOnShortTap(copyAndExpand, keepTouchMargin = keyboardFocusable)
+                    }.then(
                         if (keyboardFocusable) {
                             Modifier
                                 .indication(focusInteractions, ripple())
-                                .copyOnKeyActivation(copy, focusInteractions)
+                                .copyOnKeyActivation(copyAndExpand, focusInteractions)
                         } else {
                             Modifier
                         },
@@ -176,17 +209,17 @@ internal fun PublicKeyCopyText(
                         customActions =
                             listOf(
                                 CustomAccessibilityAction(copyLabel) {
-                                    copy()
+                                    copyAndExpand()
                                     true
                                 },
                             )
                     }
             } else {
-                modifier
+                animatedModifier
             },
-        style = style,
+        style = if (expanded) style.copy(fontFamily = FontFamily.Monospace) else style,
         color = color,
-        maxLines = maxLines,
+        maxLines = if (expanded) Int.MAX_VALUE else maxLines,
         overflow = TextOverflow.Ellipsis,
     )
 }

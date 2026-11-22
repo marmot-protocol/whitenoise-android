@@ -144,6 +144,8 @@ class GroupDetailsHeaderScreenshotTest {
         composeRule.onNodeWithTag("chat_info.copy_public_key").assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/direct_details_copy_header_dark.png")
         composeRule.onNodeWithTag("chat_info.copy_public_key").performClick()
+        composeRule.onNodeWithText(publicKey.chunked(5).joinToString(" ")).assertExists()
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/direct_details_expanded_key_dark.png")
         val clipboard =
             ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
         assertEquals(

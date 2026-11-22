@@ -11,7 +11,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -21,6 +25,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -31,6 +36,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
+import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
 
 /** Public identity without repeating technical labels or exposing operational references. */
 @Composable
@@ -95,6 +102,7 @@ internal fun GroupReviewPersonText(
     person: GroupReviewPerson,
     role: String,
     copyable: Boolean = true,
+    expanded: Boolean = false,
 ) {
     person.publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
     groupReviewNicknameLabel(person)?.let { Text(it) }
@@ -102,7 +110,7 @@ internal fun GroupReviewPersonText(
         if (copyable) {
             GroupReviewNpub(person.identifier, role)
         } else {
-            Text(groupReviewNpubLabel(person.identifier), style = MaterialTheme.typography.bodySmall)
+            GroupReviewKeyText(person.identifier, expanded)
         }
     } else if (person.publicName == null) {
         Text(stringResource(R.string.unknown), style = MaterialTheme.typography.bodySmall)
@@ -156,9 +164,24 @@ private fun GroupReviewNpub(
     role: String,
     compact: Boolean = false,
 ) {
-    GroupReviewCopyRow(npub, "$role, $npub") {
-        Text(groupReviewNpubLabel(npub, compact), style = MaterialTheme.typography.bodySmall)
+    GroupReviewCopyRow(npub, "$role, $npub") { expanded ->
+        GroupReviewKeyText(npub, expanded, compact)
     }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupReviewKeyText(
+    npub: String,
+    expanded: Boolean,
+    compact: Boolean = false,
+) {
+    Text(
+        if (expanded) publicKeyDisplayGroups(npub).joinToString(" ") else groupReviewNpubLabel(npub, compact),
+        modifier = Modifier.animatePublicKeyExpansion(expanded),
+        style = MaterialTheme.typography.bodySmall,
+        fontFamily = if (expanded) FontFamily.Monospace else null,
+    )
 }
 
 /** The shortened npub shown beside a name; the full value is spoken and copied. */
@@ -178,19 +201,22 @@ internal fun GroupReviewCopyRow(
     description: String,
     modifier: Modifier = Modifier,
     horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
-    content: @Composable RowScope.() -> Unit,
+    content: @Composable RowScope.(Boolean) -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
     val copyLabel = stringResource(R.string.copy)
+    var expanded by rememberSaveable(npub) { mutableStateOf(false) }
     Row(
         modifier
             .heightIn(min = 48.dp)
-            .clickable(onClickLabel = copyLabel, role = Role.Button) { clipboard.setText(AnnotatedString(npub)) }
+            .clickable(onClickLabel = copyLabel, role = Role.Button) {
+                clipboard.setText(AnnotatedString(npub))
+                expanded = true
+            }
             .semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = horizontalArrangement,
-        content = content,
-    )
+    ) { content(expanded) }
 }
 
 /** Separate destinations retain exact hidden keys without displaying group IDs. */
