@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
+import dev.ipf.whitenoise.android.ui.group.ChatDetailsDestination
 import dev.ipf.whitenoise.android.ui.group.GROUP_RELAYS_SCREEN_TAG
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -114,6 +115,30 @@ class ShellBoundaryFrameSampleContractTest {
     }
 
     /**
+     * The conversation shell keys its content by chat, so a fresh open context for the chat that stays the root (a
+     * notification re-land) replaces the content in its one slot and never leaves an outgoing copy of the same chat
+     * that could close the screen the live copy shows. The relays screen stays composed on every frame.
+     */
+    @Test
+    fun aSameChatReLandKeepsTheLiftedChatDetailsScreenOnEveryFrame() {
+        shell.withMountedShell(mutableStateOf(COMPACT_WIDTH), messageFixture()) { fixture, holder ->
+            shell.openTarget(fixture, holder)
+            openRelays(shell::awaitCondition)
+            val root = requireNotNull(conversationRoot(holder.shellNavigator.stack))
+            val fresh =
+                ConversationOpenContext(notificationOpenRequestId = RELAND_ID, notificationRouteTraceRequestId = RELAND_ID)
+
+            val relanded = { holder.dispatchShellNav(ShellNavEvent.CommitNotificationRoute(root.copy(open = fresh))) }
+            val gone = framesAfter(relanded) { !relaysComposed() }
+
+            assertEquals("frames after the re-land without the relays screen", emptyList<Int>(), gone)
+            assertEquals(fresh, holder.selectedChatOpenContext.value)
+            val relays = ShellRoute.ChatDetailsScreen(ChatDetailsDestination.Relays)
+            assertEquals(relays, holder.shellNavigator.stack.last())
+        }
+    }
+
+    /**
      * Runs [boundary] on the main thread with the clock held, then composes [FRAMES_WATCHED] frames one at a time and
      * returns the numbers of those in which [leaks] held.
      */
@@ -171,6 +196,7 @@ class ShellBoundaryFrameSampleContractTest {
         const val RELAYS_ENTRY_TAG = "chat_info.relays"
         const val OTHER_ACCOUNT_REF = "other-frame-sampled-account"
         const val OPEN_SCRIPTS = 3
+        const val RELAND_ID = 4_004L
 
         /** Longer than any route exit motion, so retained exit content would be seen. */
         const val FRAMES_WATCHED = 60
