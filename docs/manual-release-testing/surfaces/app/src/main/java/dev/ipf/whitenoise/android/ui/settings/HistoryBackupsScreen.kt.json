@@ -36,47 +36,6 @@
         "test_ids": [
           "SET-071"
         ]
-      },
-      {
-        "surface": "RecoveryWordsSetupContent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "fun RecoveryWordsSetupContent(",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
-        "surface": "RecoveryWordsGrid",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "fun RecoveryWordsGrid(",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
-        "surface": "CopyRecoveryWordsButton",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "fun CopyRecoveryWordsButton(",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
-        "surface": "SetupButtons",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "fun SetupButtons(",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
-        "surface": "RecoveryWordsInput",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "fun RecoveryWordsInput(",
-        "test_ids": [
-          "SET-070",
-          "SET-071"
-        ]
       }
     ],
     "string_resources": [
@@ -99,14 +58,6 @@
         ]
       },
       {
-        "surface": "R.string.cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
         "surface": "R.string.history_backups",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_backups",
@@ -120,22 +71,6 @@
         "anchor": "R.string.history_backups_cancel_restore",
         "test_ids": [
           "SET-071"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups_confirm_message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_confirm_message",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups_confirm_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_confirm_title",
-        "test_ids": [
-          "SET-070"
         ]
       },
       {
@@ -371,38 +306,6 @@
         ]
       },
       {
-        "surface": "R.string.history_backups_word_label",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_word_label",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups_words_message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_words_message",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups_words_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_words_title",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups_words_written",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_words_written",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
         "surface": "R.string.history_restore_cancelled",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
         "anchor": "R.string.history_restore_cancelled",
@@ -448,22 +351,6 @@
         "anchor": "R.string.history_restore_unavailable",
         "test_ids": [
           "SET-071"
-        ]
-      },
-      {
-        "surface": "R.string.history_backups_copy_words",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.history_backups_copy_words",
-        "test_ids": [
-          "SET-070"
-        ]
-      },
-      {
-        "surface": "R.string.copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HistoryBackupsScreen.kt",
-        "anchor": "R.string.copied",
-        "test_ids": [
-          "SET-070"
         ]
       }
     ]

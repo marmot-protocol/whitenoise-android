@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.core.encryptedBackupPassphraseInputsValid
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.exportActiveAccountNsec
 import dev.ipf.whitenoise.android.state.exportEncryptedSecretKeyBackup
+import dev.ipf.whitenoise.android.ui.common.COPIED_FEEDBACK_MILLIS
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
@@ -71,7 +72,6 @@ internal enum class KeyExportDestination { File, Preview, Share }
 
 /** Timing and geometry the prototype fixes for Profile Keys. */
 private object ProfileKeysDefaults {
-    const val COPIED_MILLIS = 2_000L
     const val MASK = "••••••••••••••••••••••••••••••••"
     const val FILE_STEM_LENGTH = 16
     val ValueRowMinHeight = 64.dp
@@ -434,7 +434,7 @@ private fun ProfileKeysEffects(
     }
     LaunchedEffect(ui.copiedKey) {
         if (ui.copiedKey != null) {
-            delay(ProfileKeysDefaults.COPIED_MILLIS)
+            delay(COPIED_FEEDBACK_MILLIS)
             ui.copiedKey = null
         }
     }

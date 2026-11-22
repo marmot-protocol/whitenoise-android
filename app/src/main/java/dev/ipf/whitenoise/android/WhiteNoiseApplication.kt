@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.media.recoverSharedPlaintextWipes
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.state.AttachmentTransfers
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
+import dev.ipf.whitenoise.android.state.HistoryBackupWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
 import dev.ipf.whitenoise.android.state.persistedApplicationLanguageTag
@@ -162,6 +163,7 @@ open class WhiteNoiseApplication :
         schedule: () -> List<Operation> = {
             buildList {
                 add(DisappearingMessageSweepWorker.schedule(this@WhiteNoiseApplication))
+                add(HistoryBackupWorker.schedule(this@WhiteNoiseApplication))
                 AppUpdateWorker.schedule(this@WhiteNoiseApplication)?.let(::add)
             }
         },

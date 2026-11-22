@@ -932,8 +932,7 @@ class WhiteNoiseAppState private constructor(
         StartupDiagnostics.bindNative(runtime.marmot)
         hostPerformance.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
         nativeAttachmentPermissions.invalidate(runtime)
-        HistoryBackupConditions.attach(appContext, runtime.marmot)
-        scheduleHistoryBackupsIfOn(runtime.marmot)
+        HistoryBackupConditions.attach(appContext, runtime.marmot) { historyBackupFacts() }
         mutationsScope.launch {
             if (marmotRuntime === runtime) refreshNativeAttachmentPermissions()
         }
@@ -6478,11 +6477,13 @@ class WhiteNoiseAppState private constructor(
         if (!isOnline) {
             hasActiveNetworkSnapshot = false
             activeNetworkTypesSnapshot = emptySet()
+            HistoryBackupConditions.report()
             noteUsableValidatedInternetSnapshot()
             return
         }
         hasActiveNetworkSnapshot = true
         activeNetworkTypesSnapshot = networkTypes ?: emptySet()
+        HistoryBackupConditions.report()
         noteUsableValidatedInternetSnapshot()
         pushWakeRecovery.schedulePendingPushWakeCatchUpDrain()
     }

@@ -1,14 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.BackgroundBackupOutcomeFfi
 import dev.ipf.marmotkit.BackupRestorePhaseFfi
 import dev.ipf.marmotkit.BackupRestoreStatusFfi
 import dev.ipf.marmotkit.BackupSettingsFfi
-import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.RecoveryWordsFfi
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -18,30 +15,33 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.lang.reflect.Proxy
 
 class HistoryBackupsControllerTest {
-    @Test fun statusFollowsMdkSettingsAndSchedulesWhileBackupsAreOn() =
+    @Test fun statusFollowsMdkSettings() =
         runTest {
             val fake = FakeBackups()
-            var scheduled = 0
-            val controller = controller(fake, onBackupsOn = { scheduled++ })
+            val controller = controller(fake)
             fake.settings = BackupSettingsFfi(enabled = false, thisDeviceWrites = false)
             controller.refresh()
             runCurrent()
             assertEquals(HistoryBackupStatus.Off, controller.state.value.status)
-            assertEquals(0, scheduled)
-            // A device that only reads still needs visits: MDK's pass is how it takes over from a quiet writer.
             fake.settings = BackupSettingsFfi(enabled = true, thisDeviceWrites = false)
             controller.refresh()
             runCurrent()
             assertEquals(HistoryBackupStatus.On(thisDeviceWrites = false), controller.state.value.status)
-            assertEquals(1, scheduled)
             fake.settings = BackupSettingsFfi(enabled = true, thisDeviceWrites = true)
             controller.refresh()
             runCurrent()
             assertEquals(HistoryBackupStatus.On(thisDeviceWrites = true), controller.state.value.status)
-            assertEquals(2, scheduled)
+        }
+
+    @Test fun withoutAnEligibleAccountTheScreenStaysLoadingAndSendsNothing() =
+        runTest {
+            val controller = HistoryBackupsController(access = null, scope = this)
+            controller.refresh()
+            controller.beginSetup()
+            runCurrent()
+            assertEquals(HistoryBackupsState(), controller.state.value)
         }
 
     @Test fun aBuildWithoutDeviceGroupsShowsUnavailableRatherThanAFailure() =
@@ -167,30 +167,23 @@ class HistoryBackupsControllerTest {
             assertEquals(0, fake.cancelledWords)
         }
 
-    @Test fun anAcceptedConfirmationSchedulesEvenIfTheFollowUpReadFails() =
+    @Test fun anAcceptedConfirmationEndsSetupEvenIfTheFollowUpReadFails() =
         runTest {
             val fake = FakeBackups()
-            var scheduled = 0
-            val controller = controller(fake, onBackupsOn = { scheduled++ })
+            val controller = controller(fake)
             controller.beginSetup()
             runCurrent()
-            fake.confirmError = refused("recovery_words_mismatch")
-            controller.confirm(listOf("nope", "nope"))
-            runCurrent()
-            assertEquals(0, scheduled)
-            fake.confirmError = null
             fake.settingsError = MarmotKitException.Runtime("io")
             controller.confirm(listOf("gamma", "india"))
             runCurrent()
-            assertEquals(1, scheduled)
+            assertNull(controller.state.value.setup)
             assertEquals(HistoryBackupStatus.LoadFailed, controller.state.value.status)
         }
 
-    @Test fun leavingDuringAnAcceptedConfirmationStillSchedules() =
+    @Test fun leavingDuringAConfirmationLetsItSettleBeforeForgetting() =
         runTest {
             val fake = FakeBackups()
-            var scheduled = 0
-            val controller = controller(fake, onBackupsOn = { scheduled++ })
+            val controller = controller(fake)
             controller.beginSetup()
             runCurrent()
             val gate = CompletableDeferred<Unit>()
@@ -198,9 +191,13 @@ class HistoryBackupsControllerTest {
             controller.confirm(listOf("gamma", "india"))
             runCurrent()
             controller.close()
+            runCurrent()
+            // The forget waits for the admitted confirmation, which holds the setup lock.
+            assertEquals(0, fake.cancelledWords)
             gate.complete(Unit)
             runCurrent()
-            assertEquals(1, scheduled)
+            assertEquals(1, fake.confirmed.size)
+            assertEquals(1, fake.cancelledWords)
         }
 
     @Test fun wordsMadeForARetiredOwnerAreForgottenAtOnce() =
@@ -338,59 +335,30 @@ class HistoryBackupsControllerTest {
         )
     }
 
-    @Test fun backgroundVisitRunsEveryAccountWithBackupsOnAndRetriesFailures() =
+    @Test fun aVisitRunsEveryAccountWithinOneBudgetAndReportsFailures() =
         runTest {
-            val fake = FakeBackups()
-            fake.settings = BackupSettingsFfi(enabled = false, thisDeviceWrites = false)
-            assertEquals(HistoryBackupVisit.NothingToBackUp, runDueHistoryBackups(fake, listOf("a", "b"), BUDGET))
-            assertTrue(fake.passes.isEmpty())
-
-            fake.settings = BackupSettingsFfi(enabled = true, thisDeviceWrites = false)
-            assertEquals(HistoryBackupVisit.Ran, runDueHistoryBackups(fake, listOf("a", "b"), BUDGET))
-            assertEquals(listOf("a", "b"), fake.passes)
-
-            fake.passError = MarmotKitException.Runtime("transport closed")
-            assertEquals(HistoryBackupVisit.Retry, runDueHistoryBackups(fake, listOf("a"), BUDGET))
-
-            fake.passError = null
-            fake.settingsError = MarmotKitException.Runtime("io")
-            assertEquals(HistoryBackupVisit.Retry, runDueHistoryBackups(fake, listOf("a"), BUDGET))
-            assertFalse(anyHistoryBackupsOn(fake, listOf("a")))
-
-            // Device groups unavailable is MDK's answer; retrying it would only back off forever.
-            fake.settingsError = refused("roster_unsupported")
-            assertEquals(HistoryBackupVisit.NothingToBackUp, runDueHistoryBackups(fake, listOf("a"), BUDGET))
-
-            fake.settingsError = null
-            assertTrue(anyHistoryBackupsOn(fake, listOf("a")))
-            fake.settings = BackupSettingsFfi(enabled = false, thisDeviceWrites = false)
-            assertFalse(anyHistoryBackupsOn(fake, listOf("a", "b")))
+            val passes = mutableListOf<String>()
+            assertTrue(runDueHistoryBackupPasses(listOf("a", "b"), BUDGET) { passes += it })
+            assertEquals(listOf("a", "b"), passes)
+            // One failing account does not stop the others, but the visit is retried.
+            val failing: suspend (String) -> Unit = { if (it == "a") error("closed") else passes += it }
+            assertFalse(runDueHistoryBackupPasses(listOf("a", "b"), BUDGET, failing))
+            assertEquals(listOf("a", "b", "b"), passes)
+            // A pass that outlives the budget is detached and retried on the next visit.
+            assertFalse(runDueHistoryBackupPasses(listOf("a"), BUDGET) { CompletableDeferred<Unit>().await() })
         }
 
     private fun TestScope.controller(
         fake: FakeBackups,
         isCurrent: () -> Boolean = { true },
-        onBackupsOn: () -> Unit = {},
-    ): HistoryBackupsController {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        return HistoryBackupsController(
-            marmot = fake,
-            accountRef = ACCOUNT,
-            scope = this,
-            isCurrent = isCurrent,
-            dispatcher = dispatcher,
-            onBackupsOn = onBackupsOn,
-        )
-    }
+    ): HistoryBackupsController = HistoryBackupsController(fake.apply { current = isCurrent }, scope = this)
 
-    private class FakeBackups(
-        delegate: MarmotInterface = unsupported(),
-    ) : MarmotInterface by delegate {
+    private class FakeBackups : HistoryBackupsAccess {
+        var current: () -> Boolean = { true }
         var settings = BackupSettingsFfi(enabled = false, thisDeviceWrites = false)
         var settingsError: Exception? = null
         var confirmError: Exception? = null
         var restoreError: Exception? = null
-        var passError: Exception? = null
         var beginGate: CompletableDeferred<Unit>? = null
         var confirmGate: CompletableDeferred<Unit>? = null
         var restoreStatus = status(BackupRestorePhaseFfi.IDLE, operation = null, revision = 0u)
@@ -400,62 +368,47 @@ class HistoryBackupsControllerTest {
         val confirmed = mutableListOf<List<String>>()
         val restoredWith = mutableListOf<String>()
         val cancelledRestores = mutableListOf<String>()
-        val passes = mutableListOf<String>()
 
-        override suspend fun backupSettings(accountRef: String): BackupSettingsFfi {
+        override fun isCurrent(): Boolean = current()
+
+        override suspend fun settings(): BackupSettingsFfi {
             settingsError?.let { throw it }
             return settings
         }
 
-        override suspend fun beginRecoveryWords(accountRef: String): RecoveryWordsFfi {
+        override suspend fun beginWords(): RecoveryWordsFfi {
             begun++
             beginGate?.await()
             return RecoveryWordsFfi(WORDS, listOf(3u, 9u))
         }
 
-        override suspend fun confirmRecoveryWords(
-            accountRef: String,
-            answers: List<String>,
-        ) {
+        override suspend fun confirmWords(answers: List<String>) {
             confirmed += answers
             confirmGate?.await()
             confirmError?.let { throw it }
         }
 
-        override suspend fun cancelRecoveryWords(accountRef: String) {
+        override suspend fun forgetWords() {
             cancelledWords++
         }
 
-        override suspend fun turnOffBackups(accountRef: String) {
+        override suspend fun turnOff() {
             turnedOff++
         }
 
-        override suspend fun beginBackupRestore(
-            accountRef: String,
-            words: String,
-        ): BackupRestoreStatusFfi {
+        override suspend fun beginRestore(words: String): BackupRestoreStatusFfi {
             restoredWith += words
             restoreError?.let { throw it }
             return restoreStatus
         }
 
-        override suspend fun cancelBackupRestore(
-            accountRef: String,
-            operation: String,
-        ): Boolean {
+        override suspend fun cancelRestore(operation: String) {
             cancelledRestores += operation
-            return true
         }
 
-        override suspend fun backupRestoreStatus(accountRef: String): BackupRestoreStatusFfi = restoreStatus
+        override suspend fun restoreStatus(): BackupRestoreStatusFfi = restoreStatus
 
-        override suspend fun watchBackupRestore(accountRef: String): Nothing = error("no watch")
-
-        override suspend fun runDueBackupPass(accountRef: String): BackgroundBackupOutcomeFfi {
-            passError?.let { throw it }
-            passes += accountRef
-            return BackgroundBackupOutcomeFfi.FINISHED_ATTEMPT
-        }
+        override suspend fun followRestore(onStatus: (BackupRestoreStatusFfi) -> Unit) = Unit
     }
 
     private companion object {
@@ -494,17 +447,5 @@ class HistoryBackupsControllerTest {
             skippedBundles = 0u,
             revision = revision,
         )
-
-        fun unsupported(): MarmotInterface {
-            val type = MarmotInterface::class.java
-            return Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { proxy, method, arguments ->
-                when (method.name) {
-                    "toString" -> "HistoryBackupsTestRuntime"
-                    "hashCode" -> System.identityHashCode(proxy)
-                    "equals" -> proxy === arguments?.firstOrNull()
-                    else -> throw UnsupportedOperationException(method.name)
-                }
-            } as MarmotInterface
-        }
     }
 }

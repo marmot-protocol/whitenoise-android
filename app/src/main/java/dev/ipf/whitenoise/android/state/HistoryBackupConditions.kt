@@ -4,13 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.util.Log
 import dev.ipf.marmotkit.MarmotInterface
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,26 +15,20 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** The platform facts MDK needs before it starts a background backup: an unmetered network and a charger. */
+/** The platform facts MDK needs before it starts a background backup: Wi-Fi that is not metered, and a charger. */
 internal data class HistoryBackupFacts(
     val wifi: Boolean,
     val charging: Boolean,
 )
 
-/** Reads the current facts. Unmetered stands in for Wi-Fi, matching WorkManager's `UNMETERED`. */
-internal fun Context.currentHistoryBackupFacts(): HistoryBackupFacts {
-    val connectivity = getSystemService(ConnectivityManager::class.java)
-    val capabilities = connectivity?.activeNetwork?.let(connectivity::getNetworkCapabilities)
+/** Reads the facts from the app's default-network snapshot and the sticky battery broadcast. */
+internal fun WhiteNoiseAppState.historyBackupFacts(): HistoryBackupFacts {
+    val network = activeNetworkTypes()
     return HistoryBackupFacts(
-        wifi = capabilities.isUnmeteredInternet(),
-        charging = isCharging(),
+        wifi = MediaAutoDownloadNetwork.WiFi in network && MediaAutoDownloadNetwork.Metered !in network,
+        charging = appContext.isCharging(),
     )
 }
-
-private fun NetworkCapabilities?.isUnmeteredInternet(): Boolean =
-    this != null &&
-        hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-        hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
 
 /** Charging or full on external power, as WorkManager's charging constraint reads the battery. */
 private fun Context.isCharging(): Boolean {
@@ -51,8 +41,8 @@ private fun Context.isCharging(): Boolean {
 /**
  * Keeps the current MarmotKit runtime told whether background backups may run (#3655). MDK requires both facts
  * before it admits a background pass, forgets them when a new runtime opens, and settles an admitted pass when
- * either turns false. Each new runtime is told at once; changes in network or power are reported as they happen.
- * Reporting is the whole job here: MDK owns when a backup is due and what it writes.
+ * either turns false. Each new runtime is told at once; the app's network listener and a power receiver report
+ * changes as they happen. Reporting is the whole job here: MDK owns when a backup is due and what it writes.
  */
 internal object HistoryBackupConditions {
     private const val TAG = "HistoryBackupConditions"
@@ -62,18 +52,22 @@ internal object HistoryBackupConditions {
 
     @Volatile private var runtime: MarmotInterface? = null
 
+    @Volatile private var facts: () -> HistoryBackupFacts = { HistoryBackupFacts(wifi = false, charging = false) }
+
     @Volatile private var lastReported: Pair<MarmotInterface, HistoryBackupFacts>? = null
     private var listening = false
 
-    /** Makes [marmot] the runtime that receives reports and reports the current facts to it. */
+    /** Makes [marmot] the runtime that receives reports of [readFacts] and reports to it now. */
     fun attach(
         context: Context,
         marmot: MarmotInterface,
+        readFacts: () -> HistoryBackupFacts,
     ) {
-        val app = context.applicationContext
+        facts = readFacts
         runtime = marmot
-        startListening(app)
-        report(app)
+        runCatchingCancellable { listenForPower(context.applicationContext) }
+            .onFailure { Log.w(TAG, "backup_power_listener_failed ${it.javaClass.simpleName}") }
+        report()
     }
 
     /** Stops reporting to [marmot] once its runtime is cleared; a newer attached runtime is left alone. */
@@ -82,52 +76,34 @@ internal object HistoryBackupConditions {
     }
 
     /** Reports the current facts to the attached runtime in the background. */
-    fun report(context: Context) {
-        val app = context.applicationContext
-        scope.launch { runtime?.let { reportNow(app, it) } }
+    fun report() {
+        scope.launch { runtime?.let { reportNow(it) } }
     }
 
     /**
      * Tells [marmot] the current facts and returns once MDK has them, skipping a repeat of its last report. False
      * when the report failed, so a caller about to run a pass knows MDK may still hold the closed default.
      */
-    @Suppress("TooGenericExceptionCaught")
-    suspend fun reportNow(
-        context: Context,
-        marmot: MarmotInterface,
-    ): Boolean =
+    suspend fun reportNow(marmot: MarmotInterface): Boolean =
         reportMutex.withLock {
-            val facts = withContext(Dispatchers.IO) { context.applicationContext.currentHistoryBackupFacts() }
-            if (lastReported?.let { it.first === marmot && it.second == facts } == true) return@withLock true
-            try {
-                // Unknown until the setter returns: a cancelled report must not let a later one be skipped.
-                lastReported = null
-                withContext(Dispatchers.IO) { marmot.setRuntimeBackupBackgroundConditions(facts.wifi, facts.charging) }
-                lastReported = marmot to facts
-                true
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                // A closed runtime is replaced by a new one, which is told on attach.
-                Log.w(TAG, "backup_conditions_report_failed ${error.javaClass.simpleName}")
-                false
-            }
+            if (runtime !== marmot) return@withLock false
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) {
+                    val current = facts()
+                    if (lastReported?.let { it.first === marmot && it.second == current } != true) {
+                        // Until the setter succeeds, a later visit must report the facts again.
+                        lastReported = null
+                        marmot.setRuntimeBackupBackgroundConditions(current.wifi, current.charging)
+                        lastReported = marmot to current
+                    }
+                }
+            }.onFailure { Log.w(TAG, "backup_conditions_report_failed ${it.javaClass.simpleName}") }
+                .isSuccess
         }
 
     @Synchronized
-    private fun startListening(app: Context) {
+    private fun listenForPower(app: Context) {
         if (listening) return
-        listening = true
-        app.getSystemService(ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
-            object : ConnectivityManager.NetworkCallback() {
-                override fun onCapabilitiesChanged(
-                    network: Network,
-                    networkCapabilities: NetworkCapabilities,
-                ) = report(app)
-
-                override fun onLost(network: Network) = report(app)
-            },
-        )
         val power =
             IntentFilter().apply {
                 addAction(Intent.ACTION_POWER_CONNECTED)
@@ -141,10 +117,11 @@ internal object HistoryBackupConditions {
                 override fun onReceive(
                     context: Context,
                     intent: Intent,
-                ) = report(app)
+                ) = report()
             },
             power,
             Context.RECEIVER_NOT_EXPORTED,
         )
+        listening = true
     }
 }

@@ -60,6 +60,7 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.COPIED_FEEDBACK_MILLIS
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -85,7 +86,6 @@ private object ShareConnectDefaults {
     val AvatarMaxSize = 152.dp
     val ErrorMaxWidth = 440.dp
     val IconSize = 24.dp
-    const val COPIED_RESET_MILLIS = 2_000L
 }
 
 /**
@@ -139,7 +139,7 @@ internal fun ShareConnectScreen(
 
     LaunchedEffect(copied) {
         if (copied) {
-            delay(ShareConnectDefaults.COPIED_RESET_MILLIS)
+            delay(COPIED_FEEDBACK_MILLIS)
             copied = false
         }
     }
