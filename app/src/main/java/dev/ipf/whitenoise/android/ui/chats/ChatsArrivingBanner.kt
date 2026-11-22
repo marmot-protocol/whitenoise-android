@@ -59,8 +59,8 @@ internal sealed interface ChatsArriving {
 
 /**
  * The notice for MDK's link [progress] on this device, a link still [awaiting] its first count, and its per-chat
- * history [imports], or null once all are done. Chats come before their history; a retry shows only when no chat
- * is still receiving.
+ * history [imports], or null once all are done. Chats come before their history, and a retry shows only when no
+ * chat is still receiving.
  */
 internal fun chatsArriving(
     progress: LinkChatProgressFfi?,
@@ -99,7 +99,7 @@ internal fun ChatsArrivingNotice(
 
 /**
  * Whether a link seen becoming Linked at [linkedAtMs] still awaits MDK's first chat count, which holds for
- * [CHAT_COUNT_WAIT_MS] at most: an approving device that never sends one must not leave the notice up for good.
+ * [CHAT_COUNT_WAIT_MS] at most, so an approving device that never sends one cannot leave the notice up for good.
  */
 @Composable
 internal fun rememberAwaitingChatCount(linkedAtMs: Long?): Boolean {
@@ -114,7 +114,7 @@ internal fun rememberAwaitingChatCount(linkedAtMs: Long?): Boolean {
     return awaiting
 }
 
-/** One line on what is still arriving; joining also shows MDK's count as a bar. Screen readers hear each change. */
+/** One line on what is still arriving, with MDK's count as a bar while joining. Screen readers hear each change. */
 @Composable
 internal fun ChatsArrivingBanner(
     arriving: ChatsArriving,
