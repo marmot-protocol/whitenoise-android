@@ -147,7 +147,7 @@ class ShellShareRouteContractTest {
         )
 
     /** A recovery store that keeps its one entry in memory. */
-    private class MemoryStore : PendingShareRequestStore {
+    internal class MemoryStore : PendingShareRequestStore {
         private var entry: ShareRequest? = null
 
         /** Keeps [request] as the one entry. */
