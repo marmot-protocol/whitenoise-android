@@ -2288,7 +2288,6 @@
     <string name="chat_rows_no_archived_detail">As conversas arquivadas aparecerão aqui.</string>
     <string name="quick_account_switching">Troca rápida de conta</string>
     <string name="quick_account_switching_detail">Mostra outras contas ao lado do seu avatar. Toque em uma para trocar.</string>
-    <string name="quick_account_switched">Mudou para %1$s</string>
     <string name="add_profile">Adicionar perfil</string>
     <string name="switch_profile">Mudar de perfil</string>
     <string name="folder_new_title">Nova pasta</string>

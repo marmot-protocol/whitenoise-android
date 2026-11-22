@@ -2288,7 +2288,6 @@
     <string name="chat_rows_no_archived_detail">Le chat archiviate appariranno qui.</string>
     <string name="quick_account_switching">Cambio rapido di account</string>
     <string name="quick_account_switching_detail">Mostra gli altri account accanto al tuo avatar. Toccane uno per passare.</string>
-    <string name="quick_account_switched">Account attivo: %1$s</string>
     <string name="add_profile">Aggiungi profilo</string>
     <string name="switch_profile">Cambia profilo</string>
     <string name="folder_new_title">Nuova cartella</string>

@@ -1,0 +1,98 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "folderDescription",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "internal fun folderDescription(",
+        "test_ids": [
+          "FLD-004",
+          "PRO-010"
+        ]
+      },
+      {
+        "surface": "smart_folder_add_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "R.string.smart_folder_add_description",
+        "test_ids": [
+          "FLD-004"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:chat_folder_description_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "R.string.chat_folder_description_label",
+        "test_ids": [
+          "SET-009",
+          "FLD-001",
+          "FLD-002",
+          "ACC-017",
+          "FLD-003"
+        ]
+      },
+      {
+        "surface": "R.string.folder_sort_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "R.string.folder_sort_name",
+        "test_ids": [
+          "FLD-007"
+        ]
+      },
+      {
+        "surface": "R.string.folder_sort_recent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "R.string.folder_sort_recent",
+        "test_ids": [
+          "FLD-007"
+        ]
+      },
+      {
+        "surface": "R.string.folder_sort_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "R.string.folder_sort_unread",
+        "test_ids": [
+          "FLD-007"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_organize_folder_add_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "R.string.explanation_organize_folder_add_description",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_sort_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "R.string.explanation_organize_folder_sort_name",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_sort_recent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "R.string.explanation_organize_folder_sort_recent",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_sort_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditParts.kt",
+        "anchor": "R.string.explanation_organize_folder_sort_unread",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

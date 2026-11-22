@@ -59,7 +59,6 @@ import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.account.RetainedTopBarAccountAvatar
-import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoffHost
@@ -134,7 +133,6 @@ internal fun ChatListTopBar(
     var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
     val profileState by appState.notificationProfiles.state.collectAsState()
     val showProfileAction = profileState.showInChatList && profileState.profiles.isNotEmpty()
-    val switchNotice = rememberQuickAccountSwitchNotice()
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
             showSelector = false
@@ -152,19 +150,14 @@ internal fun ChatListTopBar(
         if (onSwitchToAccount != null) {
             onSwitchToAccount(targetLabel)
         } else {
-            appState.requestQuickAccountSwitchTo(
-                targetLabel = targetLabel,
-                requestSwitch = { target, activated ->
-                    appState.launchMutation {
-                        appState.setActiveAccount(
-                            label = target,
-                            preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
-                            onActivated = activated,
-                        )
-                    }
-                },
-                onSwitched = switchNotice::show,
-            )
+            appState.requestQuickAccountSwitchTo(targetLabel) { target ->
+                appState.launchMutation {
+                    appState.setActiveAccount(
+                        label = target,
+                        preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+                    )
+                }
+            }
         }
     }
     LaunchedEffect(appState.accounts, appState.runtimeGeneration) {

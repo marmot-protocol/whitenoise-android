@@ -2357,7 +2357,6 @@
     <string name="chat_rows_no_archived_detail">Архивированные чаты появятся здесь.</string>
     <string name="quick_account_switching">Быстрое переключение аккаунтов</string>
     <string name="quick_account_switching_detail">Показывает другие аккаунты рядом с аватаром. Нажмите на один, чтобы переключиться.</string>
-    <string name="quick_account_switched">Выбран аккаунт %1$s</string>
     <string name="add_profile">Добавить профиль</string>
     <string name="switch_profile">Переключить профиль</string>
     <string name="folder_new_title">Новая папка</string>

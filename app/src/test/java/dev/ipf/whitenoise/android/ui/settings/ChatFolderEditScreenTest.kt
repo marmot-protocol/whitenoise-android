@@ -92,7 +92,8 @@ class ChatFolderEditScreenTest {
         content.performScrollToNode(hasTestTag("folder.keyword"))
         composeRule.onNodeWithTag("folder.keyword").performTextReplacement("")
         composeRule.onNodeWithTag("folder.keyword").performTextReplacement("After")
-        composeRule.onNodeWithTag("folder.save").performClick()
+        composeRule.onNodeWithTag("folder.save").assertDoesNotExist()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         assertEquals("After", store.folderRule(ACCOUNT_REF, id)?.keyword)
     }
 
@@ -154,10 +155,15 @@ class ChatFolderEditScreenTest {
         var closed = false
 
         renderEditor(appState, onClose = { closed = true })
-        // Save with the prefilled localized label untouched — a rule tweak,
+        // Leave with the prefilled localized label untouched after a rule tweak,
         // not a rename: the stored name must stay blank so the folder keeps
         // following locale changes.
-        composeRule.onNodeWithText(app.getString(R.string.save)).performClick()
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.legacyEdit"))
+        composeRule.onNodeWithTag("folder.legacyEdit").performClick()
+        val label = app.getString(R.string.chat_folder_unread_mentions_only)
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(label))
+        composeRule.onNodeWithText(label).performClick()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
 
         assertTrue(closed)
         val unread =
@@ -176,7 +182,7 @@ class ChatFolderEditScreenTest {
         composeRule
             .onNodeWithText(app.getString(R.string.chat_list_filter_unread))
             .performTextReplacement("Catch up")
-        composeRule.onNodeWithText(app.getString(R.string.save)).performClick()
+        composeRule.waitForIdle()
 
         val unread =
             appState.chatFolderPreferences
@@ -186,7 +192,7 @@ class ChatFolderEditScreenTest {
     }
 
     @Test
-    fun deleteFromEditorConfirmsExactFolderWithoutSavingDraft() {
+    fun deleteFromEditorConfirmsExactFolder() {
         val appState = appState()
         appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
         var closed = false
@@ -194,13 +200,14 @@ class ChatFolderEditScreenTest {
 
         composeRule
             .onNodeWithText(app.getString(R.string.chat_list_filter_unread))
-            .performTextReplacement("Unsaved name")
+            .performTextReplacement("Renamed")
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.delete"))
         composeRule.onNodeWithTag("folder.delete").performClick()
-        composeRule.onNodeWithText(app.getString(R.string.folder_delete_title, "Unread")).assertExists()
+        // The rename autosaved, so the confirmation names the folder as it now is.
+        composeRule.onNodeWithText(app.getString(R.string.folder_delete_title, "Renamed")).assertExists()
         composeRule.onNodeWithText(app.getString(R.string.folder_delete_detail)).assertExists()
         composeRule.onNodeWithText(app.getString(R.string.cancel)).performClick()
-        composeRule.onNodeWithText("Unsaved name").assertExists()
+        composeRule.onNodeWithText("Renamed").assertExists()
         val folderStillExists =
             appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).any {
                 it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
@@ -214,11 +221,11 @@ class ChatFolderEditScreenTest {
         val remaining = appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
         assertTrue(remaining.none { it.id == ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID })
         assertTrue(remaining.any { it.id == ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID })
-        assertTrue(remaining.none { it.name == "Unsaved name" })
+        assertTrue(remaining.none { it.name == "Renamed" })
     }
 
     @Test
-    fun backWhileDeleteConfirmationOpenKeepsUnsavedEdits() {
+    fun backWhileDeleteConfirmationOpenKeepsEdits() {
         val appState = appState()
         appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
         var closed = false
@@ -262,7 +269,7 @@ class ChatFolderEditScreenTest {
         composeRule.onNodeWithText(app.getString(R.string.chat_folder_direct_chats_only)).assertIsOn()
         toggle(R.string.chat_folder_groups_only)
         composeRule.onNodeWithText(app.getString(R.string.chat_folder_direct_chats_only)).assertIsOff()
-        composeRule.onNodeWithText(app.getString(R.string.save)).performClick()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         val reloaded = ChatFolderPreferences(app)
         assertEquals(
             ChatFolderRule(
@@ -276,31 +283,68 @@ class ChatFolderEditScreenTest {
         )
     }
 
+    /** Existing-folder edits persist without Save, and Back leaves directly with no discard prompt. */
     @Test
-    fun newCategoryChangesAreDiscardableAndDoNotPersistBeforeSave() {
+    fun existingFolderEditsAutosaveAndBackLeavesDirectly() {
         val appState = appState()
         appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
         var closed = false
         renderEditor(appState, onClose = { closed = true })
+        composeRule.onNodeWithTag("folder.save").assertDoesNotExist()
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.legacyEdit"))
         composeRule.onNodeWithTag("folder.legacyEdit").performClick()
         val label = app.getString(R.string.chat_folder_unread_mentions_only)
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(label))
         composeRule.onNodeWithText(label).performClick()
-        val original =
-            appState.chatFolderPreferences.folderRule(
-                ACCOUNT_REF,
-                ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID,
-            )
-        assertEquals(false, original?.unreadMentionsOnly)
+        composeRule.waitForIdle()
+        val saved =
+            appState.chatFolderPreferences.folderRule(ACCOUNT_REF, ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID)
+        assertEquals(true, saved?.unreadMentionsOnly)
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_discard)).assertDoesNotExist()
+        assertTrue(closed)
+        val reloaded = ChatFolderPreferences(app).folderRule(ACCOUNT_REF, ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID)
+        assertEquals(true, reloaded?.unreadMentionsOnly)
+    }
+
+    /** A blank name shows inline validation, other edits still save, and leaving keeps the last valid name. */
+    @Test
+    fun blankNameKeepsLastSavedNameWhileOtherEditsSave() {
+        val appState = appState()
+        val store = appState.chatFolderPreferences
+        val id = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        store.foldersFor(ACCOUNT_REF)
+        var closed = false
+        renderEditor(appState, onClose = { closed = true })
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Catch up")
+        composeRule.waitForIdle()
+        assertEquals("Catch up", store.foldersFor(ACCOUNT_REF).first { it.id == id }.name)
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("  ")
+        composeRule.onNodeWithText(app.getString(R.string.folder_name_required)).assertExists()
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.addDescription"))
+        composeRule.onNodeWithTag("folder.addDescription").performClick()
+        composeRule.onNodeWithTag("folder.description").performTextReplacement("Later")
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        assertTrue(closed)
+        val folder = ChatFolderPreferences(app).foldersFor(ACCOUNT_REF).first { it.id == id }
+        assertEquals("Catch up", folder.name)
+        assertEquals("Later", folder.description)
+    }
+
+    /** New folders keep the explicit Save flow, so leaving a dirty new draft still asks before discarding. */
+    @Test
+    fun newFolderDraftStillAsksBeforeDiscarding() {
+        val appState = appState()
+        var closed = false
+        renderEditor(appState, onClose = { closed = true }, folderId = null)
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Draft")
         composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_keep_editing)).performClick()
-        composeRule.onNodeWithText(label).assertIsOn()
+        composeRule.onNodeWithText("Draft").assertExists()
         composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_discard)).performClick()
         assertTrue(closed)
-        val reloaded = ChatFolderPreferences(app).folderRule(ACCOUNT_REF, ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID)
-        assertEquals(false, reloaded?.unreadMentionsOnly)
+        assertTrue(ChatFolderPreferences(app).foldersFor(ACCOUNT_REF).none { it.name == "Draft" })
     }
 
     @Test
@@ -315,7 +359,7 @@ class ChatFolderEditScreenTest {
         var closed = false
         renderEditor(appState, onClose = { closed = true })
         composeRule.onNodeWithText(app.getString(R.string.chat_list_filter_unread)).performTextReplacement("Future")
-        composeRule.onNodeWithText(app.getString(R.string.save)).performClick()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         assertTrue(closed)
         val reloaded = ChatFolderPreferences(app)
         assertEquals("Future", reloaded.foldersFor(ACCOUNT_REF).first { it.id == id }.name)
