@@ -757,42 +757,10 @@ class LocalNotificationPresenter(
                                     } else {
                                         emptyList()
                                     }
-                                val chipArtwork = notificationReactionChipArtwork(context, quickReactions)
                                 NotificationActions
                                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                                     ?.let { actionTarget ->
-                                        decision.actions.forEach { action ->
-                                            when (action) {
-                                                NotificationActionKind.REPLY ->
-                                                    builder.addAction(
-                                                        interactions.replyNotificationAction(
-                                                            actionTarget,
-                                                            quickReactions,
-                                                        ),
-                                                    )
-                                                // Reaction choices ride on Reply's RemoteInput so SystemUI
-                                                // can render them inline.
-                                                NotificationActionKind.REACT -> Unit
-                                                NotificationActionKind.MARK_READ ->
-                                                    builder.addAction(
-                                                        interactions.markReadNotificationAction(actionTarget),
-                                                    )
-                                            }
-                                        }
-                                        if (chipArtwork.isNotEmpty()) {
-                                            val rows =
-                                                notificationQuickReactionRows(
-                                                    context,
-                                                    quickReactions,
-                                                    chipArtwork,
-                                                ) { reaction ->
-                                                    interactions.reactionPendingIntent(actionTarget, reaction)
-                                                }
-                                            builder.extras.apply {
-                                                putString(EXTRA_QUICK_REACTION_TARGET, actionTarget.target.messageIdHex)
-                                                putParcelable(EXTRA_QUICK_REACTION_ROWS, rows)
-                                            }
-                                        }
+                                        interactions.addMessageActions(builder, actionTarget, decision.actions, quickReactions)
                                     }
                             }
                             messagingPost =
