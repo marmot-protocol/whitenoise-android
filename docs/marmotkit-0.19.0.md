@@ -102,3 +102,12 @@ master's own runs for #3987
 [45032823081](https://github.com/marmot-protocol/whitenoise-android/actions/runs/45032823081)),
 one of eight recovery executions passed all seven cases and the other seven
 failed; their logs do not name the failing case.
+
+The [rerun](https://github.com/marmot-protocol/whitenoise-android/actions/runs/45071102711)
+on `566fd82fa8` built master's `6a59fe30` as the baseline and ran both audit
+choices. Each passed every phase before recovery and six of the seven recovery
+cases in both relay modes. `healthyAccountReceivesAfterLocalDeletionAndRestart`
+failed in all four executions (`pass=0 live_attempts=4 timeline=1`). On
+2026-11-22 the maintainer waived that case for this adoption as pre-existing
+MDK #3264, as for 0.17.0. The waiver covers 0.19.0 only: a later bump that
+still fails the case needs its own decision until MDK #3264 is fixed.
