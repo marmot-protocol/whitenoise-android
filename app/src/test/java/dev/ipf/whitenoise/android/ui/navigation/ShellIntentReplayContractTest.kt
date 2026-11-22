@@ -136,6 +136,8 @@ class ShellIntentReplayContractTest {
             }
         } finally {
             seededBootstrap.complete(Unit)
+            // The last Activity is gone, so the process-owned shell state ends with it, as the task's removal does.
+            ApplicationProvider.getApplicationContext<WhiteNoiseApplication>().mainShellProcessState.release()
             ContractShellTestApplication.fixtureAppState = null
         }
     }

@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
@@ -67,6 +68,8 @@ class ShellActivityRecreationContractTest {
             ActivityScenario.launch(MainActivity::class.java).use { detailsSurviveRecreation(it, fixture) }
         } finally {
             seededBootstrap.complete(Unit)
+            // The last Activity is gone, so the process-owned shell state ends with it, as the task's removal does.
+            ApplicationProvider.getApplicationContext<WhiteNoiseApplication>().mainShellProcessState.release()
             ContractShellTestApplication.fixtureAppState = null
         }
     }
