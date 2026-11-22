@@ -215,10 +215,15 @@ internal class HistoryBackupsController(
     /** Sends the typed words in position order. A refusal keeps the setup so the user can try again. */
     fun confirm(answers: List<String>) =
         run(HistoryBackupAction.Confirm) {
-            setupMutex.withLock { setupCommand { confirmRecoveryWords(accountRef, answers.map(String::trim)) } }
+            setupMutex.withLock {
+                setupCommand {
+                    confirmRecoveryWords(accountRef, answers.map(String::trim))
+                    // Accepted words make this device the writer: schedule in the same uninterruptible step, so
+                    // leaving the screen or a failed follow-up read never strands enabled backups without work.
+                    runCatching(onWriting)
+                }
+            }
             mutableState.update { it.copy(setup = null) }
-            // Confirming makes this device the writer; schedule even if the follow-up read fails.
-            withContext(dispatcher) { runCatching(onWriting) }
             reloadSettings()
         }
 

@@ -31,7 +31,7 @@ internal fun Context.currentHistoryBackupFacts(): HistoryBackupFacts {
     val capabilities = connectivity?.activeNetwork?.let(connectivity::getNetworkCapabilities)
     return HistoryBackupFacts(
         wifi = capabilities.isUnmeteredInternet(),
-        charging = isPluggedIn(),
+        charging = isCharging(),
     )
 }
 
@@ -40,10 +40,12 @@ private fun NetworkCapabilities?.isUnmeteredInternet(): Boolean =
         hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
         hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
 
-private fun Context.isPluggedIn(): Boolean {
+/** Charging or full on external power, as WorkManager's charging constraint reads the battery. */
+private fun Context.isCharging(): Boolean {
     // The sticky battery broadcast is read without registering a receiver.
     val battery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return false
-    return battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+    val status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+    return status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
 }
 
 /**
@@ -125,6 +127,9 @@ internal object HistoryBackupConditions {
             IntentFilter().apply {
                 addAction(Intent.ACTION_POWER_CONNECTED)
                 addAction(Intent.ACTION_POWER_DISCONNECTED)
+                // Charging can stop and resume while the cable stays in.
+                addAction(BatteryManager.ACTION_CHARGING)
+                addAction(BatteryManager.ACTION_DISCHARGING)
             }
         app.registerReceiver(
             object : BroadcastReceiver() {

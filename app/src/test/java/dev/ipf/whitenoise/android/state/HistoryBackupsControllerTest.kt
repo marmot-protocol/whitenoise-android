@@ -185,6 +185,23 @@ class HistoryBackupsControllerTest {
             assertEquals(HistoryBackupStatus.LoadFailed, controller.state.value.status)
         }
 
+    @Test fun leavingDuringAnAcceptedConfirmationStillSchedules() =
+        runTest {
+            val fake = FakeBackups()
+            var scheduled = 0
+            val controller = controller(fake, onWriting = { scheduled++ })
+            controller.beginSetup()
+            runCurrent()
+            val gate = CompletableDeferred<Unit>()
+            fake.confirmGate = gate
+            controller.confirm(listOf("gamma", "india"))
+            runCurrent()
+            controller.close()
+            gate.complete(Unit)
+            runCurrent()
+            assertEquals(1, scheduled)
+        }
+
     @Test fun wordsMadeForARetiredOwnerAreForgottenAtOnce() =
         runTest {
             val fake = FakeBackups()

@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -51,7 +51,7 @@ import dev.ipf.whitenoise.android.state.historyBackupsEligible
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -311,7 +311,7 @@ private fun HistoryRestoreGroup(
                 label = stringResource(R.string.history_backups_restore_words),
                 supporting = stringResource(R.string.history_backups_restore_words_help),
                 enabled = state.running == null,
-                multiLine = true,
+                lastField = true,
                 modifier = Modifier.fillMaxWidth().testTag("history_backups.restore_words"),
             )
             val starting = state.running == HistoryBackupAction.BeginRestore
@@ -492,8 +492,8 @@ private fun hasTwelveRecoveryWords(text: CharSequence): Boolean =
     } == RECOVERY_WORD_COUNT
 
 /**
- * A field for recovery words. The password keyboard type asks the keyboard not to learn or suggest what is typed,
- * and nothing here is saveable, so the words stay out of the keyboard's history and the saved instance state.
+ * A field for recovery words. The secure field keeps the words visible but offers no Copy or Cut, the password keyboard
+ * type asks the keyboard not to learn or suggest them, and nothing here is saveable.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -503,10 +503,11 @@ private fun RecoveryWordsInput(
     enabled: Boolean,
     modifier: Modifier = Modifier,
     supporting: String? = null,
-    multiLine: Boolean = false,
+    lastField: Boolean = false,
 ) {
-    WhiteNoiseTextField(
+    WhiteNoiseSecureTextField(
         state = state,
+        textObfuscationMode = TextObfuscationMode.Visible,
         enabled = enabled,
         modifier = modifier,
         label = { Text(label) },
@@ -516,10 +517,8 @@ private fun RecoveryWordsInput(
                 capitalization = KeyboardCapitalization.None,
                 autoCorrectEnabled = false,
                 keyboardType = KeyboardType.Password,
-                imeAction = if (multiLine) ImeAction.Default else ImeAction.Next,
+                imeAction = if (lastField) ImeAction.Done else ImeAction.Next,
             ),
-        lineLimits =
-            if (multiLine) TextFieldLineLimits.MultiLine(minHeightInLines = 3) else TextFieldLineLimits.SingleLine,
     )
 }
 
