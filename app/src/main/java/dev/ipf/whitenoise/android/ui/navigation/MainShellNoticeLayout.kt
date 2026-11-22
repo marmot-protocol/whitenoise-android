@@ -22,7 +22,6 @@ import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
-import dev.ipf.whitenoise.android.ui.conversation.composer.controlFacts
 
 /** The shell's single notice layout, using control ownership from this same navigation composition. */
 @Composable
@@ -149,7 +148,7 @@ internal fun MainShellNoticeLayout(
                 DictationControlExit(
                     owner = dictationControlOwner,
                     state = dictationController.state,
-                    facts = dictationController.controlFacts,
+                    facts = dictationController.controlFactsFor(dictationComposerRoute),
                     motionAllowed = dictationMotionAllowed,
                     morphActive = { dictationMotion.active },
                 ) { renderedState, renderedFacts, exitModifier ->

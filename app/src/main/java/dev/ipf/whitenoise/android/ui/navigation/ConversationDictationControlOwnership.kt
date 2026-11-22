@@ -2,8 +2,12 @@
 
 package dev.ipf.whitenoise.android.ui.navigation
 
+import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.continueTarget
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
+import dev.ipf.whitenoise.android.ui.conversation.composer.DictationControlFacts
+import dev.ipf.whitenoise.android.ui.conversation.composer.controlFacts
 import dev.ipf.whitenoise.android.ui.shouldShowConversationDictationPersistentControl
 
 /** Presentation ownership only; this must never become a dictation delivery destination. */
@@ -57,4 +61,21 @@ internal fun conversationDictationOriginComposerVisible(
         route.selectedChatId == route.renderedChatId &&
         route.renderedAccountRef.equals(target.accountRef, ignoreCase = true) &&
         route.selectedGroupIdHex.equals(target.groupIdHex, ignoreCase = true)
+}
+
+/**
+ * Continue records into the active dictation's chat. While another chat's composer is on screen the
+ * control leaves it out, and Dictate in that composer queues a recording for that chat instead.
+ */
+internal fun ConversationDictationController.controlFactsFor(route: ConversationDictationComposerRoute): DictationControlFacts {
+    val facts = controlFacts
+    val target = continueTarget ?: return facts
+    val otherChatOnScreen =
+        route.composerVisible &&
+            route.selectedGroupIdHex != null &&
+            !(
+                route.renderedAccountRef.equals(target.accountRef, ignoreCase = true) &&
+                    route.selectedGroupIdHex.equals(target.groupIdHex, ignoreCase = true)
+            )
+    return if (otherChatOnScreen) facts.copy(continueAvailable = false) else facts
 }
