@@ -2167,6 +2167,13 @@
       "second_device": ["SET-061"]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+      "symbol": "DeviceLinkReviewPendingDialog",
+      "bindings": [],
+      "remaining": "This checking state appears only after Review on a link request from a second installation of the same account, which the single-emulator runner cannot provide. Its pending, retry and Not now behavior is covered by DeviceLinkReviewGateTest and manual SET-061; add a direct assertion when the runner can seed a second device.",
+      "second_device": ["SET-061"]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
       "symbol": "ConversationNotificationSettingsScreen",
       "bindings": [
