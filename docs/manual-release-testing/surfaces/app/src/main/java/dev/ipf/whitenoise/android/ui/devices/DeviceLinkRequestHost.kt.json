@@ -90,6 +90,14 @@
         "test_ids": [
           "SET-065"
         ]
+      },
+      {
+        "surface": "DeviceLinkRequestPresentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkRequestHost.kt",
+        "anchor": "fun DeviceLinkRequestPresentation(",
+        "test_ids": [
+          "SET-061"
+        ]
       }
     ]
   },

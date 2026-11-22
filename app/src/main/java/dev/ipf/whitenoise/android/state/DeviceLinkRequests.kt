@@ -128,6 +128,10 @@ internal class DeviceLinkRequestWatcher(
     var snapshots by mutableStateOf<Map<String, DeviceLinkSnapshotFfi>>(emptyMap())
         private set
 
+    /** Per profile, how many reads of it have succeeded and been published, so a caller can wait for a fresh one. */
+    var successfulReads by mutableStateOf<Map<String, Long>>(emptyMap())
+        private set
+
     /** Per profile, when [awaitingChatCount] saw its own link become Linked, by [monotonicNowMs]. */
     var linkedAwaitingCount by mutableStateOf<Map<String, Long>>(emptyMap())
         private set
@@ -165,6 +169,7 @@ internal class DeviceLinkRequestWatcher(
             if (!owns()) return
             // A command result published meanwhile is newer than these reads, so it stays.
             val fresh = read.filterKeys { accepted[it] == before[it] }
+            countSuccessfulReads(fresh.keys)
             publish(snapshots.filterKeys { it in accounts } + fresh, blocked)
         }
     }
@@ -191,6 +196,7 @@ internal class DeviceLinkRequestWatcher(
             val before = accepted[accountRef]
             val snapshot = read(accountRef)
             if (snapshot != null && owns() && accepted[accountRef] == before) {
+                countSuccessfulReads(setOf(accountRef))
                 publish(snapshots + (accountRef to snapshot), blocked)
             }
         }
@@ -220,6 +226,10 @@ internal class DeviceLinkRequestWatcher(
         val presented = queue.presented ?: return
         queue = queue.hidePresented(reopenForComparison = canPresentOutcome(presented.accountRef))
         reoffer(blocked)
+    }
+
+    private fun countSuccessfulReads(accounts: Set<String>) {
+        successfulReads = successfulReads + accounts.associateWith { (successfulReads[it] ?: 0L) + 1L }
     }
 
     private fun publish(

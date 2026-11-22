@@ -80,19 +80,61 @@ internal fun DeviceLinkRequestHost(
     LaunchedEffect(watcher, blocked, appState.activeAccountRef) { watcher.reoffer(blocked) }
     // A request already on screen is taken down while the app is locked, so nothing can be answered until unlock.
     val request = watcher.queue.presented ?: return
-    if (request.accountRef == appState.activeAccountRef) {
+    DeviceLinkRequestPresentation(
+        watcher = watcher,
+        request = request,
+        activeAccountRef = appState.activeAccountRef,
+        blocked = blocked,
+        profileName = appState.profileName(request.accountRef),
+        onReview = {
+            appState.launchMutation {
+                if (appState.setActiveAccount(request.accountRef)) {
+                    watcher.refresh(currentAccounts.value, currentBlocked.value)
+                }
+            }
+        },
+    ) {
         DeviceLinkApprovalGate(runtimeGeneration, request, blocked) { draft ->
             ActiveProfileLinkRequest(appState, watcher, request, draft)
         }
+    }
+}
+
+/** A Review that switched to [accountRef] after [readsBefore] successful reads of it, until the next one lands. */
+internal data class DeviceLinkReview(
+    val accountRef: String,
+    val readsBefore: Long,
+) {
+    /** Whether [accountRef]'s comparison must still wait, because no read has succeeded since the switch. */
+    fun awaits(reads: Map<String, Long>): Boolean = (reads[accountRef] ?: 0L) <= readsBefore
+}
+
+/**
+ * Shows the presented [request]: on the active profile its comparison ([activeRequest]); on another profile only
+ * the notice, whose Review runs [onReview] to activate that profile and re-read its prompt. Until a read made after
+ * Review has succeeded, the comparison stays down, so neither a slow read nor a failed one shows the cached prompt
+ * with working Link and Not now.
+ */
+@Composable
+internal fun DeviceLinkRequestPresentation(
+    watcher: DeviceLinkRequestWatcher,
+    request: DeviceLinkRequest,
+    activeAccountRef: String?,
+    blocked: Boolean,
+    profileName: String,
+    onReview: () -> Unit,
+    activeRequest: @Composable () -> Unit,
+) {
+    var review by remember(watcher) { mutableStateOf<DeviceLinkReview?>(null) }
+    if (request.accountRef == activeAccountRef) {
+        val pending = review?.takeIf { it.accountRef == request.accountRef }?.awaits(watcher.successfulReads) == true
+        if (!pending) activeRequest()
     } else if (!blocked && request.open) {
         DeviceLinkOtherProfileDialog(
-            profileName = appState.profileName(request.accountRef),
+            profileName = profileName,
             onReview = {
-                appState.launchMutation {
-                    if (appState.setActiveAccount(request.accountRef)) {
-                        watcher.refresh(currentAccounts.value, currentBlocked.value)
-                    }
-                }
+                review = DeviceLinkReview(request.accountRef, watcher.successfulReads[request.accountRef] ?: 0L)
+                onReview()
             },
             onNotNow = { watcher.hidePresented(blocked) },
         )
