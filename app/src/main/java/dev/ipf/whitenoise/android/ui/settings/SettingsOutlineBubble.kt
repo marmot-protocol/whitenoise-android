@@ -128,9 +128,15 @@ internal fun DrawScope.drawSettingsBubbleFrame(
         clipRect(card.left, card.top, card.right, card.bottom, ClipOp.Difference) { drawAtAlpha(whole, page, content) }
     }
     // A card its viewport partly clips keeps that clip at rest; the bubble leaves it as it leaves the card.
+    // The card's hidden strips stay hidden throughout, so no frame paints its chrome over the header.
     val clip = lerp(whole, card, presence.coerceIn(0f, 1f))
+    val full = geometry.card.bounds
     clipRect(clip.left, clip.top, clip.right, clip.bottom) {
-        drawSettingsBubble(geometry, presence, edge, ink, content)
+        clipRect(full.left, full.top, full.right, card.top, ClipOp.Difference) {
+            clipRect(full.left, card.bottom, full.right, full.bottom, ClipOp.Difference) {
+                drawSettingsBubble(geometry, presence, edge, ink, content)
+            }
+        }
     }
 }
 

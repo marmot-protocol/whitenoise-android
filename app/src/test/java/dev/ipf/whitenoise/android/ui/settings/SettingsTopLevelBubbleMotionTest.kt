@@ -120,7 +120,7 @@ class SettingsTopLevelBubbleMotionTest {
         val visible = Rect(16f, 100f, 344f, 260f)
         val card = card(Rect(16f, 60f, 344f, 260f)).copy(visibleBounds = visible, fill = Color.Blue)
         val geometry = SettingsBubbleGeometry(Rect(12f, 12f, 52f, 52f), card)
-        listOf(1f, CLOSING_PRESENCE).forEach { presence ->
+        listOf(1f, CLOSING_PRESENCE, 0.9f, 0.6f).forEach { presence ->
             val pixels =
                 drawFrame { drawSettingsBubbleFrame(geometry, presence, Color.Red, 1f) { drawRect(Color.Green) } }
             for (y in HIDDEN_TOP until HIDDEN_BOTTOM) {
@@ -381,8 +381,8 @@ class SettingsTopLevelBubbleMotionTest {
     private companion object {
         const val AVATAR_TAG = "fixture.avatar"
         const val CLOSING_PRESENCE = 0.98f
-        const val HIDDEN_TOP = 62
-        const val HIDDEN_BOTTOM = 96
+        const val HIDDEN_TOP = 60
+        const val HIDDEN_BOTTOM = 100
         const val AVATAR_TOP = 12
         const val SETTLE_MILLIS = 1_000L
         const val OPEN_FRAMES = 20
