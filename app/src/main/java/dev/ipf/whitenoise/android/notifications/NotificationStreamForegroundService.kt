@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
+import dev.ipf.whitenoise.android.audio.VoiceNoteForegroundService
 import dev.ipf.whitenoise.android.state.RecoveryTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.acknowledgePushWakeServiceOwner
@@ -87,6 +88,8 @@ class NotificationStreamForegroundService : Service() {
     private var pendingUserOwnedStart = false
     private var latestStartId = 0
 
+    // Route capture commands before connection bootstrap.
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     override fun onStartCommand(
         intent: Intent?,
         flags: Int,
@@ -96,6 +99,10 @@ class NotificationStreamForegroundService : Service() {
         lastServiceStartId = startId
         if (ConversationDictationForegroundService.isCommand(intent)) {
             dictation.onStartCommand(intent, startId)
+            return if (foreground.connectionServiceType == 0) START_NOT_STICKY else START_STICKY
+        }
+        if (intent != null && VoiceNoteForegroundService.isCommand(intent)) {
+            foreground.voice.onCommand(intent, startId, serviceScope)
             return if (foreground.connectionServiceType == 0) START_NOT_STICKY else START_STICKY
         }
         val trigger = foregroundStartTrigger(intent)
@@ -383,6 +390,7 @@ class NotificationStreamForegroundService : Service() {
             activeHost = null
         } else {
             dictation.onDestroy()
+            foreground.voice.onDestroy()
         }
         application.notifyCapabilityFallbackUnavailable(capabilityFallbackRequests.onRuntimeUnavailable())
         (application as? WhiteNoiseApplication)
@@ -423,6 +431,7 @@ class NotificationStreamForegroundService : Service() {
     companion object {
         private const val NOTIFICATION_ID = BackgroundConnectionNotification.NOTIFICATION_ID
         internal const val DICTATION_NOTIFICATION_ID = 1003
+        internal const val VOICE_NOTIFICATION_ID = 1004
         private var activeHost: NotificationStreamForegroundService? = null
         private val connectionStartEpoch = AtomicLong()
 
@@ -449,10 +458,10 @@ class NotificationStreamForegroundService : Service() {
 
         /** Changing the presentation ID lets Android retire the old foreground card atomically. */
         internal fun foregroundNotificationId(notification: Notification): Int =
-            if (notification.channelId == ConversationDictationForegroundService.CHANNEL_ID) {
-                DICTATION_NOTIFICATION_ID
-            } else {
-                NOTIFICATION_ID
+            when (notification.channelId) {
+                ConversationDictationForegroundService.CHANNEL_ID -> DICTATION_NOTIFICATION_ID
+                VoiceNoteForegroundService.CHANNEL_ID -> VOICE_NOTIFICATION_ID
+                else -> NOTIFICATION_ID
             }
 
         internal var foregroundRemover: (NotificationStreamForegroundService) -> Unit =

@@ -85,6 +85,46 @@ class VoiceRecordingStripPausedScreenshotTest {
         }
     }
 
+    /** Captures a locked take: the trash leaves, and the lock and Pause take the hint's place at the end. */
+    @Test
+    fun voiceRecordingStripLockedLight() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val voiceRecording =
+            VoiceRecordingController(
+                context = context,
+                outputDirectory = context.cacheDir,
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+                onPermissionRequest = { true },
+                onRecordingComplete = { _, _ -> },
+                onError = {},
+                recorderFactory = { _, file, _ -> PausableRecordingSession(file) },
+                mainDispatcher = Dispatchers.Unconfined,
+                recorderDispatcher = Dispatchers.Unconfined,
+                elapsedRealtime = { 0L },
+            )
+        try {
+            assertTrue(voiceRecording.start())
+            voiceRecording.lock()
+            composeRule.mainClock.autoAdvance = false
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface(modifier = Modifier.width(320.dp).testTag(RECORDING_STRIP_TAG)) {
+                        RecordingStripLeading(controller = voiceRecording)
+                    }
+                }
+            }
+            composeRule.mainClock.advanceTimeBy(350L)
+
+            composeRule.onNodeWithTag("composer.voice.pause").assertIsDisplayed()
+            composeRule.onNodeWithTag("composer.voice.trash").assertDoesNotExist()
+            composeRule
+                .onNodeWithTag(RECORDING_STRIP_TAG)
+                .captureRoboImage("src/test/snapshots/composer_voice_recording_strip_locked_light.png")
+        } finally {
+            voiceRecording.release()
+        }
+    }
+
     /** Stands in for the platform encoder so the strip can be captured mid-take. */
     private class PausableRecordingSession(
         private val file: java.io.File,

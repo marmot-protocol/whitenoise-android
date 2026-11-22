@@ -4,4 +4,11 @@
     <string name="voice_record_again">Yeniden kaydet</string>
     <string name="voice_message_release_to_review">İncelemek için bırakın · iptal için kaydırın</string>
     <string name="voice_recording_stop">Kaydı durdur</string>
+    <string name="voice_recording_pause">Kaydı duraklat</string>
+    <string name="voice_discard_title">Sesli mesaj silinsin mi?</string>
+    <string name="voice_discard_message">Bu kayıt gönderilmedi ve silinecek.</string>
+    <string name="voice_send_interrupted">Sesli mesaj gönderilmedi</string>
+    <string name="voice_recording_elsewhere">Başka bir sohbette sesli mesaj kaydediliyor.</string>
+    <string name="voice_row_recording">Sesli mesaj kaydediliyor</string>
+    <string name="voice_row_unsent">Gönderilmemiş sesli mesaj</string>
 </resources>

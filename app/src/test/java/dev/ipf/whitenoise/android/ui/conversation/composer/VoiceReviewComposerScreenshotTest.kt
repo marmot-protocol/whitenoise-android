@@ -9,18 +9,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -29,6 +32,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -122,14 +126,59 @@ class VoiceReviewComposerScreenshotTest {
         capture("voice_review_compact_height")
     }
 
-    /** Preparation disables replay, rerecord and duplicate sends while keeping explicit discard usable. */
+    /**
+     * While Send prepares, the disc shows a ring, the time reads "Sending" and every other action, including the
+     * custom Discard action, is unavailable, so the press can neither revoke nor repeat the send.
+     */
     @Test
-    fun pendingQueueKeepsReviewVisibleAndDiscardAvailable() {
-        render(sending = true)
-        listOf(R.string.voice_message_play, R.string.voice_record_again, R.string.send).forEach {
+    fun sendingShowsProgressAndLocksEveryOtherAction() {
+        val actions = mutableListOf<String>()
+        render(sending = true, actions = actions)
+        listOf(R.string.voice_message_play, R.string.discard, R.string.voice_record_again).forEach {
             rule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed().assertIsNotEnabled()
         }
-        rule.onNodeWithContentDescription(context.getString(R.string.discard)).assertIsDisplayed().assertIsEnabled()
+        rule.onNodeWithTag("conversation.voice.review.sending", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithText(context.getString(R.string.sending)).assertIsDisplayed()
+        val review = rule.onNodeWithTag("conversation.voice.review").fetchSemanticsNode().config
+        assertFalse(review.contains(SemanticsActions.CustomActions))
+        assertEquals(context.getString(R.string.sending), review[SemanticsProperties.StateDescription])
+        capture("voice_review_sending_light")
+        assertTrue(actions.isEmpty())
+    }
+
+    /** The sending state on AMOLED keeps the disc's outline and a visible ring. */
+    @Test
+    fun voiceReviewSendingAmoled() {
+        render(dark = true, sending = true)
+        capture("voice_review_sending_amoled")
+    }
+
+    /** At 200% type in RTL the sending label stays on one line and every target keeps its 48dp size. */
+    @Test
+    fun voiceReviewSendingNarrowLargeRtlAmoled() {
+        render(dark = true, fontScale = 2f, rtl = true, width = 240, sending = true)
+        val layouts = mutableListOf<TextLayoutResult>()
+        rule
+            .onNodeWithText(context.getString(R.string.sending))
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(1, layouts.single().lineCount)
+        listOf(R.string.voice_message_play, R.string.discard, R.string.voice_record_again).forEach {
+            val bounds = rule.onNodeWithContentDescription(context.getString(it)).fetchSemanticsNode().boundsInRoot
+            assertTrue(bounds.width >= 48f && bounds.height >= 48f)
+        }
+        capture("voice_review_sending_large_rtl_amoled")
+    }
+
+    /** Once the preview has played, a tap on the waveform seeks to that fraction of the take. */
+    @Test
+    fun waveformTapSeeksToTheTappedFraction() {
+        val seeks = mutableListOf<Float>()
+        render(onSeek = { seeks += it })
+        rule.onNodeWithTag("conversation.voice.review.waveform", useUnmergedTree = true).performTouchInput {
+            click(Offset(width * 0.75f, height / 2f))
+        }
+        assertTrue(seeks.isNotEmpty())
+        seeks.forEach { assertEquals(0.75f, it, 0.05f) }
     }
 
     /** Uses the real theme scale, not an ambient density that a popup or theme can replace. */
@@ -141,6 +190,7 @@ class VoiceReviewComposerScreenshotTest {
         actions: MutableList<String> = mutableListOf(),
         height: Int = 96,
         sending: Boolean = false,
+        onSeek: ((Float) -> Unit)? = null,
     ) {
         rule.setContent {
             CompositionLocalProvider(
@@ -163,6 +213,7 @@ class VoiceReviewComposerScreenshotTest {
                             onDiscard = { actions += "discard" },
                             onRecordAgain = { actions += "recordAgain" },
                             onSend = { actions += "send" },
+                            onSeek = onSeek,
                         )
                     }
                 }

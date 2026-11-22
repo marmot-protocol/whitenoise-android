@@ -4,4 +4,11 @@
     <string name="voice_record_again">重新录音</string>
     <string name="voice_message_release_to_review">松开以检查 · 滑动以取消</string>
     <string name="voice_recording_stop">停止录音</string>
+    <string name="voice_recording_pause">暂停录音</string>
+    <string name="voice_discard_title">要丢弃语音消息吗？</string>
+    <string name="voice_discard_message">此录音尚未发送，将被删除。</string>
+    <string name="voice_send_interrupted">语音消息未发送</string>
+    <string name="voice_recording_elsewhere">另一个聊天正在录制语音消息。</string>
+    <string name="voice_row_recording">正在录制语音消息</string>
+    <string name="voice_row_unsent">未发送的语音消息</string>
 </resources>

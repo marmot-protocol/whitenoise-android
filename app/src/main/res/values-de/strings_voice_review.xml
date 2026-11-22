@@ -4,4 +4,11 @@
     <string name="voice_record_again">Erneut aufnehmen</string>
     <string name="voice_message_release_to_review">Zum Prüfen loslassen · zum Abbrechen wegwischen</string>
     <string name="voice_recording_stop">Aufnahme stoppen</string>
+    <string name="voice_recording_pause">Aufnahme pausieren</string>
+    <string name="voice_discard_title">Sprachnachricht verwerfen?</string>
+    <string name="voice_discard_message">Diese Aufnahme wurde nicht gesendet und wird gelöscht.</string>
+    <string name="voice_send_interrupted">Sprachnachricht wurde nicht gesendet</string>
+    <string name="voice_recording_elsewhere">In einem anderen Chat wird gerade eine Sprachnachricht aufgenommen.</string>
+    <string name="voice_row_recording">Sprachnachricht wird aufgenommen</string>
+    <string name="voice_row_unsent">Nicht gesendete Sprachnachricht</string>
 </resources>

@@ -4,4 +4,11 @@
     <string name="voice_record_again">Записать заново</string>
     <string name="voice_message_release_to_review">Отпустите для проверки · сдвиньте для отмены</string>
     <string name="voice_recording_stop">Остановить запись</string>
+    <string name="voice_recording_pause">Приостановить запись</string>
+    <string name="voice_discard_title">Удалить голосовое сообщение?</string>
+    <string name="voice_discard_message">Эта запись не отправлена и будет удалена.</string>
+    <string name="voice_send_interrupted">Голосовое сообщение не отправлено</string>
+    <string name="voice_recording_elsewhere">В другом чате записывается голосовое сообщение.</string>
+    <string name="voice_row_recording">Запись голосового сообщения</string>
+    <string name="voice_row_unsent">Неотправленное голосовое сообщение</string>
 </resources>

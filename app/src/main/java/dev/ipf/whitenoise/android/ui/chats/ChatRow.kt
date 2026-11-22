@@ -291,6 +291,7 @@ internal fun ChatRow(
         consumeSelectionLongPress = selectionMode && !rangeDragActive,
         titleMetadata = {
             dictationActivity?.let { ChatRowDictationStatus(it) }
+            ChatRowVoiceStatus(appState.chatListVoiceActivity(accountRef, item))
             if (isMuted) {
                 ChatRowTitleStatus(R.drawable.ic_notifications_off, stringResource(R.string.chat_muted_badge))
             }

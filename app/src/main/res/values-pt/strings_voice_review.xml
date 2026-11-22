@@ -4,4 +4,11 @@
     <string name="voice_record_again">Gravar novamente</string>
     <string name="voice_message_release_to_review">Solte para rever · deslize para cancelar</string>
     <string name="voice_recording_stop">Parar gravação</string>
+    <string name="voice_recording_pause">Pausar gravação</string>
+    <string name="voice_discard_title">Descartar mensagem de voz?</string>
+    <string name="voice_discard_message">Esta gravação não foi enviada e será apagada.</string>
+    <string name="voice_send_interrupted">A mensagem de voz não foi enviada</string>
+    <string name="voice_recording_elsewhere">Está a ser gravada uma mensagem de voz noutra conversa.</string>
+    <string name="voice_row_recording">A gravar mensagem de voz</string>
+    <string name="voice_row_unsent">Mensagem de voz por enviar</string>
 </resources>

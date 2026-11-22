@@ -4,4 +4,11 @@
     <string name="voice_record_again">Registra di nuovo</string>
     <string name="voice_message_release_to_review">Rilascia per rivedere · scorri per annullare</string>
     <string name="voice_recording_stop">Interrompi registrazione</string>
+    <string name="voice_recording_pause">Metti in pausa la registrazione</string>
+    <string name="voice_discard_title">Eliminare il messaggio vocale?</string>
+    <string name="voice_discard_message">Questa registrazione non è stata inviata e verrà eliminata.</string>
+    <string name="voice_send_interrupted">Il messaggio vocale non è stato inviato</string>
+    <string name="voice_recording_elsewhere">È in corso la registrazione di un messaggio vocale in un\u0027altra chat.</string>
+    <string name="voice_row_recording">Registrazione del messaggio vocale</string>
+    <string name="voice_row_unsent">Messaggio vocale non inviato</string>
 </resources>

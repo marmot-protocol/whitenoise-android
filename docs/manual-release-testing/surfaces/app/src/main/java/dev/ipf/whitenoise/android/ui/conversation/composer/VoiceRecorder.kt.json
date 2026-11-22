@@ -4,14 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "LockHintAbove",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
-        "anchor": "fun LockHintAbove(",
-        "test_ids": [
-          "CON-001"
-        ]
-      },
-      {
         "surface": "MicHoldButton",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
         "anchor": "fun MicHoldButton(",
@@ -28,38 +20,12 @@
         ]
       },
       {
-        "surface": "RecordingStripLeading",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
-        "anchor": "fun RecordingStripLeading(",
-        "test_ids": [
-          "CON-001",
-          "MED-048",
-          "NAV-013"
-        ]
-      },
-      {
         "surface": "Compact toolbar target spacing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
         "anchor": "internal fun MicHoldButton(",
         "test_ids": [
           "CON-030",
           "CON-035"
-        ]
-      },
-      {
-        "surface": "Voice recording remaining-time countdown",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
-        "anchor": "fun RecordingStripLeading(",
-        "test_ids": [
-          "MED-008"
-        ]
-      },
-      {
-        "surface": "voice_recording_stops_in",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
-        "anchor": "R.string.voice_recording_stops_in",
-        "test_ids": [
-          "MED-008"
         ]
       }
     ],
@@ -78,24 +44,6 @@
         "anchor": "R.string.voice_recording_stop",
         "test_ids": [
           "CON-001"
-        ]
-      },
-      {
-        "surface": "string:voice_recording_resume",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
-        "anchor": "R.string.voice_recording_resume",
-        "test_ids": [
-          "MED-048"
-        ]
-      }
-    ],
-    "source_coverage": [
-      {
-        "surface": "R.string.voice_message_release_to_review",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
-        "anchor": "R.string.voice_message_release_to_review",
-        "test_ids": [
-          "MED-008"
         ]
       }
     ]

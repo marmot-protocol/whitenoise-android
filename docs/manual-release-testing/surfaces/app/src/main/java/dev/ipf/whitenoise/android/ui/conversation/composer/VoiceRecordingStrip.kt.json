@@ -1,0 +1,142 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "RecordingStripLeading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RecordingStripLeading(",
+        "test_ids": [
+          "CON-001",
+          "MED-048",
+          "NAV-013"
+        ]
+      },
+      {
+        "surface": "Voice recording remaining-time countdown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RecordingStripLeading(",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice_recording_stops_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "R.string.voice_recording_stops_in",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "RecordingStripDot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RecordingStripDot(",
+        "test_ids": [
+          "MED-060",
+          "NAV-014"
+        ]
+      },
+      {
+        "surface": "RecordingStripHint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RecordingStripHint(",
+        "test_ids": [
+          "MED-060",
+          "NAV-014"
+        ]
+      },
+      {
+        "surface": "RecordingStripLockedControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RecordingStripLockedControls(",
+        "test_ids": [
+          "MED-060",
+          "NAV-014"
+        ]
+      },
+      {
+        "surface": "RecordingStripResume",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RecordingStripResume(",
+        "test_ids": [
+          "MED-060",
+          "NAV-014"
+        ]
+      },
+      {
+        "surface": "RecordingStripStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RecordingStripStatus(",
+        "test_ids": [
+          "MED-060",
+          "NAV-014"
+        ]
+      },
+      {
+        "surface": "RecordingStripTrailing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RecordingStripTrailing(",
+        "test_ids": [
+          "MED-060",
+          "NAV-014"
+        ]
+      },
+      {
+        "surface": "RecordingStripTrash",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RecordingStripTrash(",
+        "test_ids": [
+          "MED-060",
+          "NAV-014"
+        ]
+      },
+      {
+        "surface": "RowScope.RecordingStripMiddle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "fun RowScope.RecordingStripMiddle(",
+        "test_ids": [
+          "MED-060"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:voice_recording_resume",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "R.string.voice_recording_resume",
+        "test_ids": [
+          "MED-048"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.voice_message_release_to_review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "R.string.voice_message_release_to_review",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "R.string.voice_message_locked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "R.string.voice_message_locked",
+        "test_ids": [
+          "MED-060"
+        ]
+      },
+      {
+        "surface": "R.string.voice_recording_pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
+        "anchor": "R.string.voice_recording_pause",
+        "test_ids": [
+          "MED-060"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

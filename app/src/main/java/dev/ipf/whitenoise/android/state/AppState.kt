@@ -455,6 +455,7 @@ class WhiteNoiseAppState private constructor(
     internal val swipePreferences = SwipePreferences(preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
+    internal val voiceNotes by lazy { createVoiceNoteSessionOwner() }
     private val dictationMicrophoneOwner = Any()
     private var initializedDictation by mutableStateOf<ConversationDictationController?>(null)
     internal val conversationDictation: ConversationDictationController
@@ -5609,7 +5610,7 @@ class WhiteNoiseAppState private constructor(
         notificationReplyDraftHandoff.removeAccount(account)
         draftWriter.removeAccount(account)
         forgetStickers(account)
-        conversationDictation.onAccountUnavailable(account)
+        releaseCaptureOwners(account)
         stopTtsForRemovedAccount(account)
     }
 
@@ -5656,7 +5657,7 @@ class WhiteNoiseAppState private constructor(
         val inView = activeAccountRef
         val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
         if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
-        conversationDictation.onAccountUnavailable(wipedRef)
+        releaseCaptureOwners(wipedRef)
         if (retireSession) clearInMemoryMediaCaches()
         try {
             val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
@@ -6621,6 +6622,7 @@ class WhiteNoiseAppState private constructor(
         } else {
             appLock.onAppBackgrounded()
             conversationDictation.onAppBackgrounded()
+            voiceNotes.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
             appLock.scheduleTtsStopAtLockBoundary()
         }
@@ -6672,6 +6674,7 @@ class WhiteNoiseAppState private constructor(
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.onTaskRemoved()
+        voiceNotes.onAppBackgrounded()
         // The app-state lifecycle is authoritative even if the TTS foreground
         // service has not started yet or its start was rejected.
         stopSpeaking()
@@ -7583,7 +7586,7 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
-        if (accountRef != null) conversationDictation.onTargetRemoved(accountRef, groupIdHex)
+        if (accountRef != null) releaseCaptureTarget(accountRef, groupIdHex)
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {

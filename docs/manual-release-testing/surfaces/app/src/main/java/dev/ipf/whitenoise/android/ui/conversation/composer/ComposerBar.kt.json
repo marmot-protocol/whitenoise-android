@@ -54,14 +54,6 @@
         ]
       },
       {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "surface": "Holding a locked recording button explains it",
-        "anchor": "R.string.explanation_conversation_voice_delete",
-        "test_ids": [
-          "CON-049"
-        ]
-      },
-      {
         "surface": "Dictation hold-to-send gesture",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
         "anchor": "dictationHoldGesture(",
@@ -90,14 +82,6 @@
         "test_ids": [
           "MSG-004",
           "MSG-007"
-        ]
-      },
-      {
-        "surface": "R.string.voice_recording_stop",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "R.string.voice_recording_stop",
-        "test_ids": [
-          "MED-008"
         ]
       },
       {
@@ -196,24 +180,6 @@
         "test_ids": [
           "SET-051",
           "MSG-023"
-        ]
-      },
-      {
-        "surface": "R.string.explanation_conversation_voice_stop",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "R.string.explanation_conversation_voice_stop",
-        "test_ids": [
-          "CON-049"
-        ]
-      }
-    ],
-    "string_resources": [
-      {
-        "surface": "Locked voice recording cancel control",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "R.string.voice_message_cancel",
-        "test_ids": [
-          "CON-030"
         ]
       }
     ]
