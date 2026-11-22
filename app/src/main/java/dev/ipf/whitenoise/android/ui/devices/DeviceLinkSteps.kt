@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,6 +24,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.DeviceLinkEmojiFfi
 import dev.ipf.marmotkit.DeviceLinkEndReasonFfi
@@ -38,6 +41,12 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val DEVICE_LINK_CODE_TAG = "device_link.code"
 internal const val DEVICE_LINK_STEP_TAG = "device_link.step"
+
+/**
+ * Each emoji's cell is at least this wide, so the code lines up in columns as on the other apps, and grows up to
+ * twice that at large text sizes so a name wraps between words instead of inside one.
+ */
+private val DEVICE_LINK_EMOJI_WIDTH = 84.dp
 internal const val DEVICE_LINK_PRIMARY_TAG = "device_link.primary"
 internal const val DEVICE_LINK_SECONDARY_TAG = "device_link.secondary"
 internal const val DEVICE_LINK_FAILED_TAG = "device_link.failed"
@@ -148,9 +157,9 @@ internal fun deviceLinkEndReason(reason: DeviceLinkEndReasonFfi): Int =
     }
 
 /**
- * MDK's comparison code as large emoji in MDK's order, wrapping onto more lines instead of shrinking or cutting
- * off. Each emoji is announced with its position and MDK's description, so the order survives a screen reader;
- * the code itself is never logged or copied anywhere.
+ * MDK's comparison code as large emoji in MDK's order, each above MDK's name for it, wrapping onto more lines
+ * instead of shrinking or cutting off. Each emoji is announced with its position and that name, so the order
+ * survives a screen reader; the code itself is never logged or copied anywhere.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -171,14 +180,20 @@ internal fun DeviceLinkCode(
                 modifier = Modifier.clearAndSetSemantics { contentDescription = spoken },
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier =
+                        Modifier
+                            .widthIn(min = DEVICE_LINK_EMOJI_WIDTH, max = DEVICE_LINK_EMOJI_WIDTH * 2)
+                            .padding(horizontal = 4.dp, vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(emoji.emoji, style = MaterialTheme.typography.displaySmall)
                     Text(
-                        text = (index + 1).toString(),
+                        text = emoji.description,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

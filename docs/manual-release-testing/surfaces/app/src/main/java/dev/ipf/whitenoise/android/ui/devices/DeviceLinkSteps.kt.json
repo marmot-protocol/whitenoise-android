@@ -267,6 +267,14 @@
         "test_ids": [
           "SET-061"
         ]
+      },
+      {
+        "surface": "Linked devices: emoji names in DeviceLinkCode",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",
+        "anchor": "text = emoji.description",
+        "test_ids": [
+          "SET-061"
+        ]
       }
     ]
   },
