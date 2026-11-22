@@ -438,7 +438,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       BEFORE_SHA: ${{ needs.responsiveness-source.outputs.before }}
       AFTER_SHA: ${{ needs.responsiveness-source.outputs.after }}
@@ -482,9 +482,10 @@ jobs:
           for role in before after; do
             (
               cd "$role"
-              ./gradlew :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest \
-                :app:assembleDevZapstoreBenchmarkRelease :benchmark:assembleDevZapstoreBenchmarkRelease \
-                -Pandroid.injected.build.abi=arm64-v8a --build-cache --no-daemon --stacktrace
+              # Each invocation gets a fresh compiler process instead of retaining both app variants.
+              fixture_flags=(-Pandroid.injected.build.abi=arm64-v8a --build-cache --no-daemon --stacktrace --max-workers=2)
+              ./gradlew :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest "${fixture_flags[@]}"
+              ./gradlew :app:assembleDevZapstoreBenchmarkRelease :benchmark:assembleDevZapstoreBenchmarkRelease "${fixture_flags[@]}"
             )
           done
       - name: Stage immutable fixture bytes and shared-certificate provenance

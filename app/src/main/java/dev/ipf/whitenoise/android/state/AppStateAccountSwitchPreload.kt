@@ -18,6 +18,27 @@ private fun WhiteNoiseAppState.ensureAccountSwitchRequestIsCurrent(generation: L
     if (!isAccountSwitchCurrent(generation)) throw AccountSwitchSnapshotSuperseded()
 }
 
+/** Prepares both independent local reads before the coordinator's fenced publication. */
+internal suspend fun WhiteNoiseAppState.loadAccountActivationProjection(
+    request: AccountSessionActivationRequest,
+    generation: Long,
+    switchingAccounts: Boolean,
+    restored: PreparedAccountSessionActivation,
+): PreparedAccountSessionActivation =
+    coroutineScope {
+        val target = accounts.firstOrNull { it.label == request.label }
+        val wanted = request.shouldActivate() && isAccountSwitchCurrent(generation)
+        val plan = accountSwitchPreloadPlan(switchingAccounts, wanted, request.preloadPolicy)
+        val snapshot =
+            if (plan.loadLocalRows) {
+                async { loadAccountSwitchLocalSnapshot(request.label, generation, plan) }
+            } else {
+                null
+            }
+        val profile = preloadStartupSelfProfile(request.preloadPolicy, target?.accountIdHex, wanted, ::loadAccountSwitchProfileSeed)
+        restored.copy(profilePresentation = profile, snapshot = snapshot?.await())
+    }
+
 /**
  * Reads the target account's local chat rows, and decodes their stored first-frame
  * avatars, before publishing the new active account. The first target composition gets
