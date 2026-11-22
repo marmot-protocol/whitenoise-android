@@ -49,6 +49,37 @@ class StartupSelfProfilePresentationTest {
             }
         }
 
+    @Test
+    fun startupReadsChatRowsWhileWaitingForSelfProfile() =
+        runBlocking {
+            val profileStarted = CountDownLatch(1)
+            val releaseProfile = CountDownLatch(1)
+            val rowsRead = CountDownLatch(1)
+            val fixture =
+                fixture(onRowsRead = { rowsRead.countDown() }) { id ->
+                    profileStarted.countDown()
+                    check(releaseProfile.await(10, TimeUnit.SECONDS))
+                    profile(id)
+                }
+            try {
+                val bootstrap = async { fixture.bootstrap() }
+                try {
+                    withTimeout(5_000) {
+                        while (profileStarted.count > 0 || rowsRead.count > 0) yield()
+                    }
+                    assertEquals(AppPhase.Bootstrapping, fixture.appState.phase)
+                } finally {
+                    releaseProfile.countDown()
+                }
+                bootstrap.await()
+                assertEquals(AppPhase.Ready, fixture.appState.phase)
+                assertEquals("Alice", fixture.appState.chatMemberTitleCached(SELF))
+                assertEquals("self", fixture.appState.consumeAccountSwitchLocalSnapshot("self")?.accountRef)
+            } finally {
+                fixture.close()
+            }
+        }
+
     /** Failure of the separate chat-row projection cannot discard a successfully read self profile. */
     @Test
     fun failedChatRowReadStillPublishesTheRetainedProfile() =
@@ -276,6 +307,7 @@ class StartupSelfProfilePresentationTest {
     private fun fixture(
         failRows: Boolean = false,
         accountSnapshot: List<AccountSummaryFfi> = listOf(account("self", SELF), account("other", OTHER)),
+        onRowsRead: () -> Unit = {},
         read: (String) -> UserProfileMetadataFfi?,
     ) = NotificationBootstrapTestFixture(
         context = context,
@@ -283,7 +315,11 @@ class StartupSelfProfilePresentationTest {
         emitStartupNotification = false,
         localDisplayName = null,
         onUserProfile = read,
-        onChatList = { if (failRows) error("synthetic local row failure") else emptyList() },
+        onChatList = {
+            onRowsRead()
+            if (failRows) error("synthetic local row failure")
+            emptyList()
+        },
     )
 
     /** Stable synthetic account metadata avoids any dependency on personal accounts. */

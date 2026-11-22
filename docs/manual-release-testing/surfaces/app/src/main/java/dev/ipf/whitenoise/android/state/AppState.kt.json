@@ -188,7 +188,8 @@
         "anchor": "private inner class AccountSessionActivation",
         "test_ids": [
           "INT-003",
-          "NAV-006"
+          "NAV-006",
+          "INT-012"
         ]
       },
       {

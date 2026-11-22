@@ -34,6 +34,7 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
             marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
                 presentedChatList(accountRef, includeArchived = true)
             }.rows
+        ensureAccountSwitchRequestIsCurrent(generation)
         val rows = presentedRows.map { it.row }
         val firstFrameAvatars =
             prewarmFirstFrameDurableAvatars(

@@ -73,8 +73,7 @@ internal class WhiteNoiseJourneys {
      * has already validated the fixture outside the measured trace.
      *
      * Macrobenchmark's cold-start wrapper force-stops the target between setup
-     * and measurement. Waiting for a test selector here would make that
-     * selector part of the measured journey and can outlive the startup metric.
+     * and measurement. The caller separately checks the useful local surface.
      */
     fun MacrobenchmarkScope.launchForStartupMeasurement() {
         startActivityAndWait()

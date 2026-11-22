@@ -4907,18 +4907,25 @@ class WhiteNoiseAppState private constructor(
             generation: Long,
             switchingAccounts: Boolean,
             restored: PreparedAccountSessionActivation,
-        ): PreparedAccountSessionActivation {
-            val target = accounts.firstOrNull { it.label == request.label }
-            val activationStillWanted = request.shouldActivate() && isAccountSwitchCurrent(generation)
-            val plan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, request.preloadPolicy)
-            val profile =
-                preloadStartupSelfProfile(request.preloadPolicy, target?.accountIdHex, activationStillWanted) {
-                    loadAccountSwitchProfileSeed(it)
-                }
-            val snapshot =
-                if (plan.loadLocalRows) loadAccountSwitchLocalSnapshot(request.label, generation, plan) else null
-            return restored.copy(profilePresentation = profile, snapshot = snapshot)
-        }
+        ): PreparedAccountSessionActivation =
+            coroutineScope {
+                val target = accounts.firstOrNull { it.label == request.label }
+                val activationStillWanted = request.shouldActivate() && isAccountSwitchCurrent(generation)
+                val plan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, request.preloadPolicy)
+                // The self profile and chat snapshot are independent local reads. Keep their shared
+                // publication boundary, but let the profile read overlap row loading and avatar decode.
+                val snapshot =
+                    if (plan.loadLocalRows) {
+                        async { loadAccountSwitchLocalSnapshot(request.label, generation, plan) }
+                    } else {
+                        null
+                    }
+                val profile =
+                    preloadStartupSelfProfile(request.preloadPolicy, target?.accountIdHex, activationStillWanted) {
+                        loadAccountSwitchProfileSeed(it)
+                    }
+                restored.copy(profilePresentation = profile, snapshot = snapshot?.await())
+            }
 
         /** Rejects revoked identities, replacement runtimes and publication during destructive account teardown. */
         override fun canPublish(
