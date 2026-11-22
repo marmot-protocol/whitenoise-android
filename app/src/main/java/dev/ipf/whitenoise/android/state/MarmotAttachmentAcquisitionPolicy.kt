@@ -100,6 +100,7 @@ internal suspend fun awaitAccountNetworkReady(
 
 private val RESUMABLE_SETUP = setOf(AccountSetupReadinessFfi.LOCAL_READY, AccountSetupReadinessFfi.PUBLISHING)
 internal const val ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS = 60_000L
+
 // Include the original 250 ms boundary so later polls don't drift past it.
 private val INITIAL_ACCOUNT_NETWORK_READY_DELAYS_MILLIS = listOf(50L, 100L, 100L)
 private const val STEADY_POLL_MILLIS = 250L
