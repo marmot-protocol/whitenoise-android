@@ -18,6 +18,7 @@
         "anchor": "fun GroupEditScreen(",
         "test_ids": [
           "GRP-001",
+          "GRP-002",
           "GRP-025",
           "PRO-010",
           "GRP-034",
@@ -63,12 +64,11 @@
         ]
       },
       {
-        "surface": "string:group_description",
+        "surface": "string:description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.group_description",
+        "anchor": "R.string.description",
         "test_ids": [
-          "GRP-001",
-          "GRP-025"
+          "GRP-002"
         ]
       },
       {
@@ -95,6 +95,7 @@
         "anchor": "R.string.group_name",
         "test_ids": [
           "GRP-001",
+          "GRP-002",
           "GRP-025"
         ]
       },

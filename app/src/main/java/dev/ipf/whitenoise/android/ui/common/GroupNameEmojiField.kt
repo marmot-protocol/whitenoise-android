@@ -1,12 +1,12 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.ImeAction
 
 /**
  * Shared group-name input chrome; picker ownership stays with each screen. The screen passes the same
@@ -15,8 +15,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 @Suppress("FunctionNaming")
 @Composable
 internal fun GroupNameEmojiField(
-    value: TextFieldValue,
-    onValueChange: (TextFieldValue) -> Unit,
+    state: TextFieldState,
     label: String,
     emojiPickerOpen: Boolean,
     onEmojiPickerClick: () -> Unit,
@@ -25,11 +24,11 @@ internal fun GroupNameEmojiField(
     emojiAnchor: EmojiSheetFieldAnchor? = null,
 ) {
     val openBelowField = rememberEmojiSheetOpener(emojiAnchor)
-    TextField(
-        value = value,
-        onValueChange = onValueChange,
+    WhiteNoiseTextField(
+        state = state,
         label = { Text(label) },
-        singleLine = true,
+        lineLimits = TextFieldLineLimits.SingleLine,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
         enabled = enabled,
         leadingIcon = {
             TextEntryEmojiAction(
@@ -38,13 +37,6 @@ internal fun GroupNameEmojiField(
                 onClick = { openBelowField(onEmojiPickerClick) },
             )
         },
-        colors =
-            TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-                errorContainerColor = Color.Transparent,
-            ),
         modifier = emojiAnchor?.let { modifier.emojiSheetFieldAnchor(it) } ?: modifier,
     )
 }

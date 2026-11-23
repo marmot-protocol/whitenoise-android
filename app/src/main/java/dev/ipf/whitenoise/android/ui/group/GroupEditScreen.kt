@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
@@ -41,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -63,11 +67,12 @@ import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
-import dev.ipf.whitenoise.android.ui.common.ProseTextField
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
+import dev.ipf.whitenoise.android.ui.common.insertTextEntryEmoji
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberEmojiSheetFieldAnchor
@@ -140,11 +145,11 @@ internal fun GroupEditScreen(
         // kind-1210 row) while this screen is open, and re-keying on those values
         // would re-init the fields and discard the user's in-progress edit. State
         // resets only when navigating to a different group. (CodeRabbit, #512.)
-        var name by
-            rememberSaveable(controller.group.groupIdHex, stateSaver = TextFieldValue.Saver) {
-                mutableStateOf(TextFieldValue(controller.group.name))
+        val name =
+            rememberSaveable(controller.group.groupIdHex, saver = TextFieldState.Saver) {
+                TextFieldState(controller.group.name, initialSelection = TextRange.Zero)
             }
-        var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
+        val description = remember(controller.group.groupIdHex) { TextFieldState(controller.group.description) }
         // The values the editor opened with: a field the user left alone is not sent, even when
         // another admin changes it while the editor is open (#3704).
         val openedName = rememberSaveable(controller.group.groupIdHex) { controller.group.name }
@@ -217,7 +222,7 @@ internal fun GroupEditScreen(
             !saving &&
                 !imageSaving &&
                 !controller.mutationInFlight &&
-                (name.text != controller.group.name || description != controller.group.description)
+                (name.text.toString() != controller.group.name || description.text.toString() != controller.group.description)
 
         LaunchedEffect(nameEditable) {
             if (!nameEditable) showEmojiPicker = false
@@ -229,7 +234,9 @@ internal fun GroupEditScreen(
             controller.clearLastMutationError()
             appState.launchMutation {
                 try {
-                    if (controller.updateGroupProfile(name.text, description, openedName, openedDescription)) onBack()
+                    if (controller.updateGroupProfile(name.text.toString(), description.text.toString(), openedName, openedDescription)) {
+                        onBack()
+                    }
                 } finally {
                     saving = false
                 }
@@ -629,12 +636,16 @@ internal fun GroupEditScreen(
                     }
                 }
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                    modifier =
+                        Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .widthIn(max = 520.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
                     verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
                 ) {
                     GroupNameEmojiField(
-                        value = name,
-                        onValueChange = { name = it },
+                        state = name,
                         label = stringResource(R.string.group_name),
                         emojiPickerOpen = showEmojiPicker,
                         onEmojiPickerClick = { if (nameEditable) showEmojiPicker = true },
@@ -642,14 +653,12 @@ internal fun GroupEditScreen(
                         modifier = Modifier.fillMaxWidth(),
                         emojiAnchor = nameEmojiAnchor,
                     )
-                    ProseTextField(
-                        value = description,
-                        filled = true,
-                        onValueChange = { description = it },
-                        label = { Text(stringResource(R.string.group_description)) },
-                        minLines = 3,
-                        maxLines = 6,
-                        enabled = canEdit,
+                    WhiteNoiseTextField(
+                        state = description,
+                        emojiAction = true,
+                        label = { Text(stringResource(R.string.description)) },
+                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
+                        enabled = nameEditable,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -736,7 +745,10 @@ internal fun GroupEditScreen(
                 closeOnPick = false,
                 onDismissRequest = { showEmojiPicker = false },
                 onEmojiPicked = { emoji ->
-                    if (nameEditable) name = insertEmojiAtSelection(name, emoji)
+                    if (nameEditable) {
+                        val current = TextFieldValue(name.text.toString(), name.selection)
+                        insertTextEntryEmoji(name, insertEmojiAtSelection(current, emoji), inputTransformation = null)
+                    }
                 },
                 recentEmojis = recentEmojiRecentsOwner.recents,
                 onEmojiUsed = { emoji -> if (nameEditable) recentEmojiRecentsOwner.onEmojiUsed(emoji) },
