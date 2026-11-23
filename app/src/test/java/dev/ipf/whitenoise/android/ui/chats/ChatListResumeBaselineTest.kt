@@ -37,6 +37,7 @@ class ChatListResumeBaselineTest {
 
     private val rowHeight = 48.dp
     private val lifecycleOwner = ResumeTestLifecycleOwner()
+
     // Enough rows to scroll, so a keyed anchor could hide a promoted head above the viewport.
     private val filler = (0 until 27).map { "R$it" }
     private var itemIds by mutableStateOf(order("A", "B", "C"))

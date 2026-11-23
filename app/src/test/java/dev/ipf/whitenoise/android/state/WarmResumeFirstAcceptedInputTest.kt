@@ -17,8 +17,10 @@ class WarmResumeFirstAcceptedInputTest {
         ShadowLog.clear()
     }
 
-    private fun inputMarkers(): List<String> =
-        ShadowLog.getLogsForTag("WNWarmResume").map { it.msg }.filter { "event=first-accepted-input" in it }
+    private fun inputMarkers(): List<String> {
+        val messages = ShadowLog.getLogsForTag("WNWarmResume").map { it.msg }
+        return messages.filter { "event=first-accepted-input" in it }
+    }
 
     @Test
     fun onlyTheFirstHandledInputOfAForegroundIsMarked() {
