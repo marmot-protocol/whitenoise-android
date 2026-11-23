@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
@@ -769,7 +770,7 @@ private fun SettingsProfileHeader(
     }
 }
 
-/** The active profile as one tappable row: avatar, name, short key that copies the full key, QR glyph and chevron. */
+/** The active profile header opens Share & Connect, with a separate copyable key below it. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -788,59 +789,65 @@ private fun SettingsProfileRow(
         shape = context.shapes.shape,
         modifier = Modifier.fillMaxWidth().settingsRowBorder(context),
     ) {
-        ListItem(
-            headlineContent = {
-                EmojiLabel(
-                    text = account.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            },
-            supportingContent = {
-                // The short key copies the whole key; the rest of the row still opens Share & Connect (#3565).
-                PublicKeyCopyText(
-                    account.subtitle,
-                    account.npub,
-                    Modifier.testTag("settings.active_profile_public_key"),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            leadingContent = {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(SettingsHomeDefaults.ProfileAvatarSize)
-                            .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
-                            .clickable(role = Role.Button, onClick = onAvatarClick)
-                            .testTag("settings.active_profile_avatar")
-                            .semantics {
-                                contentDescription = editPictureDescription
-                                role = Role.Button
-                            },
-                ) {
-                    Avatar(
-                        title = account.title,
-                        seed = account.seed,
-                        size = SettingsHomeDefaults.ProfileAvatarSize,
-                        pictureUrl = account.pictureUrl,
-                        pictureDomain = AvatarImageLoader.publicProfiles(),
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            ListItem(
+                headlineContent = {
+                    EmojiLabel(
+                        text = account.title,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleMedium,
                     )
-                }
-            },
-            trailingContent = { SettingsProfileTrailing() },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier =
+                },
+                leadingContent = {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(SettingsHomeDefaults.ProfileAvatarSize)
+                                .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
+                                .clickable(role = Role.Button, onClick = onAvatarClick)
+                                .testTag("settings.active_profile_avatar")
+                                .semantics {
+                                    contentDescription = editPictureDescription
+                                    role = Role.Button
+                                },
+                    ) {
+                        Avatar(
+                            title = account.title,
+                            seed = account.seed,
+                            size = SettingsHomeDefaults.ProfileAvatarSize,
+                            pictureUrl = account.pictureUrl,
+                            pictureDomain = AvatarImageLoader.publicProfiles(),
+                        )
+                    }
+                },
+                trailingContent = { SettingsProfileTrailing() },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .explainOnLongPress(Explanation(account.title, profileExplanation))
+                        .clickable(onClick = onClick)
+                        .testTag("settings.active_profile")
+                        .semantics {
+                            contentDescription = shareDescription
+                            role = Role.Button
+                        },
+            )
+            PublicKeyCopyText(
+                account.subtitle,
+                account.npub,
                 Modifier
-                    .fillMaxWidth()
-                    .explainOnLongPress(Explanation(account.title, profileExplanation))
-                    .clickable(onClick = onClick)
-                    .testTag("settings.active_profile")
-                    .semantics {
-                        contentDescription = shareDescription
-                        role = Role.Button
-                    },
-        )
+                    .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                    .padding(bottom = WhiteNoiseSpacing.Related)
+                    .testTag("settings.active_profile_public_key"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                keyboardFocusable = true,
+            )
+        }
     }
 }
 
