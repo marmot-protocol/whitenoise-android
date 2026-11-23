@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ManageStorageUiState
 import dev.ipf.whitenoise.android.state.StorageAction
+import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.StoredAttachmentsController
 import dev.ipf.whitenoise.android.state.StoredAttachmentsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -61,6 +62,7 @@ internal data class StoredAttachmentsActions(
     val onRetry: () -> Unit,
     val onAction: (StorageAction) -> Unit,
     val ownerKey: Any? = Unit,
+    val onOpen: (StoredAttachment) -> Unit = {},
 )
 
 /**
@@ -83,6 +85,7 @@ internal fun StoredAttachmentsRoute(
     DisposableEffect(controller) { onDispose { controller.close() } }
     LaunchedEffect(controller, storage.revision) { controller.reload() }
     val state by controller.state.collectAsStateWithLifecycle()
+    val preview = rememberStoredAttachmentPreview(appState)
     StoredAttachmentsContent(
         appState = appState,
         storage = storage,
@@ -97,6 +100,7 @@ internal fun StoredAttachmentsRoute(
                 onLoadMore = controller::loadMore,
                 onRetry = { if (state.items.isEmpty()) controller.reload() else controller.loadMore() },
                 onAction = onAction,
+                onOpen = preview,
             ),
     )
 }

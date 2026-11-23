@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -20,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
@@ -27,6 +29,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,6 +52,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 private val StoredAttachmentPreviewSize = 40.dp
+
+/** The check mark's touch target, Material's minimum. */
+private val StoredAttachmentCheckTarget = 48.dp
 
 /** The list section: a heading, the rows largest first, then loading, error or empty copy. */
 internal fun LazyListScope.storageAttachmentItems(
@@ -78,6 +86,7 @@ internal fun LazyListScope.storageAttachmentItems(
                     selected = attachment.key in list.selected,
                     enabled = !busy,
                     onToggle = { actions.onToggle(attachment.key) },
+                    onOpen = { actions.onOpen(attachment) },
                 )
             }
         }
@@ -99,8 +108,9 @@ internal fun LazyListScope.storageAttachmentItems(
 
 /**
  * One attachment: its preview or kind glyph, the sender's file name, then its size, the day it arrived and its chat,
- * with the selection mark at the end. A missing or unreadable name falls back to the kind. Tapping toggles the
- * selection, which the row reports so TalkBack announces it, and a selected row takes a tonal fill.
+ * with a check mark at the end. A missing or unreadable name falls back to the kind. Tapping the row opens the
+ * attachment so it can be reviewed before removal; the check mark, or holding the row, selects it. The check mark is
+ * its own checkbox for TalkBack, named after the attachment, and a selected row takes a tonal fill.
  */
 @Composable
 @Suppress("LongParameterList")
@@ -112,19 +122,21 @@ private fun StoredAttachmentRow(
     selected: Boolean,
     enabled: Boolean,
     onToggle: () -> Unit,
+    onOpen: () -> Unit,
 ) {
     val kind = attachment.kind
     val kindLabel = stringResource(kind.labelRes)
     val name = remember(attachment.fileName) { storageDisplayName(attachment.fileName) }
+    val title = name ?: kindLabel
     val time = attachment.receivedAtSeconds.takeIf { it > 0 }?.let { storageReceivedDate(it) }
     val origin = if (showChat) storageChatTitle(appState, attachment.groupIdHex) else null
     // Size leads the details, then the date, so the chat name is what shortens on a narrow row. The kind shows in the
     // leading glyph and, for an unnamed attachment, as the title.
     val details = listOfNotNull(storageBytes(attachment.bytes), time, origin).joinToString(" · ")
-    // The checkable overload reports a checkbox, since any number of rows can be chosen at once.
     ListItem(
-        checked = selected,
-        onCheckedChange = { onToggle() },
+        onClick = onOpen,
+        onLongClick = onToggle,
+        onLongClickLabel = stringResource(if (selected) R.string.storage_deselect else R.string.storage_select),
         shapes = context.shapes,
         modifier =
             Modifier
@@ -132,7 +144,8 @@ private fun StoredAttachmentRow(
                 .settingsRowBorder(context)
                 .testTag("storage.attachment")
                 .explainOnLongPress(
-                    Explanation(name ?: kindLabel, stringResource(R.string.explanation_privacy_storage_attachment)),
+                    Explanation(title, stringResource(R.string.explanation_privacy_storage_attachment_open)),
+                    holdToExplain = false,
                 ),
         enabled = enabled,
         leadingContent = { StoredAttachmentPreview(appState, attachment, kind) },
@@ -145,14 +158,8 @@ private fun StoredAttachmentRow(
                 overflow = TextOverflow.Ellipsis,
             )
         },
-        trailingContent = {
-            Icon(
-                selectionRowIcon(selected),
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-            )
-        },
-        colors = storedAttachmentRowColors(context),
+        trailingContent = { StoredAttachmentCheck(title, selected, enabled, onToggle) },
+        colors = storedAttachmentRowColors(context, selected),
         content = {
             Text(
                 // Isolated and laid out by its own direction, so a name in another script cannot reorder the row.
@@ -164,6 +171,31 @@ private fun StoredAttachmentRow(
             )
         },
     )
+}
+
+/** The row's check mark: a full-size checkbox target of its own, so selecting never opens the attachment. */
+@Composable
+private fun StoredAttachmentCheck(
+    title: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onToggle: () -> Unit,
+) {
+    val label = stringResource(R.string.storage_select_named, title)
+    Box(
+        Modifier
+            .size(StoredAttachmentCheckTarget)
+            .testTag("storage.attachment.select")
+            .toggleable(value = selected, enabled = enabled, role = Role.Checkbox, onValueChange = { onToggle() })
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            selectionRowIcon(selected),
+            contentDescription = null,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+        )
+    }
 }
 
 /**
@@ -183,18 +215,18 @@ private fun storageReceivedDate(epochSeconds: Long): String {
 
 /** The group fill at rest, and the picker groups' tonal highlight once selected. */
 @Composable
-private fun storedAttachmentRowColors(context: SettingsRowContext): ListItemColors {
+private fun storedAttachmentRowColors(
+    context: SettingsRowContext,
+    selected: Boolean,
+): ListItemColors {
     val selectedContainer =
         if (isAmoledSurfaceTheme()) {
             MaterialTheme.colorScheme.onSurface.copy(alpha = SettingsRowDefaults.AmoledSelectionAlpha)
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh
         }
-    return ListItemDefaults.colors(
-        containerColor = context.containerColor,
-        disabledContainerColor = context.containerColor,
-        selectedContainerColor = selectedContainer,
-    )
+    val container = if (selected) selectedContainer else context.containerColor
+    return ListItemDefaults.colors(containerColor = container, disabledContainerColor = container)
 }
 
 /** A decoded preview already held this session, otherwise the kind glyph, nothing is downloaded or decoded here. */

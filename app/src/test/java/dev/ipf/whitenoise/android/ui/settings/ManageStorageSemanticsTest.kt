@@ -201,7 +201,7 @@ class ManageStorageSemanticsTest {
     @Test fun attachmentRowsReportSelectionAndSelectAllNamesItsEffect() {
         val rows = listOf(attachment("a", 9_000_000), attachment("b", 4_000_000))
         renderList(StoredAttachmentsUiState(items = rows, complete = true, selected = setOf(rows.first().key)))
-        val nodes = composeRule.onAllNodesWithTag("storage.attachment", useUnmergedTree = true)
+        val nodes = composeRule.onAllNodesWithTag("storage.attachment.select")
         nodes[0].assertIsOn()
         nodes[1].assertIsOff()
         composeRule.onNodeWithContentDescription("Select all").assertExists()
@@ -242,10 +242,43 @@ class ManageStorageSemanticsTest {
         composeRule.waitForIdle()
         assertEquals(0, left)
         composeRule.onNodeWithTag("storage.selection").assertDoesNotExist()
-        composeRule.onAllNodesWithTag("storage.attachment", useUnmergedTree = true)[0].assertIsOff()
+        composeRule.onAllNodesWithTag("storage.attachment.select")[0].assertIsOff()
         composeRule.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
         composeRule.waitForIdle()
         assertEquals(1, left)
+    }
+
+    /** Tapping a row opens its attachment without selecting it; its check mark selects it without opening. */
+    @Test fun rowOpensAndCheckMarkSelects() {
+        val rows = listOf(attachment("a", 9_000_000))
+        val opened = mutableListOf<String>()
+        val toggled = mutableListOf<String>()
+        val appState = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                StoredAttachmentsContent(
+                    appState = appState,
+                    storage = ManageStorageUiState(),
+                    list = StoredAttachmentsUiState(items = rows, complete = true),
+                    groupIdHex = null,
+                    onBack = {},
+                    actions =
+                        StoredAttachmentsActions(
+                            onToggle = { toggled += it },
+                            onSelectAll = {},
+                            onLoadMore = {},
+                            onRetry = {},
+                            onAction = {},
+                            onOpen = { opened += it.key },
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithTag("storage.attachment").performClick()
+        composeRule.runOnIdle { assertEquals(listOf(rows[0].key) to emptyList<String>(), opened to toggled.toList()) }
+        composeRule.onNodeWithTag("storage.attachment.select").performClick()
+        composeRule.runOnIdle { assertEquals(listOf(rows[0].key) to listOf(rows[0].key), opened to toggled.toList()) }
+        composeRule.onNodeWithContentDescription("Select Photo").assertExists()
     }
 
     /** Before the last page loads, select-all says it selects only the rows shown. */

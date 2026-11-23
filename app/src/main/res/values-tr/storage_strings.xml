@@ -92,4 +92,13 @@
     <string name="storage_cache_cleared">%1$s yer açıldı</string>
     <string name="storage_caches_cleared">Fotoğraflar ve geçici dosyalar temizlendi</string>
     <string name="storage_action_failed">Yer açılamadı. Tekrar deneyin.</string>
+    <string name="storage_automatic_cleanup">Otomatik temizlik</string>
+    <string name="storage_highlight_share">%1$s · %3$s içinde %2$s</string>
+    <string name="storage_highlight_shared">%1$s · tüm profillerce paylaşılır, bu toplama dahil değil</string>
+    <string name="storage_share_under_one">%1$s altında</string>
+    <string name="storage_size_detail">%1$s · %2$s</string>
+    <string name="storage_select">Seç</string>
+    <string name="storage_deselect">Seçimi kaldır</string>
+    <string name="storage_select_named">%1$s öğesini seç</string>
+    <string name="storage_open_failed">Bu ek açılamadı</string>
 </resources>

@@ -260,7 +260,7 @@ internal fun rememberGlobalAttachmentOpener(
 }
 
 /**
- * The full-screen viewer for a library tap, with Go to Message leaving for the shown item's chat. Once the
+ * The full-screen viewer for a library tap, with Go to Message, when given, leaving for the shown item's chat. Once the
  * library settles, pages whose item it no longer lists (deleted, expired or hidden since the tap) leave the
  * viewer, and a viewer left with none closes with a notice. While the library rereads, the pages stay as
  * they were, so an unrelated change cannot close it.
@@ -271,7 +271,7 @@ internal fun GlobalAttachmentViewerHost(
     appState: WhiteNoiseAppState,
     items: List<GlobalAttachmentItem>,
     loading: Boolean,
-    onGoToMessage: (groupIdHex: String, messageIdHex: String) -> Unit,
+    onGoToMessage: ((groupIdHex: String, messageIdHex: String) -> Unit)?,
 ) {
     val request = opener.viewer ?: return
     // The last settled pages, kept while the library rereads; a plain holder, since it never drives recomposition.
@@ -290,10 +290,13 @@ internal fun GlobalAttachmentViewerHost(
         pages = pages,
         startIndex = request.startIndex.coerceAtMost(pages.lastIndex),
         onDismiss = opener::dismissViewer,
-        onGoToMessage = { page ->
-            opener.dismissViewer()
-            onGoToMessage(page.groupIdHex ?: request.controller.group.groupIdHex, page.messageIdHex)
-        },
+        onGoToMessage =
+            onGoToMessage?.let { goTo ->
+                { page ->
+                    opener.dismissViewer()
+                    goTo(page.groupIdHex ?: request.controller.group.groupIdHex, page.messageIdHex)
+                }
+            },
         pageController = { page -> opener.pageController(page, request.controller) },
     )
 }

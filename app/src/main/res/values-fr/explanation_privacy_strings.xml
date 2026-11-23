@@ -37,7 +37,6 @@
     <string name="explanation_privacy_storage_keep_media">Choisit combien de temps les pièces jointes restent sur cet appareil. Les plus anciennes sont supprimées maintenant et au fil du temps, et en retélécharger une la conserve pendant toute la durée. Les messages restent.</string>
     <string name="explanation_privacy_storage_chat">Ouvre les pièces jointes stockées pour ce chat.</string>
     <string name="explanation_privacy_storage_remove_all_chat">Demande votre confirmation, puis supprime de cet appareil toutes les pièces jointes de ce chat. Les messages restent, et vous pouvez retélécharger les pièces jointes tant que la copie de l\'expéditeur est disponible.</string>
-    <string name="explanation_privacy_storage_attachment">Sélectionne ou désélectionne cette pièce jointe pour que vous la supprimiez avec d\'autres. Rien n\'est supprimé tant que vous ne choisissez pas Supprimer.</string>
     <string name="explanation_privacy_storage_select_all">Sélectionne toutes les pièces jointes de cette liste pour que vous les supprimiez ensemble. Rien n\'est supprimé tant que vous ne choisissez pas Supprimer.</string>
     <string name="explanation_privacy_storage_select_shown">Sélectionne uniquement les pièces jointes chargées jusqu\'ici. D\'autres se chargent pendant le défilement, et rien n\'est supprimé tant que vous ne choisissez pas Supprimer.</string>
     <string name="explanation_privacy_storage_clear_selection">Efface la sélection actuelle sans rien supprimer.</string>
@@ -65,4 +64,5 @@
     <string name="explanation_privacy_profile_mute">Met en sourdine les notifications de messages de cette personne. Cela ne concerne que les messages ; la livraison et les compteurs de non lus ne changent pas.</string>
     <string name="explanation_privacy_profile_system">Ouvre les réglages d\'Android pour les notifications de cette personne, où vous pouvez définir un son et un comportement personnalisés. Les réglages personnalisés s\'appliquent à toutes les conversations de ce compte.</string>
     <string name="explanation_privacy_profile_vibration">Choisit le motif de vibration des notifications de cette personne.</string>
+    <string name="explanation_privacy_storage_attachment_open">Ouvre cette pièce jointe pour que vous puissiez la vérifier avant de la retirer. La coche, ou un appui long sur la ligne, la sélectionne pour la retirer avec d\'autres. Rien n\'est retiré tant que vous ne choisissez pas Retirer.</string>
 </resources>

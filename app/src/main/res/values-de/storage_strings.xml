@@ -92,4 +92,13 @@
     <string name="storage_cache_cleared">%1$s freigegeben</string>
     <string name="storage_caches_cleared">Bilder und temporäre Dateien gelöscht</string>
     <string name="storage_action_failed">Speicherplatz konnte nicht freigegeben werden. Versuche es erneut.</string>
+    <string name="storage_automatic_cleanup">Automatische Bereinigung</string>
+    <string name="storage_highlight_share">%1$s · %2$s von %3$s</string>
+    <string name="storage_highlight_shared">%1$s · von allen Profilen geteilt, nicht in dieser Summe</string>
+    <string name="storage_share_under_one">unter %1$s</string>
+    <string name="storage_size_detail">%1$s · %2$s</string>
+    <string name="storage_select">Auswählen</string>
+    <string name="storage_deselect">Auswahl aufheben</string>
+    <string name="storage_select_named">%1$s auswählen</string>
+    <string name="storage_open_failed">Anhang konnte nicht geöffnet werden</string>
 </resources>
