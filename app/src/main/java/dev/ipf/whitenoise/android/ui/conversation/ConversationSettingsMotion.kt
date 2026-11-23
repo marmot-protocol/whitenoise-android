@@ -219,8 +219,9 @@ internal fun Modifier.conversationSettingsHost(motion: ConversationSettingsMotio
     return onGloballyPositioned { motion.host = it.settingsMorphBounds(view) }
 }
 
-internal fun Modifier.conversationSettingsBody(motion: ConversationSettingsMotion): Modifier =
-    graphicsLayer { alpha = motion.bodyAlpha }
+internal fun Modifier.conversationSettingsBody(motion: ConversationSettingsMotion): Modifier {
+    return graphicsLayer { alpha = motion.bodyAlpha }
+}
 
 /** The contour carries the composer's outline while the native input remains in its own layer. */
 @Composable
