@@ -48,8 +48,9 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.candidateKeyPlacement
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedUser
 import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.search.GlobalPersonRow
-import dev.ipf.whitenoise.android.ui.settings.CopyableFullPublicKey
+import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
 import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
+import dev.ipf.whitenoise.android.ui.settings.publicKeyShortForm
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -112,7 +113,7 @@ class PublicKeyCopyPresentationCoverageTest {
         val key = keyText(ROW).getUnclippedBoundsInRoot()
         assertTrue("the key target leaves its row", key.left >= row.left && key.right <= row.right)
         assertTrue("the key target spans the whole row", key.right - key.left < row.right - row.left)
-        assertRowKeepsLabelAndActions(ROW, FIRST_KEY, "Alice", SHORT_KEY)
+        assertRowKeepsLabelAndActions(ROW, FIRST_KEY, "Alice", "npub1 qqqqq")
     }
 
     /**
@@ -429,13 +430,13 @@ class PublicKeyCopyPresentationCoverageTest {
         assertEquals(1, opens)
     }
 
-    /** The profile's full key block groups every character inside one copy button at least 48 dp tall. */
+    /** The profile key starts short, and one tap copies it and expands every grouped character inside the button. */
     @Test
-    fun fullKeyBlockGroupsTheWholeKeyInsideOneCopyButton() {
+    fun profileKeyExpandsTheWholeKeyInsideOneCopyButtonOnCopy() {
         var copies = 0
         composeRule.setContent {
             Themed {
-                CopyableFullPublicKey(
+                CopyablePublicKey(
                     npub = FIRST_KEY,
                     copied = false,
                     onCopy = { copies += 1 },
@@ -446,6 +447,13 @@ class PublicKeyCopyPresentationCoverageTest {
             }
         }
 
+        assertEquals(
+            publicKeyShortForm(FIRST_KEY),
+            composeRule.onNodeWithTag(KEY_TEXT, true).fetchSemanticsNode().spoken(),
+        )
+        assertEquals(FIRST_KEY, composeRule.onNodeWithTag(ROW).fetchSemanticsNode().spoken())
+        composeRule.onNodeWithTag(ROW).performClick()
+        assertEquals(1, copies)
         val target = composeRule.onNodeWithTag(ROW).getUnclippedBoundsInRoot()
         val text = composeRule.onNodeWithTag(KEY_TEXT, true).getUnclippedBoundsInRoot()
         assertTrue("target shorter than 48 dp", target.bottom - target.top >= 48.dp)
@@ -455,8 +463,6 @@ class PublicKeyCopyPresentationCoverageTest {
             composeRule.onNodeWithTag(KEY_TEXT, true).fetchSemanticsNode().spoken(),
         )
         assertEquals(FIRST_KEY, composeRule.onNodeWithTag(ROW).fetchSemanticsNode().spoken())
-        composeRule.onNodeWithTag(ROW).performClick()
-        assertEquals(1, copies)
     }
 
     /** An unresolved reference is shown but never offered for copy. */
@@ -464,7 +470,7 @@ class PublicKeyCopyPresentationCoverageTest {
     fun fullKeyBlockNeverCopiesAnUnresolvedReference() {
         var copies = 0
         composeRule.setContent {
-            Themed { CopyableFullPublicKey(UNRESOLVED, false, { copies += 1 }, targetTestTag = ROW) }
+            Themed { CopyablePublicKey(UNRESOLVED, false, { copies += 1 }, targetTestTag = ROW) }
         }
 
         val node = composeRule.onNodeWithTag(ROW).fetchSemanticsNode()
@@ -573,7 +579,7 @@ class PublicKeyCopyPresentationCoverageTest {
 
     /** The unmerged key text inside the node tagged [tag]. */
     private fun keyText(tag: String): SemanticsNodeInteraction =
-        composeRule.onNode(hasText("npub1qqqq", substring = true) and hasAnyAncestor(hasTestTag(tag)), true)
+        composeRule.onNode(hasText("npub1", substring = true) and hasAnyAncestor(hasTestTag(tag)), true)
 
     /** The Copy public key custom action merged into the row tagged [tag]. */
     private fun copyAction(
@@ -646,7 +652,7 @@ class PublicKeyCopyPresentationCoverageTest {
         /** Each classified route and the call that hands the shared presentation its canonical key. */
         val CALL_SITES =
             listOf(
-                "ui/profile/PersonProfileContent.kt" to """CopyableFullPublicKey\(\s*npub = person\.publicKey,""",
+                "ui/profile/PersonProfileContent.kt" to """CopyablePublicKey\(\s*npub = person\.publicKey,""",
                 "ui/search/GlobalPersonRow.kt" to """PublicKeyCopyText\(\s*IdentityFormatter\.short\(npub""",
                 "ui/account/ProfileSwitcherSheet.kt" to
                     """PublicKeyCopyText\(\s*shortNpub\(account\.accountIdHex\),\s*npub\(account\.accountIdHex\)""",

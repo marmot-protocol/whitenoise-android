@@ -116,7 +116,7 @@ internal class ConversationMediaSender(
         }
     }
 
-    /** Keeps the reviewed file until native optimistic acceptance; upload retries then retain the native bytes. */
+    /** Keeps the reviewed file until the optimistic row is seeded; that row's retained bytes then own every retry. */
     fun sendVoiceAttachment(
         file: java.io.File,
         durationMs: Long,
@@ -153,17 +153,11 @@ internal class ConversationMediaSender(
                         replyTarget = replyTarget,
                         replyVersion = replyVersion,
                     ) ?: return@launchMutation
-                if (replyTarget == null) {
-                    accepted = true
-                    onQueued(true)
-                }
+                // The seeded row owns the take from here, reply or not: its retained bytes back Retry and Discard.
+                accepted = true
+                onQueued(true)
                 onRevealSent()
-                controller.uploadQueued(seeded) {
-                    if (replyTarget != null) {
-                        accepted = true
-                        onQueued(true)
-                    }
-                }
+                controller.uploadQueued(seeded)
             } finally {
                 if (!accepted) onQueued(false)
             }

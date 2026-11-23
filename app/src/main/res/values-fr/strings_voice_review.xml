@@ -2,6 +2,17 @@
 <resources>
     <string name="voice_review_title">Vérifier le message vocal</string>
     <string name="voice_record_again">Réenregistrer</string>
-    <string name="voice_message_release_to_review">Relâcher pour vérifier · glisser pour annuler</string>
+    <string name="voice_message_slide_to_cancel">Glisser pour annuler</string>
     <string name="voice_recording_stop">Arrêter l’enregistrement</string>
+    <string name="voice_recording_pause">Mettre l\u0027enregistrement en pause</string>
+    <string name="voice_discard_title">Supprimer le message vocal ?</string>
+    <string name="voice_discard_message">Cet enregistrement n\u0027a pas été envoyé et sera supprimé.</string>
+    <string name="voice_send_interrupted">Le message vocal n\u0027a pas été envoyé</string>
+    <string name="voice_recording_elsewhere">Un message vocal est en cours d\u0027enregistrement dans une autre discussion.</string>
+    <string name="voice_row_recording">Enregistrement d\u0027un message vocal</string>
+    <string name="voice_row_unsent">Message vocal non envoyé</string>
+    <string name="voice_recording_paused">Enregistrement vocal en pause</string>
+    <string name="voice_send_on_release">Envoyer le message vocal en relâchant après un appui prolongé</string>
+    <string name="voice_transcribe_automatically">Transcrire automatiquement les messages vocaux reçus</string>
+    <string name="settings_voice_notes">Messages vocaux</string>
 </resources>

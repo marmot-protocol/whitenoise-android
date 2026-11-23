@@ -88,9 +88,9 @@
         ]
       },
       {
-        "surface": "Person profile complete copyable key",
+        "surface": "Person profile expanding copyable key",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
-        "anchor": "CopyableFullPublicKey(",
+        "anchor": "CopyablePublicKey(",
         "test_ids": [
           "ACC-001",
           "ACC-002"

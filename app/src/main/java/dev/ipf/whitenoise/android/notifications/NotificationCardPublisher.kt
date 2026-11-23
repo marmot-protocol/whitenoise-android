@@ -120,10 +120,11 @@ internal class NotificationCardPublisher
                         // Rewrites of a card posted by the earlier expanded-choice build
                         // return to the standard template.
                         val standard = withoutLegacyReactionRail(context, payload)
+                        val presented = withQuickReactionRows(context, standard)
                         val revision = ConversationCardPostedRegistry.newPayloadRevision()
                         // A recovery builder can discard custom views and group alert behavior. Stamp a copy of
                         // the final platform payload so the revision describes exactly the card Android receives.
-                        val outgoing = standard.clone().apply { extras.putString(EXTRA_PAYLOAD_REVISION, revision) }
+                        val outgoing = presented.clone().apply { extras.putString(EXTRA_PAYLOAD_REVISION, revision) }
                         notificationPoster(manager, tag, id, outgoing)
                         recordAcceptedPayload(tag, id, outgoing, recordedAtMs)
                     }

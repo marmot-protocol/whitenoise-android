@@ -1,13 +1,20 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -27,6 +34,60 @@ class EntityPickerSheetTerminalTest {
     @Test fun doneRejectsRetainedRowActionWhileTheSheetHides() = verifyTerminal("Done")
 
     @Test fun closeRejectsRetainedRowActionWhileTheSheetHides() = verifyTerminal("Close")
+
+    @Test
+    fun filteredRowsKeepTheirSelectionAndDisabledState() {
+        val selected = mutableStateOf(setOf("garden"))
+        rule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                WhiteNoiseEntityPickerSheet(
+                    title = "Included Chats",
+                    items =
+                        listOf(
+                            WhiteNoisePickerItem("garden", "Garden planning"),
+                            WhiteNoisePickerItem("book", "Book club"),
+                            WhiteNoisePickerItem("film", "Film club", enabled = false),
+                        ),
+                    selectedIds = selected.value,
+                    multiple = true,
+                    onSelect = { id ->
+                        selected.value = if (id in selected.value) selected.value - id else selected.value + id
+                    },
+                    onDismiss = {},
+                )
+            }
+        }
+        rule.onNodeWithTag("entity.search").performClick().performTextInput("club")
+        rule.onNodeWithTag("entity.choice.garden").assertDoesNotExist()
+        val enabled = rule.onNodeWithTag("entity.choice.book").assertIsOff()
+        enabled.performTouchInput { click(Offset(4f, center.y)) }
+        enabled.assertIsOn()
+        rule.onNodeWithTag("entity.choice.film").assertIsNotEnabled().performTouchInput { click() }
+        rule.runOnIdle { assertEquals(setOf("garden", "book"), selected.value) }
+        enabled.performTouchInput { click(Offset(4f, center.y)) }
+        enabled.assertIsOff()
+        rule.runOnIdle { assertEquals(setOf("garden"), selected.value) }
+    }
+
+    @Test
+    fun singleChoiceSelectsAndClosesTheSheet() {
+        val selection = mutableStateOf<String?>(null)
+        rule.setContent {
+            WhiteNoiseTheme {
+                if (selection.value == null) {
+                    WhiteNoiseEntityPickerSheet(
+                        title = "Choose people",
+                        items = listOf(WhiteNoisePickerItem("person", "Sample person")),
+                        onSelect = { selection.value = it },
+                        onDismiss = {},
+                    )
+                }
+            }
+        }
+        rule.onNodeWithTag("entity.choice.person").performClick()
+        rule.onNodeWithTag("sheet.surface").assertDoesNotExist()
+        rule.runOnIdle { assertEquals("person", selection.value) }
+    }
 
     // Keep the complete retained-window sequence together.
     @Suppress("LongMethod")

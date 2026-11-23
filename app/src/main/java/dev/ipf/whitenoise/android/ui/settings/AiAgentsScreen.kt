@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.ipf.whitenoise.android.R
@@ -42,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
@@ -85,6 +87,7 @@ internal fun AiAgentsContent(
 ) {
     var selectedConnectorId by rememberSaveable(npub) { mutableStateOf<String?>(null) }
     var feedback by rememberSaveable(npub) { mutableStateOf<Int?>(null) }
+    var keyExpanded by rememberSaveable(npub) { mutableStateOf(false) }
     val publicKeyLabel = stringResource(R.string.public_key)
     val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     SettingsScaffold(title = stringResource(R.string.ai_agents), onBack = onBack) {
@@ -135,10 +138,26 @@ internal fun AiAgentsContent(
                                 npub?.let {
                                     onCopy(publicKeyLabel, it)
                                     feedback = R.string.public_key_copied
+                                    keyExpanded = true
                                 }
                             },
                             modifier = Modifier.testTag("ai_agents.copy_public_key"),
-                            subtitle = npub?.let(::abbreviatedNpub),
+                            supportingContent =
+                                npub?.let { key ->
+                                    {
+                                        if (keyExpanded) {
+                                            Text(
+                                                publicKeyDisplayGroups(key).joinToString(" "),
+                                                modifier = Modifier.animatePublicKeyExpansion(keyExpanded),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontFamily = FontFamily.Monospace,
+                                                textAlign = TextAlign.Center,
+                                            )
+                                        } else {
+                                            SettingsRowSupportingText(abbreviatedNpub(key), editable = true)
+                                        }
+                                    }
+                                },
                             enabled = npub != null,
                             explanation = stringResource(R.string.explanation_organize_ai_copy_public_key),
                             leading = {

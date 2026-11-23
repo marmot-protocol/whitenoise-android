@@ -46,6 +46,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Explanation
@@ -295,8 +296,14 @@ internal fun SignUpContent(
                         modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_up.about"),
                         enabled = editable,
                         label = { Text(stringResource(R.string.about)) },
-                        placeholder = { Text(stringResource(R.string.signup_about_prompt)) },
-                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 6),
+                        placeholder = {
+                            Text(
+                                stringResource(R.string.signup_about_prompt),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                     )
                 }
                 if (offline) OnboardingOfflineNotice(onSubmit)

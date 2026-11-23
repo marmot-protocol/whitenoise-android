@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowVoiceStatus.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatRowVoiceStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowVoiceStatus.kt",
+        "anchor": "fun ChatRowVoiceStatus(",
+        "test_ids": [
+          "MED-061"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.voice_row_recording",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowVoiceStatus.kt",
+        "anchor": "R.string.voice_row_recording",
+        "test_ids": [
+          "MED-061"
+        ]
+      },
+      {
+        "surface": "R.string.voice_row_unsent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowVoiceStatus.kt",
+        "anchor": "R.string.voice_row_unsent",
+        "test_ids": [
+          "MED-061"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -144,7 +144,7 @@ internal fun ConversationDictationController.expireRetainedRecoveryIfDue() {
     pendingForegroundRecoverySessionId = null
     notificationActionGeneration += 1L
     if (!foregroundMicrophoneRequired) releaseDurableSessionLease()
-    discardFollowUp()
+    discardFollowUps("recovery_expired")
     onRecoveryExpired()
 }
 
