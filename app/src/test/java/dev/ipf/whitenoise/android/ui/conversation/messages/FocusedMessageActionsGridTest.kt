@@ -137,7 +137,10 @@ class FocusedMessageActionsGridTest {
         assertTrue(panelPositions[0].left < panelPositions[1].left && panelPositions[1].left < panelPositions[2].left)
     }
 
-    private fun taggedBounds(tag: String): Rect = composeRule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+    private fun taggedBounds(tag: String): Rect {
+        val node = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
+        return node.fetchSemanticsNode().boundsInRoot
+    }
 
     private fun bounds(label: String): Rect = composeRule.onNodeWithText(label).fetchSemanticsNode().boundsInRoot
 

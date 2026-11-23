@@ -83,8 +83,8 @@ internal class DictationFollowUpScreenshotTest : DictationNavigationRenderFixtur
         }
 
         val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG)
-        val commands = listOf("Cancel", transcriptPasteLabel, "Send").map { composeRule.onNodeWithContentDescription(it) }
-        val measured = listOf(capsule) + commands
+        val labels = listOf("Cancel", transcriptPasteLabel, "Send")
+        val measured = listOf(capsule) + labels.map { composeRule.onNodeWithContentDescription(it) }
         val originalBounds = measured.map { it.getUnclippedBoundsInRoot() }
         val resume = composeRule.onNodeWithTag(DICTATION_CONTINUE_TAG, useUnmergedTree = true)
         composeRule.mainClock.autoAdvance = false
@@ -128,6 +128,7 @@ internal class DictationFollowUpScreenshotTest : DictationNavigationRenderFixtur
                 continueAvailable = true,
                 keepsLeadingSlot = true,
             )
+        val closing = processing.copy(continueAvailable = false)
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalDensity provides Density(1f, if (dark) 2f else 1f),
@@ -136,11 +137,7 @@ internal class DictationFollowUpScreenshotTest : DictationNavigationRenderFixtur
                 WhiteNoiseTheme(darkTheme = dark, amoled = dark) {
                     Surface {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            ConversationDictationPersistentControl(
-                                state,
-                                controller,
-                                facts = processing.copy(continueAvailable = false),
-                            )
+                            ConversationDictationPersistentControl(state, controller, facts = closing)
                             ConversationDictationPersistentControl(state, controller, facts = processing)
                             ConversationDictationPersistentControl(
                                 state,

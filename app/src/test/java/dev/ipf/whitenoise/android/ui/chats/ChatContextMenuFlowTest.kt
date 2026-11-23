@@ -123,7 +123,8 @@ class ChatContextMenuFlowTest {
     private fun screenBounds(node: androidx.compose.ui.test.SemanticsNodeInteraction): Rect {
         val coordinates = node.fetchSemanticsNode().layoutInfo.coordinates
         val topLeft = coordinates.localToScreen(Offset.Zero)
-        return Rect(topLeft, coordinates.localToScreen(Offset(coordinates.size.width.toFloat(), coordinates.size.height.toFloat())))
+        val corner = Offset(coordinates.size.width.toFloat(), coordinates.size.height.toFloat())
+        return Rect(topLeft, coordinates.localToScreen(corner))
     }
 
     /** Accessibility long-click opens commands without pretending that the row is already selected. */

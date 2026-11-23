@@ -76,6 +76,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -294,11 +295,7 @@ internal fun FocusedMessageActions(
             // inset. The stack would rest a status bar too low without converting between them.
             val density = LocalDensity.current
             val topInsetPx = frameInsets.getTop(density)
-            val actionTouchX =
-                touchX?.let {
-                    val leftInsetPx = frameInsets.getLeft(density, LocalLayoutDirection.current)
-                    it - leftInsetPx - with(density) { FocusedStackHorizontalPadding.roundToPx() }
-                }
+            val actionTouchX = frameInsets.actionTouchXInPaddedFrame(touchX, density, LocalLayoutDirection.current)
             // The theme scales its typography by the app's text-size setting; sp also carries the system scale.
             val textScale = MaterialTheme.typography.bodyLarge.fontSize.value / Typography.bodyLarge.fontSize.value
             val emojiSize = with(LocalDensity.current) { (FocusedReactionEmojiSize.value * textScale).sp.toDp() }
@@ -449,6 +446,16 @@ internal fun FocusedMessageActions(
         }
     }
 }
+
+private fun WindowInsets.actionTouchXInPaddedFrame(
+    touchX: Float?,
+    density: Density,
+    layoutDirection: LayoutDirection,
+): Float? =
+    touchX?.let {
+        val leftInsetPx = getLeft(density, layoutDirection)
+        it - leftInsetPx - with(density) { FocusedStackHorizontalPadding.roundToPx() }
+    }
 
 /**
  * Places a stack child as if the stack were still the centred column of [columnWidth], aligned to its end
