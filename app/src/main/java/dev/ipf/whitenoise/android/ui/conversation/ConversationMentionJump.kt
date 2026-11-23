@@ -52,6 +52,7 @@ internal enum class ConversationMentionCoverage {
     COMPLETE,
 }
 
+/** Classifies how much of the unread range [timeline] covers for the read anchor and the window's newest edge. */
 internal fun conversationMentionCoverage(
     anchored: Boolean,
     readAnchorMessageId: String?,
@@ -90,6 +91,7 @@ internal class ConversationMentionJumpSeed(
     /** True while the outstanding count may still name a mention the loaded rows have not shown. */
     val active: Boolean get() = !retired
 
+    /** The number the control shows: the loaded targets, or more while mentions remain outside the window. */
     fun count(
         loadedIds: List<String>,
         coverage: ConversationMentionCoverage,
@@ -142,6 +144,7 @@ internal class ConversationMentionJumpSeed(
         if (!retired) readIds.add(messageId)
     }
 
+    /** Stops using the entry count; the control then follows the loaded rows only. */
     fun retire() {
         retired = true
         readIds.clear()
@@ -149,6 +152,7 @@ internal class ConversationMentionJumpSeed(
     }
 }
 
+/** The index of the row with message [id], or -1. */
 private fun List<TimelineMessage>.indexOfMessage(id: String): Int = indexOfFirst { it.record.messageIdHex == id }
 
 /** The outcome of looking for the oldest unread mention. */
@@ -157,10 +161,10 @@ internal sealed interface ConversationMentionSearch {
         val messageId: String,
     ) : ConversationMentionSearch
 
-    /** History after the start ran out, or the page budget did, without a mention. */
+    /** History after the start ran out without a mention. */
     data object Exhausted : ConversationMentionSearch
 
-    /** The start row or a newer page could not load; a later tap may succeed. */
+    /** The search stopped early: a page could not load, the page budget ran out or the request was abandoned. */
     data object Unavailable : ConversationMentionSearch
 }
 
@@ -194,7 +198,8 @@ internal fun rememberConversationMentionJumpSeed(
  * Finds the oldest unread mention by walking newer from the read anchor, or from the entry's first unread row when
  * nothing was read yet. It loads the start row when the window does not hold it and then at most [maxNewerPages]
  * newer pages. A page that cannot load because another one is in flight still counts as progress when that other
- * page moved the window.
+ * page moved the window. It loads nothing more once [isCurrent] turns false, so an abandoned jump never pages the
+ * window away from the reader.
  */
 @Suppress("LongParameterList", "ReturnCount")
 internal suspend fun resolveFirstUnreadMention(
@@ -206,14 +211,17 @@ internal suspend fun resolveFirstUnreadMention(
     hasMoreAfter: () -> Boolean,
     loadNewer: suspend () -> Boolean,
     maxNewerPages: Int = MENTION_RESOLUTION_MAX_NEWER_PAGES,
+    isCurrent: () -> Boolean = { true },
 ): ConversationMentionSearch {
     val start = readAnchorMessageId ?: firstUnreadMessageId ?: return ConversationMentionSearch.Exhausted
-    if (timeline().indexOfMessage(start) < 0 && !loadMessage(start)) return ConversationMentionSearch.Unavailable
+    val startLoaded = timeline().indexOfMessage(start) >= 0 || (isCurrent() && loadMessage(start))
+    if (!startLoaded) return ConversationMentionSearch.Unavailable
     val scan = NewerMentionScan(start, includeStart = readAnchorMessageId == null, mentionsActiveAccount)
     for (page in 0..maxNewerPages) {
         val rows = timeline()
         scan.next(rows)?.let { return it }
-        if (page == maxNewerPages || !hasMoreAfter()) return ConversationMentionSearch.Exhausted
+        if (!hasMoreAfter()) return ConversationMentionSearch.Exhausted
+        if (page == maxNewerPages || !isCurrent()) return ConversationMentionSearch.Unavailable
         val newestBefore = rows.lastOrNull()?.record?.messageIdHex
         if (!loadNewer() && timeline().lastOrNull()?.record?.messageIdHex == newestBefore) {
             return ConversationMentionSearch.Unavailable

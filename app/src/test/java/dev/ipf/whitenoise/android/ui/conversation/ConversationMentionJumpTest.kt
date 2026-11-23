@@ -216,11 +216,11 @@ class ConversationMentionJumpTest {
     }
 
     @Test
-    fun stopsAtThePageBoundWhenNoMentionExists() {
+    fun stopsAtThePageBoundWithoutRetiringTheMention() {
         val ids = listOf("r") + (1..100).map { "u$it" }
         val history = PagedHistory(ids, window = 4, start = 0)
 
-        assertEquals(ConversationMentionSearch.Exhausted, history.resolve(readAnchor = "r", maxNewerPages = 5))
+        assertEquals(ConversationMentionSearch.Unavailable, history.resolve(readAnchor = "r", maxNewerPages = 5))
         assertEquals(5, history.newerLoads)
     }
 
@@ -248,6 +248,17 @@ class ConversationMentionJumpTest {
         assertEquals(ConversationMentionSearch.Unavailable, history.resolve(readAnchor = "r"))
     }
 
+    @Test
+    fun anAbandonedJumpLoadsNoMorePages() {
+        val ids = listOf("r") + (1..20).map { "u$it" } + "m@"
+        val history = PagedHistory(ids, window = 4, start = 0)
+        var current = true
+
+        val result = history.resolve(readAnchor = "r", isCurrent = { current }, onLoad = { current = false })
+        assertEquals(ConversationMentionSearch.Unavailable, result)
+        assertEquals("the drag that abandoned the jump stops paging at once", 1, history.newerLoads)
+    }
+
     /** A sliding window over [ids]; ids ending in "@" mention the active account. */
     private class PagedHistory(
         private val ids: List<String>,
@@ -265,6 +276,8 @@ class ConversationMentionJumpTest {
             readAnchor: String?,
             firstUnread: String? = null,
             maxNewerPages: Int = MENTION_RESOLUTION_MAX_NEWER_PAGES,
+            isCurrent: () -> Boolean = { true },
+            onLoad: () -> Unit = {},
         ): ConversationMentionSearch =
             runBlocking {
                 resolveFirstUnreadMention(
@@ -281,6 +294,7 @@ class ConversationMentionJumpTest {
                     hasMoreAfter = { start + window < ids.size },
                     loadNewer = {
                         newerLoads++
+                        onLoad()
                         when {
                             stuck -> false
                             // Another page was in flight: it moved the window, this request reports no progress.
@@ -295,6 +309,7 @@ class ConversationMentionJumpTest {
                         }
                     },
                     maxNewerPages = maxNewerPages,
+                    isCurrent = isCurrent,
                 )
             }
     }

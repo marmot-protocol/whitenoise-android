@@ -50,6 +50,7 @@ internal fun LazyListScope.chatListPinnedBoundaryItem(placementDurationMillis: I
     }
 }
 
+/** The line between pinned and unpinned chats, in full `outlineVariant` in every theme. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ChatListPinnedBoundary(modifier: Modifier = Modifier) {

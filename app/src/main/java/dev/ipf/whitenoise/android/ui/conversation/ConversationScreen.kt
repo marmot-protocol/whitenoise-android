@@ -2321,8 +2321,9 @@ internal fun ConversationScreen(
                     hasMoreAfter = { controller.hasMoreAfterTimeline },
                     loadNewer = {
                         snapshotFlow { controller.isLoadingPage }.first { !it }
-                        controller.loadNewerTimelinePage()
+                        isCurrent() && controller.loadNewerTimelinePage()
                     },
+                    isCurrent = isCurrent,
                 )
             }
         if (!isCurrent()) return null
@@ -2333,6 +2334,7 @@ internal fun ConversationScreen(
         return (search as? ConversationMentionSearch.Found)?.messageId
     }
 
+    /** Visits the oldest unread mention, marks it read and highlights it; a later navigation supersedes it. */
     fun jumpToNextUnreadMention() {
         if (unreadMentionMessageIds.isEmpty() && !mentionSeed.active) return
         navigationState.searchJob?.cancel()
