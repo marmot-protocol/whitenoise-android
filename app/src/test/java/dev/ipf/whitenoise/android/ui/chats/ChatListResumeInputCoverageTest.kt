@@ -32,12 +32,13 @@ class ChatListResumeInputCoverageTest {
                 opening = '(',
                 closing = ')',
             )
-        for ((owner, call) in
-            listOf(
+        val gatedCalls =
+            mapOf(
                 "head scroll correction" to headEffect,
                 "head reorder input gate" to screen.propertyInitializerCall("headReorderInProgress"),
                 "row placement duration" to screen.propertyInitializerCall("rowPlacementDurationMillis"),
-            )) {
+            )
+        gatedCalls.forEach { (owner, call) ->
             assertTrue("$owner must receive the resume baseline", "resumeBaseline = resumeBaseline" in call)
         }
         val placementGate = screen.propertyInitializerCall("rowPlacementInProgress")

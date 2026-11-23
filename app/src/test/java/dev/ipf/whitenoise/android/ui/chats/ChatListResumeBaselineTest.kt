@@ -13,8 +13,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.testing.TestLifecycleOwner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -34,7 +35,7 @@ class ChatListResumeBaselineTest {
     val composeRule = createComposeRule()
 
     private val rowHeight = 48.dp
-    private val lifecycleOwner = TestLifecycleOwner(Lifecycle.State.RESUMED)
+    private val lifecycleOwner = ResumeTestLifecycleOwner()
     // Enough rows to scroll, so a keyed anchor could hide a promoted head above the viewport.
     private val filler = (0 until 27).map { "R$it" }
     private var itemIds by mutableStateOf(order("A", "B", "C"))
@@ -233,4 +234,16 @@ class ChatListResumeBaselineTest {
         tap("C")
         composeRule.runOnIdle { assertEquals(emptyList<String>(), openedIds) }
     }
+}
+
+private class ResumeTestLifecycleOwner : LifecycleOwner {
+    private val registry = LifecycleRegistry(this).apply { currentState = Lifecycle.State.RESUMED }
+
+    override val lifecycle: Lifecycle = registry
+
+    var currentState: Lifecycle.State
+        get() = registry.currentState
+        set(value) {
+            registry.currentState = value
+        }
 }

@@ -271,6 +271,7 @@ internal fun warmResumeMetrics(): List<Metric> =
     )
 
 /** Warm resume to the first chat-row tap the app handled, retries included (#3780). */
+@OptIn(ExperimentalMetricApi::class)
 internal fun warmResumeInputMetrics(): List<Metric> =
     warmResumeMetrics() +
         TraceSectionMetric(
