@@ -8,7 +8,8 @@ import androidx.compose.runtime.Composable
 internal fun MaestroSurfacePresentation(fixture: MaestroPresentationFixture) {
     when {
         fixture.scenario.startsWith("surface-motion-") -> MaestroMotionPresentation(fixture)
-        fixture.scenario.startsWith("surface-onboarding-") ||
+        fixture.scenario == "surface-remote-signer-disconnect" ||
+            fixture.scenario.startsWith("surface-onboarding-") ||
             fixture.scenario.startsWith("surface-addprofile-") ||
             fixture.scenario.startsWith("surface-profile-qr-") -> MaestroEntryPresentation(fixture)
         fixture.scenario.startsWith("surface-rejoin-") ||

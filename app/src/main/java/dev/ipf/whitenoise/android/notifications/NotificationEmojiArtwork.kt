@@ -37,7 +37,7 @@ private val ownedName = Regex("[0-9a-f-]{36}\\.png")
 private val artifactLock = NotificationEmojiLeases.lock
 
 /** An entire optional preview reads no more than four source images' worth of bytes. */
-private class EmojiReadBudget {
+internal class EmojiReadBudget {
     private var remaining = NOTIFICATION_EMOJI_MAX_IMAGES * CustomEmojiStore.MAX_BYTES
 
     fun read(file: File): ByteArray? {
@@ -170,7 +170,7 @@ internal fun renderNotificationEmojiArtwork(images: List<Bitmap>): Bitmap {
 }
 
 /** Message previews use the same canonical built-in precedence as conversation rendering. */
-private suspend fun notificationEmojiBitmap(
+internal suspend fun notificationEmojiBitmap(
     context: Context,
     code: String,
     readBudget: EmojiReadBudget,

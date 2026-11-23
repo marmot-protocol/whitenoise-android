@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +32,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatHistoryTransfer
 import dev.ipf.whitenoise.android.state.importedHistoryBoundary
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.devices.followEventsWhileStarted
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -147,7 +147,7 @@ internal fun ImportedHistoryBoundary(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        AppDivider(color = MaterialTheme.colorScheme.outline)
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,

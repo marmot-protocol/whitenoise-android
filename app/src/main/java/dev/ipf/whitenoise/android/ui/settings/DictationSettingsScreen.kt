@@ -178,6 +178,23 @@ internal fun DictationSettingsScreen(
                     SettingsExplainer(stringResource(R.string.dictation_send_safety_note))
                 }
             }
+            item(key = "search.DictationSettings.8") {
+                SettingsGroup(modifier = Modifier.testTag("dictation.voice_messages.group")) {
+                    row("transcribe_voice_messages") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = stringResource(R.string.dictation_transcribe_voice_messages_title),
+                            checked = preferences.transcribeVoiceMessages,
+                            onCheckedChange = appState.conversationDictationPreferences::setTranscribeVoiceMessages,
+                            modifier = Modifier.testTag("dictation.transcribe_voice_messages"),
+                            subtitle = stringResource(R.string.dictation_transcribe_voice_messages_subtitle),
+                            explanation =
+                                stringResource(R.string.explanation_appearance_dictation_transcribe_voice_messages),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_voice_note) },
+                        )
+                    }
+                }
+            }
             item(key = "search.DictationSettings.6") {
                 SettingsGroup(modifier = Modifier.testTag("dictation.system.group")) {
                     row("android_settings") { rowContext ->

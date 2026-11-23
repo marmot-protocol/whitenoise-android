@@ -324,6 +324,7 @@ internal fun AccountKeysScreen(
                 },
             npub = npub,
             hasLocalKey = hasLocalKey,
+            remoteSigner = rememberRemoteSignerAccountActions(appState, accountIdHex),
             showWipe = WIPE_ENGINE_FFI_AVAILABLE && active != null,
             ui = ui,
             onCopyPublic = {
@@ -471,6 +472,7 @@ private fun ProfileKeysList(
     onExportRaw: () -> Unit,
     onWipe: () -> Unit,
     onSignOut: () -> Unit,
+    remoteSigner: RemoteSignerAccountActions? = null,
 ) {
     val revealed = ui.privateKey != null
     val exportsEnabled = ui.exportIdle
@@ -525,7 +527,9 @@ private fun ProfileKeysList(
         item(key = "search.AccountKeys.5") {
             ProfileKeySupportingText(stringResource(R.string.profile_public_key_help))
         }
-        if (!hasLocalKey) {
+        if (remoteSigner != null) {
+            remoteSignerAccountItems(remoteSigner)
+        } else if (!hasLocalKey) {
             item(key = "search.AccountKeys.6") {
                 SettingsCallout(
                     title = stringResource(R.string.access_amber_signed_in),

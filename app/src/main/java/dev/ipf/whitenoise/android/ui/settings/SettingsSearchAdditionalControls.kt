@@ -49,6 +49,15 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             "theme",
         )
         control(
+            "Dictation.transcribe_voice_messages",
+            R.string.dictation_transcribe_voice_messages_title,
+            R.string.dictation_settings_title,
+            SettingsDetail.Dictation,
+            "search.DictationSettings.8",
+            "transcribe_voice_messages",
+            R.string.dictation_transcribe_voice_messages_subtitle,
+        )
+        control(
             "Dictation.result",
             R.string.dictation_result_title,
             R.string.dictation_settings_title,

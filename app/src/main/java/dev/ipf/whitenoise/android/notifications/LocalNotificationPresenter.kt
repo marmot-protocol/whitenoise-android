@@ -760,24 +760,12 @@ class LocalNotificationPresenter(
                                 NotificationActions
                                     .targetFromUpdate(update, notificationContent.notificationTag, notificationContent.notificationId)
                                     ?.let { actionTarget ->
-                                        decision.actions.forEach { action ->
-                                            when (action) {
-                                                NotificationActionKind.REPLY ->
-                                                    builder.addAction(
-                                                        interactions.replyNotificationAction(
-                                                            actionTarget,
-                                                            quickReactions,
-                                                        ),
-                                                    )
-                                                // Reaction choices ride on Reply's RemoteInput so SystemUI
-                                                // can render them inline.
-                                                NotificationActionKind.REACT -> Unit
-                                                NotificationActionKind.MARK_READ ->
-                                                    builder.addAction(
-                                                        interactions.markReadNotificationAction(actionTarget),
-                                                    )
-                                            }
-                                        }
+                                        interactions.addMessageActions(
+                                            builder,
+                                            actionTarget,
+                                            decision.actions,
+                                            quickReactions,
+                                        )
                                     }
                             }
                             messagingPost =
@@ -960,7 +948,10 @@ class LocalNotificationPresenter(
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
                                             )
-                                            if (carried.isNullOrEmpty() && emojiArtifact == null) {
+                                            if (carried.isNullOrEmpty() &&
+                                                emojiArtifact == null &&
+                                                !notification.extras.containsKey(EXTRA_QUICK_REACTION_ROWS)
+                                            ) {
                                                 false
                                             } else {
                                                 if (!profileAllowsPost() || !showGenerationAllowsPost()) {
@@ -978,6 +969,8 @@ class LocalNotificationPresenter(
                                                         messageIdHex = update.messageIdHex,
                                                     ),
                                                 )
+                                                builder.extras.remove(EXTRA_QUICK_REACTION_ROWS)
+                                                builder.extras.remove(EXTRA_QUICK_REACTION_TARGET)
                                                 val cleanNotification = buildSettled(true)
                                                 val retryResult =
                                                     publisher.postNotificationSafely(

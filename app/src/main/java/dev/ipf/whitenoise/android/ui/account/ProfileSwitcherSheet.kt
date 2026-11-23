@@ -149,6 +149,8 @@ internal fun ProfileSwitcherSheet(
                                     Text(stringResource(R.string.device_unlinked_title))
                                 } else if (account.isSignedOut) {
                                     Text(stringResource(R.string.signed_out))
+                                } else if (account.signerNeedsAttention) {
+                                    Text(stringResource(R.string.remote_signer_switcher_attention))
                                 }
                             }
                         },

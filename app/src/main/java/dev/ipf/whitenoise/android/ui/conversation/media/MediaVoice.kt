@@ -593,7 +593,7 @@ internal fun MediaVoiceBubble(
         )
         if (!mine && audioTranscription != null) {
             key(localFile) {
-                ReceivedAudioTranscription(localFile, audioTranscription)
+                ReceivedAudioTranscription(localFile, pillKey, audioTranscription)
             }
         }
     }

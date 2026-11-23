@@ -346,6 +346,10 @@ internal abstract class DictationNavigationRenderFixture {
 
     protected class FakePlatform : ConversationDictationPlatform {
         var cancels = 0
+        var callerAudio = false
+
+        override fun followUpCaptureSupported() = callerAudio
+
         lateinit var listener: ConversationDictationRecognitionListener
 
         override fun hasRecordAudioPermission() = true

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
@@ -34,6 +33,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.retryUsageDiagnostics
 import dev.ipf.whitenoise.android.state.setTelemetryEnabled
 import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -231,9 +231,8 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
                             R.string.diagnostics_disable_disclosure,
                         ),
                 ) { UsageDiagnosticsChoice(appState, choicesEnabled, onChoiceStarted) }
-                HorizontalDivider(
+                AppDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant,
                 )
                 DiagnosticsChoiceDetails(
                     title = stringResource(R.string.onboarding_share_logs_title),

@@ -67,13 +67,7 @@ internal class AndroidConversationDictationPlatform(
 
     override fun followUpCaptureSupported(): Boolean = callerAudio.usedThisSession
 
-    override fun beginFollowUpCapture(): Boolean = callerAudio.beginFollowUp()
-
-    override fun finishFollowUpCapture(onClosed: () -> Unit): Boolean = callerAudio.finishFollowUp(onClosed)
-
-    override fun discardFollowUpCapture(onClosed: () -> Unit): Boolean = callerAudio.discardFollowUp(onClosed)
-
-    override fun adoptFollowUpCapture(): Boolean = callerAudio.adoptFollowUp()
+    override fun followUpCaptures(): ConversationDictationFollowUpCaptures = callerAudio
 
     /**
      * Remembers what each provider build answered about caller-supplied audio.

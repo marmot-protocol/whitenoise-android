@@ -124,6 +124,26 @@
         ]
       },
       {
+        "surface": "setting:dictation_transcribe_voice_messages_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.dictation_transcribe_voice_messages_subtitle",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:dictation_transcribe_voice_messages_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.dictation_transcribe_voice_messages_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
         "surface": "setting:dictation_settings_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
         "anchor": "R.string.dictation_settings_title",

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.gestureSessionId
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.navigation.LocalDictationLauncherOrigin
 import kotlin.math.roundToInt
@@ -156,7 +157,7 @@ internal fun dictationHoldGesture(
                     consumeUntilUp(down.id)
                     return@awaitEachGesture
                 }
-                val session = controller.state.sessionId
+                val session = controller.gestureSessionId
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 state.begin(bounds)
                 try {
@@ -185,14 +186,14 @@ internal fun dictationHoldGesture(
                             }
                             DictationHoldAction.Send -> {
                                 // The controller rejects Send outside live recognition, keeping the bubble.
-                                if (controller.state.sessionId == session) {
+                                if (controller.gestureSessionId == session) {
                                     finishMorph()
                                     controller.send()
                                 }
                                 break
                             }
                             DictationHoldAction.Cancel -> {
-                                if (controller.state.sessionId == session) {
+                                if (controller.gestureSessionId == session) {
                                     finishMorph()
                                     controller.cancel()
                                 }
