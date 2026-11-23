@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchRecentStrip.kt",
         "anchor": "fun GlobalSearchRecentStrip(",
         "test_ids": [
-          "FIND-021"
+          "FIND-021",
+          "PRO-012"
         ]
       },
       {

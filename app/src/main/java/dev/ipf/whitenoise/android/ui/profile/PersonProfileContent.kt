@@ -363,6 +363,7 @@ private fun PersonProfileIdentity(
                     avatarSize,
                     pictureUrl = person.pictureUrl,
                     pictureDomain = AvatarImageLoader.publicProfiles(),
+                    followedAccount = person.seed.takeUnless { person.self },
                 )
             }
             val keyShown = person.publicKey.isNotBlank()
