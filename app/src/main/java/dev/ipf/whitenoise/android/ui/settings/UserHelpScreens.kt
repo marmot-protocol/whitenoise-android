@@ -62,8 +62,7 @@ private fun AssetManager.readUserGuides(): List<UserGuide> =
                 title = contents.lineSequence().first().removePrefix("# "),
                 body = contents.substringAfter('\n'),
             )
-        }
-        .sortedBy { it.title }
+        }.sortedBy { it.title }
 
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 @Composable

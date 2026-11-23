@@ -27,6 +27,168 @@
           "SET-069"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.documentation_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.documentation_unavailable",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.help_open_share_connect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.help_open_share_connect",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_actions_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_actions_body",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_actions_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_actions_explanation",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_actions_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_actions_title",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_close",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_example_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_example_message",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_find_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_find_body",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_find_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_find_title",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_next",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_next",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_page_number",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_page_number",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_previous",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_previous",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_share_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_share_body",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_share_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_share_title",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_show_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_show_actions",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_view_topics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_view_topics",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_white_noise",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.no_results",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.no_results",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.search_documentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.search_documentation",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.user_documentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.user_documentation",
+        "test_ids": [
+          "SET-069"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []
