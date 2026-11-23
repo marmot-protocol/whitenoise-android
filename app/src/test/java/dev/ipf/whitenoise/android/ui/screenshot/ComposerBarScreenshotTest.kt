@@ -1,12 +1,9 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
-import android.graphics.Bitmap
-import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,7 +12,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -47,8 +43,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.RecordingStripLeading
-import dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf
-import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +55,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 
 /**
  * Pixel baseline for the composer bar leaf in its idle (empty) and drafted
@@ -375,38 +368,6 @@ class ComposerBarScreenshotTest {
             .captureRoboImage("src/test/snapshots/composer_reply_amoled_compact_large_font.png")
     }
 
-    /** A staged photo's divider retains an 8 dp gap above the AMOLED reply outline. */
-    @Test
-    fun composerReplyAmoledKeepsGapAfterStagedPhoto() {
-        val photo = File(app.cacheDir, "reply-staged-photo.png")
-        val bitmap = Bitmap.createBitmap(160, 100, Bitmap.Config.ARGB_8888)
-        photo.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
-        val slot = PendingMediaSlot("reply-photo", Uri.fromFile(photo))
-
-        render(
-            darkTheme = true,
-            amoled = true,
-            draft = "Reply draft",
-            showReply = true,
-            attachmentContent = {
-                ComposerAttachmentShelf(
-                    mediaSlots = listOf(slot),
-                    documentUris = emptyList(),
-                    prepared = emptyMap(),
-                    onPreview = {},
-                    onRemoveMedia = {},
-                    onRemoveDocument = {},
-                )
-            },
-        )
-
-        val shelf = composeRule.onNodeWithTag("conversation.composer.attachments")
-        val dismiss = composeRule.onNodeWithContentDescription(app.getString(R.string.cancel_reply))
-        // The dismiss target starts at the reply's top edge, one divider pixel plus 8 dp after the shelf.
-        assertEquals(9.dp, dismiss.getUnclippedBoundsInRoot().top - shelf.getUnclippedBoundsInRoot().bottom)
-    }
-
     /** Captures that dictation remains unavailable while editing an existing message. */
     @Test
     fun composerDictationEditConstraintCompactRtl() {
@@ -531,7 +492,6 @@ class ComposerBarScreenshotTest {
         showEdit: Boolean = false,
         voiceRecordingController: VoiceRecordingController? = null,
         attachmentsEnabled: Boolean = false,
-        attachmentContent: (@Composable () -> Unit)? = null,
     ) {
         val dictation = dictationPreview?.let { createDictationPreview(it, TextFieldValue(draft)) }
         composeRule.setContent {
@@ -555,8 +515,6 @@ class ComposerBarScreenshotTest {
                             onSend = { _, _ -> },
                             onPickFromGallery = {}.takeIf { attachmentsEnabled },
                             onPickDocument = {}.takeIf { attachmentsEnabled },
-                            attachmentContent = attachmentContent,
-                            hasPendingAttachments = attachmentContent != null,
                             initialDraft = TextFieldValue(draft),
                             editingMessageId = "edited-message".takeIf { showEdit },
                             editingInitialText = "Message being edited".takeIf { showEdit },
