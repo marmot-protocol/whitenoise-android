@@ -68,7 +68,10 @@ internal class ComposerVisualTransformation(
     // untransformed text — if any unforeseen malformed input
     // state still drives buildAnnotatedString / the offset
     // mapping out of bounds, rather than letting it throw.
-    override fun filter(text: AnnotatedString): TransformedText = runCatching { transform(text) }.getOrElse { TransformedText(text, OffsetMapping.Identity) }
+    override fun filter(text: AnnotatedString): TransformedText {
+        val transformed = runCatching { transform(text) }
+        return transformed.getOrElse { TransformedText(text, OffsetMapping.Identity) }
+    }
 
     private fun transform(text: AnnotatedString): TransformedText {
         val source = text.text
@@ -95,10 +98,16 @@ internal class ComposerVisualTransformation(
         val offsetMapping =
             object : OffsetMapping {
                 /** Maps the source caret into the bounded visible text. */
-                override fun originalToTransformed(offset: Int): Int = visual.originalToTransformed(offset).coerceIn(0, visualLength)
+                override fun originalToTransformed(offset: Int): Int {
+                    val mapped = visual.originalToTransformed(offset)
+                    return mapped.coerceIn(0, visualLength)
+                }
 
                 /** Maps chip and emoji selections into the current source draft bounds. */
-                override fun transformedToOriginal(offset: Int): Int = visual.transformedToOriginal(offset).coerceIn(0, source.length)
+                override fun transformedToOriginal(offset: Int): Int {
+                    val mapped = visual.transformedToOriginal(offset)
+                    return mapped.coerceIn(0, source.length)
+                }
             }
         return TransformedText(styled(composer), offsetMapping)
     }
