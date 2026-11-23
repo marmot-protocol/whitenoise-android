@@ -36,6 +36,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationFollowUpCaptures
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
@@ -347,6 +348,25 @@ internal abstract class DictationNavigationRenderFixture {
     protected class FakePlatform : ConversationDictationPlatform {
         var cancels = 0
         var callerAudio = false
+        var deferCaptureClose = false
+        var closeCapture: (() -> Unit)? = null
+
+        override fun followUpCaptures(): ConversationDictationFollowUpCaptures =
+            object : ConversationDictationFollowUpCaptures {
+                override fun beginFollowUp(sessionId: Long): Boolean = callerAudio
+
+                override fun finishFollowUp(
+                    sessionId: Long,
+                    onClosed: () -> Unit,
+                ): Boolean = false
+
+                override fun discardFollowUp(
+                    sessionId: Long,
+                    onClosed: () -> Unit,
+                ): Boolean = false
+
+                override fun adoptFollowUp(sessionId: Long): Boolean = false
+            }
 
         override fun followUpCaptureSupported() = callerAudio
 
@@ -362,6 +382,10 @@ internal abstract class DictationNavigationRenderFixture {
                 override fun start() = Unit
 
                 override fun stop() = Unit
+
+                override fun stop(onAudioCaptureFinished: () -> Unit) {
+                    if (deferCaptureClose) closeCapture = onAudioCaptureFinished else onAudioCaptureFinished()
+                }
 
                 override fun cancel() {
                     cancels++

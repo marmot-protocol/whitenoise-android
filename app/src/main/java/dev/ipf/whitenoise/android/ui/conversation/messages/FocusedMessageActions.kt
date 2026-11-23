@@ -63,6 +63,7 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -238,6 +239,7 @@ internal fun FocusedMessageActions(
     initiatingHoldActive: Boolean = false,
     sourceBounds: IntRect?,
     touchY: Float?,
+    touchX: Float? = null,
     mine: Boolean,
     actions: List<FocusedMessageAction>,
     quickReactions: List<String>,
@@ -273,13 +275,14 @@ internal fun FocusedMessageActions(
             actions.map { action ->
                 action.withTerminalCallbacks(popupMotion::close)
             }
+        val frameInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
         BoxWithConstraints(
             modifier =
                 Modifier
                     .fillMaxSize()
                     // The overlay owns the whole window now, so the travel range is the part of it
                     // the stack may actually occupy rather than the part the system bars cover.
-                    .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
+                    .windowInsetsPadding(frameInsets)
                     // A tap reaching the frame landed beside the stack, on nothing, and dismisses
                     // exactly as the scrim underneath it would have before the frame covered it.
                     .focusedDismissOnTap(
@@ -289,7 +292,13 @@ internal fun FocusedMessageActions(
         ) {
             // The lifted bubble reports a window coordinate; the frame below starts under the top
             // inset. The stack would rest a status bar too low without converting between them.
-            val topInsetPx = WindowInsets.systemBars.union(WindowInsets.displayCutout).getTop(LocalDensity.current)
+            val density = LocalDensity.current
+            val topInsetPx = frameInsets.getTop(density)
+            val actionTouchX =
+                touchX?.let {
+                    val leftInsetPx = frameInsets.getLeft(density, LocalLayoutDirection.current)
+                    it - leftInsetPx - with(density) { FocusedStackHorizontalPadding.roundToPx() }
+                }
             // The theme scales its typography by the app's text-size setting; sp also carries the system scale.
             val textScale = MaterialTheme.typography.bodyLarge.fontSize.value / Typography.bodyLarge.fontSize.value
             val emojiSize = with(LocalDensity.current) { (FocusedReactionEmojiSize.value * textScale).sp.toDp() }
@@ -430,7 +439,7 @@ internal fun FocusedMessageActions(
                             .weight(1f, fill = false)
                             // Labels that need more than the column may use the whole padded window, so a
                             // wide window never wraps an action the 560dp column could not hold (#3587).
-                            .focusedColumnSlot(railWidth, actionPanelMaximumWidth, mine)
+                            .focusedColumnSlot(railWidth, actionPanelMaximumWidth, mine, actionTouchX)
                             .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
@@ -447,12 +456,14 @@ internal fun FocusedMessageActions(
  *
  * A child no wider than the column sits exactly where the capped stack put it. A wider one keeps that edge
  * until it would leave the window, then slides back inside it, so it grows across the window rather than
- * past either side. Offsets are start-relative, so RTL mirrors them like the column alignment did.
+ * past either side. Touch placement uses a physical X within the padded frame. Without a touch,
+ * offsets are start-relative, so RTL mirrors them like the column alignment did.
  */
 internal fun Modifier.focusedColumnSlot(
     columnWidth: Dp,
     maximumWidth: Dp,
     mine: Boolean,
+    touchX: Float? = null,
 ): Modifier =
     layout { measurable, constraints ->
         val maxChild = maximumWidth.roundToPx().coerceIn(0, constraints.maxWidth)
@@ -461,8 +472,15 @@ internal fun Modifier.focusedColumnSlot(
         val column = columnWidth.roundToPx().coerceIn(0, width)
         val columnStart = (width - column) / 2
         val preferred = if (mine) columnStart + column - placeable.width else columnStart
-        val start = preferred.coerceIn(0, (width - placeable.width).coerceAtLeast(0))
-        layout(width, placeable.height) { placeable.placeRelative(start, 0) }
+        val maxLeft = width - placeable.width
+        layout(width, placeable.height) {
+            if (touchX == null) {
+                placeable.placeRelative(preferred.coerceIn(0, maxLeft), 0)
+            } else {
+                val left = (touchX - placeable.width / 2f).roundToInt().coerceIn(0, maxLeft)
+                placeable.place(left, 0)
+            }
+        }
     }
 
 /**

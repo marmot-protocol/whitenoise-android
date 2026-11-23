@@ -252,6 +252,7 @@ internal fun ChatsScreen(
         remember(appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateOf<ChatListReturnHead?>(null)
         }
+    var actionSheetTouchX by remember { mutableStateOf<Float?>(null) }
     var actionSheetChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     val actionMenuOwner =
@@ -2105,12 +2106,13 @@ internal fun ChatsScreen(
                         onOpenProfile = { npub ->
                             if (menuActionsCurrent()) presentProfileFromVisibleList(npub)
                         },
-                        onOpenActions = {
+                        onOpenActions = { touchX ->
                             if (menuActionsCurrent()) {
                                 val continuingHold =
                                     actionMenuOwner.isCurrent(heldMenuToken[0]) &&
                                         actionSheetChatId == rowId
                                 if (!continuingHold) actionMenuOwner.open(held = false)
+                                actionSheetTouchX = touchX
                                 actionSheetChatId = rowId
                             }
                         },
@@ -2223,6 +2225,7 @@ internal fun ChatsScreen(
                                 }
                             },
                             expanded = actionSheetChatId == rowId,
+                            touchX = actionSheetTouchX,
                             focusable = !actionMenuOwner.pointerHeld,
                             modifier = Modifier.testTag("chat.menu.$rowId"),
                             canRunAction = {
