@@ -187,8 +187,10 @@ class HistoryBackupsScreenshotTest {
         button.performClick()
         assertEquals(listOf(fixture), restored)
         compose.runOnIdle { state.value = state.value.copy(problem = HistoryBackupProblem.InvalidRestoreWords) }
-        val error = ApplicationProvider.getApplicationContext<android.app.Application>()
-            .getString(R.string.history_backups_problem_restore_words)
+        val error =
+            ApplicationProvider
+                .getApplicationContext<android.app.Application>()
+                .getString(R.string.history_backups_problem_restore_words)
         compose.onNodeWithText(error).assertIsDisplayed()
         assertTrue(restoreFieldContains("orbit"))
         button.performClick()
