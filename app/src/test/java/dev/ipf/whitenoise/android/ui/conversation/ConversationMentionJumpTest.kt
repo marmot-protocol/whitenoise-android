@@ -91,6 +91,17 @@ class ConversationMentionJumpTest {
     }
 
     @Test
+    fun hidingTheBoundaryRowsNeverCountsAnOlderMention() {
+        val seed =
+            ConversationMentionJumpSeed(entryCount = 1, entryLastReadMessageId = "r", entryFirstUnreadMessageId = "f")
+
+        seed.observe(rows("old@", "r", "f", "a"), "a", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
+        // Both boundary rows are hidden; the older mention stays loaded but its order to the boundary is not known.
+        seed.observe(rows("old@", "a"), "a", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
+        assertEquals(1, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
+    }
+
+    @Test
     fun retiredSeedFollowsTheLoadedRowsOnly() {
         val seed = ConversationMentionJumpSeed(entryCount = 4)
         seed.retire()

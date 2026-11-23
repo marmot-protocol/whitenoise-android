@@ -71,7 +71,7 @@ internal fun conversationMentionCoverage(
  * history without finding a mention.
  *
  * [entryLastReadMessageId] and [entryFirstUnreadMessageId] are the entry row's unread boundary. A mention counts as
- * read once it lies between that boundary and the current read anchor, both judged on loaded rows.
+ * read once the read anchor passes it on loaded rows known to follow that boundary.
  */
 @Stable
 internal class ConversationMentionJumpSeed(
@@ -80,6 +80,7 @@ internal class ConversationMentionJumpSeed(
     private val entryFirstUnreadMessageId: String? = null,
 ) {
     private val readIds = mutableStateSetOf<String>()
+    private val afterBoundaryIds = HashSet<String>()
     private var retired by mutableStateOf(entryCount <= 0)
 
     /** True while the entry count may still name a mention the loaded rows have not shown. */
@@ -96,8 +97,9 @@ internal class ConversationMentionJumpSeed(
         }
 
     /**
-     * Records the loaded mentions the read anchor has passed since entry. When the window holds the anchor but not the
-     * entry boundary, it starts after that boundary, since the anchor never moves behind it.
+     * Records the loaded mentions the read anchor has passed since entry. Rows count only from the entry boundary, or
+     * from the first row an earlier window already placed after it, so paging or hiding the boundary rows never
+     * counts an older mention.
      */
     fun observe(
         timeline: List<TimelineMessage>,
@@ -106,18 +108,26 @@ internal class ConversationMentionJumpSeed(
         mentionsActiveAccount: (TimelineMessage) -> Boolean,
     ) {
         if (retired) return
-        val anchorIndex = readAnchorMessageId?.let { timeline.indexOfMessage(it) } ?: -1
-        if (anchorIndex >= 0) {
-            val readStart =
-                entryLastReadMessageId?.let { timeline.indexOfMessage(it).takeIf { i -> i >= 0 }?.plus(1) }
-                    ?: entryFirstUnreadMessageId?.let { timeline.indexOfMessage(it).takeIf { i -> i >= 0 } }
-                    ?: 0
-            for (index in readStart..anchorIndex) {
+        val start = afterBoundaryStart(timeline)
+        if (start != null) {
+            for (index in start until timeline.size) afterBoundaryIds.add(timeline[index].record.messageIdHex)
+            val anchorIndex = readAnchorMessageId?.let { timeline.indexOfMessage(it) } ?: -1
+            for (index in start..anchorIndex) {
                 val row = timeline[index]
                 if (row.isUnreadMention(mentionsActiveAccount)) readIds.add(row.record.messageIdHex)
             }
         }
         if (coverage == ConversationMentionCoverage.COMPLETE) retire()
+    }
+
+    /** The first loaded row known to follow the entry boundary, or null when no loaded row is. */
+    private fun afterBoundaryStart(timeline: List<TimelineMessage>): Int? {
+        val boundary =
+            entryLastReadMessageId?.let { timeline.indexOfMessage(it).takeIf { i -> i >= 0 }?.plus(1) }
+                ?: entryFirstUnreadMessageId?.let { timeline.indexOfMessage(it).takeIf { i -> i >= 0 } }
+                // A chat with no boundary was entirely unread on entry.
+                ?: 0.takeIf { entryLastReadMessageId == null && entryFirstUnreadMessageId == null }
+        return boundary ?: timeline.indexOfFirst { it.record.messageIdHex in afterBoundaryIds }.takeIf { it >= 0 }
     }
 
     /** A visited mention is read even when it was found outside the loaded rows. */
@@ -128,6 +138,7 @@ internal class ConversationMentionJumpSeed(
     fun retire() {
         retired = true
         readIds.clear()
+        afterBoundaryIds.clear()
     }
 }
 
@@ -191,23 +202,11 @@ internal suspend fun resolveFirstUnreadMention(
     maxNewerPages: Int = MENTION_RESOLUTION_MAX_NEWER_PAGES,
 ): ConversationMentionSearch {
     val start = readAnchorMessageId ?: firstUnreadMessageId ?: return ConversationMentionSearch.Exhausted
-    val includeStart = readAnchorMessageId == null
     if (timeline().indexOfMessage(start) < 0 && !loadMessage(start)) return ConversationMentionSearch.Unavailable
-    var passedStart = false
+    val scan = NewerMentionScan(start, includeStart = readAnchorMessageId == null, mentionsActiveAccount)
     for (page in 0..maxNewerPages) {
         val rows = timeline()
-        val startIndex = rows.indexOfMessage(start)
-        val candidates =
-            when {
-                startIndex >= 0 -> rows.drop(if (includeStart) startIndex else startIndex + 1)
-                // Paging newer slid the start out of the window; every loaded row is now newer than it.
-                passedStart -> rows
-                else -> return ConversationMentionSearch.Unavailable
-            }
-        passedStart = true
-        candidates.firstOrNull { it.isUnreadMention(mentionsActiveAccount) }?.let {
-            return ConversationMentionSearch.Found(it.record.messageIdHex)
-        }
+        scan.next(rows)?.let { return it }
         if (page == maxNewerPages || !hasMoreAfter()) return ConversationMentionSearch.Exhausted
         val newestBefore = rows.lastOrNull()?.record?.messageIdHex
         if (!loadNewer() && timeline().lastOrNull()?.record?.messageIdHex == newestBefore) {
@@ -215,6 +214,26 @@ internal suspend fun resolveFirstUnreadMention(
         }
     }
     return ConversationMentionSearch.Exhausted
+}
+
+/** Scans successive newer windows from [start]; once paging slides the start out, every loaded row is newer. */
+private class NewerMentionScan(
+    private val start: String,
+    private val includeStart: Boolean,
+    private val mentionsActiveAccount: (TimelineMessage) -> Boolean,
+) {
+    private var passedStart = false
+
+    /** Found for a mention, Unavailable when the start was never loaded, null to keep paging. */
+    fun next(rows: List<TimelineMessage>): ConversationMentionSearch? {
+        val startIndex = rows.indexOfMessage(start)
+        if (startIndex < 0 && !passedStart) return ConversationMentionSearch.Unavailable
+        passedStart = true
+        val candidates = if (startIndex < 0) rows else rows.drop(if (includeStart) startIndex else startIndex + 1)
+        return candidates
+            .firstOrNull { it.isUnreadMention(mentionsActiveAccount) }
+            ?.let { ConversationMentionSearch.Found(it.record.messageIdHex) }
+    }
 }
 
 /** The "@ count" control that visits the oldest unread mention. The badge caps at 99+; the label keeps the count. */

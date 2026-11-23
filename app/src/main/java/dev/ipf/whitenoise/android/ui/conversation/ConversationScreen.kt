@@ -2326,10 +2326,11 @@ internal fun ConversationScreen(
                 )
             }
         if (!isCurrent()) return null
-        if (search is ConversationMentionSearch.Found) return search.messageId
-        if (search == ConversationMentionSearch.Exhausted) mentionSeed.retire()
-        appState.present(R.string.toast_original_message_unavailable)
-        return null
+        if (search !is ConversationMentionSearch.Found) {
+            if (search == ConversationMentionSearch.Exhausted) mentionSeed.retire()
+            appState.present(R.string.toast_original_message_unavailable)
+        }
+        return (search as? ConversationMentionSearch.Found)?.messageId
     }
 
     fun jumpToNextUnreadMention() {
