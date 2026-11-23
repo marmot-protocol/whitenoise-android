@@ -107,7 +107,7 @@ class AtomicAdminInviteTest {
             val fixture = Fixture()
             try {
                 fixture.controller.refreshManagementState()
-                assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(PEER)))
+                assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(OTHER)))
                 assertTrue(fixture.invocations.isEmpty())
                 assertEquals(1, fixture.controller.members.size)
                 assertReconciliationOutcomes(emptyList())
@@ -207,7 +207,7 @@ class AtomicAdminInviteTest {
             try {
                 fixture.controller.refreshManagementState()
                 fixture.revokeOnRecipientResolution = true
-                assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(OTHER)))
+                assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(PEER)))
                 assertTrue(fixture.invocations.isEmpty())
                 assertFalse(fixture.controller.isSelfAdmin)
             } finally {
