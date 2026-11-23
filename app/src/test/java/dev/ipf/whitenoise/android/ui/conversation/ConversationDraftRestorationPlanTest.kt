@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -75,6 +76,75 @@ class ConversationDraftRestorationPlanTest {
         val projected = restore(inputs, stale)
         assertEquals(listOf(freshUri), projected.documents)
         assertEquals(mapOf(freshUri to inputs.preparedDocuments.getValue(freshUri)), projected.inputs.preparedDocuments)
+    }
+
+    /**
+     * A shelf restored from saved state after the process died: a stored video still points at its picker URI, whose
+     * grant is gone, beside a second attachment. The video is relinked to its app-owned copy in place, and the second
+     * attachment keeps its URI.
+     */
+    @Test
+    fun savedStateStoredVideoIsRelinkedInPlaceBesideASecondAttachment() {
+        val video = attachment("video", "video/mp4")
+        val photo = attachment("photo")
+        val pickerUri = Uri.parse("content://picker/video")
+        val inputs = emptyInputs().copy(slots = listOf(PendingMediaSlot(video.id, pickerUri), slot(photo.id)))
+        val plan = planDraftRestoration(inputs, "account", "group", listOf(video, photo), emptySet())
+        assertEquals(listOf(video to pickerUri), matchedStoredEntries(inputs, plan, setOf(video.id)))
+
+        val copy = Uri.parse("content://app/video")
+        val projected = project(inputs, plan, mapOf(video.id to copy))
+
+        assertEquals(listOf(PendingMediaSlot(video.id, copy), slot(photo.id)), projected.media)
+        assertEquals(setOf(video.id, photo.id), projected.inputs.preparedPhotos.keys)
+    }
+
+    /** A saved-state stored document relinked to its copy keeps its place, and its prepared entry moves to the copy. */
+    @Test
+    fun savedStateStoredDocumentIsRelinkedInPlace() {
+        val pickerUri = Uri.parse("content://picker/report")
+        val otherUri = Uri.parse("content://picker/notes")
+        val report = attachment(stagedDocumentAttachmentId("account", "group", pickerUri.toString()), "application/pdf")
+        val notes = attachment(stagedDocumentAttachmentId("account", "group", otherUri.toString()), "application/pdf")
+        val inputs = emptyInputs().copy(documents = listOf(pickerUri, otherUri))
+        val plan = planDraftRestoration(inputs, "account", "group", listOf(report, notes), emptySet())
+        assertEquals(listOf(report to pickerUri), matchedStoredEntries(inputs, plan, setOf(report.id)))
+
+        val copy = Uri.parse("content://app/report")
+        val projected = project(inputs, plan, mapOf(report.id to copy))
+
+        assertEquals(listOf(copy, otherUri), projected.documents)
+        assertEquals(
+            report,
+            projected.inputs.preparedDocuments
+                .getValue(copy)
+                .attachment,
+        )
+        assertFalse(pickerUri in projected.inputs.preparedDocuments)
+    }
+
+    /** A stored pick this composer prepared itself is never offered for relinking. */
+    @Test
+    fun preparedStoredPickIsNotRelinked() {
+        val video = attachment("video", "video/mp4")
+        val inputs =
+            emptyInputs().copy(
+                slots = listOf(slot(video.id)),
+                preparedPhotos = mapOf(video.id to DraftPreparedPhoto(video, "fresh")),
+            )
+        val plan = planDraftRestoration(inputs, "account", "group", listOf(video), emptySet())
+
+        assertTrue(matchedStoredEntries(inputs, plan, setOf(video.id)).isEmpty())
+    }
+
+    /** Projects [plan] over [inputs] with nothing added and [relinked] entries moved to their copies. */
+    private fun project(
+        inputs: DraftRestorationInputs,
+        plan: DraftRestorationPlan,
+        relinked: Map<String, Uri>,
+    ): DraftRestorationProjection {
+        val unavailable = "source unavailable"
+        return projectDraftRestoration(inputs, plan, emptyList(), emptySet(), unavailable, relinked)
     }
 
     /** Plans and projects a restoration where [stale] was removed natively, asserting nothing is reconciled. */

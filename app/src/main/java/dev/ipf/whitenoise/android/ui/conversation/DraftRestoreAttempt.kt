@@ -27,6 +27,9 @@ internal interface DraftPresentation {
         file: File,
         attachment: MessageDraftAttachmentFfi,
     ): Uri?
+
+    /** Whether the shelf can still open [uri]; a picker grant lost with the process is the usual reason it cannot. */
+    fun isReadable(uri: Uri): Boolean
 }
 
 /** The composer's presentation files in the app cache, shared through its FileProvider. */
@@ -41,6 +44,43 @@ internal class ContextDraftPresentation(
         file: File,
         attachment: MessageDraftAttachmentFfi,
     ): Uri? = draftPresentationUri(context, file, attachment)
+
+    /** Opens [uri] for reading once through the content resolver, so a revoked grant or a missing file reads false. */
+    override fun isReadable(uri: Uri): Boolean =
+        runCatching { context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } == true }
+            .getOrDefault(false)
+}
+
+/**
+ * The shelf files one restore made: [added] for draft attachments the shelf did not show, and [relinked], by attachment
+ * id, for shelf entries whose URI could no longer be read.
+ */
+internal data class MaterializedRestoration(
+    val added: List<Pair<MessageDraftAttachmentFfi, Uri>>,
+    val relinked: Map<String, Uri>,
+)
+
+/**
+ * The stored files a restore shows from the native draft on entries the shelf already holds, each with the URI its
+ * entry holds: photo slots and documents matched to the draft rather than prepared by this composer, such as a shelf
+ * restored from saved state after the process died. [storedIds] names the draft's stored files.
+ */
+internal fun matchedStoredEntries(
+    inputs: DraftRestorationInputs,
+    plan: DraftRestorationPlan,
+    storedIds: Set<String>,
+): List<Pair<MessageDraftAttachmentFfi, Uri>> {
+    val slotUris = plan.retainedSlots.associate { it.id to it.uri }
+    val photos =
+        nativePhotosNeedingRestoration(
+            plan.reconciliation.mediaBySlotId,
+            inputs.backedPhotos.keys,
+            inputs.preparedPhotos,
+        ).mapNotNull { (slotId, attachment) -> slotUris[slotId]?.let { attachment to it } }
+    val documents =
+        nativeDocumentsNeedingRestoration(plan.reconciliation.documentsByUriString, inputs.preparedDocuments)
+            .map { (uri, attachment) -> attachment to uri }
+    return (photos + documents).filter { (attachment, _) -> attachment.id in storedIds }
 }
 
 /**
@@ -86,6 +126,25 @@ internal class DraftRestoreAttempt(
             synchronized(this) { created -= file }
         }
         return uri
+    }
+
+    /**
+     * Gives one restore its shelf files: each of [unmatched], which the shelf does not show yet, and each of [matched],
+     * shelf entries with the URI they hold, whose URI can no longer be read, such as a picker grant lost with the
+     * process. Those are relinked to an app-owned copy, so preview and a send that reads the shelf never open the
+     * stale URI.
+     */
+    suspend fun materializeAll(
+        unmatched: List<MessageDraftAttachmentFfi>,
+        matched: List<Pair<MessageDraftAttachmentFfi, Uri>>,
+    ): MaterializedRestoration {
+        val added = unmatched.mapNotNull { attachment -> materialize(attachment)?.let { attachment to it } }
+        val relinked =
+            matched
+                .filterNot { (_, uri) -> presentation.isReadable(uri) }
+                .mapNotNull { (attachment, _) -> materialize(attachment)?.let { attachment.id to it } }
+                .toMap()
+        return MaterializedRestoration(added, relinked)
     }
 
     /** Hands every file this attempt created to the composer, which now shows them. */

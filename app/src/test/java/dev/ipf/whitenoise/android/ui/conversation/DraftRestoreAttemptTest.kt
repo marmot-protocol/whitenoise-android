@@ -212,10 +212,35 @@ class DraftRestoreAttemptTest {
             assertEquals(emptyList<String>(), presentationFiles())
         }
 
+    /**
+     * A shelf entry whose picker URI can no longer be read is relinked to its app-owned copy, while a second entry
+     * whose URI still reads is left alone and copies nothing.
+     */
+    @Test
+    fun unreadableMatchedEntryIsRelinkedAndReadableOneIsKept() =
+        runTest {
+            val native =
+                FileBackedDraftNative("caption").apply {
+                    holdFile("clip", 3uL, byteArrayOf(1, 2, 3))
+                    holdFile("other", 1uL, byteArrayOf(4))
+                }
+            val stale = Uri.parse("content://picker/clip")
+            val live = Uri.parse("content://picker/other")
+            val (attempt, read) = attemptFor(native, unreadable = setOf(stale))
+
+            val matched = listOf(attachment(read, "clip") to stale, attachment(read, "other") to live)
+            val restored = attempt.materializeAll(emptyList(), matched)
+
+            assertEquals(setOf("clip"), restored.relinked.keys)
+            assertEquals(listOf("clip"), presentationFiles())
+            assertArrayEquals(byteArrayOf(1, 2, 3), File(folder.root, "clip").readBytes())
+        }
+
     /** A restore attempt over [native]'s draft writing into the test folder, with the read it restores from. */
     private suspend fun TestScope.attemptFor(
         native: FileBackedDraftNative,
         linkable: Boolean = true,
+        unreadable: Set<Uri> = emptySet(),
     ): RestoreUnderTest {
         val drafts =
             MessageDraftRepository(
@@ -224,7 +249,7 @@ class DraftRestoreAttemptTest {
                 ioDispatcher = UnconfinedTestDispatcher(testScheduler),
             )
         val read = drafts.files.revisioned("acct", "group").getOrThrow()
-        val presentation = FolderPresentation(folder.root, linkable)
+        val presentation = FolderPresentation(folder.root, linkable, unreadable)
         return RestoreUnderTest(DraftRestoreAttempt(presentation, drafts, "acct", read), read)
     }
 
@@ -248,10 +273,14 @@ private data class RestoreUnderTest(
     val read: RevisionedMessageDraft,
 )
 
-/** Names each presentation file after its attachment id in [directory]; [linkable] false gives no URI. */
+/**
+ * Names each presentation file after its attachment id in [directory]; [linkable] false gives no URI, and [unreadable]
+ * names the shelf URIs that can no longer be opened.
+ */
 private class FolderPresentation(
     private val directory: File,
     private val linkable: Boolean,
+    private val unreadable: Set<Uri>,
 ) : DraftPresentation {
     /** The file named after [attachment]'s id. */
     override fun fileFor(attachment: MessageDraftAttachmentFfi): File = File(directory, attachment.id)
@@ -261,4 +290,7 @@ private class FolderPresentation(
         file: File,
         attachment: MessageDraftAttachmentFfi,
     ): Uri? = if (linkable) Uri.fromFile(file) else null
+
+    /** Every URI reads except those named [unreadable]. */
+    override fun isReadable(uri: Uri): Boolean = uri !in unreadable
 }

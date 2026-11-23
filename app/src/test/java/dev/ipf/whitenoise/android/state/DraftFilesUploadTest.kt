@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaFileTransferControlFfi
+import dev.ipf.marmotkit.MediaFileUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageDraftAttachmentInputFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
@@ -18,53 +19,60 @@ import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.media.editor.nativeHandleStub
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Pins how a send of stored draft files uploads from the draft by id and leaves admission to the draft send. */
+/** Pins how a send of stored draft files uploads from the draft by id and admits without overwriting a newer draft. */
 class DraftFilesUploadTest {
-    /** A matching draft saves the caption first, then uploads its stored file by id under that same revision. */
+    /** A draft that says exactly the send uploads its stored file by id, saves nothing and may be consumed. */
     @Test
-    fun matchingDraftUploadsStoredFilesUnderTheCaptionRevision() =
+    fun exactDraftUploadsByIdAndMayBeConsumed() =
         runBlocking {
-            val engine = DraftUploadEngine(draft = content("old caption", stored("clip")))
+            val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
+            val captured = engine.revision
 
             val outcome = engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
 
-            assertEquals(listOf("localSendStatus", "selectedMessageDraft", "save", "upload"), engine.calls)
-            assertEquals(listOf(MessageDraftAttachmentInputFfi.Retained("clip")), engine.savedInputs)
-            assertEquals("new caption", engine.savedContent)
-            assertSame(engine.savedRevision, engine.uploadRevision)
+            assertEquals(listOf("localSendStatus", "selectedMessageDraft", "upload"), engine.calls)
+            assertSame(captured, engine.uploadRevision)
             assertEquals(listOf("clip"), engine.uploadedIds)
-            assertSame(engine.savedRevision, outcome.draftRevision)
+            assertSame(captured, outcome.draftRevision)
             assertNull(outcome.acceptance)
         }
 
-    /** A draft that already carries the caption is uploaded as it stands, with no extra save. */
+    /** Text typed or an attachment added before the upload is left alone, and that draft is never consumed. */
     @Test
-    fun unchangedCaptionUploadsWithoutSaving() =
+    fun newerDraftUploadsTheHeldFilesWithoutSavingOrConsuming() =
         runBlocking {
-            val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
+            for (draft in listOf(
+                content("typed later", stored("clip")),
+                content("new caption", stored("clip"), stored("added")),
+                content("new caption", stored("clip")).copy(replyToMessageIdHex = "a".repeat(64)),
+            )) {
+                val engine = DraftUploadEngine(draft = draft)
 
-            engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
+                val outcome =
+                    engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
 
-            assertEquals(listOf("localSendStatus", "selectedMessageDraft", "upload"), engine.calls)
-            assertSame(engine.selectedRevision, engine.uploadRevision)
+                assertEquals(listOf("clip"), engine.uploadedIds)
+                assertFalse("draft $draft must not be saved", "save" in engine.calls)
+                assertNull("draft $draft must not be consumed", outcome.draftRevision)
+            }
         }
 
-    /** A draft that no longer holds exactly the send's stored files, or replies, fails before anything uploads. */
+    /** A draft that no longer holds the send's stored file, as the same stored file, fails before anything uploads. */
     @Test
-    fun draftThatNoLongerMatchesFailsBeforeUploading() =
+    fun draftWithoutTheStoredFileFailsBeforeUploading() =
         runBlocking {
             for (draft in listOf(
                 null,
                 content("new caption", stored("other")),
-                content("new caption", stored("clip"), stored("extra")),
-                content("new caption", stored("clip")).copy(replyToMessageIdHex = "a".repeat(64)),
                 content("new caption", stored("clip").copy(fileBacked = false)),
                 content("new caption", stored("clip").copy(plaintextSize = 901uL)),
+                content("new caption", stored("clip").copy(mediaType = "image/png")),
             )) {
                 val engine = DraftUploadEngine(draft = draft)
 
@@ -78,80 +86,133 @@ class DraftFilesUploadTest {
             }
         }
 
-    /** A send MDK already owns is recovered as pending without reading the draft or uploading again. */
+    /** A send MDK already owns is recovered without uploading again, and its leftover file leaves the draft. */
     @Test
-    fun recoveredSendNeverUploadsAgain() =
+    fun recoveredSendNeverUploadsAgainAndConsumesItsLeftovers() =
         runBlocking {
-            val engine = DraftUploadEngine(draft = content("new caption", stored("clip")), recovered = true)
+            val engine = DraftUploadEngine(draft = content("typed later", stored("clip")), recovered = true)
 
             val outcome = engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
 
-            assertEquals(listOf("localSendStatus"), engine.calls)
             assertTrue(outcome.recoveredWithoutUpload)
             assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, outcome.acceptance?.acceptDisposition)
+            assertTrue(engine.uploadedIds.isEmpty())
+            assertEquals(content("typed later"), engine.current)
         }
 
-    /** Only a send whose every attachment is a stored draft file, in the draft's order, maps to the draft's ids. */
+    /** Ids map only when the draft holds every attachment as a stored file, whatever else it holds. */
     @Test
-    fun draftIdsRequireEveryAttachmentStoredInOrder() {
-        val draft = content("", stored("a"), stored("b"))
+    fun heldIdsRequireEveryAttachmentStored() {
+        val draft = content("", stored("a"), stored("extra"), stored("b"))
 
-        assertEquals(listOf("a", "b"), draftFileIdsFor(draft, send("a", "b").attachments))
-        assertNull(draftFileIdsFor(draft, send("b", "a").attachments))
-        assertNull(draftFileIdsFor(draft, listOf(storedPick("a"), inlinePick("b"))))
+        assertEquals(listOf("a", "b"), heldDraftFileIds(draft, send("a", "b").attachments))
+        assertEquals(listOf("b", "a"), heldDraftFileIds(draft, send("b", "a").attachments))
+        assertNull(heldDraftFileIds(draft, listOf(storedPick("a"), inlinePick("b"))))
         val inlineUnderStoredId = content("", stored("a"), stored("b").copy(fileBacked = false))
-        assertNull(draftFileIdsFor(inlineUnderStoredId, send("a", "b").attachments))
+        assertNull(heldDraftFileIds(inlineUnderStoredId, send("a", "b").attachments))
     }
 
-    /** Uploaded stored files are admitted under the revision they uploaded from, without reading the draft again. */
+    /** Only these files and nothing else, in order, under the caption and with no reply, make a draft consumable. */
     @Test
-    fun admissionUsesTheUploadRevision() =
+    fun onlyAnExactDraftIsConsumable() {
+        val upload = send("a", "b")
+
+        assertTrue(draftIsExactly(content(" new caption ", stored("a"), stored("b")), upload))
+        assertFalse(draftIsExactly(content("new caption", stored("b"), stored("a")), upload))
+        assertFalse(draftIsExactly(content("new caption", stored("a"), stored("b"), stored("c")), upload))
+        assertFalse(draftIsExactly(content("typed later", stored("a"), stored("b")), upload))
+        assertFalse(draftIsExactly(null, upload))
+    }
+
+    /** An unchanged draft is consumed by the admission itself, with the send's caption and token. */
+    @Test
+    fun unchangedDraftIsConsumedOnAdmission() =
         runBlocking {
             val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
+            val captured = engine.revision
 
-            engine.marmot.sendComposerDraftFiles("acct", "group", emptyList(), send("clip"), admission(engine.uploaded))
+            engine.marmot.sendComposerDraftFiles("acct", "group", emptyList(), send("clip"), admission(captured))
 
-            assertEquals(listOf("localSendStatus", "admit"), engine.calls)
-            assertSame(engine.uploaded, engine.admittedRevision)
+            assertEquals("new caption", engine.admittedCaption)
+            assertSame(captured, engine.admittedConsuming)
+            assertNull(engine.current)
         }
 
-    /** A save after the upload moved the draft: the same stored files are admitted under the draft's new revision. */
+    /**
+     * A slow upload followed by a newer saved draft: the send is admitted with its own caption, the newer text is never
+     * overwritten, and reopening the draft shows that text without the sent file.
+     */
     @Test
-    fun movedDraftWithTheSameFilesIsAdmittedUnderItsNewRevision() =
+    fun newerDraftSavedDuringASlowUploadKeepsItsText() =
         runBlocking {
-            val engine = DraftUploadEngine(draft = content("typed later", stored("clip")), staleRevisions = 1)
+            val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
+            val outcome = engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
+            engine.saveText("typed later")
 
-            engine.marmot.sendComposerDraftFiles("acct", "group", emptyList(), send("clip"), admission(engine.uploaded))
+            val admission = admission(checkNotNull(outcome.draftRevision))
+            engine.marmot.sendComposerDraftFiles("acct", "group", emptyList(), send("clip"), admission)
 
-            assertEquals("new caption", engine.savedContent)
-            assertSame(engine.savedRevision, engine.admittedRevision)
+            assertEquals("new caption", engine.admittedCaption)
+            assertEquals("t", engine.admittedToken)
+            val reopened = engine.marmot.selectedMessageDraft("acct", "group").draft
+            assertEquals(content("typed later"), reopened)
         }
 
-    /** A moved draft that no longer holds exactly the uploaded files keeps the conflict, so a retry uploads again. */
+    /** An attachment added during the upload stays, and the unchanged caption the send carried leaves with its file. */
     @Test
-    fun movedDraftWithOtherFilesKeepsTheConflict() =
+    fun attachmentAddedDuringTheUploadStays() =
         runBlocking {
-            for (draft in listOf(content("", stored("other")), content("", stored("clip").copy(plaintextSize = 1uL)))) {
-                val engine = DraftUploadEngine(draft = draft, staleRevisions = 1)
+            val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
+            val outcome = engine.marmot.uploadComposerDraftFilesWithToken("acct", "group", send("clip"), control(), "t")
+            engine.addAttachment(stored("added"))
 
-                val failure =
-                    runCatching {
-                        engine.marmot.sendComposerDraftFiles(
-                            "acct",
-                            "group",
-                            emptyList(),
-                            send("clip"),
-                            admission(engine.uploaded),
-                        )
-                    }.exceptionOrNull()
+            engine.marmot.sendComposerDraftFiles(
+                "acct",
+                "group",
+                emptyList(),
+                send("clip"),
+                admission(outcome.draftRevision),
+            )
 
-                assertTrue(failure is MarmotKitException.MessageDraftRevisionConflict)
-                assertNull(engine.admittedRevision)
-            }
+            assertEquals(content("", stored("added")), engine.current)
+            assertEquals(
+                listOf(
+                    MessageDraftAttachmentInputFfi.Retained("added"),
+                    MessageDraftAttachmentInputFfi.Removed("clip"),
+                ),
+                engine.savedInputs,
+            )
         }
 
-    /** The admission for files uploaded under [revision] with the send's token. */
-    private fun admission(revision: MessageDraftRevisionFfi) = DraftFilesAdmission(revision, "t")
+    /** A save that wins the race with the leftover cleanup is read again, and the cleanup still keeps its text. */
+    @Test
+    fun leftoverCleanupFollowsARacingSave() =
+        runBlocking {
+            val engine = DraftUploadEngine(draft = content("typed later", stored("clip")))
+            engine.beforeSave = { engine.saveText("typed even later") }
+
+            engine.marmot.consumeSentDraftFiles("acct", "group", send("clip"))
+
+            assertEquals(content("typed even later"), engine.current)
+        }
+
+    /** Owned copies upload as files, upload only, without reading the draft. */
+    @Test
+    fun ownedCopiesUploadAsFilesWithoutTheDraft() =
+        runBlocking {
+            val engine = DraftUploadEngine(draft = null)
+            val request = MediaFileUploadRequestFfi(emptyList(), "new caption", send = false, blossomServer = null)
+
+            val outcome =
+                engine.marmot.uploadOwnedDraftCopiesWithToken("acct", "group", send("clip"), request, control(), "t")
+
+            assertEquals(listOf("localSendStatus", "uploadFiles"), engine.calls)
+            assertSame(request, engine.uploadedRequest)
+            assertNull(outcome.draftRevision)
+        }
+
+    /** The admission for files uploaded from [revision], if any, with the send's token. */
+    private fun admission(revision: MessageDraftRevisionFfi?) = DraftFilesAdmission(revision, "t")
 
     /** A send of stored picks named [ids], with the caption the composer sends. */
     private fun send(vararg ids: String) = DraftFilesUpload(ids.map(::storedPick), "new caption")
@@ -182,36 +243,56 @@ class DraftFilesUploadTest {
             fileBacked = true,
         )
 
-    /** Draft content holding [attachments] under [text]. */
-    private fun content(
-        text: String,
-        vararg attachments: SelectedMessageDraftAttachmentFfi,
-    ) = SelectedMessageDraftContentFfi("group", text, null, attachments.toList(), 1L, 1L)
-
     /** A transfer control that needs no native library. */
     private fun control() = nativeHandleStub(MediaFileTransferControlFfi::class.java)
 }
 
-/** Answers the draft calls a stored-file upload makes and records what it was asked. */
+/** Draft content holding [attachments] under [text]. */
+private fun content(
+    text: String,
+    vararg attachments: SelectedMessageDraftAttachmentFfi,
+) = SelectedMessageDraftContentFfi("group", text, null, attachments.toList(), 1L, 1L)
+
+/**
+ * Answers the draft calls a stored-file send makes like MarmotKit's revisioned draft: each save moves the draft to a
+ * new revision, a save under an older one conflicts, and an admission consumes the draft only while it is unchanged.
+ */
 private class DraftUploadEngine(
     draft: SelectedMessageDraftContentFfi?,
     private val recovered: Boolean = false,
-    private var staleRevisions: Int = 0,
 ) {
-    val selectedRevision: MessageDraftRevisionFfi = nativeHandleStub(MessageDraftRevisionFfi::class.java)
-    val savedRevision: MessageDraftRevisionFfi = nativeHandleStub(MessageDraftRevisionFfi::class.java)
-
-    // The revision a test's earlier upload used.
-    val uploaded: MessageDraftRevisionFfi = nativeHandleStub(MessageDraftRevisionFfi::class.java)
-    var admittedRevision: MessageDraftRevisionFfi? = null
-    private var current = draft
+    var revision: MessageDraftRevisionFfi = newRevision()
+        private set
+    var current = draft
+        private set
     val calls = mutableListOf<String>()
+    var beforeSave: () -> Unit = {}
     var savedInputs: List<MessageDraftAttachmentInputFfi>? = null
-    var savedContent: String? = null
     var uploadRevision: MessageDraftRevisionFfi? = null
     var uploadedIds: List<String> = emptyList()
+    var uploadedRequest: MediaFileUploadRequestFfi? = null
+    var admittedCaption: String? = null
+    var admittedToken: String? = null
+    var admittedConsuming: MessageDraftRevisionFfi? = null
 
     val marmot: MarmotInterface = Engine()
+
+    /** Saves [text] over the draft and keeps its attachments, as the composer's text save does. */
+    fun saveText(text: String) {
+        current = current?.copy(content = text)
+        revision = newRevision()
+    }
+
+    /** Appends [attachment] to the draft, as staging another pick does. */
+    fun addAttachment(attachment: SelectedMessageDraftAttachmentFfi) {
+        current = current?.let { it.copy(mediaAttachments = it.mediaAttachments + attachment) }
+        revision = newRevision()
+    }
+
+    /** Refuses a write under any revision but the current one. */
+    private fun requireCurrent(written: MessageDraftRevisionFfi) {
+        if (written !== revision) throw MarmotKitException.MessageDraftRevisionConflict()
+    }
 
     /** Overrides answer directly, so MarmotKit's exceptions reach the code under test unwrapped. */
     private inner class Engine : MarmotInterface by unexpectedCalls() {
@@ -225,16 +306,16 @@ private class DraftUploadEngine(
             return if (recovered) LocalSendStatusFfi.Completed(summary()) else null
         }
 
-        /** Returns the scripted draft under its first revision. */
+        /** Returns the draft under its current revision. */
         override fun selectedMessageDraft(
             accountRef: String,
             groupIdHex: String,
         ): SelectedMessageDraftFfi {
             calls += "selectedMessageDraft"
-            return SelectedMessageDraftFfi(selectedRevision, current)
+            return SelectedMessageDraftFfi(revision, current)
         }
 
-        /** Records the caption save and moves the draft to its second revision. */
+        /** Applies retained and removed inputs under the current revision and moves the draft on. */
         override fun saveMessageDraftInputsIfRevision(
             accountRef: String,
             revision: MessageDraftRevisionFfi,
@@ -243,13 +324,35 @@ private class DraftUploadEngine(
             mediaAttachments: List<MessageDraftAttachmentInputFfi>,
         ): SelectedMessageDraftFfi {
             calls += "save"
+            beforeSave().also { beforeSave = {} }
+            requireCurrent(revision)
             savedInputs = mediaAttachments
-            savedContent = content
-            current = current?.copy(content = content)
-            return SelectedMessageDraftFfi(savedRevision, current)
+            val removed = mediaAttachments.filterIsInstance<MessageDraftAttachmentInputFfi.Removed>().map { it.id }
+            current =
+                current?.let { draft ->
+                    draft.copy(
+                        content = content,
+                        replyToMessageIdHex = replyToMessageIdHex,
+                        mediaAttachments = draft.mediaAttachments.filterNot { it.id in removed },
+                    )
+                }
+            this@DraftUploadEngine.revision = newRevision()
+            return SelectedMessageDraftFfi(this@DraftUploadEngine.revision, current)
         }
 
-        /** Records the ids and revision an upload names. */
+        /** Clears the draft under the current revision. */
+        override fun clearMessageDraftIfRevision(
+            accountRef: String,
+            revision: MessageDraftRevisionFfi,
+        ): SelectedMessageDraftFfi {
+            calls += "clear"
+            requireCurrent(revision)
+            current = null
+            this@DraftUploadEngine.revision = newRevision()
+            return SelectedMessageDraftFfi(this@DraftUploadEngine.revision, null)
+        }
+
+        /** Records the ids and revision an upload from the draft names. */
         override suspend fun uploadMessageDraftAttachments(
             accountRef: String,
             revision: MessageDraftRevisionFfi,
@@ -263,16 +366,35 @@ private class DraftUploadEngine(
             return MediaUploadResultFfi(emptyList(), null)
         }
 
-        /** Admits the send under [revision], refusing the first [staleRevisions] attempts as a moved draft. */
-        override suspend fun sendMessageDraftWithClientToken(
+        /** Records a file upload request. */
+        override suspend fun uploadMediaFiles(
             accountRef: String,
-            revision: MessageDraftRevisionFfi,
+            groupIdHex: String,
+            request: MediaFileUploadRequestFfi,
+            control: MediaFileTransferControlFfi,
+        ): MediaUploadResultFfi {
+            calls += "uploadFiles"
+            uploadedRequest = request
+            return MediaUploadResultFfi(emptyList(), null)
+        }
+
+        /** Admits the snapshot and consumes the draft only while [consumingDraft] is still its revision. */
+        override suspend fun sendPreparedMediaWithClientToken(
+            accountRef: String,
+            groupIdHex: String,
             attachments: List<MediaAttachmentReferenceFfi>,
+            caption: String?,
             clientToken: String,
+            consumingDraft: MessageDraftRevisionFfi?,
         ): LocalSendAcceptanceFfi {
             calls += "admit"
-            if (staleRevisions-- > 0) throw MarmotKitException.MessageDraftRevisionConflict()
-            admittedRevision = revision
+            admittedCaption = caption
+            admittedToken = clientToken
+            admittedConsuming = consumingDraft
+            if (consumingDraft != null && consumingDraft === revision) {
+                current = null
+                revision = newRevision()
+            }
             return LocalSendAcceptanceFfi(clientToken, "m".repeat(64))
         }
     }
@@ -286,6 +408,9 @@ private class DraftUploadEngine(
             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
         )
 }
+
+/** A fresh draft revision handle that needs no native library. */
+private fun newRevision(): MessageDraftRevisionFfi = nativeHandleStub(MessageDraftRevisionFfi::class.java)
 
 /** Fails any binding call a stored-file upload test did not expect. */
 private fun unexpectedCalls(): MarmotInterface =

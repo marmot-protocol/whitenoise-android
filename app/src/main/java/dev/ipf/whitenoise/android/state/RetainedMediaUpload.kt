@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -27,8 +26,13 @@ internal class RetainedMediaUpload(
 ) {
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null
 
-    // The draft revision a send of stored draft files uploaded under, which its admission must use.
+    // The draft a send of stored draft files may consume on admission: the one it uploaded from, while that draft
+    // said exactly what it sends.
     var draftUploadRevision: MessageDraftRevisionFfi? = null
+
+    // Private copies of this send's stored draft files, by draft id, taken once an upload from the draft failed.
+    private var draftCopies: Map<String, StagedUploadSource> = emptyMap()
+    private var stagedSourcesReleased = false
     var localAcceptance: SendSummaryFfi? = null
     var recoveredWithoutUpload: Boolean = false
     var acceptedPending: Boolean = false
@@ -82,17 +86,40 @@ internal class RetainedMediaUpload(
         transferCancel?.invoke()
     }
 
-    /**
-     * Forgets the uploaded references when [failure] means a retry must upload again: MDK refused them for a stale
-     * epoch (mdk#2891), or the draft this send's stored files uploaded from no longer holds exactly them.
-     */
+    /** Forgets the uploaded references when MDK refused them for a stale epoch (mdk#2891), so a retry uploads again. */
     fun forgetUploadAfter(failure: Throwable) {
-        val draftMoved = isDraftStored && failure is MarmotKitException.MessageDraftRevisionConflict
-        if (isStaleMediaReferenceEpoch(failure) || draftMoved) {
-            uploadedReferences = null
-            draftUploadRevision = null
+        if (isStaleMediaReferenceEpoch(failure)) uploadedReferences = null
+    }
+
+    /** Whether the user's Cancel is waiting to be settled, without consuming it. */
+    val isTransferCancelRequested: Boolean
+        get() = transferCancelRequested
+
+    /** Whether this send owns a private copy of every stored draft file it carries, so retries need no draft. */
+    val ownsDraftCopies: Boolean
+        get() = isDraftStored && attachments.all { it.draftFile == null || it.draftFile.attachmentId in draftCopies }
+
+    /**
+     * Takes ownership of [copies], private copies of this send's stored draft files by draft id, released with the
+     * send's other staged files. Copies arriving after those were released, or while it already owns some, are closed.
+     */
+    fun adoptDraftCopies(
+        copies: Map<String, StagedUploadSource>,
+        closeStaged: (StagedUploadSource) -> Unit = StagedUploadSource::closeQuietly,
+    ) {
+        if (stagedSourcesReleased || draftCopies.isNotEmpty()) {
+            copies.values.forEach(closeStaged)
+        } else {
+            draftCopies = copies
         }
     }
+
+    /** The send's attachments, each stored draft file replaced by the private copy this send owns of it. */
+    fun ownedUploadAttachments(): List<PendingAttachment> =
+        attachments.map { attachment ->
+            val copy = attachment.draftFile?.let { draftCopies[it.attachmentId] }
+            if (copy == null) attachment else attachment.copy(sourceFile = copy, draftFile = null)
+        }
 
     /** Whether the user cancelled this send; reading it clears the request. */
     fun consumeTransferCancelRequest(): Boolean {
@@ -106,7 +133,11 @@ internal class RetainedMediaUpload(
      * publish-only retry never reads them again, so they need not wait for the whole send to settle.
      */
     fun releaseStagedSources(closeStaged: (StagedUploadSource) -> Unit) {
+        stagedSourcesReleased = true
         attachments.forEach { attachment -> attachment.sourceFile?.let(closeStaged) }
+        val copies = draftCopies.values
+        draftCopies = emptyMap()
+        copies.forEach(closeStaged)
     }
 
     /** Android intake resources share the queue's existing removal/discard/eviction lifetime. */

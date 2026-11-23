@@ -116,9 +116,10 @@ internal suspend fun ConversationController.uploadFileBackedRetained(
 }
 
 /**
- * Uploads a send of files the composer's draft stores from the draft's own copies, under the same commit lock,
- * cancellation check, acceptance record, progress and retry capture as a file upload. Nothing is read from the pick
- * again; the draft send that follows admits the references with this send's token.
+ * Uploads a send of files the composer's draft stores, under the same commit lock, cancellation check, acceptance
+ * record, progress and retry capture as a file upload. The first attempt reads the draft's own copies, so nothing is
+ * read from the pick again. When it fails, the send copies its files out of the draft so a Retry needs nothing the
+ * draft still holds, and later attempts upload those copies. The draft send that follows admits the references.
  */
 private suspend fun ConversationController.uploadDraftStoredRetained(
     account: String,
@@ -126,19 +127,30 @@ private suspend fun ConversationController.uploadDraftStoredRetained(
     tempId: String,
     retained: RetainedMediaUpload,
     startedAtMs: Long,
-): MediaUploadResultFfi =
-    appState
+): MediaUploadResultFfi {
+    if (retained.ownsDraftCopies) return uploadOwnedDraftCopies(account, key, tempId, retained, startedAtMs)
+    val upload = DraftFilesUpload(retained.attachments, retained.caption)
+    return appState
         .withGroupCommitLock(account, group.groupIdHex) {
             requireOptimisticSendNotCancelled(key)
             val outcome =
-                withNativeTransferControl(
-                    retained::attachTransferCancel,
-                    onProgress = retained::reportTransferProgress,
-                ) { control ->
-                    appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
-                        val upload = DraftFilesUpload(retained.attachments, retained.caption)
-                        uploadComposerDraftFilesWithToken(account, group.groupIdHex, upload, control, tempId)
+                try {
+                    withNativeTransferControl(
+                        retained::attachTransferCancel,
+                        onProgress = retained::reportTransferProgress,
+                    ) { control ->
+                        appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                            uploadComposerDraftFilesWithToken(account, group.groupIdHex, upload, control, tempId)
+                        }
                     }
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") failure: Throwable,
+                ) {
+                    // Copied under the lock, before another send of this chat can clear the draft.
+                    if (failure !is CancellationException && !retained.isTransferCancelRequested) {
+                        keepDraftFiles(account, retained)
+                    }
+                    throw failure
                 }
             // A send MDK already owns is recorded under the lock, as the file-backed path does.
             outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
@@ -147,6 +159,66 @@ private suspend fun ConversationController.uploadDraftStoredRetained(
             retained.draftUploadRevision = outcome.draftRevision
             outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)
         }.upload
+}
+
+/** Gives a send whose upload from the draft failed private copies of its stored files; a failed copy keeps none. */
+private suspend fun ConversationController.keepDraftFiles(
+    account: String,
+    retained: RetainedMediaUpload,
+) {
+    val directory = uploadSourcesDirectory(appState.appContext.cacheDir)
+    // A copy that cannot even start must not replace the upload failure the bubble reports.
+    val copies =
+        runCatching {
+            appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                copyDraftFiles(account, group.groupIdHex, retained.attachments, directory)
+            }
+        }.getOrNull() ?: return
+    retained.adoptDraftCopies(copies, appState::closeStagedUploadSourceOffMain)
+}
+
+/**
+ * Uploads the private copies a failed send of stored draft files owns, as a file upload under the same lock, cancel,
+ * progress and retry capture. The upload revision it may consume is the one its first attempt captured.
+ */
+private suspend fun ConversationController.uploadOwnedDraftCopies(
+    account: String,
+    key: String,
+    tempId: String,
+    retained: RetainedMediaUpload,
+    startedAtMs: Long,
+): MediaUploadResultFfi {
+    val batchCiphertextBytes =
+        checkNotNull(withContext(Dispatchers.IO) { fileBatchCiphertextBytes() }) {
+            "file-backed upload limits unavailable"
+        }
+    val upload = DraftFilesUpload(retained.attachments, retained.caption)
+    val stagingDirectory = uploadSourcesDirectory(appState.appContext.cacheDir)
+    return withFileUploadRequest(
+        retained.ownedUploadAttachments(),
+        retained.caption,
+        stagingDirectory,
+        batchCiphertextBytes,
+    ) { request ->
+        appState
+            .withGroupCommitLock(account, group.groupIdHex) {
+                requireOptimisticSendNotCancelled(key)
+                val outcome =
+                    withNativeTransferControl(
+                        retained::attachTransferCancel,
+                        onProgress = retained::reportTransferProgress,
+                    ) { control ->
+                        appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                            uploadOwnedDraftCopiesWithToken(account, group.groupIdHex, upload, request, control, tempId)
+                        }
+                    }
+                outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
+                outcome
+            }.also { outcome ->
+                outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)
+            }.upload
+    }
+}
 
 /** Retires host cancellation when a failed admission may already have published. */
 private fun ConversationController.recordSendAdmissionFailure(

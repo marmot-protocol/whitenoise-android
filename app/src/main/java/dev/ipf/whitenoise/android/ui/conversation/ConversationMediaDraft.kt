@@ -493,12 +493,9 @@ internal class ConversationMediaDraftState(
             val drafts = appState.messageDraftRepository
             val attempt = DraftRestoreAttempt(ContextDraftPresentation(context), drafts, accountRef, read)
             try {
+                val matched = matchedStoredEntries(restorationInputs(), plan, read.fileBacked.keys)
                 val materialized =
-                    withContext(Dispatchers.IO) {
-                        plan.reconciliation.unmatched.mapNotNull { attachment ->
-                            attempt.materialize(attachment)?.let { attachment to it }
-                        }
-                    }
+                    withContext(Dispatchers.IO) { attempt.materializeAll(plan.reconciliation.unmatched, matched) }
                 if (
                     !restorationIsCurrent(
                         version,
@@ -519,9 +516,10 @@ internal class ConversationMediaDraftState(
                     projectDraftRestoration(
                         restorationInputs(),
                         plan,
-                        materialized,
+                        materialized.added,
                         removedDraftAttachmentIds(accountRef),
                         messages.sourceUnavailable,
+                        materialized.relinked,
                     )
                 preparedPhotos = projection.inputs.preparedPhotos.withStoredSizes(read)
                 preparedDocuments = projection.inputs.preparedDocuments.withStoredSizes(read)

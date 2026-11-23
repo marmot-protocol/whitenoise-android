@@ -176,15 +176,38 @@ internal fun planDraftRestoration(
 }
 
 /**
- * Applies [plan] to [inputs], adding materialized native attachments and labelling restored photos with
- * [sourceUnavailable], to produce the visible shelf.
+ * The plan's retained slots, each whose matched attachment [relinked] names showing its app-owned copy instead, and
+ * the old shelf URI of each matched document [relinked] moves, mapped to the copy it shows.
  */
+private fun relinkedShelf(
+    plan: DraftRestorationPlan,
+    relinked: Map<String, Uri>,
+): Pair<List<PendingMediaSlot>, Map<Uri, Uri>> {
+    val slots =
+        plan.retainedSlots.map { slot ->
+            val fresh = plan.reconciliation.mediaBySlotId[slot.id]?.let { relinked[it.id] }
+            if (fresh == null) slot else slot.copy(uri = fresh)
+        }
+    val documents =
+        plan.reconciliation.documentsByUriString.entries
+            .mapNotNull { (uri, attachment) -> relinked[attachment.id]?.let { Uri.parse(uri) to it } }
+            .toMap()
+    return slots to documents
+}
+
+/**
+ * Applies [plan] to [inputs], adding materialized native attachments and labelling restored photos with
+ * [sourceUnavailable], to produce the visible shelf. Each shelf entry whose attachment id [relinked] names shows the
+ * app-owned copy it gives instead of its old URI, in the same place on the shelf.
+ */
+@Suppress("LongParameterList") // One projection of the plan and everything the restore materialized for it.
 internal fun projectDraftRestoration(
     inputs: DraftRestorationInputs,
     plan: DraftRestorationPlan,
     materialized: List<Pair<MessageDraftAttachmentFfi, Uri>>,
     removedAttachmentIds: Set<String>,
     sourceUnavailable: String,
+    relinked: Map<String, Uri> = emptyMap(),
 ): DraftRestorationProjection {
     val restoredPhotos =
         nativePhotosNeedingRestoration(
@@ -203,8 +226,10 @@ internal fun projectDraftRestoration(
     restoredPhotos.forEach { (slotId, attachment) ->
         if (attachment.mediaType.startsWith("image/", ignoreCase = true)) descriptions += slotId to sourceUnavailable
     }
-    val media = plan.retainedSlots.toMutableList()
-    val documentUris = plan.retainedDocuments.toMutableList()
+    val (relinkedSlots, relinkedDocuments) = relinkedShelf(plan, relinked)
+    documents = documents.mapKeys { (uri, _) -> relinkedDocuments[uri] ?: uri }
+    val media = relinkedSlots.toMutableList()
+    val documentUris = plan.retainedDocuments.map { relinkedDocuments[it] ?: it }.toMutableList()
     materialized.forEach { (attachment, uri) ->
         if (attachment.id in removedAttachmentIds) return@forEach
         val prepared = attachment.asRestoredPhoto()
