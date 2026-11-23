@@ -54,7 +54,12 @@ internal fun GestureSettingsContent(
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     SettingsScaffold(title = stringResource(R.string.gestures_title), onBack = onBack) {
         SettingsList {
-            item(key = "search.GestureSettings.1") { SettingsSection(stringResource(R.string.gestures_messages)) }
+            item(key = "search.GestureSettings.1") {
+                SettingsSection(
+                    title = stringResource(R.string.gestures_messages),
+                    explanation = stringResource(R.string.gestures_physical_hint),
+                )
+            }
             item(key = "search.GestureSettings.2") {
                 SettingsGroup(destination = SettingsDetail.Gestures, surface = "message-gestures") {
                     for (binding in listOf(SwipeBinding.MessageLeft, SwipeBinding.MessageRight)) {
@@ -82,7 +87,12 @@ internal fun GestureSettingsContent(
                     }
                 }
             }
-            item(key = "search.GestureSettings.3") { SettingsSection(stringResource(R.string.chats)) }
+            item(key = "search.GestureSettings.3") {
+                SettingsSection(
+                    title = stringResource(R.string.chats),
+                    explanation = stringResource(R.string.gestures_physical_hint),
+                )
+            }
             item(key = "search.GestureSettings.4") {
                 SettingsGroup {
                     for (binding in listOf(SwipeBinding.ChatLeft, SwipeBinding.ChatRight)) {
@@ -124,9 +134,6 @@ internal fun GestureSettingsContent(
                         )
                     }
                 }
-            }
-            item(key = "search.GestureSettings.6") {
-                SettingsCallout(text = stringResource(R.string.gestures_physical_hint))
             }
             item(key = "search.GestureSettings.7") {
                 SettingsGroup {

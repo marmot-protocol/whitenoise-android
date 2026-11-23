@@ -4,7 +4,7 @@ Open **Settings** from the main screen. Its rows sit in three unlabeled groups. 
 
 ## Settings layout
 
-Your profile and avatar appear at the top, with **Edit profile picture** and **Open Share & Connect**. The same group holds **Account** and **Add Profile**, which becomes **Switch Profile** once you have two or more profiles. The other settings follow in groups, then **Sign Out** and the app version. Search is the **Search settings** icon in the toolbar.
+Your profile and avatar appear at the top, with **Edit profile picture** and **Open Share & Connect**. The same group holds **Account** and **Add Profile**, which becomes **Switch Profile** once you have two or more profiles. The other settings follow in groups, then **Sign Out** and the app version. Search is the **Search settings** icon in the toolbar. Touch and hold a supported row or section heading for details about what the setting does.
 
 ### Search settings
 
@@ -78,7 +78,7 @@ This screen controls where your profile publishes information and receives invit
 
 ### Chat header shortcuts
 
-**Chat header shortcuts** adds buttons beside the chat name at the top of every chat. None are on at first. Check any of **Search in chat**, **Mute / unmute**, **Read messages aloud**, **Disappearing messages**, **Members** and **Add Members**. The header shows as many as fit beside the chat name, in the order you check them.
+**Chat header shortcuts** adds buttons beside the chat name at the top of every chat. None are on at first. Check any of **Search in chat**, **Mute / unmute**, **Read messages aloud**, **Disappearing messages**, **Members** and **Add Members**. The header shows as many as fit beside the chat name, in the order you check them. Touch and hold a shortcut row to read how it works.
 
 A button appears only in chats where it applies. **Members** shows in groups, **Disappearing messages** and **Add Members** show where you're allowed to change them, and **Read messages aloud** needs a speech engine on the device. Muting asks for how long, while unmuting applies right away. The choice applies to this device only.
 
