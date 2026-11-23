@@ -41,17 +41,6 @@ import kotlinx.coroutines.withContext
 // could evict an attachment during its own insert and make retries impossible.
 internal const val MEDIA_ALBUM_MAX_TOTAL_BYTES = ConversationController.MEDIA_RETAINED_MAX_BYTES
 
-internal val DocumentReadFailure.messageResource: Int
-    get() =
-        when (this) {
-            DocumentReadFailure.TOO_LARGE -> R.string.media_file_too_large
-            DocumentReadFailure.UNREADABLE -> R.string.media_file_unreadable
-            DocumentReadFailure.EMPTY -> R.string.media_file_empty
-            DocumentReadFailure.UNPROCESSABLE_IMAGE -> R.string.toast_couldnt_decode_image
-            DocumentReadFailure.STORAGE -> R.string.share_import_storage
-            DocumentReadFailure.VIDEO_METADATA -> R.string.media_file_video_metadata_not_removable
-        }
-
 /**
  * Media read/transform/send operations owned by a conversation.
  *
