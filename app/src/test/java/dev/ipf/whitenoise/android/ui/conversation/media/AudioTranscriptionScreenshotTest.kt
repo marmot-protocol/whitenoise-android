@@ -134,6 +134,16 @@ class AudioTranscriptionScreenshotTest {
         composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG).assertIsDisplayed().assertIsOff()
     }
 
+    @Test
+    fun automaticTranscriptionStartsOnAndCanBeHidden() {
+        val toggle = AudioTranscriptionToggleState(automatic = true)
+        composeRule.setContent { WhiteNoiseTheme { AudioTranscriptionToggle(toggle) } }
+        composeRule.runOnIdle { toggle.register(Any(), ready = true, working = false) }
+        val disc = composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG)
+        disc.assertIsOn().performClick()
+        disc.assertIsOff()
+    }
+
     /** Records three actual inline transcript toggles without adding fixture-only motion. */
     @Test
     @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")

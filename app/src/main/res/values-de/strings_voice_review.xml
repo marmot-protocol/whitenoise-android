@@ -13,4 +13,5 @@
     <string name="voice_row_unsent">Nicht gesendete Sprachnachricht</string>
     <string name="voice_recording_paused">Sprachaufnahme pausiert</string>
     <string name="voice_send_on_release">Sprachnachrichten beim Loslassen senden</string>
+    <string name="voice_transcribe_automatically">Empfangene Sprachnachrichten automatisch transkribieren</string>
 </resources>

@@ -13,4 +13,5 @@
     <string name="voice_row_unsent">Неотправленное голосовое сообщение</string>
     <string name="voice_recording_paused">Запись голосового сообщения приостановлена</string>
     <string name="voice_send_on_release">Отправлять голосовое сообщение при отпускании кнопки записи</string>
+    <string name="voice_transcribe_automatically">Автоматически расшифровывать полученные голосовые сообщения</string>
 </resources>

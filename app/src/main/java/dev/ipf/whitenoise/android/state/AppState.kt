@@ -1503,6 +1503,8 @@ class WhiteNoiseAppState private constructor(
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
 
+    internal val voiceNotePreferences = VoiceNotePreferences(preferences)
+
     internal val composerToolbarPreference by lazy {
         ComposerToolbarPreference(preferences, mutationsScope, hostPreferenceCommitMutex)
     }

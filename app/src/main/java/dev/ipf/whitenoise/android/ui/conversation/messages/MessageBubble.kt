@@ -561,9 +561,10 @@ internal fun MessageBubble(
         if (mine) {
             null
         } else {
-            remember(record.messageIdHex) {
+            val automatic = appState.voiceNotePreferences.transcribeAutomatically
+            remember(record.messageIdHex, automatic) {
                 dev.ipf.whitenoise.android.ui.conversation.media
-                    .AudioTranscriptionToggleState()
+                    .AudioTranscriptionToggleState(automatic)
             }
         }
     val translationSource =

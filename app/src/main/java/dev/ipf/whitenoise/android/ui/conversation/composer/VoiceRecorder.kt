@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -109,12 +108,7 @@ internal fun MicHoldButton(
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull { it.id == down.id }
-                                    if (change == null) {
-                                        // Parent stole the pointer — cancel rather than orphan the recorder.
-                                        controller.cancel()
-                                        terminated = true
-                                        break
-                                    }
+                                    if (change == null || (!change.pressed && change.isConsumed)) break
                                     change.consume()
                                     displacement += change.position - change.previousPosition
                                     val deltaX = displacement.x
@@ -139,7 +133,7 @@ internal fun MicHoldButton(
                                     } else if (canceled && towardCancel <= cancelThresholdPx) {
                                         canceled = false
                                     }
-                                    if (change.changedToUp() || !change.pressed) {
+                                    if (!change.pressed) {
                                         val duration = change.uptimeMillis - down.uptimeMillis
                                         val heldLongEnough = duration >= viewConfiguration.longPressTimeoutMillis
                                         when {

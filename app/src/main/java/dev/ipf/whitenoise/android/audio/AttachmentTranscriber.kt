@@ -22,6 +22,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -47,6 +49,8 @@ private const val PIPE_STALL_TIMEOUT_MS = 10_000L
 private const val PIPE_POLL_MS = 20L
 private const val PIPE_WRITE_BYTES = 16_384
 
+private val attachmentRecognition = Mutex()
+
 // OSTT 0.21.0 documents caller-audio ingestion through EOF without microphone endpointing.
 private const val MIN_FILE_AUDIO_VERSION = 58L
 
@@ -54,18 +58,19 @@ private const val MIN_FILE_AUDIO_VERSION = 58L
 internal suspend fun transcribeAttachment(
     context: Context,
     file: File,
-): String {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        throw AttachmentSpeechException(AttachmentSpeechFailure.ANDROID_VERSION)
-    }
-    return withTimeoutOrNull(RECOGNITION_TIMEOUT_MS) {
-        val service = withContext(Dispatchers.IO) { findAttachmentService(context) }
-        // The whole lifetime, including finally after cancellation, belongs to the main looper.
-        withContext(Dispatchers.Main.immediate) {
-            recognizeAttachment(context.applicationContext, service, file)
+): String =
+    attachmentRecognition.withLock {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            throw AttachmentSpeechException(AttachmentSpeechFailure.ANDROID_VERSION)
         }
-    } ?: throw AttachmentSpeechException(AttachmentSpeechFailure.TIMEOUT)
-}
+        withTimeoutOrNull(RECOGNITION_TIMEOUT_MS) {
+            val service = withContext(Dispatchers.IO) { findAttachmentService(context) }
+            // The whole lifetime, including finally after cancellation, belongs to the main looper.
+            withContext(Dispatchers.Main.immediate) {
+                recognizeAttachment(context.applicationContext, service, file)
+            }
+        } ?: throw AttachmentSpeechException(AttachmentSpeechFailure.TIMEOUT)
+    }
 
 @Suppress("ThrowsCount") // Distinguish missing, outdated and unusable providers before decoding.
 private fun findAttachmentService(context: Context): ComponentName {

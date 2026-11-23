@@ -37,7 +37,7 @@ internal fun WhiteNoiseAppState.createVoiceNoteSessionOwner(): VoiceNoteSessionO
                 onRecordingStarted = hooks.onRecordingStarted,
                 onRecordingComplete = hooks.onRecordingComplete,
                 afterHeldRelease = {
-                    hooks.onReleasedRecordingComplete.takeIf { composerToolbarPreference.value.sendHeldVoiceOnRelease }
+                    hooks.onReleasedRecordingComplete.takeIf { voiceNotePreferences.sendHeldOnRelease }
                 },
                 onError = hooks.onError,
                 // Read at record-start so a media-quality change applies to the next clip.

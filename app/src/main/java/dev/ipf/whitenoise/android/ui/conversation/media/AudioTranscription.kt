@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.settings.openOfflineSpeechToTextListing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import java.io.File
 import kotlin.coroutines.coroutineContext
@@ -73,8 +74,10 @@ private data class AudioTranscriptSlot(
  * ready and whether work is in flight; the disc shows when any recording is registered and drives them all.
  */
 @Stable
-internal class AudioTranscriptionToggleState {
-    var requested by mutableStateOf(false)
+internal class AudioTranscriptionToggleState(
+    val automatic: Boolean = false,
+) {
+    var requested by mutableStateOf(automatic)
     private val slots = mutableStateMapOf<Any, AudioTranscriptSlot>()
 
     val present: Boolean get() = slots.isNotEmpty()
@@ -125,13 +128,18 @@ internal fun ReceivedAudioTranscription(
         }
     }
 
-    DisposableEffect(lifecycle, file) {
+    DisposableEffect(lifecycle, file, toggle) {
+        var stopped = false
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_STOP) {
+                    stopped = true
                     request?.cancel()
                     ui = null
                     toggle.requested = false
+                } else if (event == Lifecycle.Event.ON_START && stopped) {
+                    stopped = false
+                    toggle.requested = toggle.automatic
                 }
             }
         lifecycle.addObserver(observer)
@@ -142,10 +150,9 @@ internal fun ReceivedAudioTranscription(
     }
 
     LaunchedEffect(working, file) {
-        if (!working || file == null || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            return@LaunchedEffect
-        }
+        if (!working || file == null) return@LaunchedEffect
         request = coroutineContext.job
+        lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.STARTED) }
         val result = loadAudioTranscript(context, file)
         coroutineContext.ensureActive()
         ui = result

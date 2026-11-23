@@ -54,7 +54,6 @@ internal data class ComposerToolbarSettings(
     val rightShortcuts: Set<ComposerShortcut> = defaultRightComposerShortcuts,
     /** Off hides the voice launcher everywhere while remembering its placement. */
     val voiceEnabled: Boolean = true,
-    val sendHeldVoiceOnRelease: Boolean = false,
 ) {
     /** Retains the saved overflow position; runtime hides More when its menu would be empty. */
     fun normalized(): ComposerToolbarSettings {
@@ -161,7 +160,6 @@ internal data class ComposerToolbarSettings(
             .put("layout", layout.id)
             .put("rightShortcuts", JSONArray(rightShortcuts.map { it.id }))
             .put("voiceEnabled", voiceEnabled)
-            .put("sendHeldVoiceOnRelease", sendHeldVoiceOnRelease)
             .toString()
 
     /** Records saved before the jump shortcuts existed keep their choices and gain the default jump placement. */
@@ -206,8 +204,7 @@ internal data class ComposerToolbarSettings(
                     }
                 // An unpinned voice launcher from any version now shares Send's slot.
                 val voiceEnabled = record.opt("voiceEnabled")?.let { it as Boolean } ?: true
-                val sendHeldVoiceOnRelease = record.optBoolean("sendHeldVoiceOnRelease", false)
-                val decoded = ComposerToolbarSettings(shortcuts, layout, right, voiceEnabled, sendHeldVoiceOnRelease)
+                val decoded = ComposerToolbarSettings(shortcuts, layout, right, voiceEnabled)
                 (if (version < FIRST_RECORD_WITH_DRAFT_JUMPS) decoded.withDefaultDraftJumps() else decoded).normalized()
             }.getOrElse { ComposerToolbarSettings() }
         }

@@ -13,4 +13,5 @@
     <string name="voice_row_unsent">Messaggio vocale non inviato</string>
     <string name="voice_recording_paused">Registrazione vocale in pausa</string>
     <string name="voice_send_on_release">Invia il messaggio vocale al rilascio dopo una pressione prolungata</string>
+    <string name="voice_transcribe_automatically">Trascrivi automaticamente i messaggi vocali ricevuti</string>
 </resources>
