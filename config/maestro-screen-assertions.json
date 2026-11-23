@@ -7105,7 +7105,7 @@
         {
           "case": "settings-help-support",
           "selector": {
-            "text": "Search documentation"
+            "id": "documentation.search.open"
           },
           "scope": "Help hub navigation to the first visible control.",
           "opened_by": {

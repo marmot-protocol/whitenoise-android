@@ -22,6 +22,15 @@
           "SET-043",
           "SET-044"
         ]
+      },
+      {
+        "surface": "SettingsSearchAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchContent.kt",
+        "anchor": "fun SettingsSearchAction(",
+        "test_ids": [
+          "SET-042",
+          "SET-044"
+        ]
       }
     ],
     "settings_controls": [
@@ -64,6 +73,14 @@
         "test_ids": [
           "SET-042",
           "SET-044"
+        ]
+      },
+      {
+        "surface": "R.string.user_documentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchContent.kt",
+        "anchor": "R.string.user_documentation",
+        "test_ids": [
+          "SET-069"
         ]
       }
     ]

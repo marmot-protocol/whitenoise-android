@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -20,6 +21,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.nativePushCapabilityForContext
 import dev.ipf.whitenoise.android.ui.settings.AccountScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatsScreen
+import dev.ipf.whitenoise.android.ui.settings.DocumentationScreen
 import dev.ipf.whitenoise.android.ui.settings.HelpSupportScreen
 import dev.ipf.whitenoise.android.ui.settings.NotificationDeliveryScreen
 import dev.ipf.whitenoise.android.ui.settings.NotificationSoundsScreen
@@ -81,6 +83,12 @@ class SettingsHubScreenshotTest {
     @Test
     fun helpSupportRtlLargeFont() = capture("settings_help_support_rtl_large_font", false, rtl = true) { HelpSupportScreen(it, {}, {}) }
 
+    @Test
+    fun documentationTopicsUseOutlinedButtons() =
+        capture("documentation_topics_amoled", true, amoled = true, waitForText = "Account access") {
+            DocumentationScreen(it, {}, {})
+        }
+
     @Test fun soundsLight() = capture("notification_sounds_light", false) { NotificationSoundsScreen(it, {}) }
 
     @Test fun soundsDark() = capture("notification_sounds_dark", true) { NotificationSoundsScreen(it, {}) }
@@ -122,6 +130,7 @@ class SettingsHubScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
         pushAvailable: Boolean = false,
+        waitForText: String? = null,
         content: @Composable (WhiteNoiseAppState) -> Unit,
     ) {
         val appState =
@@ -143,6 +152,9 @@ class SettingsHubScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) { content(appState) }
             }
+        }
+        if (waitForText != null) {
+            composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText(waitForText).fetchSemanticsNodes().isNotEmpty() }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }

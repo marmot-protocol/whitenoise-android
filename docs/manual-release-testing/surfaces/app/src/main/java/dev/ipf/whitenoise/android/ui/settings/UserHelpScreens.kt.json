@@ -34,6 +34,14 @@
         "test_ids": [
           "SET-069"
         ]
+      },
+      {
+        "surface": "UserGuideButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "fun UserGuideButton(",
+        "test_ids": [
+          "SET-069"
+        ]
       }
     ],
     "source_coverage": [

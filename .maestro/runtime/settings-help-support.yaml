@@ -18,7 +18,14 @@ name: settings-help-support
 - tapOn: "Next"
 - assertVisible: "Share your profile"
 - tapOn: "View all topics"
+- assertVisible:
+    id: "documentation.search.open"
+- tapOn:
+    id: "documentation.search.open"
 - assertVisible: "Search documentation"
+- tapOn: "Back"
+- assertVisible:
+    id: "documentation.search.open"
 - tapOn: "Back"
 - assertVisible:
     id: "settings.help_support.group"

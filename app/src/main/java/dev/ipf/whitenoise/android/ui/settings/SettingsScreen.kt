@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -57,9 +56,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
-import dev.ipf.whitenoise.android.ui.common.SearchCollapse
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
@@ -133,6 +130,7 @@ internal fun SettingsScreen(
     ) { mutableStateOf(false) }
     val catalog = remember { settingsSearchCatalog() }
     val searchOrigin = catalog.firstOrNull { it.id == searchOriginId }
+    var searchGuideId by rememberSaveable(searchOwner) { mutableStateOf<String?>(null) }
     val eligibility = settingsSearchEligibility(appState)
     val searchConfiguration = LocalConfiguration.current
     val searchDocuments =
@@ -144,6 +142,7 @@ internal fun SettingsScreen(
             searchOpen = false
             searchQuery = ""
             searchOriginId = null
+            searchGuideId = null
         }
     }
     // The profile photo on the home header opens Profile directly, so back returns home instead of Account.
@@ -152,13 +151,15 @@ internal fun SettingsScreen(
         if (target == SettingsDetail.Profile && profileFromHeader) null else settingsDetailParent(target)
     }
     val changeDetail: (SettingsDetail?) -> Unit = { destination ->
-        if (searchOrigin != null &&
-            detail == searchOrigin.destination &&
+        if (detail != null &&
+            detail == (searchOrigin?.destination ?: SettingsDetail.Documentation.takeIf { searchGuideId != null }) &&
             destination == detail?.let(parentOf)
         ) {
             searchOriginId = null
+            searchGuideId = null
             onDetailChange(null)
         } else {
+            if (destination != SettingsDetail.Documentation) searchGuideId = null
             if (destination == null) searchOriginId = null
             onDetailChange(destination)
         }
@@ -215,6 +216,14 @@ internal fun SettingsScreen(
                         }
                     },
                     searchResultList = searchResultList,
+                    onGuideSelection = { guide ->
+                        if (searchOwner == listOf<Any?>(appState.activeAccountRef, appState.runtimeGeneration) &&
+                            guide.matches(searchQuery)
+                        ) {
+                            searchGuideId = guide.id
+                            onDetailChange(SettingsDetail.Documentation)
+                        }
+                    },
                     onSearchSelection = { entry ->
                         val currentDocument =
                             prepareSettingsSearch(
@@ -246,6 +255,7 @@ internal fun SettingsScreen(
                 SettingsDetailRoute(
                     appState = appState,
                     detail = route,
+                    guideId = searchGuideId,
                     onOpenSupportChat = onOpenSupportChat,
                     onOpenDiagnostics = onOpenDiagnostics,
                     onDetailChange = { target ->
@@ -271,6 +281,7 @@ internal fun SettingsScreen(
 private fun SettingsDetailRoute(
     appState: WhiteNoiseAppState,
     detail: SettingsDetail,
+    guideId: String?,
     onOpenSupportChat: (ChatListItem) -> Unit,
     onOpenDiagnostics: () -> Unit,
     onDetailChange: (SettingsDetail?) -> Unit,
@@ -365,7 +376,7 @@ private fun SettingsDetailRoute(
         SettingsDetail.Gestures -> GestureSettingsScreen(appState, onBack = onBack)
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = onBack)
         SettingsDetail.LearnWhiteNoise, SettingsDetail.Documentation, SettingsDetail.Help ->
-            UserHelpRoute(detail, appState, onBack, onDetailChange)
+            UserHelpRoute(detail, appState, onBack, onDetailChange, guideId)
         SettingsDetail.BugReport -> BugReportScreen(onBack = onBack)
         SettingsDetail.About ->
             AboutScreen(
@@ -415,6 +426,7 @@ private fun SettingsHomeScreen(
     searchResultList: LazyListState,
     suppressSearchMotion: Boolean,
     onSearchSelection: (SettingsSearchEntry) -> Unit,
+    onGuideSelection: (UserGuide) -> Unit,
     onOpenProfilePictureActions: () -> Unit,
     viewport: SettingsHomeViewport,
     onViewportChange: (SettingsHomeViewport) -> Unit,
@@ -473,6 +485,12 @@ private fun SettingsHomeScreen(
             if (canActivateSettingsSearchResult(appState, entry, eligibility.pushAvailable)) {
                 keyboard?.hide()
                 onSearchSelection(entry)
+            }
+        },
+        onGuideSelection = { guide ->
+            if (!appState.signOutInProgress && !appState.appLock.screenVisible && !appState.wipeInProgress) {
+                keyboard?.hide()
+                onGuideSelection(guide)
             }
         },
         state =
@@ -593,6 +611,7 @@ internal fun SettingsHomeContent(
     searchResultList: LazyListState = rememberLazyListState(),
     searchAnimationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
     onSearchSelection: (SettingsSearchEntry) -> Unit = {},
+    onGuideSelection: (UserGuide) -> Unit = {},
     onAddProfileMeasured: (androidx.compose.ui.geometry.Rect?, SettingsContour?) -> Unit = { _, _ -> },
 ) {
     val currentOnViewportChange by rememberUpdatedState(onViewportChange)
@@ -621,14 +640,21 @@ internal fun SettingsHomeContent(
     SettingsScaffold(
         title = stringResource(R.string.settings),
         onBack = { if (searchOpen) onSearchOpenChange(false) else onBack() },
-        titleContent = settingsHomeSearchTitle(searchOpen, searchQuery, onSearchQueryChange, searchCollapse),
+        titleContent = settingsSearchTitle(searchOpen, searchQuery, onSearchQueryChange, searchCollapse),
         topBarModifier = Modifier.searchCollapseHost(searchCollapse),
-        topBarActions = { SettingsHomeSearchAction(searchOpen) { onSearchOpenChange(true) } },
+        topBarActions = { SettingsSearchAction(searchOpen) { onSearchOpenChange(true) } },
         modifier = Modifier.testTag(SETTINGS_HOME_CONTENT_TAG),
         prominentTitle = true,
     ) {
         if (searchOpen && searchQuery.isNotBlank()) {
-            SettingsSearchResults(searchResults, searchResultList, onSearchSelection, searchAnimationsEnabled)
+            SettingsSearchResults(
+                searchResults,
+                searchResultList,
+                onSearchSelection,
+                searchAnimationsEnabled,
+                searchQuery,
+                onGuideSelection,
+            )
         } else {
             SettingsList(state = listState) {
                 state.sections.forEach { section ->
@@ -663,36 +689,6 @@ internal fun SettingsHomeContent(
                     }
                 }
             }
-        }
-    }
-}
-
-/** Build only the existing title slot; the Settings toolbar continues owning its layout. */
-private fun settingsHomeSearchTitle(
-    searchOpen: Boolean,
-    query: String,
-    onQueryChange: (String) -> Unit,
-    searchCollapse: SearchCollapse,
-): (@Composable () -> Unit)? =
-    if (searchOpen) {
-        {
-            CompositionLocalProvider(LocalSearchCollapse provides searchCollapse) {
-                SettingsSearchField(query, onQueryChange)
-            }
-        }
-    } else {
-        null
-    }
-
-@Composable
-@Suppress("FunctionNaming")
-private fun SettingsHomeSearchAction(
-    searchOpen: Boolean,
-    onOpen: () -> Unit,
-) {
-    if (!searchOpen) {
-        IconButton(onClick = onOpen, modifier = Modifier.testTag("settings.search.open")) {
-            Icon(painterResource(R.drawable.ic_search), contentDescription = stringResource(R.string.settings_search))
         }
     }
 }

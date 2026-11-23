@@ -15,7 +15,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,7 +35,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
+import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,12 +52,13 @@ internal fun UserHelpRoute(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onDetailChange: (SettingsDetail) -> Unit,
+    guideId: String?,
 ) {
     when (detail) {
         SettingsDetail.LearnWhiteNoise ->
             LearnWhiteNoiseScreen(onBack, { onDetailChange(SettingsDetail.Documentation) })
         SettingsDetail.Documentation ->
-            DocumentationScreen(appState, onBack, { onDetailChange(SettingsDetail.ShareConnect) })
+            DocumentationScreen(appState, onBack, { onDetailChange(SettingsDetail.ShareConnect) }, guideId)
         SettingsDetail.Help ->
             HelpScreen(
                 onBack = onBack,
@@ -69,7 +72,7 @@ internal fun UserHelpRoute(
 private const val GUIDE_DIRECTORY = "user-guides"
 private const val DOCS_URL = "https://www.whitenoise.chat/docs/"
 
-private data class UserGuide(
+internal data class UserGuide(
     val id: String,
     val title: String,
     val body: String,
@@ -88,17 +91,13 @@ private fun AssetManager.readUserGuides(): List<UserGuide> =
             )
         }.sortedBy { it.title }
 
-@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+internal fun UserGuide.matches(query: String): Boolean =
+    query.trim().takeIf(String::isNotEmpty)?.let { title.contains(it, true) || body.contains(it, true) } == true
+
 @Composable
-internal fun DocumentationScreen(
-    appState: WhiteNoiseAppState,
-    onBack: () -> Unit,
-    onOpenShare: () -> Unit,
-) {
+internal fun rememberUserGuides(): List<UserGuide>? {
     val assets = LocalContext.current.assets
-    var guides by remember { mutableStateOf<List<UserGuide>?>(null) }
-    var query by rememberSaveable { mutableStateOf("") }
-    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var guides by remember(assets) { mutableStateOf<List<UserGuide>?>(null) }
     LaunchedEffect(assets) {
         guides =
             withContext(Dispatchers.IO) {
@@ -109,12 +108,61 @@ internal fun DocumentationScreen(
                 }
             }
     }
-    val selected = guides?.firstOrNull { it.id == selectedId }
-    val back: () -> Unit = {
-        if (selectedId == null) onBack() else selectedId = null
+    return guides
+}
+
+@Suppress("FunctionNaming")
+@Composable
+internal fun UserGuideButton(
+    guide: UserGuide,
+    onClick: () -> Unit,
+) {
+    WhiteNoiseOutlinedButton(onClick, Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Text(guide.title)
     }
-    BackHandler(enabled = selectedId != null, onBack = back)
-    SettingsScaffold(title = selected?.title ?: stringResource(R.string.user_documentation), onBack = back) {
+}
+
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+@Composable
+internal fun DocumentationScreen(
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+    onOpenShare: () -> Unit,
+    guideId: String? = null,
+) {
+    val guides = rememberUserGuides()
+    var query by rememberSaveable { mutableStateOf("") }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var selectedId by rememberSaveable(guideId) { mutableStateOf(guideId) }
+    val selected = guides?.firstOrNull { it.id == selectedId }
+    val showingSearch = searchOpen && selectedId == null
+    val searchCollapse = rememberSearchCollapse(showingSearch)
+    val back: () -> Unit = {
+        when {
+            guideId != null -> onBack()
+            selectedId != null -> selectedId = null
+            searchOpen -> {
+                searchOpen = false
+                query = ""
+            }
+            else -> onBack()
+        }
+    }
+    BackHandler(enabled = showingSearch || selectedId != null, onBack = back)
+    val searchLabel = R.string.search_documentation
+    SettingsScaffold(
+        title = selected?.title ?: stringResource(R.string.user_documentation),
+        onBack = back,
+        titleContent = settingsSearchTitle(showingSearch, query, { query = it.take(SETTINGS_SEARCH_MAX_QUERY) }, searchCollapse, searchLabel),
+        topBarModifier = Modifier.searchCollapseHost(searchCollapse),
+        topBarActions = {
+            if (selectedId == null) {
+                SettingsSearchAction(showingSearch, searchLabel, "documentation.search.open") {
+                    searchOpen = true
+                }
+            }
+        },
+    ) {
         if (selected != null) {
             GuideArticle(appState, selected, onOpenShare) { url ->
                 val linkedId =
@@ -129,18 +177,8 @@ internal fun DocumentationScreen(
                 target != null
             }
         } else {
-            val term = query.trim()
-            val results = guides?.filter { it.title.contains(term, true) || it.body.contains(term, true) }
+            val results = guides?.let { loaded -> if (query.isBlank()) loaded else loaded.filter { it.matches(query) } }
             SettingsList {
-                item {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        label = { Text(stringResource(R.string.search_documentation)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    )
-                }
                 if (results == null) {
                     item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 } else if (results.isEmpty()) {
@@ -160,12 +198,7 @@ internal fun DocumentationScreen(
                 } else {
                     items(results.size, key = { results[it].id }) { index ->
                         val guide = results[index]
-                        TextButton(
-                            onClick = { selectedId = guide.id },
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                        ) {
-                            Text(guide.title)
-                        }
+                        UserGuideButton(guide) { selectedId = guide.id }
                     }
                 }
             }

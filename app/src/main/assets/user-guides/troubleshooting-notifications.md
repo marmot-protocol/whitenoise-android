@@ -1,4 +1,4 @@
-# Notifications
+# Troubleshoot notifications
 
 **Outcome:** New messages trigger an alert while White Noise runs in the background.
 
