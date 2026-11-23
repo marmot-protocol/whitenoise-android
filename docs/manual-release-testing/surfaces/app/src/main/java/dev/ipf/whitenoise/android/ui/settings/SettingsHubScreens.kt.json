@@ -232,7 +232,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
         "anchor": "R.string.settings_voice_notes",
         "test_ids": [
-          "MED-058",
+          "MED-062",
           "MED-038"
         ]
       }

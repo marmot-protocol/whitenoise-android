@@ -73,10 +73,10 @@ class SettingsHubScreenshotTest {
     fun voiceLanguageRtlLargeFont() = capture("settings_voice_language_rtl_large_font", false, rtl = true) { VoiceLanguageScreen(it, {}, {}) }
 
     @Test
-    fun voiceNotesDark() = capture("settings_voice_notes_dark", true) { VoiceNoteSettingsScreen(it.voiceNotePreferences, {}) }
+    fun voiceNotesDark() = capture("settings_voice_notes_dark", true) { VoiceNoteSettingsScreen(it, {}) }
 
     @Test
-    fun voiceNotesRtlLargeFont() = capture("settings_voice_notes_rtl_large_font", false, rtl = true) { VoiceNoteSettingsScreen(it.voiceNotePreferences, {}) }
+    fun voiceNotesRtlLargeFont() = capture("settings_voice_notes_rtl_large_font", false, rtl = true) { VoiceNoteSettingsScreen(it, {}) }
 
     @Test fun helpSupportLight() = capture("settings_help_support_light", false) { HelpSupportScreen(it, {}, {}) }
 

@@ -9,7 +9,7 @@
         "anchor": "fun VoiceNoteSettingsScreen(",
         "test_ids": [
           "MED-038",
-          "MED-058"
+          "MED-062"
         ]
       }
     ],
@@ -19,7 +19,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
         "anchor": "R.string.voice_send_on_release",
         "test_ids": [
-          "MED-058"
+          "MED-062"
         ]
       },
       {
@@ -27,7 +27,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
         "anchor": "R.string.voice_transcribe_automatically",
         "test_ids": [
-          "MED-038"
+          "MED-058"
         ]
       },
       {
@@ -36,6 +36,25 @@
         "anchor": "R.string.settings_voice_notes",
         "test_ids": [
           "MED-038",
+          "MED-062"
+        ]
+      },
+      {
+        "surface": "setting:dictation_transcribe_voice_messages_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+        "anchor": "R.string.dictation_transcribe_voice_messages_subtitle",
+        "test_ids": [
+          "MED-058"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_dictation_transcribe_voice_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+        "anchor": "R.string.explanation_appearance_dictation_transcribe_voice_messages",
+        "test_ids": [
+          "SET-054",
           "MED-058"
         ]
       }

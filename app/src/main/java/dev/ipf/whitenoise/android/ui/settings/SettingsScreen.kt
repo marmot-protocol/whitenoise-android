@@ -280,8 +280,7 @@ private fun SettingsDetailRoute(
 ) {
     when (detail) {
         SettingsDetail.ShareConnect -> ShareConnectScreen(appState, onBack = onBack)
-        SettingsDetail.Account ->
-            AccountScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
+        SettingsDetail.Account -> AccountScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
         SettingsDetail.Chats -> ChatsScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
         SettingsDetail.VoiceLanguage ->
             VoiceLanguageScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
@@ -359,8 +358,7 @@ private fun SettingsDetailRoute(
         SettingsDetail.DiagnosticsImprovements -> DiagnosticsImprovementsScreen(appState, onBack = onBack)
         SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = onBack)
         SettingsDetail.Donate -> DonateScreen(onBack = onBack)
-        SettingsDetail.VoiceNotes -> VoiceNoteSettingsScreen(appState.voiceNotePreferences, onBack)
-
+        SettingsDetail.VoiceNotes -> VoiceNoteSettingsScreen(appState, onBack)
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = onBack)
         SettingsDetail.Translation -> TranslationSettingsScreen(onBack = onBack)
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = onBack)

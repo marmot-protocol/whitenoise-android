@@ -379,10 +379,6 @@
         {
           "declaration": "\"result\"",
           "represented_by": "Dictation.result"
-        },
-        {
-          "declaration": "\"transcribe_voice_messages\"",
-          "represented_by": "Dictation.transcribe_voice_messages"
         }
       ]
     },

@@ -1,17 +1,21 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.VoiceNotePreferences
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 @Composable
 @Suppress("FunctionNaming")
 internal fun VoiceNoteSettingsScreen(
-    preferences: VoiceNotePreferences,
+    appState: WhiteNoiseAppState,
     onBack: () -> Unit,
 ) {
+    val preferences = appState.voiceNotePreferences
+    val dictation by appState.conversationDictationPreferences.state.collectAsState()
     SettingsScaffold(title = stringResource(R.string.settings_voice_notes), onBack = onBack) {
         SettingsList {
             item(key = "search.VoiceNotes.1") {
@@ -29,8 +33,11 @@ internal fun VoiceNoteSettingsScreen(
                         SettingsSwitch(
                             context = context,
                             title = stringResource(R.string.voice_transcribe_automatically),
-                            checked = preferences.transcribeAutomatically,
-                            onCheckedChange = preferences::updateTranscribeAutomatically,
+                            subtitle = stringResource(R.string.dictation_transcribe_voice_messages_subtitle),
+                            explanation =
+                                stringResource(R.string.explanation_appearance_dictation_transcribe_voice_messages),
+                            checked = dictation.transcribeVoiceMessages,
+                            onCheckedChange = appState.conversationDictationPreferences::setTranscribeVoiceMessages,
                             leading = { SettingsLeadingIcon(R.drawable.ic_mic) },
                         )
                     }

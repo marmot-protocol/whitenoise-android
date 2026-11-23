@@ -1947,11 +1947,8 @@ internal fun ConversationScreen(
     fun voicePlaybackHosts() {
         ConversationVoiceRecoveryNotice(voiceCapture)
 
-        // Auto-chain voice playback: when one clip ends, play the IMMEDIATE
-        // next message iff it's also a voice attachment. Stops on any
-        // non-voice neighbor (text, image, system) or end-of-timeline. We do
-        // not skip past unrelated messages to find a later voice note — that
-        // would jump the user past content they hadn't consumed.
+        // Continue to the next visible message only if it contains a voice note.
+        // Unrelated messages and the end of the timeline stop playback.
         DisposableEffect(controller, chat.id) {
             val ownerKey = controller.group.groupIdHex
             val unregister =

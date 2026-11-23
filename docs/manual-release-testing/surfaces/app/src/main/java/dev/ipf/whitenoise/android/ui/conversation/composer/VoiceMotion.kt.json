@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceMotion.kt",
         "anchor": "fun VoiceSendingIndicator(",
         "test_ids": [
-          "MED-058",
+          "MED-062",
           "NAV-014"
         ]
       }
