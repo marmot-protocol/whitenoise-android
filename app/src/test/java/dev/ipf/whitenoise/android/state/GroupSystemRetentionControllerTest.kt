@@ -176,7 +176,7 @@ class GroupSystemRetentionControllerTest {
             replyPreview = null,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            thread = null,
             poll = null,
             groupSystem = null,
             hasReports = false,

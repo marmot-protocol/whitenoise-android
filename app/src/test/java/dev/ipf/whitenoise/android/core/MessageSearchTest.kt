@@ -37,6 +37,7 @@ class MessageSearchTest {
         assertEquals(emptyList<Int>(), MessageSearch.matchIndices(bodies, "   "))
     }
 
+    /** Reactions, deletes, group-system events and blank bodies are never searchable. */
     @Test
     fun isSearchableExcludesNonTextKindsAndBlankBodies() {
         // Plain chat with text is searchable.
@@ -52,8 +53,6 @@ class MessageSearchTest {
         assertFalse(MessageSearch.isSearchable(message(kind = 5uL), ""))
         // Group-system (kind 1210) is never searchable.
         assertFalse(MessageSearch.isSearchable(message(kind = 1210uL, plaintext = "{}"), "Alice joined"))
-        // Agent-stream-start (kind 1200) is never searchable.
-        assertFalse(MessageSearch.isSearchable(message(kind = 1200uL, plaintext = "x"), "x"))
         // A caption-less media row resolves to a blank displayed body and so
         // is not searchable — filenames are out of scope for v1.
         assertFalse(MessageSearch.isSearchable(message(kind = 9uL, plaintext = ""), ""))

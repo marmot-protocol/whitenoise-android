@@ -19,7 +19,7 @@
     <string name="explanation_account_setup_remove_relay">Removes this relay from your relay lists in this setup step. You can undo it right after.</string>
     <string name="explanation_developer_key_packages">Shows the key packages published for this account, which let others invite you to groups, and lets you manage them.</string>
     <string name="explanation_developer_quarantined_groups">Lists groups that could not be safely loaded and lets you retry recovery. Nothing is deleted.</string>
-    <string name="explanation_developer_streaming_debug" translatable="false">Shows agent-stream and MLS signaling events inline in conversations. Meant for debugging.</string>
+    <string name="explanation_developer_streaming_debug" translatable="false">Shows MLS signaling and other hidden events inline in conversations. Meant for debugging.</string>
     <string name="explanation_quarantine_refresh">Reloads the list of quarantined groups. It does not retry recovery.</string>
     <string name="explanation_quarantine_retry">Retries the shared engine validation for this group. It does not delete history, bypass checks or rejoin the group.</string>
     <string name="explanation_notifications_push">Uses Google Firebase Cloud Messaging to briefly wake White Noise, which then checks securely for messages. Local notifications keep a connection open instead.</string>

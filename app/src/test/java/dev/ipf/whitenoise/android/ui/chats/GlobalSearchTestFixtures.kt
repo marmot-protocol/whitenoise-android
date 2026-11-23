@@ -217,7 +217,7 @@ internal object GlobalSearchTestFixtures {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         groupSystem = null,
         reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
         edit = null,

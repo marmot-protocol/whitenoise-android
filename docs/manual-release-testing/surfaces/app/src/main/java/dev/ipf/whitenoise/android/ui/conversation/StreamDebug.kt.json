@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/StreamDebug.kt",
+  "legacy_sha256": "0558290ce61f5510b30581edabfc6b831d01d8528b9267238ddb86f092ac28d0",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MessageDebugRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/StreamDebug.kt",
+        "anchor": "fun MessageDebugRow(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -3164,6 +3164,7 @@ class ConversationSendRetryIntegrationTest {
             )
         }
 
+    /** An accepted-pending send settles the projection that arrived before the send returned. */
     @Test
     fun acceptedPendingSendReturnSettlesAProjectionThatArrivedFirst() =
         runTest {
@@ -3184,7 +3185,7 @@ class ConversationSendRetryIntegrationTest {
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
-                        controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                        controller.testApplyLiveTimelineChanges(
                             listOf(
                                 TimelineMessageChangeFfi.Upsert(
                                     trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -3325,6 +3326,7 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(null, sent.record.retentionExpiresAt)
         }
 
+    /** The send-time retention hint survives its projection and a page refresh while MDK's expiry is pending. */
     @Test
     fun retentionHintSurvivesProjectionAndPageRefreshWhileExpiryIsPending() =
         runTest {
@@ -3342,7 +3344,7 @@ class ConversationSendRetryIntegrationTest {
                     initialGroup = group(disappearingMessageSecs = 30uL),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
-                        controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                        controller.testApplyLiveTimelineChanges(
                             listOf(
                                 TimelineMessageChangeFfi.Upsert(
                                     trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -3831,6 +3833,7 @@ class ConversationSendRetryIntegrationTest {
             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
         )
 
+    /** A controller whose publisher projects the send before returning an accepted-pending summary. */
     private fun acceptedPendingConversationController(appState: WhiteNoiseAppState): ConversationController {
         lateinit var controller: ConversationController
         controller =
@@ -3839,7 +3842,7 @@ class ConversationSendRetryIntegrationTest {
                 initialGroup = group(),
                 initialMemberSnapshot = memberSnapshot(),
                 textPublisher = { _, _, _, _ ->
-                    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                    controller.testApplyLiveTimelineChanges(
                         listOf(
                             TimelineMessageChangeFfi.Upsert(
                                 trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -4177,7 +4180,7 @@ class ConversationSendRetryIntegrationTest {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         hasReports = false,
@@ -4244,11 +4247,12 @@ private fun attachedChatsController(
         chatsController.applyChatListRow(row)
     }
 
+/** Delivers [message] to [controller] as a new live message. */
 private fun applyProjection(
     controller: ConversationController,
     message: TimelineMessageRecordFfi,
 ) {
-    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+    controller.testApplyLiveTimelineChanges(
         listOf(
             TimelineMessageChangeFfi.Upsert(
                 trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,

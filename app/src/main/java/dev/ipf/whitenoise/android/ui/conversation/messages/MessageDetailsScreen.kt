@@ -244,7 +244,7 @@ private fun MessageFactsSection(
     val timeLabel =
         when (status) {
             MessageStatus.Sent -> R.string.message_info_sent_at
-            MessageStatus.Received, MessageStatus.Streaming -> R.string.message_info_received_at
+            MessageStatus.Received -> R.string.message_info_received_at
             MessageStatus.Pending, MessageStatus.Failed -> R.string.message_info_created_at
         }
     val primarySeconds = if (!mine && record.receivedAt > 0uL) record.receivedAt else record.recordedAt
@@ -298,7 +298,6 @@ private fun messageStatusLabels(): MessageStatusLabels =
         sent = stringResource(R.string.message_status_sent),
         received = stringResource(R.string.message_status_received),
         failed = stringResource(R.string.message_status_failed),
-        streaming = stringResource(R.string.message_status_streaming),
     )
 
 /** One label / value row of the facts table, with an optional copy action. */

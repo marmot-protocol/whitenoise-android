@@ -10,8 +10,6 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.BuildConfig
-import dev.ipf.whitenoise.android.core.MessageProjector
-import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.ui.conversation.nostr.mayRenderNostrEventCard
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
@@ -57,7 +55,7 @@ internal suspend fun ConversationController.loadNewerPage(origin: PagingOrigin =
 internal suspend fun ConversationController.refreshCurrentTimeline(
     account: String,
     pageLoader: (suspend () -> TimelinePageFfi)? = null,
-): List<String> {
+) {
     val refreshGeneration = timelineWindowGeneration.advance()
     val page =
         pageLoader?.invoke()
@@ -76,14 +74,12 @@ internal suspend fun ConversationController.refreshCurrentTimeline(
                 )
             }
     if (!timelineWindowGeneration.isCurrent(refreshGeneration)) {
-        return emptyList()
+        return
     }
     hasLoadedOlderPages = false
     protectedTimelineMessageIds.clear()
-    return applyTimelinePage(warmLaterPageEventCards(page), replaceWindow = true, updatePagination = true)
+    applyTimelinePage(warmLaterPageEventCards(page), replaceWindow = true, updatePagination = true)
 }
-
-internal fun ConversationController.testActiveStreamIds(): Set<String> = activeStreamIds.toSet()
 
 /** Returns loaded ordinary-message ids eligible for the foreground expiry sweep. */
 internal fun ConversationController.testSweepExpiryIds(): List<String> =
@@ -91,28 +87,12 @@ internal fun ConversationController.testSweepExpiryIds(): List<String> =
         .filter { shouldApplyLocalDisappearingExpiry(it.record) }
         .map { it.record.messageIdHex }
 
-/**
- * Retires a stream whose final record arrived in this window.
- *
- * Marking it removed stops a late `AgentStreamUpdateFfi.Finished` event recreating the
- * optimistic preview as a duplicate. See #25.
- */
-internal fun ConversationController.retireFinishedStream(actionRecord: AppMessageRecordFfi) {
-    if (!MessageProjector.isStreamFinal(actionRecord)) return
-    MessageProjector.streamId(actionRecord)?.let { streamId ->
-        activeStreamIds.remove(streamId)
-        removedStreamIds.add(streamId)
-        optimisticMessages.remove("stream:$streamId")
-    }
-}
-
 /** Drops indexes owned by the previous authoritative bounded window. */
 internal fun ConversationController.trimStateForWindowReplacement() {
     timelineRecords.clear()
     timelineItemsById.clear()
     timelineOrder.clear()
     authoritativeTimelineOrderByMessageId.clear()
-    durableStreamDisplayParentByMessageId.clear()
     projectedMessageIds.clear()
     // Drop stale projected records so messageById doesn't grow unbounded
     // as older pages are loaded; keep in-flight optimistic records so a
@@ -125,9 +105,7 @@ internal fun ConversationController.trimStateForWindowReplacement() {
     // don't accumulate for the controller's lifetime.
     localTimelineOrderOverrides.keys.retainAll(optimisticIds)
     localTimelineTimestampOverrides.keys.retainAll(optimisticIds)
-    preservedTimelinePositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
     optimisticSendPositionPreserves.retainAll(localTimelineTimestampOverrides.keys)
-    durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
 }
 
 /**
@@ -231,37 +209,19 @@ internal fun ConversationController.publishTimelinePageBeforeMarkdownHydration(
 }
 
 /** Applies live timeline changes and invalidates suspended whole-window refreshes. */
-internal fun ConversationController.applyTimelineChanges(changes: List<TimelineMessageChangeFfi>): List<String> {
+internal fun ConversationController.applyTimelineChanges(changes: List<TimelineMessageChangeFfi>) {
     timelineWindowGeneration.advance()
-    val displayedProjectedStreamItemIds =
-        timelineItemsById.keys.filterTo(mutableSetOf()) { it.startsWith("stream:") }
-    val removedIds =
-        changes
-            .filterIsInstance<TimelineMessageChangeFfi.Remove>()
-            .mapTo(mutableSetOf(), TimelineMessageChangeFfi.Remove::messageIdHex)
-    val recordsForStreamPositions =
-        buildList {
-            timelineRecords.values.filterTo(this) { it.messageIdHex !in removedIds }
-            changes.forEach { change ->
-                if (change is TimelineMessageChangeFfi.Upsert) add(change.message)
-            }
-        }.associateBy(TimelineMessageRecordFfi::messageIdHex)
-            .values
-            .toList()
-    val streamIds = mutableListOf<String>()
     val reactionTargets = linkedSetOf<String>()
     changes.forEach { change ->
         when (change) {
             is TimelineMessageChangeFfi.Upsert -> {
                 val record = change.message
                 recordMembershipProjectionArrival(change)
-                val actionRecord =
-                    upsertProjectedRecord(
-                        record,
-                        reconcileOptimistic = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
-                        allowDelayedProjection = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
-                        displayedProjectedStreamItemIds = displayedProjectedStreamItemIds,
-                    )
+                upsertProjectedRecord(
+                    record,
+                    reconcileOptimistic = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                    allowDelayedProjection = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                )
                 if (change.trigger.recomputesReactions()) {
                     reactionTargets.add(record.messageIdHex)
                 }
@@ -271,34 +231,9 @@ internal fun ConversationController.applyTimelineChanges(changes: List<TimelineM
                 if (record.deleted) {
                     deletedMessageIds = deletedMessageIds - record.messageIdHex
                 }
-                if (MessageProjector.isStreamStart(actionRecord)) {
-                    MessageProjector.streamId(actionRecord)?.let { streamId ->
-                        removedStreamIds.remove(streamId)
-                        streamIds.add(streamId)
-                    }
-                }
-                if (MessageProjector.isStreamFinal(actionRecord)) {
-                    MessageProjector.streamId(actionRecord)?.let { streamId ->
-                        activeStreamIds.remove(streamId)
-                        // Mark removed so a late Finished event can't recreate
-                        // the optimistic preview as a duplicate. See #25.
-                        removedStreamIds.add(streamId)
-                        optimisticMessages.remove("stream:$streamId")
-                    }
-                }
             }
             is TimelineMessageChangeFfi.Remove -> {
                 pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds + change.messageIdHex
-                val removed = timelineRecords[change.messageIdHex]
-                removed
-                    ?.let(TimelineProjector::toAppMessageRecord)
-                    ?.takeIf(MessageProjector::isStreamStart)
-                    ?.let(MessageProjector::streamId)
-                    ?.let { streamId ->
-                        removedStreamIds.add(streamId)
-                        activeStreamIds.remove(streamId)
-                        optimisticMessages.remove("stream:$streamId")
-                    }
                 removeProjectedRecord(change.messageIdHex)
                 messageById.remove(change.messageIdHex)
                 reactionTargets.add(change.messageIdHex)
@@ -306,7 +241,6 @@ internal fun ConversationController.applyTimelineChanges(changes: List<TimelineM
             }
         }
     }
-    applyDurableStreamPositions(durableStreamDisplayPositions(recordsForStreamPositions))
     pruneConfirmedOptimisticMessages()
     pruneConfirmedOptimisticReactions()
     recomputeReactions(reactionTargets)
@@ -324,9 +258,6 @@ internal fun ConversationController.applyTimelineChanges(changes: List<TimelineM
     optimisticEdits.retainTimelineWindow()
     pruneMessageOverlaysToWindow()
     publishTimelineFromIndexes()
-    // Don't relaunch a watcher for a stream finalized in this same batch
-    // (start + final records together) — it was just marked removed. See #25.
-    return streamIds.filterNot { it in removedStreamIds }
 }
 
 private suspend fun ConversationController.hydrateTimelineMarkdown(records: List<TimelineMessageRecordFfi>): List<TimelineMessageRecordFfi> {

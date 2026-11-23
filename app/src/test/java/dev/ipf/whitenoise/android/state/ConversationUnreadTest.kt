@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.TimelineThreadRefFfi
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -518,18 +519,6 @@ class ConversationUnreadTest {
     }
 
     @Test
-    fun nextAnchor_streamDebugRowCandidate_keepsCurrentAnchor() {
-        // Synthetic streaming-debug rows carry a non-hex `dbg:stream:` id and
-        // never mark read. Settling on one must not move the read pointer off
-        // the last real message.
-        val debugId = "${ConversationController.STREAM_DEBUG_ID_PREFIX}abc:1:00000000000000000001"
-        val timeline = listOf(received("r1"), message(id = debugId, direction = "debug"))
-        assertEquals("r1", nextReadAnchor(timeline, currentAnchorId = "r1", candidateIndex = 1))
-        // Even with no prior anchor, a debug row can't become the first anchor.
-        assertEquals(null, nextReadAnchor(timeline, currentAnchorId = null, candidateIndex = 1))
-    }
-
-    @Test
     fun nextAnchor_currentAnchorEvicted_resetsToCandidate() {
         val timeline = listOf(received("r2"), received("r3"))
         // "r1" trimmed out of the window -> anchorIdx < 0 -> adopt candidate.
@@ -613,7 +602,25 @@ class ConversationUnreadTest {
         assertEquals(listOf("m1"), unreadReceivedMentionIds(timeline, null, isMention))
     }
 
+    /** A thread message counts as chat to MDK, so its mention raises the chip; a parentless 1111 does not. */
+    @Test
+    fun mentions_includeThreadMessagesButNotParentlessComments() {
+        val thread = threadRow("m1", TimelineThreadRefFfi(rootMessageIdHex = "root", parentMessageIdHex = "parent"))
+        val comment = threadRow("m2", thread = null)
+
+        assertEquals(listOf("m1"), unreadReceivedMentionIds(listOf(thread, comment), null, isMention))
+    }
+
     // ---- helpers ------------------------------------------------------------
+
+    /** A received kind-1111 row MDK projected with [thread] as its place in a NIP-22 thread. */
+    private fun threadRow(
+        id: String,
+        thread: TimelineThreadRefFfi?,
+    ): TimelineMessage {
+        val row = projectedTimelineMessage(message(id, direction = "received", kind = 1111uL).record)
+        return row.copy(projected = row.projected?.copy(thread = thread))
+    }
 
     private fun received(
         id: String,

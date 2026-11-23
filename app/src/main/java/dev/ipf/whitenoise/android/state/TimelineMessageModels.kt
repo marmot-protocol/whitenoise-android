@@ -10,7 +10,6 @@ enum class MessageStatus {
     Pending,
     Sent,
     Failed,
-    Streaming,
 }
 
 enum class OutgoingMessageIndicator {
@@ -32,6 +31,7 @@ fun ChatListMessageDeliveryStateFfi.outgoingIndicator(): OutgoingMessageIndicato
         ChatListMessageDeliveryStateFfi.FAILED -> OutgoingMessageIndicator.Failed
     }
 
+/** The delivery glyph an own bubble in this status shows. */
 fun MessageStatus.outgoingIndicator(): OutgoingMessageIndicator? =
     when (this) {
         MessageStatus.Pending -> OutgoingMessageIndicator.Sending
@@ -39,7 +39,6 @@ fun MessageStatus.outgoingIndicator(): OutgoingMessageIndicator? =
         MessageStatus.Sent,
         -> OutgoingMessageIndicator.Sent
         MessageStatus.Failed -> OutgoingMessageIndicator.Failed
-        MessageStatus.Streaming -> null
     }
 
 // Immutable so MessageBubble's `item` param is stable and bubbles can skip
@@ -54,11 +53,6 @@ data class TimelineMessage(
     val timelineOrder: ULong = 0uL,
     /** Position supplied by MDK's authoritative bounded timeline window. */
     val authoritativeOrder: ULong? = null,
-    /**
-     * Immediate durable stream parent whose rendered row this row must follow.
-     * Null for ordinary authoritative rows and unanchored local overlays.
-     */
-    val displayAfterMessageIdHex: String? = null,
     /**
      * Immutable retention snapshot captured when this local send was accepted.
      * It keeps the waiting timer accurate and supplies the bounded local expiry

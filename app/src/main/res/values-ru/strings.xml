@@ -462,8 +462,6 @@
     <string name="message_actions">Действия с сообщением</string>
     <string name="message_reply_quote_description">В ответ на: %1$s, %2$s</string>
     <string name="message_deleted_preview">Сообщение удалено</string>
-    <string name="agent_stream_started">Поток агента запущен</string>
-    <string name="stream_finished">Поток завершен</string>
     <string name="media_attachment">Медиавложение</string>
     <string name="generic_message">Сообщение</string>
     <string name="giphy_media_preview">GIF через GIPHY</string>
@@ -477,8 +475,6 @@
     <string name="giphy_preview_loading">Загрузка предпросмотра</string>
     <string name="giphy_preview_unavailable">Предпросмотр недоступен</string>
     <string name="giphy_send_result">Отправить GIF: %1$s</string>
-    <string name="waiting_for_stream">Ожидание потока...</string>
-    <string name="stream_failed_format">Ошибка потока: %1$s</string>
     <string name="copy_text">Копировать текст</string>
     <string name="select_text">Выбрать текст</string>
     <string name="open_emoji_picker">Открыть выбор эмодзи</string>
@@ -1159,7 +1155,6 @@
     <string name="message_status_sent">Отправлено</string>
     <string name="message_status_received">Получено</string>
     <string name="message_status_failed">Ошибка</string>
-    <string name="message_status_streaming">Потоковая передача</string>
     <string name="toast_notification_account_unavailable">Этот аккаунт больше недоступен</string>
     <string name="toast_reply_draft_restore_failed">Не удалось восстановить ответ.</string>
     <string name="toast_draft_save_failed">Не удалось сохранить черновик.</string>

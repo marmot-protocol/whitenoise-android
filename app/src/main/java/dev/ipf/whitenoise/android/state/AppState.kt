@@ -1364,7 +1364,7 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Developer-only streaming-debug toggle. When ON, the conversation renders
-     * agent-stream and MLS-signaling kinds as debug rows inline. Stored
+     * MLS-signaling and other non-chat kinds as debug rows inline. Stored
      * independently, but only takes effect through
      * [streamingDebugEnabled], which also requires [developerMode] — turning
      * developer mode off suppresses the debug rows without clearing this value.
