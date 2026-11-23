@@ -227,9 +227,10 @@ private suspend fun WhiteNoiseAppState.showUntilSeen(
 }
 
 /**
- * Records that [toast]'s snackbar ran to the end, so the group-change notice it carries counts as seen. A snackbar a
- * newer toast cancels never gets here, and one that ends after a switch to another profile does not count. Must run on
- * the main thread, before the toast is cleared.
+ * Records that [toast]'s snackbar ran to the end, so the group-change notice it carries counts as seen. The root runs
+ * a group-change snackbar only while the app is on screen and unlocked, and one a newer toast cancels never gets here.
+ * One that ends after a switch to another profile does not count. Must run on the main thread, before the toast is
+ * cleared.
  */
 internal fun WhiteNoiseAppState.noteToastSeen(toast: ToastMessage) {
     toast.groupChangeKey?.takeIf { it.startsWith("$activeAccountRef|") }?.let { seenGroupChangeToasts += it }
