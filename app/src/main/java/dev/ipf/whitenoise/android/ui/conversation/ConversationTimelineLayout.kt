@@ -18,6 +18,9 @@ internal val CONVERSATION_TIMELINE_TAIL_GAP = 8.dp
  */
 internal val CONVERSATION_TIMELINE_ROW_SPACING = 2.dp
 
+/** Adds to the ordinary row interval for a direct transition between bubble authors. */
+internal val CONVERSATION_SENDER_CHANGE_EXTRA_SPACING = 6.dp
+
 internal val CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT =
     Arrangement.spacedBy(CONVERSATION_TIMELINE_ROW_SPACING, Alignment.Bottom)
 

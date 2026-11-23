@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListItemInfo
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -229,6 +231,38 @@ class ConversationTimelineUnderlayTest {
             assertEquals(COVERED_ROW_VALUE, reading.visibleItemsInfo.first().key)
             // The watermark asks a stricter question and must refuse it.
             assertEquals(COVERED_ROW_VALUE - 1, reading.newestReadRow(TIMELINE_LIST_INDICES)?.key)
+        }
+    }
+
+    /** Blank spacing alone cannot advance the read watermark, even for an oversized bubble. */
+    @Test
+    fun aSenderGapIsNotReadableContent() {
+        foreground = 120
+        render()
+        rule.waitForIdle()
+        rule.runOnIdle {
+            val reading = viewport.readingLayoutInfo()
+            val newest = reading.visibleItemsInfo.first()
+            val older = reading.visibleItemsInfo[1]
+            val clearHeight = reading.viewportSize.height
+            val senderGapPx = 6
+            val fixtures = listOf(clearHeight - 2 to 4, clearHeight + 2 to 4, clearHeight + 2 to 7)
+
+            for ((contentHeight, exposedRowHeight) in fixtures) {
+                val row = object : LazyListItemInfo by newest {
+                    override val size = contentHeight + senderGapPx
+                    override val offset = reading.viewportStartOffset - size + exposedRowHeight
+                }
+                val layout = object : LazyListLayoutInfo by reading {
+                    override val visibleItemsInfo = listOf(row, older)
+                }
+                assertEquals(newest.key, layout.newestReadRow(TIMELINE_LIST_INDICES)?.key)
+                val expected = if (exposedRowHeight <= senderGapPx) older.key else newest.key
+                val candidate = layout.newestReadRow(TIMELINE_LIST_INDICES) { key ->
+                    if (key == newest.key) senderGapPx else 0
+                }
+                assertEquals(expected, candidate?.key)
+            }
         }
     }
 

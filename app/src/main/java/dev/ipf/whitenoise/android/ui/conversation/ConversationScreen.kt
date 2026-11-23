@@ -4703,6 +4703,7 @@ internal fun ConversationScreen(
                                                         ).then(membershipFrameModifier),
                                                 item = item,
                                                 reactionViewport = reactionViewport,
+                                                senderGapMeasurements = timelineViewport.senderGapMeasurements,
                                                 // Newest-first rows: the chronologically
                                                 // older neighbour is the next row emitted.
                                                 older = renderedTimelineNewestFirst.getOrNull(index + 1),

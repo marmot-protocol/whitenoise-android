@@ -2,7 +2,13 @@
 
 package dev.ipf.whitenoise.android.translation
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -16,11 +22,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -36,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterIsInstance
 
 /**
  * The message's translation identity for its current text and target, or null when it cannot be translated.
@@ -119,6 +130,7 @@ internal fun MessageTranslationToggle(
 
 /**
  * One gutter switch shared by translation and transcription: a filled disc when on, an outlined disc when off.
+ * The gutter receives taps, while feedback draws inside the centered circular surface.
  * [stateDescription] lets a disc announce in-flight work while staying tappable to cancel it.
  */
 @Composable
@@ -135,10 +147,21 @@ internal fun MessageSideDisc(
     val outline = amoledOutlineBorder()
     val colors = MaterialTheme.colorScheme
     val contentColor = if (on) colors.onPrimary else colors.onSurfaceVariant
+    val interactions = remember { MutableInteractionSource() }
+    val pressAlpha by rememberMessageSideDiscPressAlpha(interactions)
+    val focused by interactions.collectIsFocusedAsState()
+    val hovered by interactions.collectIsHoveredAsState()
     Box(
         modifier =
             modifier
-                .toggleable(value = on, enabled = enabled, role = Role.Switch, onValueChange = onToggle)
+                .toggleable(
+                    value = on,
+                    interactionSource = interactions,
+                    indication = null,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = onToggle,
+                )
                 .semantics {
                     contentDescription = description
                     stateDescription?.let { this.stateDescription = it }
@@ -157,9 +180,47 @@ internal fun MessageSideDisc(
             contentColor = if (enabled) contentColor else contentColor.copy(alpha = DISABLED_ALPHA),
             border = if (on) null else outline ?: BorderStroke(1.dp, colors.outline),
         ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawBehind {
+                        val stateAlpha =
+                            when {
+                                focused -> 0.12f
+                                hovered -> 0.08f
+                                else -> 0f
+                            }
+                        val alpha = maxOf(pressAlpha, stateAlpha)
+                        if (alpha > 0f) drawCircle(contentColor.copy(alpha = alpha))
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                content()
+            }
         }
     }
+}
+
+/** Keeps quick taps visible when the scrollable timeline emits press and release in the same frame. */
+@Composable
+private fun rememberMessageSideDiscPressAlpha(interactions: MutableInteractionSource): State<Float> {
+    val pressAlpha = remember(interactions) { Animatable(0f) }
+    LaunchedEffect(interactions) {
+        interactions.interactions
+            .filterIsInstance<PressInteraction>()
+            .collectLatest { interaction ->
+                when (interaction) {
+                    is PressInteraction.Press -> pressAlpha.snapTo(0.12f)
+                    is PressInteraction.Release -> {
+                        pressAlpha.snapTo(0.12f)
+                        pressAlpha.animateTo(0f, tween(durationMillis = 150))
+                    }
+                    is PressInteraction.Cancel -> pressAlpha.snapTo(0f)
+                    else -> Unit
+                }
+            }
+    }
+    return pressAlpha.asState()
 }
 
 @Composable

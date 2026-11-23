@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -19,11 +20,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isOff
@@ -32,6 +37,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
@@ -74,6 +80,51 @@ class AudioTranscriptionScreenshotTest {
 
     @Test
     fun idleLight() = capture("idle-light", null)
+
+    /** An edge tap in the wide gutter toggles the action, while its press state stays inside the disc. */
+    @Test
+    fun pressedDiscKeepsCircularFeedback() {
+        val requests = mutableListOf<Boolean>()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                LazyColumn {
+                    item {
+                        Surface(Modifier.width(360.dp).testTag(FRAME)) {
+                            IncomingVoiceMessage(null, onToggle = { requests += it })
+                        }
+                    }
+                }
+            }
+        }
+        val disc = composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG)
+        val idle = disc.captureToImage().toPixelMap()
+        val middleX = idle.width / 2
+        val middleY = idle.height / 2
+        composeRule.mainClock.autoAdvance = false
+        disc.performTouchInput { click(Offset(2f, center.y)) }
+        composeRule.mainClock.advanceTimeByFrame()
+        val released = disc.captureToImage().toPixelMap()
+        assertTrue(
+            "a quick edge tap still gives feedback",
+            idle[middleX + 9, middleY] != released[middleX + 9, middleY],
+        )
+        composeRule.mainClock.advanceTimeBy(300)
+        assertEquals(listOf(true), requests)
+        val faded = disc.captureToImage().toPixelMap()
+        assertEquals("feedback fades to idle", idle[middleX + 9, middleY], faded[middleX + 9, middleY])
+
+        disc.performTouchInput { down(Offset(2f, center.y)) }
+        composeRule.mainClock.advanceTimeBy(300)
+        val pressed = disc.captureToImage().toPixelMap()
+        assertTrue("the disc responds to the edge press", idle[middleX + 9, middleY] != pressed[middleX + 9, middleY])
+        assertEquals("the gutter has no state layer", idle[2, middleY], pressed[2, middleY])
+        assertEquals("clipped disc corner", idle[middleX + 10, middleY + 10], pressed[middleX + 10, middleY + 10])
+        assertEquals(listOf(true), requests)
+        composeRule.onNodeWithTag(FRAME).captureRoboImage("src/test/snapshots/audio-transcription-pressed-dark.png")
+        disc.performTouchInput { up() }
+        composeRule.mainClock.advanceTimeBy(300)
+        assertEquals(listOf(true, true), requests)
+    }
 
     @Test
     fun processingDark() = capture("working-dark", AudioTranscriptUi(AudioTranscriptPhase.WORKING), Appearance.DARK)
