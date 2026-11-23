@@ -142,8 +142,7 @@ internal class ConversationMentionJumpSeed(
     }
 }
 
-private fun List<TimelineMessage>.indexOfMessage(messageId: String): Int =
-    indexOfFirst { it.record.messageIdHex == messageId }
+private fun List<TimelineMessage>.indexOfMessage(id: String): Int = indexOfFirst { it.record.messageIdHex == id }
 
 /** The outcome of looking for the oldest unread mention. */
 internal sealed interface ConversationMentionSearch {
