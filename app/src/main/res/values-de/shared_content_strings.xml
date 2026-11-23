@@ -14,4 +14,16 @@
     <string name="shared_content_partial">Noch keine passenden Anhänge geladen</string>
     <string name="shared_content_page_failed">Geteilte Inhalte konnten nicht geladen werden. Erneut versuchen.</string>
     <string name="shared_content_history_end">Ende des lokalen Anhangverlaufs</string>
+    <plurals name="shared_media_photos_selected_count">
+        <item quantity="one">%1$d Foto ausgewählt</item>
+        <item quantity="other">%1$d Fotos ausgewählt</item>
+    </plurals>
+    <string name="shared_media_select_photo">Foto auswählen</string>
+    <string name="shared_media_cancel_selection">Auswahl abbrechen</string>
+    <string name="shared_media_share_selected_photos">Ausgewählte Fotos teilen</string>
+    <string name="shared_media_photo_from">Foto von %1$s</string>
+    <string name="shared_media_video_not_selectable">Video, kann nicht ausgewählt werden</string>
+    <string name="shared_media_share_photos_failed">Fotos konnten nicht geteilt werden</string>
+    <string name="shared_media_share_photos_unavailable">Einige ausgewählte Fotos sind nicht mehr verfügbar, daher wurde nichts geteilt. Ihre Auswahl wurde aufgehoben. Versuche es erneut.</string>
+    <string name="shared_media_share_photos_too_large">Diese Fotos sind zu groß, um sie gemeinsam zu teilen. Wähle weniger aus und versuche es erneut.</string>
 </resources>

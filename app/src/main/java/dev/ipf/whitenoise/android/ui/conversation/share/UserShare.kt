@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileLink
+import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 
@@ -69,7 +70,7 @@ private fun shortNpub(npub: String): String = if (npub.length > 20) "${npub.take
  * [displayName] and [pictureUrl] come from the reader's own resolution of the npub, so a shared
  * contact reads like a person rather than a key. The truncated npub stays on the card whenever a
  * name is shown: a display name is self-asserted and could be anyone's, so it never replaces the
- * identity the recipient would act on.
+ * identity the recipient would act on. [followedAccount] is the same person's key in hex, for the followed badge.
  */
 @Composable
 internal fun UserMessageBubble(
@@ -78,6 +79,7 @@ internal fun UserMessageBubble(
     modifier: Modifier = Modifier,
     displayName: String? = null,
     pictureUrl: String? = null,
+    followedAccount: String? = null,
 ) {
     val shortened = shortNpub(user.npub)
     val resolvedName =
@@ -99,17 +101,19 @@ internal fun UserMessageBubble(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (resolvedName != null || pictureUrl != null) {
-                PersonAvatar(title = title, seed = user.npub, size = 44.dp, pictureUrl = pictureUrl)
+                PersonAvatar(title, user.npub, 44.dp, pictureUrl, followedAccount = followedAccount)
             } else {
                 // An unresolved reference gets a neutral glyph: an initial taken from "npub1"
                 // would read as a name the sender never supplied.
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                    Icon(
-                        painterResource(R.drawable.ic_person),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(10.dp).size(24.dp),
-                    )
+                FollowedPersonAvatarFrame(followedAccount, 44.dp) {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                        Icon(
+                            painterResource(R.drawable.ic_person),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(10.dp).size(24.dp),
+                        )
+                    }
                 }
             }
             Spacer(Modifier.width(12.dp))

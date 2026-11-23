@@ -272,6 +272,7 @@ private fun PollVoterItem(
                 // A blocked voter keeps a monogram, so their picture is never fetched for this list.
                 pictureUrl = if (blocked) null else avatarUrl(id),
                 pictureDomain = AvatarImageLoader.publicProfiles(),
+                followedAccount = id,
             )
         },
         trailingContent =

@@ -397,6 +397,7 @@ class AccountWipeMemberMuteRetentionTest {
                     MediaCacheDirs.ORIGINALS,
                     MediaCacheDirs.DISPLAY_THUMBNAILS,
                     MediaCacheDirs.DOCUMENT_READER,
+                    MediaCacheDirs.NOSTR_VIDEO,
                     MediaCacheDirs.NATIVE_ATTACHMENT_LEASES,
                     MediaCacheDirs.COMPOSER_PASTE,
                     MediaCacheDirs.UPLOAD_SOURCES,

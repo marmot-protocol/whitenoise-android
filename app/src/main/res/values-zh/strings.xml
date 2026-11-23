@@ -99,6 +99,9 @@
         <item quantity="other">%1$d 个筛选条件已启用</item>
     </plurals>
     <string name="chat_list_search_clear_all_filters">全部清除</string>
+    <string name="chat_list_search_recent">最近</string>
+    <string name="chat_list_search_recent_clear">清除</string>
+    <string name="chat_list_search_recent_remove">从最近中移除</string>
     <string name="chat_list_search_filter_chat">聊天</string>
     <string name="chat_list_search_filter_sender">发送者</string>
     <string name="chat_list_search_filter_date">日期</string>

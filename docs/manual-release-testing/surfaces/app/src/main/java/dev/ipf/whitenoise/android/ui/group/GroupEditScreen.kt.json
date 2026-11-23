@@ -18,6 +18,7 @@
         "anchor": "fun GroupEditScreen(",
         "test_ids": [
           "GRP-001",
+          "GRP-002",
           "GRP-025",
           "PRO-010",
           "GRP-034",
@@ -63,15 +64,6 @@
         ]
       },
       {
-        "surface": "string:group_description",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.group_description",
-        "test_ids": [
-          "GRP-001",
-          "GRP-025"
-        ]
-      },
-      {
         "surface": "string:group_image_search_edit",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_image_search_edit",
@@ -84,15 +76,6 @@
         "surface": "string:group_image_search_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_image_search_title",
-        "test_ids": [
-          "GRP-001",
-          "GRP-025"
-        ]
-      },
-      {
-        "surface": "string:group_name",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.group_name",
         "test_ids": [
           "GRP-001",
           "GRP-025"
@@ -172,6 +155,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.save_group",
         "test_ids": [
+          "GRP-002",
           "GRP-001",
           "GRP-025"
         ]

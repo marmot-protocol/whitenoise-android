@@ -48,7 +48,8 @@ private val AvatarPalette =
  * picture whose cached bytes are a GIF animates over its first frame under the shared profile policy; a
  * supplied [picture] animates only when the caller names its stored person-picture [animationKey]. A URL
  * this starts decoding runs in [pictureDomain]'s worker, single-use unless the caller names one, such as
- * [AvatarImageLoader.publicProfiles] for a person's published picture.
+ * [AvatarImageLoader.publicProfiles] for a person's published picture. [followedAccount] names the person this avatar
+ * shows, as public-key hex, so it carries the followed-person badge while the active account follows them.
  */
 @Composable
 internal fun Avatar(
@@ -63,6 +64,7 @@ internal fun Avatar(
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
     initialUrlImage: ImageBitmap? = null,
     onUrlImageDisplayed: ((ImageBitmap?) -> Unit)? = null,
+    followedAccount: String? = null,
 ) {
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
@@ -97,6 +99,34 @@ internal fun Avatar(
     if (onUrlImageDisplayed != null) {
         SideEffect { onUrlImageDisplayed(loadedUrlImage.takeIf { image === loadedUrlImage }) }
     }
+    val animatedKey =
+        if (privateSource) {
+            null
+        } else if (picture == null) {
+            pictureUrl
+        } else {
+            animationKey
+        }
+    if (followedAccount != null) {
+        FollowedPersonAvatarFrame(followedAccount, size) {
+            AvatarCircle(title, size, color, image, animatedKey, groupAnimation)
+        }
+    } else {
+        AvatarCircle(title, size, color, image, animatedKey, groupAnimation)
+    }
+}
+
+/** The clipped picture or monogram; [Avatar] decides which pixels and who they show. */
+@Composable
+@Suppress("FunctionNaming")
+private fun AvatarCircle(
+    title: String,
+    size: Dp,
+    color: Color,
+    image: ImageBitmap?,
+    animatedKey: String?,
+    groupAnimation: GroupAvatarAnimation?,
+) {
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
         contentAlignment = Alignment.Center,
@@ -108,14 +138,6 @@ internal fun Avatar(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            val animatedKey =
-                if (privateSource) {
-                    null
-                } else if (picture == null) {
-                    pictureUrl
-                } else {
-                    animationKey
-                }
             AvatarAnimationLayers(animatedKey, image, groupAnimation, size)
         } else {
             AvatarMonogram(title, size)
@@ -155,8 +177,16 @@ internal fun PersonAvatar(
     seed: String,
     size: Dp,
     pictureUrl: String?,
+    followedAccount: String? = null,
 ) {
-    Avatar(title, seed, size, pictureUrl, pictureDomain = AvatarImageLoader.publicProfiles())
+    Avatar(
+        title,
+        seed,
+        size,
+        pictureUrl,
+        pictureDomain = AvatarImageLoader.publicProfiles(),
+        followedAccount = followedAccount,
+    )
 }
 
 /** Keeps group admission and person-picture intent separate while sharing the avatar's pixels. */

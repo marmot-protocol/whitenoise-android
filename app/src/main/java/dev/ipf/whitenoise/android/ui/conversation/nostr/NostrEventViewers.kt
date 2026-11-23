@@ -1,5 +1,4 @@
 @file:Suppress("FunctionNaming")
-@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
@@ -7,15 +6,12 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,8 +22,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -46,23 +39,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogProperties
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.datasource.okhttp.OkHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.PlayerView
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.WebLinkConfirmation
 import dev.ipf.whitenoise.android.ui.common.AppDivider
@@ -135,7 +114,6 @@ internal fun NostrEventReaderDialog(
             NostrVideoPlayerDialog(
                 mediaUrl = url,
                 origin = bounds,
-                mediaMimeType = card.mediaMimeType.takeIf { url == card.mediaUrl },
                 onDismiss = { playing = null },
             )
         }
@@ -376,163 +354,6 @@ private fun openNostrEvent(
         )
     }
 }
-
-/** Hosts the referenced video in its own window and uses normal dismissal when returning to a playback source. */
-@Composable
-internal fun NostrVideoPlayerDialog(
-    mediaUrl: String,
-    mediaMimeType: String?,
-    onDismiss: () -> Unit,
-    origin: Rect? = null,
-) {
-    var playbackFailed by remember(mediaUrl) { mutableStateOf(false) }
-    val player = rememberNostrVideoPlayer(mediaUrl, mediaMimeType) { playbackFailed = true }
-    MeasuredPlaybackDialog(
-        origin = origin,
-        ownerKey = mediaUrl,
-        onDismissRequest = onDismiss,
-        properties =
-            DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnBackPress = true,
-                dismissOnClickOutside = false,
-                decorFitsSystemWindows = false,
-            ),
-    ) {
-        NostrVideoPlayerSurface(
-            player = player,
-            playbackFailed = playbackFailed,
-            onRetry = {
-                playbackFailed = false
-                player.prepare()
-                player.playWhenReady = true
-            },
-            onDismiss = dismiss,
-        )
-    }
-}
-
-@Composable
-private fun rememberNostrVideoPlayer(
-    mediaUrl: String,
-    mediaMimeType: String?,
-    onPlaybackFailed: () -> Unit,
-): ExoPlayer {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val player =
-        remember(mediaUrl, mediaMimeType) {
-            ExoPlayer
-                .Builder(context)
-                .setMediaSourceFactory(DefaultMediaSourceFactory(OkHttpDataSource.Factory(nostrMediaHttpClient)))
-                .build()
-                .apply {
-                    setAudioAttributes(nostrVideoAudioAttributes, true)
-                    // Unplugging headphones pauses instead of moving the clip to the speaker.
-                    setHandleAudioBecomingNoisy(true)
-                    addListener(
-                        object : Player.Listener {
-                            override fun onPlayerError(error: PlaybackException) = onPlaybackFailed()
-                        },
-                    )
-                    setMediaItem(
-                        MediaItem
-                            .Builder()
-                            .setUri(mediaUrl)
-                            .apply { mediaMimeType?.let(::setMimeType) }
-                            .build(),
-                    )
-                }
-        }
-    DisposableEffect(player) { onDispose { player.release() } }
-    DisposableEffect(lifecycleOwner, player) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_STOP) player.pause()
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    LaunchedEffect(player) {
-        VoicePlaybackController.pause()
-        player.prepare()
-        player.playWhenReady = true
-    }
-    return player
-}
-
-@Composable
-private fun NostrVideoPlayerSurface(
-    player: ExoPlayer,
-    playbackFailed: Boolean,
-    onRetry: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Box(
-        modifier = Modifier.fillMaxSize().nativePageBody().background(Color.Black),
-        contentAlignment = Alignment.Center,
-    ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { viewContext ->
-                PlayerView(viewContext).apply {
-                    this.player = player
-                    useController = true
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                    controllerShowTimeoutMs = VIDEO_CONTROLS_TIMEOUT_MILLIS
-                }
-            },
-            onRelease = { playerView -> playerView.player = null },
-        )
-        if (playbackFailed) NostrVideoPlaybackFailure(onRetry)
-        IconButton(
-            onClick = onDismiss,
-            modifier =
-                Modifier
-                    .align(Alignment.TopStart)
-                    .nativePageHeader()
-                    .statusBarsPadding()
-                    .padding(8.dp),
-        ) {
-            Icon(
-                painterResource(R.drawable.ic_arrow_back),
-                contentDescription = stringResource(R.string.close),
-                tint = Color.White,
-            )
-        }
-    }
-}
-
-@Composable
-private fun NostrVideoPlaybackFailure(onRetry: () -> Unit) {
-    Column(
-        modifier =
-            Modifier
-                .padding(24.dp)
-                .background(Color.Black.copy(alpha = 0.78f), MaterialTheme.shapes.large)
-                .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.nostr_video_playback_failed),
-            color = Color.White,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        TextButton(onClick = onRetry) {
-            Text(stringResource(R.string.retry), color = Color.White)
-        }
-    }
-}
-
-private val nostrVideoAudioAttributes =
-    AudioAttributes
-        .Builder()
-        .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-        .setUsage(C.USAGE_MEDIA)
-        .build()
-
-private const val VIDEO_CONTROLS_TIMEOUT_MILLIS = 2_500
 
 internal const val NOSTR_EVENT_READER_BODY_TAG = "nostr-event-reader-body"
 

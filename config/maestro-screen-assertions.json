@@ -428,6 +428,27 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchRecentStrip.kt",
+      "symbol": "GlobalSearchRecentTile",
+      "bindings": [
+        {
+          "case": "presentation-extra-search-recent-remove",
+          "selector": {
+            "text": "Remove from recent"
+          },
+          "scope": "Recent search row with fixed entries; long press opens the tile menu and Remove dispatches removal of that profile only.",
+          "entry_assertion": {
+            "text": "Remove from recent"
+          },
+          "opened_by": {
+            "longPressOn": {
+              "text": "Fixture Alice"
+            }
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
       "symbol": "ColumnScope.NotificationProfileQuickSheetContent",
       "bindings": [
@@ -1985,7 +2006,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
       "symbol": "NostrVideoPlayerDialog",
       "bindings": [
         {
@@ -1993,7 +2014,7 @@
           "selector": {
             "text": "Couldn’t play this video\\."
           },
-          "scope": "ExoPlayer local missing-file failure and Close; no successful playback claim.",
+          "scope": "Refused non-HTTPS video source failure and Close; no successful playback claim.",
           "entry_assertion": {
             "text": "Couldn’t play this video\\."
           },

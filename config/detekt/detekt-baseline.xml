@@ -164,9 +164,7 @@
     <ID>FunctionNaming:MediaLibrary.kt:@Composable internal fun FileLibraryRow</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable internal fun SharedMediaSection</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable internal fun VoiceLibraryRow</ID>
-    <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun EmptyPlaceholder</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun FileLibraryTab</ID>
-    <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun MediaTileGrid</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun SenderAvatar</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun VoiceLibraryTab</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun UrlLibraryRow</ID>

@@ -98,7 +98,13 @@ internal fun GlobalSearchResultRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
     ) {
-        PersonAvatar(presentation.senderLabel, result.senderIdHex, GlobalSearchResultAvatarSize, presentation.avatarUrl)
+        PersonAvatar(
+            presentation.senderLabel,
+            result.senderIdHex,
+            GlobalSearchResultAvatarSize,
+            presentation.avatarUrl,
+            followedAccount = result.senderIdHex,
+        )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             GlobalSearchResultOrigin(presentation)
             Text(
