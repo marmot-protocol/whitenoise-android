@@ -413,18 +413,10 @@ internal fun ComposerBar(
         Box(modifier.fillMaxWidth().height(with(routeDensity) { lastMeasuredHeight.toDp() }))
         return
     }
-    val conversationEmojiForSend =
-        conversationEmoji.takeIf {
-            draftAccountRef == appState?.activeAccountRef && editingMessageId == null && !hasPendingAttachments
-        }
-    val installedEmoji =
-        rememberInstalledEmojiPicker(
-            appState?.takeIf {
-                draftAccountRef == it.activeAccountRef &&
-                    editingMessageId == null &&
-                    !hasPendingAttachments
-            },
-        )
+    val draftSendsAsActiveAccount = draftAccountRef == appState?.activeAccountRef && editingMessageId == null
+    val emojiSetsActive = draftSendsAsActiveAccount && !hasPendingAttachments
+    val conversationEmojiForSend = conversationEmoji.takeIf { emojiSetsActive }
+    val installedEmoji = rememberInstalledEmojiPicker(appState?.takeIf { emojiSetsActive })
     val actionColors = accountActionColors(appState)
     val configuration = LocalConfiguration.current
     val windowLayout = LocalWindowLayout.current
@@ -567,8 +559,7 @@ internal fun ComposerBar(
     // from that chat's saved draft rather than carrying state across.
     var textFieldValue by textState.valueState
     val text = textFieldValue.text
-    val composerEmojiPainters = rememberComposerEmojiPainters(text)
-    val composerEmojiShortcodes = composerEmojiPainters.keys
+    val composerEmoji = rememberComposerEmoji(text, installedEmoji, conversationEmojiForSend)
     val dictationState = dictationController?.state ?: ConversationDictationState.Idle
     val dictationOwnedByComposer =
         dictationAccountRef != null &&
@@ -969,8 +960,7 @@ internal fun ComposerBar(
     /** Deletes the current selection or previous code point and repairs mention tokens before publishing. */
     fun deleteFromComposer() {
         val proposedValue = deleteComposerSelectionOrPreviousCodePoint(textFieldValue) ?: return
-        val updatedValue =
-            repairComposerMentionEdit(textFieldValue, proposedValue, mentionPickerEnabled, composerEmojiShortcodes)
+        val updatedValue = composerEmoji.repair(textFieldValue, proposedValue, mentionPickerEnabled)
         applyComposerFieldValue(updatedValue)
     }
 
@@ -1682,7 +1672,7 @@ internal fun ComposerBar(
                                 expandedControlLayout,
                             ),
                         textFieldValue = textFieldValue,
-                        emojiPainters = composerEmojiPainters,
+                        emojiPainters = composerEmoji.painters,
                         readAcceptedValue = { textState.valueState.value },
                         composerFocus = composerFocus,
                         emojiPickerOpen = composerEmojiPickerRequested,
@@ -1697,13 +1687,7 @@ internal fun ComposerBar(
                         onValueChange = { value ->
                             finishControlMorph()
                             if (!isRecordingVoice && voiceReviewClip == null) {
-                                val applied =
-                                    repairComposerMentionEdit(
-                                        textFieldValue,
-                                        value,
-                                        mentionPickerEnabled,
-                                        composerEmojiShortcodes,
-                                    )
+                                val applied = composerEmoji.repair(textFieldValue, value, mentionPickerEnabled)
                                 applyComposerFieldValue(applied)
                             }
                         },

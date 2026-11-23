@@ -14,10 +14,13 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.core.MentionComposer
+import dev.ipf.whitenoise.android.ui.ConversationEmojiPicker
 import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.InstalledEmojiPicker
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.composerEmojiArtwork
+import dev.ipf.whitenoise.android.ui.rememberComposerEmojiLibrary
 import dev.ipf.whitenoise.android.ui.rememberEmojiArtPainter
 
 /** Marks the visible slot that draws one shortcode's artwork; the item is the shortcode. */
@@ -123,16 +126,41 @@ internal fun composerVisualText(
     )
 }
 
+/** The composer's drawn emoji: painters for its field and the codes its edit repair keeps whole. */
+internal class ComposerEmoji(
+    val painters: Map<String, Painter>,
+) {
+    /** [repairComposerMentionEdit] that also keeps each drawn emoji whole. */
+    fun repair(
+        old: TextFieldValue,
+        proposed: TextFieldValue,
+        clampMentionSelection: Boolean,
+    ): TextFieldValue = repairComposerMentionEdit(old, proposed, clampMentionSelection, painters.keys)
+}
+
+/** The drawn emoji for [text], resolved with the same installed and chat sets as the picker and suggestions. */
+@Composable
+internal fun rememberComposerEmoji(
+    text: String,
+    installed: InstalledEmojiPicker?,
+    conversation: ConversationEmojiPicker?,
+): ComposerEmoji {
+    val library = rememberComposerEmojiLibrary(installed, conversation)
+    return ComposerEmoji(rememberComposerEmojiPainters(text, library))
+}
+
 /** Rendered shortcodes in [text] whose artwork is ready, with their painters. Codes still loading stay as text. */
 @Composable
-internal fun rememberComposerEmojiPainters(text: String): Map<String, Painter> {
-    val library = LocalCustomEmoji.current
+internal fun rememberComposerEmojiPainters(
+    text: String,
+    library: CustomEmojiSet = LocalCustomEmoji.current,
+): Map<String, Painter> {
     val shortcodes = remember(library) { composerEmojiShortcodes(library) }
     val codes = remember(text, shortcodes) { composerEmojiRanges(text, shortcodes).map { it.item }.distinct() }
     val painters = LinkedHashMap<String, Painter>()
     for (code in codes) {
         key(code) {
-            composerEmojiArtwork(code)?.let { painters[code] = rememberEmojiArtPainter(it) }
+            composerEmojiArtwork(code, library)?.let { painters[code] = rememberEmojiArtPainter(it) }
         }
     }
     return painters

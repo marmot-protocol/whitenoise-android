@@ -83,12 +83,22 @@ internal fun ComposerEmojiLibrary(
     conversation: ConversationEmojiPicker? = null,
     content: @Composable () -> Unit,
 ) {
+    CompositionLocalProvider(
+        LocalCustomEmoji provides rememberComposerEmojiLibrary(installed, conversation),
+        content = content,
+    )
+}
+
+/** The device emoji plus the composer's installed and chat sets, as [ComposerEmojiLibrary] provides them. */
+@Composable
+internal fun rememberComposerEmojiLibrary(
+    installed: InstalledEmojiPicker?,
+    conversation: ConversationEmojiPicker?,
+): CustomEmojiSet {
     val local = LocalCustomEmoji.current
-    val library =
-        remember(local, installed, conversation) {
-            CustomEmojiSet(local.entries, installed ?: local.installed, conversation ?: local.conversation)
-        }
-    CompositionLocalProvider(LocalCustomEmoji provides library, content = content)
+    return remember(local, installed, conversation) {
+        CustomEmojiSet(local.entries, installed ?: local.installed, conversation ?: local.conversation)
+    }
 }
 
 /**
@@ -96,19 +106,22 @@ internal fun ComposerEmojiLibrary(
  * otherwise bundled or device-local files. Null for Unicode and for codes whose artwork has not loaded.
  */
 @Composable
-internal fun composerEmojiArtwork(emoji: String): EmojiArt? {
-    val library = LocalCustomEmoji.current
-    return if (library.usesInstalledArtwork(emoji) || library.usesConversationArtwork(emoji)) {
-        libraryEmojiArtwork(emoji)
+internal fun composerEmojiArtwork(
+    emoji: String,
+    library: CustomEmojiSet = LocalCustomEmoji.current,
+): EmojiArt? =
+    if (library.usesInstalledArtwork(emoji) || library.usesConversationArtwork(emoji)) {
+        libraryEmojiArtwork(emoji, library)
     } else {
         EmojiShortcodes.art(emoji, library, emptyMap())
     }
-}
 
 /** Resolves one visible shortcode without retaining stale pixels when its set or account changes. */
 @Composable
-internal fun libraryEmojiArtwork(shortcode: String): EmojiArt? {
-    val library = LocalCustomEmoji.current
+internal fun libraryEmojiArtwork(
+    shortcode: String,
+    library: CustomEmojiSet = LocalCustomEmoji.current,
+): EmojiArt? {
     val conversation = library.conversation
     if (library.usesConversationArtwork(shortcode) && conversation != null) {
         return key(conversation, shortcode) {
@@ -116,7 +129,7 @@ internal fun libraryEmojiArtwork(shortcode: String): EmojiArt? {
             art
         }
     }
-    val picker = LocalCustomEmoji.current.installed
+    val picker = library.installed
     val entry = picker?.entries?.get(shortcode)
     return if (picker == null || entry == null) {
         null
