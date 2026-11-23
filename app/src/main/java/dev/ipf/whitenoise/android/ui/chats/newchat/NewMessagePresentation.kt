@@ -43,9 +43,11 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.conversation.LocalMeasuredPenDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
@@ -231,7 +233,7 @@ private fun NewMessageActionGroup(
 /** Native interactive row with prototype segmented surfaces and the existing followed state. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("FunctionNaming", "LongParameterList")
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun NewMessagePersonRow(
     person: NewMessagePerson,
     index: Int,
@@ -244,6 +246,8 @@ internal fun NewMessagePersonRow(
     val (personModifier, personClick) = rememberMeasuredControlClick(onClick)
     val (profileModifier, profileClick) = rememberMeasuredControlClick(onLongClick)
     val candidate = person.candidate
+    val titleIsKey = abbreviatesPublicKey(candidate.displayName, candidate.npub)
+    val subtitle = person.subtitle?.takeUnless { titleIsKey && abbreviatesPublicKey(it, candidate.npub) }
     val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
     val followed = if (candidate.isFollowing) stringResource(R.string.user_search_you_follow) else null
     Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
@@ -275,8 +279,14 @@ internal fun NewMessagePersonRow(
                 }
             },
             supportingContent =
-                person.subtitle?.let { subtitle ->
-                    { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                subtitle?.let { label ->
+                    {
+                        if (abbreviatesPublicKey(label, candidate.npub)) {
+                            PublicKeyCopyText(label, candidate.npub, enabled = enabled)
+                        } else {
+                            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
                 },
             trailingContent =
                 if (creating) {
@@ -284,7 +294,13 @@ internal fun NewMessagePersonRow(
                 } else {
                     null
                 },
-            content = { EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            content = {
+                if (titleIsKey) {
+                    PublicKeyCopyText(candidate.displayName, candidate.npub, enabled = enabled)
+                } else {
+                    EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            },
         )
         if (index < count - 1) HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerLow)
     }
