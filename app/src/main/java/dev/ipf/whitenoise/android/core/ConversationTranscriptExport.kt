@@ -155,6 +155,7 @@ object ConversationTranscriptExport {
         return file
     }
 
+    /** The export object for [record], the [index]th event of the transcript. */
     private fun eventJson(
         index: Int,
         record: TimelineMessageRecordFfi,
@@ -172,7 +173,6 @@ object ConversationTranscriptExport {
             .put("received_at", record.receivedAt.jsonNumber())
             .putNullable("reply_to_message_id_hex", record.replyToMessageIdHex)
             .putNullable("media_json", record.mediaJson)
-            .putNullable("agent_text_stream_json", record.agentTextStreamJson)
             .put("reactions", reactionsJson(record.reactions))
             .putNullable("group_system", record.groupSystem?.let(::groupSystemJson))
             .put("deleted", record.deleted)

@@ -5,11 +5,12 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [official 0.18.0 adoption](marmotkit-0.18.0.md) records Android's pin and
-consumer changes. The [official 0.17.0 adoption](marmotkit-0.17.0.md) records the
+The [official 0.19.0 adoption](marmotkit-0.19.0.md) records Android's pin and
+consumer changes. The [official 0.18.0 adoption](marmotkit-0.18.0.md) records the
 populated upgrade baseline.
 
-The [official 0.16.0 adoption](marmotkit-0.16.0.md), the
+The [official 0.17.0 adoption](marmotkit-0.17.0.md), the
+[official 0.16.0 adoption](marmotkit-0.16.0.md), the
 [official 0.15.0 release](marmotkit-0.15.0.md), the
 [November 9 nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261109),
 [8 November nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261108),
@@ -70,9 +71,11 @@ ignores history comparison. The October 22 nightly includes MDK #2513's fixes fo
 [#2381](https://github.com/marmot-protocol/mdk/issues/2381). All seven cases must
 execute: no ignored recovery case can satisfy adoption.
 
-The populated campaign builds current master and the candidate with one disposable
-signer and isolated `.mdkqualification` package. It fails closed if master no
-longer pins the reviewed 0.17.0 source `4df811ae`. Qualification
+The populated campaign builds the last master revision before the adoption
+(`6a59fe30`, set in `scripts/build-mdk-qualification.sh`) and the candidate with one
+disposable signer and isolated `.mdkqualification` package, once with audit sharing
+enabled and once declined. It fails closed unless that revision pins the reviewed
+0.18.0 source `34646a57`. Qualification
 sources must compile against both runtimes: when a MarmotKit type differs, keep the
 candidate's form in the qualification package and the baseline's form under
 `scripts/mdk-baseline-overlay/` as `<File>.kt.txt`, which the staging script copies

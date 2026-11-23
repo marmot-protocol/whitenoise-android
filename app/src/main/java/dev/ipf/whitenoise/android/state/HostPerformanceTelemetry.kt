@@ -1,10 +1,16 @@
 package dev.ipf.whitenoise.android.state
 
+import android.content.SharedPreferences
 import android.os.SystemClock
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val MAX_DEFERRED_HOST_PERFORMANCE_EMITTERS = 128
@@ -408,4 +414,31 @@ internal fun completeHostPreferenceCommit(
         attempt.failure()
         throw throwable
     }
+}
+
+/** Commits one host preference transaction off-main and times actual durable completion. */
+@Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
+internal fun WhiteNoiseAppState.persistHostSetting(
+    preferences: SharedPreferences,
+    commitMutex: Mutex,
+    edit: SharedPreferences.Editor.() -> Unit,
+) {
+    val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
+    val editor =
+        try {
+            preferences.edit().apply(edit)
+        } catch (throwable: Throwable) {
+            attempt.failure()
+            throw throwable
+        }
+    mutationsScope
+        .launch {
+            commitMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    completeHostPreferenceCommit(attempt, editor::commit)
+                }
+            }
+        }.invokeOnCompletion { cause ->
+            if (cause is CancellationException) attempt.cancel()
+        }
 }

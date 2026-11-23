@@ -318,6 +318,7 @@ internal fun SettingsAction(
     opensRoute: Boolean = false,
     leading: (@Composable () -> Unit)?,
     routeKey: Any? = null,
+    supportingContent: (@Composable () -> Unit)? = null,
 ) {
     val (origin, navigate) = rememberSettingsRouteClick(context, routeKey, onClick)
     ListItem(
@@ -335,7 +336,7 @@ internal fun SettingsAction(
                 },
         enabled = enabled,
         leadingContent = settingsLeadingSlot(leading, enabled),
-        supportingContent = subtitle?.let { { SettingsRowSupportingText(it, enabled) } },
+        supportingContent = supportingContent ?: subtitle?.let { { SettingsRowSupportingText(it, enabled) } },
         colors = settingsRowColors(context),
         content = { SettingsRowTitle(title, enabled, destructive) },
     )

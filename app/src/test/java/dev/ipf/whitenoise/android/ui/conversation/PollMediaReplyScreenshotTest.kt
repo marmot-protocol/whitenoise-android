@@ -154,18 +154,19 @@ class PollMediaReplyScreenshotTest : PollMessageTestFixtures() {
     /** The reply preview MDK projects for a reply to [target]. */
     private fun replyPreviewOf(target: TimelineMessage) =
         TimelineReplyPreviewFfi(
-            target.record.messageIdHex,
-            target.record.sender,
-            target.record.plaintext,
-            target.record.contentTokens,
-            target.record.kind,
-            null,
-            null,
-            emptyList(),
-            null,
-            false,
-            DeletionSourceFfi.UNKNOWN,
-            null,
+            messageIdHex = target.record.messageIdHex,
+            replyToMessageIdHex = null,
+            sender = target.record.sender,
+            plaintext = target.record.plaintext,
+            contentTokens = target.record.contentTokens,
+            kind = target.record.kind,
+            sticker = null,
+            mediaJson = null,
+            media = emptyList(),
+            deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
+            invalidationStatus = null,
+            thread = null,
         )
 
     /** Waits for the scripted unavailable files to settle before capturing their reply presentation. */

@@ -191,13 +191,11 @@ internal fun refreshedProfilePresentation(
     rawDisplayName: String?,
 ): ProfilePresentation {
     val refreshedDisplayName =
-        ProfileSanitizer.displayName(
-            if (profile != null) {
-                profile.displayName ?: profile.name
-            } else {
-                rawDisplayName
-            },
-        )
+        if (profile != null) {
+            ProfileSanitizer.displayName(profile.displayName ?: profile.name)
+        } else {
+            mdkFallbackDisplayName(rawDisplayName)
+        }
     return ProfilePresentation(
         displayName =
             if (profile != null) {

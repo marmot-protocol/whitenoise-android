@@ -257,6 +257,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         -> SettingsDetail.Chats
         SettingsDetail.EmojiSets -> SettingsDetail.CustomEmoji
         SettingsDetail.Language,
+        SettingsDetail.VoiceNotes,
         SettingsDetail.TextToSpeech,
         SettingsDetail.Translation,
         SettingsDetail.Dictation,

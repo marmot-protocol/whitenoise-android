@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatListPreviewTextTest {
+    /** Deleted, poll, GIPHY and group-system arms win without evaluating the latest-message fallback. */
     @Test
     fun projectedArmsPreservePrecedenceWithoutEvaluatingFallback() {
         val copy = MessageTextCopy.Default
@@ -22,8 +23,6 @@ class ChatListPreviewTextTest {
             )
         assertEquals(copy.deleted, render(9uL, "hidden", true))
         assertEquals(copy.poll, render(1068uL, "wire"))
-        assertEquals(copy.agentStreamStarted, render(1200uL))
-        assertEquals("stream body", render(1200uL, "stream body"))
         assertEquals(copy.giphyMedia, render(9uL, "https://media.giphy.com/media/abc/giphy.gif\nvia GIPHY"))
         assertEquals(
             dev.ipf.whitenoise.android.core.GroupSystemEvents

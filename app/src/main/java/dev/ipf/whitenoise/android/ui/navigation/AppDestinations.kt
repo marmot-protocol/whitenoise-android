@@ -34,6 +34,7 @@ internal enum class SettingsDetail {
     BlockedUsers,
     AiAgents,
     Donate,
+    VoiceNotes,
     TextToSpeech,
     Translation,
     Dictation,

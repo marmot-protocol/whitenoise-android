@@ -35,12 +35,14 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowNetworkCapabilities
 import org.robolectric.shadows.ShadowNetworkInfo
 
@@ -259,6 +261,44 @@ class SignUpProfileDraftSubmissionTest {
             assertEquals(listOf("Quiet Otter", "Quiet Otter"), publications.map { it.displayName })
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aboutGrowsWhenTextWrapsAndShrinksWhenCleared() {
+        composeRule.setContent {
+            val scope = rememberCoroutineScope()
+            val controller = remember { idleSignUpController(scope) }
+            WhiteNoiseTheme { SignUpScreen(controller, { true }, { "Quiet Otter" }, {}) }
+        }
+        val about = composeRule.onNodeWithTag("onboarding.sign_up.about")
+        val emptyHeight = about.fetchSemanticsNode().size.height
+        val nameHeight =
+            composeRule
+                .onNodeWithTag("onboarding.sign_up.name")
+                .fetchSemanticsNode()
+                .size.height
+        assertEquals(nameHeight.toDouble(), emptyHeight.toDouble(), 2.0)
+
+        val longText = "I like long walks, libraries, and fixing old cameras. ".repeat(3).trimEnd()
+        about.performTextInput(longText)
+        about.assertTextContains(longText)
+        assertTrue(about.fetchSemanticsNode().size.height > emptyHeight)
+
+        val fiveLines = "One\nTwo\nThree\nFour\nFive"
+        about.performTextReplacement(fiveLines)
+        val fiveLineHeight = about.fetchSemanticsNode().size.height
+        val sixLines = "$fiveLines\nSix"
+        about.performTextReplacement(sixLines)
+        val sixLineHeight = about.fetchSemanticsNode().size.height
+        assertTrue(sixLineHeight > fiveLineHeight)
+
+        about.performTextReplacement("$sixLines\nSeven")
+        about.assertTextContains("$sixLines\nSeven")
+        assertEquals(sixLineHeight, about.fetchSemanticsNode().size.height)
+
+        about.performTextReplacement("")
+        assertEquals(emptyHeight, about.fetchSemanticsNode().size.height)
     }
 
     /** A fresh form starts with one generated name and stages it as the draft (#3662). */

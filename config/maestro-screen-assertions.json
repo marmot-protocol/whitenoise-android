@@ -5239,6 +5239,24 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+      "symbol": "VoiceDiscardConfirmation",
+      "bindings": [
+        {
+          "case": "presentation-modal-voice-discard",
+          "selector": {
+            "text": "Discard voice message\\?"
+          },
+          "scope": "Production confirmation dialog with Cancel and Discard callbacks from supplied review state.",
+          "entry_assertion": {
+            "text": "Discard voice message\\?"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Exercise recording, draft retention after Cancel, and draft deletion after Discard on a device."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewRecoveryMarker.kt",
       "symbol": "VoiceReviewUnavailableNotice",
       "bindings": [
@@ -6655,6 +6673,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+      "symbol": "VoiceNoteSettingsScreen",
+      "bindings": [
+        {
+          "case": "settings-voice-language",
+          "selector": {
+            "id": "settings.voice_notes.group"
+          },
+          "scope": "Voice notes page shows both switches and Back returns to Voice & language.",
+          "entry_assertion": {
+            "id": "settings.voice_notes.group"
+          },
+          "opened_by": {
+            "text": "Voice notes"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
       "symbol": "VoiceLanguageScreen",
       "bindings": [
@@ -7097,6 +7134,41 @@
         }
       ],
       "remaining": "Video mode, recording, the microphone prompt and a real capture need a camera-backed emulator; ConversationCameraContentTest, ConversationCameraCaptureKindTest and a manual emulator run cover them."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerScreen.kt",
+      "symbol": "RemoteSignerScreen",
+      "bindings": [
+        {
+          "case": "presentation-surface-onboarding-signin",
+          "selector": {
+            "id": "remote_signer.method.link"
+          },
+          "scope": "Sign-in entry opens the production remote-signer method picker before native pairing.",
+          "opened_by": {
+            "id": "onboarding.sign_in.remote_signer"
+          }
+        }
+      ],
+      "remaining": "Exercise both pairing directions against a cooperative remote signer, including permission review, browser approval and successful sign-in (ONB-027 and ONB-028)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+      "symbol": "RemoteSignerAccountDialogs",
+      "bindings": [
+        {
+          "case": "presentation-surface-remote-signer-disconnect",
+          "selector": {
+            "id": "confirmation.confirm"
+          },
+          "scope": "Disconnect confirmation is visible and Cancel dispatches dismissal on fixture state.",
+          "entry_assertion": {
+            "text": "Disconnect the signer\\?"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Exercise the permission review and disconnect dialogs with a paired account, and confirm disconnect keeps the account on the device (ONB-029)."
     }
   ]
 }

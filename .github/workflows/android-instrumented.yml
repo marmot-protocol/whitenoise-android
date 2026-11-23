@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       mdk_qualification:
-        description: Populated MarmotKit 0.17.0 upgrade, cold restart and both recovery modes
+        description: Populated MarmotKit 0.18.0 upgrade, cold restart and both recovery modes
         required: false
         type: boolean
         default: false

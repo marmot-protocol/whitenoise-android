@@ -204,6 +204,7 @@ object TimelineProjector {
             -> null
         }
 
+    /** The bubble body for [record]: deletion or failed-delivery copy, else its projected body. */
     fun displayBody(
         record: TimelineMessageRecordFfi,
         copy: MessageTextCopy = MessageTextCopy.Default,
@@ -212,9 +213,7 @@ object TimelineProjector {
         if (usesPersistedFailurePresentation(record)) return copy.invalidated
         return projectedBody(
             plaintext = record.plaintext,
-            kind = record.kind,
             mediaJson = record.mediaJson,
-            agentTextStreamJson = record.agentTextStreamJson,
             fallback = { MessageProjector.displayBody(toAppMessageRecord(record), copy) },
             copy = copy,
         )
@@ -281,6 +280,7 @@ object TimelineProjector {
             myAccountId,
         )
 
+    /** The quoted body a reply preview shows, or deletion copy for a deleted target. */
     private fun TimelineReplyPreviewFfi.displayBody(
         copy: MessageTextCopy,
         mediaFallback: MediaPreviewFallback?,
@@ -288,9 +288,7 @@ object TimelineProjector {
         if (deleted) return copy.deleted
         return projectedBody(
             plaintext = plaintext,
-            kind = kind,
             mediaJson = mediaJson,
-            agentTextStreamJson = agentTextStreamJson,
             fallback = { MessageProjector.displayBody(toAppMessageRecord(), copy) },
             mediaFallback = mediaFallback,
             copy = copy,
@@ -317,11 +315,10 @@ object TimelineProjector {
             sticker = sticker,
         )
 
+    /** The [fallback] body, or typed media or generic message copy when that body is blank. */
     private fun projectedBody(
         plaintext: String,
-        kind: ULong,
         mediaJson: String?,
-        agentTextStreamJson: String?,
         fallback: () -> String,
         mediaFallback: MediaPreviewFallback? = null,
         copy: MessageTextCopy,
@@ -331,8 +328,6 @@ object TimelineProjector {
         return when {
             mediaFallback != null -> mediaFallback.text(copy)
             mediaJson != null -> copy.mediaLabel(replyMediaKindFromJson(mediaJson))
-            agentTextStreamJson != null -> copy.streamFinished
-            kind == 1200uL -> copy.agentStreamStarted
             else -> copy.message
         }
     }

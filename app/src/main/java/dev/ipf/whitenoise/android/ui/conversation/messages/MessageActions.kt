@@ -72,6 +72,7 @@ internal fun MessageActionMenu(
     initiatingHoldActive: Boolean = false,
     anchorBoundsInWindow: IntRect?,
     anchorWindowYPx: Float?,
+    anchorWindowXPx: Float? = null,
     canReply: Boolean,
     canReact: Boolean,
     canDelete: Boolean,
@@ -213,10 +214,12 @@ internal fun MessageActionMenu(
     // stays anchored to the bubble at the original press position.
     val pressedBounds = remember { anchorBoundsInWindow }
     val pressedY = remember { anchorWindowYPx }
+    val pressedX = remember { anchorWindowXPx }
     FocusedMessageActions(
         initiatingHoldActive = initiatingHoldActive,
         sourceBounds = pressedBounds,
         touchY = pressedY,
+        touchX = pressedX,
         mine = mine,
         actions = actions,
         quickReactions = quickReactionEmojis,

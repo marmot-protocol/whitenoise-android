@@ -1,0 +1,282 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+  "legacy_sha256": "23c27b62c12fda22498abab312c68497f7da36f124aa3bb85375df696f411327",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: MessageDetailsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "FactRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun FactRow(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageDeliverySection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageDeliverySection(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageDetailsContentCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageDetailsContentCard(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "MessageDetailsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageDetailsScreen(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "Poll label in message details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.poll_preview",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "MessageFactsSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageFactsSection(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageReactionsSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageReactionsSection(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageReportRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageReportRow(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "MessageReportsSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "fun MessageReportsSection(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_copy_id",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_copy_id",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_copy_sender_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_copy_sender_key",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_details",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_created_at",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_created_at",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_disappears_at",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_disappears_at",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_message_id",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_message_id",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_received_at",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_received_at",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_sent_at",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_sent_at",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_info_status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_info_status",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_reports_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_reports_section",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:message_sender_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_sender_public_key",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_sender_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_sender_time",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_status_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_status_failed",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_status_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_status_pending",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_status_received",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_status_received",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:message_status_sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.message_status_sent",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:reactions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.reactions",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:report_dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.report_dismiss",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_dismissed_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.report_dismissed_label",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_reported_by",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.report_reported_by",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:sent_from",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.sent_from",
+        "test_ids": [
+          "MSG-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: MessageDetailsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

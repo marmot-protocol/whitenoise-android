@@ -15,8 +15,8 @@ import java.util.Locale
  * What the conversation's open search is marking, or null when search is closed.
  *
  * [matchedMessageIds] is the same set the match counter and the navigation arrows use. A bubble
- * outside it must not be marked even when the query appears in its displayed text: a reaction row,
- * a deleted tombstone or an agent stream can show text that search itself never counts, and marking
+ * outside it must not be marked even when the query appears in its displayed text: a reaction row
+ * or a deleted tombstone can show text that search itself never counts, and marking
  * one would promise a result the arrows can never reach.
  *
  * Carried as a local so every rendered bubble can mark its own matches without this being threaded

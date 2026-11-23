@@ -106,9 +106,9 @@ data class MessageStatusLabels(
     val sent: String,
     val received: String,
     val failed: String,
-    val streaming: String,
 )
 
+/** The entry of [labels] that names [status]. */
 fun labelFor(
     status: MessageStatus,
     labels: MessageStatusLabels,
@@ -118,5 +118,4 @@ fun labelFor(
         MessageStatus.Sent -> labels.sent
         MessageStatus.Received -> labels.received
         MessageStatus.Failed -> labels.failed
-        MessageStatus.Streaming -> labels.streaming
     }

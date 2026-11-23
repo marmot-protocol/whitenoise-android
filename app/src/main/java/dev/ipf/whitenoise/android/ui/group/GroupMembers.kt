@@ -280,6 +280,9 @@ internal fun SoleAdminDeletePicker(
                 Modifier.fillMaxWidth().heightIn(max = 360.dp).fadingVerticalScroll(rememberScrollState()),
             ) {
                 GroupMemberIdentityRows(candidates) { _, member ->
+                    val title = appState.displayName(member.memberIdHex)
+                    val npub = appState.npubForDisplay(member.memberIdHex)
+                    val titleIsKey = abbreviatesPublicKey(title, npub)
                     Row(
                         modifier =
                             Modifier
@@ -296,19 +299,17 @@ internal fun SoleAdminDeletePicker(
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            EmojiLabel(
-                                appState.displayName(member.memberIdHex),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                appState.shortNpub(member.memberIdHex),
-                                fontFamily = FontFamily.Monospace,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            if (titleIsKey) {
+                                PublicKeyCopyText(title, npub)
+                            } else {
+                                EmojiLabel(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                PublicKeyCopyText(
+                                    appState.shortNpub(member.memberIdHex),
+                                    npub,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }

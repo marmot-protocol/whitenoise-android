@@ -30,10 +30,11 @@
     ],
     "source_coverage": [
       {
-        "surface": "Bounded avatar preparation retained across conversation navigation",
+        "surface": "Bounded avatar preparation retained through scrolling and conversation navigation",
         "anchor": "fun rememberRetainedGroupAvatarPreparation(",
         "test_ids": [
-          "CHL-017"
+          "CHL-017",
+          "CHL-040"
         ],
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt"
       },

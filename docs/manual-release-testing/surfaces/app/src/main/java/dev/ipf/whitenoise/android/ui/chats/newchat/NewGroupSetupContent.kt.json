@@ -259,6 +259,14 @@
         "test_ids": [
           "NCH-002"
         ]
+      },
+      {
+        "surface": "Description field grows with text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": ".testTag(\"group_setup.description\")",
+        "test_ids": [
+          "NCH-002"
+        ]
       }
     ],
     "source_coverage": [

@@ -16,9 +16,9 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -42,6 +42,8 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupSetupScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.newGroupDetailsEditable
 import dev.ipf.whitenoise.android.ui.chats.newchat.submittedNewGroupName
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCategoryTestTag
+import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerItemTestTag
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.group.GROUP_EMOJI_IMAGE_PICKER_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -122,15 +124,13 @@ class NewGroupNameEmojiPickerTest {
         field.performTextReplacement("hello world")
         field.performTextInputSelection(TextRange(6, 11))
         composeRule.onNode(nameEmojiActionMatcher()).performClick()
-        waitForEmoji("😀")
-
-        composeRule.onAllNodesWithText("😀")[0].performClick()
+        pickGrinningEmoji()
 
         val firstUpdate = composeRule.onNode(hasSetTextAction() and hasText("hello 😀"))
         assertSelection(firstUpdate, TextRange("hello 😀".length))
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
 
-        composeRule.onAllNodesWithText("😀")[0].performClick()
+        pickGrinningEmoji()
         val secondUpdate = composeRule.onNode(hasSetTextAction() and hasText("hello 😀😀"))
         assertSelection(secondUpdate, TextRange("hello 😀😀".length))
     }
@@ -185,9 +185,7 @@ class NewGroupNameEmojiPickerTest {
     fun picksUseTheSharedRecentEmojiPath() {
         renderScreen()
         composeRule.onNode(nameEmojiActionMatcher()).performClick()
-        waitForEmoji("😀")
-
-        composeRule.onAllNodesWithText("😀")[0].performClick()
+        pickGrinningEmoji()
 
         val recents = (context.applicationContext as WhiteNoiseApplication).recentEmojiRecentsOwner.recents
         assertEquals("😀", recents.firstOrNull())
@@ -266,10 +264,15 @@ class NewGroupNameEmojiPickerTest {
         composeRule.onNode(hasSetTextAction() and hasText(draftName)).assertExists()
     }
 
-    private fun waitForEmoji(emoji: String) {
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText(emoji).fetchSemanticsNodes().isNotEmpty()
-        }
+    private fun pickGrinningEmoji() {
+        // Built-in sets can fill the first viewport of the picker.
+        val smileys = EmojiCategory.SmileysAndPeople
+        val category = composeRule.onNodeWithTag(emojiPickerCategoryTestTag(smileys))
+        composeRule.waitUntil(timeoutMillis = 5_000) { category.isDisplayed() }
+        category.performClick()
+        val emoji = composeRule.onNode(hasTestTag(emojiPickerItemTestTag(smileys, 0)) and hasText("😀"))
+        composeRule.waitUntil(timeoutMillis = 5_000) { emoji.isDisplayed() }
+        emoji.performClick()
     }
 
     private fun assertSelection(

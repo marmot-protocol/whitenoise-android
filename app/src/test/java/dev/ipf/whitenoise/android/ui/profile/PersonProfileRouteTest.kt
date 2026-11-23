@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -41,6 +42,8 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.profileNotificationOverrides
+import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
+import dev.ipf.whitenoise.android.ui.settings.publicKeyShortForm
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -110,12 +113,15 @@ class PersonProfileRouteTest {
         composeRule.onNodeWithText("Private contact note").assertDoesNotExist()
     }
 
-    /** A named profile shows the complete key exactly once, as one copy button, with no shortened capsule (#3565). */
+    /** A named profile shows its key exactly once, as one copy button that starts short and expands (#3565). */
     @Test fun namedProfileShowsOneCompleteCopyableKey() {
         show()
         composeRule.onNodeWithTag("person_profile.name").assertExists()
         composeRule.onAllNodesWithTag("person_profile.full_public_key", useUnmergedTree = true).assertCountEquals(1)
         composeRule.onNodeWithTag("person_profile.copy_public_key.visual", useUnmergedTree = true).assertDoesNotExist()
+        composeRule
+            .onNodeWithTag("person_profile.full_public_key", useUnmergedTree = true)
+            .assertTextEquals(publicKeyShortForm(publicKey))
         composeRule
             .onNodeWithTag("person_profile.copy_public_key")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Text, listOf(AnnotatedString(publicKey))))
@@ -126,7 +132,7 @@ class PersonProfileRouteTest {
             )
     }
 
-    /** Taps on the key text and on the copy glyph both copy the exact contiguous key, without grouping spaces. */
+    /** Taps on the key text and on the copy glyph both copy the exact contiguous key, and the first one expands it. */
     @Test fun keyTextAndGlyphCopyTheContiguousKey() {
         show()
         val clipboard = context.getSystemService(ClipboardManager::class.java)
@@ -139,6 +145,9 @@ class PersonProfileRouteTest {
                 ?.text
                 ?.toString(),
         )
+        composeRule
+            .onNodeWithTag("person_profile.full_public_key", useUnmergedTree = true)
+            .assertTextEquals(publicKeyDisplayGroups(publicKey).joinToString(" "))
         clipboard.setPrimaryClip(android.content.ClipData.newPlainText("", ""))
         composeRule.onNodeWithTag("person_profile.copy_public_key").performTouchInput {
             click(Offset(width - 24f, height / 2f))
@@ -157,7 +166,7 @@ class PersonProfileRouteTest {
             )
     }
 
-    /** A nameless profile keeps an accessible heading and the one complete key, never a shortened key title. */
+    /** A nameless profile keeps an accessible heading and its one expandable key, never a shortened key title. */
     @Test fun namelessProfileShowsTheCompleteKeyInsteadOfAShortenedTitle() {
         show(metadata = profile.copy(name = null))
         composeRule.onNodeWithTag("person_profile.name").assertDoesNotExist()

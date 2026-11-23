@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -40,6 +39,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DateFormatPreference
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.chatHistoryTransfer
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -77,7 +77,7 @@ internal fun UnreadMessagesDivider(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         ) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            AppDivider(color = MaterialTheme.colorScheme.outline)
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelMedium,

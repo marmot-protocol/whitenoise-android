@@ -20,14 +20,32 @@ internal interface ConversationDictationParkedAudio {
     fun discard()
 }
 
+/** Recorders that only buffer audio beside the session capture, keyed by their future session id. */
+internal interface ConversationDictationFollowUpCaptures {
+    fun beginFollowUp(sessionId: Long): Boolean
+
+    fun finishFollowUp(
+        sessionId: Long,
+        onClosed: () -> Unit,
+    ): Boolean
+
+    fun discardFollowUp(
+        sessionId: Long,
+        onClosed: () -> Unit,
+    ): Boolean
+
+    /** A follow-up becomes the session capture only when the previous one has left the slot. */
+    fun adoptFollowUp(sessionId: Long): Boolean
+}
+
 /** Main-looper owner retains a discarded recorder until its native closure is acknowledged. */
 @Suppress("TooManyFunctions")
 internal class ConversationDictationCaptureOwner(
     private val create: () -> ConversationDictationCallerAudio?,
-) {
+) : ConversationDictationFollowUpCaptures {
     private var current: ConversationDictationCallerAudio? = null
     private var closing: ConversationDictationCallerAudio? = null
-    private var followUp: ConversationDictationCallerAudio? = null
+    private val followUps = LinkedHashMap<Long, ConversationDictationCallerAudio>()
 
     /** Whether this gesture's session recorded through an app-owned capture. */
     var usedThisSession = false
@@ -52,35 +70,38 @@ internal class ConversationDictationCaptureOwner(
     }
 
     /** Records beside the session capture without attaching a provider stream. */
-    fun beginFollowUp(): Boolean {
-        val capture = if (followUp == null) create() else null
+    override fun beginFollowUp(sessionId: Long): Boolean {
+        val capture = if (sessionId !in followUps) create() else null
         if (capture == null) return false
         val started = capture.start()
         if (started) {
-            followUp = capture
+            followUps[sessionId] = capture
         } else {
             capture.discard()
         }
         return started
     }
 
-    fun finishFollowUp(onClosed: () -> Unit): Boolean {
-        val capture = followUp ?: return false
+    override fun finishFollowUp(
+        sessionId: Long,
+        onClosed: () -> Unit,
+    ): Boolean {
+        val capture = followUps[sessionId] ?: return false
         capture.finish(mainThreadDictationCaptureClosure(onClosed))
         return true
     }
 
-    fun discardFollowUp(onClosed: () -> Unit): Boolean {
-        val capture = followUp ?: return false
-        followUp = null
+    override fun discardFollowUp(
+        sessionId: Long,
+        onClosed: () -> Unit,
+    ): Boolean {
+        val capture = followUps.remove(sessionId) ?: return false
         capture.discard(mainThreadDictationCaptureClosure(onClosed))
         return true
     }
 
-    /** The follow-up becomes the session capture only when the previous one has left the slot. */
-    fun adoptFollowUp(): Boolean {
-        val capture = followUp?.takeIf { current == null } ?: return false
-        followUp = null
+    override fun adoptFollowUp(sessionId: Long): Boolean {
+        val capture = (if (current == null) followUps.remove(sessionId) else null) ?: return false
         closing = null
         current = capture
         usedThisSession = true

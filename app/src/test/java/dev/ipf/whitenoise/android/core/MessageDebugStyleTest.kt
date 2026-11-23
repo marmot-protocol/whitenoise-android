@@ -18,24 +18,6 @@ class MessageDebugStyleTest {
     }
 
     @Test
-    fun streamStartIsStreamSignalingWithKindAndStreamId() {
-        val style =
-            MessageDebugClassifier.debugStyle(
-                message(
-                    id = "ss",
-                    plaintext = "",
-                    kind = 1200uL,
-                    tags = listOf(MessageProjector.streamTag("abc123")),
-                ),
-            )
-
-        assertEquals(MessageDebugCategory.StreamSignaling, style.category)
-        assertFalse(style.isUserVisibleBubble)
-        assertTrue(style.kindLabel.contains("1200"))
-        assertTrue(style.detailText.contains("abc123"))
-    }
-
-    @Test
     fun reactionIsControl() {
         val style =
             MessageDebugClassifier.debugStyle(
@@ -104,6 +86,7 @@ class MessageDebugStyleTest {
         assertEquals(TimelineRowKind.Bubble, timelineRowKind(record, streamingDebugEnabled = true))
     }
 
+    /** The tag summary reads "(none)" for an untagged record and lists one tag per line otherwise. */
     @Test
     fun tagsSummaryIsNoneWhenEmptyAndMultiLineOtherwise() {
         val empty = MessageDebugClassifier.debugStyle(message(id = "m", plaintext = "hi", tags = emptyList()))
@@ -112,17 +95,16 @@ class MessageDebugStyleTest {
                 message(
                     id = "m",
                     plaintext = "",
-                    kind = 1200uL,
                     tags =
                         listOf(
-                            MessageProjector.streamTag("abc123"),
-                            MessageTagFfi(listOf("stream-start", "start")),
+                            MessageTagFfi(listOf("e", "abc123")),
+                            MessageTagFfi(listOf("q", "start")),
                         ),
                 ),
             )
 
         assertEquals("tags: (none)", empty.tagsSummary)
-        assertEquals("tags:\nstream abc123\nstream-start start", tagged.tagsSummary)
+        assertEquals("tags:\ne abc123\nq start", tagged.tagsSummary)
     }
 
     private fun reaction(

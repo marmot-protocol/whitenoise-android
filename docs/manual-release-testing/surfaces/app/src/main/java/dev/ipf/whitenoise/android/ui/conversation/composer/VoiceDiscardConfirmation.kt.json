@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "VoiceDiscardConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+        "anchor": "fun VoiceDiscardConfirmation(",
+        "test_ids": [
+          "MED-059"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.voice_discard_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+        "anchor": "R.string.voice_discard_title",
+        "test_ids": [
+          "MED-059"
+        ]
+      },
+      {
+        "surface": "R.string.voice_discard_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+        "anchor": "R.string.voice_discard_message",
+        "test_ids": [
+          "MED-059"
+        ]
+      },
+      {
+        "surface": "R.string.discard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+        "anchor": "R.string.discard",
+        "test_ids": [
+          "MED-059"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "MED-059"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
