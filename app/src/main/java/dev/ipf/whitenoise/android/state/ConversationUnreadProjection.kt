@@ -167,12 +167,12 @@ internal fun unreadReceivedMentionIds(
     if (readAnchorMessageId != null && anchorIdx < 0) return emptyList()
     return timeline
         .drop(anchorIdx + 1)
-        .filter { it.isUnreadEligible() && it.isMentionableChat() && mentionsActiveAccount(it) }
+        .filter { it.isUnreadEligible() && it.isChatOrThreadMessage() && mentionsActiveAccount(it) }
         .mapNotNull { it.record.messageIdHex.takeIf { id -> id.isNotBlank() } }
 }
 
-/** A kind-9 chat row or a thread message, the rows MDK classifies as possible mentions. */
-private fun TimelineMessage.isMentionableChat(): Boolean {
+/** A kind-9 chat row or a thread message, the rows MDK counts as chat for unread counts, mentions and search. */
+internal fun TimelineMessage.isChatOrThreadMessage(): Boolean {
     val inThread = projected?.thread != null
     return MessageProjector.isChatKind(record.kind) || isThreadMessage(record.kind, inThread)
 }

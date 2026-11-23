@@ -54,10 +54,11 @@ which turn those inputs into `--features otlp-export` and
   parent, so Android shows a kind-1111 thread message from a client with a thread
   view inline, as a text bubble quoting its parent. MDK now counts such a
   message as chat for unread counts, mentions and search, so Android's
-  jump-to-mention chip and its in-chat and global search results count a
-  kind-1111 row that carries `thread` (`isThreadMessage` in `core/ThreadMessages.kt`) as
-  they count kind 9. A kind 1111 without a parent stays a custom row. A reply
-  sent from Android stays a kind-9 inline reply. Fixtures pass `thread = null`.
+  jump-to-mention chip, its in-chat and global search results and its TalkBack
+  announcement of a newly arrived message count a kind-1111 row that carries
+  `thread` (`isThreadMessage` in `core/ThreadMessages.kt`) as they count kind
+  9. A kind 1111 without a parent stays a custom row. A reply sent from Android
+  stays a kind-9 inline reply. Fixtures pass `thread = null`.
 - `MessageDraftAttachmentInputFfi.Removed` is new, and
   `saveMessageDraftInputsIfRevision` now keeps every attachment a save does not
   name. Android saves drafts only through the whole-list `saveMessageDraft`
@@ -68,10 +69,9 @@ Not adopted in this change: `sendThreadMessage` and a thread view. Several
 surfaces still treat only kind 9 as chat, so a thread message misses them: the
 "Edited" label on an author's edit (the bubble shows the edited text, which MDK
 supplies), the Markdown fallback parse, the edit, forward, speak, translate,
-share and "show less" actions, multi-select, the files and media library, the
-TalkBack announcement of a newly arrived message and the chat-list attachment
-glyph. With streaming debug on, a thread message renders as an unknown-kind debug
-row instead of its bubble. Device-group and multi-device APIs stay as 0.18.0
+share and "show less" actions, multi-select, the files and media library and
+the chat-list attachment glyph. With streaming debug on, a thread message
+renders as an unknown-kind debug row instead of its bubble. Device-group and multi-device APIs stay as 0.18.0
 left them; linked devices now resend invitation decisions after losing a
 device-group fork without Android doing anything.
 
