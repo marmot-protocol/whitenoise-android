@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,7 +45,9 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -97,12 +100,24 @@ internal fun GroupCreationPersonRow(
             pictureDomain = AvatarImageLoader.publicProfiles(),
         )
     }
+    val titleIsKey = abbreviatesPublicKey(candidate.displayName, candidate.npub)
+    val keyFocusable = onClick == null || !enabled
     val supporting: (@Composable () -> Unit)? =
-        person.subtitle?.let { subtitle ->
-            { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        person.subtitle?.takeUnless { titleIsKey && abbreviatesPublicKey(it, candidate.npub) }?.let { subtitle ->
+            {
+                if (abbreviatesPublicKey(subtitle, candidate.npub)) {
+                    PublicKeyCopyText(subtitle, candidate.npub, keyboardFocusable = keyFocusable)
+                } else {
+                    Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
     val headline: @Composable () -> Unit = {
-        EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (titleIsKey) {
+            PublicKeyCopyText(candidate.displayName, candidate.npub, keyboardFocusable = keyFocusable)
+        } else {
+            EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         if (onClick == null) {
@@ -157,9 +172,9 @@ internal fun GroupSelectedPerson(
     val candidate = person.candidate
     val interaction = remember(candidate.accountIdHex) { MutableInteractionSource() }
     val remove = stringResource(R.string.remove_member_named, candidate.displayName)
+    val titleIsKey = abbreviatesPublicKey(candidate.displayName, candidate.npub)
     Column(
-        Modifier
-            .width(80.dp)
+        (if (titleIsKey) Modifier.widthIn(min = 80.dp, max = 280.dp) else Modifier.width(80.dp))
             .clickable(interaction, null, role = Role.Button, onClick = onRemove)
             .semantics { contentDescription = remove }
             .testTag("new_group.selected.${candidate.accountIdHex}"),
@@ -187,12 +202,16 @@ internal fun GroupSelectedPerson(
                 }
             }
         }
-        EmojiLabel(
-            candidate.displayName,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.labelMedium,
-            textAlign = TextAlign.Center,
-        )
+        if (titleIsKey) {
+            PublicKeyCopyText(candidate.displayName, candidate.npub, style = MaterialTheme.typography.labelMedium)
+        } else {
+            EmojiLabel(
+                candidate.displayName,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }

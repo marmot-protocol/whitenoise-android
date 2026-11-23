@@ -4,6 +4,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
@@ -47,6 +48,9 @@ class GroupMemberKeyCopyTest {
 
         composeRule.onNodeWithTag("transfer_admin.key.$PEER", useUnmergedTree = true).performClick()
         assertEquals(PEER_NPUB, clipText())
+        composeRule
+            .onNodeWithTag("transfer_admin.key.$PEER", useUnmergedTree = true)
+            .assertTextEquals(PEER_NPUB.chunked(5).joinToString(" "))
         assertEquals(emptyList<String>(), picked)
         composeRule.onNode(hasText(PEER_NAME), useUnmergedTree = true).performClick()
         composeRule.waitForIdle()

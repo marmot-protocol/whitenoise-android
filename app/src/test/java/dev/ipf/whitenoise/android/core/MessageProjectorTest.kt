@@ -326,32 +326,7 @@ class MessageProjectorTest {
         assertNull(pollCopyText(pollProjection("Lunch?", "Soup", " \n "), MessageTextCopy.Default))
     }
 
-    @Test
-    fun previewTextRecognizesStreamStartAndFinalMessages() {
-        val start =
-            message(
-                id = "start",
-                plaintext = "",
-                kind = 1200uL,
-                tags = listOf(MessageProjector.streamTag("abc123")),
-            )
-        val final =
-            message(
-                id = "final",
-                plaintext = "Final transcript",
-                kind = 9uL,
-                tags =
-                    listOf(
-                        MessageProjector.streamTag("abc123"),
-                        MessageTagFfi(listOf("stream-start", "start")),
-                    ),
-            )
-
-        assertEquals("Agent stream started", MessageProjector.previewText(start))
-        assertEquals("Final transcript", MessageProjector.previewText(final))
-        assertTrue(MessageProjector.isStreamFinal(final))
-    }
-
+    /** Preview fallbacks use the copy the UI supplies rather than the English defaults. */
     @Test
     fun messageFallbackCopyCanBeLocalizedByUi() {
         val copy =
@@ -363,8 +338,6 @@ class MessageProjectorTest {
                 partialVisibility = "partial",
                 nonCanonicalHistory = "noncanonical",
                 deliveryNotConfirmed = "unconfirmed",
-                agentStreamStarted = "started",
-                streamFinished = "finished",
                 mediaAttachment = "media",
                 message = "message",
             )
@@ -392,6 +365,7 @@ class MessageProjectorTest {
         assertFalse(MessageProjector.isDeleted("m2", setOf("m1")))
     }
 
+    /** Plain text and an agent's reply forward; media, reactions, deletes, system events and blanks do not. */
     @Test
     fun forwardableTextAcceptsPlainTextAndRejectsNonTextRecords() {
         // Plain user-authored kind-9 text: forwardable.
@@ -411,27 +385,25 @@ class MessageProjectorTest {
                 kind = 9uL,
                 tags = listOf(MessageTagFfi(listOf("_media_pending", "scan.png", "image/png"))),
             )
-        // Agent-stream final (kind-9 + stream tag) is not a plain text message.
-        val stream =
+        // An agent's reply is an ordinary kind-9 message, whatever tags it carries.
+        val agentReply =
             message(
                 id = "s",
-                plaintext = "partial transcript",
+                plaintext = "final transcript",
                 kind = 9uL,
-                tags = listOf(MessageProjector.streamTag("abc123")),
+                tags = listOf(MessageTagFfi(listOf("stream", "abc123"))),
             )
         val reaction = reaction(id = "r", sender = "alice", target = "m1", emoji = "👍", at = 1u)
         val deleted = delete(id = "d", sender = "alice", target = "m1", at = 1u)
-        val streamStart = message(id = "ss", plaintext = "", kind = 1200uL)
         val groupSystem = message(id = "gs", plaintext = "{}", kind = 1210uL)
         val blank = message(id = "b", plaintext = "   ", kind = 9uL)
 
         assertTrue(MessageProjector.isForwardableText(text))
         assertFalse(MessageProjector.isForwardableText(media))
         assertFalse(MessageProjector.isForwardableText(pendingMedia))
-        assertFalse(MessageProjector.isForwardableText(stream))
+        assertTrue(MessageProjector.isForwardableText(agentReply))
         assertFalse(MessageProjector.isForwardableText(reaction))
         assertFalse(MessageProjector.isForwardableText(deleted))
-        assertFalse(MessageProjector.isForwardableText(streamStart))
         assertFalse(MessageProjector.isForwardableText(groupSystem))
         assertFalse(MessageProjector.isForwardableText(blank))
     }
@@ -615,6 +587,7 @@ class MessageProjectorTest {
         assertNull(MessageProjector.forwardableText(blank))
     }
 
+    /** Copy and read-aloud take plain text, an agent's reply and media captions, never reactions or placeholders. */
     @Test
     fun copyableTextKeepsPlainTextAndMediaCaptionsButSkipsNonText() {
         val text = message(id = "text", plaintext = "original")
@@ -642,11 +615,11 @@ class MessageProjectorTest {
                 plaintext = "caption",
                 tags = listOf(MessageTagFfi(listOf("_media_pending", "image.png", "image/png"))),
             )
-        val stream =
+        val agentReply =
             message(
                 id = "stream",
                 plaintext = "generated",
-                tags = listOf(MessageProjector.streamTag("stream-id")),
+                tags = listOf(MessageTagFfi(listOf("stream", "stream-id"))),
             )
         val reaction = reaction(id = "reaction", sender = "alice", target = "text", emoji = "👍", at = 2u)
 
@@ -655,7 +628,7 @@ class MessageProjectorTest {
         assertNull(MessageProjector.copyableText(captionlessMedia))
         assertNull(MessageProjector.copyableText(pendingMedia))
         assertEquals("caption", MessageProjector.copyableText(pendingCaptionedMedia))
-        assertNull(MessageProjector.copyableText(stream))
+        assertEquals("generated", MessageProjector.copyableText(agentReply))
         assertNull(MessageProjector.copyableText(reaction))
 
         assertTrue(MessageProjector.canSpeak(text, editedText = "edited"))
@@ -663,7 +636,7 @@ class MessageProjectorTest {
         assertFalse(MessageProjector.canSpeak(captionlessMedia))
         assertFalse(MessageProjector.canSpeak(pendingMedia))
         assertTrue(MessageProjector.canSpeak(pendingCaptionedMedia))
-        assertFalse(MessageProjector.canSpeak(stream))
+        assertTrue(MessageProjector.canSpeak(agentReply))
         assertFalse(MessageProjector.canSpeak(reaction))
     }
 

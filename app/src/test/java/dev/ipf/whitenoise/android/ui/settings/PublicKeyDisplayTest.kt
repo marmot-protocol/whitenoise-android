@@ -51,6 +51,17 @@ class PublicKeyDisplayTest {
         assertEquals(publicKeyDisplayGroups(first).last(), publicKeyDisplayGroups(second).last())
     }
 
+    /** The short form is exactly the first two and last two display groups, the ends the expanded key emphasizes. */
+    @Test
+    fun theShortFormKeepsTheOuterGroups() {
+        val groups = publicKeyDisplayGroups(NPUB)
+
+        val outerGroups = groups.take(2).joinToString("") + "…" + groups.takeLast(2).joinToString("")
+        assertEquals(outerGroups, publicKeyShortForm(NPUB))
+        assertEquals(NPUB.take(10) + "…" + NPUB.takeLast(8), publicKeyShortForm(NPUB))
+        assertEquals("npub1abc", publicKeyShortForm("npub1abc"))
+    }
+
     /** The drawn key is grouped, but assistive technologies and tests read the canonical contiguous value. */
     @Test
     fun theKeyIsReadAsItsContiguousCanonicalValue() {

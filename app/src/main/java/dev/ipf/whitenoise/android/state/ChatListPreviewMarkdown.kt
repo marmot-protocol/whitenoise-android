@@ -12,7 +12,7 @@ import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
  * message-body arm exactly: a non-deleted row whose plaintext is non-blank
  * and whose kind is not one of the special-cased arms is rendered verbatim,
  * so its body — and only its body — may be parsed into preview tokens.
- * Edit (1009), agent-stream-start (1200), and group-system (1210) rows —
+ * Edit (1009), poll (1068), and group-system (1210) rows —
  * plus deleted/blank rows — surface derived copy, so their payloads must
  * never be parsed into preview tokens and styled in their place (issue #577).
  * Recognized GIPHY envelopes likewise surface localized media copy instead of

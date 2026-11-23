@@ -167,7 +167,7 @@ internal fun NewGroupSetupContent(
                         enabled = state.detailsEditable,
                         modifier = Modifier.fillMaxWidth().testTag("group_setup.description"),
                         label = { Text(stringResource(R.string.description)) },
-                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 6),
+                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                     )
                 }
             }

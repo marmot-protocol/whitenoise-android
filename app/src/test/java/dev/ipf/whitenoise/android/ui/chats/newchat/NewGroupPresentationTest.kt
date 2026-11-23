@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -17,6 +18,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
@@ -34,6 +37,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Actual presentation controls and saved form state, independent of native mutation success. */
 @RunWith(RobolectricTestRunner::class)
@@ -105,6 +109,40 @@ class NewGroupPresentationTest {
         composeRule.onNodeWithText(context.getString(R.string.user_search_address_unverified)).assertIsDisplayed()
         composeRule.onNodeWithTag("address.retry").performClick()
         assertEquals(1, retries)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun descriptionGrowsWhenTextWrapsAndShrinksWhenCleared() {
+        setup(NewGroupDraft(), presentation())
+        val description = composeRule.onNodeWithTag("group_setup.description")
+        val emptyHeight = description.fetchSemanticsNode().size.height
+        val nameHeight =
+            composeRule
+                .onNodeWithTag("group_setup.name")
+                .fetchSemanticsNode()
+                .size.height
+        assertEquals(nameHeight.toDouble(), emptyHeight.toDouble(), 2.0)
+
+        val longText = "A place to plan weekend trips and share photos. ".repeat(3).trimEnd()
+        description.performTextInput(longText)
+        description.assertTextContains(longText)
+        assertTrue(description.fetchSemanticsNode().size.height > emptyHeight)
+
+        val fiveLines = "One\nTwo\nThree\nFour\nFive"
+        description.performTextReplacement(fiveLines)
+        val fiveLineHeight = description.fetchSemanticsNode().size.height
+        val sixLines = "$fiveLines\nSix"
+        description.performTextReplacement(sixLines)
+        val sixLineHeight = description.fetchSemanticsNode().size.height
+        assertTrue(sixLineHeight > fiveLineHeight)
+
+        description.performTextReplacement("$sixLines\nSeven")
+        description.assertTextContains("$sixLines\nSeven")
+        assertEquals(sixLineHeight, description.fetchSemanticsNode().size.height)
+
+        description.performTextReplacement("")
+        assertEquals(emptyHeight, description.fetchSemanticsNode().size.height)
     }
 
     /** Native image preparation disables photo and creation while surfacing the real work state. */

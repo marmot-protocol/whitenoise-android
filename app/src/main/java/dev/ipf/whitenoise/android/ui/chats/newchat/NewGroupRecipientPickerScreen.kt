@@ -112,7 +112,10 @@ private fun NewGroupRecipientAccountScreen(
         candidate: RecipientSearch.Candidate,
         addressMatch: Boolean = false,
     ) = GroupCreationPerson(
-        candidate.copy(displayName = selectedMemberDisplayName(candidate, appState)),
+        candidate.copy(
+            displayName = selectedMemberDisplayName(candidate, appState),
+            npub = appState.npubForDisplay(candidate.accountIdHex).ifBlank { candidate.npub },
+        ),
         when {
             addressMatch -> addressResultLabel
             candidate.isFollowing -> followedLabel

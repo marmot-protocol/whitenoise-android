@@ -436,8 +436,6 @@
     <string name="message_actions">Nachrichtenaktionen</string>
     <string name="message_reply_quote_description">Antwort – %1$s: %2$s</string>
     <string name="message_deleted_preview">Nachricht geloescht</string>
-    <string name="agent_stream_started">Agent-Stream gestartet</string>
-    <string name="stream_finished">Stream beendet</string>
     <string name="media_attachment">Medienanhang</string>
     <string name="generic_message">Nachricht</string>
     <string name="giphy_media_preview">GIF über GIPHY</string>
@@ -451,8 +449,6 @@
     <string name="giphy_preview_loading">Vorschau wird geladen</string>
     <string name="giphy_preview_unavailable">Vorschau nicht verfügbar</string>
     <string name="giphy_send_result">GIF senden: %1$s</string>
-    <string name="waiting_for_stream">Warte auf Stream...</string>
-    <string name="stream_failed_format">Stream fehlgeschlagen: %1$s</string>
     <string name="copy_text">Text kopieren</string>
     <string name="select_text">Text auswählen</string>
     <string name="open_emoji_picker">Emoji-Auswahl öffnen</string>
@@ -1111,7 +1107,6 @@
     <string name="message_status_sent">Gesendet</string>
     <string name="message_status_received">Empfangen</string>
     <string name="message_status_failed">Fehlgeschlagen</string>
-    <string name="message_status_streaming">Wird gestreamt</string>
     <string name="toast_notification_account_unavailable">Dieses Konto ist nicht mehr verfügbar</string>
     <string name="toast_reply_draft_restore_failed">Antwort konnte nicht wiederhergestellt werden.</string>
     <string name="toast_draft_save_failed">Entwurf konnte nicht gespeichert werden.</string>
@@ -2850,4 +2845,6 @@
     <string name="remote_signer_disconnect_body">Dieses Konto bleibt auf dem Gerät. Senden und andere Aktionen, die eine Signatur erfordern, sind erst nach erneuter Kopplung wieder möglich.</string>
     <string name="remote_signer_disconnect_confirm">Trennen</string>
     <string name="remote_signer_switcher_attention">Signier-App benötigt deine Aufmerksamkeit</string>
+    <string name="dictation_transcribe_voice_messages_title">Sprachnachrichten automatisch transkribieren</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">Zeigt Transkripte heruntergeladener Sprachnachrichten beim Lesen des Chats an. Offline Speech to Text ist erforderlich.</string>
 </resources>

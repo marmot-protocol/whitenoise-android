@@ -2,6 +2,17 @@
 <resources>
     <string name="voice_review_title">檢查語音訊息</string>
     <string name="voice_record_again">重新錄音</string>
-    <string name="voice_message_release_to_review">放開以檢查 · 滑動以取消</string>
+    <string name="voice_message_slide_to_cancel">滑動以取消</string>
     <string name="voice_recording_stop">停止錄音</string>
+    <string name="voice_recording_pause">暫停錄音</string>
+    <string name="voice_discard_title">要捨棄語音訊息嗎？</string>
+    <string name="voice_discard_message">此錄音尚未傳送，將會刪除。</string>
+    <string name="voice_send_interrupted">語音訊息未傳送</string>
+    <string name="voice_recording_elsewhere">另一個聊天正在錄製語音訊息。</string>
+    <string name="voice_row_recording">正在錄製語音訊息</string>
+    <string name="voice_row_unsent">未傳送的語音訊息</string>
+    <string name="voice_recording_paused">語音錄製已暫停</string>
+    <string name="voice_send_on_release">放開時直接傳送長按錄製的語音訊息</string>
+    <string name="voice_transcribe_automatically">自動轉錄收到的語音訊息</string>
+    <string name="settings_voice_notes">語音訊息</string>
 </resources>

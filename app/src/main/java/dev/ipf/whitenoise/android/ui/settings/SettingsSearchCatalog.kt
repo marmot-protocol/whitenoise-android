@@ -18,7 +18,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 ),
             )
         }
-        addAll(settingsHubDestinationEntries())
+        addAll(settingsHubDestinationEntries() + voiceNoteSettingsSearchEntries())
         add(
             SettingsSearchEntry(
                 "Appearance.action_color",

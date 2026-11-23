@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.ui.settings.HelpSupportScreen
 import dev.ipf.whitenoise.android.ui.settings.NotificationDeliveryScreen
 import dev.ipf.whitenoise.android.ui.settings.NotificationSoundsScreen
 import dev.ipf.whitenoise.android.ui.settings.VoiceLanguageScreen
+import dev.ipf.whitenoise.android.ui.settings.VoiceNoteSettingsScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -72,6 +73,12 @@ class SettingsHubScreenshotTest {
 
     @Test
     fun voiceLanguageRtlLargeFont() = capture("settings_voice_language_rtl_large_font", false, rtl = true) { VoiceLanguageScreen(it, {}, {}) }
+
+    @Test
+    fun voiceNotesDark() = capture("settings_voice_notes_dark", true) { VoiceNoteSettingsScreen(it, {}) }
+
+    @Test
+    fun voiceNotesRtlLargeFont() = capture("settings_voice_notes_rtl_large_font", false, rtl = true) { VoiceNoteSettingsScreen(it, {}) }
 
     @Test fun helpSupportLight() = capture("settings_help_support_light", false) { HelpSupportScreen(it, {}, {}) }
 

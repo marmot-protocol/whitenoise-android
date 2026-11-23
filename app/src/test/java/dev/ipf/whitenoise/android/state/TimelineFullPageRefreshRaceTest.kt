@@ -11,14 +11,12 @@ import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
-import dev.ipf.whitenoise.android.core.MessageProjector
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
@@ -27,7 +25,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -46,7 +43,7 @@ import kotlin.coroutines.CoroutineContext
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class TimelineFullPageRefreshRaceTest {
-    /** Discarding a stale preparation must leave both live rows and commit callback untouched. */
+    /** Discarding a stale preparation must leave the live row and commit callback untouched. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun newerLiveProjectionWinsWhileOlderWindowPreparationIsSuspended() =
@@ -70,7 +67,7 @@ class TimelineFullPageRefreshRaceTest {
                 preparationDispatcher.runPending()
                 advanceUntilIdle()
 
-                assertEquals(emptyList<String>(), staleApply.await())
+                staleApply.await()
                 assertFalse("stale preparations must not report a committed page", committed)
                 val timelineIds = controller.timeline.map { it.record.messageIdHex }.toSet()
                 assertTrue(NEW_MESSAGE_ID in timelineIds)
@@ -98,9 +95,9 @@ class TimelineFullPageRefreshRaceTest {
         }
     }
 
-    /** A stale FFI refresh must preserve a newer stream watcher and its live row. */
+    /** A stale FFI refresh must preserve a newer live row. */
     @Test
-    fun staleFullPageRefreshDoesNotDropNewerLiveProjectionOrStreamWatcher() =
+    fun staleFullPageRefreshDoesNotDropNewerLiveProjection() =
         runBlocking {
             val controller = conversationController()
             val staleOnlyPage = staleOnlyRefreshPage()
@@ -117,28 +114,22 @@ class TimelineFullPageRefreshRaceTest {
                 }
 
             refreshAwaitingLiveGate.await()
-            val liveStreamId = applyLiveProjectionDuringRefresh(controller)
+            applyLiveProjectionDuringRefresh(controller)
             releaseStalePage.complete(Unit)
-            val streamIdsFromStaleRefresh = refreshJob.await()
+            refreshJob.await()
             shadowOf(Looper.getMainLooper()).idle()
 
-            assertLiveTimelineSurvivesStaleRefresh(controller, liveStreamId, streamIdsFromStaleRefresh)
+            val timelineIds = controller.timeline.map { it.record.messageIdHex }.toSet()
+            assertTrue(
+                "live plain message must remain after stale refresh",
+                NEW_MESSAGE_ID in timelineIds,
+            )
         }
 
-    private fun applyLiveProjectionDuringRefresh(controller: ConversationController): String {
-        val liveStreamId = "stream-live-1849"
-        controller.testApplyLiveTimelineChangesAndRegisterStreams(
+    /** Applies a newer live row while an older window read or preparation is still in flight. */
+    private fun applyLiveProjectionDuringRefresh(controller: ConversationController) {
+        controller.testApplyLiveTimelineChanges(
             listOf(
-                TimelineMessageChangeFfi.Upsert(
-                    trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
-                    message =
-                        timelineRecord(
-                            messageId = STREAM_START_ID,
-                            timelineAt = 2uL,
-                            kind = 1200uL,
-                            tags = listOf(MessageProjector.streamTag(liveStreamId)),
-                        ),
-                ),
                 TimelineMessageChangeFfi.Upsert(
                     trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
                     message =
@@ -149,49 +140,16 @@ class TimelineFullPageRefreshRaceTest {
                 ),
             ),
         )
-        return liveStreamId
     }
 
-    private fun assertLiveTimelineSurvivesStaleRefresh(
-        controller: ConversationController,
-        liveStreamId: String,
-        streamIdsFromStaleRefresh: List<String>,
-    ) {
-        val timelineIds = controller.timeline.map { it.record.messageIdHex }.toSet()
-        assertTrue(
-            "live plain message must remain after stale refresh",
-            NEW_MESSAGE_ID in timelineIds,
-        )
-        assertTrue(
-            "live stream-start row must remain after stale refresh",
-            STREAM_START_ID in timelineIds,
-        )
-        assertTrue(
-            "stream watcher registration must survive stale refresh",
-            liveStreamId in controller.testActiveStreamIds(),
-        )
-        assertEquals(
-            "stale full-page refresh must not return stream watcher ids",
-            emptyList<String>(),
-            streamIdsFromStaleRefresh,
-        )
-    }
-
-    private fun staleOnlyRefreshPage(): TimelinePageFfi {
-        val staleStreamId = "stream-stale-1849"
-        return timelinePage(
+    /** The older window a refresh reads before the newer live row lands. */
+    private fun staleOnlyRefreshPage(): TimelinePageFfi =
+        timelinePage(
             timelineRecord(
                 messageId = OLD_MESSAGE_ID,
                 timelineAt = 1uL,
             ),
-            timelineRecord(
-                messageId = STALE_STREAM_START_ID,
-                timelineAt = 0uL,
-                kind = 1200uL,
-                tags = listOf(MessageProjector.streamTag(staleStreamId)),
-            ),
         )
-    }
 
     /** Builds a controller whose preparation dispatcher can be paused at the race boundary. */
     private fun conversationController(dispatcher: CoroutineDispatcher? = null): ConversationController {
@@ -280,12 +238,10 @@ class TimelineFullPageRefreshRaceTest {
             hasMoreAfter = false,
         )
 
-    /** Builds a received timeline record with the given id, timestamp, kind and tags. */
+    /** Builds a received kind-9 timeline record with the given id and timestamp. */
     private fun timelineRecord(
         messageId: String,
         timelineAt: ULong,
-        kind: ULong = 9uL,
-        tags: List<MessageTagFfi> = emptyList(),
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
             clientToken = null,
@@ -296,15 +252,15 @@ class TimelineFullPageRefreshRaceTest {
             sender = "peer",
             plaintext = "body-$messageId",
             contentTokens = emptyMarkdown(),
-            kind = kind,
-            tags = tags,
+            kind = 9uL,
+            tags = emptyList(),
             timelineAt = timelineAt,
             receivedAt = timelineAt,
             replyToMessageIdHex = null,
             replyPreview = null,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            thread = null,
             poll = null,
             groupSystem = null,
             hasReports = false,
@@ -345,7 +301,5 @@ class TimelineFullPageRefreshRaceTest {
         private val GROUP_ID = "bb".repeat(32)
         private const val OLD_MESSAGE_ID = "msg-old"
         private const val NEW_MESSAGE_ID = "msg-new-live"
-        private const val STREAM_START_ID = "msg-stream-start-live"
-        private const val STALE_STREAM_START_ID = "msg-stream-start-stale"
     }
 }

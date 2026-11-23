@@ -20,7 +20,7 @@ data class ConversationSearchMatch(
  *   - Case-insensitive substring match on plaintext message bodies only.
  *   - Searchable kinds are the user-authored text bodies (chat / replies /
  *     text notes). Reactions (kind 7), deletes (kind 5), group-system events
- *     (kind 1210), agent-stream markers, and attachment-only media rows are
+ *     (kind 1210), and attachment-only media rows are
  *     NOT searchable text — they carry no plaintext the user typed and would
  *     produce confusing matches against synthesized labels or filenames.
  *   - The caller supplies the already-displayed text (edit-resolved) so a
@@ -31,7 +31,7 @@ object MessageSearch {
      * Whether [record] contributes a searchable plaintext body.
      *
      * A row is searchable when it is a plain text message (not a reaction,
-     * delete, group-system event, or agent-stream marker) AND it actually
+     * delete, or group-system event) AND it actually
      * carries text. Media rows are searchable only by their accompanying
      * caption text — never by attachment filenames (explicitly out of scope
      * for v1) — which falls out naturally because [displayedText] for a
@@ -44,7 +44,6 @@ object MessageSearch {
         if (MessageProjector.isReaction(record)) return false
         if (MessageProjector.isDelete(record)) return false
         if (MessageProjector.isGroupSystem(record)) return false
-        if (MessageProjector.isStreamStart(record)) return false
         return displayedText.isNotBlank()
     }
 

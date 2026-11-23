@@ -279,7 +279,7 @@ class DetailRouteMotionScreenshotTest {
                         } else {
                             emptyList()
                         },
-                    agentTextStreamJson = null,
+                    thread = null,
                     poll = null,
                     groupSystem = null,
                     hasReports = false,
@@ -295,7 +295,7 @@ class DetailRouteMotionScreenshotTest {
                 )
             rule.runOnUiThread {
                 // Use the same projection/index/publication path as a live received message.
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                controller.testApplyLiveTimelineChanges(
                     listOf(
                         dev.ipf.marmotkit.TimelineMessageChangeFfi.Upsert(
                             trigger = dev.ipf.marmotkit.TimelineUpdateTriggerFfi.NEW_MESSAGE,

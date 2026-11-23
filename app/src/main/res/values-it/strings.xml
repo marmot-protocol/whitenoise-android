@@ -438,8 +438,6 @@
     <string name="message_actions">Azioni messaggio</string>
     <string name="message_reply_quote_description">In risposta a %1$s: %2$s</string>
     <string name="message_deleted_preview">Messaggio eliminato</string>
-    <string name="agent_stream_started">Stream agente avviato</string>
-    <string name="stream_finished">Stream terminato</string>
     <string name="media_attachment">Allegato multimediale</string>
     <string name="generic_message">Messaggio</string>
     <string name="giphy_media_preview">GIF tramite GIPHY</string>
@@ -453,8 +451,6 @@
     <string name="giphy_preview_loading">Caricamento anteprima</string>
     <string name="giphy_preview_unavailable">Anteprima non disponibile</string>
     <string name="giphy_send_result">Invia GIF: %1$s</string>
-    <string name="waiting_for_stream">In attesa dello stream...</string>
-    <string name="stream_failed_format">Stream non riuscito: %1$s</string>
     <string name="copy_text">Copia testo</string>
     <string name="select_text">Seleziona testo</string>
     <string name="open_emoji_picker">Apri selettore emoji</string>
@@ -1113,7 +1109,6 @@
     <string name="message_status_sent">Inviato</string>
     <string name="message_status_received">Ricevuto</string>
     <string name="message_status_failed">Non riuscito</string>
-    <string name="message_status_streaming">In streaming</string>
     <string name="toast_notification_account_unavailable">Quell\'account non è più disponibile</string>
     <string name="toast_reply_draft_restore_failed">Impossibile ripristinare la risposta.</string>
     <string name="toast_draft_save_failed">Impossibile salvare la bozza.</string>
@@ -2838,4 +2833,6 @@
     <string name="remote_signer_disconnect_body">L’account rimane su questo dispositivo. L’invio e le altre azioni che richiedono una firma riprendono dopo un nuovo abbinamento.</string>
     <string name="remote_signer_disconnect_confirm">Disconnetti</string>
     <string name="remote_signer_switcher_attention">L’app di firma remota richiede attenzione</string>
+    <string name="dictation_transcribe_voice_messages_title">Trascrivi automaticamente i messaggi vocali</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">Mostra nella conversazione le trascrizioni dei messaggi vocali scaricati. Richiede Offline Speech to Text.</string>
 </resources>

@@ -165,6 +165,9 @@
     "Chats": [
       "settings-chats"
     ],
+    "VoiceNotes": [
+      "settings-voice-language"
+    ],
     "VoiceLanguage": [
       "settings-voice-language"
     ],

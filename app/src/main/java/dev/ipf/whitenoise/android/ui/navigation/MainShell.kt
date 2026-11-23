@@ -1562,6 +1562,8 @@ internal fun MainShell(
             selectedChat == null &&
             !appState.appLock.screenVisible &&
             navAccountStable
+    val visibleGroup = selectedChat?.group?.groupIdHex.takeIf { dictationComposerRoute.composerVisible }
+    val voiceCapsule = persistentVoiceRecorder(appState, visibleGroup, navAccountStable)
     MainShellNoticeLayout(
         notice = appState.transientNotice,
         dictationController = appState.conversationDictation,
@@ -1569,8 +1571,11 @@ internal fun MainShell(
         appLockScreenVisible = appState.appLock.screenVisible,
         persistentTopContent = {
             ForwardOperationStatusHost(appState)
+            if (voiceCapsule != null) {
+                PersistentVoiceCapture(voiceCapsule, padStatusBars = !forwardOperationVisible)
+            }
             if (playbackInShell) {
-                Box(if (forwardOperationVisible) Modifier else Modifier.statusBarsPadding()) {
+                Box(if (forwardOperationVisible || voiceCapsule != null) Modifier else Modifier.statusBarsPadding()) {
                     dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar(
                         appState,
                         onBodyClick = guardedPlaybackSourceOpen,
@@ -1578,7 +1583,7 @@ internal fun MainShell(
                 }
             }
         },
-        persistentTopContentConsumesStatusBars = forwardOperationVisible || playbackInShell,
+        persistentTopContentConsumesStatusBars = forwardOperationVisible || playbackInShell || voiceCapsule != null,
         playbackHost = shellPlaybackHost,
         handoffOwner = appState.activeAccountRef to appState.runtimeGeneration,
         handoffDestination =

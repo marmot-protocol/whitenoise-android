@@ -436,8 +436,6 @@
     <string name="message_actions">Mesaj eylemleri</string>
     <string name="message_reply_quote_description">Yanıtlanan: %1$s, %2$s</string>
     <string name="message_deleted_preview">Mesaj silindi</string>
-    <string name="agent_stream_started">Ajan akışı başlatıldı</string>
-    <string name="stream_finished">Akış bitti</string>
     <string name="media_attachment">Medya eki</string>
     <string name="generic_message">Mesaj</string>
     <string name="giphy_media_preview">GIPHY üzerinden GIF</string>
@@ -451,8 +449,6 @@
     <string name="giphy_preview_loading">Önizleme yükleniyor</string>
     <string name="giphy_preview_unavailable">Önizleme kullanılamıyor</string>
     <string name="giphy_send_result">GIF gönder: %1$s</string>
-    <string name="waiting_for_stream">Akış bekleniyor...</string>
-    <string name="stream_failed_format">Akış başarısız: %1$s</string>
     <string name="copy_text">Metni kopyala</string>
     <string name="select_text">Metin seç</string>
     <string name="open_emoji_picker">Emoji seçiciyi aç</string>
@@ -1111,7 +1107,6 @@
     <string name="message_status_sent">Gönderildi</string>
     <string name="message_status_received">Alındı</string>
     <string name="message_status_failed">Başarısız</string>
-    <string name="message_status_streaming">Aktarılıyor</string>
     <string name="toast_notification_account_unavailable">Bu hesap artık kullanılamıyor</string>
     <string name="toast_reply_draft_restore_failed">Yanıt geri yüklenemedi.</string>
     <string name="toast_draft_save_failed">Taslak kaydedilemedi.</string>
@@ -2831,4 +2826,6 @@
     <string name="remote_signer_disconnect_body">Bu hesap cihazda kalır. Tekrar eşleştirene kadar mesaj gönderemez veya imza gerektiren diğer işlemleri yapamazsın.</string>
     <string name="remote_signer_disconnect_confirm">Bağlantıyı kes</string>
     <string name="remote_signer_switcher_attention">Uzak imzalama uygulaması ilgilenmeni bekliyor</string>
+    <string name="dictation_transcribe_voice_messages_title">Sesli mesajları otomatik olarak yazıya dök</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">İndirilen sesli mesajların dökümünü sohbeti görüntülerken gösterir. Offline Speech to Text gereklidir.</string>
 </resources>

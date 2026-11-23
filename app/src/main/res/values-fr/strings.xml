@@ -438,8 +438,6 @@
     <string name="message_actions">Actions du message</string>
     <string name="message_reply_quote_description">En réponse à %1$s : %2$s</string>
     <string name="message_deleted_preview">Message supprimé</string>
-    <string name="agent_stream_started">Flux de l’agent démarré</string>
-    <string name="stream_finished">Flux terminé</string>
     <string name="media_attachment">Pièce jointe multimédia</string>
     <string name="generic_message">Message</string>
     <string name="giphy_media_preview">GIF fourni par GIPHY</string>
@@ -453,8 +451,6 @@
     <string name="giphy_preview_loading">Chargement de l’aperçu</string>
     <string name="giphy_preview_unavailable">Aperçu indisponible</string>
     <string name="giphy_send_result">Envoyer le GIF : %1$s</string>
-    <string name="waiting_for_stream">En attente du flux...</string>
-    <string name="stream_failed_format">Échec du flux : %1$s</string>
     <string name="copy_text">Copier le texte</string>
     <string name="select_text">Sélectionner le texte</string>
     <string name="open_emoji_picker">Ouvrir le sélecteur d’émojis</string>
@@ -1113,7 +1109,6 @@
     <string name="message_status_sent">Envoyé</string>
     <string name="message_status_received">Reçu</string>
     <string name="message_status_failed">Échec</string>
-    <string name="message_status_streaming">Diffusion</string>
     <string name="toast_notification_account_unavailable">Ce compte n\'est plus disponible</string>
     <string name="toast_reply_draft_restore_failed">Impossible de restaurer la réponse.</string>
     <string name="toast_draft_save_failed">Impossible d’enregistrer le brouillon.</string>
@@ -2838,4 +2833,6 @@
     <string name="remote_signer_disconnect_body">Ce compte reste sur cet appareil. L’envoi et les autres actions nécessitant une signature seront de nouveau possibles après une nouvelle association.</string>
     <string name="remote_signer_disconnect_confirm">Déconnecter</string>
     <string name="remote_signer_switcher_attention">L’application de signature demande votre attention</string>
+    <string name="dictation_transcribe_voice_messages_title">Transcrire automatiquement les messages vocaux</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">Affiche les transcriptions des messages vocaux téléchargés dans la conversation. Nécessite Offline Speech to Text.</string>
 </resources>

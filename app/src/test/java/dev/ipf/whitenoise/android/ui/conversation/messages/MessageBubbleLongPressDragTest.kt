@@ -516,7 +516,7 @@ class MessageBubbleLongPressDragTest {
                 replyPreview = null,
                 mediaJson = null,
                 media = MessageAttachments.acceptedOutcomes(listOf(media)),
-                agentTextStreamJson = null,
+                thread = null,
                 poll = null,
                 groupSystem = null,
                 hasReports = false,

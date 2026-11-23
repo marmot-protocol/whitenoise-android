@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -144,6 +145,14 @@ class GroupDetailsHeaderScreenshotTest {
         composeRule.onNodeWithTag("chat_info.copy_public_key").assertHeightIsAtLeast(48.dp)
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/direct_details_copy_header_dark.png")
         composeRule.onNodeWithTag("chat_info.copy_public_key").performClick()
+        composeRule
+            .onNodeWithTag("chat_info.copy_public_key.visual", useUnmergedTree = true)
+            .assertWidthIsEqualTo(328.dp)
+        val expandedKey = composeRule.onNodeWithText(publicKey.chunked(5).joinToString(" "), useUnmergedTree = true)
+        val layout = mutableListOf<TextLayoutResult>()
+        expandedKey.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layout) }
+        assertTrue("The full key should fit within three lines", layout.single().lineCount <= 3)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/direct_details_expanded_key_dark.png")
         val clipboard =
             ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
         assertEquals(

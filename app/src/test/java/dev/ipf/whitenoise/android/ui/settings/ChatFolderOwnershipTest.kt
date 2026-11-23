@@ -5,7 +5,6 @@ import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -370,7 +369,7 @@ class ChatFolderOwnershipTest {
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(inclusions))
         composeRule.onNodeWithText(inclusions).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_manual_hint)).assertExists()
-        composeRule.onNode(isToggleable() and hasAnyAncestor(hasTestTag("folder.choice.g1"))).performClick()
+        composeRule.onNode(hasTestTag("folder.choice.g1") and isToggleable()).performClick()
         composeRule.onNodeWithText(app.getString(R.string.done)).performClick()
         assertFalse(state.chatFolderPreferences.foldersFor(A).any { it.name == "Rotated" })
         restoration.emulateSavedInstanceStateRestore()

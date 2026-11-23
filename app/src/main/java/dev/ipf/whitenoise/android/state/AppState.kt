@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
+import dev.ipf.whitenoise.android.ui.conversation.media.ReceivedVoiceTranscripts
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
@@ -142,7 +143,6 @@ import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -209,7 +209,6 @@ internal data class HostPerformanceRuntimeOwner(
 
 private fun openMarmotRuntime(context: Context) = MarmotClient(context).let { AppMarmotRuntime(it.rootPath, it.marmot) }
 
-private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
 private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
 private const val FORWARD_TERMINAL_STATUS_DURATION_MS = 2_000L
@@ -223,16 +222,6 @@ private val processNotificationCardCancellationDispatcher: CoroutineDispatcher b
             Thread(task, "wn-notification-cancel").apply { isDaemon = true }
         }.asCoroutineDispatcher()
 }
-
-internal fun appStateScopeExceptionHandler(
-    report: (Throwable) -> Unit = { throwable ->
-        if (BuildConfig.DEBUG) {
-            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
-        } else {
-            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure")
-        }
-    },
-): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
 
 private data class PendingAccountSwitchTrace(
     val accountRef: String,
@@ -443,7 +432,9 @@ class WhiteNoiseAppState private constructor(
         DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val swipePreferences = SwipePreferences(preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
+    internal val receivedVoiceTranscripts = ReceivedVoiceTranscripts()
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
+    internal val voiceNotes by lazy { createVoiceNoteSessionOwner() }
     private val dictationMicrophoneOwner = Any()
     private var initializedDictation by mutableStateOf<ConversationDictationController?>(null)
     internal val conversationDictation: ConversationDictationController
@@ -1373,7 +1364,7 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Developer-only streaming-debug toggle. When ON, the conversation renders
-     * agent-stream and MLS-signaling kinds as debug rows inline. Stored
+     * MLS-signaling and other non-chat kinds as debug rows inline. Stored
      * independently, but only takes effect through
      * [streamingDebugEnabled], which also requires [developerMode] — turning
      * developer mode off suppresses the debug rows without clearing this value.
@@ -1493,6 +1484,8 @@ class WhiteNoiseAppState private constructor(
 
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
+
+    internal val voiceNotePreferences = VoiceNotePreferences(preferences)
 
     internal val composerToolbarPreference by lazy {
         ComposerToolbarPreference(preferences, mutationsScope, hostPreferenceCommitMutex)
@@ -5578,6 +5571,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
     private fun clearSignedOutAccountMemory(account: String) {
+        receivedVoiceTranscripts.forgetAccount(account)
         attachmentCollections.forgetAccount(account)
         composerExpansionStateRetention.removeAccount(account)
         composerDraftExpansionBridge.removeAccount(account)
@@ -5585,7 +5579,7 @@ class WhiteNoiseAppState private constructor(
         notificationReplyDraftHandoff.removeAccount(account)
         draftWriter.removeAccount(account)
         forgetStickers(account)
-        conversationDictation.onAccountUnavailable(account)
+        releaseCaptureOwners(account)
         stopTtsForRemovedAccount(account)
     }
 
@@ -5633,7 +5627,8 @@ class WhiteNoiseAppState private constructor(
         val wipedAccountId = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
         if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
-        conversationDictation.onAccountUnavailable(wipedRef)
+        receivedVoiceTranscripts.forgetAccount(wipedRef)
+        releaseCaptureOwners(wipedRef)
         if (retireSession) clearInMemoryMediaCaches()
         try {
             val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
@@ -5776,27 +5771,8 @@ class WhiteNoiseAppState private constructor(
         accountListLoaded = result.isSuccess
     }
 
-    /** Commits one host preference transaction off-main and times actual durable completion. */
-    @Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
     private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) {
-        val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
-        val editor =
-            try {
-                preferences.edit().apply(edit)
-            } catch (throwable: Throwable) {
-                attempt.failure()
-                throw throwable
-            }
-        mutationsScope
-            .launch {
-                hostPreferenceCommitMutex.withLock {
-                    withContext(Dispatchers.IO) {
-                        completeHostPreferenceCommit(attempt, editor::commit)
-                    }
-                }
-            }.invokeOnCompletion { cause ->
-                if (cause is CancellationException) attempt.cancel()
-            }
+        persistHostSetting(preferences, hostPreferenceCommitMutex, edit)
     }
 
     fun updateDeveloperMode(enabled: Boolean) {
@@ -6599,6 +6575,7 @@ class WhiteNoiseAppState private constructor(
         } else {
             appLock.onAppBackgrounded()
             conversationDictation.onAppBackgrounded()
+            voiceNotes.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
             appLock.scheduleTtsStopAtLockBoundary()
         }
@@ -6650,6 +6627,7 @@ class WhiteNoiseAppState private constructor(
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.onTaskRemoved()
+        voiceNotes.onAppBackgrounded()
         // The app-state lifecycle is authoritative even if the TTS foreground
         // service has not started yet or its start was rejected.
         stopSpeaking()
@@ -7561,7 +7539,7 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
-        if (accountRef != null) conversationDictation.onTargetRemoved(accountRef, groupIdHex)
+        if (accountRef != null) releaseCaptureTarget(accountRef, groupIdHex)
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {

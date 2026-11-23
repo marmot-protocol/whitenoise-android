@@ -423,8 +423,6 @@
     <string name="message_actions">訊息操作</string>
     <string name="message_reply_quote_description">回覆 %1$s：%2$s</string>
     <string name="message_deleted_preview">訊息已刪除</string>
-    <string name="agent_stream_started">代理串流已開始</string>
-    <string name="stream_finished">串流已結束</string>
     <string name="media_attachment">媒體附件</string>
     <string name="generic_message">訊息</string>
     <string name="giphy_media_preview">來自 GIPHY 的 GIF</string>
@@ -438,8 +436,6 @@
     <string name="giphy_preview_loading">正在載入預覽</string>
     <string name="giphy_preview_unavailable">無法預覽</string>
     <string name="giphy_send_result">傳送 GIF：%1$s</string>
-    <string name="waiting_for_stream">正在等待串流...</string>
-    <string name="stream_failed_format">串流失敗：%1$s</string>
     <string name="copy_text">複製文字</string>
     <string name="select_text">選取文字</string>
     <string name="open_emoji_picker">開啟表情符號選擇器</string>
@@ -1092,7 +1088,6 @@
     <string name="message_status_sent">已傳送</string>
     <string name="message_status_received">已接收</string>
     <string name="message_status_failed">失敗</string>
-    <string name="message_status_streaming">串流中</string>
     <string name="toast_notification_account_unavailable">該帳戶已無法使用</string>
     <string name="toast_reply_draft_restore_failed">無法還原回覆。</string>
     <string name="toast_draft_save_failed">無法儲存草稿。</string>
@@ -2792,4 +2787,6 @@
     <string name="remote_signer_disconnect_body">此賬號會保留在此裝置上。重新配對前，無法傳送訊息或執行其他需要簽名的操作。</string>
     <string name="remote_signer_disconnect_confirm">斷開連線</string>
     <string name="remote_signer_switcher_attention">遠端簽名器需要你的處理</string>
+    <string name="dictation_transcribe_voice_messages_title">自動轉錄語音訊息</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">在查看聊天時顯示已下載語音訊息的轉錄文字。 需要 Offline Speech to Text。</string>
 </resources>

@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import android.util.Log
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.isThreadMessage
 
 /**
  * Index of the first (oldest) still-unread received message in [timeline]
@@ -148,8 +150,9 @@ internal fun TimelineMessage.isUnreadEligible(): Boolean = !fromOtherOwnDevice &
  * from the first loaded row, but a non-null anchor that has fallen out of the
  * loaded window returns no ids. For this chip, hiding is safer than resurrecting
  * an already-read mention after a conversation is recreated. Only kind-9 chat
- * rows can be mentions; [mentionsActiveAccount] is passed in so this stays pure
- * and the ui-layer NIP-27 detection isn't pulled into the state layer.
+ * rows and thread messages, which MDK also counts as chat, can be mentions.
+ * [mentionsActiveAccount] is passed in so this stays pure and the ui-layer
+ * NIP-27 detection isn't pulled into the state layer.
  */
 internal fun unreadReceivedMentionIds(
     timeline: List<TimelineMessage>,
@@ -164,6 +167,12 @@ internal fun unreadReceivedMentionIds(
     if (readAnchorMessageId != null && anchorIdx < 0) return emptyList()
     return timeline
         .drop(anchorIdx + 1)
-        .filter { it.isUnreadEligible() && it.record.kind == 9uL && mentionsActiveAccount(it) }
+        .filter { it.isUnreadEligible() && it.isChatOrThreadMessage() && mentionsActiveAccount(it) }
         .mapNotNull { it.record.messageIdHex.takeIf { id -> id.isNotBlank() } }
+}
+
+/** A kind-9 chat row or a thread message, the rows MDK counts as chat for unread counts, mentions and search. */
+internal fun TimelineMessage.isChatOrThreadMessage(): Boolean {
+    val inThread = projected?.thread != null
+    return MessageProjector.isChatKind(record.kind) || isThreadMessage(record.kind, inThread)
 }

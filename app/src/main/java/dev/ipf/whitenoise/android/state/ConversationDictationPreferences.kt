@@ -18,6 +18,8 @@ internal data class ConversationDictationPreferenceState(
     val recognitionServiceOverride: ComponentName? = null,
     val providerSelection: ConversationDictationProviderChoice? = null,
     val pauseOtherAudio: Boolean = true,
+    /** Received voice messages are transcribed on this device as soon as their audio is local. */
+    val transcribeVoiceMessages: Boolean = false,
 )
 
 /** Local-only endpointing and result behavior for composer dictation. */
@@ -64,6 +66,11 @@ internal class ConversationDictationPreferences(
         update(current().copy(pauseOtherAudio = value))
     }
 
+    fun setTranscribeVoiceMessages(value: Boolean) {
+        if (current().transcribeVoiceMessages == value) return
+        update(current().copy(transcribeVoiceMessages = value))
+    }
+
     /** Persists an explicit service identity, or clears it to follow Android's system default. */
     fun setRecognitionServiceOverride(value: ComponentName?) {
         val selection =
@@ -92,6 +99,7 @@ internal class ConversationDictationPreferences(
             .putLong(KEY_FINISH_AFTER_SILENCE, value.finishAfterSilenceMillis ?: MANUAL_FINISH)
             .putString(KEY_SILENCE_DELIVERY_MODE, value.silenceDeliveryMode.name)
             .putBoolean(KEY_PAUSE_OTHER_AUDIO, value.pauseOtherAudio)
+            .putBoolean(KEY_TRANSCRIBE_VOICE_MESSAGES, value.transcribeVoiceMessages)
             // The old key governed every completion, including the ones a person ended by hand.
             // Dropping it on the first write keeps an upgrade from acting on a choice made under
             // those wider rules, so the narrower setting above starts from paste.
@@ -119,12 +127,15 @@ internal class ConversationDictationPreferences(
                 ?: ConversationDictationDeliveryMode.PasteIntoDraft
         val selection = decodeSelection(preferences.getString(KEY_PROVIDER_SELECTION, null))
         val pauseOtherAudio = runCatching { preferences.getBoolean(KEY_PAUSE_OTHER_AUDIO, true) }.getOrDefault(true)
+        val transcribeVoiceMessages =
+            runCatching { preferences.getBoolean(KEY_TRANSCRIBE_VOICE_MESSAGES, false) }.getOrDefault(false)
         return ConversationDictationPreferenceState(
             silence,
             silenceDelivery,
             selection?.service,
             selection,
             pauseOtherAudio,
+            transcribeVoiceMessages,
         )
     }
 
@@ -177,6 +188,7 @@ internal class ConversationDictationPreferences(
         private const val KEY_DELIVERY_MODE = "deliveryMode"
         private const val KEY_SILENCE_DELIVERY_MODE = "silenceDeliveryMode"
         private const val KEY_PAUSE_OTHER_AUDIO = "pauseOtherAudio"
+        private const val KEY_TRANSCRIBE_VOICE_MESSAGES = "transcribeVoiceMessages"
         private const val KEY_PROVIDER_SELECTION = "providerSelection"
         private const val KEY_RECOGNITION_SERVICE_OVERRIDE = "recognitionServiceOverride"
         private const val MANUAL_FINISH = -1L

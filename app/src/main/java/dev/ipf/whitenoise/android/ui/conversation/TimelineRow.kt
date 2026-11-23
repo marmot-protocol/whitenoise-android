@@ -129,12 +129,6 @@ internal fun TimelineRow(
                     if (size.height > 0) onMeasured(item.record.messageIdHex, size.height)
                 },
         ) {
-            if (item.id.startsWith(ConversationController.STREAM_DEBUG_ID_PREFIX)) {
-                if (appState.streamingDebugEnabled) {
-                    StreamDebugEventRow(record = item.record)
-                }
-                return@Column
-            }
             when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
                 TimelineRowKind.GroupSystem -> {
                     GroupSystemTimelineRow(

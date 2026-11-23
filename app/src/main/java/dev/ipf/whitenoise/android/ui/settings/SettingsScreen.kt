@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -291,8 +290,7 @@ private fun SettingsDetailRoute(
 ) {
     when (detail) {
         SettingsDetail.ShareConnect -> ShareConnectScreen(appState, onBack = onBack)
-        SettingsDetail.Account ->
-            AccountScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
+        SettingsDetail.Account -> AccountScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
         SettingsDetail.Chats -> ChatsScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
         SettingsDetail.VoiceLanguage ->
             VoiceLanguageScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
@@ -370,6 +368,7 @@ private fun SettingsDetailRoute(
         SettingsDetail.DiagnosticsImprovements -> DiagnosticsImprovementsScreen(appState, onBack = onBack)
         SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = onBack)
         SettingsDetail.Donate -> DonateScreen(onBack = onBack)
+        SettingsDetail.VoiceNotes -> VoiceNoteSettingsScreen(appState, onBack)
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = onBack)
         SettingsDetail.Translation -> TranslationSettingsScreen(onBack = onBack)
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = onBack)
@@ -775,85 +774,75 @@ private fun SettingsProfileRow(
     val editPictureDescription = stringResource(R.string.profile_picture_edit)
     val avatarExplanation = stringResource(R.string.explanation_settings_profile_picture)
     val profileExplanation = stringResource(R.string.explanation_settings_profile_row)
+    var keyExpanded by rememberSaveable(account.npub) { mutableStateOf(false) }
     Surface(
         color = context.containerColor,
         shape = context.shapes.shape,
         modifier = Modifier.fillMaxWidth().settingsRowBorder(context),
     ) {
-        ListItem(
-            headlineContent = {
-                EmojiLabel(
-                    text = account.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            },
-            supportingContent = {
-                // The short key copies the whole key; the rest of the row still opens Share & Connect (#3565).
-                PublicKeyCopyText(
-                    account.subtitle,
-                    account.npub,
-                    Modifier.testTag("settings.active_profile_public_key"),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            leadingContent = {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(SettingsHomeDefaults.ProfileAvatarSize)
-                            .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
-                            .clickable(role = Role.Button, onClick = onAvatarClick)
-                            .testTag("settings.active_profile_avatar")
-                            .semantics {
-                                contentDescription = editPictureDescription
-                                role = Role.Button
-                            },
-                ) {
-                    Avatar(
-                        title = account.title,
-                        seed = account.seed,
-                        size = SettingsHomeDefaults.ProfileAvatarSize,
-                        pictureUrl = account.pictureUrl,
-                        pictureDomain = AvatarImageLoader.publicProfiles(),
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            ListItem(
+                headlineContent = {
+                    EmojiLabel(
+                        text = account.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleMedium,
                     )
-                }
-            },
-            trailingContent = { SettingsProfileTrailing() },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .explainOnLongPress(Explanation(account.title, profileExplanation))
-                    .clickable(onClick = onClick)
-                    .testTag("settings.active_profile")
-                    .semantics {
-                        contentDescription = shareDescription
-                        role = Role.Button
+                },
+                supportingContent =
+                    if (keyExpanded) {
+                        null
+                    } else {
+                        {
+                            PublicKeyCopyText(
+                                account.subtitle,
+                                account.npub,
+                                Modifier.testTag("settings.active_profile_public_key"),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                onExpand = { keyExpanded = true },
+                            )
+                        }
                     },
-        )
-    }
-}
-
-/** QR glyph and chevron that announce the profile row as the way to Share & Connect. */
-@Composable
-@Suppress("FunctionNaming")
-private fun SettingsProfileTrailing() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_settings_qr_code_2),
-            contentDescription = null,
-            modifier = Modifier.size(SettingsHomeDefaults.IconSize),
-        )
-        Icon(
-            painter = painterResource(R.drawable.ic_chevron_right),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+                leadingContent = {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(SettingsHomeDefaults.ProfileAvatarSize)
+                                .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
+                                .clickable(role = Role.Button, onClick = onAvatarClick)
+                                .testTag("settings.active_profile_avatar")
+                                .semantics {
+                                    contentDescription = editPictureDescription
+                                    role = Role.Button
+                                },
+                    ) {
+                        Avatar(
+                            title = account.title,
+                            seed = account.seed,
+                            size = SettingsHomeDefaults.ProfileAvatarSize,
+                            pictureUrl = account.pictureUrl,
+                            pictureDomain = AvatarImageLoader.publicProfiles(),
+                        )
+                    }
+                },
+                trailingContent = { SettingsProfileTrailing() },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .explainOnLongPress(Explanation(account.title, profileExplanation))
+                        .clickable(onClick = onClick)
+                        .testTag("settings.active_profile")
+                        .semantics {
+                            contentDescription = shareDescription
+                            role = Role.Button
+                        },
+            )
+            if (keyExpanded) {
+                SettingsExpandedProfileKey(account.npub)
+            }
+        }
     }
 }
 
@@ -914,5 +903,4 @@ private fun SignOutGroup(onSignOut: () -> Unit) {
 /** Sizes the Settings home fixes independently of the row components. */
 private object SettingsHomeDefaults {
     val ProfileAvatarSize = 56.dp
-    val IconSize = 24.dp
 }
