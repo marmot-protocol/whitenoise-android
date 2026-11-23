@@ -181,12 +181,13 @@ internal fun PublicKeyCopyText(
     maxLines: Int = 1,
     enabled: Boolean = true,
     keyboardFocusable: Boolean = false,
+    onExpand: (() -> Unit)? = null,
 ) {
     val copy = rememberPublicKeyCopy(npub)
     var expanded by rememberSaveable(npub) { mutableStateOf(false) }
     val copyAndExpand = {
         copy()
-        expanded = true
+        if (onExpand == null) expanded = true else onExpand()
     }
     val copyLabel = stringResource(R.string.public_key_copy_action_with_value, npub)
     val focusInteractions = remember { MutableInteractionSource() }

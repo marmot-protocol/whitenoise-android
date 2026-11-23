@@ -76,7 +76,7 @@ class SettingsScreenScreenshotTest {
     @Test
     fun settingsProfileKeyExpandedAmoled() {
         render(darkTheme = true, amoled = true)
-        composeRule.onNodeWithTag("settings.active_profile_public_key").performClick()
+        composeRule.onNodeWithTag("settings.active_profile_public_key", useUnmergedTree = true).performClick()
         capture("settings_screen_profile_key_expanded_amoled")
     }
 

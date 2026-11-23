@@ -45,6 +45,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
@@ -60,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.SearchCollapse
+import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
@@ -769,7 +772,7 @@ private fun SettingsProfileHeader(
     }
 }
 
-/** The active profile header opens Share & Connect, with a separate copyable key below it. */
+/** The active profile as one tappable row: avatar, name, short key that copies the full key, QR glyph and chevron. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -783,12 +786,13 @@ private fun SettingsProfileRow(
     val editPictureDescription = stringResource(R.string.profile_picture_edit)
     val avatarExplanation = stringResource(R.string.explanation_settings_profile_picture)
     val profileExplanation = stringResource(R.string.explanation_settings_profile_row)
+    var keyExpanded by rememberSaveable(account.npub) { mutableStateOf(false) }
     Surface(
         color = context.containerColor,
         shape = context.shapes.shape,
         modifier = Modifier.fillMaxWidth().settingsRowBorder(context),
     ) {
-        Column(horizontalAlignment = Alignment.End) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             ListItem(
                 headlineContent = {
                     EmojiLabel(
@@ -798,6 +802,20 @@ private fun SettingsProfileRow(
                         style = MaterialTheme.typography.titleMedium,
                     )
                 },
+                supportingContent =
+                    if (keyExpanded) {
+                        null
+                    } else {
+                        {
+                            PublicKeyCopyText(
+                                account.subtitle,
+                                account.npub,
+                                Modifier.testTag("settings.active_profile_public_key"),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                onExpand = { keyExpanded = true },
+                            )
+                        }
+                    },
                 leadingContent = {
                     Box(
                         modifier =
@@ -833,19 +851,29 @@ private fun SettingsProfileRow(
                             role = Role.Button
                         },
             )
-            PublicKeyCopyText(
-                account.subtitle,
-                account.npub,
-                Modifier
-                    .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
-                    .padding(bottom = SettingsHomeDefaults.ProfileKeyBottomInset)
-                    .testTag("settings.active_profile_public_key"),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                keyboardFocusable = true,
-            )
+            if (keyExpanded) {
+                SettingsExpandedProfileKey(account.npub)
+            }
         }
     }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun SettingsExpandedProfileKey(npub: String) {
+    PublicKeyCopyText(
+        publicKeyDisplayGroups(npub).joinToString(" "),
+        npub,
+        Modifier
+            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+            .padding(bottom = WhiteNoiseSpacing.Related)
+            .animatePublicKeyExpansion(expanded = true),
+        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = Int.MAX_VALUE,
+        keyboardFocusable = true,
+        onExpand = {},
+    )
 }
 
 /** QR glyph and chevron that announce the profile row as the way to Share & Connect. */
@@ -926,6 +954,5 @@ private fun SignOutGroup(onSignOut: () -> Unit) {
 /** Sizes the Settings home fixes independently of the row components. */
 private object SettingsHomeDefaults {
     val ProfileAvatarSize = 56.dp
-    val ProfileKeyBottomInset = 12.dp
     val IconSize = 24.dp
 }
