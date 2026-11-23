@@ -12,6 +12,7 @@ class ActionColorSurfaceCoverageTest {
     fun accountActionsAndUnreadSurfacesConsumeTheAccountActionToken() {
         // Neutral New Message appearance is covered by rendered theme goldens.
         val composer = source("conversation/composer/ComposerBar.kt")
+        val voice = source("conversation/composer/VoiceLockedActions.kt")
         val chatRow = source("chats/ChatRow.kt")
         val topBar = source("chats/ChatListTopBar.kt")
         val accountSwitcher = source("account/AccountSwitcher.kt")
@@ -20,12 +21,12 @@ class ActionColorSurfaceCoverageTest {
         assertEquals(
             "The shared text Send disc and locked-voice Send must use the resolved container",
             2,
-            Regex("""containerColor = actionColors\.container""").findAll(composer).count(),
+            Regex("""containerColor = actionColors\.container""").findAll(composer + voice).count(),
         )
         assertEquals(
             "The shared text Send disc and locked-voice Send must use the resolved foreground",
             2,
-            Regex("""contentColor = actionColors\.content""").findAll(composer).count(),
+            Regex("""contentColor = actionColors\.content""").findAll(composer + voice).count(),
         )
 
         assertTrue(

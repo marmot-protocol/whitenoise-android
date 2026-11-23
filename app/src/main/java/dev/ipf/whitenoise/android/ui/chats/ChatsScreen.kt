@@ -2105,12 +2105,10 @@ internal fun ChatsScreen(
                         onOpenProfile = { npub ->
                             if (menuActionsCurrent()) presentProfileFromVisibleList(npub)
                         },
-                        onOpenActions = {
+                        onOpenActions = { touchX ->
                             if (menuActionsCurrent()) {
-                                val continuingHold =
-                                    actionMenuOwner.isCurrent(heldMenuToken[0]) &&
-                                        actionSheetChatId == rowId
-                                if (!continuingHold) actionMenuOwner.open(held = false)
+                                val held = heldMenuToken[0].takeIf { actionSheetChatId == rowId }
+                                actionMenuOwner.openAt(touchX, held)
                                 actionSheetChatId = rowId
                             }
                         },
@@ -2223,6 +2221,7 @@ internal fun ChatsScreen(
                                 }
                             },
                             expanded = actionSheetChatId == rowId,
+                            touchX = actionMenuOwner.touchX,
                             focusable = !actionMenuOwner.pointerHeld,
                             modifier = Modifier.testTag("chat.menu.$rowId"),
                             canRunAction = {

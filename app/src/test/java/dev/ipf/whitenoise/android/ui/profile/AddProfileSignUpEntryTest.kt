@@ -206,8 +206,7 @@ class AddProfileSignUpEntryTest {
         controller.submit(SignUpProfileDraft("Wrong duplicate", ""))
         waitFor { controller.stage == SignUpStage.Complete }
         assertEquals(2, creates.get())
-        assertEquals(1, publishes.get())
-        assertEquals("Bob", published?.name)
+        assertEquals(0, publishes.get())
         assertEquals("bob", app.activeAccountRef)
     }
 
@@ -354,9 +353,12 @@ class AddProfileSignUpEntryTest {
                         creates.incrementAndGet()
                         if (holdCreate) check(createRelease.await(10, TimeUnit.SECONDS))
                         if (failCreate) error("Controlled unaccepted create failure")
+                        val submitted = args!![0] as UserProfileMetadataFfi
+                        // A resumed setup can return an earlier profile, which still needs an explicit save.
+                        val initial = if (failPublishOnce) submitted.copy(about = "Earlier setup") else submitted
                         IdentityCreationResultFfi(
                             nativeCreated ?: bob,
-                            args!![0] as UserProfileMetadataFfi,
+                            initial,
                             AccountSetupReadinessFfi.LOCAL_READY,
                         )
                     }

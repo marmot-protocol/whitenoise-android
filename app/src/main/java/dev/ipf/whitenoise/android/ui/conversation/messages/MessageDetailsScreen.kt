@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -60,6 +59,7 @@ import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
@@ -355,9 +355,8 @@ private fun MessageReactionsSection(reactions: List<ReactionTally>) {
             )
             reactions.forEachIndexed { index, tally ->
                 if (index > 0) {
-                    HorizontalDivider(
+                    AppDivider(
                         modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
                 ListItem(
@@ -409,9 +408,8 @@ private fun MessageReportsSection(
             )
             reports.forEachIndexed { index, report ->
                 if (index > 0) {
-                    HorizontalDivider(
+                    AppDivider(
                         modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
                 MessageReportRow(report, index, reporterName(report.reporter), locale, zone, canDismiss, onDismiss)

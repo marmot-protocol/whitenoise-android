@@ -31,6 +31,7 @@ internal fun AddAccountSheetContent(
     privateKeyState: TextFieldState? = null,
     amberSignInStage: Int? = null,
     onBack: () -> Unit = {},
+    onUseRemoteSigner: ((String?) -> Unit)? = null,
 ) {
     val busy = inFlightAction != OnboardingAction.Idle
     val key = privateKeyState ?: remember { TextFieldState(identity) }
@@ -65,6 +66,7 @@ internal fun AddAccountSheetContent(
             onLoginWithAmber = onLoginWithAmber,
             onSignInValue = { onImport() },
             onSystemBackWhileBusy = onBack,
+            onUseRemoteSigner = onUseRemoteSigner,
         )
     } else {
         WelcomeScreen(

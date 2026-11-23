@@ -46,6 +46,18 @@ class ConversationDictationPreferencesTest {
         assertTrue(ConversationDictationPreferences(context, preferences()).current().pauseOtherAudio)
     }
 
+    /** Automatic voice-message transcription is opt-in, persists, and a malformed value stays off. */
+    @Test
+    fun transcribeVoiceMessagesIsOptInAndPersists() {
+        val original = ConversationDictationPreferences(context, preferences())
+        assertFalse(original.current().transcribeVoiceMessages)
+        original.setTranscribeVoiceMessages(true)
+        assertTrue(ConversationDictationPreferences(context, preferences()).current().transcribeVoiceMessages)
+
+        preferences().edit().putString("transcribeVoiceMessages", "invalid").commit()
+        assertFalse(ConversationDictationPreferences(context, preferences()).current().transcribeVoiceMessages)
+    }
+
     /** Verifies only supported endpointing values persist and send mode requires explicit selection. */
     @Test
     fun persistsOnlySupportedSilenceThresholdsAndExplicitSendMode() {

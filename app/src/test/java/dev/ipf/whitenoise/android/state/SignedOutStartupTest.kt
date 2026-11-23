@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import android.app.Application
 import android.content.Context
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.Nip46ErrorFfi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -35,6 +37,50 @@ class SignedOutStartupTest {
                 assertEquals(1, fixture.runtimeStartCalls.get())
                 assertEquals(1, fixture.subscriptionCalls.get())
                 assertEquals(1, fixture.signerRegistrationCalls.get())
+            }
+        }
+
+    /**
+     * A remote-signer account whose pairing MDK erased (disconnected or signed out) reports no NIP-46 credentials.
+     * It must still never get an Amber callback, and Account keys must offer pairing again.
+     */
+    @Test
+    fun endedRemoteSignerPairingIsNotTakenForAnAmberAccount() =
+        runBlocking {
+            val preferences =
+                RuntimeEnvironment.getApplication().getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            assertTrue(preferences.edit().putStringSet("remote_signer_accounts", setOf("remote")).commit())
+            try {
+                val accounts = listOf(account("amber", external = true), account("remote", external = true))
+                withFixture(accounts, selected = "amber") { fixture ->
+                    assertEquals("only the Amber account gets a callback", 1, fixture.signerRegistrationCalls.get())
+                    val remote = fixture.appState.remoteSigners.status("remote")
+                    assertEquals(RemoteSignerHealth.PairingEnded, remote?.health)
+                    assertNull(fixture.appState.remoteSigners.status("amber"))
+                }
+            } finally {
+                preferences.edit().remove("remote_signer_accounts").commit()
+            }
+        }
+
+    @Test
+    fun restoredRemoteSignerKeepsItsSessionWhenAmberResumeFails() =
+        runBlocking {
+            val accounts = listOf(account("amber", external = true), account("remote", external = true))
+            withFixture(
+                accounts,
+                onNip46Resume = { accountRef ->
+                    if (accountRef == "remote") {
+                        true
+                    } else {
+                        throw MarmotKitException.Nip46(Nip46ErrorFfi.Storage())
+                    }
+                },
+            ) { fixture ->
+                assertEquals(1, fixture.signerRegistrationCalls.get())
+                val remoteStatus = fixture.appState.remoteSigners.status("remote")
+                assertEquals(RemoteSignerHealth.Paired, remoteStatus?.health)
+                assertNull(fixture.appState.remoteSigners.status("amber"))
             }
         }
 
@@ -171,6 +217,7 @@ class SignedOutStartupTest {
         selected: String? = accounts.first().label,
         signInFailure: Throwable? = null,
         onSignInAccount: ((String) -> Unit)? = null,
+        onNip46Resume: ((String) -> Boolean)? = null,
         block: suspend (NotificationBootstrapTestFixture) -> Unit,
     ) {
         val context: Application = RuntimeEnvironment.getApplication()
@@ -190,13 +237,18 @@ class SignedOutStartupTest {
                 emitStartupNotification = false,
                 signInFailure = signInFailure,
                 onSignInAccount = onSignInAccount,
+                onNip46Resume = onNip46Resume,
             )
         try {
             fixture.bootstrap()
             block(fixture)
         } finally {
             fixture.close()
-            preferences.edit().remove("active_account").commit()
+            preferences
+                .edit()
+                .remove("active_account")
+                .remove("remote_signer_accounts")
+                .commit()
         }
     }
 

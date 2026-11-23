@@ -203,7 +203,7 @@ class AppStateSignUpReentryTest {
         idleUntil { f.controller.stage == SignUpStage.Complete }
         assertEquals(1, f.starts.get())
         assertEquals(1, f.creations.get())
-        assertEquals(1, f.publications.get())
+        assertEquals(0, f.publications.get())
     }
 
     /** The real adapter over a native double whose setup readiness each test scripts. */

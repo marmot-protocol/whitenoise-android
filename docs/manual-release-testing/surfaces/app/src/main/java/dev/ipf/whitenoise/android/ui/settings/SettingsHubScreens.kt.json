@@ -226,6 +226,15 @@
         "test_ids": [
           "SET-058"
         ]
+      },
+      {
+        "surface": "R.string.settings_voice_notes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_voice_notes",
+        "test_ids": [
+          "MED-062",
+          "MED-038"
+        ]
       }
     ],
     "composable_surfaces": [

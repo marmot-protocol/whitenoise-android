@@ -2,6 +2,17 @@
 <resources>
     <string name="voice_review_title">Sesli mesajı gözden geçir</string>
     <string name="voice_record_again">Yeniden kaydet</string>
-    <string name="voice_message_release_to_review">İncelemek için bırakın · iptal için kaydırın</string>
+    <string name="voice_message_slide_to_cancel">Iptal için kaydırın</string>
     <string name="voice_recording_stop">Kaydı durdur</string>
+    <string name="voice_recording_pause">Kaydı duraklat</string>
+    <string name="voice_discard_title">Sesli mesaj silinsin mi?</string>
+    <string name="voice_discard_message">Bu kayıt gönderilmedi ve silinecek.</string>
+    <string name="voice_send_interrupted">Sesli mesaj gönderilmedi</string>
+    <string name="voice_recording_elsewhere">Başka bir sohbette sesli mesaj kaydediliyor.</string>
+    <string name="voice_row_recording">Sesli mesaj kaydediliyor</string>
+    <string name="voice_row_unsent">Gönderilmemiş sesli mesaj</string>
+    <string name="voice_recording_paused">Ses kaydı duraklatıldı</string>
+    <string name="voice_send_on_release">Basılı tutarak kaydedilen sesli mesajı bırakınca gönder</string>
+    <string name="voice_transcribe_automatically">Alınan sesli mesajları otomatik olarak yazıya dök</string>
+    <string name="settings_voice_notes">Sesli mesajlar</string>
 </resources>

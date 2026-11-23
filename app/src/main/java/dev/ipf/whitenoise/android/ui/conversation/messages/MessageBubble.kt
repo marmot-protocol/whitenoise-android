@@ -410,7 +410,6 @@ internal fun MessageBubble(
     LaunchedEffect(isActionMenuOpen) {
         if (!isActionMenuOpen) pressState.longPressTtsStart = null
     }
-    var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     val hasReports = item.projected?.hasReports == true
     val focusedMessageLayer = if (isActionMenuOpen) rememberGraphicsLayer() else null
     var focusedMediaReady by remember(item.presentationId, focusedMessageLayer) { mutableStateOf(false) }
@@ -563,7 +562,7 @@ internal fun MessageBubble(
         } else {
             remember(record.messageIdHex) {
                 dev.ipf.whitenoise.android.ui.conversation.media
-                    .AudioTranscriptionToggleState()
+                    .AudioTranscriptionToggleState(record.messageIdHex)
             }
         }
     val translationSource =
@@ -1711,7 +1710,6 @@ internal fun MessageBubble(
                                                 windowPosition,
                                             )
                                         }
-                                    longPressWindowY = windowPosition.y
                                     pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                     pressState.initiatingMenuHoldActive = true
                                     // Freeze the rendered hit now. The bubble
@@ -1823,7 +1821,6 @@ internal fun MessageBubble(
                                         // anchor to the bubble top and seed the first word.
                                         pressState.longPressWindowPosition = null
                                         pressState.selectionSeedVisibleOffset = null
-                                        longPressWindowY = null
                                         pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                         onActionMenuOpenChange(true)
                                         true
@@ -2177,7 +2174,6 @@ internal fun MessageBubble(
                             if (!selectionMode && !textSelectionMode) {
                                 pressState.longPressWindowPosition = null
                                 pressState.selectionSeedVisibleOffset = null
-                                longPressWindowY = null
                                 pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                 onActionMenuOpenChange(true)
                             }
@@ -2340,7 +2336,6 @@ internal fun MessageBubble(
                                             if (!deleted && !selectionMode && !textSelectionMode) {
                                                 pressState.longPressWindowPosition = null
                                                 pressState.selectionSeedVisibleOffset = null
-                                                longPressWindowY = null
                                                 pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                                 onActionMenuOpenChange(true)
                                             }
@@ -2890,7 +2885,8 @@ internal fun MessageBubble(
                     expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
                     initiatingHoldActive = pressState.initiatingMenuHoldActive,
                     anchorBoundsInWindow = pressState.actionMenuAnchorBounds,
-                    anchorWindowYPx = longPressWindowY,
+                    anchorWindowYPx = pressState.longPressWindowPosition?.y,
+                    anchorWindowXPx = pressState.longPressWindowPosition?.x,
                     canReply = !deleted && !actionsReadOnly,
                     canReact = !deleted && !actionsReadOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
