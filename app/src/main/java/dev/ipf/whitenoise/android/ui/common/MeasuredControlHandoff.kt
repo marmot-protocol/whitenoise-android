@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -208,6 +207,9 @@ internal class MeasuredControlHandoff(
             (previous != destination || continuesSameOwner || hasLauncher) &&
             from != null
 
+    private fun motionDirection(): SurfaceMotion =
+        if (previous != null && previous == closeDestination) SurfaceMotion.Close else SurfaceMotion.Open
+
     /** New placement supplies the destination; a missing endpoint never waits or revives later. */
     suspend fun animatePrepared(token: Any) {
         if (request !== token || start == null) return
@@ -220,8 +222,7 @@ internal class MeasuredControlHandoff(
         end = target
         progress.snapTo(0f)
         awaitingFrame = false
-        val motion = if (previous != null && previous == closeDestination) SurfaceMotion.Close else SurfaceMotion.Open
-        progress.animateTo(1f, motion.spec())
+        progress.animateTo(1f, motionDirection().spec())
         if (request === token) finish()
     }
 
@@ -310,22 +311,7 @@ internal class MeasuredControlHandoff(
         start = origin
         end = target
         progress.snapTo(0f)
-        progress.animateTo(
-            1f,
-            tween(
-                if (previous != null && previous == closeDestination) {
-                    APP_MOTION_CLOSE_MILLIS
-                } else {
-                    APP_MOTION_OPEN_MILLIS
-                },
-                easing =
-                    if (previous != null && previous == closeDestination) {
-                        AppMotionCloseEasing
-                    } else {
-                        AppMotionOpenEasing
-                    },
-            ),
-        )
+        progress.animateTo(1f, motionDirection().spec())
         start = null
         end = null
     }
