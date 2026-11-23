@@ -1665,16 +1665,13 @@ internal fun ChatsScreen(
         }
     }
     val resumeBaseline = rememberChatListResumeBaseline()
-    // Keep a new chat-list head flush at the top when live activity reorders
-    // keyed items (issues #541 / #1313 / #1651). LazyColumn otherwise pins the
-    // previous head by key, leaving the promoted row above or clipped by the viewport.
-    //
-    // Two paths, both via [ChatListHeadSnap] (background returns: ChatListResumeBaseline):
-    //   - Return from a conversation: if the head changed while the list was
-    //     off-screen, snap regardless of the restored scroll index (#1313).
-    //   - Active on-list reader: animate the one-row correction only from the
-    //     true top so both keyed rows move together; never yank a deeper reader
-    //     or interrupt active scrolling (#541 / #1651).
+    // Keep a new chat-list head flush at the top when live activity reorders keyed items (issues #541 / #1313 /
+    // #1651). LazyColumn otherwise pins the previous head by key, leaving the promoted row above or clipped by the
+    // viewport. Two paths, both via [ChatListHeadSnap] (background returns: ChatListResumeBaseline):
+    //   - Return from a conversation: if the head changed while the list was off-screen, snap regardless of the
+    //     restored scroll index (#1313).
+    //   - Active on-list reader: animate the one-row correction only from the true top so both keyed rows move
+    //     together; never yank a deeper reader or interrupt active scrolling (#541 / #1651).
     // Keyed on `showArchived` so the tracked head resets alongside `chatListState` on a view swap.
     val activeHeadId = visibleItems.firstOrNull()?.id.takeIf { ordinaryActiveList }
     val activeReturnHead = chatListReturnHead(visibleItems).takeIf { ordinaryActiveList }
