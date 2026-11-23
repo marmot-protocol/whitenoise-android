@@ -21,6 +21,7 @@ private const val SHIFT_3 = 24
 /** Bounded zlib (`/FlateDecode`) reading and same-length rewriting for metadata streams. */
 internal object PdfFlate {
     /** Inflates [compressed], or returns null when it is not zlib data or inflates past [limit] bytes. */
+    @Suppress("ReturnCount") // Not zlib, too large and finished are separate exits.)
     fun inflate(
         compressed: ByteArray,
         limit: Int,

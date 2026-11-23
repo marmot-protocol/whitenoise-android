@@ -190,6 +190,8 @@ internal class ConversationMediaSender(
         onAfterSend: () -> Unit = {},
     ) {
         val completion = StagedMediaSendCompletion(onAccepted, onRejected, onSettled)
+        // The person's choice to send PDFs with their metadata covers this send only, every chunk of it.
+        val keepPdfMetadata = pdfChoices.takeConsent()
         val replyTarget = controller.replyingTo?.messageIdHex
         val replyVersion = controller.replySelectionVersion
         // A reply is one message read wholly into memory, so it keeps the one-message limit; the shelf stays.
@@ -213,6 +215,7 @@ internal class ConversationMediaSender(
                     preparedImageAttachments,
                     preparedDocumentAttachments,
                     pendingDraftClear,
+                    keepPdfMetadata,
                 )
             return startCollectionSend(request, completion, onAfterSend, sendDrafts)
         }
@@ -237,6 +240,7 @@ internal class ConversationMediaSender(
                         preparedDocumentAttachments,
                         allowFileBacked = replyTarget == null,
                         staging = FileBackedSendStaging { stagedSources += it },
+                        keepPdfMetadata = keepPdfMetadata,
                     )
                 val ready =
                     preparedForReplySend(prepared, imageSlots.size, documentUris.size, replyTarget != null)
@@ -350,6 +354,7 @@ internal class ConversationMediaSender(
         preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment>,
         allowFileBacked: Boolean,
         staging: FileBackedSendStaging,
+        keepPdfMetadata: Set<android.net.Uri> = emptySet(),
         pickKey: (String) -> String = { it },
     ): PreparedStagedAttachments {
         // Reading the native limit is a binding call, so it stays off Main.
@@ -373,6 +378,7 @@ internal class ConversationMediaSender(
                     documentBudget,
                     allowFileBacked,
                     staging,
+                    keepPdfMetadata,
                     pickKey,
                 )
             }
@@ -408,13 +414,14 @@ internal class ConversationMediaSender(
      * A prepared video refused for its private metadata is reported, never re-read or sent as saved. Each document
      * decodes in the draft of its pick, [pickKey] of its URI.
      */
-    @Suppress("LongParameterList") // The documents, their prepared bytes, the budgets, staging and draft keys.
+    @Suppress("LongParameterList") // Documents, prepared bytes, budgets, staging, PDF consent and draft keys.
     private suspend fun readStagedDocuments(
         documentUris: List<android.net.Uri>,
         preparedDocuments: PreparedVideoCheck<android.net.Uri>,
         bytesBudget: Long,
         allowFileBacked: Boolean,
         staging: FileBackedSendStaging,
+        keepPdfMetadata: Set<android.net.Uri>,
         pickKey: (String) -> String,
     ): DocumentReadOutcome {
         val attachments = mutableListOf<PendingAttachment>()
@@ -454,7 +461,9 @@ internal class ConversationMediaSender(
                 failures += read.failures
                 overflowed = overflowed || read.albumOverflowed
             }
-            totalBytes -= withContext(Dispatchers.IO) { attachments.dropUnconfirmedPdfMetadata(firstOfUri, failures) }
+            val keeps = uri in keepPdfMetadata
+            totalBytes -=
+                withContext(Dispatchers.IO) { attachments.dropUnconfirmedPdfMetadata(firstOfUri, failures, keeps) }
         }
         return DocumentReadOutcome(attachments, failures, overflowed, totalBytes)
     }

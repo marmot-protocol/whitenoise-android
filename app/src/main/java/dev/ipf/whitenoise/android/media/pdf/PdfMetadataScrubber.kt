@@ -19,12 +19,25 @@ import java.nio.channels.FileChannel
  * changed either. Each change is checked by planning again, which must find nothing left; otherwise every write is
  * undone, so a refused PDF always keeps its original bytes.
  */
+@Suppress("TooManyFunctions") // Inspect and scrub for each input kind, plus the shared guards.)
 internal object PdfMetadataScrubber {
     /** What removing metadata from [bytes] would do, without changing them. */
     fun inspect(bytes: ByteArray): PdfMetadataResult = inspect(ArrayPdfBytes(bytes))
 
     /** What removing metadata from [file] would do, without changing it. */
     fun inspect(file: File): PdfMetadataResult = withMapped(file, writable = false, ::inspect)
+
+    /** What removing metadata from [length] bytes at [offset] of the file open on [channel] would do. */
+    fun inspect(
+        channel: FileChannel,
+        offset: Long,
+        length: Long,
+    ): PdfMetadataResult =
+        try {
+            mapped(channel, offset, length, ::inspect)
+        } catch (_: IOException) {
+            PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)
+        }
 
     /** Removes metadata from [bytes] in place. A refused PDF keeps its bytes. */
     fun scrub(bytes: ByteArray): PdfMetadataResult = scrub(ArrayPdfBytes(bytes))
@@ -117,18 +130,26 @@ internal object PdfMetadataScrubber {
     ): PdfMetadataResult =
         try {
             RandomAccessFile(file, if (writable) "rw" else "r").use { access ->
-                val size = access.length()
-                when {
-                    size == 0L -> PdfMetadataResult.NotPdf
-                    size > Int.MAX_VALUE -> PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)
-                    else -> {
-                        val mode = if (writable) FileChannel.MapMode.READ_WRITE else FileChannel.MapMode.READ_ONLY
-                        val buffer = access.channel.map(mode, 0L, size)
-                        block(BufferPdfBytes(buffer)).also { if (writable) buffer.force() }
-                    }
-                }
+                val mode = if (writable) FileChannel.MapMode.READ_WRITE else FileChannel.MapMode.READ_ONLY
+                mapped(access.channel, 0L, access.length(), block, mode)
             }
         } catch (_: IOException) {
             PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)
+        }
+
+    private fun mapped(
+        channel: FileChannel,
+        offset: Long,
+        length: Long,
+        block: (PdfBytes) -> PdfMetadataResult,
+        mode: FileChannel.MapMode = FileChannel.MapMode.READ_ONLY,
+    ): PdfMetadataResult =
+        when {
+            length == 0L -> PdfMetadataResult.NotPdf
+            length !in 1..Int.MAX_VALUE -> PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)
+            else -> {
+                val buffer = channel.map(mode, offset, length)
+                block(BufferPdfBytes(buffer)).also { if (mode == FileChannel.MapMode.READ_WRITE) buffer.force() }
+            }
         }
 }

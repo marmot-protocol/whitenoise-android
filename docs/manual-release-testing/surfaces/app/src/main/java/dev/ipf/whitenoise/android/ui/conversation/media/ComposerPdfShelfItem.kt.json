@@ -11,6 +11,22 @@
           "MED-064",
           "MED-065"
         ]
+      },
+      {
+        "surface": "ComposerPdfShelfEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfShelfItem.kt",
+        "anchor": "fun ComposerPdfShelfEffects(",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "ReadComposerPdfMetadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfShelfItem.kt",
+        "anchor": "fun ReadComposerPdfMetadata(",
+        "test_ids": [
+          "MED-065"
+        ]
       }
     ]
   },

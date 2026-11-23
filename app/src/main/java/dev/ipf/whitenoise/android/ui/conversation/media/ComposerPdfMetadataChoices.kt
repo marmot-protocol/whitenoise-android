@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataRefusal
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
-import dev.ipf.whitenoise.android.state.PendingAttachment
 
 /** What the composer learned about one staged PDF: its [name] and what its prepared bytes say about metadata. */
 internal data class ComposerPdfState(
@@ -35,8 +34,8 @@ private class ComposerPdfPendingSend(
 /**
  * The composer's staged PDFs whose metadata cannot be removed, and the person's choice to send them as they are
  * (#3377). The shelf reads every prepared PDF into [record], whether or not its card is on screen. A choice covers
- * one send: [marked] attaches it to that send's prepared attachments as [PendingAttachment.keepsPdfMetadata], which
- * carries it through a collection's later chunks, and forgets it. It is never saved with a draft.
+ * one send: the sender takes it with [takeConsent] when the send starts and keeps it for that send's chunks. It is
+ * never saved with a draft.
  */
 @Stable
 internal class ComposerPdfMetadataChoices {
@@ -89,17 +88,8 @@ internal class ComposerPdfMetadataChoices {
         resumeWaitingSend()
     }
 
-    /**
-     * [prepared] with the person's choice to send a PDF as it is attached to that PDF's own attachment. The choice is
-     * used up: a later send of the same file asks again.
-     */
-    fun marked(prepared: Map<Uri, PendingAttachment>): Map<Uri, PendingAttachment> {
-        val chosen = keepOriginal
-        keepOriginal = emptySet()
-        return prepared.mapValues { (uri, attachment) ->
-            if (uri in chosen) attachment.copy(keepsPdfMetadata = true) else attachment
-        }
-    }
+    /** The PDFs the person chose to send as they are, for the send starting now. A later send asks again. */
+    fun takeConsent(): Set<Uri> = keepOriginal.also { keepOriginal = emptySet() }
 
     /**
      * Runs [send] at once unless some of [uris] are PDFs that keep their metadata and have no choice yet. Then it
@@ -111,23 +101,14 @@ internal class ComposerPdfMetadataChoices {
         onCancel: () -> Unit,
         send: () -> Unit,
     ) {
-        if (decision != null || pendingSend != null) return onCancel()
-        if (uris.any { it in reading }) {
-            pendingSend = ComposerPdfPendingSend(uris, onCancel, send)
-            return
-        }
         val undecided =
             uris.distinct().filter { it !in keepOriginal && states[it]?.metadata is PdfMetadataResult.Refused }
-        if (undecided.isEmpty()) return send()
-        val pending = undecided.mapNotNull(states::get)
-        decision =
-            ComposerPdfDecision(
-                names = pending.map { it.name },
-                reasons = pending.mapNotNullTo(linkedSetOf()) { (it.metadata as? PdfMetadataResult.Refused)?.reason },
-                uris = undecided,
-                send = send,
-                cancel = onCancel,
-            )
+        when {
+            decision != null || pendingSend != null -> onCancel()
+            uris.any { it in reading } -> pendingSend = ComposerPdfPendingSend(uris, onCancel, send)
+            undecided.isEmpty() -> send()
+            else -> decision = decisionFor(undecided.mapNotNull(states::get), undecided, onCancel, send)
+        }
     }
 
     /** Sends the waiting PDFs as they are. */
@@ -148,3 +129,17 @@ internal class ComposerPdfMetadataChoices {
         queued?.onCancel?.invoke()
     }
 }
+
+/** The question for [undecided] PDFs, whose read states are [pending]. */
+private fun decisionFor(
+    pending: List<ComposerPdfState>,
+    undecided: List<Uri>,
+    onCancel: () -> Unit,
+    send: () -> Unit,
+) = ComposerPdfDecision(
+    names = pending.map { it.name },
+    reasons = pending.mapNotNullTo(linkedSetOf()) { (it.metadata as? PdfMetadataResult.Refused)?.reason },
+    uris = undecided,
+    send = send,
+    cancel = onCancel,
+)

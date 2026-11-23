@@ -23,8 +23,11 @@ internal fun removeDocumentMetadataInPlace(
 ): Boolean = removeDocumentVideoMetadataInPlace(mediaType, bytes).also { if (it) PdfMetadataScrubber.scrub(bytes) }
 
 /** Removes private metadata from this staged Files snapshot in place, as [removeDocumentMetadataInPlace] does. */
-internal fun StagedUploadSource.removeDocumentMetadata(mediaType: String): Boolean =
-    removeDocumentVideoMetadata(mediaType).also { if (it) scrubPdfMetadata() }
+internal fun StagedUploadSource.removeDocumentMetadata(mediaType: String): Boolean {
+    val accepted = removeDocumentVideoMetadata(mediaType)
+    if (accepted) scrubPdfMetadata()
+    return accepted
+}
 
 /**
  * Removes PDF metadata from this staged snapshot in place. The size is unchanged, so the budget that admitted the
@@ -63,20 +66,22 @@ internal fun PendingAttachment.pdfMetadata(): PdfMetadataResult =
 
 /**
  * Drops the attachments from [from] on that are PDFs still carrying metadata, adding
- * [DocumentReadFailure.PDF_METADATA] for each: one whose removal failed, and one that keeps it without the person's
- * choice to send it as it is. Returns the in-memory bytes it dropped, so the caller can give them back to its budget.
+ * [DocumentReadFailure.PDF_METADATA] for each: one whose removal failed, and one that keeps it unless the person
+ * chose to send it as it is, [keepsMetadata]. Returns the in-memory bytes it dropped, so the caller can give them
+ * back to its budget.
  * Call off Main.
  */
 internal fun MutableList<PendingAttachment>.dropUnconfirmedPdfMetadata(
     from: Int,
     failures: MutableSet<DocumentReadFailure>,
+    keepsMetadata: Boolean,
 ): Long {
     var dropped = 0L
     val iterator = listIterator(from)
     while (iterator.hasNext()) {
         val attachment = iterator.next()
         val metadata = attachment.pdfMetadata()
-        val unconfirmed = metadata is PdfMetadataResult.Refused && !attachment.keepsPdfMetadata
+        val unconfirmed = metadata is PdfMetadataResult.Refused && !keepsMetadata
         if (metadata is PdfMetadataResult.Removable || unconfirmed) {
             iterator.remove()
             failures += DocumentReadFailure.PDF_METADATA

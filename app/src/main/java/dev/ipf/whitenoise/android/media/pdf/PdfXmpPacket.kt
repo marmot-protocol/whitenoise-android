@@ -76,7 +76,9 @@ internal class PdfXmpPacket private constructor(
             value: String,
         ): String = " $name=\"$value\""
 
-        private fun ByteArray.withoutWhitespace(): ByteArray =
-            filter { !isPdfWhitespace(it.toInt() and BYTE_MASK) }.toByteArray()
+        private fun ByteArray.withoutWhitespace(): ByteArray {
+            val kept = filterNot { isPdfWhitespace(it.toInt() and BYTE_MASK) }
+            return kept.toByteArray()
+        }
     }
 }

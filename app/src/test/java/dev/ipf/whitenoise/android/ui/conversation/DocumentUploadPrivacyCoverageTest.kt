@@ -215,9 +215,19 @@ class DocumentUploadPrivacyCoverageTest {
             try {
                 val signed = fixture("signed")
                 val uri = pick("kept-signed.pdf", PDF, signed, signed.size.toLong())
-                val kept = PendingAttachment(signed.copyOf(), PDF, "kept-signed.pdf", keepsPdfMetadata = true)
+                val kept = PendingAttachment(signed.copyOf(), PDF, "kept-signed.pdf")
+                val unconfirmed = send(listOf(uri), mapOf(uri to kept), expectedUploads = 0)
+                assertTrue("a refused PDF without a choice is not sent", unconfirmed.uploads.isEmpty())
 
-                val sent = send(listOf(uri), mapOf(uri to kept), expectedUploads = 1)
+                val sent =
+                    send(listOf(uri), mapOf(uri to kept), expectedUploads = 1) { sender ->
+                        sender.pdfChoices.record(
+                            uri,
+                            ComposerPdfState("kept-signed.pdf", PdfMetadataScrubber.inspect(signed)),
+                        )
+                        sender.pdfChoices.confirmThen(listOf(uri), {}) {}
+                        sender.pdfChoices.confirm()
+                    }
 
                 assertTrue(sent.accepted)
                 assertArrayEquals(signed, sent.uploads.values.single())
@@ -283,7 +293,11 @@ class DocumentUploadPrivacyCoverageTest {
                         .payload.streamUris
                         .single()
                 val reader =
-                    ConversationAttachmentReader(mediaSendReconciliationAppState(), context, fileBackedLimits = { LIMITS })
+                    ConversationAttachmentReader(
+                        mediaSendReconciliationAppState(),
+                        context,
+                        fileBackedLimits = { LIMITS },
+                    )
                 val read = reader.readPickedDocuments(listOf(uri))
                 assertCleanCopyOf("shared", source, read.attachments.single().plaintextBytes)
             } finally {

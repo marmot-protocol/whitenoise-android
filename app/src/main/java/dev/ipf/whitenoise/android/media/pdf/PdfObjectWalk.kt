@@ -22,7 +22,7 @@ internal class PdfObjectWalk(
     private val unreadable = mutableSetOf<Int>()
     private val infoLike = mutableListOf<Pair<Int, Int>>()
     private val embeddedInfo = mutableListOf<PdfValue>()
-    private var signed = false
+    private val guessed = mutableListOf<PdfGuessedStream>()
 
     // Once one stream has no `endstream` after it, no later stream can have one, so later searches stop at once.
     private var endstreamMissingFrom = Int.MAX_VALUE
@@ -39,7 +39,7 @@ internal class PdfObjectWalk(
                     else -> position + 1
                 }
         }
-        return PdfLayout(index, trailers, streams, plainStreams, unreadable, infoLike, embeddedInfo, signed)
+        return PdfLayout(index, trailers, streams, plainStreams, unreadable, infoLike, embeddedInfo, guessed)
     }
 
     private fun endOfLine(from: Int): Int {
@@ -52,12 +52,12 @@ internal class PdfObjectWalk(
         try {
             val dict = parser.parse(keyword + TRAILER.size) as? PdfDict ?: return keyword + TRAILER.size
             trailers += dict
-            if (hasSignature(dict)) signed = true
             dict.end
         } catch (_: PdfSyntaxException) {
             keyword + TRAILER.size
         }
 
+    @Suppress("ReturnCount") // Not an object, unreadable, a plain value, a dictionary, or a stream.)
     private fun visitObject(keyword: Int): Int {
         val next = keyword + OBJ.size
         val (number, generation) = objectHeaderBefore(keyword) ?: return next
@@ -69,7 +69,6 @@ internal class PdfObjectWalk(
                 return next
             }
         index.add(number, generation, value.start)
-        if (hasSignature(value)) signed = true
         if (value !is PdfDict) return value.end
         value.entries.forEach { (key, entry) -> if (key.startsWith("PTEX.")) embeddedInfo += entry }
         val streamKeyword = bytes.skipSpace(value.end)
@@ -98,6 +97,7 @@ internal class PdfObjectWalk(
                 dataStart >= endstreamMissingFrom -> -1
                 else -> bytes.indexOf(ENDSTREAM, dataStart).also { if (it < 0) endstreamMissingFrom = dataStart }
             }
+        if (verifiedEnd == null) guessed += PdfGuessedStream(dict["Length"], dataStart, endKeyword)
         if (endKeyword < 0) {
             unreadable += number
             return dataStart
@@ -111,11 +111,14 @@ internal class PdfObjectWalk(
 
     private fun isInteresting(dict: PdfDict): Boolean {
         val type = dict.name("Type")
-        return type == "ObjStm" || type == "Metadata" || dict.name("Subtype") == "XML" ||
+        return type == "ObjStm" ||
+            type == "Metadata" ||
+            dict.name("Subtype") == "XML" ||
             (dict.name("Subtype") == "Image" && dict.filters()?.any { it == "DCTDecode" || it == "DCT" } != false)
     }
 
     /** Reads `N G` back from the `obj` keyword at [keyword], or null when the keyword does not open an object. */
+    @Suppress("ReturnCount", "CyclomaticComplexMethod") // Reads two tokens backwards; each check exits at once.)
     private fun objectHeaderBefore(keyword: Int): Pair<Int, Int>? {
         var position = keyword - 1
         if (position < 0 || !isPdfWhitespace(bytes[position])) return null

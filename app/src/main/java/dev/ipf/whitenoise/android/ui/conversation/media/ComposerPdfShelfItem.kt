@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.Composable
@@ -10,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -17,11 +19,15 @@ import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataRefusal
+import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataScrubber
 import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaTransport
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.conversation.MEDIA_ALBUM_MAX_TOTAL_BYTES
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.FileInputStream
 import java.util.UUID
 
 // The thumbnail is at most 56dp tall; this edge keeps it sharp at high densities without a large bitmap.
@@ -85,28 +91,89 @@ internal fun rememberComposerPdfPageRenderer(): ComposerPdfPageRenderer {
 }
 
 /**
- * Reads what every prepared document on the shelf says about PDF metadata into [choices], whether or not its card is
- * on screen, so a send can ask about all of them at once. Content decides, so a PDF with another name is read too.
+ * The composer's PDF bookkeeping beside the shelf: forgets PDFs that left it, reads every staged one, asks before a
+ * send that keeps metadata, and cancels a send still waiting when the shelf leaves, which keeps its attachments.
  */
 @Composable
-internal fun ReadComposerPdfMetadata(
+internal fun ComposerPdfShelfEffects(
     choices: ComposerPdfMetadataChoices,
     documentUris: List<Uri>,
     preparedDocuments: Map<Uri, DraftPreparedPhoto>,
+    metadata: Map<Uri, LocalPreviewMetadata>,
 ) {
-    val read = remember(choices) { mutableMapOf<Uri, DraftPreparedPhoto>() }
+    LaunchedEffect(choices, documentUris) { choices.retainOnly(documentUris) }
+    ReadComposerPdfMetadata(choices, documentUris, preparedDocuments) { uri ->
+        preparedDocuments[uri]?.attachment?.fileName ?: metadata[uri]?.displayName ?: uri.lastPathSegment
+    }
+    ComposerPdfMetadataDialog(choices)
+    DisposableEffect(choices) { onDispose { choices.cancel() } }
+}
+
+/**
+ * Reads what every document on the shelf says about PDF metadata into [choices], whether or not its card is on
+ * screen, so a send can ask about all of them at once. Content decides, so a PDF with another name is read too. A
+ * prepared document is read from its prepared bytes. One too large to prepare is read where it is, as the send will
+ * read it; one still being prepared waits for its bytes. Every document still to read is marked first, so a send
+ * waits for all of them, not only the one being read.
+ */
+@Composable
+private fun ReadComposerPdfMetadata(
+    choices: ComposerPdfMetadataChoices,
+    documentUris: List<Uri>,
+    preparedDocuments: Map<Uri, DraftPreparedPhoto>,
+    names: (Uri) -> String?,
+) {
+    val resolver = LocalContext.current.contentResolver
+    val currentNames by rememberUpdatedState(names)
+    // What each staged URI was last read as: its prepared draft's digest, or the URI itself when unprepared.
+    val read = remember(choices) { mutableMapOf<Uri, String>() }
     LaunchedEffect(choices, documentUris, preparedDocuments) {
-        documentUris.distinct().forEach { uri ->
-            val document = preparedDocuments[uri]
-            if (document == null) choices.stopReading(uri)
-            if (document == null || read[uri] === document) return@forEach
-            choices.reading(uri)
-            val attachment = document.attachment
-            val metadata = withContext(Dispatchers.Default) { PdfMetadataScrubber.inspect(attachment.plaintext) }
-            read[uri] = document
-            choices.record(uri, ComposerPdfState(safeDocumentDisplayName(attachment.fileName), metadata))
+        read.keys.retainAll(documentUris.toSet())
+        val pending =
+            documentUris.distinct().mapNotNull { uri ->
+                val key = preparedDocuments[uri]?.attachmentDigest ?: uri.toString()
+                (uri to key).takeIf { read[uri] != key }
+            }
+        pending.forEach { (uri, _) -> choices.reading(uri) }
+        pending.forEach { (uri, key) ->
+            val bytes = preparedDocuments[uri]?.attachment?.plaintext
+            val name = currentNames(uri)
+            val metadata =
+                withContext(Dispatchers.IO) {
+                    if (bytes != null) PdfMetadataScrubber.inspect(bytes) else unpreparedPdf(resolver, uri, name)
+                }
+            if (metadata == null) {
+                choices.stopReading(uri)
+            } else {
+                read[uri] = key
+                choices.record(uri, ComposerPdfState(safeDocumentDisplayName(name), metadata))
+            }
         }
     }
+}
+
+/**
+ * What a document too large to prepare says about PDF metadata, read through the provider's file, or null for one
+ * that will be prepared. A PDF by name or type that the provider cannot open as a file reads as unsupported, so a
+ * send asks about it.
+ */
+private fun unpreparedPdf(
+    resolver: ContentResolver,
+    uri: Uri,
+    name: String?,
+): PdfMetadataResult? {
+    if (queryContentSize(resolver, uri) <= MEDIA_ALBUM_MAX_TOTAL_BYTES) return null
+    val named = documentAttachmentKind(safeGetType(resolver, uri), name.orEmpty()) == DocumentAttachmentKind.Pdf
+    val unreadable = if (named) PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported) else null
+    return runCatching {
+        resolver.openAssetFileDescriptor(uri, "r")?.use { asset ->
+            FileInputStream(asset.fileDescriptor).use { input ->
+                val channel = input.channel
+                val length = if (asset.length >= 0) asset.length else channel.size() - asset.startOffset
+                PdfMetadataScrubber.inspect(channel, asset.startOffset, length)
+            }
+        }
+    }.getOrNull() ?: unreadable
 }
 
 /**

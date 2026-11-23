@@ -9,11 +9,15 @@ private const val CR = 13
 private const val SPACE = 32
 private const val PERCENT = '%'.code
 private const val DELIMITERS = "()<>[]{}/%"
+private const val ASCII_LIMIT = 128
 
 internal fun isPdfWhitespace(byte: Int): Boolean =
-    byte == SPACE || byte == LF || byte == CR || byte == TAB || byte == FF || byte == NUL
+    when (byte) {
+        SPACE, LF, CR, TAB, FF, NUL -> true
+        else -> false
+    }
 
-internal fun isPdfDelimiter(byte: Int): Boolean = byte < 128 && DELIMITERS.indexOf(byte.toChar()) >= 0
+internal fun isPdfDelimiter(byte: Int): Boolean = byte < ASCII_LIMIT && DELIMITERS.indexOf(byte.toChar()) >= 0
 
 internal fun isPdfRegular(byte: Int): Boolean = !isPdfWhitespace(byte) && !isPdfDelimiter(byte)
 
@@ -39,13 +43,7 @@ internal fun PdfBytes.skipSpace(from: Int): Int {
 internal fun PdfBytes.matches(
     at: Int,
     word: ByteArray,
-): Boolean {
-    if (at < 0 || at > size - word.size) return false
-    for (offset in word.indices) {
-        if (get(at + offset) != (word[offset].toInt() and BYTE_MASK)) return false
-    }
-    return true
-}
+): Boolean = at >= 0 && at <= size - word.size && word.indices.all { get(at + it) == (word[it].toInt() and BYTE_MASK) }
 
 /** Whether [word] appears at [at] as a whole token, with no regular character on either side. */
 internal fun PdfBytes.isKeywordAt(

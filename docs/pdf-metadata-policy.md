@@ -33,9 +33,10 @@ refuses always keeps its original bytes.
 | Part of the PDF | Removed | Kept |
 | --- | --- | --- |
 | Document information (`/Info`) in every revision, stored plainly or inside an object stream | Every string value, including author, title, subject, keywords, creator and producer apps, creation and modification dates, and custom entries such as a company. Each value becomes `()` or `<>` padded with spaces. Strings referenced indirectly are emptied too. | The keys themselves and non-string values such as `/Trapped`. |
+| Copies of document information left behind | Information dictionaries that no trailer points to any more, and the copies pdfTeX embeds for included PDFs (`/PTEX.InfoDict`, `/PTEX.FileName`), are emptied the same way. | — |
 | XMP metadata streams (document, page, image or font level) | The whole packet: Dublin Core, XMP basic, PDF properties, rights, media management history and IDs, and vendor namespaces. It is replaced by an empty packet padded with spaces. A `/FlateDecode` stream is re-encoded to exactly its original length. | PDF/A (`pdfaid:part`, `pdfaid:conformance`) and PDF/UA (`pdfuaid:part`) identification, when the original declared it. |
 | XMP packets stored plainly elsewhere | Replaced by the same empty packet. | — |
-| Embedded baseline JPEG photos (`/DCTDecode`) | The payloads of EXIF and XMP (APP1), IPTC and Photoshop records (APP13), vendor segments (APP3 to APP12, APP15) and comments become zeros. | JFIF (APP0), ICC colour profiles (APP2), Adobe colour transforms (APP14) and the image data. |
+| Embedded baseline JPEG photos (`/DCTDecode`) | The payloads of EXIF and XMP (APP1), IPTC and Photoshop records (APP13), vendor segments (APP3 to APP12, APP15) and comments become zeros, including segments placed after the image data. | JFIF (APP0), ICC colour profiles (APP2), Adobe colour transforms (APP14) and the image data. |
 
 Not covered:
 
@@ -54,15 +55,18 @@ chooses **Send as is**:
 | --- | --- |
 | Digitally signed or certified (a `/ByteRange` signature dictionary anywhere, including in an object stream) | Any change invalidates the signature. |
 | Encrypted or password protected (`/Encrypt` in a trailer) | Its strings and streams cannot be read or rewritten without the key. |
-| Metadata the scrubber cannot rewrite at the same length, an embedded JPEG wrapped in another filter, or a structure it cannot read | A different length would move every later object. |
+| Metadata the scrubber cannot rewrite at the same length, an embedded JPEG wrapped in another filter, a metadata string that another part of the document also uses, or a structure it cannot read | A different length would move every later object, and emptying a shared string would change visible content. |
 
-The composer card shows the state of each staged PDF before sending. Sending
+The composer reads every staged PDF, on screen or not, and its card shows the
+state before sending: "Metadata removed", "Metadata removed on send" for a draft
+an earlier version saved, or why the metadata stays. A PDF too large to prepare
+is read where it is. Sending waits until every staged PDF has been read, then
 asks once for the PDFs that keep their metadata, naming them; **Cancel** keeps
-everything on the shelf. The choice belongs to the PDFs on the shelf at that
-moment: it travels with each prepared attachment into the send, it is never
-saved with a draft, and removing a PDF forgets it. A PDF that nobody chose to
-send as it is never leaves the device by any path; the send reports
-"Couldn't remove this PDF's metadata, so it wasn't sent".
+everything on the shelf. The answer covers that one send, every chunk of it:
+the sender takes it when the send starts, so the next send of the same PDF asks
+again. It is never saved with a draft, and removing a PDF forgets it. A PDF that
+nobody chose to send as it is never leaves the device by any path; the send
+reports that it wasn't sent.
 
 ## Where it runs
 
@@ -71,8 +75,9 @@ send as it is never leaves the device by any path; the send reports
   saved as a draft or offered for upload.
 - Drafts that an earlier version saved are cleaned again on a copy before a send
   reuses them, because a draft's bytes are shared with its native draft.
-- The send checks every document's bytes once more and drops a PDF that still
-  carries metadata without the person's choice.
+- The send checks every document's bytes once more. It drops a PDF whose
+  metadata could not be removed, and one that keeps it without the person's
+  choice for this send.
 
 The composer previews each staged PDF's first page through the isolated document
 parser that the in-app reader uses, one fresh worker per PDF.
@@ -82,7 +87,8 @@ parser that the in-app reader uses, one fresh worker per PDF.
 - `PdfMetadataScrubberTest` and `PdfFlateTest` cover the committed fixtures from
   [`scripts/generate_pdf_metadata_fixtures.py`](../scripts/generate_pdf_metadata_fixtures.py):
   removal across revisions and object streams, unchanged offsets, kept content,
-  PDF/A identification, embedded photos, refusals and truncated input.
+  PDF/A identification, embedded photos, refusals, truncated and hostile input,
+  shared strings, reused object numbers and leftover information copies.
 - `DocumentUploadPrivacyCoverageTest` sends the fixtures through the real sender
   and reads the bytes handed to MDK.
 - `ComposerPdfMetadataChoicesTest` and `ComposerPdfAttachmentScreenshotTest`

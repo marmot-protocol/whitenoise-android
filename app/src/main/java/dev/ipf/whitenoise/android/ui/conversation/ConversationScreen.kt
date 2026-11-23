@@ -3512,8 +3512,7 @@ internal fun ConversationScreen(
                 sendingDocuments,
                 caption,
                 preparedImageAttachments = mediaDraftState.preparedAttachments(),
-                preparedDocumentAttachments =
-                    mediaSender.pdfChoices.marked(mediaDraftState.preparedDocumentAttachments()),
+                preparedDocumentAttachments = mediaDraftState.preparedDocumentAttachments(),
                 onSettled = {
                     onCaptionSettled()
                     if (canSettle() && pendingMediaSlots == sendingMedia && pendingDocumentUris == sendingDocuments) {

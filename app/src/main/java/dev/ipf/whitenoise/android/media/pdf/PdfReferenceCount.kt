@@ -2,10 +2,12 @@ package dev.ipf.whitenoise.android.media.pdf
 
 private const val MAX_NUMBER_DIGITS = 10
 private const val REFERENCE = 'R'.code
+private const val PLUS = '+'.code
 
 /**
  * Counts how often each of [targets] is referred to as `N G R` anywhere in [bytes]: in any object, any revision or
- * any trailer. One linear pass; it reads only plain bytes, so callers add decoded object streams themselves.
+ * any trailer, with or without a `+` sign. One linear pass; it reads only plain bytes, so callers add decoded
+ * object streams themselves.
  */
 internal fun countReferences(
     bytes: PdfBytes,
@@ -14,7 +16,7 @@ internal fun countReferences(
     val counts = HashMap<Pair<Int, Int>, Int>()
     var position = 0
     while (position < bytes.size) {
-        if (!isPdfDigit(bytes[position]) || (position > 0 && isPdfRegular(bytes[position - 1]))) {
+        if (!startsNumber(bytes, position)) {
             position++
             continue
         }
@@ -28,7 +30,19 @@ internal fun countReferences(
     return counts
 }
 
+/** Whether an integer token starts at [position], allowing the sign `+` that readers accept before it. */
+private fun startsNumber(
+    bytes: PdfBytes,
+    position: Int,
+): Boolean {
+    val before = position - 1
+    val signed = before >= 0 && bytes[before] == PLUS
+    val boundary = if (signed) before - 1 else before
+    return isPdfDigit(bytes[position]) && (boundary < 0 || !isPdfRegular(bytes[boundary]))
+}
+
 /** The `(number, generation)` and end of a reference whose number [number] ends at [from], or null. */
+@Suppress("ReturnCount") // Each malformed-input check exits at once, so later reads never see unchecked data.)
 private fun referenceAfter(
     bytes: PdfBytes,
     from: Int,

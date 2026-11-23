@@ -15,6 +15,16 @@ internal class PdfStream(
     val exact: Boolean,
 )
 
+/**
+ * A stream whose end was found by searching for `endstream`, because its `/Length` was indirect or wrong: [length]
+ * is its declared `/Length` and [endKeyword] where the search stopped, or -1 when no `endstream` followed.
+ */
+internal class PdfGuessedStream(
+    val length: PdfValue?,
+    val dataStart: Int,
+    val endKeyword: Int,
+)
+
 /** One uncompressed object: where its value starts and its generation. */
 internal class PdfObjectAt(
     val position: Int,
@@ -34,7 +44,8 @@ internal class PdfLayout(
     val infoLike: List<Pair<Int, Int>>,
     /** Values of pdfTeX's private `/PTEX.*` entries: an embedded figure's file name and document information. */
     val embeddedInfo: List<PdfValue>,
-    val signed: Boolean,
+    /** Streams whose end the walk had to guess; the plan confirms each before trusting what followed it. */
+    val guessed: List<PdfGuessedStream>,
 ) {
     /** Every uncompressed object numbered [number] with [generation], oldest revision first. */
     fun positions(
@@ -88,14 +99,6 @@ internal class PdfObjectIndex {
     }
 }
 
-/** Whether [value] holds a `/ByteRange` key at any depth: a signature dictionary, direct or nested. */
-internal fun hasSignature(value: PdfValue): Boolean =
-    when (value) {
-        is PdfDict -> value.entries.any { (key, nested) -> key == "ByteRange" || hasSignature(nested) }
-        is PdfArray -> value.items.any(::hasSignature)
-        else -> false
-    }
-
 private val INFO_KEYS = setOf("Author", "Creator", "Producer", "CreationDate", "ModDate")
 private val CONTENT_KEYS = setOf("Type", "Subtype", "Parent", "Rect", "P", "FT", "Kids", "Contents")
 
@@ -103,5 +106,7 @@ private val CONTENT_KEYS = setOf("Type", "Subtype", "Parent", "Rect", "P", "FT",
  * Whether [dict] looks like a document-information dictionary: it has an author, app or date entry and none of the
  * keys that mark page content, annotations, form fields or other typed objects.
  */
-internal fun isInfoLike(dict: PdfDict): Boolean =
-    dict.entries.any { it.first in INFO_KEYS } && dict.entries.none { it.first in CONTENT_KEYS }
+internal fun isInfoLike(dict: PdfDict): Boolean = dict.entries.any { it.first in INFO_KEYS } && !hasContentKeys(dict)
+
+/** Whether [dict] has a key that marks page content, an annotation, a form field or another typed object. */
+internal fun hasContentKeys(dict: PdfDict): Boolean = dict.entries.any { it.first in CONTENT_KEYS }

@@ -59,8 +59,9 @@ class ComposerPdfAttachmentScreenshotTest {
 
     /** Several PDFs are listed by name; both answers stay reachable at large RTL text. */
     @Test
-    fun severalQuestionLargeRtl() =
+    fun severalQuestionLargeRtl() {
         captureDialog("several_large_rtl", dark = true, large = true, names = listOf(SIGNED, "Scan 2024-03.pdf"))
+    }
 
     /** Confirming sends once and records the choice; cancelling keeps the PDF waiting. */
     @Test
@@ -97,7 +98,9 @@ class ComposerPdfAttachmentScreenshotTest {
                         Card("Quarterly report final.pdf", 12, page, ComposerPdfPrivacy.Removed)
                         Card(SIGNED, 3, page, ComposerPdfPrivacy.Signed)
                         Card(SIGNED, 3, page, ComposerPdfPrivacy.SendingAsIs)
+                        Card("Draft notes.pdf", 2, page, ComposerPdfPrivacy.RemovedOnSend)
                         Card("Bank statement.pdf", null, null, ComposerPdfPrivacy.Encrypted)
+                        Card("Form export.pdf", 1, null, ComposerPdfPrivacy.Unsupported)
                         Card("Scan 2024-03.pdf", null, null, null)
                     }
                 }

@@ -29,8 +29,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
@@ -147,13 +145,7 @@ internal fun ComposerAttachmentShelf(
     val hasVisual = items.any { it is StagedPreviewItem.Media }
     val pdfRenderer = rememberComposerPdfPageRenderer()
     val pdfs = remember(pdfChoices, pdfRenderer) { pdfChoices?.let { ComposerShelfPdfs(it, pdfRenderer) } }
-    if (pdfChoices != null) {
-        LaunchedEffect(pdfChoices, documentUris) { pdfChoices.retainOnly(documentUris) }
-        ReadComposerPdfMetadata(pdfChoices, documentUris, preparedDocuments)
-        ComposerPdfMetadataDialog(pdfChoices)
-        // A send still waiting for an answer when the shelf leaves keeps its attachments.
-        DisposableEffect(pdfChoices) { onDispose { pdfChoices.cancel() } }
-    }
+    if (pdfChoices != null) ComposerPdfShelfEffects(pdfChoices, documentUris, preparedDocuments, metadata)
     Column(Modifier.fillMaxWidth()) {
         LazyRow(
             modifier =

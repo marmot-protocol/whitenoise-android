@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.net.Uri
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataRefusal
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
-import dev.ipf.whitenoise.android.state.PendingAttachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -69,24 +68,61 @@ class ComposerPdfMetadataChoicesTest {
         assertNull(choices.decision)
     }
 
-    /** The choice rides on the PDF's own prepared attachment and is forgotten once the PDF leaves the shelf. */
+    /** A send takes the choice for itself, so the next send of the same PDF asks again; it leaves with the PDF. */
     @Test
-    fun theChoiceFollowsThePdfAndLeavesWithIt() {
+    fun theChoiceCoversOneSendAndLeavesWithThePdf() {
         choices.confirmThen(listOf(signed), {}) {}
         choices.confirm()
-        val prepared =
-            mapOf(
-                signed to PendingAttachment(byteArrayOf(1), "application/pdf", "signed.pdf"),
-                cleaned to PendingAttachment(byteArrayOf(2), "application/pdf", "cleaned.pdf"),
-            )
 
-        val marked = choices.marked(prepared)
-
-        assertTrue(marked.getValue(signed).keepsPdfMetadata)
-        assertFalse(marked.getValue(cleaned).keepsPdfMetadata)
-        choices.retainOnly(listOf(cleaned))
+        assertEquals(setOf(signed), choices.takeConsent())
         assertFalse(choices.keepsOriginal(signed))
+        choices.confirmThen(listOf(signed), {}) { error("sent without asking") }
+        assertNotNull("the next send asks again", choices.decision)
+        choices.cancel()
+
+        choices.retainOnly(listOf(cleaned))
         assertNull(choices.state(signed))
         assertNotNull(choices.state(cleaned))
+    }
+
+    /** A send that names a PDF still being read waits for it, then asks; leaving the shelf cancels it. */
+    @Test
+    fun aSendWaitsForAPdfStillBeingRead() {
+        val later = Uri.parse("content://fixture/later")
+        var sent = 0
+        var cancelled = 0
+        choices.reading(later)
+        choices.confirmThen(listOf(cleaned, later), { cancelled++ }) { sent++ }
+        assertEquals(0, sent)
+        assertNull(choices.decision)
+
+        choices.record(later, ComposerPdfState("later.pdf", PdfMetadataResult.Refused(PdfMetadataRefusal.Encrypted)))
+
+        assertEquals(listOf("later.pdf"), checkNotNull(choices.decision).names)
+        choices.cancel()
+        assertEquals(1, cancelled)
+
+        choices.reading(later)
+        choices.confirmThen(listOf(later), { cancelled++ }) { sent++ }
+        choices.cancel()
+        assertEquals(2, cancelled)
+        choices.stopReading(later)
+        assertEquals(0, sent)
+    }
+
+    /** A PDF that leaves the shelf while it is read no longer holds a send back. */
+    @Test
+    fun aPdfLeavingWhileReadReleasesTheSend() {
+        val later = Uri.parse("content://fixture/later")
+        var sent = 0
+        choices.reading(later)
+        choices.confirmThen(listOf(cleaned), { error("cancelled") }) { sent++ }
+        assertEquals("a send without the unread PDF goes at once", 1, sent)
+        choices.confirmThen(listOf(cleaned, later), { error("cancelled") }) { sent++ }
+        assertEquals(1, sent)
+
+        choices.retainOnly(listOf(cleaned))
+
+        assertEquals(2, sent)
     }
 }

@@ -11,6 +11,7 @@ internal class PdfStreamData(
     val data: ByteArray,
 ) {
     /** The bytes that replace the stream's data so it decodes to [prefix], padding spaces, then [suffix]. */
+    @Suppress("ReturnCount") // A plain stream that does not fit, a plain one that does, and a compressed one.)
     fun encode(
         prefix: ByteArray,
         suffix: ByteArray,
@@ -29,6 +30,7 @@ internal class PdfStreamData(
  * for any other encoding, data that does not inflate within bounds, or a length that cannot be confirmed. An
  * indirect `/Length` is resolved through [layout].
  */
+@Suppress("ReturnCount") // Each malformed-input check exits at once, so later reads never see unchecked data.)
 internal fun decodeStreamData(
     bytes: PdfBytes,
     layout: PdfLayout,
@@ -61,6 +63,7 @@ private fun hasNoPrediction(parameters: PdfValue?): Boolean =
     }
 
 /** Where [stream]'s data ends by its `/Length`, resolving an indirect length, or null when it cannot be known. */
+@Suppress("ReturnCount") // Each malformed-input check exits at once, so later reads never see unchecked data.)
 private fun exactStreamEnd(
     bytes: PdfBytes,
     layout: PdfLayout,

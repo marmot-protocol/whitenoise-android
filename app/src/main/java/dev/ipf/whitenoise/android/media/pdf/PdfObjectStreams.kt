@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.media.pdf
 
 private const val MAX_OBJECT_STREAM_BYTES = 256L * 1024 * 1024
-private val BYTE_RANGE = ascii("/ByteRange")
 
 /** One decoded object stream (`/Type /ObjStm`) and where each compressed object's value starts in it. */
 internal class PdfObjectStream(
@@ -32,14 +31,14 @@ internal fun decodeObjectStreams(
             break
         }
         val objectStream = PdfObjectStream(data, offsets)
-        // A plain search is enough here: a false match only refuses, which leaves the file unchanged.
-        if (objectStream.bytes.indexOf(BYTE_RANGE, 0) >= 0) plan.refuse(PdfMetadataRefusal.Signed)
+        if (containsName(objectStream.bytes, "ByteRange")) plan.refuse(PdfMetadataRefusal.Signed)
         decoded += objectStream
     }
     return decoded
 }
 
 /** Reads the `/N` number-and-offset pairs at the start of an object stream's [data]. */
+@Suppress("ReturnCount") // Each malformed-input check exits at once, so later reads never see unchecked data.)
 private fun objectOffsets(
     data: ByteArray,
     dict: PdfDict,

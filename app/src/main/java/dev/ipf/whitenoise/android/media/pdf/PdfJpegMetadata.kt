@@ -13,6 +13,7 @@ private const val APP13 = 0xED
 private const val APP15 = 0xEF
 private const val COM = 0xFE
 private const val SEGMENT_HEADER = 4
+private val PRIVATE_MARKERS = setOf(APP1, APP15, COM) + (APP3..APP13)
 private const val LENGTH_SHIFT = 8
 
 /**
@@ -24,8 +25,9 @@ private const val LENGTH_SHIFT = 8
 internal object PdfJpegMetadata {
     /**
      * Adds zeroing edits for the JPEG in [start] until [end] to [plan], walking every segment through EOI, including
-     * those between scans. Returns false when it is malformed. Data that ends after a scan without EOI is accepted.
+     * those between scans. Returns false when it is malformed or ends before EOI.
      */
+    @Suppress("ReturnCount", "CyclomaticComplexMethod") // One exit per JPEG marker class, in one loop.
     fun plan(
         bytes: PdfBytes,
         start: Int,
@@ -34,7 +36,6 @@ internal object PdfJpegMetadata {
     ): Boolean {
         if (end - start < 2 || bytes[start] != MARKER || bytes[start + 1] != SOI) return false
         var position = start + 2
-        var scanned = false
         while (position + 2 <= end) {
             if (bytes[position] != MARKER) return false
             val marker = bytes[position + 1]
@@ -48,14 +49,11 @@ internal object PdfJpegMetadata {
                     if (length < 2 || position + 2 + length > end) return false
                     if (isPrivate(marker)) plan.zero(bytes, position + SEGMENT_HEADER, length - 2)
                     position += 2 + length
-                    if (marker == SOS) {
-                        scanned = true
-                        position = nextMarker(bytes, position, end)
-                    }
+                    if (marker == SOS) position = nextMarker(bytes, position, end)
                 }
             }
         }
-        return scanned
+        return false
     }
 
     /** The next marker after entropy-coded data from [from]: `FF` not followed by stuffing `00` or a restart. */
@@ -67,12 +65,14 @@ internal object PdfJpegMetadata {
         var position = from
         while (position + 1 < end) {
             val next = bytes[position + 1]
-            if (bytes[position] == MARKER && next != 0 && next != MARKER && next !in RST0..RST7) return position
+            if (bytes[position] == MARKER && endsEntropyData(next)) return position
             position++
         }
         return end
     }
 
-    private fun isPrivate(marker: Int): Boolean =
-        marker == APP1 || marker in APP3..APP13 || marker == APP15 || marker == COM
+    /** Whether `FF` followed by [next] is a marker rather than stuffing or a restart inside a scan. */
+    private fun endsEntropyData(next: Int): Boolean = next != 0 && next != MARKER && next !in RST0..RST7
+
+    private fun isPrivate(marker: Int): Boolean = marker in PRIVATE_MARKERS
 }

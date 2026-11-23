@@ -13,12 +13,16 @@ private const val OPEN_BRACKET = '['.code
 private const val CLOSE_BRACKET = ']'.code
 private const val SLASH = '/'.code
 private const val REFERENCE = 'R'.code
+private const val NAME_ESCAPE_WIDTH = 3
+private const val NUMBER_SIGNS = "+-."
+private val DICT_KEYWORDS = setOf("true", "false", "null")
 
 /** Reads PDF values from [bytes]. Every malformed value throws [PdfSyntaxException]; nesting is bounded. */
 internal class PdfValueParser(
     private val bytes: PdfBytes,
 ) {
     /** Parses the value that starts at the first token at or after [from]. */
+    @Suppress("CyclomaticComplexMethod") // One branch per PDF value type; splitting it hides the grammar.
     fun parse(
         from: Int,
         depth: Int = 0,
@@ -33,7 +37,7 @@ internal class PdfValueParser(
             byte == OPEN_PAREN -> parseLiteralString(start)
             byte == OPEN_BRACKET -> parseArray(start, depth)
             byte == SLASH -> parseName(start)
-            isPdfDigit(byte) || byte == '+'.code || byte == '-'.code || byte == '.'.code -> parseNumberOrRef(start)
+            startsNumber(byte) -> parseNumberOrRef(start)
             isPdfRegular(byte) -> parseKeyword(start)
             else -> pdfSyntaxError()
         }
@@ -51,9 +55,7 @@ internal class PdfValueParser(
             if (bytes[index] == GREATER && bytes[index + 1] == GREATER) return PdfDict(start, index + 2, entries)
             val key = parse(index, depth + 1) as? PdfName ?: pdfSyntaxError()
             val value = parse(key.end, depth + 1)
-            if (value is PdfKeyword && value.word != "true" && value.word != "false" && value.word != "null") {
-                pdfSyntaxError()
-            }
+            if (value is PdfKeyword && value.word !in DICT_KEYWORDS) pdfSyntaxError()
             entries += key.name to value
             index = value.end
         }
@@ -110,7 +112,7 @@ internal class PdfValueParser(
                 val low = Character.digit(bytes[index + 2], HEX_RADIX)
                 if (high < 0 || low < 0) pdfSyntaxError()
                 name.append((high * HEX_RADIX + low).toChar())
-                index += 3
+                index += NAME_ESCAPE_WIDTH
             } else {
                 name.append(byte.toChar())
                 index++
@@ -130,14 +132,17 @@ internal class PdfValueParser(
         val generation = readNumber(generationStart)
         val marker = bytes.skipSpace(generation.end)
         val generationNumber = generation.text.toIntOrNull()
-        return if (generationNumber != null && marker < bytes.size && bytes[marker] == REFERENCE &&
-            (marker + 1 == bytes.size || !isPdfRegular(bytes[marker + 1]))
-        ) {
+        return if (generationNumber != null && isReferenceMarker(marker)) {
             PdfRef(start, marker + 1, objectNumber, generationNumber)
         } else {
             number
         }
     }
+
+    /** Whether the `R` of a reference stands alone at [marker]. */
+    private fun isReferenceMarker(at: Int): Boolean = at < bytes.size && bytes[at] == REFERENCE && endsToken(at + 1)
+
+    private fun endsToken(at: Int): Boolean = at == bytes.size || !isPdfRegular(bytes[at])
 
     private fun readNumber(start: Int): PdfNumber {
         var index = start
@@ -153,3 +158,5 @@ internal class PdfValueParser(
         return PdfKeyword(start, index, String(bytes.copy(start, index), Charsets.ISO_8859_1))
     }
 }
+
+private fun startsNumber(byte: Int): Boolean = isPdfDigit(byte) || byte.toChar() in NUMBER_SIGNS

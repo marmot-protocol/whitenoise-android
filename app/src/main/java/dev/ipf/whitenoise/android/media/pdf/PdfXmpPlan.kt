@@ -40,8 +40,8 @@ internal fun planMetadataStreams(
 
 /**
  * Replaces any other XMP packet stored in an unfiltered stream, such as one in a stream that does not declare itself
- * as metadata, with [PdfXmpPacket] at the same length. Each packet must open and close inside one of [plainStreams];
- * one that does not, or that has no end, refuses the plan because its extent cannot be trusted. [covered] ranges
+ * as metadata, with [PdfXmpPacket] at the same length. Each packet must fill one of [plainStreams] on its own; one
+ * that does not, or that has no end, refuses the plan because its extent or role cannot be trusted. [covered] ranges
  * were already handled.
  */
 internal fun planLoosePackets(
@@ -59,7 +59,8 @@ internal fun planLoosePackets(
             continue
         }
         val stream = plainStreams.firstOrNull { begin in it }
-        val end = stream?.let { packetEnd(bytes, begin, it.last + 1) } ?: -1
+        val end =
+            stream?.let { packetEnd(bytes, begin, it.last + 1) }?.takeIf { holdsOnly(bytes, stream, begin, it) } ?: -1
         val replacement = if (end < 0) null else replacementFor(bytes.copy(begin, end))
         when {
             end < 0 || replacement == null -> plan.refuse(PdfMetadataRefusal.Unsupported)
@@ -72,6 +73,23 @@ internal fun planLoosePackets(
         position = if (end < 0) -1 else bytes.indexOf(PACKET_BEGIN, end)
     }
 }
+
+/**
+ * Whether [stream] holds nothing but the packet from [begin] until [end] and whitespace. Anything else, such as a
+ * page that prints an XMP example, could be visible content.
+ */
+private fun holdsOnly(
+    bytes: PdfBytes,
+    stream: IntRange,
+    begin: Int,
+    end: Int,
+): Boolean = end >= 0 && isBlank(bytes, stream.first, begin) && isBlank(bytes, end, stream.last + 1)
+
+private fun isBlank(
+    bytes: PdfBytes,
+    from: Int,
+    until: Int,
+): Boolean = (from until until).all { isPdfWhitespace(bytes[it]) }
 
 /** The same-length replacement for [packet], empty when it already is one, or null when none fits. */
 private fun replacementFor(packet: ByteArray): ByteArray? =

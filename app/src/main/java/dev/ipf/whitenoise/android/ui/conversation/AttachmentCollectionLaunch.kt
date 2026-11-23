@@ -42,6 +42,7 @@ internal data class CollectionSendRequest(
     val preparedImages: Map<String, PendingAttachment> = emptyMap(),
     val preparedDocuments: Map<Uri, PendingAttachment> = emptyMap(),
     val draftClear: DraftSendClearToken? = null,
+    val keepPdfMetadata: Set<Uri> = emptySet(),
 )
 
 /** What MDK knows about a chunk token after the process that recorded it ended. */
@@ -117,6 +118,7 @@ internal fun ConversationMediaSender.startCollectionSend(
                     request.preparedDocuments,
                     request.draftClear,
                     onAfterSend,
+                    keepPdfMetadata = request.keepPdfMetadata,
                 )
             val held = lease.also { lease = null }
             AttachmentCollectionSender { latestCollectionSender(account, groupIdHex) ?: original }.drive(run, held)

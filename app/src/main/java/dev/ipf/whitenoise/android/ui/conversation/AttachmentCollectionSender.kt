@@ -49,6 +49,8 @@ internal class CollectionRun(
     val draftClear: DraftSendClearToken? = null,
     val onFirstSeeded: () -> Unit = {},
     private val pickScope: String? = null,
+    /** PDFs the person chose to send with their metadata, for this run only; a resumed run asks again. */
+    val keepPdfMetadata: Set<Uri> = emptySet(),
 ) {
     /**
      * The pick an item's slot id or document URI is drafted under: unchanged for a send from the composer, scoped to
@@ -271,6 +273,7 @@ internal class AttachmentCollectionSender(
                             listOfNotNull(run.preparedDocument(uri)?.let { uri to it }).toMap(),
                         allowFileBacked = true,
                         staging = FileBackedSendStaging { staged += it },
+                        keepPdfMetadata = run.keepPdfMetadata,
                         pickKey = run::pickKey,
                     )
                 val attachment = (prepared.images + prepared.documents.attachments).singleOrNull()
