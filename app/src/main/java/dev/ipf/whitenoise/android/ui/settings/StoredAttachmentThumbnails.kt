@@ -93,8 +93,10 @@ private suspend fun storedAttachmentReference(
     appState: WhiteNoiseAppState,
     account: String,
     attachment: StoredAttachment,
-): MediaAttachmentReferenceFfi? =
-    runCatchingCancellable { appState.findNativeAttachment(attachment.transferRequest(account))?.reference }.getOrNull()
+): MediaAttachmentReferenceFfi? {
+    val request = attachment.transferRequest(account)
+    return runCatchingCancellable { appState.findNativeAttachment(request)?.reference }.getOrNull()
+}
 
 /** Decodes the row's pixels from the device copy, or null when none can be read within the budgets. */
 private suspend fun decodeStoredThumbnail(
