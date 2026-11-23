@@ -1,0 +1,115 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SharedPhotoSelectionBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "fun SharedPhotoSelectionBar(",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "BoxScope.SharedTileSelectionOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "fun BoxScope.SharedTileSelectionOverlay(",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "Modifier.selectPhotoAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "fun Modifier.selectPhotoAction(",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "Modifier.selectedTileInset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "fun Modifier.selectedTileInset(",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "SelectionMark",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "fun SelectionMark(",
+        "test_ids": [
+          "MED-063"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:shared_media_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "R.string.shared_media_share",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "string:shared_media_share_photos_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "R.string.shared_media_share_photos_failed",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "string:shared_media_share_photos_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "R.string.shared_media_share_photos_unavailable",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "string:shared_media_share_photos_too_large",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "R.string.shared_media_share_photos_too_large",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "string:shared_media_cancel_selection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "R.string.shared_media_cancel_selection",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "string:shared_media_share_selected_photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "R.string.shared_media_share_selected_photos",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "string:shared_media_select_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "R.string.shared_media_select_photo",
+        "test_ids": [
+          "MED-063"
+        ]
+      },
+      {
+        "surface": "plurals:shared_media_photos_selected_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
+        "anchor": "R.plurals.shared_media_photos_selected_count",
+        "test_ids": [
+          "MED-063"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -16,8 +16,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
 /** Month-sectioned grid of visual tiles. */
+@Suppress("LongMethod", "LongParameterList")
 @Composable
 internal fun MediaTileGrid(
     sections: List<MediaMonthSection<SharedMediaTile>>,
@@ -40,8 +44,10 @@ internal fun MediaTileGrid(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     emptyLabel: String,
+    share: SharedPhotoShare,
     onTapTile: (SharedMediaTile) -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     if (sections.isEmpty()) {
         EmptyPlaceholder(emptyLabel)
         return
@@ -63,33 +69,61 @@ internal fun MediaTileGrid(
                 )
             }
             gridItems(section.items, key = { "${it.messageIdHex}#${it.attachmentIndex}" }) { tile ->
-                Box(Modifier.aspectRatio(1f).settingsCardMorph(), contentAlignment = Alignment.BottomStart) {
-                    if (tile.isVideo) {
-                        MediaVideoGridTile(
-                            messageIdHex = tile.messageIdHex,
-                            attachmentIndex = tile.attachmentIndex,
-                            reference = tile.reference,
-                            controller = controller,
-                            appState = appState,
-                            mine = tile.mine,
-                            onTap = { onTapTile(tile) },
-                            overflowCount = 0,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        MediaImageGridTile(
-                            messageIdHex = tile.messageIdHex,
-                            attachmentIndex = tile.attachmentIndex,
-                            reference = tile.reference,
-                            controller = controller,
-                            appState = appState,
-                            mine = tile.mine,
-                            onTap = { onTapTile(tile) },
-                            overflowCount = 0,
-                            modifier = Modifier.fillMaxSize(),
+                val selecting = share.selection.active
+                val selected = selecting && share.selection.isSelected(tile)
+                val select = {
+                    if (!share.sharing) share.selection.toggle(tile)
+                }
+                Box(Modifier.aspectRatio(1f).settingsCardMorph()) {
+                    // While selecting, the overlay below owns this tile's touch and accessibility.
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .selectedTileInset(selected)
+                            .then(if (selecting) Modifier.clearAndSetSemantics {} else Modifier),
+                        contentAlignment = Alignment.BottomStart,
+                    ) {
+                        if (tile.isVideo) {
+                            MediaVideoGridTile(
+                                messageIdHex = tile.messageIdHex,
+                                attachmentIndex = tile.attachmentIndex,
+                                reference = tile.reference,
+                                controller = controller,
+                                appState = appState,
+                                mine = tile.mine,
+                                onTap = { onTapTile(tile) },
+                                overflowCount = 0,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            MediaImageGridTile(
+                                messageIdHex = tile.messageIdHex,
+                                attachmentIndex = tile.attachmentIndex,
+                                reference = tile.reference,
+                                controller = controller,
+                                appState = appState,
+                                mine = tile.mine,
+                                onTap = { onTapTile(tile) },
+                                overflowCount = 0,
+                                modifier =
+                                    Modifier.fillMaxSize().selectPhotoAction(enabled = !selecting, onSelect = select),
+                                onLongPress = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    select()
+                                },
+                            )
+                        }
+                        SharedMediaTileCaption(tile, appState)
+                    }
+                    if (selecting) {
+                        SharedTileSelectionOverlay(
+                            tile = tile,
+                            selected = selected,
+                            enabled = !share.sharing,
+                            description = sharedTileSelectionDescription(tile, appState),
+                            onToggle = select,
                         )
                     }
-                    SharedMediaTileCaption(tile, appState)
                 }
             }
         }
@@ -126,6 +160,21 @@ private fun SharedMediaTileCaption(
         }
     }
 }
+
+/** What a tile announces while selecting: who sent a photo, or that a video cannot be selected. */
+@Composable
+private fun sharedTileSelectionDescription(
+    tile: SharedMediaTile,
+    appState: WhiteNoiseAppState,
+): String =
+    if (tile.isVideo) {
+        stringResource(R.string.shared_media_video_not_selectable)
+    } else {
+        stringResource(
+            R.string.shared_media_photo_from,
+            if (tile.mine) stringResource(R.string.you) else appState.displayName(tile.sender),
+        )
+    }
 
 /** Keeps the caption legible over bright artwork without hiding the photo behind it. */
 private const val SHARED_TILE_CAPTION_ALPHA = 0.86f

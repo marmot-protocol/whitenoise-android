@@ -452,6 +452,7 @@ private fun MediaLibraryContent(
     onLoadMore: () -> Unit = {},
 ) {
     var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
+    val photoShare = rememberSharedPhotoShare(tiles, controller, appState)
     val viewerSelection = remember { SharedMediaViewerSelection() }
     val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
     val forwardActions = rememberMediaViewerForwardActions(controller, appState)
@@ -496,11 +497,15 @@ private fun MediaLibraryContent(
     SharedContentScaffold(
         category = category,
         filter = filter,
-        onFilter = { filter = it },
+        onFilter = {
+            photoShare.exit()
+            filter = it
+        },
         onBack = onBack,
         loading = tiles.isLoading,
         paging = paging,
         onLoadMore = onLoadMore,
+        selectionBar = photoShare.selectionBar(tiles.isLoading),
     ) {
         val selectedEmpty =
             when (category) {
@@ -525,6 +530,7 @@ private fun MediaLibraryContent(
                         controller = controller,
                         appState = appState,
                         emptyLabel = stringResource(R.string.shared_content_empty),
+                        share = photoShare,
                         onTapTile = { viewerSelection.select(it.messageIdHex, it.attachmentIndex) },
                     )
                 SharedContentCategory.Links ->
