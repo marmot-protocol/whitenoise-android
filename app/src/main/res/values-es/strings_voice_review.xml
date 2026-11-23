@@ -14,4 +14,5 @@
     <string name="voice_recording_paused">Grabación de voz en pausa</string>
     <string name="voice_send_on_release">Enviar mensajes de voz al soltar después de mantener pulsado</string>
     <string name="voice_transcribe_automatically">Transcribir automáticamente los mensajes de voz recibidos</string>
+    <string name="settings_voice_notes">Mensajes de voz</string>
 </resources>

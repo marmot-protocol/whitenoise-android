@@ -5801,28 +5801,8 @@ class WhiteNoiseAppState private constructor(
         accountListLoaded = result.isSuccess
     }
 
-    /** Commits one host preference transaction off-main and times actual durable completion. */
-    @Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
-    private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) {
-        val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
-        val editor =
-            try {
-                preferences.edit().apply(edit)
-            } catch (throwable: Throwable) {
-                attempt.failure()
-                throw throwable
-            }
-        mutationsScope
-            .launch {
-                hostPreferenceCommitMutex.withLock {
-                    withContext(Dispatchers.IO) {
-                        completeHostPreferenceCommit(attempt, editor::commit)
-                    }
-                }
-            }.invokeOnCompletion { cause ->
-                if (cause is CancellationException) attempt.cancel()
-            }
-    }
+    private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) =
+        persistHostSetting(preferences, hostPreferenceCommitMutex, edit)
 
     fun updateDeveloperMode(enabled: Boolean) {
         developerMode = enabled

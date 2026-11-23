@@ -359,6 +359,8 @@ private fun SettingsDetailRoute(
         SettingsDetail.DiagnosticsImprovements -> DiagnosticsImprovementsScreen(appState, onBack = onBack)
         SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = onBack)
         SettingsDetail.Donate -> DonateScreen(onBack = onBack)
+        SettingsDetail.VoiceNotes -> VoiceNoteSettingsScreen(appState.voiceNotePreferences, onBack)
+
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = onBack)
         SettingsDetail.Translation -> TranslationSettingsScreen(onBack = onBack)
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = onBack)

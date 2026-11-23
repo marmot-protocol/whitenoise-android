@@ -11,7 +11,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
-import dev.ipf.whitenoise.android.state.VoiceNotePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.quickAccountSwitching
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
@@ -239,7 +238,7 @@ internal fun ChatsScreen(
 }
 
 /** Voice & language hub: the app language and the spoken, dictated and translated text features. */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod") // Keep the declared hub row order together.
 @Composable
 internal fun VoiceLanguageScreen(
     appState: WhiteNoiseAppState,
@@ -265,6 +264,15 @@ internal fun VoiceLanguageScreen(
                             routeKey = SettingsDetail.Language,
                             onClick = { onOpenDetail(SettingsDetail.Language) },
                             leading = { SettingsLeadingIcon(R.drawable.ic_language) },
+                        )
+                    }
+                    row("voice_notes") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.settings_voice_notes),
+                            routeKey = SettingsDetail.VoiceNotes,
+                            onClick = { onOpenDetail(SettingsDetail.VoiceNotes) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_mic) },
                         )
                     }
                     row("read_aloud") { context ->
@@ -299,34 +307,6 @@ internal fun VoiceLanguageScreen(
                     }
                 }
             }
-            item(key = "search.VoiceLanguage.voice_notes") {
-                VoiceNoteSettings(appState.voiceNotePreferences)
-            }
-        }
-    }
-}
-
-@Composable
-@Suppress("FunctionNaming")
-private fun VoiceNoteSettings(preferences: VoiceNotePreferences) {
-    SettingsGroup(destination = SettingsDetail.VoiceLanguage, surface = "voice-note-controls") {
-        row("voice_send_on_release") { context ->
-            SettingsSwitch(
-                context = context,
-                title = stringResource(R.string.voice_send_on_release),
-                checked = preferences.sendHeldOnRelease,
-                onCheckedChange = preferences::updateSendHeldOnRelease,
-                leading = { SettingsLeadingIcon(R.drawable.ic_send) },
-            )
-        }
-        row("voice_transcribe_automatically") { context ->
-            SettingsSwitch(
-                context = context,
-                title = stringResource(R.string.voice_transcribe_automatically),
-                checked = preferences.transcribeAutomatically,
-                onCheckedChange = preferences::updateTranscribeAutomatically,
-                leading = { SettingsLeadingIcon(R.drawable.ic_mic) },
-            )
         }
     }
 }

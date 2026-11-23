@@ -18,7 +18,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 ),
             )
         }
-        addAll(settingsHubDestinationEntries())
+        addAll(settingsHubDestinationEntries() + voiceNoteSettingsSearchEntries())
         add(
             SettingsSearchEntry(
                 "Appearance.action_color",
@@ -680,22 +680,6 @@ private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
             SettingsDetail.VoiceLanguage,
             "search.VoiceLanguage.1",
             "language",
-        ),
-        hubEntry(
-            "VoiceLanguage.voice_send_on_release",
-            R.string.voice_send_on_release,
-            R.string.settings_voice_language,
-            SettingsDetail.VoiceLanguage,
-            "search.VoiceLanguage.voice_notes",
-            "voice_send_on_release",
-        ),
-        hubEntry(
-            "VoiceLanguage.voice_transcribe_automatically",
-            R.string.voice_transcribe_automatically,
-            R.string.settings_voice_language,
-            SettingsDetail.VoiceLanguage,
-            "search.VoiceLanguage.voice_notes",
-            "voice_transcribe_automatically",
         ),
         hubEntry(
             "home.ReadAloud",

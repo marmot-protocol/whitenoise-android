@@ -14,4 +14,5 @@
     <string name="voice_recording_paused">Enregistrement vocal en pause</string>
     <string name="voice_send_on_release">Envoyer le message vocal en relâchant après un appui prolongé</string>
     <string name="voice_transcribe_automatically">Transcrire automatiquement les messages vocaux reçus</string>
+    <string name="settings_voice_notes">Messages vocaux</string>
 </resources>

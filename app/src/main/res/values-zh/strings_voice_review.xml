@@ -14,4 +14,5 @@
     <string name="voice_recording_paused">语音录制已暂停</string>
     <string name="voice_send_on_release">松开时直接发送长按录制的语音消息</string>
     <string name="voice_transcribe_automatically">自动转录收到的语音消息</string>
+    <string name="settings_voice_notes">语音消息</string>
 </resources>

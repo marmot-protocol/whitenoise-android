@@ -14,4 +14,5 @@
     <string name="voice_recording_paused">語音錄製已暫停</string>
     <string name="voice_send_on_release">放開時直接傳送長按錄製的語音訊息</string>
     <string name="voice_transcribe_automatically">自動轉錄收到的語音訊息</string>
+    <string name="settings_voice_notes">語音訊息</string>
 </resources>

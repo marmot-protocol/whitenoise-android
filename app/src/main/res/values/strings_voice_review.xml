@@ -14,4 +14,5 @@
     <string name="voice_recording_paused">Voice recording paused</string>
     <string name="voice_send_on_release">Send held voice notes on release</string>
     <string name="voice_transcribe_automatically">Automatically transcribe received voice notes</string>
+    <string name="settings_voice_notes">Voice notes</string>
 </resources>
