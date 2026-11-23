@@ -10,9 +10,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.FollowedPersonBadge
@@ -75,7 +79,12 @@ internal fun ChatRowAvatarMarkers(
     Box {
         avatar()
         if (followed) {
-            FollowedPersonBadge(Modifier.align(Alignment.BottomEnd), followedPersonBadgeSize(CHAT_ROW_AVATAR_SIZE))
+            // Announced with the row, like the pin beside it.
+            val description = stringResource(R.string.user_search_you_follow)
+            FollowedPersonBadge(
+                Modifier.align(Alignment.BottomEnd).semantics { contentDescription = description },
+                followedPersonBadgeSize(CHAT_ROW_AVATAR_SIZE),
+            )
         }
         if (pinned) {
             Surface(
