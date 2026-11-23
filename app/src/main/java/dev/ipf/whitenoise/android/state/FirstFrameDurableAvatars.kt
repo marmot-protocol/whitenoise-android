@@ -79,16 +79,17 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
     accountRef: String,
     rows: List<PresentedChatRowFfi>,
     awaitColdWorkers: Boolean = true,
+    onPrepared: ((renderableAssets: Int, decodedAssets: Int) -> Unit)? = null,
 ): List<FirstFrameDurableAvatar> {
     val selections =
         firstFrameDurableAvatarSelections(rows, accountRef) { groupIdHex ->
             draftStore.draftedAtSecondsFor(accountRef, groupIdHex)
-        }.takeIf { it.isNotEmpty() } ?: return emptyList()
+        }
     decodeDurableAvatarsWithinBudget(
         if (awaitColdWorkers) selections else selectionsServableNow(selections, accountRef),
         accountRef,
     )
-    return selections.map { it.first }.mapNotNull { asset ->
+    val decoded = selections.map { it.first }.mapNotNull { asset ->
         val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
         AvatarImageLoader.cachedImage(key)?.let { image ->
             FirstFrameDurableAvatar(
@@ -99,6 +100,8 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
             )
         }
     }
+    onPrepared?.invoke(selections.size, decoded.size)
+    return decoded
 }
 
 /**

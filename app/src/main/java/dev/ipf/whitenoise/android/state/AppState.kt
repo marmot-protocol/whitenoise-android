@@ -5034,6 +5034,14 @@ class WhiteNoiseAppState private constructor(
         recordPendingAccountSwitchStage(accountRef, "cached-chat-rows-ready", rowCount)
     }
 
+    internal fun recordStartupAvatarPreparation(
+        renderableAssets: Int,
+        decodedAssets: Int,
+    ) {
+        startupPerformance.record(PerformancePhase.STARTUP_AVATARS_RENDERABLE, count = renderableAssets)
+        startupPerformance.record(PerformancePhase.STARTUP_AVATARS_DECODED, count = decodedAssets)
+    }
+
     /** Records the point where every cached row has a local member projection. */
     internal fun recordAccountSwitchMemberDerivedLocalReady(
         accountRef: String,

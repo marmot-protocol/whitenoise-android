@@ -91,6 +91,8 @@ internal enum class PerformancePhase(
     FAILED_RUNTIME_CLOSE("failed_runtime_close", ROUTINE_SPAN_THRESHOLD_MS),
     MARMOT_START("marmot_start", ROUTINE_SPAN_THRESHOLD_MS),
     CACHED_CHAT_ROWS_READY("cached_chat_rows_ready"),
+    STARTUP_AVATARS_RENDERABLE("startup_avatars_renderable"),
+    STARTUP_AVATARS_DECODED("startup_avatars_decoded"),
     MEMBER_DERIVED_LOCAL_READY("member_derived_local_ready"),
     FIRST_LOCAL_FRAME("first_local_frame"),
     ACCOUNT_SWITCH_MEMBER_DERIVED_DEFERRED("account_switch_member_derived_deferred"),

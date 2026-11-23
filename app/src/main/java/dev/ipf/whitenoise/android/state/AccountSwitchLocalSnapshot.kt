@@ -213,6 +213,7 @@ internal data class AccountSwitchPreloadPlan(
      * switch resets every worker, and a new one can take longer than the whole avatar budget to start (#3496).
      */
     val awaitColdAvatarWorkers: Boolean = true,
+    val recordStartupAvatarPreparation: Boolean = false,
 )
 
 /** What a switch to another account reads before publication, chosen by its [preloadPolicy]. */
@@ -244,6 +245,7 @@ internal fun accountSwitchPreloadPlan(
             includePresentationSeeds ||
                 (loadLocalRows && preloadPolicy == AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS),
         awaitColdAvatarWorkers = preloadPolicy != AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+        recordStartupAvatarPreparation = preloadPolicy == AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
     )
 }
 

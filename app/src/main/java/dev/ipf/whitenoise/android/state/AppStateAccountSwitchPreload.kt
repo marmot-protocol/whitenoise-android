@@ -68,6 +68,7 @@ internal suspend fun WhiteNoiseAppState.loadAccountSwitchLocalSnapshot(
                 accountRef,
                 presentedRows,
                 awaitColdWorkers = plan.awaitColdAvatarWorkers,
+                onPrepared = if (plan.recordStartupAvatarPreparation) ::recordStartupAvatarPreparation else null,
             )
         ensureAccountSwitchRequestIsCurrent(generation)
         recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
