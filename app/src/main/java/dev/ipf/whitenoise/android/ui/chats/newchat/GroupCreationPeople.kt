@@ -45,10 +45,10 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.LocalFollowedPeople
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
+import dev.ipf.whitenoise.android.ui.common.isFollowedPerson
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -76,8 +76,12 @@ internal fun GroupCreationPersonRow(
 ) {
     val candidate = person.candidate
     val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
-    val isFollowed = candidate.isFollowing || LocalFollowedPeople.current.contains(candidate.accountIdHex)
-    val followed = if (isFollowed) stringResource(R.string.user_search_you_follow) else null
+    val followed =
+        if (isFollowedPerson(candidate.isFollowing, candidate.accountIdHex)) {
+            stringResource(R.string.user_search_you_follow)
+        } else {
+            null
+        }
     val (profileModifier, profileClick) = rememberMeasuredControlClick { origin -> onLongClick?.invoke(origin) }
     val native =
         rememberSettingsNativeSurface(

@@ -68,10 +68,19 @@ internal class FollowedPeople(
 
 internal val LocalFollowedPeople = compositionLocalOf { FollowedPeople.None }
 
+/** Whether a row presents its person as followed: its caller already [known] it, or the active account follows them. */
+@Composable
+internal fun isFollowedPerson(
+    known: Boolean,
+    accountIdHex: String?,
+): Boolean = known || LocalFollowedPeople.current.contains(accountIdHex)
+
 /** Supplies [LocalFollowedPeople] for the whole app from [rememberFollowedPeople]. */
 @Composable
-internal fun followedPeopleFor(appState: WhiteNoiseAppState): ProvidedValue<FollowedPeople> =
-    LocalFollowedPeople provides rememberFollowedPeople(appState)
+internal fun followedPeopleFor(appState: WhiteNoiseAppState): ProvidedValue<FollowedPeople> {
+    val followed = rememberFollowedPeople(appState)
+    return LocalFollowedPeople provides followed
+}
 
 /**
  * Reads the active account's follow list from MDK's local cache whenever the account changes, the app returns to the
@@ -176,8 +185,10 @@ internal fun FollowedPersonBadge(
 }
 
 /** Five twelfths of the avatar (20 dp on a 48 dp row), kept between a legible minimum and a modest maximum. */
-internal fun followedPersonBadgeSize(avatarSize: Dp): Dp =
-    (avatarSize * BADGE_TO_AVATAR_RATIO).coerceIn(MIN_BADGE_SIZE, MAX_BADGE_SIZE)
+internal fun followedPersonBadgeSize(avatarSize: Dp): Dp {
+    val proportional = avatarSize * BADGE_TO_AVATAR_RATIO
+    return proportional.coerceIn(MIN_BADGE_SIZE, MAX_BADGE_SIZE)
+}
 
 internal const val FOLLOWED_PERSON_BADGE_TEST_TAG = "recipient-followed-person-badge"
 private val FOLLOWED_PERSON_BADGE_SIZE = 20.dp

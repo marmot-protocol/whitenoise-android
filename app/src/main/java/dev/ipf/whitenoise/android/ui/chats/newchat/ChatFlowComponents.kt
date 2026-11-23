@@ -50,8 +50,8 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.FollowedPersonBadge
 import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
-import dev.ipf.whitenoise.android.ui.common.LocalFollowedPeople
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.isFollowedPerson
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.icons.filled.RadioButtonUnchecked
@@ -162,7 +162,7 @@ internal fun ContactRow(
     avatarDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
-    val followed = isFollowed || LocalFollowedPeople.current.contains(followedAccount)
+    val followed = isFollowedPerson(isFollowed, followedAccount)
     val followedStateDescription =
         if (followed) {
             stringResource(R.string.user_search_you_follow)
