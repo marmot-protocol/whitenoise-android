@@ -33,10 +33,6 @@ internal class MeasuredPenDialogMotion(
     private var cachedBubble: SurfaceMorphGeometry? = null
     internal var drawsSource: () -> Boolean by mutableStateOf({ false })
 
-    fun debugGeometry() =
-        "origin=$origin landing=${landing?.visibleBounds} host=$cachedHost " +
-            "sourceCurrent=${isSourceCurrent()}"
-
     fun reportLanding(card: SurfaceMorphCard?) {
         landing = card
     }

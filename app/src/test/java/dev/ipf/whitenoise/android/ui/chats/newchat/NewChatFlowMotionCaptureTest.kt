@@ -95,7 +95,7 @@ class NewChatFlowMotionCaptureTest {
             advanceOpeningFrames()
             composeRule.runOnIdle {
                 val motion = checkNotNull(launch.value)
-                assertTrue(motion.debugGeometry(), motion.drawsSource())
+                assertTrue(motion.drawsSource())
             }
             actionGroup.assertIsNotDisplayed()
             composeRule.mainClock.advanceTimeBy(1_000L)

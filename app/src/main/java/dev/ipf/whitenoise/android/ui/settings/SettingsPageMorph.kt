@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.clipRect
 import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
@@ -64,8 +63,8 @@ internal class SettingsPageMorph {
     /** The cards the mounted child route measured, which a top-level bubble may land on. */
     internal var childCards: (() -> List<SurfaceMorphCard>)? by mutableStateOf(null)
     private val bubbleCache = SettingsBubbleCardCache()
-    internal fun bubbleCards(): List<SurfaceMorphCard> =
-        childCards?.invoke()?.takeIf { it.isNotEmpty() } ?: bubbleCache.cards(destinations.values)
+
+    internal fun bubbleCards(): List<SurfaceMorphCard> = childCards?.invoke()?.takeIf { it.isNotEmpty() } ?: bubbleCache.cards(destinations.values)
 
     internal val bodyTop: Float
         get() =
