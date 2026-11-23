@@ -5,6 +5,7 @@ import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Configurator
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.onElementOrNull
@@ -115,6 +116,18 @@ private const val MAIN_ACTIVITY = "dev.ipf.whitenoise.android.MainActivity"
 
 /** A short, fixed retry so a closed input gate costs about its own length, not a navigation timeout. */
 private fun UiDevice.tapRowUntilOpened(groupName: String) {
+    // UI Automator otherwise waits for an accessibility-quiet window before each lookup.
+    val configurator = Configurator.getInstance()
+    val idleTimeout = configurator.waitForIdleTimeout
+    configurator.waitForIdleTimeout = 0L
+    try {
+        tapUntilOpened(groupName)
+    } finally {
+        configurator.waitForIdleTimeout = idleTimeout
+    }
+}
+
+private fun UiDevice.tapUntilOpened(groupName: String) {
     val deadline = SystemClock.uptimeMillis() + OPEN_ROW_TIMEOUT_MS
     while (SystemClock.uptimeMillis() < deadline) {
         val opened =

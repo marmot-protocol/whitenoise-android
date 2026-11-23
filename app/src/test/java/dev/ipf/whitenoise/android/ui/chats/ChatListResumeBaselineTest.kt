@@ -43,6 +43,7 @@ class ChatListResumeBaselineTest {
     private var itemIds by mutableStateOf(order("A", "B", "C"))
     private val openedIds = mutableListOf<String>()
     private var interactionsEnabled = true
+    private var headCorrectionsStarted = 0
     private lateinit var listState: LazyListState
 
     private fun order(vararg head: String): List<String> = head.toList() + filler
@@ -57,6 +58,7 @@ class ChatListResumeBaselineTest {
                     rowHeight = rowHeight,
                     onOpen = openedIds::add,
                     onRowsComposed = { _, enabled -> interactionsEnabled = enabled },
+                    onHeadScrollCorrectionStarted = { headCorrectionsStarted += 1 },
                 )
             }
         }
@@ -170,6 +172,11 @@ class ChatListResumeBaselineTest {
         setHarness()
         composeRule.runOnUiThread { itemIds = order("C", "A", "B") }
         advanceFrames(1)
+        composeRule.runOnIdle {
+            assertEquals("the live promotion must start a head correction", 1, headCorrectionsStarted)
+            assertTrue("the correction must still be running when the app stops", listState.isScrollInProgress)
+            assertFalse(interactionsEnabled)
+        }
 
         // Stop and start before the stopped window composes again.
         stopAndResume()
