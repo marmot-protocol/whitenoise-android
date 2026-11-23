@@ -358,6 +358,7 @@ internal fun ContactPickerScreen(
                                 },
                             avatarSeed = resolvedAccountIdHex,
                             avatarUrl = appState.contactAvatarSource(resolvedAccountIdHex),
+                            followedAccount = resolvedAccountIdHex,
                             enabled = !busy && !alreadyMember,
                             onClick = { toggle(candidate) },
                             onLongClick = profileClick,

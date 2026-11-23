@@ -8,6 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "fun ComposerPill(",
         "test_ids": [
+          "CON-012",
           "CON-001",
           "CON-005",
           "CON-007",

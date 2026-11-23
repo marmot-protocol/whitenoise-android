@@ -88,6 +88,7 @@ private fun MentionPickerRow(
                 size = MENTION_ROW_AVATAR,
                 pictureUrl = candidate.avatarUrl,
                 pictureDomain = AvatarImageLoader.publicProfiles(),
+                followedAccount = candidate.accountIdHex,
             )
         },
         modifier =

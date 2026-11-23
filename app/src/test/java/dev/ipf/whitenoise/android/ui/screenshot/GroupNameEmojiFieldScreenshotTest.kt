@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -10,7 +11,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -102,8 +102,7 @@ class GroupNameEmojiFieldScreenshotTest {
                 WhiteNoiseTheme(darkTheme = darkTheme) {
                     Surface(modifier = Modifier.width(360.dp).testTag(TAG)) {
                         GroupNameEmojiField(
-                            value = TextFieldValue(value),
-                            onValueChange = {},
+                            state = rememberTextFieldState(value),
                             label = label,
                             emojiPickerOpen = pickerOpen,
                             onEmojiPickerClick = {},

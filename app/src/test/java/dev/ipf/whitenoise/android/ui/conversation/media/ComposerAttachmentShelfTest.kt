@@ -18,16 +18,22 @@ import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
+import dev.ipf.whitenoise.android.state.timelineAppMessage
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -49,11 +55,7 @@ class ComposerAttachmentShelfTest {
     /** Visual shelf uses prototype card geometry and independent actions. */
     @Test
     fun visualShelfUsesPrototypeCardGeometryAndIndependentActions() {
-        val image = File(context.cacheDir, "shelf-landscape.png")
-        val bitmap = Bitmap.createBitmap(160, 100, Bitmap.Config.ARGB_8888)
-        bitmap.eraseColor(android.graphics.Color.rgb(64, 128, 144))
-        image.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
+        val image = createLandscapePhoto("shelf-landscape.png")
         val slot = PendingMediaSlot("landscape-slot", Uri.fromFile(image))
         var preview = -1
         var removed: PendingMediaSlot? = null
@@ -93,6 +95,43 @@ class ComposerAttachmentShelfTest {
             ).performClick()
         assertEquals(slot, removed)
         assertEquals(0, preview)
+    }
+
+    /** A staged photo's divider retains an 8 dp gap above the AMOLED reply outline. */
+    @Test
+    fun composerReplyAmoledKeepsGapAfterStagedPhoto() {
+        val slot = PendingMediaSlot("reply-photo", Uri.fromFile(createLandscapePhoto("reply-staged-photo.png")))
+        val parent = timelineAppMessage("parent")
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.width(360.dp)) {
+                    ComposerBar(
+                        replyingTo = parent,
+                        replyingToDisplay = TimelineReplyDisplay(sender = "alice", body = "Parent message"),
+                        messageTextCopy = MessageTextCopy.Default,
+                        onCancelReply = {},
+                        onSend = { _, _ -> },
+                        initialDraft = TextFieldValue("Reply draft"),
+                        hasPendingAttachments = true,
+                        attachmentContent = {
+                            ComposerAttachmentShelf(
+                                mediaSlots = listOf(slot),
+                                documentUris = emptyList(),
+                                prepared = emptyMap(),
+                                onPreview = {},
+                                onRemoveMedia = {},
+                                onRemoveDocument = {},
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
+        val shelf = composeRule.onNodeWithTag("conversation.composer.attachments")
+        val dismiss = composeRule.onNodeWithContentDescription(context.getString(R.string.cancel_reply))
+        // The dismiss target starts at the reply's top edge, one divider pixel plus 8 dp after the shelf.
+        assertEquals(9.dp, dismiss.getUnclippedBoundsInRoot().top - shelf.getUnclippedBoundsInRoot().bottom)
     }
 
     /** Utility shelf keeps filename and removal at large text in rtl. */
@@ -298,5 +337,14 @@ class ComposerAttachmentShelfTest {
         assertEquals(160 to 72, composerAttachmentCardSize(ComposerAttachmentCardKind.File))
         assertEquals(128, composerShelfHeight(hasVisualAttachment = true))
         assertEquals(88, composerShelfHeight(hasVisualAttachment = false))
+    }
+
+    private fun createLandscapePhoto(fileName: String): File {
+        val image = File(context.cacheDir, fileName)
+        val bitmap = Bitmap.createBitmap(160, 100, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(android.graphics.Color.rgb(64, 128, 144))
+        image.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        return image
     }
 }
