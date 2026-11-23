@@ -33,6 +33,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -94,6 +95,13 @@ class ChatContextMenuFlowTest {
             val row = composeRule.onNodeWithTag("chat.row.a")
             val frame = screenBounds(composeRule.onRoot())
             val rowBounds = screenBounds(row)
+            val menu = composeRule.onNodeWithTag("chat.menu.a")
+            openMenu()
+            val accessibleLeft = screenBounds(menu).left
+            composeRule.onNode(isPopup()).dispatchNativePopupBack()
+            menu.assertDoesNotExist()
+            // Material reserves room for the menu shadow at the edges.
+            val menuMargin = with(composeRule.density) { 8.dp.toPx() }
             val positions =
                 listOf(0.05f, 0.5f, 0.95f).map { fraction ->
                     row.performTouchInput {
@@ -102,11 +110,12 @@ class ChatContextMenuFlowTest {
                         advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
                         moveTo(point)
                     }
-                    val menu = composeRule.onNodeWithTag("chat.menu.a").assertIsDisplayed()
+                    menu.assertIsDisplayed()
                     row.performTouchInput { up() }
                     val bounds = screenBounds(menu)
                     val pressX = rowBounds.left + rowBounds.width * fraction
-                    val expectedLeft = (pressX - bounds.width / 2).coerceIn(frame.left, frame.right - bounds.width)
+                    val expectedLeft =
+                        (pressX - bounds.width / 2).coerceIn(frame.left + menuMargin, frame.right - menuMargin - bounds.width)
                     assertEquals(expectedLeft, bounds.left, 2f)
                     assertTrue(bounds.top >= frame.top && bounds.bottom <= frame.bottom)
                     composeRule.onNode(isPopup()).dispatchNativePopupBack()
@@ -116,8 +125,7 @@ class ChatContextMenuFlowTest {
             assertTrue(positions[0] < positions[1] && positions[1] < positions[2])
 
             openMenu()
-            val fallback = screenBounds(composeRule.onNodeWithTag("chat.menu.a"))
-            assertTrue(fallback.left > positions[1])
+            assertEquals(accessibleLeft, screenBounds(menu).left, 2f)
         }
 
     private fun screenBounds(node: androidx.compose.ui.test.SemanticsNodeInteraction): Rect {

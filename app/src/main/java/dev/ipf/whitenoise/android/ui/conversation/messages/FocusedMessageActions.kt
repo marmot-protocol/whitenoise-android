@@ -58,7 +58,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
@@ -76,7 +75,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -213,7 +211,6 @@ private const val FOCUSED_MORE_DISC_ALPHA = 0.08f
 private val FocusedStackMaximumWidth = 560.dp
 private val FocusedOverlayShadowSafeInset = 8.dp
 private val FocusedReactionRailInset = 4.dp
-private val FocusedStackHorizontalPadding = 16.dp
 
 // Two rows of 48dp targets: the rail height the overlay's 200dp preview budget was sized around.
 private val FocusedReactionRailBudget = 108.dp
@@ -446,49 +443,6 @@ internal fun FocusedMessageActions(
         }
     }
 }
-
-private fun WindowInsets.actionTouchXInPaddedFrame(
-    touchX: Float?,
-    density: Density,
-    layoutDirection: LayoutDirection,
-): Float? =
-    touchX?.let {
-        val leftInsetPx = getLeft(density, layoutDirection)
-        it - leftInsetPx - with(density) { FocusedStackHorizontalPadding.roundToPx() }
-    }
-
-/**
- * Places a stack child as if the stack were still the centred column of [columnWidth], aligned to its end
- * edge for [mine] and its start edge otherwise, while letting it measure up to [maximumWidth].
- *
- * A child no wider than the column sits exactly where the capped stack put it. A wider one keeps that edge
- * until it would leave the window, then slides back inside it, so it grows across the window rather than
- * past either side. Touch placement uses a physical X within the padded frame. Without a touch,
- * offsets are start-relative, so RTL mirrors them like the column alignment did.
- */
-internal fun Modifier.focusedColumnSlot(
-    columnWidth: Dp,
-    maximumWidth: Dp,
-    mine: Boolean,
-    touchX: Float? = null,
-): Modifier =
-    layout { measurable, constraints ->
-        val maxChild = maximumWidth.roundToPx().coerceIn(0, constraints.maxWidth)
-        val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maxChild))
-        val width = constraints.maxWidth
-        val column = columnWidth.roundToPx().coerceIn(0, width)
-        val columnStart = (width - column) / 2
-        val preferred = if (mine) columnStart + column - placeable.width else columnStart
-        val maxLeft = width - placeable.width
-        layout(width, placeable.height) {
-            if (touchX == null) {
-                placeable.placeRelative(preferred.coerceIn(0, maxLeft), 0)
-            } else {
-                val left = (touchX - placeable.width / 2f).roundToInt().coerceIn(0, maxLeft)
-                placeable.place(left, 0)
-            }
-        }
-    }
 
 /**
  * Balances the reaction rail over as few rows as the width allows, so every configured choice keeps
