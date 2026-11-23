@@ -64,7 +64,10 @@ internal class SettingsPageMorph {
     internal var childCards: (() -> List<SurfaceMorphCard>)? by mutableStateOf(null)
     private val bubbleCache = SettingsBubbleCardCache()
 
-    internal fun bubbleCards(): List<SurfaceMorphCard> = childCards?.invoke()?.takeIf { it.isNotEmpty() } ?: bubbleCache.cards(destinations.values)
+    internal fun bubbleCards(): List<SurfaceMorphCard> {
+        val measuredCards = childCards?.invoke()
+        return measuredCards?.takeIf { it.isNotEmpty() } ?: bubbleCache.cards(destinations.values)
+    }
 
     internal val bodyTop: Float
         get() =
