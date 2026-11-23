@@ -79,15 +79,24 @@ class ShareConnectScreenBehaviorTest {
     @Test
     fun keyCapsuleCopiesAndAnnouncesTheCopiedState() {
         mount(copied = false)
-        composeRule.onNodeWithContentDescription("Copy public key").assertIsDisplayed().performClick()
+        composeRule
+            .onNodeWithTag("share_connect.copy_public_key")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Not copied"))
+            .performClick()
         composeRule.runOnIdle { assertEquals(1, copyCount) }
     }
 
-    /** While copied, the capsule announces the copied state instead of the copy action. */
+    /** While copied, the capsule announces its copied state. */
     @Test
     fun copiedCapsuleShowsTheCopiedDescription() {
         mount(copied = true)
-        composeRule.onNodeWithContentDescription("Copied").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("share_connect.copy_public_key")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Copied"))
     }
 
     /** The pinned Scan QR Code button opens the scanner, and an invalid scan shows the error under the caption. */
