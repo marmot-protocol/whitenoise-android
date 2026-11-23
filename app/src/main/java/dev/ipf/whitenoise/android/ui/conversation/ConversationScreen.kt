@@ -1468,7 +1468,7 @@ internal fun ConversationScreen(
         }
     }
     // #4030: MDK's entry count shows the control on the first frame; the loaded rows take over as they settle.
-    val mentionSeed = rememberConversationMentionJumpSeed(entryUnreadSessionIdentity, entryRow?.unreadMentionCount)
+    val mentionSeed = rememberConversationMentionJumpSeed(entryUnreadSessionIdentity, entryRow)
     val mentionCoverage by remember(controller, mentionSeed) {
         derivedStateOf {
             conversationMentionCoverage(
@@ -1483,10 +1483,8 @@ internal fun ConversationScreen(
         derivedStateOf { mentionSeed.count(unreadMentionMessageIds, mentionCoverage) }
     }
     LaunchedEffect(mentionSeed) {
-        snapshotFlow { unreadMentionMessageIds to mentionCoverage }.collect { (ids, coverage) ->
-            val loaded = controller.timeline.mapTo(HashSet()) { it.record.messageIdHex }
-            mentionSeed.observe(ids, coverage, readAnchorMessageId in loaded) { it in loaded }
-        }
+        snapshotFlow { Triple(controller.timeline, readAnchorMessageId, mentionCoverage) }
+            .collect { (rows, anchor, coverage) -> mentionSeed.observe(rows, anchor, coverage, mentionsSelf) }
     }
     // Reading the raw IME inset in the body would re-subscribe and recompose
     // this (very heavy) screen on every keyboard-animation frame. Capture the
@@ -2306,10 +2304,10 @@ internal fun ConversationScreen(
 
     /**
      * The oldest unread mention, waiting for entry positioning and searching past the window if needed. Null when the
-     * request was superseded, or after a current request found nothing and retired the seed with a notice.
+     * request was superseded or nothing was found; a search that ran out of history retires the seed.
      */
     suspend fun nextUnreadMentionTarget(isCurrent: () -> Boolean): String? {
-        val target =
+        val search =
             mentionSeed.jumpTarget(
                 awaitAnchored = { snapshotFlow { initialTimelineAnchored }.first { it } },
                 loadedTarget = { unreadMentionMessageIds.firstOrNull() },
@@ -2321,15 +2319,16 @@ internal fun ConversationScreen(
                     mentionsActiveAccount = mentionsSelf,
                     loadMessage = { controller.loadUntilMessageAvailable(it) },
                     hasMoreAfter = { controller.hasMoreAfterTimeline },
-                    loadNewer = { controller.loadNewerTimelinePage() },
-                )
+                ) {
+                    snapshotFlow { controller.isLoadingPage }.first { !it }
+                    controller.loadNewerTimelinePage()
+                }
             }
         if (!isCurrent()) return null
-        if (target == null) {
-            mentionSeed.retire()
-            appState.present(R.string.toast_original_message_unavailable)
-        }
-        return target
+        if (search is ConversationMentionSearch.Found) return search.messageId
+        if (search == ConversationMentionSearch.Exhausted) mentionSeed.retire()
+        appState.present(R.string.toast_original_message_unavailable)
+        return null
     }
 
     fun jumpToNextUnreadMention() {

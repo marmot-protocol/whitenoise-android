@@ -10,7 +10,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,40 +34,58 @@ class ConversationMentionJumpTest {
 
     @Test
     fun loadedRowsReachingTheNewestRowReplaceTheEntryCount() {
-        val seed = ConversationMentionJumpSeed(entryCount = 3)
+        val seed = ConversationMentionJumpSeed(entryCount = 3, entryLastReadMessageId = "r")
+        val rows = rows("r", "u1")
 
         // The read anchor already passed the mentions: the full unread range is loaded and holds none.
         assertEquals(0, seed.count(emptyList(), ConversationMentionCoverage.COMPLETE))
-        seed.observe(emptyList(), ConversationMentionCoverage.COMPLETE, anchorLoaded = true) { true }
+        seed.observe(rows, "r", ConversationMentionCoverage.COMPLETE, ::mentionsTestAccount)
         assertFalse("a covered range retires the entry count", seed.active)
         // A later window that no longer reaches the newest row must not bring the stale count back.
         assertEquals(0, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
     }
 
     @Test
-    fun aMentionReadBehindTheAnchorLeavesTheCount() {
-        val seed = ConversationMentionJumpSeed(entryCount = 3)
-        val loaded = setOf("anchor", "m1")
+    fun aMentionTheReadAnchorPassesLeavesTheCount() {
+        val seed = ConversationMentionJumpSeed(entryCount = 3, entryLastReadMessageId = "r")
+        val rows = rows("r", "m1@", "u1")
 
-        seed.observe(listOf("m1"), ConversationMentionCoverage.PARTIAL, anchorLoaded = true) { it in loaded }
-        assertEquals(3, seed.count(listOf("m1"), ConversationMentionCoverage.PARTIAL))
-        // The anchor moved past m1 while it stayed loaded: m1 was read, two mentions remain beyond the window.
-        seed.observe(emptyList(), ConversationMentionCoverage.PARTIAL, anchorLoaded = true) { it in loaded }
+        seed.observe(rows, "r", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
+        assertEquals(3, seed.count(listOf("m1@"), ConversationMentionCoverage.PARTIAL))
+        // The anchor moved past m1: it was read, two mentions remain beyond the window.
+        seed.observe(rows, "u1", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
         assertEquals(2, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
-        seed.visited("m2")
+        seed.visited("m2@")
+        assertEquals(1, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
+    }
+
+    @Test
+    fun aMentionBeforeTheEntryBoundaryIsNotCountedAsReadNow() {
+        val seed = ConversationMentionJumpSeed(entryCount = 1, entryLastReadMessageId = "r")
+
+        seed.observe(rows("old@", "r", "u1"), "u1", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
+        assertEquals(1, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
+    }
+
+    @Test
+    fun aNeverReadChatCountsMentionsTheFirstReadAnchorPasses() {
+        val seed = ConversationMentionJumpSeed(entryCount = 2, entryFirstUnreadMessageId = "f")
+
+        // The first settled viewport reads past m1 before any unread list existed.
+        seed.observe(rows("f", "m1@", "u1"), "u1", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
         assertEquals(1, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
     }
 
     @Test
     fun pagingTheAnchorOrAMentionOutOfTheWindowIsNotReading() {
-        val seed = ConversationMentionJumpSeed(entryCount = 1)
+        val seed = ConversationMentionJumpSeed(entryCount = 1, entryLastReadMessageId = "r")
 
-        seed.observe(listOf("m1"), ConversationMentionCoverage.PARTIAL, anchorLoaded = true) { true }
+        seed.observe(rows("r", "m1@"), "r", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
         // Paging evicted the anchor: no loaded targets, the unread mention still counts.
-        seed.observe(emptyList(), ConversationMentionCoverage.PARTIAL, anchorLoaded = false) { false }
+        seed.observe(rows("u5", "u6"), "r", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
         assertEquals(1, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
         // The anchor is back but m1 itself is paged out: still unread.
-        seed.observe(emptyList(), ConversationMentionCoverage.PARTIAL, anchorLoaded = true) { it == "anchor" }
+        seed.observe(rows("x", "r"), "r", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
         assertEquals(1, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
         assertTrue(seed.active)
     }
@@ -93,13 +110,13 @@ class ConversationMentionJumpTest {
                 async(start = CoroutineStart.UNDISPATCHED) {
                     seed.jumpTarget({ anchored.await() }, { loaded }) {
                         resolved++
-                        "far"
+                        ConversationMentionSearch.Found("far")
                     }
                 }
             assertFalse("the tap is held, not dropped, until entry positioning", tap.isCompleted)
             loaded = "m1"
             anchored.complete(Unit)
-            assertEquals("m1", tap.await())
+            assertEquals(ConversationMentionSearch.Found("m1"), tap.await())
             assertEquals(0, resolved)
         }
 
@@ -107,9 +124,12 @@ class ConversationMentionJumpTest {
     fun aTapWithoutALoadedMentionSearchesOnlyWhileTheSeedIsActive() =
         runBlocking {
             val seed = ConversationMentionJumpSeed(entryCount = 1)
-            assertEquals("far", seed.jumpTarget({}, { null }) { "far" })
+            assertEquals(ConversationMentionSearch.Found("far"), seed.jumpTarget({}, { null }) { found("far") })
             seed.retire()
-            assertNull(seed.jumpTarget({}, { null }) { error("a retired seed must not search") })
+            assertEquals(
+                ConversationMentionSearch.Exhausted,
+                seed.jumpTarget({}, { null }) { error("a retired seed must not search") },
+            )
         }
 
     @Test
@@ -142,7 +162,7 @@ class ConversationMentionJumpTest {
     fun resolvesALoadedMentionAfterTheAnchorWithoutPaging() {
         val history = PagedHistory(listOf("r", "m0@", "u1", "m1@"), window = 4, start = 0)
 
-        assertEquals("m1@", history.resolve(readAnchor = "m0@"))
+        assertEquals(found("m1@"), history.resolve(readAnchor = "m0@"))
         assertEquals(0, history.newerLoads)
     }
 
@@ -151,7 +171,7 @@ class ConversationMentionJumpTest {
         val ids = listOf("r") + (1..10).map { "u$it" } + "m@" + listOf("u11")
         val history = PagedHistory(ids, window = 4, start = 0)
 
-        assertEquals("m@", history.resolve(readAnchor = "r"))
+        assertEquals(found("m@"), history.resolve(readAnchor = "r"))
         assertTrue("the anchor slid out of the window", history.window().none { it.record.messageIdHex == "r" })
         assertEquals(4, history.newerLoads)
     }
@@ -160,7 +180,7 @@ class ConversationMentionJumpTest {
     fun loadsTheAnchorWhenTheWindowStartsAfterIt() {
         val history = PagedHistory(listOf("old@", "r", "u1", "m@", "u2", "u3", "u4"), window = 3, start = 4)
 
-        assertEquals("m@", history.resolve(readAnchor = "r"))
+        assertEquals(found("m@"), history.resolve(readAnchor = "r"))
         assertEquals(listOf("r"), history.loadedMessages)
     }
 
@@ -168,7 +188,7 @@ class ConversationMentionJumpTest {
     fun withoutAReadAnchorStartsAtTheEntryFirstUnreadInclusive() {
         val history = PagedHistory(listOf("old@", "f@", "u1"), window = 3, start = 0)
 
-        assertEquals("f@", history.resolve(readAnchor = null, firstUnread = "f@"))
+        assertEquals(found("f@"), history.resolve(readAnchor = null, firstUnread = "f@"))
     }
 
     @Test
@@ -176,16 +196,32 @@ class ConversationMentionJumpTest {
         val ids = listOf("r") + (1..100).map { "u$it" }
         val history = PagedHistory(ids, window = 4, start = 0)
 
-        assertNull(history.resolve(readAnchor = "r", maxNewerPages = 5))
+        assertEquals(ConversationMentionSearch.Exhausted, history.resolve(readAnchor = "r", maxNewerPages = 5))
         assertEquals(5, history.newerLoads)
     }
 
     @Test
-    fun noStartRowOrUnloadableAnchorResolvesNothing() {
+    fun noStartRowIsExhaustedAndAnUnloadableAnchorIsUnavailable() {
         val history = PagedHistory(listOf("a", "m@"), window = 2, start = 0)
 
-        assertNull(history.resolve(readAnchor = null, firstUnread = null))
-        assertNull(history.resolve(readAnchor = "gone"))
+        assertEquals(ConversationMentionSearch.Exhausted, history.resolve(readAnchor = null, firstUnread = null))
+        assertEquals(ConversationMentionSearch.Unavailable, history.resolve(readAnchor = "gone"))
+    }
+
+    @Test
+    fun aPageAnotherLoadAdvancedKeepsTheSearchGoing() {
+        val ids = listOf("r") + (1..6).map { "u$it" } + "m@"
+        val history = PagedHistory(ids, window = 4, start = 0, busyLoads = 1)
+
+        assertEquals(found("m@"), history.resolve(readAnchor = "r"))
+    }
+
+    @Test
+    fun aPageThatCannotLoadLeavesTheSearchUnavailable() {
+        val ids = listOf("r") + (1..10).map { "u$it" } + "m@"
+        val history = PagedHistory(ids, window = 4, start = 0, stuck = true)
+
+        assertEquals(ConversationMentionSearch.Unavailable, history.resolve(readAnchor = "r"))
     }
 
     /** A sliding window over [ids]; ids ending in "@" mention the active account. */
@@ -193,6 +229,8 @@ class ConversationMentionJumpTest {
         private val ids: List<String>,
         private val window: Int,
         private var start: Int,
+        private var busyLoads: Int = 0,
+        private val stuck: Boolean = false,
     ) {
         var newerLoads = 0
         val loadedMessages = mutableListOf<String>()
@@ -203,7 +241,7 @@ class ConversationMentionJumpTest {
             readAnchor: String?,
             firstUnread: String? = null,
             maxNewerPages: Int = MENTION_RESOLUTION_MAX_NEWER_PAGES,
-        ): String? =
+        ): ConversationMentionSearch =
             runBlocking {
                 resolveFirstUnreadMention(
                     readAnchorMessageId = readAnchor,
@@ -219,8 +257,18 @@ class ConversationMentionJumpTest {
                     hasMoreAfter = { start + window < ids.size },
                     loadNewer = {
                         newerLoads++
-                        start += window / 2
-                        true
+                        when {
+                            stuck -> false
+                            // Another page was in flight: it moved the window, this request reports no progress.
+                            busyLoads-- > 0 -> {
+                                start += window / 2
+                                false
+                            }
+                            else -> {
+                                start += window / 2
+                                true
+                            }
+                        }
                     },
                     maxNewerPages = maxNewerPages,
                 )
@@ -228,6 +276,10 @@ class ConversationMentionJumpTest {
     }
 
     private companion object {
+        fun found(id: String) = ConversationMentionSearch.Found(id)
+
+        fun rows(vararg ids: String): List<TimelineMessage> = ids.map(::message)
+
         fun message(id: String): TimelineMessage =
             TimelineMessage(
                 id = "msg:$id",
@@ -258,3 +310,6 @@ class ConversationMentionJumpTest {
             )
     }
 }
+
+/** Ids ending in "@" mention the active account. */
+private fun mentionsTestAccount(message: TimelineMessage): Boolean = message.record.messageIdHex.endsWith("@")
