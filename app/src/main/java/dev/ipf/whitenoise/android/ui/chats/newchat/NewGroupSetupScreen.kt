@@ -556,7 +556,10 @@ private fun NewGroupSetupAccountScreen(
                 members =
                     members.map { member ->
                         GroupCreationPerson(
-                            member.copy(displayName = selectedMemberDisplayName(member, appState)),
+                            member.copy(
+                                displayName = selectedMemberDisplayName(member, appState),
+                                npub = appState.npubForDisplay(member.accountIdHex).ifBlank { member.npub },
+                            ),
                             appState.shortNpub(member.accountIdHex).takeIf { it.isNotBlank() },
                             selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
                         )

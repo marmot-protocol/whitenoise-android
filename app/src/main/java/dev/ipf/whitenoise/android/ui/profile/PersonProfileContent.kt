@@ -51,7 +51,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
-import dev.ipf.whitenoise.android.ui.settings.CopyableFullPublicKey
+import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
@@ -424,8 +424,8 @@ private fun PersonProfileIdentity(
                 )
             }
             if (keyShown) {
-                // One complete, copyable key replaces the old short capsule plus inert full block (#3321, #3565).
-                CopyableFullPublicKey(
+                // One key: short until tapped, then copied and expanded in full (#3321, #3565).
+                CopyablePublicKey(
                     npub = person.publicKey,
                     copied = copied,
                     onCopy = onCopy,

@@ -418,6 +418,7 @@ class GroupMembersReviewScreenshotTest {
             val memberBounds = memberCopy.fetchSemanticsNode().boundsInRoot
             assertTrue(memberBounds.height >= 48f && memberBounds.width >= 48f)
             memberCopy.performClick()
+            rule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertExists()
             assertEquals(
                 npub,
                 clipboard.primaryClip!!

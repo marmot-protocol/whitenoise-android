@@ -14,12 +14,13 @@
         ]
       },
       {
-        "surface": "CopyableFullPublicKey",
+        "surface": "CopyablePublicKey",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullPublicKey.kt",
-        "anchor": "internal fun CopyableFullPublicKey(",
+        "anchor": "internal fun CopyablePublicKey(",
         "test_ids": [
           "ACC-001",
-          "ACC-002"
+          "ACC-002",
+          "ACC-019"
         ]
       }
     ],

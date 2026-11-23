@@ -39,7 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.share.QrShareCardRenderer
 import dev.ipf.whitenoise.android.share.QrShareCardSpec
@@ -59,7 +58,7 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
-import dev.ipf.whitenoise.android.ui.settings.FullPublicKey
+import dev.ipf.whitenoise.android.ui.settings.CopyablePublicKey
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 internal fun profileQrContentForNpub(npub: String): String? = ProfileLink.parse(npub)?.qrUri
@@ -161,29 +160,16 @@ internal fun ProfileQrSheet(
                 fontWeight = FontWeight.SemiBold,
             )
             if (npub.isNotBlank()) {
-                Button(
-                    onClick = {
+                // One key: short until tapped, then copied and expanded in full for comparison (#3321).
+                CopyablePublicKey(
+                    npub = npub,
+                    copied = copied,
+                    onCopy = {
                         clipboard.setText(AnnotatedString(npub))
                         copied = true
                     },
-                ) {
-                    Icon(painterResource(R.drawable.ic_check), contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (copied) {
-                            stringResource(
-                                R.string.copied,
-                            )
-                        } else {
-                            IdentityFormatter.short(npub, prefix = 16, suffix = 14)
-                        },
-                    )
-                }
-                // The button abbreviates; the whole key stays readable beside the code (#3321).
-                FullPublicKey(
-                    npub = npub,
-                    testTag = "profile_qr.full_public_key",
-                    label = stringResource(R.string.public_key),
+                    targetTestTag = "profile_qr.copy_public_key",
+                    textTestTag = "profile_qr.full_public_key",
                 )
             }
             link?.let { QrCodeImage(content = it.qrUri) }
