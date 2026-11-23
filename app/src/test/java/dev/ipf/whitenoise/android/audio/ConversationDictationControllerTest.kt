@@ -8026,11 +8026,13 @@ class ConversationDictationControllerTest {
                         sendStarted.complete(Unit)
                         assertTrue(request.beginDispatch())
                         request.onPendingShown()
-                        finishSend.await()
+                        finishSend.await().also(request.onTextSendSettled)
                     },
                 )
 
             fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            val sessionId = requireNotNull(fixture.controller.state.sessionId)
+            ShadowLog.clear()
             fixture.controller.send()
             fixture.platform.listener.onResult("dictated")
             runCurrent()
@@ -8046,6 +8048,14 @@ class ConversationDictationControllerTest {
             finishSend.complete(true)
             advanceUntilIdle()
 
+            val sendOutcomes =
+                ShadowLog
+                    .getLogsForTag("WNDictation")
+                    .mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
+                    .filter { it["event"] == "send_outcome" }
+            assertEquals(listOf("pending_visible", "durably_accepted"), sendOutcomes.map { it["outcome"] })
+            assertEquals(listOf(sessionId, sessionId), sendOutcomes.map { it["session"] })
+            assertEquals(0L, sendOutcomes.last()["active_session"])
             assertFalse(fixture.controller.hasDurableSession)
             assertEquals(1, durableStops)
             assertEquals(1, fixture.controller.pendingSendRevision(ACCOUNT, GROUP))
