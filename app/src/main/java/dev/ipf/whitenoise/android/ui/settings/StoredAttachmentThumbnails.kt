@@ -59,7 +59,10 @@ internal fun rememberStoredAttachmentThumbnail(
     val account = appState.activeAccountRef
     val context = LocalContext.current
     val visual = kind == StoredAttachmentKind.Photo || kind == StoredAttachmentKind.Video
-    val loaded by produceState(StoredThumbnail(), account, attachment.key, visual) {
+    val generation = appState.runtimeGeneration
+    val loaded by produceState(StoredThumbnail(), account, generation, attachment.key, visual) {
+        // A restarted producer keeps its last value, so clear it before anything for a new identity is drawn.
+        value = StoredThumbnail()
         if (account == null || !visual) return@produceState
         val key = mediaCacheKey(account, attachment.groupIdHex, attachment.messageIdHex, attachment.attachmentIndex)
         appState.cachedMediaThumbnail(key)?.let {
@@ -68,13 +71,15 @@ internal fun rememberStoredAttachmentThumbnail(
         }
         StoredThumbnailLoads.withPermit {
             val reference = storedAttachmentReference(appState, account, attachment) ?: return@withPermit
+            val current = { appState.activeAccountRef == account && appState.runtimeGeneration == generation }
+            if (!current()) return@withPermit
             value = StoredThumbnail(thumbhash = reference.thumbhash)
             val video = kind == StoredAttachmentKind.Video
             val bitmap =
                 runCatchingCancellable {
                     decodeStoredThumbnail(appState, context, account, attachment, reference, video)
                 }.getOrNull()
-            bitmap?.takeIf { appState.activeAccountRef == account }?.let {
+            bitmap?.takeIf { current() }?.let {
                 value = value.copy(bitmap = it.asImageBitmap())
             }
         }
