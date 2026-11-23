@@ -11,4 +11,6 @@
     <string name="voice_recording_elsewhere">Un message vocal est en cours d\u0027enregistrement dans une autre discussion.</string>
     <string name="voice_row_recording">Enregistrement d\u0027un message vocal</string>
     <string name="voice_row_unsent">Message vocal non envoyé</string>
+    <string name="voice_recording_paused">Enregistrement vocal en pause</string>
+    <string name="voice_send_on_release">Envoyer le message vocal en relâchant après un appui prolongé</string>
 </resources>

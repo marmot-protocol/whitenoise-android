@@ -11,4 +11,6 @@
     <string name="voice_recording_elsewhere">Se está grabando un mensaje de voz en otro chat.</string>
     <string name="voice_row_recording">Grabando mensaje de voz</string>
     <string name="voice_row_unsent">Mensaje de voz sin enviar</string>
+    <string name="voice_recording_paused">Grabación de voz en pausa</string>
+    <string name="voice_send_on_release">Enviar mensajes de voz al soltar después de mantener pulsado</string>
 </resources>

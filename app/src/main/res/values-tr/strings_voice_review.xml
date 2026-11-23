@@ -11,4 +11,6 @@
     <string name="voice_recording_elsewhere">Başka bir sohbette sesli mesaj kaydediliyor.</string>
     <string name="voice_row_recording">Sesli mesaj kaydediliyor</string>
     <string name="voice_row_unsent">Gönderilmemiş sesli mesaj</string>
+    <string name="voice_recording_paused">Ses kaydı duraklatıldı</string>
+    <string name="voice_send_on_release">Basılı tutarak kaydedilen sesli mesajı bırakınca gönder</string>
 </resources>

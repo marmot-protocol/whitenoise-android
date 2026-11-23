@@ -11,4 +11,6 @@
     <string name="voice_recording_elsewhere">另一个聊天正在录制语音消息。</string>
     <string name="voice_row_recording">正在录制语音消息</string>
     <string name="voice_row_unsent">未发送的语音消息</string>
+    <string name="voice_recording_paused">语音录制已暂停</string>
+    <string name="voice_send_on_release">松开时直接发送长按录制的语音消息</string>
 </resources>

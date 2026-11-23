@@ -11,4 +11,6 @@
     <string name="voice_recording_elsewhere">В другом чате записывается голосовое сообщение.</string>
     <string name="voice_row_recording">Запись голосового сообщения</string>
     <string name="voice_row_unsent">Неотправленное голосовое сообщение</string>
+    <string name="voice_recording_paused">Запись голосового сообщения приостановлена</string>
+    <string name="voice_send_on_release">Отправлять голосовое сообщение при отпускании кнопки записи</string>
 </resources>

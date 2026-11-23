@@ -11,4 +11,6 @@
     <string name="voice_recording_elsewhere">In einem anderen Chat wird gerade eine Sprachnachricht aufgenommen.</string>
     <string name="voice_row_recording">Sprachnachricht wird aufgenommen</string>
     <string name="voice_row_unsent">Nicht gesendete Sprachnachricht</string>
+    <string name="voice_recording_paused">Sprachaufnahme pausiert</string>
+    <string name="voice_send_on_release">Sprachnachrichten beim Loslassen senden</string>
 </resources>
