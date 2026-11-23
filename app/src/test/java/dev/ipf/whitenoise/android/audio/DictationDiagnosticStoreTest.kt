@@ -27,7 +27,8 @@ class DictationDiagnosticStoreTest {
             requireNotNull(
                 DictationDiagnosticSchema.parse(
                     "event=finish_timing action=send tap_to_capture_closed_ms=12 tap_to_last_result_ms=640 " +
-                        "tap_to_transcript_ready_ms=700 generations_after_tap=2 retries_after_tap=1 settle_wait_ms=50 " +
+                        "tap_to_transcript_ready_ms=700 generations_after_tap=2 " +
+                        "retries_after_tap=1 settle_wait_ms=50 " +
                         "audio_ms=4300 session=3",
                 ),
             )
@@ -81,6 +82,15 @@ class DictationDiagnosticStoreTest {
     }
 
     @Test
+    fun sendOutcomesKeepTheOriginalSession() {
+        for (outcome in listOf("durably_accepted", "terminal_failure")) {
+            val fields = event("event=send_outcome outcome=$outcome session=7 active_session=8")
+            assertEquals(outcome, fields["outcome"])
+            assertEquals(7L, fields["session"])
+        }
+    }
+
+    @Test
     fun emittedRetryAndLifecycleFieldsSurviveTheClosedSchema() {
         val examples =
             mapOf(
@@ -88,10 +98,6 @@ class DictationDiagnosticStoreTest {
                     mapOf("reason" to "provider_disconnected", "retry" to 2L),
                 "event=foreground_service_start requested=true" to
                     mapOf("requested" to true),
-                "event=send_outcome outcome=durably_accepted session=7" to
-                    mapOf("outcome" to "durably_accepted", "session" to 7L),
-                "event=send_outcome outcome=terminal_failure session=7" to
-                    mapOf("outcome" to "terminal_failure", "session" to 7L),
                 "event=retry path=retained_transcript" to
                     mapOf("path" to "retained_transcript"),
                 "event=completion_action reason=already_finishing" to
