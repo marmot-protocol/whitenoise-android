@@ -5271,6 +5271,24 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceDiscardConfirmation.kt",
+      "symbol": "VoiceDiscardConfirmation",
+      "bindings": [
+        {
+          "case": "presentation-modal-voice-discard",
+          "selector": {
+            "text": "Discard voice message\\?"
+          },
+          "scope": "Production confirmation dialog with Cancel and Discard callbacks from supplied review state.",
+          "entry_assertion": {
+            "text": "Discard voice message\\?"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Exercise recording, draft retention after Cancel, and draft deletion after Discard on a device."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewRecoveryMarker.kt",
       "symbol": "VoiceReviewUnavailableNotice",
       "bindings": [
@@ -6682,6 +6700,25 @@
           },
           "opened_by": {
             "text": "Chats"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+      "symbol": "VoiceNoteSettingsScreen",
+      "bindings": [
+        {
+          "case": "settings-voice-language",
+          "selector": {
+            "id": "settings.voice_notes.group"
+          },
+          "scope": "Voice notes page shows both switches and Back returns to Voice & language.",
+          "entry_assertion": {
+            "id": "settings.voice_notes.group"
+          },
+          "opened_by": {
+            "text": "Voice notes"
           }
         }
       ]

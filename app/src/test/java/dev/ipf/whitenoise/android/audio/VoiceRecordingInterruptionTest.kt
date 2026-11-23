@@ -294,6 +294,50 @@ class VoiceRecordingInterruptionTest {
             }
         }
 
+    /** Only a stopped take shows Closing until review receives it; a cancelled take never claims to be saved. */
+    @Test
+    fun closingIsVisibleOnlyForATakeHeadedToReview() =
+        runTest {
+            withRecording {
+                controller.start()
+                runCurrent()
+                controller.stop()
+                assertFalse(controller.isRecording)
+                assertTrue(controller.isClosing)
+                advanceTimeBy(VoiceRecordingController.RECORDING_TAIL_MS)
+                runCurrent()
+                assertEquals(1, completed.size)
+                assertFalse(controller.isClosing)
+
+                controller.start()
+                runCurrent()
+                controller.cancel()
+                assertFalse(controller.isClosing)
+                runCurrent()
+                assertFalse(controller.isClosing)
+                assertEquals(1, completed.size)
+            }
+        }
+
+    /** Pressing the microphone again while a take closes records a new take and still delivers the old one. */
+    @Test
+    fun restartDuringClosingRecordsAgainAndClosingClears() =
+        runTest {
+            withRecording {
+                controller.start()
+                runCurrent()
+                controller.stop()
+                assertTrue(controller.isClosing)
+                assertTrue(controller.start())
+                assertTrue(controller.isRecording)
+                runCurrent()
+                assertEquals(1, completed.size)
+                assertFalse(controller.isClosing)
+                assertTrue(controller.isRecording)
+                assertEquals(2, sessions.size)
+            }
+        }
+
     /** Releases the fixture controller and temporary files even when a recording assertion fails. */
     private fun TestScope.withRecording(
         onError: (Throwable) -> Unit = { throw it },

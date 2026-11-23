@@ -434,6 +434,7 @@ class WhiteNoiseAppState private constructor(
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val receivedVoiceTranscripts = ReceivedVoiceTranscripts()
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
+    internal val voiceNotes by lazy { createVoiceNoteSessionOwner() }
     private val dictationMicrophoneOwner = Any()
     private var initializedDictation by mutableStateOf<ConversationDictationController?>(null)
     internal val conversationDictation: ConversationDictationController
@@ -1485,6 +1486,8 @@ class WhiteNoiseAppState private constructor(
 
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
+
+    internal val voiceNotePreferences = VoiceNotePreferences(preferences)
 
     internal val composerToolbarPreference by lazy {
         ComposerToolbarPreference(preferences, mutationsScope, hostPreferenceCommitMutex)
@@ -5578,7 +5581,7 @@ class WhiteNoiseAppState private constructor(
         notificationReplyDraftHandoff.removeAccount(account)
         draftWriter.removeAccount(account)
         forgetStickers(account)
-        conversationDictation.onAccountUnavailable(account)
+        releaseCaptureOwners(account)
         stopTtsForRemovedAccount(account)
     }
 
@@ -5627,7 +5630,7 @@ class WhiteNoiseAppState private constructor(
         val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
         if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
         receivedVoiceTranscripts.forgetAccount(wipedRef)
-        conversationDictation.onAccountUnavailable(wipedRef)
+        releaseCaptureOwners(wipedRef)
         if (retireSession) clearInMemoryMediaCaches()
         try {
             val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
@@ -5770,27 +5773,8 @@ class WhiteNoiseAppState private constructor(
         accountListLoaded = result.isSuccess
     }
 
-    /** Commits one host preference transaction off-main and times actual durable completion. */
-    @Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
     private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) {
-        val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
-        val editor =
-            try {
-                preferences.edit().apply(edit)
-            } catch (throwable: Throwable) {
-                attempt.failure()
-                throw throwable
-            }
-        mutationsScope
-            .launch {
-                hostPreferenceCommitMutex.withLock {
-                    withContext(Dispatchers.IO) {
-                        completeHostPreferenceCommit(attempt, editor::commit)
-                    }
-                }
-            }.invokeOnCompletion { cause ->
-                if (cause is CancellationException) attempt.cancel()
-            }
+        persistHostSetting(preferences, hostPreferenceCommitMutex, edit)
     }
 
     fun updateDeveloperMode(enabled: Boolean) {
@@ -6595,6 +6579,7 @@ class WhiteNoiseAppState private constructor(
         } else {
             appLock.onAppBackgrounded()
             conversationDictation.onAppBackgrounded()
+            voiceNotes.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
             appLock.scheduleTtsStopAtLockBoundary()
         }
@@ -6646,6 +6631,7 @@ class WhiteNoiseAppState private constructor(
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.onTaskRemoved()
+        voiceNotes.onAppBackgrounded()
         // The app-state lifecycle is authoritative even if the TTS foreground
         // service has not started yet or its start was rejected.
         stopSpeaking()
@@ -7557,7 +7543,7 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
-        if (accountRef != null) conversationDictation.onTargetRemoved(accountRef, groupIdHex)
+        if (accountRef != null) releaseCaptureTarget(accountRef, groupIdHex)
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {

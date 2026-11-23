@@ -10,6 +10,8 @@ internal class ChatContextMenuOwner {
         private set
     var pointerHeld by mutableStateOf(false)
         private set
+    var touchX: Float? by mutableStateOf(null)
+        private set
     private var disposed = false
     private var activeOpening = false
     val isActive: Boolean get() = !disposed
@@ -22,6 +24,16 @@ internal class ChatContextMenuOwner {
         pointerHeld = held
         token = next
         return next
+    }
+
+    /** A real press updates the held opening. An accessible action starts its own opening. */
+    fun openAt(
+        touchX: Float?,
+        heldToken: Any?,
+    ) {
+        if (disposed) return
+        if (!isCurrent(heldToken)) open(held = false)
+        this.touchX = touchX
     }
 
     /** Identity comparison rejects a closed opening and every older opening, even for the same row. */

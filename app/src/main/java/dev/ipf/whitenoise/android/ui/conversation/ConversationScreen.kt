@@ -153,7 +153,6 @@ import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
 import dev.ipf.whitenoise.android.state.markInboundMessageVisibleForHostPerformance
 import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
-import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
@@ -315,33 +314,6 @@ private val InitialTimelineBackfillNoProgressError =
 // split into bounded chunks, so the count no longer bounds a single message's payload.
 // A reply is still one message, so ConversationMediaSender keeps it to ATTACHMENT_CHUNK_MAX_ITEMS.
 private const val MEDIA_PICKER_MAX_ITEMS = dev.ipf.whitenoise.android.state.ATTACHMENT_COLLECTION_MAX_ITEMS
-
-/** Maps recorder failures to localized, privacy-safe user presentation. */
-private fun presentVoiceRecordingFailure(
-    appState: WhiteNoiseAppState,
-    throwable: Throwable,
-    voiceTooShortMessage: String,
-) {
-    when {
-        throwable is dev.ipf.whitenoise.android.audio.VoiceRecordingSaveException ->
-            appState.present(R.string.voice_recording_save_failed)
-        throwable is IllegalStateException && throwable.message == "voice recording too short" ->
-            appState.present(voiceTooShortMessage)
-        throwable.message?.contains("audio is in use", ignoreCase = true) == true ->
-            appState.presentFailure(
-                R.string.voice_message_recording_failed,
-                "VOICE_RECORDING_START",
-                throwable,
-                AppText.Resource(R.string.voice_message_microphone_busy),
-            )
-        else ->
-            appState.presentFailure(
-                R.string.voice_message_recording_failed,
-                "VOICE_RECORDING",
-                throwable,
-            )
-    }
-}
 
 private val MEMBERSHIP_FRAME_EVENT_TYPES = setOf("member_added", "member_removed")
 
@@ -1965,148 +1937,18 @@ internal fun ConversationScreen(
         }
     }
 
-    // Voice-message recording surface — owned per ConversationScreen so a
-    // backgrounded recording is dropped on dispose. The recorder writes
-    // into a per-session temp dir. Completion opens review; only explicit Send
-    // transfers the file to the native sender. Unsent review files are removed on disposal.
-    val voiceOutputDir =
-        remember(context) {
-            java.io.File(context.cacheDir, "voice-recordings").apply { mkdirs() }
-        }
-    val micPermissionDeniedMsg = stringResource(R.string.voice_message_permission_denied)
-    val voiceTooShortMsg = stringResource(R.string.voice_message_too_short)
-    var voiceMicPermissionRequested by remember { mutableStateOf(false) }
-    val voiceMicPermissionLauncher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestPermission(),
-        ) { granted -> if (!granted) appState.present(micPermissionDeniedMsg) }
+    val voiceCapture = rememberConversationVoiceCapture(appState, controller, mediaSender, scope)
+    val voiceReview = voiceCapture.review
+    val voiceRecordingController = voiceCapture.recorder
 
-    val voiceReviewRecovery =
-        dev.ipf.whitenoise.android.ui.conversation.composer.rememberVoiceReviewRecoveryMarker(
-            conversationAccountRef,
-            controller.group.groupIdHex,
-        )
-    val voiceReviewRuntime = appState.runtimeGeneration
-    val voiceReview =
-        remember(controller, conversationAccountRef, voiceReviewRuntime, mediaSender, voiceReviewRecovery) {
-            dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview(
-                scope = scope,
-                ownerIsCurrent = {
-                    conversationAccountRef != null &&
-                        appState.activeAccountRef == conversationAccountRef &&
-                        appState.runtimeGeneration == voiceReviewRuntime &&
-                        controller.boundAccountRef == conversationAccountRef
-                },
-                send = { file, duration, canSend, onQueued ->
-                    mediaSender.sendVoiceAttachment(file, duration, canSend, onQueued)
-                },
-                onSendFailure = { appState.present(R.string.send_failed) },
-                onPlaybackFailure = { appState.present(R.string.voice_message_failed) },
-                onReviewPresenceChanged = voiceReviewRecovery::updatePresence,
-            )
-        }
-    DisposableEffect(voiceReview) {
-        onDispose { voiceReview.release() }
-    }
-
-    val voiceRecordingCompletedClip =
-        remember(voiceReview) {
-            mutableStateOf<dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewClip?>(null)
-        }
-    val voiceRecordingStopNotice =
-        dev.ipf.whitenoise.android.ui.conversation.composer.rememberVoiceRecordingStopNotice(
-            voiceReview,
-            appState,
-            conversationAccountRef,
-            controller.group.groupIdHex,
-        )
-    val voiceRecordingController =
-        // Re-key on every captured dependency: chat.id (basic), controller
-        // (avoids dispatching through a stale ConversationController when
-        // appState.runtimeGeneration changes), and voiceOutputDir (a fresh
-        // File reference if context/cacheDir flips — also future-proofs an
-        // account-scoped dir).
-        remember(chat.id, controller, voiceOutputDir, voiceReview) {
-            dev.ipf.whitenoise.android.audio.VoiceRecordingController(
-                context = context,
-                outputDirectory = voiceOutputDir,
-                scope = scope,
-                onPermissionRequest = {
-                    val granted =
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                            PackageManager.PERMISSION_GRANTED
-                    if (!granted && !voiceMicPermissionRequested) {
-                        voiceMicPermissionRequested = true
-                        voiceMicPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                    granted
-                },
-                onRecordingComplete = { file, durationMs ->
-                    voiceRecordingCompletedClip.value =
-                        if (voiceReview.offer(file, durationMs)) voiceReview.clip else null
-                },
-                onError = { throwable ->
-                    presentVoiceRecordingFailure(appState, throwable, voiceTooShortMsg)
-                },
-                // Honor the user's media-quality ceiling for voice notes.
-                // Read at record-start (the controller is not re-keyed on the
-                // quality state) so a setting change applies to the next clip.
-                bitrateProvider = { appState.mediaQuality.audioBitrateBps },
-                microphoneCaptures = appState.microphoneCaptureCoordinator,
-                onAutomaticStop = { reason ->
-                    val completedClip = voiceRecordingCompletedClip.value
-                    voiceRecordingCompletedClip.value = null
-                    voiceRecordingStopNotice(reason, completedClip)
-                },
-            )
-        }
-    dev.ipf.whitenoise.android.ui.conversation.composer
-        .VoiceRecordingLifecycleEffect(voiceRecordingController)
-    LaunchedEffect(voiceRecordingController.isRecording, voiceReview.clip) {
-        if (voiceRecordingController.isRecording) {
-            voiceRecordingCompletedClip.value = null
-            voiceReview.discardForNewRecording()
-            voiceReviewRecovery.updatePresence(false)
-        }
-    }
-
-    /**
-     * Shows the voice-review recovery notice, releases the recorder and chains voice playback to the next voice
-     * message.
-     */
+    /** Shows the voice-review recovery notice and chains voice playback to the next voice message. */
     @Composable
     @Suppress("LongMethod")
     fun voicePlaybackHosts() {
-        if (voiceReviewRecovery.hasReview && voiceReview.clip == null && !voiceRecordingController.isRecording) {
-            dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewUnavailableNotice(
-                onDismiss = { voiceReviewRecovery.updatePresence(false) },
-                onRecordAgain = {
-                    var accepted = false
-                    voiceReviewRecovery.consume {
-                        val ownsRecorder =
-                            conversationAccountRef != null &&
-                                appState.activeAccountRef == conversationAccountRef &&
-                                appState.runtimeGeneration == voiceReviewRuntime &&
-                                controller.boundAccountRef == conversationAccountRef
-                        if (ownsRecorder && voiceRecordingController.start()) {
-                            voiceReviewRecovery.updatePresence(false)
-                            voiceRecordingController.lock()
-                            accepted = true
-                        }
-                    }
-                    accepted
-                },
-            )
-        }
-        DisposableEffect(voiceRecordingController) {
-            onDispose { voiceRecordingController.release() }
-        }
+        ConversationVoiceRecoveryNotice(voiceCapture)
 
-        // Auto-chain voice playback: when one clip ends, play the IMMEDIATE
-        // next message iff it's also a voice attachment. Stops on any
-        // non-voice neighbor (text, image, system) or end-of-timeline. We do
-        // not skip past unrelated messages to find a later voice note — that
-        // would jump the user past content they hadn't consumed.
+        // Continue to the next visible message only if it contains a voice note.
+        // Unrelated messages and the end of the timeline stop playback.
         DisposableEffect(controller, chat.id) {
             val ownerKey = controller.group.groupIdHex
             val unregister =

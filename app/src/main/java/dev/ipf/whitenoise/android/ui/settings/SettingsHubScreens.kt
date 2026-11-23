@@ -248,7 +248,7 @@ internal fun ChatsScreen(
 }
 
 /** Voice & language hub: the app language and the spoken, dictated and translated text features. */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod") // Keep the declared hub row order together.
 @Composable
 internal fun VoiceLanguageScreen(
     appState: WhiteNoiseAppState,
@@ -274,6 +274,15 @@ internal fun VoiceLanguageScreen(
                             routeKey = SettingsDetail.Language,
                             onClick = { onOpenDetail(SettingsDetail.Language) },
                             leading = { SettingsLeadingIcon(R.drawable.ic_language) },
+                        )
+                    }
+                    row("voice_notes") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.settings_voice_notes),
+                            routeKey = SettingsDetail.VoiceNotes,
+                            onClick = { onOpenDetail(SettingsDetail.VoiceNotes) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_mic) },
                         )
                     }
                     row("read_aloud") { context ->

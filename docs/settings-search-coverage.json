@@ -379,10 +379,6 @@
         {
           "declaration": "\"result\"",
           "represented_by": "Dictation.result"
-        },
-        {
-          "declaration": "\"transcribe_voice_messages\"",
-          "represented_by": "Dictation.transcribe_voice_messages"
         }
       ]
     },
@@ -820,6 +816,10 @@
           "represented_by": "VoiceLanguage.language"
         },
         {
+          "declaration": "\"voice_notes\"",
+          "represented_by": "home.VoiceNotes"
+        },
+        {
           "declaration": "\"read_aloud\"",
           "represented_by": "home.ReadAloud"
         },
@@ -878,6 +878,18 @@
         {
           "declaration": "\"retry\"",
           "represented_by": "home.HistoryBackups"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"voice_send_on_release\"",
+          "represented_by": "VoiceNotes.voice_send_on_release"
+        },
+        {
+          "declaration": "\"voice_transcribe_automatically\"",
+          "represented_by": "VoiceNotes.voice_transcribe_automatically"
         }
       ]
     }
@@ -1003,6 +1015,9 @@
     },
     "HistoryBackups": {
       "catalog_id": "home.HistoryBackups"
+    },
+    "VoiceNotes": {
+      "catalog_id": "home.VoiceNotes"
     }
   },
   "exclusions": {
