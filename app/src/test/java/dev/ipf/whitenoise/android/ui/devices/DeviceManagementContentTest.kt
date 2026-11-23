@@ -1,14 +1,19 @@
 package dev.ipf.whitenoise.android.ui.devices
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.CompromiseWarningItemFfi
 import dev.ipf.marmotkit.CompromiseWarningReasonFfi
@@ -20,6 +25,7 @@ import dev.ipf.whitenoise.android.state.LinkedDeviceChatCounts
 import dev.ipf.whitenoise.android.state.LinkedDeviceRow
 import dev.ipf.whitenoise.android.state.LinkedDeviceSettingsPatch
 import dev.ipf.whitenoise.android.state.SignInListState
+import dev.ipf.whitenoise.android.ui.common.ExplanationHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,6 +43,29 @@ class DeviceManagementContentTest {
     @get:Rule val compose = createComposeRule()
 
     private val context: Context = ApplicationProvider.getApplicationContext()
+
+    /**
+     * A device's page is headed by the facts MDK reports, link history included, read as one item under the name
+     * in the title. Holding the header explains them, as the row it replaced did.
+     */
+    @Test
+    fun theDevicePageIsHeadedByItsFactsAndExplainsThem() {
+        val device = fixtureDevice("tablet", label = "Tablet", linkedByLabel = "Phone")
+        compose.setContent {
+            WhiteNoiseTheme { ExplanationHost { LinkedDeviceDetailContent(device, false, {}) } }
+        }
+
+        val linkedBy = context.getString(R.string.linked_devices_linked_by, "Phone")
+        compose.onNodeWithText("Tablet").assertIsDisplayed()
+        compose
+            .onNodeWithTag(DEVICE_DETAIL_HERO_TAG)
+            .assertIsDisplayed()
+            .assertTextContains("White Noise · Android", substring = true)
+            .assertTextContains(linkedBy, substring = true)
+            .performTouchInput { longClick() }
+        val explanation = context.getString(R.string.explanation_linked_device_row)
+        compose.onNodeWithTag("explanation.body").assertTextEquals(explanation)
+    }
 
     /** Each switch sends a patch that names only its own setting. */
     @Test

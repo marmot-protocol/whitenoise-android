@@ -259,7 +259,7 @@
       "manual_ids": [
         "SET-060"
       ],
-      "assertions": "Linked devices opens from Account for an account that has linked no device and says so; Back returns to Account without starting a link.",
+      "assertions": "Devices opens from Account for an account that has linked no device and says so; Back returns to Account without starting a link.",
       "postcondition": "none"
     },
     "navigation-profile-edit-cancel": {

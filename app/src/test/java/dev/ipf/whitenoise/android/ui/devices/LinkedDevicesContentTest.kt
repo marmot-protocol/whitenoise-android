@@ -150,6 +150,39 @@ class LinkedDevicesContentTest {
         }
     }
 
+    /** The roster row leaves out when and by whom a device was linked, which the device's own page still says. */
+    @Test
+    fun theRosterLeavesLinkHistoryToTheDevicePage() {
+        lateinit var row: List<String>
+        lateinit var page: List<String>
+        val device = fixtureDevice("named", linkedByLabel = "Phone", lastActiveAtSeconds = FIXTURE_LINKED_AT)
+        compose.setContent {
+            row = linkedDeviceSummary(device, linkHistory = false)
+            page = linkedDeviceSummary(device)
+        }
+        val linkedBy = context.getString(R.string.linked_devices_linked_by, "Phone")
+        val linkedOnPrefix = context.getString(R.string.linked_devices_linked_on, "").trim()
+        val lastActivePrefix = context.getString(R.string.linked_devices_last_active, "").trim()
+
+        compose.runOnIdle {
+            assertEquals(false, row.any { it == linkedBy || it.startsWith(linkedOnPrefix) })
+            assertEquals(true, row.any { it.startsWith(lastActivePrefix) })
+            assertEquals(true, linkedBy in page && page.any { it.startsWith(linkedOnPrefix) })
+            assertEquals(row, page.filterNot { it == linkedBy || it.startsWith(linkedOnPrefix) })
+        }
+    }
+
+    /** A device is drawn as a handheld one, an unnamed platform included, unless its platform names a computer. */
+    @Test
+    fun aDeviceGetsTheGlyphOfItsPlatform() {
+        assertEquals(R.drawable.ic_device, linkedDeviceIcon(""))
+        assertEquals(R.drawable.ic_device, linkedDeviceIcon("Android"))
+        assertEquals(R.drawable.ic_device, linkedDeviceIcon("watch"))
+        assertEquals(R.drawable.ic_device_laptop, linkedDeviceIcon(" macOS "))
+        assertEquals(R.drawable.ic_device_desktop, linkedDeviceIcon("LINUX"))
+        assertEquals(R.drawable.ic_device_desktop, linkedDeviceIcon("Windows"))
+    }
+
     /** A sibling with no counted heartbeat says so, and this device never shows a last-active line. */
     @Test
     fun heartbeatLinesFollowWhatMdkObserved() {
@@ -200,7 +233,7 @@ class LinkedDevicesContentTest {
         )
     }
 
-    /** The Account hub has no Linked devices row unless the caller supplies one. */
+    /** The Account hub has no Devices row unless the caller supplies one. */
     @Test
     fun theAccountHubOmitsLinkedDevicesByDefault() {
         compose.setContent { WhiteNoiseTheme { AccountHubGroup(ProfileReadiness.Loading) {} } }
