@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -311,9 +312,10 @@ internal fun <T> rememberRouteMotionModifier(
         SideEffect {
             hooks.handoff?.hidePen = { motion && progress.value < 1f && landing() != null }
         }
+        val running by remember(progress) { derivedStateOf { progress.value < 1f } }
         return Modifier
             .onGloballyPositioned { host.value = it.motionBoundsOnScreen(view) }
-            .settingsTransitionInputGate(opening && motion && progress.value < 1f)
+            .settingsTransitionInputGate(opening && motion && running)
             .settingsBubbleMotion(
                 opening = opening,
                 progress = { progress.value },

@@ -29,6 +29,7 @@ private const val GLYPH_FADE_END = 0.5f
 
 /** A card that rests without a border takes over the bubble's edge and fill over this last stretch. */
 private const val OUTLINE_HANDOVER_START = 0.85f
+private const val LANDING_CLIP_READY = 0.5f
 
 /**
  * One native card a surface can land on, in screen coordinates: its outer [bounds], the
@@ -104,9 +105,12 @@ internal fun DrawScope.drawClippedSurfaceMorph(
     val card = geometry.card.visibleBounds
     val clip = lerp(Rect(Offset.Zero, size), card, presence.coerceIn(0f, 1f))
     val full = geometry.card.bounds
+    val landingClip = ramp(presence, 0f, LANDING_CLIP_READY)
+    val top = card.top - (card.top - geometry.origin.top).coerceAtLeast(0f) * (1f - landingClip)
+    val bottom = card.bottom + (geometry.origin.bottom - card.bottom).coerceAtLeast(0f) * (1f - landingClip)
     clipRect(clip.left, clip.top, clip.right, clip.bottom) {
-        clipRect(full.left, full.top, full.right, card.top, ClipOp.Difference) {
-            clipRect(full.left, card.bottom, full.right, full.bottom, ClipOp.Difference) {
+        clipRect(full.left, full.top, full.right, top.coerceAtLeast(full.top), ClipOp.Difference) {
+            clipRect(full.left, bottom.coerceAtMost(full.bottom), full.right, full.bottom, ClipOp.Difference) {
                 drawSurfaceMorph(geometry, presence, colors, ink, content)
             }
         }

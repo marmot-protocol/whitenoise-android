@@ -165,6 +165,16 @@ class SettingsTopLevelBubbleMotionTest {
         assertEquals(Color.Green, pixels[100, 650])
     }
 
+    @Test fun clippedLandingDoesNotCutTheSourcePen() {
+        val card = fixedCard(Rect(16f, 600f, 344f, 800f)).copy(visibleBounds = Rect(16f, 600f, 344f, 740f))
+        val bubble = SurfaceMorphGeometry(PEN, card, PEN_SURFACE)
+        val pixels =
+            drawFrame {
+                drawClippedSurfaceMorph(bubble, 0f, BUBBLE_COLORS, 1f, content = null)
+            }
+        assertEquals(Color.Gray, pixels[324, 752])
+    }
+
     @Test fun partlyClippedCardsKeepTheirViewportClipWhileTheBubblesAreOnThem() {
         // The viewport hides the profile card's top under the header and the pen card's bottom below the fold.
         val top =

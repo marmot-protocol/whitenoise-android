@@ -56,6 +56,7 @@ internal class SettingsPageMorph {
 
     /** The live outline of the control an anchor-only route, such as a chat, opens from. */
     internal var anchorContour: (() -> SettingsContour?)? = null
+    private var closingOrigin: Rect? = null
     internal var closingAnchorContour: (() -> SettingsContour?)? = null
     private var exitStart = 1f
     private var entryStart = 0f
@@ -164,11 +165,13 @@ internal class SettingsPageMorph {
         if (opening || native?.isEmpty() != true) {
             native
         } else {
-            (closingAnchorContour ?: anchorContour)
-                ?.invoke()
-                ?.takeIf { it.bounds.validIn(transitionHost) }
-                ?.let { listOf(it.copy(key = targetAnchorKey ?: correspondenceKey ?: 0, viewport = transitionHost)) }
-                ?: native
+            val key = targetAnchorKey ?: correspondenceKey ?: 0
+            val anchor = (closingAnchorContour ?: anchorContour)?.invoke()?.takeIf { it.bounds.validIn(transitionHost) }
+            val measured = closingOrigin?.takeIf { it.validIn(transitionHost) }
+            val contour =
+                anchor?.copy(key = key, viewport = transitionHost)
+                    ?: measured?.let { settingsOriginContour(it, transitionHost, key) }
+            contour?.let(::listOf) ?: native
         }
 
     /** The activating control's bounds for [next], as [begin] will resolve it; null without a measured click. */
@@ -268,6 +271,7 @@ internal class SettingsPageMorph {
         val visibleSelection = pendingEndpoint?.takeIf { it.destination == next }?.visibleBounds ?: selected
         val returnTarget = returnTargets[target]
         val returnPoint = returnTarget?.point
+        closingOrigin = returnTarget?.unoutlinedOrigin.takeUnless { forward }
         // Resolve the activating row against native groups before freezing or clearing their reports.
         val activatedGroup =
             selected?.let { bounds ->
@@ -312,7 +316,7 @@ internal class SettingsPageMorph {
                 selected != null &&
                 visibleSelection?.visibleIn(host) == true
             ) {
-                returnTargets[next] = ReturnTarget(selected.center, correspondenceKey)
+                returnTargets[next] = ReturnTarget(selected.center, correspondenceKey, unoutlinedOrigin = originSource?.bounds)
             } else {
                 returnTargets.remove(next)
             }

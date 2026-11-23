@@ -443,14 +443,15 @@ internal fun <T> rememberSettingsCardMorphHost(
     val borderlessProgress =
         remember(morph, ownerKey, target, borderless) {
             val changed = lastTarget[0] !== NoRouteTarget && lastTarget[0] != target
-            Animatable(if (borderless && changed) inFlight?.let { 1f - it.presence } ?: 0f else 1f)
+            val resumeProgress = inFlight?.let { if (forward) it.presence else 1f - it.presence } ?: 0f
+            Animatable(if (borderless && changed) resumeProgress else 1f)
         }
     // Back from a container still growing shrinks it over the live parent; nothing of the old route is kept.
     val resume =
         remember(morph, ownerKey, target) {
             SettingsContainerResume(
                 shrinking = inFlight != null && !forward,
-                resumedFrom = inFlight?.takeIf { forward && it.shrinking }?.let { 1f - it.presence },
+                resumedFrom = inFlight?.takeIf { forward && it.shrinking }?.presence,
                 shrinkFrom = inFlight?.takeIf { !forward }?.presence ?: 1f,
             )
         }

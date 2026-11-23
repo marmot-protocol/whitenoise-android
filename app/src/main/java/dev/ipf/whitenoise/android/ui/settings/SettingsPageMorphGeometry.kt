@@ -38,6 +38,7 @@ internal data class ReturnTarget(
     val point: Offset,
     val groupKey: Int?,
     val childGroupKey: Int? = null,
+    val unoutlinedOrigin: Rect? = null,
 )
 
 internal data class PresentedFrame(
