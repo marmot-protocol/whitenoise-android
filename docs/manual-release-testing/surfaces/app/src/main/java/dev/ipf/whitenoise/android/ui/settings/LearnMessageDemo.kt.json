@@ -1,0 +1,75 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "LearnDemoBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "fun LearnDemoBubble(",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "LearnMessageDemo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "fun LearnMessageDemo(",
+        "test_ids": [
+          "SET-069"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.learn_demo_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "R.string.learn_demo_label",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_demo_sender",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "R.string.learn_demo_sender",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_example_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "R.string.learn_example_message",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_show_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "R.string.learn_show_actions",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.message_react",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "R.string.message_react",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.reply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LearnMessageDemo.kt",
+        "anchor": "R.string.reply",
+        "test_ids": [
+          "SET-069"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

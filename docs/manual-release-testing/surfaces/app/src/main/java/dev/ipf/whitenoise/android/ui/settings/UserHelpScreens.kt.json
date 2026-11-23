@@ -4,9 +4,9 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "LearnMessageActions",
+        "surface": "LearnMarmotLink",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
-        "anchor": "fun LearnMessageActions(",
+        "anchor": "fun LearnMarmotLink(",
         "test_ids": [
           "SET-069"
         ]
@@ -46,25 +46,9 @@
         ]
       },
       {
-        "surface": "R.string.learn_actions_explanation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
-        "anchor": "R.string.learn_actions_explanation",
-        "test_ids": [
-          "SET-069"
-        ]
-      },
-      {
         "surface": "R.string.learn_actions_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_actions_title",
-        "test_ids": [
-          "SET-069"
-        ]
-      },
-      {
-        "surface": "R.string.learn_example_message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
-        "anchor": "R.string.learn_example_message",
         "test_ids": [
           "SET-069"
         ]
@@ -102,6 +86,38 @@
         ]
       },
       {
+        "surface": "R.string.learn_marmot_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_marmot_body",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_marmot_link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_marmot_link",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_marmot_link_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_marmot_link_failed",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "R.string.learn_marmot_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.learn_marmot_title",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
         "surface": "R.string.learn_open_share",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_open_share",
@@ -121,14 +137,6 @@
         "surface": "R.string.learn_share_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_share_title",
-        "test_ids": [
-          "SET-069"
-        ]
-      },
-      {
-        "surface": "R.string.learn_show_actions",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
-        "anchor": "R.string.learn_show_actions",
         "test_ids": [
           "SET-069"
         ]

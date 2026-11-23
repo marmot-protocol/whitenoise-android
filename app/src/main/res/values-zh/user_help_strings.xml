@@ -5,11 +5,15 @@
     <string name="learn_share_title">分享你的个人资料</string>
     <string name="learn_share_body">打开“分享与连接”以展示二维码或分享个人资料链接。请妥善保管你的私钥。</string>
     <string name="learn_actions_title">回复或添加表情回应</string>
-    <string name="learn_actions_body">长按消息即可查看操作。用这条示例消息试试。</string>
+    <string name="learn_actions_body">将消息向聊天中间滑动即可回复。长按消息可查看回应等更多操作。</string>
     <string name="learn_example_message">明天见！</string>
     <string name="learn_show_actions">显示消息操作</string>
-    <string name="learn_actions_explanation">选择“回复”可引用消息，也可以选择一个表情来回应。</string>
     <string name="learn_open_share">打开分享与连接</string>
     <string name="learn_group_title">创建私密群组</string>
     <string name="learn_group_body">把想联系的人聚在同一个对话里。从新建聊天创建群组，然后选择要邀请的人。你的消息采用端到端加密。</string>
+    <string name="learn_demo_label">练习消息 · 不会发送任何内容</string>
+    <string name="learn_demo_sender">演示联系人</string>
+    <string name="learn_marmot_title">跨应用聊天</string>
+    <string name="learn_marmot_body">好友可以通过其他兼容应用加入对话。White Noise 使用开放的 Marmot 协议，让不同团队开发的应用能够互通。</string>
+    <string name="learn_marmot_link">探索 Marmot 应用</string>
 </resources>

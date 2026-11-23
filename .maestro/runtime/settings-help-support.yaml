@@ -23,10 +23,15 @@ name: settings-help-support
       text: "See you tomorrow!"
     direction: DOWN
 - longPressOn: "See you tomorrow!"
+- assertVisible: "Practice message · nothing is sent"
+- tapOn: "Reply"
+- assertVisible: "Demo contact"
 - scrollUntilVisible:
     element:
-      text: "Choose Reply to quote the message in your response, or choose an emoji to react."
+      text: "Chat across apps"
     direction: DOWN
+- tapOn: "Chat across apps"
+- assertVisible: "Explore Marmot apps"
 - tapOn: "Done"
 - assertVisible:
     id: "settings.help_support.group"

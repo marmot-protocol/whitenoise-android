@@ -12,10 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
@@ -117,6 +120,14 @@ class SettingsHubScreenshotTest {
                 advanceWalkthrough("Find someone", "learn_white_noise_connect_amoled")
                 advanceWalkthrough("Make a private group", "learn_white_noise_groups_amoled")
                 advanceWalkthrough("Reply or react", "learn_white_noise_actions_amoled")
+                val example = composeRule.onNodeWithText("See you tomorrow!")
+                example.performScrollTo().performTouchInput { longClick() }
+                composeRule.onNodeWithText("Reply").assertExists()
+                composeRule.onRoot().captureRoboImage("src/test/snapshots/learn_white_noise_demo_actions_amoled.png")
+                example.performTouchInput { swipeRight() }
+                composeRule.onNodeWithText("Demo contact").assertExists()
+                composeRule.onRoot().captureRoboImage("src/test/snapshots/learn_white_noise_demo_reply_amoled.png")
+                advanceWalkthrough("Chat across apps", "learn_white_noise_marmot_amoled")
             },
         ) {
             LearnWhiteNoiseScreen(onBack = {}, onShareProfile = {})

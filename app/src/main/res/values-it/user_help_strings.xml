@@ -5,11 +5,15 @@
     <string name="learn_share_title">Condividi il tuo profilo</string>
     <string name="learn_share_body">Apri Condividi e connettiti per mostrare il tuo codice QR o condividere il link del profilo. Tieni per te la chiave privata di accesso.</string>
     <string name="learn_actions_title">Rispondi o reagisci</string>
-    <string name="learn_actions_body">Tieni premuto un messaggio per vedere le azioni. Prova con questo esempio.</string>
+    <string name="learn_actions_body">Scorri un messaggio verso il centro della chat per rispondere. Tienilo premuto per altre azioni, incluse le reazioni.</string>
     <string name="learn_example_message">A domani!</string>
     <string name="learn_show_actions">Mostra le azioni del messaggio</string>
-    <string name="learn_actions_explanation">Scegli Rispondi per citare il messaggio oppure scegli un’emoji per reagire.</string>
     <string name="learn_open_share">Apri Condividi e connettiti</string>
     <string name="learn_group_title">Crea un gruppo privato</string>
     <string name="learn_group_body">Riunisci le persone giuste in una conversazione. Crea un gruppo da Nuova chat e scegli chi invitare. I tuoi messaggi sono crittografati end-to-end.</string>
+    <string name="learn_demo_label">Messaggio di prova · non viene inviato nulla</string>
+    <string name="learn_demo_sender">Contatto dimostrativo</string>
+    <string name="learn_marmot_title">Chatta tra app diverse</string>
+    <string name="learn_marmot_body">I tuoi amici possono partecipare da un’altra app compatibile. White Noise usa Marmot, un protocollo aperto che permette a team diversi di creare app che funzionano insieme.</string>
+    <string name="learn_marmot_link">Scopri le app Marmot</string>
 </resources>

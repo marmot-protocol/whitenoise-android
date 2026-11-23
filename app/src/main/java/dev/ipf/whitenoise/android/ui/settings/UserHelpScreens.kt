@@ -5,7 +5,6 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -41,6 +40,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlinx.coroutines.launch
@@ -59,7 +59,13 @@ private enum class LearnTopic(
         R.drawable.learn_groups,
         R.string.learn_actions_title,
     ),
-    Actions(R.string.learn_actions_title, R.string.learn_actions_body, R.drawable.learn_actions, R.string.done),
+    Actions(
+        R.string.learn_actions_title,
+        R.string.learn_actions_body,
+        R.drawable.learn_actions,
+        R.string.learn_marmot_title,
+    ),
+    Marmot(R.string.learn_marmot_title, R.string.learn_marmot_body, R.drawable.learn_marmot, R.string.done),
 }
 
 @Suppress("FunctionNaming")
@@ -79,6 +85,7 @@ internal fun LearnWhiteNoiseScreen(
             state = pager,
             modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.Top,
+            userScrollEnabled = pager.currentPage != LearnTopic.Actions.ordinal,
         ) { index ->
             val topic = LearnTopic.entries[index]
             LearnTopicPage(
@@ -130,7 +137,8 @@ private fun LearnTopicPage(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (topic == LearnTopic.Actions) LearnMessageActions()
+        if (topic == LearnTopic.Actions) LearnMessageDemo()
+        if (topic == LearnTopic.Marmot) LearnMarmotLink()
         Row(
             Modifier.align(Alignment.CenterHorizontally).clearAndSetSemantics { },
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -158,21 +166,16 @@ private fun LearnTopicPage(
 
 @Suppress("FunctionNaming")
 @Composable
-private fun LearnMessageActions() {
-    var actionsVisible by rememberSaveable { mutableStateOf(false) }
-    val label = stringResource(R.string.learn_show_actions)
-    OutlinedCard {
-        Text(
-            stringResource(R.string.learn_example_message),
-            Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClickLabel = label,
-                    onClick = { actionsVisible = !actionsVisible },
-                    onLongClick = { actionsVisible = true },
-                    onLongClickLabel = label,
-                ).padding(16.dp),
-        )
+private fun LearnMarmotLink() {
+    val uriHandler = LocalUriHandler.current
+    var openFailed by rememberSaveable { mutableStateOf(false) }
+    OutlinedButton(
+        onClick = {
+            openFailed = runCatching { uriHandler.openUri(WhiteNoiseUrls.MARMOT_APPS) }.isFailure
+        },
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+    ) {
+        Text(stringResource(R.string.learn_marmot_link))
     }
-    if (actionsVisible) Text(stringResource(R.string.learn_actions_explanation))
+    if (openFailed) Text(stringResource(R.string.learn_marmot_link_failed), color = MaterialTheme.colorScheme.error)
 }
