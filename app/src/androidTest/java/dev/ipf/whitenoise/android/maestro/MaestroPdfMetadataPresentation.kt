@@ -26,7 +26,8 @@ internal fun MaestroPdfMetadataPresentation(fixture: MaestroPresentationFixture)
     val choices =
         remember(fixture) {
             ComposerPdfMetadataChoices().apply {
-                record(signed, ComposerPdfState("Signed lease.pdf", PdfMetadataResult.Refused(PdfMetadataRefusal.Signed)))
+                val refused = PdfMetadataResult.Refused(PdfMetadataRefusal.Signed)
+                record(signed, ComposerPdfState("Signed lease.pdf", refused))
             }
         }
     Box(Modifier.fillMaxSize()) {
