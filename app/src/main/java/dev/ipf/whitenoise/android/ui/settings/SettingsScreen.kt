@@ -861,6 +861,7 @@ private fun SettingsProfileRow(
 @Composable
 @Suppress("FunctionNaming")
 private fun SettingsExpandedProfileKey(npub: String) {
+    val style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center)
     PublicKeyCopyText(
         publicKeyDisplayGroups(npub).joinToString(" "),
         npub,
@@ -868,7 +869,7 @@ private fun SettingsExpandedProfileKey(npub: String) {
             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
             .padding(bottom = WhiteNoiseSpacing.Related)
             .animatePublicKeyExpansion(expanded = true),
-        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center),
+        style = style,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = Int.MAX_VALUE,
         keyboardFocusable = true,

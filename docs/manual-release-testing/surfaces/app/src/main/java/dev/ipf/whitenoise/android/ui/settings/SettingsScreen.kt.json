@@ -87,6 +87,14 @@
         ]
       },
       {
+        "surface": "SettingsExpandedProfileKey",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsExpandedProfileKey(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
         "surface": "SettingsProfileTrailing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SettingsProfileTrailing(",
