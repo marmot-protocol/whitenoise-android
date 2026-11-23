@@ -7,11 +7,12 @@ import dev.ipf.whitenoise.android.BuildConfig
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Time from a foreground start to the first input a handler acted on (#3780).
+ * Time from a foreground start to the first input the UI accepted (#3780).
  *
  * [WarmResumeTrace] opens one async section per foreground. Call [firstAcceptedInput]
- * only after a handler has acted on the input; later inputs in that foreground are
- * ignored. A stop or a newer foreground closes a section that saw no input.
+ * from a handler the input reached past every motion and lock gate, even if the
+ * action it requests is then declined; later inputs in that foreground are ignored.
+ * A stop or a newer foreground closes a section that saw no input.
  */
 internal object WarmResumeInputTrace {
     private val nextCookie = AtomicInteger()

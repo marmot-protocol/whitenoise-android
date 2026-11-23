@@ -166,6 +166,21 @@ class ChatListResumeBaselineTest {
     }
 
     @Test
+    fun headCorrectionInterruptedWithoutAStoppedFrameIsSettledOnTheFirstResumedFrame() {
+        setHarness()
+        composeRule.runOnUiThread { itemIds = order("C", "A", "B") }
+        advanceFrames(1)
+
+        // Stop and start before the stopped window composes again.
+        stopAndResume()
+        advanceFrames(1)
+
+        assertFlushResumedOrder()
+        tapListTop()
+        composeRule.runOnIdle { assertEquals(listOf("C"), openedIds) }
+    }
+
+    @Test
     fun placementStillRunningWhenStoppedIsSettledOnTheFirstResumedFrame() {
         setHarness()
         composeRule.runOnUiThread { itemIds = order("A", "C", "B") }

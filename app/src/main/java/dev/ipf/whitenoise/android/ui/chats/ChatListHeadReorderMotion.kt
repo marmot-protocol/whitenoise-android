@@ -243,8 +243,8 @@ internal fun rememberChatListHeadReorderGate(
         synchronousGateInProgress = false
     }
 
-    // A correction the stop interrupted keeps input closed until its collector settles it.
-    return (synchronousGateInProgress && !resumeBaseline.active) || scrollCorrectionInProgress
+    // ChatListActiveHeadScrollEffect settles a correction the stop froze before this frame's layout.
+    return !resumeBaseline.active && (synchronousGateInProgress || scrollCorrectionInProgress)
 }
 
 /**
@@ -290,6 +290,18 @@ internal fun ChatListActiveHeadScrollEffect(
         )
     chatListResumeHeadSnap(listState, activeHeadId, pinnedOrder, datasetKey, isActiveList, resumeBaseline.active)
     val liveProgressCallback by rememberUpdatedState(onHeadReorderInProgressChange)
+    val runningCorrection = remember(listState, datasetKey, isActiveList) { ChatListHeadCorrectionRef() }
+    SideEffect {
+        // Runs before this frame's measure: a correction the stop froze ends at the top now, so
+        // the first resumed frame is settled and takes taps (#3780).
+        if (resumeBaseline.active) {
+            runningCorrection.job?.takeIf { it.isActive }?.let { frozen ->
+                frozen.cancel()
+                listState.requestScrollToItem(0)
+                liveProgressCallback(false)
+            }
+        }
+    }
     // A filter replacement restarts this collector and clears its previous-head
     // snapshot. LazyColumn keeps any still-valid keyed scroll anchor; unlike an
     // incoming-message promotion, the replacement never launches scroll motion.
@@ -335,6 +347,7 @@ internal fun ChatListActiveHeadScrollEffect(
                             isCurrent = { serial == correctionSerial },
                             onProgress = { liveProgressCallback(it) },
                         )
+                    runningCorrection.job = correctionJob
                 }
                 previous = current
             }
@@ -343,6 +356,10 @@ internal fun ChatListActiveHeadScrollEffect(
             liveProgressCallback(false)
         }
     }
+}
+
+private class ChatListHeadCorrectionRef {
+    var job: Job? = null
 }
 
 /** Runs one traced correction; superseded cleanup cannot release its successor's input gate. */
