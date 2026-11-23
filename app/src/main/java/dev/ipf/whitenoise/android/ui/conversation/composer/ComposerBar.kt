@@ -1211,9 +1211,9 @@ internal fun ComposerBar(
                 val voiceReviewClip = voiceReview?.clip?.takeIf { voicePhase.showsReview }
                 val replyVisible = replyingTo != null || replyExit.exiting
                 val amoled = isAmoledSurfaceTheme()
-                val replyTopInset = if (amoled) 0.dp else 8.dp
-                val replyInsets = PaddingValues(start = 8.dp, top = replyTopInset, end = 8.dp, bottom = 8.dp)
                 val replyLeadsAccessory = replyVisible && attachmentContent == null && editingMessageId == null
+                val replyTopInset = if (amoled && replyLeadsAccessory) 0.dp else 8.dp
+                val replyInsets = PaddingValues(start = 8.dp, top = replyTopInset, end = 8.dp, bottom = 8.dp)
                 val accessoryTopInset = if (amoled && replyLeadsAccessory) 8.dp else ComposerResizeStripHeight
                 val baseAccessoryContent: (@Composable () -> Unit)? =
                     // Edit shows its pill in the action row instead, and takes precedence over a reply.

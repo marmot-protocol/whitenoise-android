@@ -646,7 +646,6 @@ internal fun GroupEditScreen(
                     nameEmojiAnchor = nameEmojiAnchor,
                     emojiPickerOpen = showEmojiPicker,
                     onEmojiPickerClick = { if (nameEditable) showEmojiPicker = true },
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
             }
         }

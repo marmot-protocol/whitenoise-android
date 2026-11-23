@@ -4,20 +4,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.EmojiSheetFieldAnchor
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
+/** Group fields that share the settings footer's adaptive width and side insets. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun GroupEditFields(
@@ -27,14 +26,9 @@ internal fun GroupEditFields(
     nameEmojiAnchor: EmojiSheetFieldAnchor,
     emojiPickerOpen: Boolean,
     onEmojiPickerClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier =
-            modifier
-                .widthIn(max = 520.dp)
-                .fillMaxWidth()
-                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
     ) {
         GroupNameEmojiField(
