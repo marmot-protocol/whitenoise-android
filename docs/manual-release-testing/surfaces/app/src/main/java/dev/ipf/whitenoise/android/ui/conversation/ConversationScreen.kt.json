@@ -63,14 +63,6 @@
         "test_ids": [
           "CON-037"
         ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "surface": "Holding the jump to mention pill explains it",
-        "anchor": "R.string.explanation_conversation_jump_to_mention",
-        "test_ids": [
-          "CON-049"
-        ]
       }
     ],
     "settings_controls": [
@@ -80,15 +72,6 @@
         "anchor": "R.string.close",
         "test_ids": [
           "MED-008"
-        ]
-      },
-      {
-        "surface": "string:conversation_jump_to_mention",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "R.string.conversation_jump_to_mention",
-        "test_ids": [
-          "CON-028",
-          "CON-031"
         ]
       },
       {

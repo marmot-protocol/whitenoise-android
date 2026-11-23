@@ -167,9 +167,13 @@ internal fun unreadReceivedMentionIds(
     if (readAnchorMessageId != null && anchorIdx < 0) return emptyList()
     return timeline
         .drop(anchorIdx + 1)
-        .filter { it.isUnreadEligible() && it.isChatOrThreadMessage() && mentionsActiveAccount(it) }
-        .mapNotNull { it.record.messageIdHex.takeIf { id -> id.isNotBlank() } }
+        .filter { it.isUnreadMention(mentionsActiveAccount) }
+        .map { it.record.messageIdHex }
 }
+
+/** A received chat or thread row with an id that mentions the active account, as the unread mention count sees it. */
+internal fun TimelineMessage.isUnreadMention(mentionsActiveAccount: (TimelineMessage) -> Boolean): Boolean =
+    record.messageIdHex.isNotBlank() && isUnreadEligible() && isChatOrThreadMessage() && mentionsActiveAccount(this)
 
 /** A kind-9 chat row or a thread message, the rows MDK counts as chat for unread counts, mentions and search. */
 internal fun TimelineMessage.isChatOrThreadMessage(): Boolean {

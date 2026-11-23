@@ -31,13 +31,11 @@ import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -79,11 +77,8 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.onClick
@@ -191,7 +186,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
-import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -200,7 +194,6 @@ import dev.ipf.whitenoise.android.ui.common.reverseLazyListDragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
-import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationDictationDraftWriter
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberAttachmentState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
@@ -1461,6 +1454,12 @@ internal fun ConversationScreen(
     // the engine's mention classification, reusing the #414 per-message detection.
     val selfAccountIdHex = conversationSelfAccountIdHex
     val mentionDetectionCache = remember(controller, chat.id, selfAccountIdHex) { MentionDetectionCache() }
+    val mentionsSelf: (TimelineMessage) -> Boolean = { msg ->
+        !selfAccountIdHex.isNullOrBlank() &&
+            mentionDetectionCache.getOrCompute(msg.record.messageIdHex, msg.record.contentTokens) {
+                documentMentionsAccount(msg.record.contentTokens, selfAccountIdHex) { appState.accountIdHexForMention(it) }
+            }
+    }
     val unreadMentionMessageIds by remember(controller, chat.id, selfAccountIdHex, mentionDetectionCache) {
         derivedStateOf {
             // Anchor on the UI read high-water mark. It advances immediately when
@@ -1469,16 +1468,29 @@ internal fun ConversationScreen(
             if (!initialTimelineAnchored || selfAccountIdHex.isNullOrBlank() || readAnchorMessageId == null) {
                 emptyList()
             } else {
-                unreadReceivedMentionIds(controller.timeline, readAnchorMessageId) { msg ->
-                    mentionDetectionCache.getOrCompute(msg.record.messageIdHex, msg.record.contentTokens) {
-                        documentMentionsAccount(
-                            document = msg.record.contentTokens,
-                            accountIdHex = selfAccountIdHex,
-                            resolveAccountIdHex = { bech32 -> appState.accountIdHexForMention(bech32) },
-                        )
-                    }
-                }
+                unreadReceivedMentionIds(controller.timeline, readAnchorMessageId, mentionsSelf)
             }
+        }
+    }
+    // #4030: MDK's entry count shows the control on the first frame; the loaded rows take over as they settle.
+    val mentionSeed = rememberConversationMentionJumpSeed(entryUnreadSessionIdentity, entryRow?.unreadMentionCount)
+    val mentionCoverage by remember(controller, mentionSeed) {
+        derivedStateOf {
+            conversationMentionCoverage(
+                initialTimelineAnchored,
+                readAnchorMessageId,
+                controller.timeline,
+                controller.hasMoreAfterTimeline,
+            )
+        }
+    }
+    val unreadMentionCount by remember(mentionSeed) {
+        derivedStateOf { mentionSeed.count(unreadMentionMessageIds, mentionCoverage) }
+    }
+    LaunchedEffect(mentionSeed) {
+        snapshotFlow { unreadMentionMessageIds to mentionCoverage }.collect { (ids, coverage) ->
+            val loaded = controller.timeline.mapTo(HashSet()) { it.record.messageIdHex }
+            mentionSeed.observe(ids, coverage, readAnchorMessageId in loaded) { it in loaded }
         }
     }
     // Reading the raw IME inset in the body would re-subscribe and recompose
@@ -2298,7 +2310,7 @@ internal fun ConversationScreen(
         )
 
     fun jumpToNextUnreadMention() {
-        val targetMessageId = unreadMentionMessageIds.firstOrNull() ?: return
+        if (unreadMentionMessageIds.isEmpty() && !mentionSeed.active) return
         navigationState.searchJob?.cancel()
         navigationState.targetHighlight.clear()
         navigationState.navigateReplyJob?.cancel()
@@ -2306,7 +2318,27 @@ internal fun ConversationScreen(
         navigationState.navigateReplyJob =
             scope.launch {
                 tracedPagingSection(ConversationMentionJumpTrace.TOTAL) {
+                    val targetMessageId =
+                        mentionSeed.jumpTarget(
+                            awaitAnchored = { snapshotFlow { initialTimelineAnchored }.first { it } },
+                            loadedTarget = { unreadMentionMessageIds.firstOrNull() },
+                        ) {
+                            resolveFirstUnreadMention(
+                                readAnchorMessageId = readAnchorMessageId,
+                                firstUnreadMessageId = entryFirstUnreadMessageId,
+                                timeline = { controller.timeline },
+                                mentionsActiveAccount = mentionsSelf,
+                                loadMessage = { controller.loadUntilMessageAvailable(it) },
+                                hasMoreAfter = { controller.hasMoreAfterTimeline },
+                                loadNewer = { controller.loadNewerTimelinePage() },
+                            )
+                        }
                     if (!navigationRequest.isCurrent()) return@launch
+                    if (targetMessageId == null) {
+                        mentionSeed.retire()
+                        appState.present(R.string.toast_original_message_unavailable)
+                        return@launch
+                    }
                     val available =
                         tracedPagingSection(ConversationMentionJumpTrace.AVAILABILITY) {
                             controller.loadUntilMessageAvailable(targetMessageId)
@@ -2349,6 +2381,7 @@ internal fun ConversationScreen(
                     // chat-list @-badge — decrement in step; advance the local read
                     // anchor so the chip's derived count updates immediately.
                     readAnchorMessageId = targetMessageId
+                    mentionSeed.visited(targetMessageId)
                     controller.markReadUpTo(targetMessageId)
                     tracedPagingSection(ConversationMentionJumpTrace.HIGHLIGHT) {
                         showTransientMessageHighlight(targetMessageId)
@@ -5025,53 +5058,12 @@ internal fun ConversationScreen(
                                         }
                                         // Jump-to-mention chip: tap visits the oldest unread
                                         // mention and marks it read, so the count steps down.
-                                        val mentionCount = unreadMentionMessageIds.size
                                         // The chip keeps its last count while it shrinks away instead of showing 0.
                                         val shownMentionCount = remember { IntArray(1) }
-                                        if (mentionCount > 0) shownMentionCount[0] = mentionCount
-                                        val mentionBadge =
-                                            shownMentionCount[0].let { if (it > 99) "99+" else it.toString() }
-                                        ConversationNavigationControl(
-                                            visible = !selectionMode && mentionCount > 0,
-                                        ) {
-                                            // The badge caps at 99+; the spoken label keeps the real count.
-                                            val jumpToMentionLabel =
-                                                stringResource(R.string.conversation_jump_to_mention) + ", " +
-                                                    pluralStringResource(
-                                                        R.plurals.unread_mentions_count,
-                                                        shownMentionCount[0],
-                                                        shownMentionCount[0],
-                                                    )
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = MaterialTheme.colorScheme.tertiaryContainer,
-                                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                                                shadowElevation = 2.dp,
-                                                modifier =
-                                                    Modifier
-                                                        .height(34.dp)
-                                                        .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
-                                                        .explainOnLongPress(
-                                                            composerExplanation(
-                                                                R.string.conversation_jump_to_mention,
-                                                                R.string.explanation_conversation_jump_to_mention,
-                                                            ),
-                                                        ).clickable(role = Role.Button) { jumpToNextUnreadMention() }
-                                                        .clearAndSetSemantics {
-                                                            contentDescription = jumpToMentionLabel
-                                                        },
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                                    modifier = Modifier.padding(horizontal = 12.dp),
-                                                ) {
-                                                    Text("@", style = MaterialTheme.typography.titleMedium)
-                                                    Text(
-                                                        mentionBadge,
-                                                        style = MaterialTheme.typography.labelLarge,
-                                                    )
-                                                }
+                                        if (unreadMentionCount > 0) shownMentionCount[0] = unreadMentionCount
+                                        ConversationNavigationControl(visible = !selectionMode && unreadMentionCount > 0) {
+                                            ConversationJumpToMentionButton(shownMentionCount[0]) {
+                                                jumpToNextUnreadMention()
                                             }
                                         }
                                         ConversationNavigationControl(
