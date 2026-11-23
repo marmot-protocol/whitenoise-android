@@ -148,7 +148,11 @@ private fun changeHeadline(kind: String): Int =
         else -> R.string.group_change_not_made
     }
 
-/** Why MDK did not make the change, by its stable reason tag; any other tag means the settled group refused it. */
+/**
+ * Why MDK did not make the change, by its stable reason tag. Any other tag, such as an invitee's KeyPackage that
+ * expired while the invite waited (`invalid_key_package_lifetime`), says only that the group could not accept it,
+ * because most of MDK's refusal tags mean nothing about the group having changed.
+ */
 @StringRes
 private fun refusalReason(reason: String): Int =
     when (reason) {
@@ -156,7 +160,7 @@ private fun refusalReason(reason: String): Int =
         "not_a_member" -> R.string.group_change_reason_not_member
         "not_delivered" -> R.string.group_change_reason_not_delivered
         "refused" -> R.string.group_change_reason_refused
-        else -> R.string.group_change_reason_group_changed
+        else -> R.string.group_change_reason_not_accepted
     }
 
 /**
@@ -185,33 +189,50 @@ internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(notice: GroupChang
 
 /**
  * Presents [notice], titled with the chat's name when the chat list knows it and tagged with its [showing] key, and
- * waits until its own snackbar has run to the end, which [noteToastSeen] records. The toast has one slot, so when the
- * notice leaves the slot without that record, another toast replaced it, and the notice is presented again once the
- * slot is free. Returns false once its account is no longer active before it is seen.
+ * waits until its own snackbar has run to the end in its own profile, which [noteToastSeen] records. The toast has one
+ * slot, so when the notice leaves the slot without that record, another toast replaced it, and the notice is presented
+ * again once the slot is free. A switch to another profile takes the notice off screen, so it is neither seen nor
+ * dismissed there, and returns false, leaving MDK's record for when its profile is active again.
  */
 private suspend fun WhiteNoiseAppState.showUntilSeen(
     notice: GroupChangeNotice,
     showing: String,
 ): Boolean {
     val (title, detail) = groupChangeToast(chatTitle(notice.accountRef, notice.groupIdHex), notice)
+
+    // Waits until the toast slot meets done, or until the notice's profile is no longer active.
+    suspend fun awaitToastOrSwitch(done: (ToastMessage?) -> Boolean) {
+        snapshotFlow { activeAccountRef != notice.accountRef || done(toast) }.first { it }
+    }
+
     while (activeAccountRef == notice.accountRef) {
         seenGroupChangeToasts -= showing
         // Tagged with the change, so another change's notice with the same wording still replaces this one.
         presentText(ToastMessage(title, detail, groupChangeKey = showing))
         val shown = toast
-        snapshotFlow { toast }.first { it !== shown }
-        if (seenGroupChangeToasts.remove(showing)) return true
-        snapshotFlow { toast }.first { it == null }
+        awaitToastOrSwitch { it !== shown }
+        when {
+            // A switch woke it, even one already undone if the notice is still up. Only this notice is withdrawn: a
+            // newer toast that replaced it stays.
+            activeAccountRef != notice.accountRef || toast === shown -> {
+                clearToast(shown)
+                break
+            }
+            seenGroupChangeToasts.remove(showing) -> return true
+            else -> awaitToastOrSwitch { it == null }
+        }
     }
+    seenGroupChangeToasts -= showing
     return false
 }
 
 /**
  * Records that [toast]'s snackbar ran to the end, so the group-change notice it carries counts as seen. A snackbar a
- * newer toast cancels never gets here. Must run on the main thread, before the toast is cleared.
+ * newer toast cancels never gets here, and one that ends after a switch to another profile does not count. Must run on
+ * the main thread, before the toast is cleared.
  */
 internal fun WhiteNoiseAppState.noteToastSeen(toast: ToastMessage) {
-    toast.groupChangeKey?.let { seenGroupChangeToasts += it }
+    toast.groupChangeKey?.takeIf { it.startsWith("$activeAccountRef|") }?.let { seenGroupChangeToasts += it }
 }
 
 /**

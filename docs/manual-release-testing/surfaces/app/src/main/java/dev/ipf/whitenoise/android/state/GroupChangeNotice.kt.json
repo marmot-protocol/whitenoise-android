@@ -132,9 +132,9 @@
         ]
       },
       {
-        "surface": "Group change refused after the group changed",
+        "surface": "Group change the settled group could not accept",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
-        "anchor": "R.string.group_change_reason_group_changed",
+        "anchor": "R.string.group_change_reason_not_accepted",
         "test_ids": [
           "GRP-045"
         ]

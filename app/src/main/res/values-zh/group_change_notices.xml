@@ -11,7 +11,7 @@
     <string name="group_change_reason_not_member">你已不再是此群组的成员。</string>
     <string name="group_change_reason_not_delivered">此更改未送达该群组的任何中继。请检查网络连接，然后重试。</string>
     <string name="group_change_reason_refused">该群组的中继拒绝了此更改。请检查聊天，然后重试。</string>
-    <string name="group_change_reason_group_changed">此更改等待发送期间，群组已发生变化。请检查聊天，然后重试。</string>
+    <string name="group_change_reason_not_accepted">群组无法接受此更改。请检查聊天，然后重试。</string>
     <string name="group_change_reason_superseded">同一时间群组中有另一项更改。请检查聊天，然后重试。</string>
     <string name="group_change_already_done">此群组中的另一项更改已完成了你的更改要做的事。</string>
     <string name="group_change_notice_detail">%1$s。%2$s</string>

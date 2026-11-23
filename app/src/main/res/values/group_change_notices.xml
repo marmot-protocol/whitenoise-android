@@ -13,7 +13,7 @@
     <string name="group_change_reason_not_member">You’re no longer a member of this group.</string>
     <string name="group_change_reason_not_delivered">It didn’t reach any of the group’s relays. Check your connection, then try again.</string>
     <string name="group_change_reason_refused">The group’s relays refused it. Check the chat, then try again.</string>
-    <string name="group_change_reason_group_changed">The group changed while it was waiting to send. Check the chat, then try again.</string>
+    <string name="group_change_reason_not_accepted">The group couldn’t accept it. Check the chat, then try again.</string>
     <string name="group_change_reason_superseded">Another change to the group was made at the same time. Check the chat, then try again.</string>
     <string name="group_change_already_done">Another change to this group already did what yours would have.</string>
     <!-- %1$s is what did not happen, such as "Invitation not sent"; %2$s says why, as a full sentence. -->

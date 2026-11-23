@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.whitenoise.android.ui.chats.resolveCompleteChatListIds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -30,7 +31,7 @@ internal suspend fun MarmotInterface.acknowledgeGroupChange(notice: GroupChangeN
 internal suspend fun MarmotInterface.newestRetainedGroupChange(accountRef: String): GroupChangeNotice? {
     val groups =
         listOf(ChatListViewFfi.CHATS, ChatListViewFfi.ARCHIVED)
-            .flatMap { view -> runCatchingCancellable { chatListIds(accountRef, view) }.getOrNull().orEmpty() }
+            .flatMap { view -> listedChats(accountRef, view) }
             .distinct()
     return groups
         .flatMap { group ->
@@ -38,6 +39,20 @@ internal suspend fun MarmotInterface.newestRetainedGroupChange(accountRef: Strin
         }.sortedByDescending { it.at }
         .firstNotNullOfOrNull { retainedGroupChangeNotice(accountRef, it) }
 }
+
+/**
+ * [view]'s chats for [accountRef]. While MDK backfills the chat list it refuses the read rather than return part of it,
+ * and this read runs once per stream open, so that refusal is retried for about a minute before the view is skipped.
+ */
+private suspend fun MarmotInterface.listedChats(
+    accountRef: String,
+    view: ChatListViewFfi,
+): List<String> =
+    runCatchingCancellable {
+        resolveCompleteChatListIds(RETAINED_CHANGE_LIST_ATTEMPTS, RETAINED_CHANGE_LIST_RETRY_MS) {
+            chatListIds(accountRef, view)
+        }
+    }.getOrNull().orEmpty()
 
 /**
  * Raises the active account's newest retained change when the event stream opens and acknowledges it once the user has
@@ -50,3 +65,7 @@ internal suspend fun WhiteNoiseAppState.presentRetainedGroupChange(marmot: Marmo
         runCatchingCancellable { marmot.acknowledgeGroupChange(notice) }
     }
 }
+
+/** Reads of a not-ready chat list at stream open, each waiting 0.5 s longer than the last: about 52 s in all. */
+private const val RETAINED_CHANGE_LIST_ATTEMPTS = 15
+private const val RETAINED_CHANGE_LIST_RETRY_MS = 500L

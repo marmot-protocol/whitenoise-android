@@ -11,7 +11,7 @@
     <string name="group_change_reason_not_member">Artık bu grubun üyesi değilsiniz.</string>
     <string name="group_change_reason_not_delivered">Değişiklik grubun rölelerinin hiçbirine ulaşmadı. Bağlantınızı kontrol edin, sonra tekrar deneyin.</string>
     <string name="group_change_reason_refused">Grubun röleleri değişikliği reddetti. Sohbeti kontrol edin, sonra tekrar deneyin.</string>
-    <string name="group_change_reason_group_changed">Değişiklik gönderilmeyi beklerken grup değişti. Sohbeti kontrol edin, sonra tekrar deneyin.</string>
+    <string name="group_change_reason_not_accepted">Grup değişikliği kabul edemedi. Sohbeti kontrol edin, sonra tekrar deneyin.</string>
     <string name="group_change_reason_superseded">Aynı anda gruba başka bir değişiklik yapıldı. Sohbeti kontrol edin, sonra tekrar deneyin.</string>
     <string name="group_change_already_done">Bu gruptaki başka bir değişiklik, sizinkinin yapacağını zaten yaptı.</string>
     <string name="group_change_notice_detail">%1$s. %2$s</string>

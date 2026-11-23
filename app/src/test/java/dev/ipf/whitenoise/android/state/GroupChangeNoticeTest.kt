@@ -9,11 +9,13 @@ import dev.ipf.marmotkit.GroupChangeNotDeliveredFfi
 import dev.ipf.marmotkit.GroupEventKindFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,6 +26,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.intrinsics.intercepted
+import kotlin.coroutines.resumeWithException
 
 /**
  * A group change MDK could not make reaches the user once, says what did not happen and why, and clears MDK's record of
@@ -78,9 +84,20 @@ class GroupChangeNoticeTest {
             groupChangeNotice(notDelivered("enable_account_devices", "refused"))?.headline,
         )
         assertEquals(
-            AppText.Resource(R.string.group_change_reason_group_changed),
+            AppText.Resource(R.string.group_change_reason_not_accepted),
             groupChangeNotice(notDelivered("leave", "admin_depletion"))?.reason,
         )
+    }
+
+    /**
+     * An invite refused because the invitee's KeyPackage expired while it waited says only that the group could not
+     * accept it: the group itself may not have changed.
+     */
+    @Test
+    fun anInviteKeyThatExpiredInTheQueueIsNotCalledAGroupChange() {
+        val notice = groupChangeNotice(refusal(artifact = null, reason = "invalid_key_package_lifetime"))
+        assertEquals(AppText.Resource(R.string.group_change_invite_not_sent), notice?.headline)
+        assertEquals(AppText.Resource(R.string.group_change_reason_not_accepted), notice?.reason)
     }
 
     /** MDK's own upkeep changes are not the user's, so they raise nothing. */
@@ -260,10 +277,75 @@ class GroupChangeNoticeTest {
             assertNull(state.toast)
         }
 
-    /** Retires the current toast as its snackbar does when it ends, then lets the waiting notice run. */
-    private suspend fun retireToast(state: WhiteNoiseAppState) {
+    /**
+     * A switch to another profile while the notice is on screen takes it off there and leaves the change unseen, so it
+     * shows again once its own profile is active.
+     */
+    @Test
+    fun aProfileSwitchWithdrawsTheNoticeAndLeavesItUnseen() =
+        runBlocking {
+            val state = appState(active = ACCOUNT)
+            val notice = groupChangeNotice(notDelivered("invite", "not_delivered"))!!
+            val seen = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(notice) }
+            state.switchMediaSessionForTest("other")
+            Snapshot.sendApplyNotifications()
+            repeat(SETTLE_YIELDS) { yield() }
+            assertNull(state.toast)
+            assertFalse(seen.await())
+            state.switchMediaSessionForTest(ACCOUNT)
+            val again = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(notice) }
+            assertEquals(notice.headline, state.toast?.title)
+            retireToast(state)
+            assertTrue(again.await())
+        }
+
+    /** A notice whose snackbar ends in another profile is not seen, even if its own profile is back before it looks. */
+    @Test
+    fun aNoticeDismissedInAnotherProfileIsNotSeen() =
+        runBlocking {
+            val state = appState(active = ACCOUNT)
+            val notice = groupChangeNotice(notDelivered("invite", "not_delivered"))!!
+            val seen = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(notice) }
+            state.switchMediaSessionForTest("other")
+            retireToast(state, settle = false)
+            state.switchMediaSessionForTest(ACCOUNT)
+            Snapshot.sendApplyNotifications()
+            repeat(SETTLE_YIELDS) { yield() }
+            assertFalse(seen.isCompleted)
+            assertEquals(notice.headline, state.toast?.title)
+            retireToast(state)
+            assertTrue(seen.await())
+        }
+
+    /** A profile switch withdraws only the notice: a newer toast that replaced it stays on screen. */
+    @Test
+    fun aProfileSwitchLeavesANewerToastAlone() =
+        runBlocking {
+            val state = appState(active = ACCOUNT)
+            val seen =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    state.showGroupChangeNotice(groupChangeNotice(notDelivered("invite", "refused"))!!)
+                }
+            state.presentText(AppText.Plain("Other"))
+            Snapshot.sendApplyNotifications()
+            yield()
+            state.switchMediaSessionForTest("other")
+            Snapshot.sendApplyNotifications()
+            repeat(SETTLE_YIELDS) { yield() }
+            assertFalse(seen.await())
+            assertEquals(AppText.Plain("Other"), state.toast?.title)
+        }
+
+    /**
+     * Retires the current toast as its snackbar does when it ends, then, when [settle], lets the waiting notice run.
+     */
+    private suspend fun retireToast(
+        state: WhiteNoiseAppState,
+        settle: Boolean = true,
+    ) {
         state.toast?.let(state::noteToastSeen)
         state.clearToast()
+        if (!settle) return
         Snapshot.sendApplyNotifications()
         repeat(SETTLE_YIELDS) { yield() }
     }
@@ -323,15 +405,37 @@ class GroupChangeNoticeTest {
         }
 
     /**
+     * A chat list MDK is still loading at stream open is read again, so its chat's retained change still shows. One
+     * that never finishes loading is given up, with nothing shown.
+     */
+    @Test
+    fun aChatListStillLoadingIsReadAgain() =
+        runTest {
+            val marmot =
+                RecordingMarmot(
+                    ids = mapOf(ChatListViewFfi.CHATS to listOf(GROUP)),
+                    records = mapOf(GROUP to listOf(record())),
+                    notReadyReads = 2,
+                )
+            assertEquals(COMMIT, marmot.proxy.newestRetainedGroupChange(ACCOUNT)?.commitIdHex)
+            assertEquals(listOf("not ready CHATS", "not ready CHATS", "read $GROUP"), marmot.calls)
+
+            val loading = RecordingMarmot(ids = mapOf(ChatListViewFfi.CHATS to listOf(GROUP)), notReadyReads = 100)
+            assertNull(loading.proxy.newestRetainedGroupChange(ACCOUNT))
+            assertFalse("read $GROUP" in loading.calls)
+        }
+
+    /**
      * A [MarmotInterface] answering only the calls these notices make and recording them. [ids] are each view's chats,
-     * [records] each group's retained changes, [upkeepNewest] an extra record in the first listed chat, and
-     * [failingGroup] a chat whose read throws.
+     * [records] each group's retained changes, [upkeepNewest] an extra record in the first listed chat,
+     * [failingGroup] a chat whose read throws, and [notReadyReads] how many chat-list reads MDK refuses as not ready.
      */
     private class RecordingMarmot(
         private val ids: Map<ChatListViewFfi, List<String>> = emptyMap(),
         private val records: Map<String, List<GroupChangeNotDeliveredFfi>> = emptyMap(),
         private val upkeepNewest: GroupChangeNotDeliveredFfi? = null,
         private val failingGroup: String? = null,
+        private var notReadyReads: Int = 0,
     ) {
         val calls = mutableListOf<String>()
 
@@ -343,7 +447,8 @@ class GroupChangeNoticeTest {
                 ->
                 val args = arguments.orEmpty()
                 when (method.name) {
-                    "chatListIds" -> ids[args[1]].orEmpty()
+                    "chatListIds" ->
+                        if (notReadyReads > 0) notReady(args[1], args.last()) else ids[args[1]].orEmpty()
                     "groupChangesNotDelivered" -> groupRecords(args[1] as String)
                     "acknowledgeChangeNotDelivered" -> {
                         calls += "ack ${args[1]} ${args[2]}"
@@ -352,6 +457,23 @@ class GroupChangeNoticeTest {
                     else -> error("unexpected call ${method.name}")
                 }
             } as MarmotInterface
+
+        /**
+         * Refuses [view]'s read as MDK does while it loads the chat list. The binding declares no exception, so a proxy
+         * cannot throw it: the suspended call is resumed with it instead.
+         */
+        @Suppress("UNCHECKED_CAST")
+        private fun notReady(
+            view: Any?,
+            continuation: Any?,
+        ): Any {
+            notReadyReads -= 1
+            calls += "not ready $view"
+            (continuation as Continuation<Any?>)
+                .intercepted()
+                .resumeWithException(MarmotKitException.ChatPresentationNotReady())
+            return COROUTINE_SUSPENDED
+        }
 
         /** Records the read of [group] and answers its records, throwing for [failingGroup]. */
         private fun groupRecords(group: String): List<GroupChangeNotDeliveredFfi> {

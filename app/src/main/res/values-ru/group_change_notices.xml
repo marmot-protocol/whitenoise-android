@@ -11,7 +11,7 @@
     <string name="group_change_reason_not_member">Вы больше не участник этой группы.</string>
     <string name="group_change_reason_not_delivered">Изменение не дошло ни до одного реле группы. Проверьте подключение и повторите попытку.</string>
     <string name="group_change_reason_refused">Реле группы отклонили изменение. Проверьте чат и повторите попытку.</string>
-    <string name="group_change_reason_group_changed">Группа изменилась, пока изменение ожидало отправки. Проверьте чат и повторите попытку.</string>
+    <string name="group_change_reason_not_accepted">Группа не смогла принять изменение. Проверьте чат и повторите попытку.</string>
     <string name="group_change_reason_superseded">Одновременно в группу было внесено другое изменение. Проверьте чат и повторите попытку.</string>
     <string name="group_change_already_done">Другое изменение в этой группе уже сделало то же, что и ваше.</string>
     <string name="group_change_notice_detail">%1$s. %2$s</string>

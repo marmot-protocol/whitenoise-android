@@ -11,7 +11,7 @@
     <string name="group_change_reason_not_member">Vous n’êtes plus membre de ce groupe.</string>
     <string name="group_change_reason_not_delivered">La modification n’a atteint aucun des relais du groupe. Vérifiez votre connexion et réessayez.</string>
     <string name="group_change_reason_refused">Les relais du groupe ont refusé la modification. Vérifiez la discussion et réessayez.</string>
-    <string name="group_change_reason_group_changed">Le groupe a changé pendant que la modification attendait d’être envoyée. Vérifiez la discussion et réessayez.</string>
+    <string name="group_change_reason_not_accepted">Le groupe n’a pas pu accepter la modification. Vérifiez la discussion et réessayez.</string>
     <string name="group_change_reason_superseded">Une autre modification du groupe a été faite au même moment. Vérifiez la discussion et réessayez.</string>
     <string name="group_change_already_done">Une autre modification de ce groupe a déjà fait ce que la vôtre aurait fait.</string>
     <string name="group_change_notice_detail">%1$s. %2$s</string>

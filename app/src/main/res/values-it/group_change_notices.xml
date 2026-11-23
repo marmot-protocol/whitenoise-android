@@ -11,7 +11,7 @@
     <string name="group_change_reason_not_member">Non sei più membro di questo gruppo.</string>
     <string name="group_change_reason_not_delivered">La modifica non ha raggiunto nessuno dei relay del gruppo. Controlla la connessione e riprova.</string>
     <string name="group_change_reason_refused">I relay del gruppo hanno rifiutato la modifica. Controlla la chat e riprova.</string>
-    <string name="group_change_reason_group_changed">Il gruppo è cambiato mentre la modifica era in attesa di invio. Controlla la chat e riprova.</string>
+    <string name="group_change_reason_not_accepted">Il gruppo non ha potuto accettare la modifica. Controlla la chat e riprova.</string>
     <string name="group_change_reason_superseded">Nello stesso momento è stata fatta un’altra modifica al gruppo. Controlla la chat e riprova.</string>
     <string name="group_change_already_done">Un’altra modifica a questo gruppo ha già fatto quello che avrebbe fatto la tua.</string>
     <string name="group_change_notice_detail">%1$s. %2$s</string>
