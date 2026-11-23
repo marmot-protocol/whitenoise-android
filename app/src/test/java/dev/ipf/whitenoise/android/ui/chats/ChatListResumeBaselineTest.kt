@@ -71,6 +71,8 @@ class ChatListResumeBaselineTest {
 
     private fun advanceFrames(count: Int) {
         repeat(count) {
+            // Publishes pending state changes, so the next frame composes them.
+            composeRule.runOnIdle { }
             composeRule.mainClock.advanceTimeByFrame()
             composeRule.runOnIdle { }
         }

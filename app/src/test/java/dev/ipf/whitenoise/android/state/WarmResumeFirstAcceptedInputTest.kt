@@ -31,7 +31,7 @@ class WarmResumeFirstAcceptedInputTest {
         val markers = inputMarkers()
         assertEquals(1, markers.size)
         assertTrue(markers.single().startsWith("activity=$token "))
-        assertTrue("epoch=1 surface=chat_list" in markers.single())
+        assertTrue("epoch=1 surface=chatlist" in markers.single())
         WarmResumeTrace.foregroundStopped(token, 1)
     }
 
@@ -57,7 +57,7 @@ class WarmResumeFirstAcceptedInputTest {
 
         WarmResumeTrace.foregroundStarted(token, 2, WarmResumeLifecycleClass.entries.first())
         WarmResumeInputTrace.firstAcceptedInput(WarmResumeRenderedSurface.ChatList)
-        assertTrue("epoch=2 surface=chat_list" in inputMarkers().single())
+        assertTrue("epoch=2 surface=chatlist" in inputMarkers().single())
         WarmResumeTrace.foregroundStopped(token, 2)
     }
 }

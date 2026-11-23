@@ -68,7 +68,8 @@ class ChatListResumeInputCoverageTest {
         )
         assertTrue(
             "zero-duration rows must drop the item animation so inserted rows are drawn opaque at once",
-            "fadeInSpec = if (placementDurationMillis > 0) tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS) else null" in rowMotion,
+            "fadeInSpec = if (placementDurationMillis > 0) tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS) else null" in
+                rowMotion,
         )
         assertTrue(
             "the resumed head must not open the head reorder gate",
