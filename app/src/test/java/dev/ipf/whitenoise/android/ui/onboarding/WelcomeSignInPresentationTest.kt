@@ -52,17 +52,17 @@ class WelcomeSignInPresentationTest {
         }
         val field = composeRule.onNodeWithTag("onboarding.sign_in.private_key_container", useUnmergedTree = true)
         val scan = composeRule.onNodeWithTag("onboarding.sign_in.scan")
-        assertEquals(
-            field.fetchSemanticsNode().boundsInRoot.center.y,
-            scan.fetchSemanticsNode().boundsInRoot.center.y,
-            0.5f,
-        )
+
+        /** Compare the center of the visible input surface with the scanner control. */
+        fun assertScannerAligned() {
+            val fieldBounds = field.fetchSemanticsNode().boundsInRoot
+            val scanBounds = scan.fetchSemanticsNode().boundsInRoot
+            assertEquals(fieldBounds.center.y, scanBounds.center.y, 0.5f)
+        }
+
+        assertScannerAligned()
         composeRule.runOnIdle { error.value = R.string.sign_in_error_public_key }
-        assertEquals(
-            field.fetchSemanticsNode().boundsInRoot.center.y,
-            scan.fetchSemanticsNode().boundsInRoot.center.y,
-            0.5f,
-        )
+        assertScannerAligned()
     }
 
     /** The native Amber capability moves to Sign In and never appears as an unsolicited Welcome action. */
