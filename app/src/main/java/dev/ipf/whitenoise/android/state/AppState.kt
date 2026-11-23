@@ -1499,7 +1499,7 @@ class WhiteNoiseAppState private constructor(
     var toast by mutableStateOf<ToastMessage?>(null)
         private set
 
-    /** Group-change notices this process has seen, has on screen, and has seen run to the end. Main thread only. */
+    /** Group-change notices this process has seen and has on screen. Main thread only. */
     internal val groupChangeNotices = GroupChangeNotices()
 
     private val transientNotices = TransientNotices { NoticeOwner(activeAccountRef, runtimeGeneration) }

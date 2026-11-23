@@ -178,9 +178,7 @@ internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(notice: GroupChang
         else -> {
             groupChangeNotices.showing += showing
             try {
-                showUntilSeen(notice, showing).also { seen ->
-                    if (seen) groupChangeNotices.shown.firstShowing(notice.accountRef, notice.changeIdHex)
-                }
+                showUntilSeen(notice, showing)
             } finally {
                 groupChangeNotices.showing -= showing
             }
@@ -190,11 +188,11 @@ internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(notice: GroupChang
 
 /**
  * Presents [notice], titled with the chat's name when the chat list knows it and tagged with its [showing] key, and
- * waits until its own snackbar has run to the end in its own profile, which [noteToastSeen] records. The toast has one
- * slot, so when the notice leaves the slot without that record, another toast replaced it, and the notice is presented
- * again once the slot is free. A switch to another profile takes the notice off screen, so it is neither seen nor
- * dismissed there, and returns false, leaving MDK's record for when its profile is active again. Cancelling it, as a
- * closing event stream does, takes the notice off screen too, unseen.
+ * waits until its own snackbar has run to the end in its own profile, which [noteToastSeen] records among the notices
+ * this process has seen. The toast has one slot, so when the notice leaves the slot without that record, another toast
+ * replaced it, and the notice is presented again once the slot is free. A switch to another profile takes the notice
+ * off screen, so it is neither seen nor dismissed there, and returns false, leaving MDK's record for when its profile
+ * is active again. Cancelling it, as a closing event stream does, takes the notice off screen too, unseen.
  */
 private suspend fun WhiteNoiseAppState.showUntilSeen(
     notice: GroupChangeNotice,
@@ -208,7 +206,6 @@ private suspend fun WhiteNoiseAppState.showUntilSeen(
     }
 
     while (activeAccountRef == notice.accountRef) {
-        groupChangeNotices.seenToasts -= showing
         // Tagged with the change, so another change's notice with the same wording still replaces this one.
         presentText(ToastMessage(title, detail, groupChangeKey = showing))
         val shown = toast
@@ -221,28 +218,31 @@ private suspend fun WhiteNoiseAppState.showUntilSeen(
             throw cancelled
         }
         when {
+            groupChangeNotices.shown.contains(notice.accountRef, notice.changeIdHex) -> return true
             // A switch woke it, even one already undone if the notice is still up. Only this notice is withdrawn: a
             // newer toast that replaced it stays.
             activeAccountRef != notice.accountRef || toast === shown -> {
                 clearToast(shown)
                 break
             }
-            groupChangeNotices.seenToasts.remove(showing) -> return true
             else -> awaitToastOrSwitch { it == null }
         }
     }
-    groupChangeNotices.seenToasts -= showing
     return false
 }
 
 /**
- * Records that [toast]'s snackbar ran to the end, so the group-change notice it carries counts as seen. The root runs
- * a group-change snackbar only while the app is on screen and unlocked, and one a newer toast cancels never gets here.
- * One that ends after a switch to another profile does not count. Must run on the main thread, before the toast is
- * cleared.
+ * Records that [toast]'s snackbar ran to the end, so the group-change notice it carries counts as seen in this
+ * process, even when its presenter is cancelled before it wakes, as when its event stream closes at that moment: the
+ * change's next report is then acknowledged without showing it again. The root runs a group-change snackbar only while
+ * the app is on screen and unlocked, and one a newer toast cancels never gets here. One that ends after a switch to
+ * another profile does not count. Must run on the main thread, before the toast is cleared.
  */
 internal fun WhiteNoiseAppState.noteToastSeen(toast: ToastMessage) {
-    toast.groupChangeKey?.takeIf { it.startsWith("$activeAccountRef|") }?.let { groupChangeNotices.seenToasts += it }
+    val key = toast.groupChangeKey ?: return
+    // The key is the notice's account and change ID, which has no `|`.
+    val accountRef = key.substringBeforeLast('|')
+    if (accountRef == activeAccountRef) groupChangeNotices.shown.firstShowing(accountRef, key.substringAfterLast('|'))
 }
 
 /**
@@ -267,14 +267,11 @@ internal fun groupChangeToast(
 
 /** One process's group-change notices, by account and MDK ID. Not thread-safe: use it from the main thread. */
 internal class GroupChangeNotices {
-    /** Notices already seen, so a change MDK reports again is not shown twice. */
+    /** Notices whose snackbar ran to the end, so a change MDK reports again is acknowledged without showing twice. */
     val shown = ShownQueuedRefusals()
 
     /** Notices on screen and not yet seen. */
     val showing = mutableSetOf<String>()
-
-    /** Toasts whose snackbar ran to the end, until their notice reads it. */
-    val seenToasts = mutableSetOf<String>()
 }
 
 /**

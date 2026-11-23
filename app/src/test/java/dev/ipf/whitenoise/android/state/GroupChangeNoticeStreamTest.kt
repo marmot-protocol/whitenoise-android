@@ -3,11 +3,15 @@ package dev.ipf.whitenoise.android.state
 import android.os.Looper
 import dev.ipf.marmotkit.GroupEventKindFfi
 import dev.ipf.marmotkit.MarmotEventFfi
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,9 +47,49 @@ class GroupChangeNoticeStreamTest {
                 awaitOnMain { fixture.destroyedEventSubscriptions.get() == 1 }
                 assertNull(state.toast)
                 assertTrue(state.groupChangeNotices.showing.isEmpty())
+                assertFalse(state.groupChangeNotices.shown.contains(ACCOUNT, COMMIT))
             } finally {
                 listener.cancel()
                 awaitOnMain { listener.isCompleted }
+                fixture.close()
+            }
+        }
+
+    /**
+     * A snackbar that ran to the end just before its stream closed still counts as seen, although the stream's end
+     * cancels the presenter before it wakes: the change's next report, as the reopened stream's retained read raises
+     * it, is acknowledged without showing it again.
+     */
+    @Test
+    fun aSnackbarThatEndsAsItsStreamClosesStaysSeen() =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = RuntimeEnvironment.getApplication(),
+                    emitStartupNotification = false,
+                    initialActiveAccountRef = ACCOUNT,
+                )
+            val state = fixture.appState
+            val listener = launch(Dispatchers.IO) { fixture.runReceiptLoop() }
+            var again: Deferred<Boolean>? = null
+            try {
+                fixture.emitRuntimeEvent(notDelivered())
+                awaitOnMain { state.toast != null }
+                // The root's snackbar ends, and the stream closes before the presenter sees the slot change.
+                state.toast?.let(state::noteToastSeen)
+                state.clearToast()
+                fixture.endRuntimeEventStream()
+                awaitOnMain { fixture.destroyedEventSubscriptions.get() == 1 }
+                again =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        state.showGroupChangeNotice(requireNotNull(groupChangeNotice(notDelivered())))
+                    }
+                assertTrue(again.isCompleted && again.await())
+                assertNull(state.toast)
+            } finally {
+                again?.cancel()
+                listener.cancel()
+                awaitOnMain { listener.isCompleted && again?.isCompleted != false }
                 fixture.close()
             }
         }
@@ -68,7 +112,7 @@ class GroupChangeNoticeStreamTest {
             groupIdHex = "b".repeat(64),
             event =
                 GroupEventKindFfi.GroupChangeNotDelivered(
-                    commitIdHex = "c".repeat(64),
+                    commitIdHex = COMMIT,
                     intentKind = "invite",
                     reason = "not_delivered",
                 ),
@@ -76,6 +120,7 @@ class GroupChangeNoticeStreamTest {
 
     private companion object {
         const val ACCOUNT = "alice"
+        val COMMIT = "c".repeat(64)
         const val AWAIT_TIMEOUT_MS = 10_000L
     }
 }

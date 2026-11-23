@@ -38,7 +38,8 @@ class RootToastSnackbarTest {
         val state = emptyAppState()
         val host = SnackbarHostState()
         val onScreen = MutableStateFlow(false)
-        val key = "${state.activeAccountRef}|change"
+        val account = requireNotNull(state.activeAccountRef)
+        val key = "$account|change"
         composeRule.setContent { RootToastSnackbarEffect(state, host, retryLabel = "Retry", onScreen = onScreen) }
         composeRule.runOnIdle { state.presentText(ToastMessage(AppText.Plain("Team"), groupChangeKey = key)) }
         composeRule.runOnIdle { assertNull(host.currentSnackbarData) }
@@ -49,14 +50,14 @@ class RootToastSnackbarTest {
         composeRule.runOnIdle {
             assertNull(host.currentSnackbarData)
             assertNotNull(state.toast)
-            assertFalse(key in state.groupChangeNotices.seenToasts)
+            assertFalse(state.groupChangeNotices.shown.contains(account, "change"))
         }
 
         onScreen.value = true
         composeRule.runOnIdle { requireNotNull(host.currentSnackbarData).dismiss() }
         composeRule.runOnIdle {
             assertNull(state.toast)
-            assertTrue(key in state.groupChangeNotices.seenToasts)
+            assertTrue(state.groupChangeNotices.shown.contains(account, "change"))
         }
     }
 
