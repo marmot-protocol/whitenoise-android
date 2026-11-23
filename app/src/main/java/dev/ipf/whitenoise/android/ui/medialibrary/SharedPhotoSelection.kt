@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.ui.conversation.media.OutboundShareAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentsExternally
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 
 /** A gallery slot: the message and authored attachment index a tile was selected from. */
 private fun SharedMediaTile.slot() = messageIdHex to attachmentIndex
@@ -52,6 +53,36 @@ internal class SharedPhotoSelection {
     }
 }
 
+/** A gallery's photo selection and the one share it may be staging. */
+@Stable
+internal class SharedPhotoShare {
+    val selection = SharedPhotoSelection()
+
+    private var job by mutableStateOf<Job?>(null)
+
+    /** Whether a share of the selection is being staged. */
+    val sharing: Boolean get() = job != null
+
+    internal var start: () -> Unit = {}
+
+    /** Ends selection mode and cancels a share still being staged, deleting its staged files. */
+    fun exit() {
+        job?.cancel()
+        job = null
+        selection.clear()
+    }
+
+    /** Records [next] as the share being staged. */
+    internal fun begin(next: Job) {
+        job = next
+    }
+
+    /** Forgets [finished] unless a newer share replaced it. */
+    internal fun end(finished: Job?) {
+        if (job === finished) job = null
+    }
+}
+
 /**
  * Selected photos that no longer resolve, by slot, to the same photo in the gallery's [current] tiles: the slot is
  * gone or hidden, became a video, or now carries a different reference.
@@ -74,13 +105,13 @@ internal class SharedPhotosUnavailableException(
 
 /**
  * Shares the whole verified files of [photos] through one Android share sheet, with no caption and nothing else from
- * their messages. [currentPhotos] returns the gallery's settled tiles, or null once the gallery no longer owns the
- * share; it is checked before anything is staged and again before the share sheet opens. A selection that stopped
- * resolving fails with [SharedPhotosUnavailableException], a set over the staging budget with
+ * their messages. [currentPhotos] returns the gallery's current tiles, or null once the gallery no longer owns the
+ * share; it is checked before anything is staged, again before the share sheet opens, and after a failed staging. A
+ * selection that stopped resolving fails with [SharedPhotosUnavailableException], a set over the staging budget with
  * `OutboundShareTooLargeException`, and a lost owner cancels. Each interruption deletes every staged file and opens
  * no share sheet.
  */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooGenericExceptionCaught")
 internal suspend fun shareSelectedPhotos(
     context: Context,
     accountRef: String,
@@ -91,19 +122,38 @@ internal suspend fun shareSelectedPhotos(
 ) {
     require(photos.isNotEmpty()) { "No photos selected" }
 
-    /** Cancels when the gallery lost the share and fails when a selected slot stopped resolving. */
-    suspend fun requireAvailable() {
-        val current = currentPhotos() ?: throw CancellationException("shared photo gallery owner changed")
-        val unavailable = unavailableSelectedPhotos(photos, current)
-        if (unavailable.isNotEmpty()) throw SharedPhotosUnavailableException(unavailable)
-    }
+    /** The selected photos that no longer resolve, or null once the gallery no longer owns the share. */
+    suspend fun unavailable(): List<SharedMediaTile>? = currentPhotos()?.let { unavailableSelectedPhotos(photos, it) }
 
-    requireAvailable()
-    shareAttachmentsExternally(
-        context = context,
-        accountRef = accountRef,
-        attachments = photos.map { photo -> OutboundShareAttachment(photo.reference) { source(photo) } },
-        chooserTitle = chooserTitle,
-        beforeLaunch = { requireAvailable() },
-    )
+    requireSharedPhotosAvailable(unavailable())
+    try {
+        shareAttachmentsExternally(
+            context = context,
+            accountRef = accountRef,
+            attachments = photos.map { photo -> OutboundShareAttachment(photo.reference) { source(photo) } },
+            chooserTitle = chooserTitle,
+            beforeLaunch = { requireSharedPhotosAvailable(unavailable()) },
+        )
+    } catch (failure: Exception) {
+        // A photo removed while it was read usually fails its read; report it as unavailable so it is deselected.
+        val settled = failure is CancellationException || failure is SharedPhotosUnavailableException
+        throw sharedPhotosFailure(failure, if (settled) null else unavailable())
+    }
 }
+
+/** Cancels once the gallery lost the share, and fails while any selected photo is [unavailable]. */
+private fun requireSharedPhotosAvailable(unavailable: List<SharedMediaTile>?) {
+    if (unavailable == null) throw CancellationException("shared photo gallery owner changed")
+    if (unavailable.isNotEmpty()) throw SharedPhotosUnavailableException(unavailable)
+}
+
+/** [failure], unless photos found [unavailable] after it explain it better. */
+private fun sharedPhotosFailure(
+    failure: Exception,
+    unavailable: List<SharedMediaTile>?,
+): Exception =
+    if (unavailable.isNullOrEmpty()) {
+        failure
+    } else {
+        SharedPhotosUnavailableException(unavailable).apply { addSuppressed(failure) }
+    }

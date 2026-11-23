@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -120,9 +121,15 @@ class SharedPhotoSelectionScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_photo_selection_sharing_rtl_200.png")
     }
 
-    private fun tileNode(tile: SharedMediaTile) = composeRule.onNodeWithTag("shared.selection.tile.${tile.messageIdHex}#${tile.attachmentIndex}")
+    private fun tileNode(tile: SharedMediaTile): SemanticsNodeInteraction {
+        val tag = "shared.selection.tile.${tile.messageIdHex}#${tile.attachmentIndex}"
+        return composeRule.onNodeWithTag(tag)
+    }
 
-    private fun toggleState(state: ToggleableState) = SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, state)
+    private fun toggleState(state: ToggleableState): SemanticsMatcher {
+        val property = SemanticsProperties.ToggleableState
+        return SemanticsMatcher.expectValue(property, state)
+    }
 
     /** The production scaffold, bar and overlays over flat stand-in artwork, without media IO. */
     private fun render(
@@ -175,7 +182,7 @@ class SharedPhotoSelectionScreenshotTest {
                 if (tile.isVideo) Text("▶", Modifier.padding(8.dp))
             }
             if (selecting) {
-                SharedTileSelectionOverlay(
+                SharedTileSelectionToggle(
                     tile = tile,
                     selected = selected,
                     enabled = !share.sharing,

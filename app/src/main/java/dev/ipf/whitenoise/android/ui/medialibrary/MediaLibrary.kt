@@ -433,6 +433,7 @@ internal fun MediaLibraryRoute(
                 onJumpToMessage,
                 paging = state,
                 onLoadMore = { scope.launch { pager?.loadMore() } },
+                liveVisuals = pager?.liveVisuals { controller.boundAccountIdHex },
             )
         }
     }
@@ -450,9 +451,10 @@ private fun MediaLibraryContent(
     onJumpToMessage: (String) -> Unit,
     paging: GroupAttachmentState? = null,
     onLoadMore: () -> Unit = {},
+    liveVisuals: (suspend () -> List<SharedMediaTile>)? = null,
 ) {
     var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
-    val photoShare = rememberSharedPhotoShare(tiles, controller, appState)
+    val photoShare = rememberSharedPhotoShare(tiles, controller, appState, liveVisuals)
     val viewerSelection = remember { SharedMediaViewerSelection() }
     val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
     val forwardActions = rememberMediaViewerForwardActions(controller, appState)
@@ -501,7 +503,7 @@ private fun MediaLibraryContent(
             photoShare.exit()
             filter = it
         },
-        onBack = onBack,
+        onBack = photoShare.backOr(onBack),
         loading = tiles.isLoading,
         paging = paging,
         onLoadMore = onLoadMore,
@@ -562,6 +564,7 @@ private fun MediaLibraryContent(
 }
 
 /** Empty state of a library tab. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun EmptyPlaceholder(label: String) {
     SharedContentEmptyState(label)

@@ -12,9 +12,9 @@
         ]
       },
       {
-        "surface": "BoxScope.SharedTileSelectionOverlay",
+        "surface": "BoxScope.SharedTileSelectionToggle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedPhotoSelectionUi.kt",
-        "anchor": "fun BoxScope.SharedTileSelectionOverlay(",
+        "anchor": "fun BoxScope.SharedTileSelectionToggle(",
         "test_ids": [
           "MED-063"
         ]

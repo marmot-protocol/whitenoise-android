@@ -176,6 +176,50 @@ class SharedPhotoShareTest {
             assertNoShare()
         }
 
+    /** A photo removed while it is read fails its read; the share reports it unavailable so it can be deselected. */
+    @Test
+    fun aReadFailureForARemovedPhotoReportsItUnavailable() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget()
+            var current = gallery
+            val readFailure = IOException("blob deleted")
+
+            val failure =
+                runCatching {
+                    shareSelectedPhotos(context, "account", listOf(beach, harbour), "Share", { current }) { photo ->
+                        if (photo == harbour) {
+                            current = gallery - harbour
+                            throw readFailure
+                        }
+                        AttachmentPlaintext.Bytes(bytesOf(photo))
+                    }
+                }.exceptionOrNull()
+
+            assertTrue("$failure", failure is SharedPhotosUnavailableException)
+            assertEquals(listOf(harbour), (failure as SharedPhotosUnavailableException).photos)
+            assertTrue(readFailure in failure.suppressed)
+            assertNoShare()
+        }
+
+    /** One selected photo is sent as a single stream. */
+    @Test
+    fun aSingleSelectedPhotoIsSentAlone() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget(Intent.ACTION_SEND, JPEG)
+
+            shareSelectedPhotos(context, "account", listOf(harbour), "Share", { gallery }) {
+                AttachmentPlaintext.Bytes(bytesOf(it))
+            }
+
+            val send = sentIntent()
+            assertEquals(Intent.ACTION_SEND, send.action)
+            val uri = requireNotNull(send.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
+            assertEquals("harbour.jpg", displayName(uri))
+            assertEquals(uri, send.clipData!!.getItemAt(0).uri)
+        }
+
     /** A gallery that lost its account or conversation while staging cancels silently and deletes the set. */
     @Test
     fun aGalleryThatLostOwnershipCancelsBeforeLaunch() =
@@ -286,6 +330,21 @@ class SharedPhotoShareTest {
         assertEquals(0, selection.count)
     }
 
+    /** The gallery's own Back ends selection mode first and only then leaves, as system Back does. */
+    @Test
+    fun topBarBackEndsSelectionBeforeLeaving() {
+        val share = SharedPhotoShare()
+        var left = 0
+        val back = share.backOr { left += 1 }
+
+        share.selection.toggle(beach)
+        back()
+        assertFalse(share.selection.active)
+        assertEquals(0, left)
+        back()
+        assertEquals(1, left)
+    }
+
     private fun assertNoShare() {
         assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
         assertTrue(sharedFiles().isEmpty())
@@ -296,10 +355,13 @@ class SharedPhotoShareTest {
         return requireNotNull(chooser.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java))
     }
 
-    private fun registerShareTarget() {
+    private fun registerShareTarget(
+        action: String = Intent.ACTION_SEND_MULTIPLE,
+        mediaType: String = "image/*",
+    ) {
         val application = ApplicationInfo().apply { packageName = SHARE_TARGET_PACKAGE }
         shadowOf(context.packageManager).addResolveInfoForIntent(
-            Intent(Intent.ACTION_SEND_MULTIPLE).setType("image/*"),
+            Intent(action).setType(mediaType),
             ResolveInfo().apply {
                 activityInfo =
                     ActivityInfo().apply {

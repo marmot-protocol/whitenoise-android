@@ -18,14 +18,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,6 +43,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -54,100 +51,92 @@ import dev.ipf.whitenoise.android.ui.conversation.media.OutboundShareTooLargeExc
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailure
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 
-/** A gallery's photo selection and the one share it may be staging. */
-@Stable
-internal class SharedPhotoShare {
-    val selection = SharedPhotoSelection()
-
-    private var job by mutableStateOf<Job?>(null)
-
-    /** Whether a share of the selection is being staged. */
-    val sharing: Boolean get() = job != null
-
-    internal var start: () -> Unit = {}
-
-    /** Ends selection mode and cancels a share still being staged, deleting its staged files. */
-    fun exit() {
-        job?.cancel()
-        job = null
-        selection.clear()
+/** Top-bar Back ends selection mode first, as system Back does, and otherwise leaves the gallery. */
+internal fun SharedPhotoShare.backOr(leave: () -> Unit): () -> Unit =
+    {
+        if (selection.active) exit() else leave()
     }
 
-    /** Records [next] as the share being staged. */
-    internal fun begin(next: Job) {
-        job = next
+/** The pager's photos and videos from its live state, which can be newer than the last composed projection. */
+internal fun GroupAttachmentPager.liveVisuals(accountId: () -> String?): suspend () -> List<SharedMediaTile> =
+    {
+        val entries = state.entries
+        val account = accountId()
+        withContext(Dispatchers.Default) { attachmentLibraryTiles(entries, account).visuals }
     }
-
-    /** Forgets [finished] unless a newer share replaced it. */
-    internal fun end(finished: Job?) {
-        if (job === finished) job = null
-    }
-}
 
 /**
- * Owns photo selection for one gallery route; Back ends selection mode before it leaves the gallery. The share runs
- * in the route's scope, so closing the gallery or switching account, runtime or conversation cancels staging, and it
- * opens a share sheet only while the gallery that started it still owns the conversation's foreground presentation.
+ * Owns photo selection for one gallery route. The share is checked against [liveVisuals] when available, otherwise
+ * against the composed [tiles], and may open a share sheet only while this gallery's account, runtime and
+ * conversation still own the conversation's foreground presentation.
  */
 @Composable
 internal fun rememberSharedPhotoShare(
     tiles: SharedMediaTiles,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    liveVisuals: (suspend () -> List<SharedMediaTile>)?,
+): SharedPhotoShare {
+    val currentTiles by rememberUpdatedState(tiles)
+    val owner = remember { Triple(appState.activeAccountRef, controller.boundAccountRef, appState.runtimeGeneration) }
+    return rememberSharedPhotoShare(
+        ownsShare = {
+            controller.ownsRetainedForegroundPresentation &&
+                Triple(appState.activeAccountRef, controller.boundAccountRef, appState.runtimeGeneration) == owner &&
+                !appState.appLock.screenVisible &&
+                !appState.signOutInProgress &&
+                !appState.wipeInProgress
+        },
+        accountRef = { controller.conversationAccountRef },
+        currentVisuals = liveVisuals ?: { currentTiles.visuals },
+        source = { photo ->
+            attachmentSource(controller, photo.messageIdHex, photo.attachmentIndex, photo.reference, photo.mine)
+        },
+        onFailure = { selection, error -> presentSharedPhotosFailure(appState, selection, error) },
+    )
+}
+
+/**
+ * The share runs in this composition's scope, so closing the gallery or switching account, runtime or conversation
+ * cancels staging and deletes what was staged. Back ends selection mode before it leaves the gallery. A failure is
+ * reported only while [ownsShare] holds.
+ */
+@Suppress("LongParameterList")
+@Composable
+internal fun rememberSharedPhotoShare(
+    ownsShare: () -> Boolean,
+    accountRef: () -> String?,
+    currentVisuals: suspend () -> List<SharedMediaTile>,
+    source: suspend (SharedMediaTile) -> AttachmentPlaintext,
+    onFailure: (SharedPhotoSelection, Throwable) -> Unit,
 ): SharedPhotoShare {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val chooserTitle = stringResource(R.string.shared_media_share)
-    val currentTiles by rememberUpdatedState(tiles)
     val state = remember { SharedPhotoShare() }
-    val owner = remember { Triple(appState.activeAccountRef, controller.boundAccountRef, appState.runtimeGeneration) }
     BackHandler(enabled = state.selection.active, onBack = state::exit)
-
-    /** Whether this gallery's account, runtime and conversation still own the share and nothing hides the app. */
-    fun ownsShare(): Boolean =
-        controller.ownsRetainedForegroundPresentation &&
-            Triple(appState.activeAccountRef, controller.boundAccountRef, appState.runtimeGeneration) == owner &&
-            !appState.appLock.screenVisible &&
-            !appState.signOutInProgress &&
-            !appState.wipeInProgress
-
-    /** The gallery's tiles once a refresh settles, or null when it no longer owns the share. */
-    suspend fun settledVisuals(): List<SharedMediaTile>? {
-        val settled =
-            withTimeoutOrNull(SHARE_SETTLE_TIMEOUT_MS) { snapshotFlow { currentTiles }.first { !it.isLoading } }
-        if (!ownsShare()) return null
-        return checkNotNull(settled) { "Shared media is still loading" }.visuals
-    }
-
     state.start = start@{
-        if (state.sharing || !state.selection.active || currentTiles.isLoading || !ownsShare()) return@start
+        if (state.sharing || !state.selection.active || !ownsShare()) return@start
         val photos = state.selection.photos
-        val accountRef = controller.conversationAccountRef ?: return@start
+        val account = accountRef() ?: return@start
         // Recorded before it starts, so the share is visible as staging before it can finish or fail.
         val job =
             scope.launch(start = CoroutineStart.LAZY) {
                 val self = currentCoroutineContext()[Job]
                 try {
                     runCatchingCancellable {
-                        shareSelectedPhotos(context, accountRef, photos, chooserTitle, { settledVisuals() }) { photo ->
-                            attachmentSource(
-                                controller,
-                                photo.messageIdHex,
-                                photo.attachmentIndex,
-                                photo.reference,
-                                photo.mine,
-                            )
-                        }
+                        val current = suspend { if (ownsShare()) currentVisuals() else null }
+                        shareSelectedPhotos(context, account, photos, chooserTitle, current, source)
                     }.onSuccess {
                         state.selection.clear()
                     }.onFailure { error ->
-                        if (ownsShare()) presentSharedPhotosFailure(appState, state.selection, error)
+                        if (ownsShare()) onFailure(state.selection, error)
                     }
                 } finally {
                     state.end(self)
@@ -261,7 +250,7 @@ internal fun Modifier.selectPhotoAction(
  */
 @Suppress("FunctionNaming")
 @Composable
-internal fun BoxScope.SharedTileSelectionOverlay(
+internal fun BoxScope.SharedTileSelectionToggle(
     tile: SharedMediaTile,
     selected: Boolean,
     enabled: Boolean,
@@ -344,6 +333,3 @@ private val SELECTED_OUTLINE_WIDTH = 3.dp
 private const val UNSELECTED_MARK_ALPHA = 0.3f
 
 private const val UNSELECTABLE_SCRIM_ALPHA = 0.7f
-
-/** How long a share waits for a gallery refresh to settle before rechecking its selection. */
-private const val SHARE_SETTLE_TIMEOUT_MS = 5_000L

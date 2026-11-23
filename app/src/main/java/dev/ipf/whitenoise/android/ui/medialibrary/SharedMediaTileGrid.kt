@@ -36,7 +36,7 @@ import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
 /** Month-sectioned grid of visual tiles. */
-@Suppress("LongMethod", "LongParameterList")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 internal fun MediaTileGrid(
     sections: List<MediaMonthSection<SharedMediaTile>>,
@@ -116,7 +116,7 @@ internal fun MediaTileGrid(
                         SharedMediaTileCaption(tile, appState)
                     }
                     if (selecting) {
-                        SharedTileSelectionOverlay(
+                        SharedTileSelectionToggle(
                             tile = tile,
                             selected = selected,
                             enabled = !share.sharing,
