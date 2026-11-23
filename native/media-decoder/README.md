@@ -126,8 +126,11 @@ decoder handling of skip-sample metadata remains enabled.
 Source dimensions retain the 32768-edge and 200-million-pixel admission bounds.
 A requested video decoder additionally caps its surface at 16777216 pixels
 before allocation. Oversized decode surfaces produce a resource refusal instead
-of a smaller hidden decode. Decoder threads are fixed at one and dav1d frame
-delay at one. The 64 MiB per-allocation ceiling applies to FFmpeg's allocation API.
+of a smaller hidden decode. Video decoders use frame and slice threads, one per
+online core up to four; audio decoders stay single-threaded and dav1d frame
+delay stays at one. The threads live in the same worker under its seccomp
+filter, and each holds its own decode context, so peak worker memory grows with
+the thread count. The 64 MiB per-allocation ceiling applies to FFmpeg's allocation API.
 This is not a process-wide or aggregate native-memory limit: dav1d internal
 allocations and runtime overhead are separate, and reference frames can
 consume more in aggregate.
@@ -165,7 +168,7 @@ size when the requested edge allows them. Larger textures reduce proportionally;
 metadata retains the original display geometry. Rotation remains a separate
 scalar throughout.
 
-Fresh dynamic libswscale contexts use its stable backend, one thread and explicit
+Fresh dynamic libswscale contexts use its stable backend, the same bounded thread count and explicit
 perceptual intent. When dimensions change, the first context resizes in the
 source pixel encoding with its color properties and HDR side data retained.
 Only then does the second context map that bounded image into full-range RGBA

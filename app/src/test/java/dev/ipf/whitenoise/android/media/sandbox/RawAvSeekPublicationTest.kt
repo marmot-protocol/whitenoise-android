@@ -189,6 +189,10 @@ class RecordingCanvasSurface {
         return Canvas(bitmap)
     }
 
+    /** Production draws on the hardware canvas; this fixture supplies the same tiny real canvas. */
+    @Implementation
+    fun lockHardwareCanvas(): Canvas = lockCanvas(null)
+
     /** Counts actual sink posts, including explicit clears separately reset by the fixture. */
     @Implementation fun unlockCanvasAndPost(canvas: Canvas) {
         posts++

@@ -218,12 +218,19 @@ class MediaVideoGeometryTests(unittest.TestCase):
                              ("colorspace", "AVCOL_SPC_RGB"), ("color_primaries", "AVCOL_PRI_BT709"),
                              ("color_trc", "AVCOL_TRC_IEC61966_2_1")):
             self.assertIn("converted.rgba->" + field + " = " + value, video)
-        for setting in ("context->intent = SWS_INTENT_PERCEPTUAL", "context->threads = 1",
+        for setting in ("context->intent = SWS_INTENT_PERCEPTUAL", "context->threads = workerThreads()",
                         "context->backends = SWS_BACKEND_STABLE"):
             self.assertIn(setting, SOURCE)
         self.assertNotIn("SWS_UNSTABLE", SOURCE)
         self.assertIn("converted.rgba->linesize[0]", video)
         self.assertIn("size_t(width) * 4", video)
+
+    def test_video_decode_and_conversion_threads_are_bounded_and_audio_stays_single_threaded(self):
+        """Video decode and conversion use at most four threads; audio decode stays single-threaded."""
+        self.assertIn("constexpr long kMaxWorkerThreads = 4;", SOURCE)
+        self.assertIn("std::clamp<long>(online, 1, kMaxWorkerThreads)", SOURCE)
+        self.assertIn("thread_count = isVideo ? workerThreads() : 1;", SOURCE)
+        self.assertIn("thread_type = isVideo ? FF_THREAD_FRAME | FF_THREAD_SLICE : 0;", SOURCE)
 
     def test_dolby_vision_base_layer_policy_rejects_profile_five_and_unknown_matrices(self):
         """Dolby vision base layer policy rejects profile five and unknown matrices."""

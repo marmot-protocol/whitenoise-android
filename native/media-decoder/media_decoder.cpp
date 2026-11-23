@@ -135,6 +135,7 @@ constexpr int64_t kMaxConversionPixels = 8388608;
 constexpr int kConversionAlignment = 64;
 constexpr int64_t kConversionPadding = 1024;
 constexpr int kMaxSamples = 65536;
+constexpr long kMaxWorkerThreads = 4;
 constexpr size_t kMaxAllocation = 64U * 1024 * 1024;
 constexpr int kIoBytes = 32768;
 constexpr int kMaxReadSteps = 8192;
@@ -395,6 +396,12 @@ bool allowedAudio(AVCodecID id) {
     }
 }
 
+/** Bounded worker thread count for video decode and pixel conversion: online cores, at most four. */
+int workerThreads() {
+    const long online = sysconf(_SC_NPROCESSORS_ONLN);
+    return int(std::clamp<long>(online, 1, kMaxWorkerThreads));
+}
+
 /** Select a supported stream of the requested media type without opening an unapproved decoder. */
 void selectTrack(Session& s, Track& track, AVMediaType type) {
     int best = av_find_best_stream(s.format, type, -1, -1, nullptr, 0);
@@ -425,8 +432,11 @@ void openTrack(Session& s, Track& track, AVMediaType type) {
     track.codec = avcodec_alloc_context3(decoder);
     check(track.codec, "decoder_allocation_refused");
     check(avcodec_parameters_to_context(track.codec, parameters) >= 0, "invalid_codec_parameters");
-    track.codec->thread_count = 1;
-    track.codec->thread_type = 0;
+    // Software video decode is the playback bottleneck: frame and slice threads keep 1080p/4K inside the frame
+    // interval. Threads share this process and its seccomp filter; audio decoding stays single-threaded.
+    const bool isVideo = type == AVMEDIA_TYPE_VIDEO;
+    track.codec->thread_count = isVideo ? workerThreads() : 1;
+    track.codec->thread_type = isVideo ? FF_THREAD_FRAME | FF_THREAD_SLICE : 0;
     track.codec->max_pixels = kMaxPixels;
     track.codec->max_samples = kMaxSamples * 8LL;
     AVDictionary* options = nullptr;
@@ -558,7 +568,7 @@ SwsContext* dynamicScaler(SwsContext*& context) {
     if (!context) {
         context = sws_alloc_context();
         check(context, "pixel_context_allocation_refused");
-        context->threads = 1;
+        context->threads = workerThreads();
         context->scaler = SWS_SCALE_BILINEAR;
         context->intent = SWS_INTENT_PERCEPTUAL;
         context->backends = SWS_BACKEND_STABLE;

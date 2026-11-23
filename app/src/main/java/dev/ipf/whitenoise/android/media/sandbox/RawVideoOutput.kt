@@ -23,6 +23,9 @@ internal class RawVideoOutput(
     private var ownedSurface = false
     private var textureIdentity: SurfaceTexture? = null
     private var holder: SurfaceHolder? = null
+
+    // The surface whose hardware canvas failed; only that surface falls back to CPU drawing.
+    private var softwareSurface: Surface? = null
     private var texture: TextureView? = null
     private val holderCallback =
         object : SurfaceHolder.Callback {
@@ -132,7 +135,7 @@ internal class RawVideoOutput(
             val target = surface?.takeIf { it.isValid } ?: return false
             try {
                 val start = if (observation == null) 0L else android.os.SystemClock.elapsedRealtimeNanos()
-                val canvas = target.lockCanvas(null)
+                val canvas = lockFrameCanvas(target)
                 val acquired = if (observation == null) 0L else android.os.SystemClock.elapsedRealtimeNanos()
                 var drawn = 0L
                 try {
@@ -153,6 +156,23 @@ internal class RawVideoOutput(
         }
 
     /**
+     * Draws on the GPU: a CPU canvas scales every frame into the full display surface in software, which costs
+     * more than the frame interval at phone resolutions. A surface without hardware drawing keeps the CPU path.
+     */
+    private fun lockFrameCanvas(target: Surface): Canvas {
+        if (softwareSurface !== target) {
+            try {
+                return target.lockHardwareCanvas()
+            } catch (_: IllegalStateException) {
+                softwareSurface = target
+            } catch (_: IllegalArgumentException) {
+                softwareSurface = target
+            }
+        }
+        return target.lockCanvas(null)
+    }
+
+    /**
      * Detaches only if [expected] is null or is the exact current target, rejecting stale clears.
      */
     fun clear(expected: Any?) {
@@ -170,6 +190,7 @@ internal class RawVideoOutput(
         surface = null
         ownedSurface = false
         textureIdentity = null
+        softwareSurface = null
     }
 
     /**
@@ -178,7 +199,7 @@ internal class RawVideoOutput(
     private fun clearFrame() {
         val target = surface?.takeIf { it.isValid } ?: return
         try {
-            val canvas = target.lockCanvas(null)
+            val canvas = lockFrameCanvas(target)
             try {
                 canvas.drawColor(Color.BLACK)
             } finally {

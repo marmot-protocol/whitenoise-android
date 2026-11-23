@@ -769,7 +769,7 @@ internal class IsolatedAvStream private constructor(
             uri: android.net.Uri,
             wantVideo: Boolean = true,
             wantAudio: Boolean = true,
-            edge: Int = AvStreamProtocol.MAX_EDGE,
+            edge: Int = playbackEdge(context),
             lane: AvStreamLane = AvStreamLane.Playback,
         ): IsolatedAvStream {
             require(uri.scheme == "file" || uri.scheme == "content")
