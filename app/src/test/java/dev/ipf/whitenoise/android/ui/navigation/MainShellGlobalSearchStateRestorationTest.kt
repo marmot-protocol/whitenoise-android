@@ -22,12 +22,15 @@ import dev.ipf.whitenoise.android.ui.chats.ChatListSearchTopResetEffect
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchAccountScope
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchChatFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchGridResetEffect
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecent
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecentsOwner
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSelectedResult
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSenderFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.viewportFilters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -80,6 +83,76 @@ class MainShellGlobalSearchStateRestorationTest {
             assertFalse(requireNotNull(holder).beginConversationSearch("old", requireNotNull(home), null))
         }
         composeRule.runOnIdle { assertEquals(null, requireNotNull(holder).conversationReturn) }
+    }
+
+    /**
+     * Recent search destinations (#4004) live in memory beside the shell search: Back keeps them and the
+     * active search, a new account starts empty, an old account's holder cannot add to it, and a restart forgets them.
+     */
+    @Test
+    fun recentDestinationsStayWithTheAccountSessionOnly() {
+        val account = mutableStateOf("personal")
+        var holder: MainShellGlobalSearchStateHolder? = null
+        val restoration = StateRestorationTester(composeRule)
+        restoration.setContent {
+            val owner = rememberMainShellGlobalSearchState(account.value, 1)
+            SideEffect { holder = owner }
+        }
+        val chat = GlobalSearchRecent.Chat("group")
+        val profile = GlobalSearchRecent.Profile("npub1alice")
+        composeRule.runOnIdle {
+            val owner = requireNotNull(holder)
+            owner.update { it.copy(isOpen = true, query = "alice") }
+            assertTrue(owner.recents.record(owner.scopedState.accountScopeToken, chat))
+        }
+        composeRule.runOnIdle {
+            val owner = requireNotNull(holder)
+            assertTrue(owner.beginConversationSearch("group", owner.scopedState.copy(query = "inside"), null))
+        }
+        composeRule.runOnIdle {
+            val owner = requireNotNull(holder)
+            assertEquals("alice", owner.finishConversationSearch()?.previousSearch?.query)
+        }
+        composeRule.runOnIdle {
+            val owner = requireNotNull(holder)
+            assertEquals("Back restores the active search", "alice", owner.scopedState.query)
+            assertEquals(listOf(chat), owner.recents.entries)
+        }
+        val personal = requireNotNull(holder)
+        val personalToken = personal.scopedState.accountScopeToken
+        composeRule.runOnIdle { account.value = "work" }
+        composeRule.runOnIdle {
+            val work = requireNotNull(holder)
+            assertTrue("a new account starts empty", work.recents.entries.isEmpty())
+            // A profile lookup that finishes for the old account writes only to that account's holder.
+            personal.recents.record(personalToken, profile)
+            assertFalse(work.recents.record(personalToken, profile))
+            assertTrue(work.recents.entries.isEmpty())
+            assertTrue(work.recents.record(work.scopedState.accountScopeToken, profile))
+        }
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.runOnIdle {
+            assertTrue("process restart forgets the list", requireNotNull(holder).recents.entries.isEmpty())
+        }
+    }
+
+    /** The shell's retained owner keeps recents across Activity recreation in the same process. */
+    @Test
+    fun recentDestinationsSurviveActivityRecreationThroughTheRetainedOwner() {
+        val owner = GlobalSearchRecentsOwner()
+        var holder: MainShellGlobalSearchStateHolder? = null
+        val restoration = StateRestorationTester(composeRule)
+        restoration.setContent {
+            val state = rememberMainShellGlobalSearchState("personal", 1, owner)
+            SideEffect { holder = state }
+        }
+        val chat = GlobalSearchRecent.Chat("group")
+        composeRule.runOnIdle {
+            val state = requireNotNull(holder)
+            state.recents.record(state.scopedState.accountScopeToken, chat)
+        }
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.runOnIdle { assertEquals(listOf(chat), requireNotNull(holder).recents.entries) }
     }
 
     /** Selection persists only as identifiers; rotation retains it and a new account drops it. */

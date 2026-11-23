@@ -58,12 +58,9 @@ import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.isPeerSourced
 import dev.ipf.whitenoise.android.state.messagePreviewForRetention
-import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownTimestampText
-import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
@@ -330,29 +327,7 @@ internal fun ChatRow(
                         Modifier
                     },
             ) {
-                GroupAvatar(
-                    appState = appState,
-                    group = item.group,
-                    title = title,
-                    seed = item.selectedAvatarSeed ?: avatarAccount ?: item.group.groupIdHex,
-                    size = 52.dp,
-                    // A group without its own image shows its monogram, never a
-                    // member's photo; only direct chats borrow the peer's picture.
-                    // Only the account the projector names (the peer of an unnamed pair, an inviter)
-                    // lends its picture; MDK's selected avatar for a named group is ignored, as the
-                    // conversation header does.
-                    accountRef = accountRef,
-                    fallbackPictureUrl =
-                        avatarAccount?.let {
-                            appState.privateContactAvatarSource(it, accountRef)
-                                ?: item.selectedAvatarUrl
-                                ?: appState.avatarUrl(it)
-                        },
-                    firstFrameAvatar = item.firstFrameAvatar,
-                    durableAvatar = item.selectedAvatarAsset,
-                    durableAvatarIsPersonPicture = item.selectedPresentation?.avatarSource?.isPeerSourced() == true,
-                    retainCompatibility = true,
-                )
+                ChatListItemAvatar(item, appState, accountRef, title, 52.dp)
                 if (pinned) {
                     Surface(
                         modifier = Modifier.align(Alignment.BottomEnd).size(20.dp),
