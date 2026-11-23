@@ -12,7 +12,6 @@ internal fun playbackEdge(context: Context): Int {
 }
 
 /** Clamps a display's longest side to the protocol range, keeping a usable floor for odd or missing metrics. */
-internal fun playbackEdge(displayLongestPx: Int): Int =
-    displayLongestPx.coerceIn(MIN_PLAYBACK_EDGE, AvStreamProtocol.MAX_EDGE)
+internal fun playbackEdge(longestPx: Int): Int = longestPx.coerceIn(MIN_PLAYBACK_EDGE, AvStreamProtocol.MAX_EDGE)
 
 private const val MIN_PLAYBACK_EDGE = 1280

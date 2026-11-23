@@ -132,7 +132,7 @@ internal class RawVideoOutput(
             val target = surface?.takeIf { it.isValid } ?: return false
             try {
                 val start = if (observation == null) 0L else android.os.SystemClock.elapsedRealtimeNanos()
-                val canvas = lockFrameCanvas(target)
+                val canvas = target.lockCanvas(null)
                 val acquired = if (observation == null) 0L else android.os.SystemClock.elapsedRealtimeNanos()
                 var drawn = 0L
                 try {
@@ -151,13 +151,6 @@ internal class RawVideoOutput(
                 false
             }
         }
-
-    /**
-     * Draws on the GPU: a CPU canvas scales every frame into the full display surface in software, which costs
-     * more than the frame interval at phone resolutions. A surface connected to HWUI posts every canvas through
-     * HWUI, so this output never mixes in a CPU canvas; a failed lock skips that frame or clear instead.
-     */
-    private fun lockFrameCanvas(target: Surface): Canvas = target.lockHardwareCanvas()
 
     /**
      * Detaches only if [expected] is null or is the exact current target, rejecting stale clears.
@@ -185,7 +178,7 @@ internal class RawVideoOutput(
     private fun clearFrame() {
         val target = surface?.takeIf { it.isValid } ?: return
         try {
-            val canvas = lockFrameCanvas(target)
+            val canvas = target.lockCanvas(null)
             try {
                 canvas.drawColor(Color.BLACK)
             } finally {
