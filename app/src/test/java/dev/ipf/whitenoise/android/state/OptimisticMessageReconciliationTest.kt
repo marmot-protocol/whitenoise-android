@@ -524,6 +524,7 @@ class OptimisticMessageReconciliationTest {
         val pending = timelineMessage("temp-id", MessageStatus.Pending, plaintext = "hi @npub1abc")
         val projected =
             AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = "confirmed",
                 direction = "sent",
                 groupIdHex = "group",
@@ -556,6 +557,7 @@ class OptimisticMessageReconciliationTest {
             id = "msg:$id",
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = id,
                     direction = "sent",
                     groupIdHex = "group",
@@ -594,6 +596,7 @@ class OptimisticMessageReconciliationTest {
             id = "msg:$id",
             record =
                 AppMessageRecordFfi(
+                    invalidated = false,
                     messageIdHex = id,
                     direction = "sent",
                     groupIdHex = "group",
@@ -626,6 +629,7 @@ class OptimisticMessageReconciliationTest {
     /** Builds a projected kind-9 media record carrying a PDF imeta tag. */
     private fun mediaProjection(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "sent",
             groupIdHex = "group",
@@ -726,6 +730,7 @@ class OptimisticMessageReconciliationTest {
         sender: String = "alice",
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = direction,
             groupIdHex = "group",

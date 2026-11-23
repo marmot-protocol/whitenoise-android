@@ -1,10 +1,13 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Data
 import androidx.work.ListenableWorker.Result
 import androidx.work.NetworkType
+import androidx.work.WorkManager
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
@@ -22,6 +25,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Executes [NotificationReplyWorker.doWork] through the WorkManager test
@@ -42,6 +47,9 @@ class NotificationReplyWorkerTest {
     @Volatile
     private var sendSummary: SendSummaryFfi = sentSummary()
 
+    @Volatile
+    private var onRecoveryRead: () -> Unit = {}
+
     private lateinit var fixture: NotificationBootstrapTestFixture
     private lateinit var workerContext: NotificationWorkerTestApplication
 
@@ -54,6 +62,10 @@ class NotificationReplyWorkerTest {
             NotificationBootstrapTestFixture(
                 context = realContext,
                 accounts = listOf(signingAccount()),
+                onTimelineMessages = { _, _ ->
+                    onRecoveryRead()
+                    null
+                },
                 onSendText = { _, _, _ ->
                     sendFailure?.let { throw it }
                     sendSummary
@@ -136,13 +148,90 @@ class NotificationReplyWorkerTest {
             assertEquals(0, fixture.sendTextCalls.get())
         }
 
+    /** An accepted reply recovered after a restart completes even when App Lock already covers the app. */
+    @Test
+    fun committedReplyCompletesWhileLockedWithoutSendingAgain() =
+        runTest {
+            fixture.bootstrap()
+            fixture.appState.setAppLockScreenVisibleForTest(true)
+            val workId = UUID.randomUUID()
+            val completionKey = NotificationReplyWorker.notificationReplyCompletionKey(workId)
+            val store = NotificationReplyCompletionStore.create(realContext)
+            val boundary = NotificationReplyRecoveryBoundary(1uL, "a".repeat(64))
+            checkNotNull(store.markStarted(completionKey, "scope", boundary))
+            assertTrue(store.markCommittedMessage(completionKey, "b".repeat(64)))
+            val worker = buildWorker(inputData = encryptedInput(workId), id = workId)
+
+            assertEquals(Result.success(), pumpingMainLooper { worker.doWork() })
+            assertTrue(store.isCompleted(completionKey))
+            assertEquals(0, fixture.sendTextCalls.get())
+            assertEquals(0, fixture.markReadCalls.get())
+
+            val read = replyAction().copy(kind = NotificationActionKind.MARK_READ)
+            val workName = NotificationMarkReadWorker.notificationMarkReadWorkName(read, dismissCard = false)
+            val queued = WorkManager.getInstance(realContext).getWorkInfosForUniqueWork(workName).get()
+            assertEquals(1, queued.size)
+        }
+
+    /** Once the read-only probe rules out acceptance, expiration clears the active receipt. */
+    @Test
+    fun expiredLockedReplyRetiresAnUncommittedAttempt() =
+        runTest {
+            fixture.bootstrap()
+            fixture.appState.setAppLockScreenVisibleForTest(true)
+            val workId = UUID.randomUUID()
+            val completionKey = NotificationReplyWorker.notificationReplyCompletionKey(workId)
+            val store = NotificationReplyCompletionStore.create(realContext)
+            val boundary = NotificationReplyRecoveryBoundary(1uL, "a".repeat(64))
+            checkNotNull(store.markStarted(completionKey, "scope", boundary))
+            expireLockWait(workId)
+            val worker = buildWorker(inputData = encryptedInput(workId), id = workId)
+
+            assertEquals(Result.failure(), pumpingMainLooper { worker.doWork() })
+            assertEquals(NotificationReplyAbandonedOutcome.Failure, store.abandonedOutcome(completionKey))
+            assertFalse(store.hasStarted(completionKey))
+            assertEquals(0, fixture.sendTextCalls.get())
+        }
+
+    /** Authentication during the recovery read admits the reply even after its lock wait has expired. */
+    @Test
+    fun unlockDuringRecoveryAdmitsAnUncommittedReply() =
+        runTest {
+            fixture.bootstrap()
+            fixture.appState.setAppLockScreenVisibleForTest(true)
+            val workId = UUID.randomUUID()
+            val completionKey = NotificationReplyWorker.notificationReplyCompletionKey(workId)
+            val store = NotificationReplyCompletionStore.create(realContext)
+            val boundary = NotificationReplyRecoveryBoundary(1uL, "a".repeat(64))
+            checkNotNull(store.markStarted(completionKey, "scope", boundary))
+            expireLockWait(workId)
+            onRecoveryRead = {
+                val unlocked = CountDownLatch(1)
+                Handler(Looper.getMainLooper()).post {
+                    fixture.appState.setAppLockScreenVisibleForTest(false)
+                    unlocked.countDown()
+                }
+                check(unlocked.await(5L, TimeUnit.SECONDS))
+            }
+            val worker = buildWorker(inputData = encryptedInput(workId), id = workId)
+
+            assertEquals(Result.success(), pumpingMainLooper { worker.doWork() })
+            assertTrue(store.isCompleted(completionKey))
+            assertEquals(1, fixture.sendTextCalls.get())
+        }
+
+    /** Legacy WorkManager input terminates immediately and explains how to retry from an unlocked session. */
     @Test
     fun legacyPlaintextRepliesFailImmediatelyBehindTheAppLock() =
         runTest {
             fixture.appState.setAppLockScreenVisibleForTest(true)
-            val worker = buildWorker(inputData = legacyPlaintextInput("hello"))
+            val workId = UUID.randomUUID()
+            val worker = buildWorker(inputData = legacyPlaintextInput("hello"), id = workId)
 
-            assertEquals(Result.failure(), worker.doWork())
+            assertEquals(Result.failure(), pumpingMainLooper { worker.doWork() })
+            val store = NotificationReplyCompletionStore.create(realContext)
+            val key = NotificationReplyWorker.notificationReplyCompletionKey(workId)
+            assertEquals(NotificationReplyAbandonedOutcome.Failure, store.abandonedOutcome(key))
             assertEquals(0, fixture.sendTextCalls.get())
         }
 
@@ -333,6 +422,15 @@ class NotificationReplyWorkerTest {
                 outcome.exceptionOrNull() is CancellationException,
             )
         }
+
+    /** Seeds WorkManager's lock-wait clock far enough in the past to reach its terminal branch. */
+    private fun expireLockWait(workId: UUID) {
+        val delay = NotificationActionRetryStore.MAXIMUM_LOCK_WAIT_MILLIS
+        val retryPrefs =
+            realContext.getSharedPreferences("whitenoise.notification_action_retries", Context.MODE_PRIVATE)
+        val expiredAt = System.currentTimeMillis() - delay - 60_000L
+        NotificationActionRetryStore(retryPrefs) { expiredAt }.shouldDeferForLock(workId.toString(), delay)
+    }
 
     private fun replyAction() = testNotificationAction(NotificationActionKind.REPLY)
 

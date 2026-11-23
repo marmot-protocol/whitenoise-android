@@ -237,15 +237,17 @@ internal object BackgroundReceiptFixtureSupport {
         val manager = WorkManager.getInstance(context)
         val nativeStates =
             stalled.map { runCatching { nativeState(marmot, receiver, group, it).name }.getOrElse { "error" } }
-        val workStates =
+        val workInfos =
             stalled.map { request ->
-                manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(request)).get().map { it.state.name }
+                manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(request)).get()
             }
+        val workStates = workInfos.map { infos -> infos.map { it.state.name } }
         ControlledAttachmentProbe.report(
             JSONObject()
                 .put("phase", "background-receipt-stall")
                 .put("native_states", nativeStates.toString())
                 .put("work_states", workStates.toString())
+                .put("scheduling", backgroundReceiptSchedulingDiagnostics(context, workInfos.flatten()))
                 .put("allowed_types", state.automaticAttachmentPolicy(receiver.label).allowedNow().toString())
                 .put("approval_applied", permissions(state).appliedRevision(receiver.label) != null)
                 .put("validated_internet", state.hasValidatedInternet()),

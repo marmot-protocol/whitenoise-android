@@ -47,7 +47,7 @@ internal class ConversationMuteControl(
     val labelRes: Int get() = if (muted) R.string.chat_row_action_unmute else R.string.mute
 
     @get:DrawableRes
-    val iconRes: Int get() = if (muted) R.drawable.ic_volume_up else R.drawable.ic_notifications_off
+    val iconRes: Int get() = if (muted) R.drawable.ic_settings_notifications else R.drawable.ic_notifications_off
 
     @get:StringRes
     val explanationRes: Int

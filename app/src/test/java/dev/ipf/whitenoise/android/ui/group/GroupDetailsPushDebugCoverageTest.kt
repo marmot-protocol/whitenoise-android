@@ -9,7 +9,7 @@ import java.io.File
 class GroupDetailsPushDebugCoverageTest {
     @Test
     fun developerModeLoadsGroupPushDiagnosticsThroughController() {
-        val screen = groupDetailsSource().readText()
+        val screen = groupDetailsSource()
         val controller = conversationControllerSource()
 
         assertTrue(
@@ -40,7 +40,7 @@ class GroupDetailsPushDebugCoverageTest {
 
     @Test
     fun pushDebugSectionRendersOnlyInsideDeveloperModeBlock() {
-        val screen = groupDetailsSource().readText()
+        val screen = groupDetailsSource()
         val developerPanelsBody = screen.functionBody("developerPanels")
         val developerGate = developerPanelsBody.indexOf("if (!appState.developerMode) return")
         val pushSection = developerPanelsBody.indexOf("PushDeliveryDebugSection(")
@@ -55,7 +55,7 @@ class GroupDetailsPushDebugCoverageTest {
 
     @Test
     fun pushDebugSectionSurfacesTokenHealthAndCopyableIdentifiers() {
-        val screen = groupDetailsSource().readText()
+        val screen = groupDetailsSource()
         val sectionBody = screen.functionBody("PushDeliveryDebugSection")
         val tokenRowsBody = screen.functionBody("PushTokenDebugRows")
 
@@ -92,10 +92,14 @@ class GroupDetailsPushDebugCoverageTest {
         )
     }
 
-    private fun groupDetailsSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
-        ).firstOrNull { it.exists() }
-            ?: error("Missing GroupDetailsScreen.kt source file")
+    private fun groupDetailsSource(): String {
+        val owner =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
+            ).firstOrNull { it.exists() }
+                ?: error("Missing GroupDetailsScreen.kt source file")
+        return listOf(owner, File(owner.parentFile, "GroupDetailsDiagnostics.kt"))
+            .joinToString("\n") { it.readText() }
+    }
 }

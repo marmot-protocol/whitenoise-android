@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -29,8 +29,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.previewConversationVibration
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.PlayArrow
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 @Suppress("FunctionNaming")
@@ -40,18 +39,18 @@ internal fun NotifyForDialog(
     onDismiss: () -> Unit,
     onSelect: (ChatNotifyMode) -> Unit,
 ) {
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.notify_for)) },
         text = {
             Column {
                 NotificationModeRow(R.string.notify_all_messages, selected = currentMode == ChatNotifyMode.ALL) {
-                    onSelect(ChatNotifyMode.ALL)
+                    close { onSelect(ChatNotifyMode.ALL) }
                 }
                 NotificationModeRow(
                     R.string.notify_only_mentions,
                     selected = currentMode == ChatNotifyMode.MENTIONS_ONLY,
-                ) { onSelect(ChatNotifyMode.MENTIONS_ONLY) }
+                ) { close { onSelect(ChatNotifyMode.MENTIONS_ONLY) } }
             }
         },
         confirmButton = {},
@@ -67,7 +66,7 @@ internal fun VibrationPatternDialog(
 ) {
     val context = LocalContext.current
     var selected by remember(currentPattern) { mutableStateOf(currentPattern) }
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.vibration_pattern)) },
         text = {
@@ -89,10 +88,13 @@ internal fun VibrationPatternDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSelect(selected) }) { Text(stringResource(R.string.save)) }
+            TextButton(onClick = {
+                val choice = selected
+                close { onSelect(choice) }
+            }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -119,7 +121,7 @@ private fun VibrationPatternRow(
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         IconButton(onClick = onPreview) {
             Icon(
-                Icons.Default.PlayArrow,
+                painterResource(R.drawable.ic_play_arrow),
                 contentDescription = stringResource(R.string.preview_vibration_pattern, label),
             )
         }

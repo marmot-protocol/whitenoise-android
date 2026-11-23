@@ -16,7 +16,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -29,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
@@ -50,10 +53,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Check
-import dev.ipf.whitenoise.android.ui.icons.filled.QrCode
-import dev.ipf.whitenoise.android.ui.icons.filled.QrCodeScanner
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.qr.QrCodeImage
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
@@ -87,7 +87,11 @@ internal fun ProfileQrSheet(
     var shareMenuExpanded by remember { mutableStateOf(false) }
     var pictureShareInProgress by remember { mutableStateOf(false) }
     var sheetActive by remember { mutableStateOf(true) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState =
+        rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = {
+            sheetActive ||
+                it == SheetValue.Hidden
+        })
     val contentScrollState = rememberScrollState()
     val shareProfileTitle = stringResource(R.string.share_profile)
     val profileCardHeadline = stringResource(R.string.profile_share_card_headline)
@@ -96,11 +100,24 @@ internal fun ProfileQrSheet(
     val accountRef = remember { appState.activeAccountRef }
     DisposableEffect(Unit) { onDispose { sheetActive = false } }
 
-    /** Revoke captured callbacks before asking the host to remove this sheet. */
-    fun dismissSheet() {
+    val terminal = rememberSheetTerminalMotion(sheetState, accountRef to runtimeGeneration)
+
+    /** Revoke captured work immediately; keep only the decorative sheet until Material hides it. */
+    fun finishSheet(action: () -> Unit) {
+        if (!sheetActive) return
         sheetActive = false
-        onDismiss()
+        terminal.close {
+            val ownerCurrent =
+                appState.activeAccountRef == accountRef && appState.runtimeGeneration == runtimeGeneration
+            val accountAvailable = !appState.signOutInProgress && !appState.wipeInProgress
+            if (ownerCurrent && accountAvailable) {
+                onDismiss()
+                action()
+            }
+        }
     }
+
+    fun dismissSheet() = finishSheet {}
 
     /** Fence asynchronous rendering from a replaced account/runtime or dismissed sheet. */
     fun ownsSheet(): Boolean =
@@ -113,6 +130,12 @@ internal fun ProfileQrSheet(
     ModalBottomSheet(
         onDismissRequest = ::dismissSheet,
         sheetState = sheetState,
+        sheetGesturesEnabled = sheetActive,
+        properties =
+            ModalBottomSheetProperties(
+                shouldDismissOnBackPress = sheetActive,
+                shouldDismissOnClickOutside = sheetActive,
+            ),
         containerColor = amoledSheetContainerColor(),
     ) {
         Column(
@@ -144,9 +167,17 @@ internal fun ProfileQrSheet(
                         copied = true
                     },
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_check), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (copied) stringResource(R.string.copied) else IdentityFormatter.short(npub, prefix = 16, suffix = 14))
+                    Text(
+                        if (copied) {
+                            stringResource(
+                                R.string.copied,
+                            )
+                        } else {
+                            IdentityFormatter.short(npub, prefix = 16, suffix = 14)
+                        },
+                    )
                 }
                 // The button abbreviates; the whole key stays readable beside the code (#3321).
                 FullPublicKey(
@@ -167,7 +198,7 @@ internal fun ProfileQrSheet(
                         if (pictureShareInProgress) {
                             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.QrCode, contentDescription = null)
+                            Icon(painterResource(R.drawable.ic_settings_qr_code_2), contentDescription = null)
                         }
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.share))
@@ -240,7 +271,7 @@ internal fun ProfileQrSheet(
                         },
                         modifier = Modifier.weight(1f),
                     ) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                        Icon(painterResource(R.drawable.ic_qr_code_scanner), contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.scan))
                     }
@@ -257,12 +288,10 @@ internal fun ProfileQrSheet(
                 val accountIdHex = appState::accountIdHexForMention
                 when (val outcome = QrScanResult.resolve(raw, QrScanUseCase.ViewProfile, accountIdHex)) {
                     is QrScanOutcome.OpenProfileNpub -> {
-                        dismissSheet()
-                        appState.presentProfile(outcome.npub)
+                        if (ownsSheet()) finishSheet { appState.presentProfile(outcome.npub) }
                     }
                     is QrScanOutcome.OpenProfileNprofile -> {
-                        dismissSheet()
-                        appState.presentNostrProfile(outcome.nprofile)
+                        if (ownsSheet()) finishSheet { appState.presentNostrProfile(outcome.nprofile) }
                     }
                     QrScanOutcome.Invalid -> scanError = notWhiteNoiseProfileQrError
                     is QrScanOutcome.FillRecipientQuery -> scanError = notWhiteNoiseProfileQrError

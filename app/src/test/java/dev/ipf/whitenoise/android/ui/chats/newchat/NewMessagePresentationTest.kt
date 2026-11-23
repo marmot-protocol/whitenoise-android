@@ -230,7 +230,7 @@ class NewMessagePresentationTest {
                     true,
                     null,
                     null,
-                    NewMessageActions({}, {}, {}, {}, { calls += "retrySearch" }, {}, {}, {}, {}, {}),
+                    NewMessageActions({}, {}, {}, {}, { calls += "retrySearch" }, {}, {}, { _, _ -> }, { _, _ -> }, {}),
                     isValidNpub = { true },
                 )
             }
@@ -272,8 +272,8 @@ class NewMessagePresentationTest {
                         { calls += "retrySearch" },
                         { calls += "retryChat" },
                         {},
-                        { calls += "person" },
-                        { calls += "profile" },
+                        { _, _ -> calls += "person" },
+                        { _, _ -> calls += "profile" },
                         {},
                         agentSettings = { calls += "agent" },
                     ),

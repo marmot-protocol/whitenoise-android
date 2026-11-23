@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPairing.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "R.string.remote_signer_error_invalid_link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPairing.kt",
+        "anchor": "R.string.remote_signer_error_invalid_link",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_error_not_bunker_link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPairing.kt",
+        "anchor": "R.string.remote_signer_error_not_bunker_link",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

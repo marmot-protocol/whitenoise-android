@@ -69,11 +69,12 @@
         ]
       },
       {
-        "surface": "ShareTargetRow",
+        "surface": "Measured emoji-set route motion",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
-        "anchor": "fun ShareTargetRow(",
+        "anchor": "rememberSettingsRouteClick",
         "test_ids": [
-          "SYS-001",
+          "FLD-001",
+          "SYS-004",
           "PRO-008"
         ]
       }

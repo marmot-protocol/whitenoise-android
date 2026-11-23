@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,9 +47,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachme
 import dev.ipf.whitenoise.android.ui.conversation.media.validatedAttachmentCacheFile
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Download
-import dev.ipf.whitenoise.android.ui.icons.filled.Pause
-import dev.ipf.whitenoise.android.ui.icons.filled.PlayArrow
+import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -102,14 +101,14 @@ private fun VoiceLibraryActionIcon(
             )
         } else if (!playable) {
             Icon(
-                imageVector = Icons.Default.Download,
+                imageVector = Icons.Default.ArrowDownward,
                 contentDescription = stringResource(R.string.media_tap_to_download),
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(24.dp),
             )
         } else {
             Icon(
-                imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                painter = painterResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play_arrow),
                 contentDescription =
                     stringResource(
                         if (playing) R.string.voice_message_pause else R.string.voice_message_play,
@@ -197,6 +196,7 @@ internal fun VoiceLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(rememberMediaLibraryRowSurface())
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)

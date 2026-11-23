@@ -29,12 +29,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -48,6 +51,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.SafeHttpsGet
 import dev.ipf.whitenoise.android.media.ByteSizeLruCache
+import dev.ipf.whitenoise.android.media.GIPHY_MAX_MEDIA_BYTES
+import dev.ipf.whitenoise.android.media.GIPHY_USER_AGENT
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -58,7 +63,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.editedLabelTarget
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,7 +74,7 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.coroutines.resume
 
-internal const val GIPHY_MAX_BODY_BYTES = 5 * 1024 * 1024
+internal const val GIPHY_MAX_BODY_BYTES = GIPHY_MAX_MEDIA_BYTES
 private const val GIPHY_MEMORY_CACHE_MAX_BYTES = 20L * 1024 * 1024
 private const val GIPHY_CONNECT_TIMEOUT_MILLIS = 10_000
 private const val GIPHY_READ_TIMEOUT_MILLIS = 15_000
@@ -97,7 +101,7 @@ internal class GiphyMessageFooter(
     val showStatus: Boolean,
     val status: MessageStatus,
     val editedLabel: String?,
-    val onEditedClick: (() -> Unit)?,
+    val onEditedClick: ((Rect?) -> Unit)?,
 )
 
 /** Thread-safe, byte-bounded cache that survives conversation-row disposal within this process. */
@@ -302,7 +306,7 @@ internal fun RemoteGiphyMediaCard(
                         when {
                             failed ->
                                 MediaCircleAction(
-                                    icon = Icons.Default.Refresh,
+                                    icon = ImageVector.vectorResource(R.drawable.ic_refresh),
                                     contentDescription = stringResource(R.string.media_tap_to_retry),
                                     onClick = onLoad,
                                 )
@@ -432,7 +436,7 @@ private suspend fun decodeOwnedGiphyPresentation(
 }
 
 /** Fetches bounded encoded bytes through the existing HTTPS, host, redirect and MIME validation. */
-private suspend fun fetchRemoteGiphyBytes(request: RemoteGiphyMedia.ImageRequest): ByteArray? =
+internal suspend fun fetchRemoteGiphyBytes(request: RemoteGiphyMedia.ImageRequest): ByteArray? =
     withContext(Dispatchers.IO) {
         suspendCancellableCoroutine { continuation ->
             val result =
@@ -441,6 +445,7 @@ private suspend fun fetchRemoteGiphyBytes(request: RemoteGiphyMedia.ImageRequest
                     maxBodyBytes = GIPHY_MAX_BODY_BYTES,
                     connectTimeoutMillis = GIPHY_CONNECT_TIMEOUT_MILLIS,
                     readTimeoutMillis = GIPHY_READ_TIMEOUT_MILLIS,
+                    requestHeaders = mapOf("User-Agent" to GIPHY_USER_AGENT),
                     hostAllowed = { RemoteGiphyMedia.isAllowedMediaUrl(it.toString()) },
                     contentTypeAllowed = { value ->
                         val mime = value?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)

@@ -639,7 +639,7 @@ internal class DiskByteCache(
 
     /** Wipes every cache surface and invalidates reads, writes, sweeps, and filename memoization. */
     @Synchronized
-    fun clear() {
+    fun clear(onFailure: (Throwable) -> Unit = {}) {
         // Bump first so any put scheduled against the prior generation is
         // rejected even if it grabs this lock right after the wipe. See #154.
         cacheLifetime.advance()
@@ -650,17 +650,8 @@ internal class DiskByteCache(
             fileNameMemoLifetime.advance()
             fileNameMemo.clear()
         }
-        // Hold the lock for the whole wipe. Deleting outside it (an earlier
-        // #99 attempt) let a concurrent put() recreate a `.enc` that the orphan
-        // sweep then removed — a race. clear() runs on sign-out/account-switch,
-        // so briefly blocking get()/put() is fine, and it keeps the privacy
-        // guarantee that ALL of this account's media (including orphan `.enc`s)
-        // is wiped. The #99 win — get() not holding the lock across decryption —
-        // is unaffected, since that's in get(), not here.
-        index.values.forEach { entry ->
-            runCatching { entry.file.delete() }
-            runCatching { legacyTagFileFor(entry.file, SUFFIX).delete() }
-        }
+        // Keep deletion under the lock so a concurrent put cannot recreate an entry during the orphan sweep.
+        val files = index.values.flatMap { listOf(it.file, legacyTagFileFor(it.file, SUFFIX)) }.toMutableSet()
         index.clear()
         unresolvedEnvelopes.clear()
         residentBytes = 0L
@@ -668,18 +659,21 @@ internal class DiskByteCache(
         // Sweep directly instead of calling ensureHydrated(): sign-out can run
         // before the cache has ever been touched, and building the full index
         // just to delete it causes avoidable main-thread directory work.
-        cacheDir
-            .listFiles()
-            ?.asSequence()
-            ?.filter {
-                it.isFile &&
-                    (
-                        it.name.endsWith(SUFFIX) ||
-                            it.name.endsWith(LEGACY_SUFFIX) ||
-                            it.name.endsWith(TMP_SUFFIX) ||
-                            it.name.endsWith(TAG_SUFFIX)
-                    )
-            }?.forEach { runCatching { it.delete() } }
+        val listed =
+            runCatching {
+                if (cacheDir.exists()) {
+                    cacheDir.listFiles() ?: throw IOException("could not list disk cache")
+                } else {
+                    emptyArray()
+                }
+            }.onFailure(onFailure).getOrDefault(emptyArray())
+        val suffixes = listOf(SUFFIX, LEGACY_SUFFIX, TMP_SUFFIX, TAG_SUFFIX)
+        files += listed.filter { file -> file.isFile && suffixes.any { file.name.endsWith(it) } }
+        files.forEach { file ->
+            runCatching {
+                check(file.delete() || !file.exists()) { "could not delete disk cache file" }
+            }.onFailure(onFailure)
+        }
         onMutation()
     }
 

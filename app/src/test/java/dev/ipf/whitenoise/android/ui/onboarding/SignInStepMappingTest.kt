@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.onboarding
 
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.IdentityImportOutcome
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -35,6 +36,17 @@ class SignInStepMappingTest {
             messages,
         )
         assertEquals("account-setup states must not share a message", 4, messages.toSet().size)
+    }
+
+    /** A correct key for a profile this device was unlinked from says so, on sign-in and on recovery alike. */
+    @Test
+    fun anUnlinkedProfileIsNotReportedAsAWrongKey() {
+        val unlinked = IdentityImportOutcome.Unlinked("work")
+        assertEquals(SignInStep.AskRemovalConsent("work"), signInStepFor(unlinked, "entered-key"))
+        assertEquals(
+            SignInStep.InlineError(R.string.error_account_unlinked),
+            recoveryStepFor(unlinked),
+        )
     }
 
     @Test
@@ -142,6 +154,32 @@ class SignInStepMappingTest {
             recoveryStepFor(IdentityImportOutcome.SetupKeyPackageRecoveryAvailable),
         )
     }
+
+    /** A failed removal never starts sign-in; completing it retries the original key exactly once. */
+    @Test
+    fun removingTheConfirmedProfileControlsTheRetry() =
+        runTest {
+            val calls = mutableListOf<String>()
+            val retry: suspend (String) -> IdentityImportOutcome = {
+                assertEquals(nsec, it)
+                calls += "import"
+                IdentityImportOutcome.SetupStarted
+            }
+            val refused =
+                signInAfterRemovalConsent("old", nsec, {
+                    calls += it
+                    false
+                }, retry)
+            assertEquals(SignInStep.InlineError(R.string.unlinked_account_remove_failed), refused)
+            assertEquals(listOf("old"), calls)
+            val accepted =
+                signInAfterRemovalConsent("old", nsec, {
+                    calls += it
+                    true
+                }, retry)
+            assertEquals(SignInStep.SetupStarted, accepted)
+            assertEquals(listOf("old", "old", "import"), calls)
+        }
 
     private fun inlineErrorRes(outcome: IdentityImportOutcome): Int {
         val step = signInStepFor(outcome, nsec)

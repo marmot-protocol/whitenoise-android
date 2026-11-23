@@ -36,6 +36,37 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class BatchMessageDeleteDialogBehaviorTest {
+    @Test
+    fun busyWrapperRejectsDismissalThenAcceptsItWhenIdle() {
+        val busy = mutableStateOf(true)
+        var dismissed = 0
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                BatchMessageDeleteDialog(
+                    selectedCount = 2,
+                    breakdown = BatchDeleteBreakdown(deleteForEveryone = 0, hideLocally = 2),
+                    deleteInFlight = busy.value,
+                    onDeleteForEveryone = {},
+                    onDeleteForMe = {},
+                    onDismissRequest = { dismissed++ },
+                )
+            }
+        }
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.onNodeWithText(string(R.string.cancel)).performClick()
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.runOnIdle {
+            assertEquals(0, dismissed)
+            busy.value = false
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithText(string(R.string.delete_for_me)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.cancel)).performClick()
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.runOnIdle { assertEquals(1, dismissed) }
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 

@@ -31,11 +31,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.EngineTrust
-import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceOption
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceUnavailableReason
-import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
 import dev.ipf.whitenoise.android.audio.tts.shouldReportNoTtsEngine
 import dev.ipf.whitenoise.android.state.TtsMediaMixVolume
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
@@ -50,6 +48,7 @@ import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.group.TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import java.util.Locale
 
 /** Which speech picker is open. */
@@ -77,7 +76,6 @@ internal fun TextToSpeechScreen(
     var refreshToken by remember { mutableIntStateOf(0) }
     var picker by rememberSaveable { mutableStateOf<SpeechSetting?>(null) }
     var customRateOpen by rememberSaveable { mutableStateOf(false) }
-    var pendingEnginePackage by remember { mutableStateOf<String?>(null) }
     var settingsFailed by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
@@ -104,7 +102,11 @@ internal fun TextToSpeechScreen(
     SettingsScaffold(title = stringResource(R.string.settings_read_aloud), onBack = onBack) {
         SettingsList {
             item(key = "search.TextToSpeech.1") {
-                SettingsGroup(modifier = Modifier.testTag("speech.engine.group")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("speech.engine.group"),
+                    destination = SettingsDetail.TextToSpeech,
+                    surface = "speech-engine",
+                ) {
                     if (showEngineChooser && engineChoice.engines.isNotEmpty()) {
                         row("engine") { rowContext ->
                             SettingsLink(
@@ -140,7 +142,7 @@ internal fun TextToSpeechScreen(
                                     },
                                 enabled = resolvedPackage != null,
                                 explanation = stringResource(R.string.explanation_appearance_tts_voice),
-                                leading = { SettingsLeadingIcon(R.drawable.ic_record_voice_over) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_text_to_speech) },
                             )
                         }
                     }
@@ -178,7 +180,7 @@ internal fun TextToSpeechScreen(
                             modifier = Modifier.testTag(TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG),
                             subtitle = stringResource(R.string.tts_auto_read_default_global_subtitle),
                             explanation = stringResource(R.string.explanation_appearance_tts_auto_read),
-                            leading = { SettingsLeadingIcon(R.drawable.ic_text_to_speech) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_record_voice_over) },
                         )
                     }
                     row("media_mix") { context ->
@@ -256,17 +258,7 @@ internal fun TextToSpeechScreen(
                             )
                         SpeechChoice(engine.label, engine.packageName == resolvedPackage, trust) {
                             picker = null
-                            val warn =
-                                requiresTtsTrustWarning(
-                                    engine.packageName,
-                                    appState.runtimeTrustForTtsSelectionWarning(engine.packageName),
-                                    appState.ttsWarningPreferences,
-                                )
-                            if (warn) {
-                                pendingEnginePackage = engine.packageName
-                            } else {
-                                appState.selectTtsEngine(engine.packageName)
-                            }
+                            appState.selectTtsEngine(engine.packageName)
                         }
                     },
                 onDismiss = { picker = null },
@@ -344,16 +336,6 @@ internal fun TextToSpeechScreen(
             },
         )
     }
-    pendingEnginePackage?.let { enginePackage ->
-        TtsTrustWarningDialog(
-            onProceed = {
-                appState.acknowledgeTtsTrustWarning(enginePackage)
-                pendingEnginePackage = null
-                appState.selectTtsEngine(enginePackage)
-            },
-            onDismiss = { pendingEnginePackage = null },
-        )
-    }
 }
 
 /** One voice with its language and why it can or cannot be used. */
@@ -416,11 +398,11 @@ private fun SpeechCustomRateDialog(
             TextButton(
                 onClick = {
                     attempted = true
-                    parsed?.let(onRateSelected)
+                    parsed?.let { rate -> close { onRateSelected(rate) } }
                 },
             ) { Text(stringResource(R.string.tts_rate_apply)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 

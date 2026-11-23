@@ -73,6 +73,20 @@ class RestoredForwardRequestDispositionTest {
         )
     }
 
+    /** The surviving profile's first unrelated conversation also retires a forward from a removed profile. */
+    @Test
+    fun removedOwnerIsDiscardedEvenInAForeignConversation() {
+        assertEquals(
+            RestoredForwardDisposition.Discard,
+            disposition(
+                request(),
+                boundGroupIdHex = "ff".repeat(32),
+                boundAccountRef = "account-b",
+                signedIn = setOf("account-b"),
+            ),
+        )
+    }
+
     /** A signed-out chosen destination discards the request rather than re-owning it. */
     @Test
     fun signedOutDestinationIsDiscardedNotSubstituted() {

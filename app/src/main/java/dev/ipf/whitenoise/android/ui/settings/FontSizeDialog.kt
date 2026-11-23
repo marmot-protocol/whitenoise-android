@@ -70,7 +70,7 @@ internal fun FontSizeDialog(
                 Text(stringResource(R.string.appearance_font_size_help), style = MaterialTheme.typography.bodyMedium)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },
+        confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.done)) } },
         dismissButton = {
             TextButton(
                 onClick = { onSelect(AppFontScale.Default) },
@@ -152,7 +152,7 @@ internal fun FontFamilyDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("font_family.done")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag("font_family.done")) {
                 Text(stringResource(R.string.done))
             }
         },

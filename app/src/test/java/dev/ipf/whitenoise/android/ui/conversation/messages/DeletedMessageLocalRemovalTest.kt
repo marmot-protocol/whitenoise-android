@@ -9,12 +9,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
@@ -97,7 +99,7 @@ class DeletedMessageLocalRemovalTest {
     }
 
     @Test
-    fun physicalLongPressOffersOnlyDeleteForMeAndSuccessfulRemovalHidesTheRow() {
+    fun physicalLongPressOffersLocalRemovalAndSelection() {
         val surface = render(failCommits = false)
 
         placeholder().assertIsDisplayed()
@@ -105,6 +107,7 @@ class DeletedMessageLocalRemovalTest {
 
         placeholder().performTouchInput { longClick() }
 
+        composeRule.openPlaceholderDeleteConfirmation(::string)
         assertDeleteConfirmationWithoutMenu()
         composeRule.onNodeWithText(string(R.string.delete_for_everyone)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.delete_for_me)).performClick()
@@ -128,14 +131,46 @@ class DeletedMessageLocalRemovalTest {
     }
 
     @Test
-    fun accessibilityLongClickOpensTheSameDeleteOnlySurface() {
+    fun accessibilityLongClickOpensThePlaceholderMenu() {
         render(failCommits = false)
 
         composeRule
             .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick))
             .performSemanticsAction(SemanticsActions.OnLongClick)
 
+        composeRule.openPlaceholderDeleteConfirmation(::string)
         assertDeleteConfirmationWithoutMenu()
+    }
+
+    @Test
+    fun placeholderSelectMenuEntersSelectionAndTapClearsIt() {
+        render(failCommits = false)
+        placeholder().performTouchInput { longClick() }
+        composeRule.onNodeWithText(string(R.string.select), substring = false).performClick()
+        composeRule.onNode(isSelected()).assertIsDisplayed().performClick()
+        composeRule.onNode(isSelected()).assertDoesNotExist()
+        placeholder().assertIsDisplayed()
+    }
+
+    @Test
+    fun holdAndDragStartsSelectionOnPlaceholder() {
+        var starts = 0
+        render(failCommits = false, onDragStart = { starts++ })
+        placeholder().performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset(0f, viewConfiguration.touchSlop + 32f))
+            up()
+        }
+        composeRule.runOnIdle { assertEquals(1, starts) }
+    }
+
+    @Test
+    fun readOnlyPlaceholderOffersNeitherSelectionNorRemoval() {
+        render(failCommits = false, readOnly = true)
+        placeholder().performTouchInput { longClick() }
+        composeRule.onNodeWithText(string(R.string.select), substring = false).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.delete_for_me), substring = false).assertDoesNotExist()
     }
 
     @Test
@@ -209,6 +244,7 @@ class DeletedMessageLocalRemovalTest {
         val surface = render(failCommits = false)
         placeholder().performTouchInput { longClick() }
 
+        composeRule.openPlaceholderDeleteConfirmation(::string)
         composeRule.onNodeWithText(string(R.string.cancel)).performClick()
 
         placeholder().assertIsDisplayed()
@@ -222,6 +258,7 @@ class DeletedMessageLocalRemovalTest {
         val surface = render(failCommits = true)
         placeholder().performTouchInput { longClick() }
 
+        composeRule.openPlaceholderDeleteConfirmation(::string)
         val deleteForMe = composeRule.onNodeWithText(string(R.string.delete_for_me))
         deleteForMe.performClick()
         composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
@@ -280,10 +317,6 @@ class DeletedMessageLocalRemovalTest {
             assertEquals(0, runtimeOpens.get())
         }
 
-    /**
-     * A tombstone has exactly one action, so long-press opens its confirmation
-     * directly: the actions menu — Delete row included — never appears.
-     */
     private fun assertDeleteConfirmationWithoutMenu() {
         composeRule.onNodeWithText(string(R.string.delete_message_title), substring = false).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.delete_message_local_only), substring = false).assertIsDisplayed()
@@ -351,6 +384,8 @@ class DeletedMessageLocalRemovalTest {
     private fun render(
         failCommits: Boolean,
         deletionSource: DeletionSourceFfi = DeletionSourceFfi.UNKNOWN,
+        readOnly: Boolean = false,
+        onDragStart: () -> Unit = {},
     ): TestSurface {
         val preferences = CommitControllablePreferences(backingPreferences, failCommits)
         val appState = appState(preferences)
@@ -368,6 +403,7 @@ class DeletedMessageLocalRemovalTest {
 
         composeRule.setContent {
             var actionMenuOpen by remember { mutableStateOf(false) }
+            var selected by remember { mutableStateOf(false) }
             WhiteNoiseTheme {
                 Box(Modifier.fillMaxWidth().testTag(SCREENSHOT_TAG)) {
                     controller.timeline.forEach { current ->
@@ -377,15 +413,15 @@ class DeletedMessageLocalRemovalTest {
                             controller = controller,
                             appState = appState,
                             highlighted = false,
-                            selectionMode = false,
+                            selectionMode = selected,
                             textSelectionMode = false,
                             onTextSelectionModeChange = {},
                             onTextSelectionBoundsChange = {},
-                            batchSelectable = true,
-                            selected = false,
-                            onToggleSelection = {},
+                            batchSelectable = !readOnly,
+                            selected = selected,
+                            onToggleSelection = { selected = !selected },
                             rangeDragActive = false,
-                            onDragSelectionStart = {},
+                            onDragSelectionStart = { onDragStart() },
                             onDragSelection = { false },
                             onDragSelectionEnd = {},
                             onDragSelectionCancel = {},
@@ -399,7 +435,7 @@ class DeletedMessageLocalRemovalTest {
                             showSenderName = false,
                             showSenderAvatar = false,
                             collapseLongMessages = false,
-                            readOnly = false,
+                            readOnly = readOnly,
                         )
                     }
                 }
@@ -588,7 +624,7 @@ class DeletedMessageLocalRemovalTest {
     }
 
     private fun deletedRecord(deletionSource: DeletionSourceFfi = DeletionSourceFfi.UNKNOWN) =
-        messageRecord(body = LIVE_BODY, deleted = true, deletionSource = deletionSource)
+        messageRecord(body = CODE_BODY, deleted = true, deletionSource = deletionSource)
 
     /** Builds the received test message record with the given body, deletion state and reactions. */
     private fun messageRecord(

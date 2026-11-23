@@ -6,10 +6,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
@@ -107,6 +111,37 @@ class FocusedMessageActionsGridTest {
         assertTrue("the first action sits on the right", bounds("Reply").left > bounds("Edit").left)
     }
 
+    @Test
+    fun touchMovesOnlyActionsAndClampsToFrameInRtlAtLargeText() {
+        var touchX by mutableStateOf<Float?>(null)
+        render(
+            labels = listOf("Reply"),
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+            touchX = { touchX },
+        )
+        val frame = taggedBounds(FOCUSED_OVERLAY_FRAME_TEST_TAG)
+        val preview = taggedBounds("message-actions-preview")
+        val fallbackAction = bounds("Reply")
+        val panelPositions =
+            listOf(frame.left + 1, frame.center.x, frame.right - 1).map { press ->
+                composeRule.runOnIdle { touchX = press }
+                val panel = taggedBounds(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG)
+                assertEquals(preview, taggedBounds("message-actions-preview"))
+                assertEquals(fallbackAction.top, bounds("Reply").top, 0.5f)
+                panel
+            }
+        assertEquals(frame.left + 16, panelPositions.first().left, 0.5f)
+        assertEquals(frame.center.x, panelPositions[1].center.x, 0.5f)
+        assertEquals(frame.right - 16, panelPositions.last().right, 0.5f)
+        assertTrue(panelPositions[0].left < panelPositions[1].left && panelPositions[1].left < panelPositions[2].left)
+    }
+
+    private fun taggedBounds(tag: String): Rect {
+        val node = composeRule.onNodeWithTag(tag, useUnmergedTree = true)
+        return node.fetchSemanticsNode().boundsInRoot
+    }
+
     private fun bounds(label: String): Rect = composeRule.onNodeWithText(label).fetchSemanticsNode().boundsInRoot
 
     /** The distinct row positions the given labels occupy, which is the grid's row count. */
@@ -117,6 +152,7 @@ class FocusedMessageActionsGridTest {
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         destructiveLast: Boolean = false,
+        touchX: () -> Float? = { null },
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = fontScale) {
@@ -124,6 +160,7 @@ class FocusedMessageActionsGridTest {
                     FocusedMessageActions(
                         sourceBounds = IntRect(0, 260, 360, 340),
                         touchY = 300f,
+                        touchX = touchX(),
                         mine = true,
                         actions =
                             labels.mapIndexed { index, label ->

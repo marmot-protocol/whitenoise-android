@@ -67,7 +67,7 @@ class DebugStrictModePolicyTest {
         val appState = source("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt").readText()
         val debugManifest = source("src/debug/AndroidManifest.xml").readText()
 
-        assertTrue("RuntimePolicyHooks.allowThreadDiskReads(::readPersistedThemeMode)" in activity)
+        assertTrue("RuntimePolicyHooks.allowThreadDiskReads(this::readPersistedThemeMode)" in activity)
         assertTrue("RuntimePolicyHooks.noteSlowCall(\"marmot-ffi-access\")" in appState)
         assertTrue("android:name=\".DebugWhiteNoiseApplication\"" in debugManifest)
     }

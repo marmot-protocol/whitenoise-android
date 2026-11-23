@@ -12,6 +12,7 @@ internal fun DictationDisclosureDialog(
     offlineSpeechToText: Boolean,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    ownerKey: Any? = Unit,
 ) {
     val title =
         if (offlineSpeechToText) R.string.dictation_disclosure_offline_title else R.string.dictation_disclosure_title
@@ -26,6 +27,7 @@ internal fun DictationDisclosureDialog(
         message = stringResource(message),
         confirmLabel = stringResource(R.string.dictation_continue),
         onConfirm = onConfirm,
+        ownerKey = ownerKey,
         onDismiss = onDismiss,
     )
 }

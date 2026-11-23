@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.Context
 import androidx.compose.runtime.saveable.Saver
 import dev.ipf.whitenoise.android.core.ConversationTranscriptExport
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
@@ -7,25 +8,7 @@ import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.share.ForeignContentSource
 import dev.ipf.whitenoise.android.state.ConversationController
-
-/** Saves a nullable Uri across process death (camera capture round-trip). */
-internal val NullableUriSaver: Saver<android.net.Uri?, String> =
-    Saver(
-        save = { it?.toString() ?: "" },
-        restore = { s -> s.takeIf { it.isNotEmpty() }?.let(android.net.Uri::parse) },
-    )
-
-/**
- * Saves a nullable [java.io.File] across process death by its absolute path.
- * Used so the camera capture's temp-file handle survives the round-trip and a
- * capture cancelled after process death can still delete the empty temp
- * instead of leaking it (issue #531).
- */
-internal val NullableFileSaver: Saver<java.io.File?, String> =
-    Saver(
-        save = { it?.absolutePath ?: "" },
-        restore = { s -> s.takeIf { it.isNotEmpty() }?.let { path -> java.io.File(path) } },
-    )
+import java.io.File
 
 // Persist a multi-pick selection across rotation / process death. Empty list
 // encodes "no preview shown" so the parent re-render skips the sheet on
@@ -62,11 +45,20 @@ internal fun validatedAttachmentCacheFile(file: java.io.File?): java.io.File? =
         ?.takeIf { it.isFile && it.length() > 0L }
         ?.also(AttachmentPlaintextCache::touch)
 
-/** Create a cache file for a camera capture. Returns null if it can't be made. */
-internal fun createImageCaptureFile(context: android.content.Context): java.io.File? =
+/** Create a cache file for a camera photo. Returns null if it can't be made. */
+internal fun createImageCaptureFile(context: Context): File? = createCaptureFile(context, ".jpg")
+
+/** Create a cache file for a camera video, whose `.mp4` name gives it a video type, or null if it can't be made. */
+internal fun createVideoCaptureFile(context: Context): File? = createCaptureFile(context, ".mp4")
+
+/** Create an empty file in the camera cache directory the file provider shares, or null if it can't be made. */
+private fun createCaptureFile(
+    context: android.content.Context,
+    suffix: String,
+): java.io.File? =
     try {
         val dir = java.io.File(context.cacheDir, "camera").apply { mkdirs() }
-        java.io.File.createTempFile("capture_", ".jpg", dir)
+        java.io.File.createTempFile("capture_", suffix, dir)
     } catch (_: Throwable) {
         null
     }
@@ -138,8 +130,8 @@ internal fun fileProviderUri(
  * out of a chat (an external PDF reader holding the granted URI, the
  * system share-sheet target, etc.). Yanking the file out from under
  * those readers caused the "opened PDF goes blank when I leave the chat"
- * class of bug — the [sweepStaleSharedMedia] janitor cleans those on a
- * stale-age basis at app start instead.
+ * class of bug. The [sweepStaleSharedMedia] janitor handles expiry at app
+ * startup, and Sign Out & Wipe explicitly revokes access and deletes them.
  */
 internal fun clearMediaTempFiles(context: android.content.Context) {
     runCatching { AttachmentPlaintextCache.clearUnheldFiles(java.io.File(context.cacheDir, "camera")) }

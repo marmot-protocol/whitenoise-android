@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDialog
@@ -53,6 +55,7 @@ class InviteDeclineStepDownDialogScreenshotTest {
         amoled: Boolean = false,
         largeRtl: Boolean = false,
     ) {
+        val lifetime = mutableStateOf(0)
         var confirmed = 0
         var dismissed = 0
         composeRule.setContent {
@@ -60,7 +63,9 @@ class InviteDeclineStepDownDialogScreenshotTest {
                 CompositionLocalProvider(
                     LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
-                    InviteDeclineStepDownDialog(onConfirm = { confirmed++ }, onDismiss = { dismissed++ })
+                    key(lifetime.value) {
+                        InviteDeclineStepDownDialog(onConfirm = { confirmed++ }, onDismiss = { dismissed++ })
+                    }
                 }
             }
         }
@@ -74,6 +79,7 @@ class InviteDeclineStepDownDialogScreenshotTest {
 
         composeRule.onNodeWithTag("invite.decline.stepDown.cancel").performClick()
         composeRule.runOnIdle { assertEquals(0 to 1, confirmed to dismissed) }
+        composeRule.runOnIdle { lifetime.value++ }
         composeRule.onNodeWithTag("invite.decline.stepDown.confirm").performClick()
         composeRule.runOnIdle { assertEquals(1 to 1, confirmed to dismissed) }
     }

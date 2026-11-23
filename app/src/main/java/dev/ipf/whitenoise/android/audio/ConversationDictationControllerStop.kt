@@ -28,6 +28,7 @@ internal fun ConversationDictationController.stopWithDeliveryMode(
     deliveryMode: ConversationDictationDeliveryMode?,
     automatic: Boolean = false,
 ) {
+    if (followUpTakesCompletion(deliveryMode, automatic)) return
     expireRetainedRecoveryIfDue()
     val captureGeneration = captureClosureGeneration
     val current = state
@@ -49,6 +50,7 @@ internal fun ConversationDictationController.stopWithDeliveryMode(
     // A result for the old choice must not deliver or reject the replacement choice.
     if (replacingValidation) completion.validation.reset()
     conversationDictationDiagnostic("event=completion_action action=$action source=$source accepted=true")
+    finishTiming.tap(elapsedRealtime())
     // Capture is already sealed by the silence endpoint; only the delivery choice changes.
     if (finishRequested) {
         if (replacingValidation && completion.transcript.isNotBlank()) {

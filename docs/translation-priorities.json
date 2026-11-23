@@ -1,0 +1,22 @@
+{
+  "Sign-in and recovery": [
+    "sign_in", "sign_in_*", "sign_out", "sign_out_*", "onboarding_*",
+    "key_export_*", "error_invalid_key_package", "account_history_may_be_incomplete"
+  ],
+  "Invites and chat": [
+    "chats", "new_chat", "new_message", "start_chat", "send", "sending", "retry",
+    "accept", "decline", "invited_as_account", "invited_to_chat_by", "invited_to_this_group",
+    "invite_preview_with_inviter", "invite_pending", "invite_decline_step_down_*",
+    "send_failed", "message_discard_*", "message_partial_visibility_warning",
+    "message_noncanonical_history_warning", "message_selection_row_content_description"
+  ],
+  "Privacy and destructive actions": [
+    "notification_permission_*", "audit_upload_disclosure", "diagnostics_group_disclosure",
+    "delete_chat_dialog_*", "delete_group_dialog_*", "delete_group_confirm",
+    "delete_for_me", "delete_for_everyone", "delete_message_title",
+    "delete_message_scope_choice", "delete_message_local_only",
+    "explanation_privacy_notif_previews", "explanation_privacy_screen_security",
+    "explanation_privacy_incognito_keyboard", "explanation_privacy_device_auth",
+    "explanation_privacy_default_disappearing"
+  ]
+}

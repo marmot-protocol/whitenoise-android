@@ -68,6 +68,51 @@
       "assertions": "Notifications Delivery & battery page opens its delivery choices; Back returns to Notifications, then Settings and Chats.",
       "postcondition": "none"
     },
+    "notification-profiles-create-schedule": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-049",
+        "NTF-052"
+      ],
+      "assertions": "Create a named profile next to the starter profiles, turn on its schedule, confirm the start time dialog, clear Saturday and Sunday and save; the reopened editor keeps the weekday choices. Back from an unchanged editor asks nothing. No clock, time zone or delivery proof.",
+      "postcondition": "none"
+    },
+    "notification-profiles-allowed-chats": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-050",
+        "NTF-053"
+      ],
+      "assertions": "The editor names the active account, the allowed-chats picker selects the fixture group and the saved profile reopens with 1 chat; an unsaved deselection asks before discarding, Keep Editing keeps it and Discard restores the saved chat. No delivery or account-switch proof.",
+      "postcondition": "none"
+    },
+    "notification-profiles-delete": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-049",
+        "NTF-053",
+        "NTF-054"
+      ],
+      "assertions": "Fresh data lists the Sleep, Work and Focus starter profiles. Delete on Work asks first; Cancel keeps the editor and the profile, confirming removes Work while Sleep and Focus stay.",
+      "postcondition": "none"
+    },
+    "notification-profiles-emoji-people": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-055",
+        "NTF-057"
+      ],
+      "assertions": "On the Sleep starter profile the emoji badge offers Remove emoji, which clears it; tapping the empty badge opens the emoji picker. Allowed people opens the active account's people picker; choosing Maestro Bob shows 1 person, which survives save and reopen. No delivery proof.",
+      "postcondition": "none"
+    },
+    "notification-profiles-quick-sheet": {
+      "suite": "settings",
+      "manual_ids": [
+        "NTF-051"
+      ],
+      "assertions": "Saving a profile adds the chat-list profile button, which opens the quick sheet; choosing the saved profile, For 1 hour shows the banner with an end time, the banner reopens the sheet and Turn off removes it; Until I turn it off shows the banner and the top-bar button turns it off. No relaunch, schedule-window or delivery proof.",
+      "postcondition": "none"
+    },
     "settings-read-aloud": {
       "suite": "settings",
       "manual_ids": [
@@ -207,6 +252,14 @@
         "ACC-009"
       ],
       "assertions": "Private key remains concealed when opening and leaving Profile Keys; no reveal or clipboard export.",
+      "postcondition": "none"
+    },
+    "settings-linked-devices": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-060"
+      ],
+      "assertions": "Linked devices opens from Account for an account that has linked no device and says so; Back returns to Account without starting a link.",
       "postcondition": "none"
     },
     "navigation-profile-edit-cancel": {
@@ -422,6 +475,15 @@
         "NCH-002"
       ],
       "assertions": "Group recipient picker Back restores New Message.",
+      "postcondition": "none",
+      "fixture": "creation"
+    },
+    "creation-new-chat-back-reopen": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-001"
+      ],
+      "assertions": "Native chat list opens New Message, Android Back removes the inline dialog and restores the chat list, and reopening remains usable.",
       "postcondition": "none",
       "fixture": "creation"
     },
@@ -3475,7 +3537,7 @@
         "ACC-010",
         "NAV-010"
       ],
-      "assertions": "Deliberately reveal the disposable key, background/foreground the same process and require it hidden before copying. No process recreation or pending-export completion is inferred. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "assertions": "Background with the real PIN prompt open, return to a hidden key and retry with the disposable PIN. Then background/foreground the same process after revealing and require it hidden before copying. No process recreation or pending-export completion is inferred. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
       "postcondition": "private-key-copy-owner"
     },
     "keys-private-reveal-departure-copy": {
@@ -3570,6 +3632,7 @@
     "presentation-image-editor-coordinates":{"suite":"presentation","manual_ids":["MED-006"],"assertions":"Photo coordinates numeric controls open and cancel without modifying the staged recipe.","postcondition":"presentation-checked","presentation":"image-editor-coordinates","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-image-editor-draw":{"suite":"presentation","manual_ids":["MED-006"],"assertions":"Photo draw numeric controls open and cancel without modifying the staged recipe.","postcondition":"presentation-checked","presentation":"image-editor-draw","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-image-editor-quality":{"suite":"presentation","manual_ids":["MED-006"],"assertions":"Editor output-quality picker opens and cancels without saving or exporting.","postcondition":"presentation-checked","presentation":"image-editor-quality","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-image-camera-close":{"suite":"presentation","manual_ids":["MED-001"],"assertions":"Actual in-app conversation camera opens in Photo mode with its shutter, Photo/Video switch and lens switch, and Close returns without a capture; preview, recording and capture are unproven.","postcondition":"presentation-checked","presentation":"image-camera-close","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-nostr-note":{"suite":"presentation","manual_ids":["RDR-001","RDR-002"],"assertions":"Actual resolved note reader renders full synthetic content and closes; signature/relay resolution is not simulated proof.","postcondition":"presentation-checked","presentation":"nostr-note","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-nostr-article":{"suite":"presentation","manual_ids":["RDR-001","RDR-002"],"assertions":"Actual resolved article reader renders full synthetic content and closes; signature/relay resolution is not simulated proof.","postcondition":"presentation-checked","presentation":"nostr-article","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-nostr-image":{"suite":"presentation","manual_ids":["RDR-004"],"assertions":"Public image pane explicitly requests generated pixels, opens the real fullscreen viewer and dismisses it; no network fetch.","postcondition":"presentation-checked","presentation":"nostr-image","presentation_actions":["image-load","dismiss"],"layer":"production-presentation-ui"},
@@ -3590,7 +3653,7 @@
     "presentation-setup-profile":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Profile and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-profile","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-setup-relays":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Read and write relays and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-relays","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-setup-inbox":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Inbox relays and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-inbox","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
-    "presentation-setup-device":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Your chats stay here and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-device","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-setup-device":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Chats on this device and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-device","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-setup-follows":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Production account setup controller/checklist opens Follow list and returns without acknowledging a native checkpoint.","postcondition":"presentation-checked","presentation":"setup-follows","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-setup-error":{"suite":"presentation","manual_ids":["ONB-006"],"assertions":"Synthetic client failure renders the actual account setup recovery action; no native repair is claimed.","postcondition":"presentation-checked","presentation":"setup-error","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-selection-contact-all":{"suite":"presentation","manual_ids":["MED-001"],"assertions":"Actual production contact preview, field filtering and enabled state; verify exact selected contact callback without address book or dispatch.","postcondition":"presentation-checked","presentation":"selection-contact-all","presentation_actions":["contact-selected"],"layer":"production-presentation-ui"},
@@ -3636,7 +3699,7 @@
     "presentation-group-ui-notify-mentions":{"suite":"presentation","manual_ids":["GRP-001"],"assertions":"Actual notification mode dialog verifies the selected ALL or MENTIONS_ONLY callback; no notification-channel or native preference mutation.","postcondition":"presentation-checked","presentation":"group-ui-notify-mentions","presentation_actions":["notify-selected"],"layer":"production-presentation-ui"},
     "presentation-group-ui-mute-date":{"suite":"presentation","manual_ids":["GRP-001","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual custom mute date/time stages cancel back to the parent, with a fixed clock and no applied mute.","postcondition":"presentation-checked","presentation":"group-ui-mute-date","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-group-ui-mute-time":{"suite":"presentation","manual_ids":["GRP-001","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual custom mute date/time stages cancel back to the parent, with a fixed clock and no applied mute.","postcondition":"presentation-checked","presentation":"group-ui-mute-time","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
-    "presentation-group-ui-disappearing-custom":{"suite":"presentation","manual_ids":["GRP-001","SCR-001","SCR-002","SCR-003","SCR-004","SET-028"],"assertions":"Actual custom retention number/unit picker opens through its production parent; Cancel retains the original timer.","postcondition":"presentation-checked","presentation":"group-ui-disappearing-custom","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-group-ui-disappearing-custom":{"suite":"presentation","manual_ids":["GRP-001","SCR-001","SCR-002","SCR-003","SCR-004","SET-028"],"assertions":"Actual custom retention value/unit page opens inside its production sheet; Back and dismissal retain the original timer.","postcondition":"presentation-checked","presentation":"group-ui-disappearing-custom","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-group-ui-entity-empty":{"suite":"presentation","manual_ids":["FIND-001","FIND-004","FIND-008","FLD-001","FLD-002","MSG-037","SCR-001","SCR-002","SCR-003","SCR-004","SET-009"],"assertions":"Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation.","postcondition":"presentation-checked","presentation":"group-ui-entity-empty","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-group-ui-entity-disabled":{"suite":"presentation","manual_ids":["FIND-001","FIND-004","FIND-008","FLD-001","FLD-002","MSG-037","SCR-001","SCR-002","SCR-003","SCR-004","SET-009"],"assertions":"Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation.","postcondition":"presentation-checked","presentation":"group-ui-entity-disabled","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-group-ui-entity-select":{"suite":"presentation","manual_ids":["FIND-001","FIND-004","FIND-008","FLD-001","FLD-002","MSG-037","SCR-001","SCR-002","SCR-003","SCR-004","SET-009"],"assertions":"Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation.","postcondition":"presentation-checked","presentation":"group-ui-entity-select","presentation_actions":["entity-selected"],"layer":"production-presentation-ui"},
@@ -3646,12 +3709,14 @@
     "presentation-group-ui-leave-confirm":{"suite":"presentation","manual_ids":["CHL-001","CHL-006","CHL-007","CHL-008","CHL-009","CHL-010","CHL-011","CHL-012","CHL-026","CHL-027","CHL-028","FLD-002"],"assertions":"Actual separate leave-and-delete confirmation verifies the selected dismissal/confirmation callback; no chat departure is performed.","postcondition":"presentation-checked","presentation":"group-ui-leave-confirm","presentation_actions":["confirm"],"layer":"production-presentation-ui"},
     "presentation-group-ui-successor-empty":{"suite":"presentation","manual_ids":["GRP-001","MSG-037","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual sole-admin handover picker with no successor rows, dismissed without selecting or deleting.","postcondition":"presentation-checked","presentation":"group-ui-successor-empty","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-group-ui-emoji-empty":{"suite":"presentation","manual_ids":["GRP-001"],"assertions":"Actual emoji group-image sheet blocks Apply with no selection; renderer and publication callback must remain untouched.","postcondition":"presentation-checked","presentation":"group-ui-emoji-empty","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-giphy-disclosure-dismiss":{"suite":"presentation","manual_ids":["MED-057"],"assertions":"The production GIPHY sheet shows its privacy disclosure and dispatches dismissal when opened without credentials in the presentation fixture.","postcondition":"presentation-checked","presentation":"giphy-disclosure-dismiss","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-group-ui-image-search-empty":{"suite":"presentation","manual_ids":["GRP-001","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual image search sheet presents empty/error result from a bounded search port, checks the actual query, and cancels without fetching image bytes or public network.","postcondition":"presentation-checked","presentation":"group-ui-image-search-empty","presentation_actions":["search-requested","dismiss"],"layer":"production-presentation-ui"},
     "presentation-group-ui-image-search-error":{"suite":"presentation","manual_ids":["GRP-001","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual image search sheet presents empty/error result from a bounded search port, checks the actual query, and cancels without fetching image bytes or public network.","postcondition":"presentation-checked","presentation":"group-ui-image-search-error","presentation_actions":["search-requested","dismiss"],"layer":"production-presentation-ui"},
     "presentation-feedback-chat-copyable":{"suite":"presentation","manual_ids":["NCH-001"],"assertions":"Actual relay feedback dialog shows report/information; Copy verifies the synthetic report in the platform clipboard before dismissal.","postcondition":"presentation-checked","presentation":"feedback-chat-copyable","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-feedback-chat-informational":{"suite":"presentation","manual_ids":["NCH-001"],"assertions":"Actual relay feedback dialog shows report/information; Copy verifies the synthetic report in the platform clipboard before dismissal.","postcondition":"presentation-checked","presentation":"feedback-chat-informational","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-surface-onboarding-welcome":{"suite":"presentation","manual_ids":["ONB-001","ONB-004","ONB-005","ONB-008","ONB-009","ONB-011","ONB-022","ONB-024"],"assertions":"Observe production content only; no fixture Back or dismissal is production action proof. Native route/action cases retain their separate qualification.","postcondition":"presentation-observed","presentation":"surface-onboarding-welcome","presentation_actions":[],"layer":"production-presentation-ui"},
-    "presentation-surface-onboarding-signin":{"suite":"presentation","manual_ids":["ONB-001","ONB-004","ONB-005","ONB-008","ONB-009","ONB-011","ONB-022","ONB-024"],"assertions":"Observe production content only; no fixture Back or dismissal is production action proof. Native route/action cases retain their separate qualification.","postcondition":"presentation-observed","presentation":"surface-onboarding-signin","presentation_actions":[],"layer":"production-presentation-ui"},
+    "presentation-surface-onboarding-signin":{"suite":"presentation","manual_ids":["ONB-001","ONB-004","ONB-005","ONB-008","ONB-009","ONB-011","ONB-022","ONB-024","ONB-027"],"assertions":"Observe production sign-in and remote-signer method selection. Native pairing and sign-in retain their separate qualification.","postcondition":"presentation-observed","presentation":"surface-onboarding-signin","presentation_actions":[],"layer":"production-presentation-ui"},
+    "presentation-surface-remote-signer-disconnect":{"suite":"presentation","manual_ids":["ONB-029"],"assertions":"The production disconnect dialog shows its confirmation and Cancel dispatches dismissal.","postcondition":"presentation-checked","presentation":"surface-remote-signer-disconnect","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-surface-onboarding-signup":{"suite":"presentation","manual_ids":["ONB-002","ONB-003","ONB-025","PRO-010","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Observe production content only; no fixture Back or dismissal is production action proof. Native route/action cases retain their separate qualification.","postcondition":"presentation-observed","presentation":"surface-onboarding-signup","presentation_actions":[],"layer":"production-presentation-ui"},
     "presentation-surface-addprofile-welcome":{"suite":"presentation","manual_ids":["PRO-001"],"assertions":"Actual secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account.","postcondition":"presentation-checked","presentation":"surface-addprofile-welcome","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-surface-addprofile-signin":{"suite":"presentation","manual_ids":["PRO-001"],"assertions":"Actual secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account.","postcondition":"presentation-checked","presentation":"surface-addprofile-signin","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
@@ -3820,6 +3885,7 @@
     "presentation-modal-sentences-boundary":{"suite":"modals","manual_ids":["TTS-004"],"assertions":"Actual chooser applies its 200-sentence bound to 201 supplied choices; scroll to the real last item and dispatch its exact stable identity. No speech/hardware claim.","postcondition":"presentation-checked","presentation":"modal-sentences-boundary","presentation_actions":["chooser-dispatch","select-sentence-200"],"layer":"production-presentation-ui"},
     "presentation-modal-local-delete-readonly":{"suite":"modals","manual_ids":["CHL-024","CHL-025"],"assertions":"Actual local-delete snackbar Details route, complete report, Dismiss/Back/reopen; Copy absent when its actual privacy-safe-copy flag is disabled.","postcondition":"presentation-checked","presentation":"modal-local-delete-readonly","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-modal-local-delete-copy":{"suite":"modals","manual_ids":["CHL-024","CHL-025"],"assertions":"Actual local-delete snackbar Details route, complete report, Dismiss/Back/reopen; fresh native plain-text clipboard and safe cleanup.","postcondition":"presentation-checked","presentation":"modal-local-delete-copy","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-modal-voice-discard":{"suite":"modals","manual_ids":["MED-059"],"assertions":"Production voice discard prompt, Cancel, reopen, and Discard callback. Supplied state covers the confirmation only.","postcondition":"presentation-checked","presentation":"modal-voice-discard","presentation_actions":["voice-keep","voice-discard"],"layer":"production-presentation-ui"},
     "presentation-modal-voice-unavailable":{"suite":"modals","manual_ids":["MED-008"],"assertions":"Actual unavailable-recording notice, Dismiss/Back/reopen and exact Record again handoff. Supplied state does not certify microphone or recording restoration.","postcondition":"presentation-checked","presentation":"modal-voice-unavailable","presentation_actions":["notice-dismiss","notice-dismiss","record-again"],"layer":"production-presentation-ui"},
     "presentation-modal-signin-recovery":{"suite":"modals","manual_ids":["ONB-009","ONB-024"],"assertions":"Real sign-in recovery consent, original key retention, Cancel/Back/reopen and exact Confirm callback; no native account recovery.","postcondition":"presentation-checked","presentation":"modal-signin-recovery","presentation_actions":["recovery-dismiss","recovery-dismiss","recover-consent"],"layer":"production-presentation-ui"},
     "presentation-modal-signin-busy":{"suite":"modals","manual_ids":["ONB-009"],"assertions":"Actual busy SignInContent suppresses supplied recovery consent and disables the key field; original key remains intact.","postcondition":"presentation-checked","presentation":"modal-signin-busy","presentation_actions":["done"],"layer":"production-presentation-ui"},

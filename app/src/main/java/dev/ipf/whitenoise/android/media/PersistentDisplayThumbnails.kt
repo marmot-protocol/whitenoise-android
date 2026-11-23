@@ -295,9 +295,9 @@ internal class PersistentDisplayThumbnails(
     }
 
     /** Account teardown and Clear Cache retire both persisted data and all pending producers. */
-    fun clear() =
+    fun clear(onFailure: (Throwable) -> Unit = {}) =
         invalidate {
-            disk.clear()
+            disk.clear(onFailure)
             synchronized(sourceIndex) { sourceIndex.clear() }
         }
 

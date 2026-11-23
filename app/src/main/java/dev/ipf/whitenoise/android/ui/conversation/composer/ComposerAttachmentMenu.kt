@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.navigation.DictationLauncherOrigin
 import dev.ipf.whitenoise.android.ui.navigation.LocalDictationLauncherOrigin
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /** Above-Add placement mirrors the pinned prototype, with its below-anchor fallback in short windows. */
@@ -125,7 +126,8 @@ internal data class ComposerMenuTextShortcuts(
 /** Native acquisition callbacks in the prototype command surface; no picker or permission owner is replaced. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongParameterList", "LongMethod")
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+// Nullable platform acquisition callbacks form a declarative menu catalog, not alternative control-flow owners.
 internal fun ComposerAttachmentMenu(
     anchorBounds: IntRect,
     expanded: Boolean,
@@ -138,8 +140,10 @@ internal fun ComposerAttachmentMenu(
     onContact: (() -> Unit)?,
     onPoll: (() -> Unit)? = null,
     onSticker: (() -> Unit)? = null,
+    onSearchGifs: (() -> Unit)? = null,
     textShortcuts: ComposerMenuTextShortcuts = ComposerMenuTextShortcuts(),
     onCustomize: (() -> Unit)? = null,
+    onRouteOrigin: (ComposerShortcut, Rect?) -> Unit = { _, _ -> },
 ) {
     // Holding any row closes the menu and explains it; Customize composer is the last row.
     val explain: @Composable (ComposerShortcut) -> Modifier = { shortcut ->
@@ -150,11 +154,18 @@ internal fun ComposerAttachmentMenu(
             onCamera?.let { composerAttachmentItem(ComposerShortcut.Camera, R.drawable.ic_camera, it, explain) },
             onGallery?.let { composerAttachmentItem(ComposerShortcut.Gallery, R.drawable.ic_image, it, explain) },
             onFiles?.let { composerAttachmentItem(ComposerShortcut.Files, R.drawable.ic_description, it, explain) },
+            composerGiphyItem(onSearchGifs, onDismiss),
             onLocation?.let {
-                composerAttachmentItem(ComposerShortcut.Location, R.drawable.ic_location_on, it, explain)
+                composerAttachmentItem(ComposerShortcut.Location, R.drawable.ic_location_on, it, explain) { origin ->
+                    onRouteOrigin(ComposerShortcut.Location, origin)
+                }
             },
             onUser?.let { composerAttachmentItem(ComposerShortcut.Person, R.drawable.ic_person, it, explain) },
-            onContact?.let { composerAttachmentItem(ComposerShortcut.Contact, R.drawable.ic_person, it, explain) },
+            onContact?.let {
+                composerAttachmentItem(ComposerShortcut.Contact, R.drawable.ic_person, it, explain) { origin ->
+                    onRouteOrigin(ComposerShortcut.Contact, origin)
+                }
+            },
             onPoll?.let { composerAttachmentItem(ComposerShortcut.Poll, R.drawable.ic_description, it, explain) },
             onSticker?.let { composerAttachmentItem(ComposerShortcut.Sticker, R.drawable.ic_sticker, it, explain) },
         ) + composerMenuTextItems(textShortcuts, anchorBounds, explain) +
@@ -169,6 +180,7 @@ internal fun ComposerAttachmentMenu(
             )
         }
     KeyboardSafePopup(expanded, onDismiss, position) {
+        val popupMotion = this
         BoxWithConstraints {
             val menuMaxHeight =
                 with(density) {
@@ -189,6 +201,16 @@ internal fun ComposerAttachmentMenu(
             ) {
                 Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
                     items.forEachIndexed { index, item ->
+                        val (originModifier, activate) =
+                            rememberMeasuredControlClick { origin ->
+                                if (popupMotion.acceptsInput && item.enabled) {
+                                    item.onOrigin?.invoke(origin)
+                                    popupMotion.close {
+                                        onDismiss()
+                                        item.onClick()
+                                    }
+                                }
+                            }
                         DropdownMenuItem(
                             text = { Text(item.label) },
                             leadingIcon = {
@@ -196,11 +218,8 @@ internal fun ComposerAttachmentMenu(
                             },
                             shape = MenuDefaults.itemShape(index, items.size).shape,
                             colors = MenuDefaults.selectableItemColors(),
-                            onClick = {
-                                onDismiss()
-                                item.onClick()
-                            },
-                            modifier = item.modifier,
+                            onClick = activate,
+                            modifier = item.modifier.then(originModifier),
                         )
                     }
                 }
@@ -290,7 +309,33 @@ private fun composerAttachmentItem(
     @DrawableRes icon: Int,
     onClick: () -> Unit,
     explain: @Composable (ComposerShortcut) -> Modifier,
-) = WhiteNoiseMenuItem(stringResource(shortcut.labelRes), onClick, icon, modifier = explain(shortcut))
+    onOrigin: ((Rect?) -> Unit)? = null,
+) = WhiteNoiseMenuItem(
+    stringResource(shortcut.labelRes),
+    onClick,
+    icon,
+    modifier = explain(shortcut),
+    onOrigin = onOrigin,
+)
+
+/** Adds the GIF search action and its provider disclosure when the build supports it. */
+@Composable
+private fun composerGiphyItem(
+    onSearchGifs: (() -> Unit)?,
+    onDismiss: () -> Unit,
+): WhiteNoiseMenuItem? {
+    if (onSearchGifs == null) return null
+    return WhiteNoiseMenuItem(
+        stringResource(R.string.giphy_search_title),
+        onSearchGifs,
+        R.drawable.ic_gif,
+        modifier =
+            Modifier.explainOnLongPress(
+                composerExplanation(R.string.giphy_search_title, R.string.giphy_search_privacy),
+                beforeShow = onDismiss,
+            ),
+    )
+}
 
 /** Opens composer customization; holding it explains what customization covers. */
 @Composable

@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -35,6 +36,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
@@ -46,9 +48,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsMentionPresentation
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
@@ -96,41 +96,9 @@ import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
 import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
 import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
-
-internal fun ttsBodyIsCollapsed(
-    collapseEnabled: Boolean,
-    measuredBodyHeightPx: Int?,
-    maxBodyHeightPx: Int,
-): Boolean = collapseEnabled && (measuredBodyHeightPx == null || measuredBodyHeightPx > maxBodyHeightPx)
-
-/**
- * Selects the final file card as the message footer owner when no visual tile already owns it and
- * the message has no caption; a caption is the message's last line and carries the footer itself.
- * Confirmed and optimistic file renderers apply the returned ownership only to their last card.
- */
-internal fun fileCardOwnsFooter(
-    deleted: Boolean,
-    fileCount: Int,
-    visualOwnsFooter: Boolean,
-    hasCaption: Boolean = false,
-): Boolean = !deleted && fileCount > 0 && !visualOwnsFooter && !hasCaption
-
-/**
- * Selects an uncaptioned visual-only group for overlay metadata.
- * A file attachment always takes precedence so mixed groups keep one stable trailing footer.
- */
-internal fun visualMediaOwnsFooter(
-    deleted: Boolean,
-    hasInvalidationWarning: Boolean,
-    visualCount: Int,
-    fileCount: Int,
-    hasCaption: Boolean,
-): Boolean = !deleted && !hasInvalidationWarning && visualCount > 0 && fileCount == 0 && !hasCaption
 
 /** Footer frame for visual media: time and status at the trailing edge. */
 @Composable
@@ -175,7 +143,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     sharedUser: SharedUser?,
     remoteGiphyMedia: RemoteGiphyMedia?,
     giphyEditedLabel: String?,
-    onGiphyEditedClick: (() -> Unit)?,
+    onGiphyEditedClick: ((Rect?) -> Unit)?,
     deleted: Boolean,
     mine: Boolean,
     showStatus: Boolean,
@@ -379,37 +347,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
         }
     }
     if (!deleted && !bubbleMedia.hasConfirmedMedia && bubbleMedia.pendingAudio.isNotEmpty()) {
-        bubbleMedia.pendingAudio.forEach { (index, pending) ->
-            val presentationOwner = rememberVoicePresentationOwner(controller, appState)
-            val attachmentKey = VoicePresentationAttachmentKey(record.messageIdHex, index, 0uL)
-            key(presentationOwner, attachmentKey) {
-                MediaVoiceBubble(
-                    messageIdHex = record.messageIdHex,
-                    attachmentIndex = index,
-                    reference =
-                        remember(record.messageIdHex, index, pending) {
-                            MediaAttachmentReferenceFfi(
-                                locators = emptyList(),
-                                ciphertextSha256 = "",
-                                plaintextSha256 = "",
-                                nonceHex = "",
-                                fileName = pending.fileName,
-                                mediaType = pending.mediaType,
-                                version = EncryptedMediaVersionFfi.V1,
-                                sourceEpoch = 0uL,
-                                dim = null,
-                                thumbhash = null,
-                            )
-                        },
-                    mine = true,
-                    focusPlaybackMessage = false,
-                    controller = controller,
-                    appState = appState,
-                    presentationOwner = presentationOwner,
-                    onLongPress = onMediaLongPress,
-                )
-            }
-        }
+        PendingVoiceAttachments(item, bubbleMedia.pendingAudio, controller, appState, onMediaLongPress)
     }
     if (!deleted && !bubbleMedia.hasConfirmedMedia && bubbleMedia.pendingVisuals.isNotEmpty()) {
         val uploadFailed = item.status == MessageStatus.Failed
@@ -556,13 +494,14 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     timestampColor: Color,
     showStatus: Boolean,
     editedLabel: String?,
-    onEditedClick: (() -> Unit)?,
+    onEditedClick: ((Rect?) -> Unit)?,
     footerOnVisualMedia: Boolean,
     footerOnPendingVisual: Boolean,
     showTimestamp: Boolean = true,
     invalidationWarning: String?,
     mine: Boolean,
     onExpand: () -> Unit,
+    onExpandAt: ((Rect?) -> Unit)? = null,
     statusContainerColor: Color? = null,
 ) {
     val showOuterMetadata = bodyText != null || (!footerOnVisualMedia && !footerOnPendingVisual)
@@ -584,7 +523,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                         modifier = Modifier.size(24.dp),
                     ) {
                         Icon(
-                            Icons.Default.Refresh,
+                            painterResource(R.drawable.ic_refresh),
                             contentDescription = stringResource(R.string.retry),
                             tint = timestampColor,
                             modifier = Modifier.size(16.dp),
@@ -597,7 +536,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     modifier = Modifier.size(24.dp),
                 ) {
                     Icon(
-                        Icons.Default.Close,
+                        painterResource(R.drawable.ic_close),
                         contentDescription = stringResource(R.string.discard_failed_message),
                         tint = timestampColor,
                         modifier = Modifier.size(16.dp),
@@ -873,16 +812,20 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             }
         }
         val readMoreFooter: @Composable () -> Unit = {
+            val (originModifier, expand) =
+                rememberMeasuredControlClick { origin ->
+                    onExpandAt?.invoke(origin) ?: onExpand()
+                }
             Text(
                 readMoreLabel,
                 style = MaterialTheme.typography.bodyLarge,
                 color = readMoreStyle.color,
                 fontWeight = readMoreStyle.fontWeight,
                 modifier =
-                    Modifier.clickable(
+                    Modifier.then(originModifier).clickable(
                         onClickLabel = readMoreLabel,
                         role = Role.Button,
-                        onClick = onExpand,
+                        onClick = expand,
                     ),
             )
         }

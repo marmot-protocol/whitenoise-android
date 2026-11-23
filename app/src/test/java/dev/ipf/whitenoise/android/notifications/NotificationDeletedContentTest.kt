@@ -103,6 +103,7 @@ class NotificationDeletedContentTest {
             listOf("reply accepted"),
             handled.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.toList(),
         )
+        assertTrue((handled.flags and Notification.FLAG_LOCAL_ONLY) != 0)
 
         presenter.cancelConversationCardIfSameGeneration(key.tag, key.id, "new-id")
         assertNull(card(ACCOUNT))

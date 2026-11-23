@@ -28,7 +28,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
@@ -37,12 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.nativePageFooter
+import dev.ipf.whitenoise.android.ui.common.nativePageHeader
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Email
-import dev.ipf.whitenoise.android.ui.icons.filled.Person
 import dev.ipf.whitenoise.android.ui.icons.filled.Phone
 
 /**
@@ -56,9 +58,11 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Phone
 internal fun ContactPreviewScreen(
     contact: SharedContact,
     onDismiss: () -> Unit,
+    origin: Rect? = null,
     onSend: (SharedContact) -> Unit,
 ) {
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
@@ -68,18 +72,22 @@ internal fun ContactPreviewScreen(
         val canSend = (includePhone && contact.phone != null) || (includeEmail && contact.email != null)
 
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize().nativePageBody()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
+                                .nativePageHeader()
                                 .statusBarsPadding()
                                 .padding(horizontal = 4.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+                        IconButton(onClick = dismiss) {
+                            Icon(
+                                painterResource(R.drawable.ic_close),
+                                contentDescription = stringResource(R.string.close),
+                            )
                         }
                         Text(
                             stringResource(R.string.share_contact_title),
@@ -92,7 +100,7 @@ internal fun ContactPreviewScreen(
                     ) {
                         Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                             Icon(
-                                Icons.Default.Person,
+                                painterResource(R.drawable.ic_person),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                 modifier = Modifier.padding(12.dp).size(28.dp),
@@ -129,16 +137,17 @@ internal fun ContactPreviewScreen(
                     onClick = {
                         if (sending || !canSend) return@FloatingActionButton
                         sending = true
-                        onSend(
+                        val selected =
                             contact.copy(
                                 phone = contact.phone?.takeIf { includePhone },
                                 email = contact.email?.takeIf { includeEmail },
-                            ),
-                        )
+                            )
+                        close { onSend(selected) }
                     },
                     modifier =
                         Modifier
                             .align(Alignment.BottomEnd)
+                            .nativePageFooter()
                             .navigationBarsPadding()
                             .padding(24.dp)
                             .semantics {
@@ -157,7 +166,10 @@ internal fun ContactPreviewScreen(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
+                    Icon(
+                        painterResource(R.drawable.ic_arrow_upward),
+                        contentDescription = stringResource(R.string.send),
+                    )
                 }
             }
         }

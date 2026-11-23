@@ -441,6 +441,7 @@ class AgentStreamPreviewTest {
         final: Boolean,
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "received",
             groupIdHex = "group",

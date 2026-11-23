@@ -27,9 +27,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
-import dev.ipf.marmotkit.OnboardingCheckOutcomeFfi
-import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
-import dev.ipf.marmotkit.OnboardingFindingContextFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
@@ -209,7 +206,7 @@ internal fun SetupDetails(state: AccountSetupState) {
             Text(stringResource(R.string.setup_checks), style = MaterialTheme.typography.titleMedium)
             Text(state.accountLabel, style = MaterialTheme.typography.labelMedium)
             state.currentStep?.findings?.forEach { finding ->
-                SetupFindingContent(finding)
+                SetupFindingContent(finding, showTitle = !snapshot.deviceNoticeCovers(state.currentStep?.step, finding))
             }
             SetupChecklist(snapshot)
         }
@@ -225,6 +222,7 @@ internal fun SetupFindingContent(
     finding: OnboardingFindingFfi,
     showTitle: Boolean = true,
 ) {
+    if (!showTitle && finding.endpoint.isNullOrBlank() && !finding.hasDiagnosticEvidence()) return
     Row(
         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
@@ -255,12 +253,7 @@ internal fun SetupFindingContent(
 /** Preserves each native check's provenance; legacy unknown records do not acquire invented evidence. */
 @Composable
 internal fun SetupFindingEvidence(finding: OnboardingFindingFfi) {
-    if (finding.context == OnboardingFindingContextFfi.UNKNOWN &&
-        finding.purpose == OnboardingCheckPurposeFfi.UNKNOWN &&
-        finding.outcome == OnboardingCheckOutcomeFfi.UNKNOWN
-    ) {
-        return
-    }
+    if (!finding.hasDiagnosticEvidence()) return
     Text(
         stringResource(
             R.string.setup_finding_check,

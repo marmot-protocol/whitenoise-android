@@ -1,0 +1,223 @@
+package dev.ipf.whitenoise.android.ui.conversation.composer
+
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isPopup
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.ExplanationHostState
+import dev.ipf.whitenoise.android.ui.common.ExplanationSheetHost
+import dev.ipf.whitenoise.android.ui.common.LocalExplanationHost
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.design.AboveWindowYPopupPositionProvider
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import kotlin.math.roundToInt
+
+/** A composer control's explanation opens above the composer without taking focus; others keep the modal sheet. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+class ComposerExplanationEdgeTest {
+    @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
+    private val host = ExplanationHostState()
+    private var keyboard by mutableStateOf(0.dp)
+
+    /** Held inside the composer, the explanation's bottom is the composer's top edge, in a non-focusable popup. */
+    @Test
+    fun composerControlsExplainAboveTheComposersTopEdge() {
+        render(aboveComposer = true)
+        composeRule.onNodeWithTag(CONTROL).performTouchInput { longClick() }
+
+        val composerTop =
+            composeRule
+                .onNodeWithTag(COMPOSER)
+                .fetchSemanticsNode()
+                .positionInWindow.y
+        composeRule.runOnIdle { assertEquals(composerTop.roundToInt(), host.bottomWindowY) }
+        composeRule.onNode(hasTestTag(SHEET) and hasAnyAncestor(isPopup())).assertIsDisplayed()
+    }
+
+    /** Held anywhere else, such as in Settings, the explanation keeps the modal sheet at the window's bottom. */
+    @Test
+    fun otherControlsKeepTheModalSheet() {
+        render(aboveComposer = false)
+        composeRule.onNodeWithTag(CONTROL).performTouchInput { longClick() }
+
+        composeRule.runOnIdle { assertNull(host.bottomWindowY) }
+        composeRule.onNodeWithTag(SHEET).assertIsDisplayed()
+        composeRule.onNode(hasTestTag(SHEET) and hasAnyAncestor(isPopup())).assertDoesNotExist()
+    }
+
+    /** The editor's Back closes an explanation open above the composer, and leaves any other explanation alone. */
+    @Test
+    fun editorBackClosesOnlyTheComposersExplanation() {
+        var close: (() -> Unit)? = null
+        composeRule.setContent {
+            CompositionLocalProvider(LocalExplanationHost provides host) { close = composerExplanationClose() }
+        }
+        composeRule.runOnIdle { assertNull(close) }
+
+        composeRule.runOnIdle { host.show(EXPLANATION) }
+        composeRule.runOnIdle { assertNull(close) }
+
+        composeRule.runOnIdle { host.show(EXPLANATION, bottomEdge = { 600 }) }
+        composeRule.runOnIdle { checkNotNull(close).invoke() }
+        composeRule.runOnIdle { assertNull(host.shown) }
+    }
+
+    /**
+     * On Android 16 the editor's pre-IME Back closes an explanation, and otherwise stays off while only the
+     * sending-identity popup is open, which owns Back through its overlay callback there.
+     */
+    @Test
+    fun preImeBackClosesExplanationsOnEveryVersion() {
+        val close = {}
+
+        assertTrue(preImeHandlesBack(closeSendingIdentity = null, closeExplanation = close))
+        assertTrue(preImeHandlesBack(closeSendingIdentity = close, closeExplanation = close))
+        assertFalse(preImeHandlesBack(closeSendingIdentity = close, closeExplanation = null))
+        assertTrue(preImeHandlesBack(closeSendingIdentity = null, closeExplanation = null))
+    }
+
+    /** Below Android 14, where app Back callbacks don't run, the editor's pre-IME Back closes the identity popup. */
+    @Test
+    @Config(sdk = [30, 33])
+    fun preImeBackClosesTheIdentityPopupBeforeAndroid14() {
+        assertTrue(preImeHandlesBack(closeSendingIdentity = {}, closeExplanation = null))
+    }
+
+    /**
+     * On Android 13, which ignores MainActivity's activity-level Back opt-in, the activity's Back closes an explanation
+     * opened above the composer while the editor isn't focused, instead of leaving the conversation under it.
+     */
+    @Test
+    @Config(sdk = [33])
+    fun activityBackClosesTheComposersExplanationOnAndroid13() {
+        render(aboveComposer = true)
+        composeRule.onNodeWithTag(CONTROL).performTouchInput { longClick() }
+        composeRule.runOnIdle { assertEquals(EXPLANATION, host.shown) }
+
+        composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+
+        composeRule.runOnIdle { assertNull(host.shown) }
+    }
+
+    /** The open sheet follows the composer when it moves, as when the keyboard opens or closes or the window turns. */
+    @Test
+    fun theSheetFollowsTheComposerWhileItShows() {
+        render(aboveComposer = true)
+        composeRule.onNodeWithTag(CONTROL).performTouchInput { longClick() }
+        assertEquals(composerTopOnScreen(), sheetBottomOnScreen())
+
+        keyboard = 300.dp
+
+        val top = composerTopOnScreen()
+        assertEquals(top, sheetBottomOnScreen())
+        composeRule.runOnIdle { assertEquals(top, host.bottomWindowY) }
+    }
+
+    /** The composer's top edge on screen, in whole pixels. */
+    private fun composerTopOnScreen(): Int =
+        composeRule
+            .onNodeWithTag(COMPOSER)
+            .fetchSemanticsNode()
+            .positionOnScreen.y
+            .roundToInt()
+
+    /** The bottom edge of the explanation's sheet, which sits in its own popup window, on screen in whole pixels. */
+    private fun sheetBottomOnScreen(): Int {
+        val sheet = composeRule.onNode(hasTestTag(SHEET) and hasAnyAncestor(isPopup())).fetchSemanticsNode()
+        return (sheet.positionOnScreen.y + sheet.size.height).roundToInt()
+    }
+
+    /**
+     * The sheet sits centered with its bottom at the edge, or at the visible frame's bottom when the edge is below
+     * it.
+     */
+    @Test
+    fun placementKeepsTheSheetBottomAtTheEdge() {
+        val window = IntSize(360, 700)
+        val sheet = IntSize(300, 200)
+
+        assertEquals(IntOffset(30, 400), place(bottomY = 600, window, sheet, LayoutDirection.Ltr))
+        assertEquals(IntOffset(30, 400), place(bottomY = 600, window, sheet, LayoutDirection.Rtl))
+        assertEquals(IntOffset(30, 500), place(bottomY = 900, window, sheet, LayoutDirection.Ltr))
+    }
+
+    /** Where the composer placement puts a [sheet] whose bottom edge belongs at [bottomY]. */
+    private fun place(
+        bottomY: Int,
+        window: IntSize,
+        sheet: IntSize,
+        direction: LayoutDirection,
+    ): IntOffset = AboveWindowYPopupPositionProvider(bottomY).calculatePosition(IntRect.Zero, window, direction, sheet)
+
+    /**
+     * A 120dp composer holding one explained control above a [keyboard]-high gap at the bottom of the window, inside or
+     * outside the edge scope.
+     */
+    private fun render(aboveComposer: Boolean) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalExplanationHost provides host) {
+                    Column(Modifier.fillMaxSize()) {
+                        Spacer(Modifier.weight(1f))
+                        val composer: @Composable () -> Unit = {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp)
+                                    .testTag(COMPOSER)
+                                    .composerExplanationEdge(),
+                            ) {
+                                Box(Modifier.size(48.dp).testTag(CONTROL).explainOnLongPress(EXPLANATION))
+                            }
+                        }
+                        if (aboveComposer) ExplainAboveComposer(composer) else composer()
+                        Spacer(Modifier.height(keyboard))
+                    }
+                    ExplanationSheetHost(host)
+                }
+            }
+        }
+    }
+
+    private companion object {
+        const val COMPOSER = "composer"
+        const val CONTROL = "composer.control"
+        const val SHEET = "explanation.sheet"
+        val EXPLANATION = Explanation("Camera", "Takes a photo to send in this chat.")
+    }
+}

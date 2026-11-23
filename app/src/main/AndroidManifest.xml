@@ -167,10 +167,15 @@
         </activity>
         <activity android:name=".widget.ConversationWidgetTapActivity" android:exported="false" />
         <activity
+            android:name=".ui.conversation.media.ConversationCameraActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden"
+            android:theme="@style/Theme.WhiteNoise.Dark" />
+        <activity
             android:name=".MainActivity"
             android:enableOnBackInvokedCallback="true"
             android:exported="true"
-            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|keyboardHidden"
+            android:configChanges="orientation|screenLayout|screenSize|smallestScreenSize|density|keyboard|keyboardHidden|navigation"
             android:label="${appName}"
             android:launchMode="singleTask"
             android:theme="@style/Theme.WhiteNoise.Starting"
@@ -203,6 +208,10 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="*/*" />
             </intent-filter>
+            <!-- Long-pressing the notification profile tile opens the app. -->
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -233,6 +242,20 @@
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
+        </service>
+        <!-- Opt-in Quick Settings tile for notification profiles; the system binds it with this permission. -->
+        <service
+            android:name=".notifications.NotificationProfileTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_notifications_paused"
+            android:label="@string/notification_profile_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
         </service>
         <receiver
             android:name=".notifications.BackgroundConnectionBootReceiver"

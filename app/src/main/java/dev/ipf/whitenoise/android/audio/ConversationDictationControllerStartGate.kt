@@ -12,8 +12,14 @@ internal fun ConversationDictationController.rejectsExistingSession(
     groupIdHex: String,
     mode: ConversationDictationMode,
 ): Boolean {
-    if (state is ConversationDictationState.ProviderActivityActive) {
-        conversationDictationDiagnostic("event=request_start accepted=false reason=provider_activity_active")
+    val unavailableReason =
+        when {
+            followUp.pending != null -> "follow_up_pending"
+            state is ConversationDictationState.ProviderActivityActive -> "provider_activity_active"
+            else -> null
+        }
+    if (unavailableReason != null) {
+        conversationDictationDiagnostic("event=request_start accepted=false reason=$unavailableReason")
         return true
     }
     val retainsTranscript =
@@ -92,3 +98,19 @@ internal fun ConversationDictationController.completedTargetValidation(
     } catch (_: RuntimeException) {
         ConversationDictationTargetValidation.Indeterminate
     }
+
+/** Accept only the disclosure still owned by the current gesture. */
+internal fun ConversationDictationController.acceptPendingDisclosure(
+    expected: ConversationDictationState.DisclosureRequired?,
+    markDisclosureAccepted: () -> Unit,
+    markOfflineDisclosureAccepted: () -> Unit,
+) {
+    val pending = expected ?: return
+    if (state !== pending) return
+    if (pending.usesOfflineSpeechToText) {
+        markOfflineDisclosureAccepted()
+    } else {
+        markDisclosureAccepted()
+    }
+    startTarget(pending.sessionId, pending.target)
+}

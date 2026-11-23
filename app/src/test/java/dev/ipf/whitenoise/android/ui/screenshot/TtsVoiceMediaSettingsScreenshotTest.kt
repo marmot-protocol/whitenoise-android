@@ -108,7 +108,7 @@ class TtsVoiceMediaSettingsScreenshotTest {
                         checked = true,
                         onCheckedChange = {},
                         subtitle = stringResource(R.string.tts_auto_read_default_global_subtitle),
-                        leading = { SettingsLeadingIcon(R.drawable.ic_text_to_speech) },
+                        leading = { SettingsLeadingIcon(R.drawable.ic_record_voice_over) },
                     )
                 }
                 row("media_mix") { context ->

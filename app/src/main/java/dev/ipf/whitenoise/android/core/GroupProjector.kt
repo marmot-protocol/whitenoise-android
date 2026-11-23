@@ -48,12 +48,13 @@ object GroupProjector {
         copy: GroupTitleCopy = GroupTitleCopy.Default,
         conversationKind: ChatConversationKindFfi? = null,
         soleSelfMember: Boolean = false,
+        selfAccountIdHex: String? = null,
     ): String =
         displayTitle(
             name = group.name,
-            pendingInviteAccount = if (group.pendingConfirmation) inviteAccount(group, otherMemberAccount) else null,
+            pendingInviteAccount = inviteAccount(group, otherMemberAccount, selfAccountIdHex),
             groupIdHex = group.groupIdHex,
-            otherMemberAccount = otherMemberAccount,
+            otherMemberAccount = otherMemberAccount?.takeUnless { it.equals(selfAccountIdHex, ignoreCase = true) },
             memberCount = memberCount,
             memberTitle = memberTitle,
             copy = copy,
@@ -101,13 +102,20 @@ object GroupProjector {
         return copy.unknownTitle
     }
 
+    /**
+     * The account a pending invitation is shown as coming from: MDK's welcomer, else the other member. A welcomer
+     * equal to [selfAccountIdHex] is one of the account's own devices passing the invitation on, which is not an
+     * inviter to name, so the other member stands in or nobody is named. The other member is never the account
+     * itself either, which a roster holding only the account's own devices would otherwise offer.
+     */
     fun inviteAccount(
         group: AppGroupRecordFfi,
         otherMemberAccount: String?,
+        selfAccountIdHex: String? = null,
     ): String? {
         if (!group.pendingConfirmation) return null
-        return group.welcomerAccountIdHex?.takeIf { it.isNotBlank() }
-            ?: otherMemberAccount?.takeIf { it.isNotBlank() }
+        val named = { account: String -> account.isNotBlank() && !account.equals(selfAccountIdHex, true) }
+        return group.welcomerAccountIdHex?.takeIf(named) ?: otherMemberAccount?.takeIf(named)
     }
 
     /**
@@ -122,9 +130,12 @@ object GroupProjector {
         group: AppGroupRecordFfi,
         otherMemberAccount: String?,
         memberCount: Int,
+        selfAccountIdHex: String? = null,
     ): String? =
-        inviteAccount(group, otherMemberAccount)
-            ?: otherMemberAccount?.takeIf { isUnnamed(group.name) && memberCount == 2 }
+        inviteAccount(group, otherMemberAccount, selfAccountIdHex)
+            ?: otherMemberAccount?.takeIf {
+                !it.equals(selfAccountIdHex, ignoreCase = true) && isUnnamed(group.name) && memberCount == 2
+            }
 
     /**
      * Whether a member's own picture may stand in for this conversation's

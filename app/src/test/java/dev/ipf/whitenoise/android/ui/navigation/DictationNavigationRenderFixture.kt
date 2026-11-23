@@ -3,15 +3,12 @@ package dev.ipf.whitenoise.android.ui.navigation
 import android.content.Context
 import android.graphics.Bitmap
 import android.view.View
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -39,6 +36,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationFollowUpCaptures
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
@@ -49,6 +47,7 @@ import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatsNewMessageFabContent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestButton
 import dev.ipf.whitenoise.android.ui.conversation.ConversationNavigationStack
 import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
@@ -185,7 +184,10 @@ internal abstract class DictationNavigationRenderFixture {
                             }
                             if (!fixture.locked) {
                                 val transition =
-                                    updateTransition(fixture.route.selectedChatId, label = "dictation route")
+                                    rememberConversationRouteTransition(
+                                        fixture.route.selectedChatId,
+                                        suppressMotion = false,
+                                    )
                                 ConversationRouteAnimatedContent(
                                     transition = transition,
                                     routeForwardDirection = 1,
@@ -244,8 +246,7 @@ internal abstract class DictationNavigationRenderFixture {
         var composerHeightPx by remember { mutableIntStateOf(0) }
         Box(Modifier.fillMaxSize()) {
             if (chatId == null) {
-                Scaffold(
-                    contentWindowInsets = WindowInsets.navigationBars,
+                WhiteNoiseScaffold(
                     floatingActionButton = { ChatsNewMessageFabContent(missingRelays = false) {} },
                 ) { innerPadding ->
                     Box(Modifier.fillMaxSize().padding(innerPadding))
@@ -346,6 +347,29 @@ internal abstract class DictationNavigationRenderFixture {
 
     protected class FakePlatform : ConversationDictationPlatform {
         var cancels = 0
+        var callerAudio = false
+        var deferCaptureClose = false
+        var closeCapture: (() -> Unit)? = null
+
+        override fun followUpCaptures(): ConversationDictationFollowUpCaptures =
+            object : ConversationDictationFollowUpCaptures {
+                override fun beginFollowUp(sessionId: Long): Boolean = callerAudio
+
+                override fun finishFollowUp(
+                    sessionId: Long,
+                    onClosed: () -> Unit,
+                ): Boolean = false
+
+                override fun discardFollowUp(
+                    sessionId: Long,
+                    onClosed: () -> Unit,
+                ): Boolean = false
+
+                override fun adoptFollowUp(sessionId: Long): Boolean = false
+            }
+
+        override fun followUpCaptureSupported() = callerAudio
+
         lateinit var listener: ConversationDictationRecognitionListener
 
         override fun hasRecordAudioPermission() = true
@@ -358,6 +382,10 @@ internal abstract class DictationNavigationRenderFixture {
                 override fun start() = Unit
 
                 override fun stop() = Unit
+
+                override fun stop(onAudioCaptureFinished: () -> Unit) {
+                    if (deferCaptureClose) closeCapture = onAudioCaptureFinished else onAudioCaptureFinished()
+                }
 
                 override fun cancel() {
                     cancels++

@@ -51,8 +51,7 @@ import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
 import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Download
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
+import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -404,7 +403,7 @@ internal fun MediaVideoGridTile(
                             )
                         failed ->
                             Icon(
-                                Icons.Default.Refresh,
+                                painterResource(R.drawable.ic_refresh),
                                 contentDescription = stringResource(R.string.video_failed),
                                 modifier = Modifier.size(24.dp),
                             )
@@ -416,7 +415,7 @@ internal fun MediaVideoGridTile(
                             )
                         !startDownload && localFile == null ->
                             Icon(
-                                Icons.Default.Download,
+                                Icons.Default.ArrowDownward,
                                 contentDescription = stringResource(R.string.media_tap_to_download),
                                 modifier = Modifier.size(24.dp),
                             )

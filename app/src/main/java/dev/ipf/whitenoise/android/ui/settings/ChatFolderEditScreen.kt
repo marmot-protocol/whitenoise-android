@@ -11,11 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -24,7 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -44,13 +42,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.allLoadedFolderChats
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
-import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
-import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
@@ -59,8 +54,9 @@ internal const val CHAT_FOLDER_EDIT_CONTENT_TAG = "chat-folder-edit-content"
 
 /**
  * Create/edit form for one chat folder: name and description, Included Chats, the automatic rules (People,
- * Keyword, category switches) and a live Preview. Nothing persists until Save; Back asks before discarding
- * a dirty draft, and a failed save keeps every field (M027, M028).
+ * Keyword, category switches) and a live Preview. A new folder persists only on Save, and Back asks before
+ * discarding it (M027, M028). An existing folder saves every valid edit as it happens and on leaving, so Back
+ * returns directly; a blank name or invalid rule keeps the last saved value.
  */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
@@ -95,7 +91,6 @@ private fun ChatFolderEditSession(
     val runtimeGeneration = remember { appState.runtimeGeneration }
     var active by remember { mutableStateOf(true) }
     var submitted by remember { mutableStateOf(false) }
-    DisposableEffect(Unit) { onDispose { active = false } }
     LaunchedEffect(appState.activeAccountRef) {
         if (appState.activeAccountRef != accountRef) onClose()
     }
@@ -155,7 +150,8 @@ private fun ChatFolderEditSession(
     var failed by rememberSaveable { mutableStateOf(false) }
     var deleteFailed by rememberSaveable { mutableStateOf(false) }
 
-    val rule =
+    /** The rule as the controls show it, read at call time so a same-frame edit is never missed. */
+    fun currentRule() =
         ChatFolderRule(
             includeMemberPubkeys = memberHexes,
             unreadOnly = unreadOnly,
@@ -173,6 +169,7 @@ private fun ChatFolderEditSession(
             smartFilter = smartPayload,
             includeAll = includeAll,
         )
+    val rule = currentRule()
     val initialRule = (existingRule ?: ChatFolderRule()).copy(smartFilter = initialSmart)
     // Preserve untouched future/invalid payloads for metadata edits; automatic matching stays disabled.
     val smartRuleValid =
@@ -183,6 +180,32 @@ private fun ChatFolderEditSession(
     // Comparing quick payloads decodes both rules, so name and description keystrokes must not repeat it.
     val smartRuleUnchanged =
         remember(smartPayload, initialSmart) { sameQuickFilterPayload(smartPayload, initialSmart) }
+
+    fun currentDraft() =
+        FolderDraft(
+            name.text.toString(),
+            description.text.toString(),
+            currentRule(),
+            manualChatIds,
+            showWhenEmpty,
+            sort,
+        )
+    val draft = currentDraft()
+    // What the store last accepted, built from the store rather than restored fields: opening writes nothing, and
+    // an edit the store rejected before a configuration change still differs and is retried.
+    var lastSaved by remember {
+        mutableStateOf(
+            FolderDraft(
+                prefillName,
+                existing?.description.orEmpty(),
+                existingRule ?: ChatFolderRule(),
+                initialManual,
+                initialShowWhenEmpty,
+                initialSort,
+            ),
+        )
+    }
+    var backRetryFailed by remember { mutableStateOf(false) }
     val dirty =
         name.text.toString() != prefillName ||
             description.text.toString() != existing?.description.orEmpty() ||
@@ -192,17 +215,71 @@ private fun ChatFolderEditSession(
             showWhenEmpty != initialShowWhenEmpty ||
             sort != initialSort
 
-    /** Back confirms discarding a dirty draft. */
+    /**
+     * Persist an existing folder's draft. A blank name keeps the stored name and an invalid rule keeps the stored
+     * rule, so leaving never loses or corrupts the last valid value; other fields still save.
+     */
+    fun autosave() {
+        val current = currentDraft()
+        if (folderId == null || current == lastSaved) return
+        if (!canMutate() || submitted) return
+        val trimmedName = current.name.trim()
+        val savedRule =
+            if (smartRuleValid) {
+                current.rule.takeIf { it != ChatFolderRule() }
+            } else {
+                store.folderRule(accountRef, folderId)
+            }
+        // An untouched prefill on an un-renamed default is not a rename: persisting it would freeze the
+        // localized label into the store and the folder would stop following locale changes.
+        val renamed = existing?.name.orEmpty().isNotEmpty() || trimmedName != prefillName
+        val saved =
+            try {
+                store.commitFolderDraft(
+                    accountRef = accountRef,
+                    folderId = folderId,
+                    name = trimmedName.takeIf { renamed && it.isNotEmpty() },
+                    description = current.description.trim(),
+                    manualChatIds = current.manualChatIds,
+                    rule = savedRule,
+                    showWhenEmpty = current.showWhenEmpty,
+                    sort = current.sort,
+                )
+            } catch (_: Exception) {
+                null
+            }
+        failed = saved == null
+        if (saved != null) {
+            lastSaved = current
+            backRetryFailed = false
+        }
+    }
+    LaunchedEffect(draft) { autosave() }
+    val latestAutosave by rememberUpdatedState(::autosave)
+    DisposableEffect(Unit) {
+        onDispose {
+            latestAutosave()
+            active = false
+        }
+    }
+
+    /** Back leaves an existing folder after saving it, and confirms discarding a dirty new draft. */
     fun back() {
         when {
             confirmDelete -> confirmDelete = false
+            folderId != null -> {
+                autosave()
+                // A failed save keeps the editor open once so the error is seen; Back again leaves.
+                if (!failed || missing || backRetryFailed) onClose() else backRetryFailed = true
+            }
             dirty -> discard = true
             else -> onClose()
         }
     }
 
     dev.ipf.whitenoise.android.ui.conversation.PlaybackSourceLeaveGuard { proceed ->
-        if (dirty) {
+        autosave()
+        if (folderId == null && dirty) {
             pendingPlaybackSource = proceed
             discard = true
         } else {
@@ -211,32 +288,24 @@ private fun ChatFolderEditSession(
     }
     BackHandler(onBack = ::back)
 
-    /** Saves the folder, failing if it vanished meanwhile. */
+    /** Creates the new folder; existing folders autosave instead. */
     @Suppress("ReturnCount") // Early exits preserve route ownership and reject invalid or superseded actions.
     fun save() {
-        if (!canMutate() || submitted || !smartRuleValid) return
-        if (folderId != null && store.foldersFor(accountRef).none { it.id == folderId }) {
-            failed = true
-            return
-        }
+        if (folderId != null || !smartRuleValid) return
+        if (!canMutate() || submitted) return
         val trimmedName =
             name.text
                 .toString()
                 .trim()
                 .takeIf { it.isNotEmpty() } ?: return
         submitted = true
-        val trimmedDescription = description.text.toString().trim()
-        // An untouched prefill on an un-renamed default is not a rename:
-        // persisting it would freeze the localized label into the store and
-        // the folder would stop following locale changes.
-        val renamed = existing?.name.orEmpty().isNotEmpty() || trimmedName != prefillName
         val saved =
             try {
                 store.commitFolderDraft(
                     accountRef = accountRef,
-                    folderId = folderId,
-                    name = if (renamed || folderId == null) trimmedName else null,
-                    description = trimmedDescription,
+                    folderId = null,
+                    name = trimmedName,
+                    description = description.text.toString().trim(),
                     manualChatIds = manualChatIds,
                     rule = rule.takeIf { it != ChatFolderRule() },
                     showWhenEmpty = showWhenEmpty,
@@ -360,7 +429,9 @@ private fun ChatFolderEditSession(
                     when {
                         missing -> stringResource(R.string.folder_unavailable)
                         deleteFailed -> stringResource(R.string.folder_delete_failed)
+                        failed && folderId != null -> stringResource(R.string.folder_autosave_failed)
                         failed -> stringResource(R.string.folder_save_failed)
+                        folderId != null && name.text.isBlank() -> stringResource(R.string.folder_name_required)
                         else -> null
                     },
             ),
@@ -440,35 +511,16 @@ private fun ChatFolderEditSession(
     }
 
     if (discard) {
-        WhiteNoiseAlertDialog(
-            onDismissRequest = {
+        ChatFolderDiscardDialog(
+            onDiscard = {
+                val proceed = pendingPlaybackSource
+                pendingPlaybackSource = null
+                discard = false
+                if (proceed != null) proceed() else onClose()
+            },
+            onKeepEditing = {
                 discard = false
                 pendingPlaybackSource = null
-            },
-            title = { Text(stringResource(R.string.folder_discard_title)) },
-            text = { Text(stringResource(R.string.folder_discard_detail)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val proceed = pendingPlaybackSource
-                        pendingPlaybackSource = null
-                        discard = false
-                        if (proceed != null) proceed() else onClose()
-                    },
-                    modifier =
-                        Modifier.explainOnLongPress(
-                            Explanation(
-                                stringResource(R.string.folder_discard),
-                                stringResource(R.string.explanation_organize_folder_discard),
-                            ),
-                        ),
-                ) { Text(stringResource(R.string.folder_discard)) }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    discard = false
-                    pendingPlaybackSource = null
-                }) { Text(stringResource(R.string.folder_keep_editing)) }
             },
         )
     }
@@ -505,31 +557,6 @@ private fun ChatFolderEditSession(
     }
 }
 
-/** Everything the editor renders; the text fields are shared state so typing needs no round trip. */
-internal data class ChatFolderEditFormState(
-    val isNew: Boolean,
-    val name: TextFieldState,
-    val description: TextFieldState,
-    val keyword: TextFieldState,
-    val unreadOnly: Boolean,
-    val includeMuted: Boolean,
-    val groupsOnly: Boolean,
-    val archivedOnly: Boolean,
-    val manualChatCount: Int,
-    val peopleCount: Int,
-    val previewCount: Int,
-    val canSave: Boolean,
-    val canDelete: Boolean = !isNew,
-    val error: String? = null,
-    val unreadMentionsOnly: Boolean = false,
-    val directChatsOnly: Boolean = false,
-    val pinnedOnly: Boolean = false,
-    val advancedRules: Boolean = false,
-    val showWhenEmpty: Boolean = false,
-    val sort: ChatFolderSort = ChatFolderSort.RECENT,
-    val includeAll: Boolean = false,
-)
-
 /** The form without any store access, so tests can render every draft. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -558,19 +585,8 @@ internal fun ChatFolderEditContent(
         onBack = onBack,
         modifier = Modifier.imePadding(),
         topBarActions = {
-            TextButton(
-                enabled = state.canSave,
-                onClick = onSave,
-                modifier =
-                    Modifier
-                        .testTag("folder.save")
-                        .explainOnLongPress(
-                            Explanation(
-                                stringResource(R.string.save),
-                                stringResource(R.string.explanation_organize_folder_save),
-                            ),
-                        ),
-            ) { Text(stringResource(R.string.save)) }
+            // An existing folder saves as it is edited, so only a new folder has a Save action.
+            if (state.isNew) ChatFolderSaveAction(state.canSave, onSave)
         },
     ) {
         WhiteNoiseLazyColumn(
@@ -842,62 +858,3 @@ internal fun ChatFolderEditContent(
         }
     }
 }
-
-/** Optional metadata is revealed only when needed; existing descriptions remain visible. */
-@Composable
-private fun folderDescription(description: TextFieldState) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    if (expanded || description.text.isNotEmpty()) {
-        WhiteNoiseTextField(
-            state = description,
-            emojiAction = true,
-            modifier = Modifier.fillMaxWidth().testTag("folder.description"),
-            label = { Text(stringResource(R.string.chat_folder_description_label)) },
-            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 2, maxHeightInLines = 4),
-        )
-    } else {
-        val addLabel = stringResource(R.string.smart_folder_add_description)
-        TextButton(
-            onClick = { expanded = true },
-            modifier =
-                Modifier
-                    .testTag("folder.addDescription")
-                    .explainOnLongPress(
-                        Explanation(
-                            addLabel,
-                            stringResource(R.string.explanation_organize_folder_add_description),
-                        ),
-                    ),
-        ) {
-            Text(addLabel)
-        }
-    }
-}
-
-/** Adds [id] when absent and removes it when present. */
-private fun Set<String>.toggled(id: String): Set<String> = if (id in this) this - id else this + id
-
-/** Which picker sheet is open. */
-private enum class FolderPicker { Chats, People, Preview }
-
-/** Only unsaved selected identifiers survive rotation; the existing per-account store remains authoritative. */
-private val FolderSelectionSaver =
-    Saver<Set<String>, List<String>>(
-        save = { it.toList() },
-        restore = { it.toSet() },
-    )
-
-private fun folderSortExplanation(sort: ChatFolderSort): Int =
-    when (sort) {
-        ChatFolderSort.RECENT -> R.string.explanation_organize_folder_sort_recent
-        ChatFolderSort.NAME -> R.string.explanation_organize_folder_sort_name
-        ChatFolderSort.UNREAD -> R.string.explanation_organize_folder_sort_unread
-    }
-
-/** Stable choices are persisted independently for each local folder. */
-private fun folderSortLabel(sort: ChatFolderSort): Int =
-    when (sort) {
-        ChatFolderSort.RECENT -> R.string.folder_sort_recent
-        ChatFolderSort.NAME -> R.string.folder_sort_name
-        ChatFolderSort.UNREAD -> R.string.folder_sort_unread
-    }

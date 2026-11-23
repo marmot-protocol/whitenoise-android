@@ -5,11 +5,14 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
@@ -43,6 +46,17 @@ data class ChatListAvatarSeed(
 private const val DIRECT_CHAT_MEMBER_COUNT = 2
 
 /**
+ * Build the first notification-open frame solely from the exact local row.
+ * Membership enrichment is intentionally absent from this boundary because it
+ * is loaded by the conversation after navigation and may be queued behind
+ * account activation. The row still preserves pre-read unread state.
+ */
+internal fun chatListItemFromNotificationProjection(
+    projection: ChatListRowFfi,
+    accountIdHex: String? = null,
+): ChatListItem = chatListItemFromProjection(row = projection, activeAccountIdHex = accountIdHex)
+
+/**
  * Builds a chat-list item from the engine projection and its selected presentation.
  * [members] remains the only authoritative source for membership-sensitive fields;
  * [presentationMembers] supplies display continuity while a newer roster loads.
@@ -66,18 +80,20 @@ internal fun chatListItemFromProjection(
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
-    val selectedPeer = selectedPresentation?.peerId?.takeIf(String::isNotBlank)
-    val selectedMemberCount =
-        (selectedPresentation?.title as? PresentationTextFfi.UnnamedGroup)
-            ?.memberCount
-            ?.coerceAtMost(Int.MAX_VALUE.toULong())
-            ?.toInt()
-    val resolvedMemberCount =
-        selectedMemberCount
-            ?: if (selectedPeer != null) DIRECT_CHAT_MEMBER_COUNT else presentation?.memberCount ?: 0
-    val displayGroup = chatListDisplayGroup(row, baseGroup, selectedPresentation, resolvedMemberCount)
+    val selectedPeer = selectedPresentation?.peerId?.takeIf { it.isNotBlank() && !it.equals(activeAccountIdHex, true) }
+    val resolvedMemberCount = presentationMemberCount(selectedPresentation, selectedPeer, presentation)
+    // A replaced group picture still selected by a dirty presentation yields to the row's current picture.
+    val supersededPicture = selectedPresentation?.selectsSupersededGroupPicture(row) == true
+    val displayGroup =
+        chatListDisplayGroup(
+            row,
+            baseGroup,
+            selectedPresentation.takeUnless { supersededPicture },
+            resolvedMemberCount,
+        )
     return ChatListItem(
         group = displayGroup,
+        ownerAccountIdHex = activeAccountIdHex,
         latest = chatListLatestMessage(row),
         otherMemberAccount = members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) },
         memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0,
@@ -89,10 +105,18 @@ internal fun chatListItemFromProjection(
         inviteConfirmationUnresolved =
             !displayGroup.selfMembership.isNonMember() &&
                 (group?.let { it.pendingConfirmation != row.pendingConfirmation } ?: row.pendingConfirmation),
-        selectedPresentation = selectedPresentation,
+        selectedPresentation =
+            if (supersededPicture) {
+                selectedPresentation?.copy(
+                    avatar = SelectedAvatarFfi.Placeholder(row.groupIdHex, PresentationSourceFfi.GROUP_FALLBACK),
+                    avatarSource = PresentationSourceFfi.GROUP_FALLBACK,
+                )
+            } else {
+                selectedPresentation
+            },
         selectedAvatarAsset =
             adoptableSelectedAvatarAsset(
-                asset = selectedAvatarAsset,
+                asset = selectedAvatarAsset.takeUnless { supersededPicture },
                 avatarSource = selectedPresentation?.avatarSource,
                 group = displayGroup,
                 memberCount = resolvedMemberCount,
@@ -108,10 +132,22 @@ internal fun chatListItemFromProjection(
     )
 }
 
+/** Uses the selected group count, then the direct peer, then the roster retained for display. */
+private fun presentationMemberCount(
+    selected: ConversationPresentationFfi?,
+    peer: String?,
+    roster: ChatListMemberPresentation?,
+): Int {
+    val unnamedGroup = selected?.title as? PresentationTextFfi.UnnamedGroup
+    return unnamedGroup?.memberCount?.coerceAtMost(Int.MAX_VALUE.toULong())?.toInt()
+        ?: if (peer != null) DIRECT_CHAT_MEMBER_COUNT else roster?.memberCount ?: 0
+}
+
 /** The chat-list row's latest message as a renderable record, or null when the row has none. */
 private fun chatListLatestMessage(row: ChatListRowFfi): AppMessageRecordFfi? =
     row.lastMessage?.let { preview ->
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = preview.messageIdHex,
             direction = "received",
             groupIdHex = row.groupIdHex,
@@ -199,7 +235,19 @@ data class ChatListItem(
      * [ChatsController] supplies a monotonic value for live/local activity.
      */
     val activitySequence: ULong = 0uL,
+    /** The identity whose native row this is, including rows displayed for an inactive profile. */
+    val ownerAccountIdHex: String? = null,
 ) {
+    /** Inviter or direct peer used by avatar fallbacks across chat, picker, notification and shortcut surfaces. */
+    internal val avatarAccount: String?
+        get() =
+            GroupProjector.avatarAccount(
+                group,
+                presentationOtherMemberAccount,
+                presentationMemberCount,
+                ownerAccountIdHex,
+            )
+
     val id: String = group.groupIdHex
 
     /** Presentation only: conflicting snapshots cannot establish invitation consent. */
@@ -279,6 +327,10 @@ data class ChatListItem(
         sanitizedNamedTitle?.lowercase()
             ?: (presentationOtherMemberAccount ?: "~$presentationMemberCount").lowercase()
     }
+
+    /** Time of the message shown to the reader. Empty and pruned rows retain their last known activity. */
+    val previewTimestamp: ULong?
+        get() = projection?.lastMessage?.timelineAt?.takeIf { it > 0uL } ?: latestAt
 
     val latestAt: ULong?
         // Prefer MDK's durable semantic activity timestamp. It is advanced by
@@ -363,17 +415,26 @@ data class ChatListItem(
     /** [hasUnread] with the removed-group suppression applied (#625). */
     fun effectiveHasUnread(activeAccountIdHex: String?): Boolean = hasUnread && !removedFromGroup(activeAccountIdHex)
 
-    /** Delivery tick for the projected last message, or null for no tick. */
-    fun projectedDeliveryIndicator(): OutgoingMessageIndicator? =
-        if (awaitingSendPreview) {
-            OutgoingMessageIndicator.Sending
-        } else {
-            projection
-                ?.lastMessage
-                ?.takeUnless { it.deleted }
-                ?.deliveryState
-                ?.outgoingIndicator()
+    /**
+     * Delivery tick for the projected last message, or null for no tick. MDK reports a delivery state only for a
+     * message this installation sent. A last message [ownAccountIdHex] wrote on another of its devices has none, yet
+     * it is the account's own and already delivered, so it gets the sent tick instead of reading as received.
+     */
+    fun projectedDeliveryIndicator(ownAccountIdHex: String? = null): OutgoingMessageIndicator? {
+        val last = projection?.lastMessage?.takeUnless { it.deleted }
+        return when {
+            awaitingSendPreview -> OutgoingMessageIndicator.Sending
+            last == null -> null
+            last.fromAnotherOwnDevice(ownAccountIdHex) -> OutgoingMessageIndicator.Sent
+            else -> last.deliveryState.outgoingIndicator()
         }
+    }
+
+    /** Whether this preview is a message [ownAccountIdHex] wrote that this installation did not send. */
+    private fun ChatListMessagePreviewFfi.fromAnotherOwnDevice(ownAccountIdHex: String?): Boolean {
+        val received = deliveryState == ChatListMessageDeliveryStateFfi.NOT_APPLICABLE && groupSystem == null
+        return received && ownAccountIdHex != null && sender.equals(ownAccountIdHex, ignoreCase = true)
+    }
 
     /** The engine's durable mute projection — ORed with local preferences. */
     fun engineMuted(): Boolean = projection?.muted == true

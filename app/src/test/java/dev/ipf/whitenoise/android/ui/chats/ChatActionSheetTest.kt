@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -9,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isPopup
@@ -20,7 +23,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -29,6 +34,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -367,5 +373,61 @@ class ChatActionSheetTest {
             onDelete = {},
             onDismiss = {},
         )
+    }
+
+    @Test fun capturePopupFrames() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val shown = mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                Box(Modifier.fillMaxSize().background(Color.Black))
+                CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                    ChatContextMenu(
+                        expanded = shown.value,
+                        hasUnread = false,
+                        canMarkUnread = true,
+                        archived = false,
+                        muted = false,
+                        pinned = false,
+                        showPinToggle = true,
+                        showMovePinnedUp = false,
+                        showMovePinnedDown = false,
+                        onMarkRead = {},
+                        onMarkUnread = {},
+                        onAddToFolder = {},
+                        onArchiveToggle = {},
+                        onMuteToggle = {},
+                        onPinToggle = {},
+                        onMovePinned = {},
+                        onSelect = {},
+                        onDelete = {},
+                        onDismiss = { shown.value = false },
+                    )
+                }
+            }
+        }
+        captureTransitionFrames("popup/forward") { composeRule.runOnIdle { shown.value = true } }
+        captureTransitionFrames("popup/reverse") { composeRule.onNodeWithText(string(R.string.select)).performClick() }
+    }
+
+    private fun captureTransitionFrames(
+        name: String,
+        action: () -> Unit,
+    ) {
+        check(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val folder = File("build/animation-frames/$name").apply { mkdirs() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        captureScreenRoboImage(File(folder, "source.png").path)
+        action()
+        composeRule.runOnIdle {
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        repeat(32) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            captureScreenRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+        }
     }
 }

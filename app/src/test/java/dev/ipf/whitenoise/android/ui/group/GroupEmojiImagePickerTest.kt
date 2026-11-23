@@ -1,5 +1,10 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package dev.ipf.whitenoise.android.ui.group
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -10,7 +15,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performSemanticsAction
 import dev.ipf.whitenoise.android.media.GroupEmojiImageException
 import dev.ipf.whitenoise.android.media.GroupEmojiImageRenderer
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
@@ -177,6 +181,39 @@ class GroupEmojiImagePickerTest {
     }
 
     @Test
+    @Config(qualifiers = "en-w360dp-h780dp-mdpi")
+    fun cancelKeepsFooterGeometryAndDoesNotStartApplyProgress() {
+        var dismissCalls = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                GroupEmojiImagePickerSheet(
+                    applyInFlight = false,
+                    recentEmojis = listOf("😀"),
+                    onEmojiUsed = {},
+                    onApply = { error("Cancel must not apply") },
+                    onDismiss = { dismissCalls++ },
+                    renderer = { error("No selection") },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        val label = composeRule.onNodeWithText("Use emoji image", useUnmergedTree = true)
+        val before = label.fetchSemanticsNode().boundsInRoot.size
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.mainClock.advanceTimeBy(16)
+        composeRule.waitForIdle()
+        assertEquals(before, label.fetchSemanticsNode().boundsInRoot.size)
+        composeRule
+            .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .assertCountEquals(0)
+        composeRule.runOnIdle { assertEquals(0, dismissCalls) }
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(1, dismissCalls) }
+    }
+
+    @Test
     fun inFlightApplyLocksSelectionRemovalActionsAndDismissal() {
         val applyInFlight = androidx.compose.runtime.mutableStateOf(false)
         var dismissCalls = 0
@@ -201,11 +238,12 @@ class GroupEmojiImagePickerTest {
         composeRule.onAllNodesWithText("🚀").onFirst().assertIsNotEnabled()
         composeRule.onNodeWithText("Cancel").assertIsNotEnabled()
         composeRule.onNodeWithText("Use emoji image").assertIsNotEnabled()
+        // Busy sheets expose no dismissal accessibility action.
         composeRule
-            .onNode(
+            .onAllNodes(
                 androidx.compose.ui.test.SemanticsMatcher
                     .keyIsDefined(androidx.compose.ui.semantics.SemanticsActions.Dismiss),
-            ).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.Dismiss)
+            ).assertCountEquals(0)
 
         composeRule.onNodeWithTag(GROUP_EMOJI_IMAGE_PICKER_TAG).assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, dismissCalls) }

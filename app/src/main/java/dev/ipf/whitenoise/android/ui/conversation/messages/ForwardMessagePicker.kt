@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -82,16 +83,13 @@ import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.controlHandoffEndpoint
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.Search
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.share.DestinationFilterIncomplete
 import dev.ipf.whitenoise.android.ui.share.DestinationFolderFilterState
 import dev.ipf.whitenoise.android.ui.share.DestinationFolderFilters
@@ -121,6 +119,7 @@ internal fun ForwardMessagePickerFullScreen(
     sourceAccountRef: String?,
     onDismiss: () -> Unit,
     onForward: (destinationAccountRef: String, targetGroupIds: List<String>) -> Boolean,
+    origin: Rect? = null,
     initialDestinationAccountRef: String? = null,
     initialSelectedGroupIds: List<String> = emptyList(),
     onPickerStateChanged: PickerStateListener = { _, _, _ -> },
@@ -140,7 +139,12 @@ internal fun ForwardMessagePickerFullScreen(
             onDismiss()
         }
     }
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
+        onDismissStart = {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        },
         onDismissRequest = dismissPicker,
         properties =
             DialogProperties(
@@ -154,7 +158,7 @@ internal fun ForwardMessagePickerFullScreen(
             attachmentCount = attachmentCount,
             originGroupIdHex = originGroupIdHex,
             sourceAccountRef = sourceAccountRef,
-            onDismiss = dismissPicker,
+            onDismiss = dismiss,
             onForward = onForward,
             initialDestinationAccountRef = initialDestinationAccountRef,
             initialSelectedGroupIds = initialSelectedGroupIds,
@@ -386,7 +390,10 @@ internal fun ForwardMessagePickerContent(
                                         onClear = closeSearch,
                                         emptyTrailingIcon = {
                                             IconButton(onClick = closeSearch) {
-                                                Icon(Icons.Default.Close, stringResource(R.string.close))
+                                                Icon(
+                                                    painterResource(R.drawable.ic_close),
+                                                    stringResource(R.string.close),
+                                                )
                                             }
                                         },
                                         modifier =
@@ -417,7 +424,7 @@ internal fun ForwardMessagePickerContent(
                                     modifier = Modifier.controlHandoffEndpoint(searchHandoff, false),
                                 ) {
                                     Icon(
-                                        Icons.Default.Search,
+                                        painterResource(R.drawable.ic_search),
                                         contentDescription = stringResource(R.string.forward_search_chats),
                                     )
                                 }
@@ -426,7 +433,7 @@ internal fun ForwardMessagePickerContent(
                         navigationIcon = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { if (searchOpen) closeSearch() else onDismiss() }) {
-                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+                                    Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
                                 }
                                 sendingAccount?.let { account ->
                                     val name = appState.networkDisplayName(account.accountIdHex)
@@ -488,7 +495,7 @@ internal fun ForwardMessagePickerContent(
                         modifier = Modifier.fillMaxWidth().testTag("forward.confirm"),
                     ) {
                         Icon(
-                            Icons.AutoMirrored.Filled.Forward,
+                            painterResource(R.drawable.ic_forward),
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
@@ -505,7 +512,13 @@ internal fun ForwardMessagePickerContent(
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .nativePageBody(padding)
+                .padding(padding)
+                .consumeWindowInsets(padding),
+        ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 key(destination.selectedAccountRef) {
                     DestinationFolderFilters(
@@ -761,28 +774,3 @@ private fun awaitingForwardFilterRows(
     filteredEmpty: Boolean,
     browsingFiltered: Boolean,
 ): Boolean = targetsEmpty || (browsingFiltered && filteredEmpty)
-
-/** Adds/removes only this complete visible result; selections outside it remain untouched. */
-internal fun forwardSelectionAfterVisibleToggle(
-    selected: List<String>,
-    visibleIds: List<String>,
-): List<String> = forwardSelectionAfterFolderToggle(selected, visibleIds)
-
-/** A partial result can be browsed, but cannot authorize a bulk destination selection. */
-@Composable
-internal fun ForwardVisibleSelectionAction(
-    selected: List<String>,
-    visibleIds: List<String>,
-    complete: Boolean,
-    onSelectionChange: (List<String>) -> Unit,
-) {
-    val allSelected = visibleIds.isNotEmpty() && selected.containsAll(visibleIds)
-    val label = stringResource(if (allSelected) R.string.chat_list_deselect_all else R.string.chat_list_select_all)
-    IconButton(
-        onClick = { onSelectionChange(forwardSelectionAfterVisibleToggle(selected, visibleIds)) },
-        enabled = complete && visibleIds.isNotEmpty(),
-        modifier = Modifier.testTag("forward.selectAll"),
-    ) {
-        Icon(painterResource(if (allSelected) R.drawable.ic_deselect_all else R.drawable.ic_select_all), label)
-    }
-}

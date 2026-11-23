@@ -1,0 +1,114 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+  "legacy_sha256": "5f0083019b67bfa067eb0ae9ba55a3406001daf5b0233737a24e89e153662b5e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: ProfileSwitcherSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "ProfileSwitcherSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "fun ProfileSwitcherSheet(",
+        "test_ids": [
+          "NAV-004",
+          "NAV-006",
+          "CHL-022",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_unlinked_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "R.string.device_unlinked_title",
+        "test_ids": [
+          "SET-066"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.active",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "R.string.active",
+        "test_ids": [
+          "NAV-004",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "R.string.add_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "R.string.add_profile",
+        "test_ids": [
+          "NAV-004",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "R.string.read_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "R.string.read_only",
+        "test_ids": [
+          "NAV-004",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "R.string.settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "R.string.settings",
+        "test_ids": [
+          "NAV-004",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "R.string.signed_out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "R.string.signed_out",
+        "test_ids": [
+          "NAV-004",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "R.string.switch_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "R.string.switch_profile",
+        "test_ids": [
+          "NAV-004",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_switcher_attention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "R.string.remote_signer_switcher_attention",
+        "test_ids": [
+          "ONB-029"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: ProfileSwitcherSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

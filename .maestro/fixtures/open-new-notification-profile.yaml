@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Start a named draft next to the starter profiles.
+- runFlow: open-notification-profiles.yaml
+- tapOn:
+    id: "notification-profiles.create"
+- assertVisible:
+    id: "notification-profile.edit"
+- assertVisible: "New profile"
+- assertVisible:
+    id: "notification-profile.save"
+    enabled: false
+- tapOn:
+    id: "notification-profile.name"
+- inputText: "Maestro sleep"
+- hideKeyboard
+- assertVisible:
+    id: "notification-profile.save"
+    enabled: true

@@ -44,6 +44,7 @@ class ConversationInitialTimelineTest {
                 preview(deliveryState = ChatListMessageDeliveryStateFfi.FAILED),
                 // A seeded event card would paint as Loading before the first page can warm it (#2238).
                 preview(plaintext = "look nostr:note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv"),
+                preview(plaintext = "bare note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv"),
                 // An escaped link destination still renders a card, so it waits for the page too.
                 preview(plaintext = "[post](https\\://njump.me/note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv)"),
             )
@@ -65,7 +66,6 @@ class ConversationInitialTimelineTest {
     fun cardLookalikePreviewStillSeeds() {
         listOf(
             "see footnote1 below",
-            "bare note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv",
             "njump.me/note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv",
         ).forEach { plaintext ->
             assertEquals(
@@ -163,6 +163,7 @@ class ConversationInitialTimelineTest {
     /** Builds the sent kind-9 test message record with the given text. */
     private fun record(plaintext: String) =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = MESSAGE_ID,
             direction = "sent",
             groupIdHex = GROUP_ID,

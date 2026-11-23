@@ -1,0 +1,237 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Remote signer status and recovery in Account keys",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "fun LazyListScope.remoteSignerAccountItems(",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "Remote signer re-pair and disconnect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "fun rememberRemoteSignerAccountActions(",
+        "test_ids": [
+          "ONB-029"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "RemoteSignerAccountDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "fun RemoteSignerAccountDialogs(",
+        "test_ids": [
+          "ONB-029"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_action_disconnect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_action_disconnect",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_action_pair_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_action_pair_again",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_action_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_action_retry",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_action_review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_action_review",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_approval_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_approval_done",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_approval_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_approval_open",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_disconnect_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_disconnect_body",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_disconnect_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_disconnect_confirm",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_disconnect_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_disconnect_title",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_owns_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_owns_key",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_review_approve",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_review_approve",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_review_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_review_title",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_signed_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_signed_in",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_approval",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_approval",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_approval_host",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_approval_host",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_approval_unsupported",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_approval_unsupported",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_connecting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_connecting",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_declined",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_declined",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_disconnected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_disconnected",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_ended",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_ended",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_paired",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_paired",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_permissions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_permissions",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_reconnecting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_reconnecting",
+        "test_ids": [
+          "ONB-029"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_status_unreachable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+        "anchor": "R.string.remote_signer_status_unreachable",
+        "test_ids": [
+          "ONB-029"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

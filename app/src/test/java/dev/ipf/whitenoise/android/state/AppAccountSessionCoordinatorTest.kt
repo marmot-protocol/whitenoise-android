@@ -274,6 +274,7 @@ class AppAccountSessionCoordinatorTest {
             stalled.complete(Unit)
             assertNull(toB.await())
             assertNotNull(toC.await())
+            assertEquals(listOf("original"), host.cancelledLinks)
             assertEquals("c", host.activeAccount)
             assertEquals(listOf("publish:c"), host.events.filter { it.startsWith("publish:") })
             assertEquals(listOf("c"), ready)
@@ -490,6 +491,7 @@ class AppAccountSessionCoordinatorTest {
             assertNull(selection.await())
             publication.await()
             assertEquals("created", host.activeAccount)
+            assertEquals(listOf("original"), host.cancelledLinks)
             assertFalse(host.events.any { it.startsWith("publish:") })
         }
 
@@ -643,6 +645,12 @@ class AppAccountSessionCoordinatorTest {
         ): Boolean = publicationAllowed && runtime == currentRuntimeGeneration
 
         /** Exposes the last suspending platform step before publication. */
+        val cancelledLinks = mutableListOf<String>()
+
+        override suspend fun cancelOutgoingDeviceLink(label: String) {
+            cancelledLinks += label
+        }
+
         override suspend fun hidePreviousAccountShortcuts() {
             events += "hide"
             beforeHide()

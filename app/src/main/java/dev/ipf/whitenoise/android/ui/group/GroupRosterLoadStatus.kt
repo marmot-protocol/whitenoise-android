@@ -16,14 +16,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.ui.chats.newchat.QuickActionButton
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.PersonAdd
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 /**
@@ -123,7 +123,7 @@ internal fun GroupDetailsAddMemberAction(
 ) {
     if (!visible) return
     QuickActionButton(
-        icon = Icons.Default.PersonAdd,
+        icon = ImageVector.vectorResource(R.drawable.ic_group_add),
         label = stringResource(R.string.quick_action_add),
         onClick = onClick,
         enabled = memberAdministrationPresentable(rosterState, seededSelfMember) && !mutationsBlocked,

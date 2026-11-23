@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,8 +40,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Group
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -138,7 +136,7 @@ internal fun PersonGroupsInCommonContent(
                                                     )
                                                 }
                                                 val menuScrollState = rememberScrollState()
-                                                DropdownMenu(
+                                                AnimatedDropdownMenu(
                                                     expanded,
                                                     onDismissRequest = { expanded = false },
                                                     scrollState = menuScrollState,
@@ -147,12 +145,14 @@ internal fun PersonGroupsInCommonContent(
                                                             menuScrollState,
                                                             stableRenderTarget = true,
                                                         ),
-                                                ) {
+                                                ) { surface ->
                                                     DropdownMenuItem(
                                                         text = { Text(removeLabel(group)) },
                                                         onClick = {
-                                                            expanded = false
-                                                            onRemove(group.id)
+                                                            surface.close {
+                                                                expanded = false
+                                                                onRemove(group.id)
+                                                            }
                                                         },
                                                     )
                                                 }
@@ -192,7 +192,7 @@ internal fun PersonSharedGroupAvatars(
     avatar: @Composable (String) -> ImageBitmap? = { null },
 ) {
     if (rows.isEmpty()) {
-        Icon(Icons.Default.Group, null, Modifier.size(24.dp))
+        Icon(painterResource(R.drawable.ic_group), null, Modifier.size(24.dp))
         return
     }
     val shown = rows.take(3)

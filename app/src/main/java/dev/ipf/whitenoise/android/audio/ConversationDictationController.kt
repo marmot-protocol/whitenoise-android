@@ -5,8 +5,6 @@ package dev.ipf.whitenoise.android.audio
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Handler
-import android.os.Looper
 import android.os.SystemClock
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -196,6 +194,7 @@ internal class ConversationDictationController internal constructor(
                 )
             }
             observedState = value
+            if (value is ConversationDictationState.Failed) sealFollowUp()
         }
 
     internal fun conversationDictationDiagnostic(event: String) {
@@ -204,7 +203,7 @@ internal class ConversationDictationController internal constructor(
 
     internal val completionRevisions = mutableStateMapOf<ConversationDictationKey, Int>()
     internal val pendingSendRevisions = mutableStateMapOf<ConversationDictationKey, Int>()
-    private var nextSessionId = 0L
+    internal var nextSessionId = 0L
     private val notificationInstanceId = UUID.randomUUID().toString()
     internal val recognitionDeadlines = ConversationDictationRecognitionDeadlines()
     internal var captureClosureTimeoutHandle: ConversationDictationTimeoutHandle? = null
@@ -256,8 +255,9 @@ internal class ConversationDictationController internal constructor(
     internal val recognition = ConversationDictationRecognitionCoordinator()
     internal val generation = ConversationDictationGenerationOwner(recognitionDeadlines::cancelGeneration)
     internal val restart = ConversationDictationRestartOwner()
+    internal val followUp = ConversationDictationFollowUpOwner()
     internal val accumulatedTranscript: String get() = recognition.transcript
-
+    internal val finishTiming = ConversationDictationFinishTiming()
     internal var retainedAudioFailure: ConversationDictationFailure? = null
     var recoveryHandedToComposer by mutableStateOf(false)
         internal set
@@ -320,12 +320,14 @@ internal class ConversationDictationController internal constructor(
 
     /** True while provider segment processing remains part of an open capture. */
     val captureInProgress: Boolean
-        get() = !finishRequested && inActiveRecognitionState
+        get() = followUp.capturing || (!finishRequested && inActiveRecognitionState)
 
     /** The completion button that owns indeterminate work for the current visible phase. */
     val processingDeliveryMode: ConversationDictationDeliveryMode?
         get() =
-            if (finishRequested && inActiveRecognitionState) {
+            if (followUp.pending != null) {
+                followUp.processingMode
+            } else if (finishRequested && inActiveRecognitionState) {
                 requestedDeliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft
             } else {
                 null
@@ -359,7 +361,9 @@ internal class ConversationDictationController internal constructor(
         get() = runCatching(platform::speechProviderPackage).getOrNull()
 
     val completionActionsEnabled: Boolean
-        get() = !deliveryInProgress && completion.intent.canChooseExplicit && hasPendingCompletion
+        get() =
+            followUp.acceptsCompletion
+                ?: (!deliveryInProgress && completion.intent.canChooseExplicit && hasPendingCompletion)
 
     private val hasPendingCompletion: Boolean
         get() =
@@ -566,6 +570,7 @@ internal class ConversationDictationController internal constructor(
         resetTranscriptSession()
         recoveryHandedToComposer = false
         state = ConversationDictationState.Idle
+        promoteFollowUp(previousDelivered = false)
         return true
     }
 
@@ -688,14 +693,11 @@ internal class ConversationDictationController internal constructor(
     fun providerActivityIntent(): Intent = platform.providerActivityIntent()
 
     /** Records the first-use disclosure and resumes its exact pending target. */
-    fun acceptDisclosure() {
-        val pending = state as? ConversationDictationState.DisclosureRequired ?: return
-        if (pending.usesOfflineSpeechToText) {
-            markOfflineDisclosureAccepted()
-        } else {
-            markDisclosureAccepted()
-        }
-        startTarget(pending.sessionId, pending.target)
+    fun acceptDisclosure(
+        expected: ConversationDictationState.DisclosureRequired? =
+            state as? ConversationDictationState.DisclosureRequired,
+    ) {
+        acceptPendingDisclosure(expected, markDisclosureAccepted, markOfflineDisclosureAccepted)
     }
 
     /** Resumes recognition after a grant or publishes the appropriate permission failure. */
@@ -772,6 +774,7 @@ internal class ConversationDictationController internal constructor(
 
     /** Discards process-memory transcript state and releases every resource held by the session. */
     fun cancel() {
+        if (cancelFollowUp()) return
         // Once MDK dispatch starts, cancellation cannot recall the message. Retain ownership until its outcome.
         if (deliveryInProgress) {
             conversationDictationDiagnostic(
@@ -792,6 +795,7 @@ internal class ConversationDictationController internal constructor(
      * its own drain deadline. This deliberately narrows #3401 to choices the user did not make.
      */
     fun interruptForAudioFocusLoss() {
+        sealFollowUp()
         if (!inActiveRecognitionState || deliveryInProgress || completion.intent.committed) return
         if (finishRequested && completion.intent.explicit) {
             // Another app's audio cannot change the sealed speech, so finish the user's chosen action.
@@ -935,7 +939,7 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
     ) {
-        parkedRecoveries.remove(ConversationDictationKey.from(accountRef, groupIdHex))?.audio?.discard()
+        forgetConversationAudio(accountRef, groupIdHex)
         if (!isOwnedBy(accountRef, groupIdHex)) return
         draftTargetRemoved = true
         val current = state
@@ -963,11 +967,8 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Cancels only when the target account is signed out or removed, not when it becomes inactive. */
     fun onAccountUnavailable(accountRef: String) {
-        parkedRecoveries.keys.filter { it.accountRef.equals(accountRef, ignoreCase = true) }.forEach { key ->
-            parkedRecoveries.remove(key)?.audio?.discard()
-        }
+        forgetAccountAudio(accountRef)
         if (state.target?.accountRef?.equals(accountRef, ignoreCase = true) == true) {
             conversationDictationDiagnostic("event=account_unavailable outcome=cancelled")
             cancelSession()
@@ -976,6 +977,7 @@ internal class ConversationDictationController internal constructor(
 
     /** Releases any provider/microphone resource without discarding retained transcript text. */
     fun onAppBackgrounded() {
+        sealFollowUp()
         pendingForegroundRecoverySessionId = null
         onMicrophoneBackgrounded()
         val abort =
@@ -1173,7 +1175,7 @@ internal class ConversationDictationController internal constructor(
                 (attempt - 1).coerceIn(0, PROVIDER_DISCONNECT_RETRY_DELAYS_MILLIS.lastIndex),
             ]
         } else {
-            GENERATION_RESTART_DELAY_MILLIS
+            restart.shortSettle.settleMillis(providerEnded = isEmptyRecognition, finishing = finishRequested)
         }
 
     internal companion object {
@@ -1205,15 +1207,4 @@ internal class ConversationDictationController internal constructor(
         const val PERMISSION_RETRY_DELAY_MILLIS = 500L
         val PROVIDER_DISCONNECT_RETRY_DELAYS_MILLIS = longArrayOf(500L, 1_000L, 2_000L)
     }
-}
-
-/** Posts a cancellable main-thread watchdog used to bound recognizer state transitions. */
-private fun scheduleConversationDictationTimeout(
-    delayMillis: Long,
-    callback: () -> Unit,
-): ConversationDictationTimeoutHandle {
-    val handler = Handler(Looper.getMainLooper())
-    val runnable = Runnable(callback)
-    handler.postDelayed(runnable, delayMillis)
-    return ConversationDictationTimeoutHandle { handler.removeCallbacks(runnable) }
 }

@@ -75,6 +75,50 @@ class NewChatFoundingOptionsTest {
             assertEquals(604_800uL, receivedOptions?.disappearingMessageSecs)
         }
 
+    /** Without a default, a direct chat uses MarmotKit's shared direct operation so both people are admins. */
+    @Test
+    fun directChatWithoutDefaultUsesSharedDirectConversation() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val preferences = context.getSharedPreferences("new-chat-founding-options", Context.MODE_PRIVATE)
+            preferences.edit().clear().commit()
+            var receivedAccount: String? = null
+            var receivedPeer: String? = null
+            val marmot =
+                Proxy.newProxyInstance(
+                    MarmotInterface::class.java.classLoader,
+                    arrayOf(MarmotInterface::class.java),
+                ) { proxy, method, arguments ->
+                    when (method.name) {
+                        "startDirectConversation" -> {
+                            receivedAccount = arguments!![0] as String
+                            receivedPeer = arguments[1] as String
+                            "direct-group"
+                        }
+                        "toString" -> "NewChatFoundingOptionsMarmotFake"
+                        "hashCode" -> System.identityHashCode(proxy)
+                        "equals" -> proxy === arguments?.firstOrNull()
+                        else -> error("Unexpected Marmot call: ${method.name}")
+                    }
+                } as MarmotInterface
+            val runtime = AppMarmotRuntime(rootPath = "test", marmot = marmot)
+            val state =
+                WhiteNoiseAppState(
+                    context = context,
+                    draftStore = DraftStore(NewChatFoundingOptionsDraftPersistence),
+                    accountIdHexResolver = { null },
+                    accounts = listOf(AccountSummaryFfi("alice", "aa".repeat(32), true, false, false, true, false)),
+                    activeAccountRef = "alice",
+                    initialMarmotRuntime = runtime,
+                    marmotRuntimeFactory = { runtime },
+                    preferences = preferences,
+                )
+
+            assertEquals("direct-group", state.createProfileChatGroup("npub1bob"))
+            assertEquals("alice", receivedAccount)
+            assertEquals("npub1bob", receivedPeer)
+        }
+
     @Test
     fun staleAccountSaveIsRejectedWithoutChangingEitherAccount() {
         val context = ApplicationProvider.getApplicationContext<Context>()

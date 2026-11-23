@@ -149,7 +149,9 @@ def inventory(root=ROOT, include_companions=False):
     return {'schema': 1, 'requirements': requirements, 'surfaces': surfaces, 'cases': cases,
             'screen_catalog': screens, 'discovered_screen_count': len(screens),
             'planned_screen_assertion_count': sum(bool(screen['bindings']) for screen in screens),
-            'screens_without_direct_assertions': [screen['symbol'] for screen in screens if not screen['bindings']],
+            'screens_without_direct_assertions': [screen['symbol'] for screen in screens
+                                                  if not screen['bindings'] and not screen['second_device']],
+            'screens_needing_second_device': [screen['symbol'] for screen in screens if screen['second_device']],
             'screen_edge_check_count': sum(len(screen['edge_plan']) for screen in screens),
             'named_edge_cases': edges, 'named_edge_case_count': len(edges),
             'required_edge_dimensions': list(EDGE_DIMENSIONS),
@@ -194,6 +196,8 @@ def markdown_inventory(result, source_sha=None):
             lines.extend([f"Direct planned assertion: [{binding['case']}]({base}{result['cases'][binding['case']]['flow']}) — {binding['scope']} Execution remains unverified.", ''])
         if not screen['bindings']:
             lines.extend(['Remaining screen coverage: ' + screen['remaining'], ''])
+        if screen['second_device']:
+            lines.extend(['Needs a second device, covered manually by: ' + ', '.join(screen['second_device']), ''])
         if screen['companion_test_source_references']:
             references = [f'[{Path(item["source"]).name}]({base}{item["source"]})'
                           for item in screen['companion_test_source_references']]

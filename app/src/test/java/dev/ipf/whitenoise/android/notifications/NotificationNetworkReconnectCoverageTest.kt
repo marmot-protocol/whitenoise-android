@@ -330,16 +330,22 @@ class NotificationNetworkReconnectCoverageTest {
                 .substringAfter("private suspend fun WhiteNoiseAppState.enrichPostedNotificationUpdate")
                 .substringBefore("private suspend fun WhiteNoiseAppState.postNotificationContentCorrection")
         val latePost = notificationContent.functionBody("postNotificationLateCorrection")
+        val eligibility =
+            notificationContentSource().resolveSibling("AppStateNotificationPostEligibility.kt").readText()
         val notificationGates =
-            notificationContent
-                .substringAfter("private fun WhiteNoiseAppState.isNotificationGenerationPostAllowed")
+            eligibility
+                .substringAfter("internal fun WhiteNoiseAppState.isNotificationGenerationPostAllowed")
+                .substringBefore("internal fun WhiteNoiseAppState.isNotificationEnrichmentAllowed")
+        val epochEnrichmentGate =
+            eligibility
+                .substringAfter("internal fun WhiteNoiseAppState.isNotificationEnrichmentAllowed")
                 .substringBefore("/**")
         val capturedEnrichmentGate =
             Regex(
-                """private fun WhiteNoiseAppState\.isNotificationEnrichmentAllowed\(""" +
+                """internal fun WhiteNoiseAppState\.isNotificationEnrichmentAllowed\(""" +
                     """\s*update: NotificationUpdateFfi,\s*""" +
                     """firstPost: NotificationFirstPost,\s*\): Boolean =([\s\S]*?)\n\s*/\*\*""",
-            ).find(notificationContent)?.groupValues?.get(1).orEmpty()
+            ).find(eligibility)?.groupValues?.get(1).orEmpty()
         assertTrue(
             "a wipe that starts during notification enrichment must block the final presenter write",
             "isNotificationEnrichmentAllowed(candidate, firstPost)" in enrichment &&
@@ -349,7 +355,7 @@ class NotificationNetworkReconnectCoverageTest {
                 "firstPost.epoch" in capturedEnrichmentGate &&
                 "firstPost.accountCacheEpoch" in capturedEnrichmentGate &&
                 "firstPost.engineMuted" in capturedEnrichmentGate &&
-                "isNotificationGenerationPostAllowed(" in notificationGates &&
+                "isNotificationGenerationPostAllowed(" in epochEnrichmentGate &&
                 "!networkNotificationRecoverySuppressed" in notificationGates,
         )
     }

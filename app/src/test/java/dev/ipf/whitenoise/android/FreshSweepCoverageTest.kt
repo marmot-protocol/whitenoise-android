@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android
 
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.ui.common.relativeTimeRefreshDelayMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -79,7 +80,9 @@ class FreshSweepCoverageTest {
     fun selectableMessageProjectionsSnapshotTextFromTheirRealInputs() {
         val source = source("ui/conversation/ConversationSelectableMessages.kt")
         val projection =
-            source.functionBody("projectSelectableMessages") + source.functionBody("selectableMessageProjection")
+            source.functionBody("projectSelectableMessages") +
+                source.functionBody("selectableMessageProjection") +
+                source.functionBody("liveSelectableMessage")
 
         assertTrue("each message must be projected", "selectableMessageProjection(item, controller" in projection)
         assertTrue("projected deletions must come from the controller", "controller.deletedMessageIds" in projection)
@@ -177,6 +180,7 @@ class FreshSweepCoverageTest {
 
     @Test
     fun twoStepLeavesAndInviteFailuresStayInsideTheirSafetyBoundaries() {
+        val adminLeave = source("state/AdminGroupLeave.kt")
         val departure = source("state/ChatsControllerDeparture.kt")
         val source = source("state/ChatsController.kt") + "\n" + conversationControllerSource()
         val chatListLeave =
@@ -194,7 +198,10 @@ class FreshSweepCoverageTest {
             )
 
         assertTrue(chatListLeave.contains("withContext(NonCancellable)"))
-        assertTrue(conversationLeave.contains("withContext(NonCancellable)"))
+        assertTrue(conversationLeave.contains("leaveWithRoster("))
+        assertTrue(adminLeave.kotlinFunctionBody("demoteThenLeave").contains("withContext(NonCancellable)"))
+        val legacyLeave = "leaveAsAdmin(account, group.groupIdHex) { demoteThenLeave(account, onDemoted) }"
+        assertTrue(adminLeave.contains(legacyLeave))
         assertTrue(accept.indexOf("acceptGroupInvite") < accept.indexOf("refreshMembers()"))
         val resolver =
             source.section(
@@ -291,7 +298,9 @@ class FreshSweepCoverageTest {
             Regex(
                 """withContext\(Dispatchers\.Main\.immediate\) \{\s*""" +
                     """application\.appState\.ensureNotificationRuntimeStarted\(\)\s*""" +
-                    """application\.appState\.markNotificationMessageRead\(""",
+                    """if \(!application\.appState\.appLock\.notificationActionsAllowed\) """ +
+                    """return@withContext null\s*""" +
+                    """application\.appState\.markNotificationMessageReadIfAllowed\(""",
             )
 
         assertTrue("mark-read broadcasts must only enqueue durable work", "NotificationMarkReadWorker.enqueue" in markReadEnqueue)
@@ -381,7 +390,7 @@ class FreshSweepCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$relativePath"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$relativePath"),
-        ).firstOrNull(File::exists)?.readText()
+        ).firstOrNull(File::exists)?.motionOwnerSource()
             ?: error("Missing source file: $relativePath")
 
     /** Reads the attachment-video sources split across the bubble, grid tile, cache and viewer files. */

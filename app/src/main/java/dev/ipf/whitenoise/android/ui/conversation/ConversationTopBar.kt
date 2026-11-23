@@ -1,5 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,7 +76,6 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
-import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
@@ -263,8 +268,6 @@ internal fun ConversationTopBar(
                                     Modifier
                                         .fillMaxWidth()
                                         .heightIn(min = 48.dp)
-                                        // Details unfold from this header and fold back into it.
-                                        .settingsCardMorph(anchor = ConversationMorphAnchor.Details)
                                         .clip(RoundedCornerShape(12.dp))
                                         // The reader speaks the chat name and member line, then offers Details.
                                         .explainOnLongPress(
@@ -471,7 +474,16 @@ private fun HeaderTimerBadge(
             modifier = Modifier.size(12.dp).testTag("conversation.header.timer"),
             tint = labelColor,
         )
-        Text(label, style = labelStyle, color = labelColor, maxLines = 1, softWrap = false)
+        // A new timer rolls in under the old one, so a change made from the sheet is visible where it lives.
+        AnimatedContent(
+            targetState = label,
+            transitionSpec = {
+                (slideInVertically { it } + fadeIn()).togetherWith(slideOutVertically { -it } + fadeOut())
+            },
+            label = "header-timer-label",
+        ) { shown ->
+            Text(shown, style = labelStyle, color = labelColor, maxLines = 1, softWrap = false)
+        }
     }
 }
 

@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import dev.ipf.whitenoise.android.core.nip19
+import dev.ipf.whitenoise.android.core.nip19Tlv
+import dev.ipf.whitenoise.android.core.nip19Uint
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,10 +14,14 @@ import org.junit.Test
 class NostrEventCardTriggerTest {
     private val note = noteBech32("a".repeat(64))
 
-    /** A `nostr:` event URI and an HTTP(S) link with a NIP-19 event segment both render cards, so both match. */
+    /** The host admits each form the existing parser and event collector can turn into cards. */
     @Test
     fun formsThatRenderCardsMatch() {
         listOf(
+            note,
+            "see ($note).",
+            nip19("nevent", nip19Tlv(0, List(32) { 17 })),
+            nip19("naddr", nip19Tlv(0, listOf(97)) + nip19Tlv(2, List(32) { 17 }) + nip19Tlv(3, nip19Uint(30_617u))),
             "nostr:$note",
             "see (nostr:$note).",
             "https://njump.me/$note",
@@ -38,26 +45,20 @@ class NostrEventCardTriggerTest {
         ).forEach { text -> assertTrue("must match: $text", mayNameNostrEventCard(text)) }
     }
 
-    /** An escaped `nostr\:` colon stays literal in MDK, so it renders no card and does not match. */
-    @Test
-    fun escapedNostrUriDoesNotMatch() {
-        assertFalse(mayNameNostrEventCard("nostr\\:$note"))
-        assertFalse("an escape is not a scheme", mayNameNostrEventCard("https\\:njump.me $note"))
-    }
-
-    /** Prose, bare tokens and scheme-less links never render a card, so they hold nothing. */
+    /** Prose lookalikes and scheme-less links admit no event reference. */
     @Test
     fun lookalikesThatRenderNoCardDoNotMatch() {
         listOf(
             "see footnote1 below",
             "footnote1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgw0hqv",
-            "bare $note",
+            "@$note",
+            note.uppercase(),
+            "note1" + "q".repeat(1020),
             "njump.me/$note",
             "www.njump.me/$note",
             "foonostr:$note",
             "nostr:${note.uppercase()}",
             "nostr:note1abc",
-            "https://example.com and then $note",
             "https://example.com/xnote1qqqqqqqq",
         ).forEach { text -> assertFalse("must not match: $text", mayNameNostrEventCard(text)) }
     }
@@ -89,7 +90,7 @@ class NostrEventCardTriggerTest {
     fun segmentMatchesOnlyAfterSchemeInItsOwnRun() {
         assertTrue(mayNameNostrEventCard("http://a https://b http://njump.me/$note"))
         assertTrue(mayNameNostrEventCard("https://x\ty https://njump.me/$note"))
-        assertFalse(mayNameNostrEventCard("https://a https://b\n$note"))
-        assertFalse(mayNameNostrEventCard("$note https://njump.me/"))
+        assertFalse(mayNameNostrEventCard("https://a https://b\n${note.uppercase()}"))
+        assertFalse(mayNameNostrEventCard("${note.uppercase()} https://njump.me/"))
     }
 }

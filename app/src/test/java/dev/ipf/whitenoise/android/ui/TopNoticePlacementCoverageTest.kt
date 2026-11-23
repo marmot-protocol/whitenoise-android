@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -165,11 +166,11 @@ class TopNoticePlacementCoverageTest {
     @Test
     fun theRoutedConversationScopesItsBanners() {
         val shell = mainSource("ui/navigation/MainShell.kt")
-        val provide = shell.indexOf("LocalTopNoticeScope provides")
-        val screen = shell.indexOf("ConversationScreen(", provide)
-        assertTrue("the scope must wrap the conversation", provide >= 0 && screen > provide)
-        val scope = shell.substring(provide, screen)
-        assertTrue("ConversationNoticeDestination(content.accountRef, chat.group.groupIdHex)" in scope)
+        val open = shell.indexOf("ConversationScope(\n")
+        val screen = shell.indexOf("ConversationScreen(", open)
+        assertTrue("the scope must wrap the conversation", open >= 0 && screen > open)
+        val scope = mainSource("ui/conversation/ConversationScope.kt").functionBody("ConversationScope")
+        assertTrue("LocalTopNoticeScope provides ConversationNoticeDestination(accountRef, groupIdHex)" in scope)
     }
 
     /** Banner placement reads one host decision: the owning slot, its scope, and the lock gate. */
@@ -216,11 +217,11 @@ class TopNoticePlacementCoverageTest {
         sourceRoot()
             .walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
-            .map { it.relativeTo(sourceRoot()).path to it.readText() }
+            .map { it.relativeTo(sourceRoot()).path to it.motionOwnerSource() }
             .toList()
 
     /** One production source by its path below the app package. */
-    private fun mainSource(path: String): String = File(sourceRoot(), path).readText()
+    private fun mainSource(path: String): String = File(sourceRoot(), path).motionOwnerSource()
 
     /** The app package's source root, from either the module or the repository working directory. */
     private fun sourceRoot(): File =

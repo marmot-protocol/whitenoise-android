@@ -17,10 +17,12 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -34,8 +36,7 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Check
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,15 +48,25 @@ internal fun ShareChatPickerAccountSheet(
     onChooseAccount: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal =
+        rememberSheetTerminalMotion(sheetState, Triple(appState, appState.activeAccountRef, appState.runtimeGeneration))
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        onDismissRequest = { terminal.close(onDismiss) },
         containerColor = amoledSheetContainerColor(),
     ) {
         ShareChatPickerAccountSheetContent(
             appState = appState,
             accounts = accounts,
             selectedAccountRef = selectedAccountRef,
-            onChooseAccount = onChooseAccount,
+            onChooseAccount = { accountRef ->
+                terminal.close(accountRef) { selected ->
+                    onChooseAccount(selected)
+                    // Choosing the current account or a now-rejected target must still retire this sheet.
+                    onDismiss()
+                }
+            },
         )
     }
 }
@@ -145,7 +156,7 @@ private fun ShareChatPickerAccountItem(
         },
         trailingContent = {
             if (selected) {
-                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.selected))
+                Icon(painterResource(R.drawable.ic_check), contentDescription = stringResource(R.string.selected))
             }
         },
     )

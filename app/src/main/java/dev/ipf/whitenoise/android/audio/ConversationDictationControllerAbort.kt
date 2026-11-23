@@ -12,6 +12,7 @@ internal fun ConversationDictationController.cancelSession() {
     clearRecognitionSession(cancel = true)
     resetTranscriptSession()
     state = ConversationDictationState.Idle
+    promoteFollowUp(previousDelivered = false)
 }
 
 /** Handles involuntary teardown without routing already recognized text through cancellation. */

@@ -1,0 +1,80 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AddRelaySheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
+        "anchor": "fun AddRelaySheet(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:add_relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
+        "anchor": "R.string.add_relay",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:choose_at_least_one_role",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
+        "anchor": "R.string.choose_at_least_one_role",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_publishing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
+        "anchor": "R.string.relay_list_publishing",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
+        "anchor": "R.string.relay_url",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:use_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
+        "anchor": "R.string.use_for",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_relays_add_submit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
+        "anchor": "R.string.explanation_relays_add_submit",
+        "test_ids": [
+          "SET-056"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

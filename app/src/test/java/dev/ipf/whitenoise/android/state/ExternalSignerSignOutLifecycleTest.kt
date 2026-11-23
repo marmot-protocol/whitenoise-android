@@ -161,7 +161,7 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
             state.createIdentity()
             assertEquals(1, createdIdentityCalls.get())
             assertEquals(accountRef, state.activeAccountRef)
-            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
+            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
             createdPolicyFailure = null
             val retry = runCatching { state.createIdentity() }
             assertTrue(retry.exceptionOrNull() is kotlinx.coroutines.CancellationException)
@@ -196,7 +196,7 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
             read.awaitEntered()
             setupSnapshotReply = null
             try {
-                assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
+                assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
             } finally {
                 read.release(
                     dev.ipf.whitenoise.android.ui.onboarding.setup
@@ -219,7 +219,7 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
             read.awaitEntered()
             setupRecoveryReply = null
             try {
-                assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
+                assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
             } finally {
                 read.release(true)
             }
@@ -273,7 +273,7 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
         runBlocking {
             val state = appState(profileCleanupFailureContext(throws = true))
             seedProfileAlertChoices(state)
-            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
+            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).native.localCleanup.completed)
             assertEquals(1, wipeCalls.get())
             assertTrue(listAccountsCalls.get() > 0)
             assertNull(state.activeAccountRef)

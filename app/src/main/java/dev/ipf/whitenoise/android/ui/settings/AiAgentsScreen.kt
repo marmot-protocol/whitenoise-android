@@ -16,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +44,8 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -97,7 +100,11 @@ internal fun AiAgentsContent(
             }
             item(key = "search.AiAgents.3") { SettingsSection(stringResource(R.string.ai_agents_connectors_title)) }
             item(key = "search.AiAgents.4") {
-                SettingsGroup(modifier = Modifier.testTag("ai_agents.connectors")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("ai_agents.connectors"),
+                    destination = SettingsDetail.AiAgents,
+                    surface = "ai-connectors",
+                ) {
                     agentConnectors.forEach { connector ->
                         row(connector.id) { rowContext ->
                             SettingsLink(
@@ -202,9 +209,12 @@ private fun AgentSetupSheet(
         onCopy(title, prompt)
         copied = true
     }
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheet)
+    val close = { terminal.close(onDismiss) }
+    WhiteNoiseModalBottomSheet(onDismissRequest = close, sheetState = sheet) {
         Column(Modifier.fillMaxWidth()) {
-            WhiteNoiseSheetHeader(title = title, onClose = onDismiss)
+            WhiteNoiseSheetHeader(title = title, onClose = close)
             Column(
                 modifier =
                     Modifier

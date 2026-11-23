@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.audio
 
+import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.kotlinBlockFrom
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,7 +13,9 @@ class VoiceRecordingOwnershipCoverageTest {
     /** Registers production capture and review-owned feedback rather than a detached snackbar. */
     @Test
     fun conversationInstallsForegroundLifecycleAndRecordingBudgetFeedback() {
-        val conversation = source("ui/conversation/ConversationScreen.kt")
+        val screen = source("ui/conversation/ConversationScreen.kt")
+        val conversation = source("ui/conversation/ConversationVoiceCapture.kt")
+        assertTrue(screen.contains("rememberConversationVoiceCapture(appState, controller, mediaSender"))
         val lifecycle = source("ui/conversation/composer/VoiceRecordingLifecycle.kt")
         assertTrue(conversation.contains("VoiceRecordingLifecycleEffect(voiceRecordingController)"))
         assertTrue(lifecycle.contains("Lifecycle.Event.ON_PAUSE) controller.interrupt()"))
@@ -22,11 +27,40 @@ class VoiceRecordingOwnershipCoverageTest {
         assertTrue(lifecycle.contains("R.string.voice_recording_interrupted"))
         assertTrue(lifecycle.contains("appState.presentConversationTransient("))
         assertTrue(lifecycle.contains("appState::clearTransientNotice"))
+        // An automatic stop is recorded in the chat's draft and explained by that chat, never as a global snackbar.
+        val owner = source("audio/VoiceNoteSessionOwner.kt")
         val automaticStop =
-            conversation
-                .substringAfter("onAutomaticStop = { reason ->")
-                .substringBefore("\n                },")
-        assertFalse(automaticStop.contains("appState.present("))
+            owner.kotlinBlockFrom(
+                openDelimiter = owner.indexOf("onAutomaticStop = {") + "onAutomaticStop = ".length,
+                description = "onAutomaticStop",
+            )
+        assertTrue(automaticStop.contains("withStopReason("))
+        assertFalse(automaticStop.contains("present"))
+    }
+
+    /**
+     * The conversation presents the process-level owner's recorder and draft and never ends them: closing the chat
+     * unbinds, so a locked take keeps recording and a finished take waits in review.
+     */
+    @Test
+    fun closingTheChatUnbindsAndNeverEndsTheTake() {
+        val conversation = source("ui/conversation/ConversationVoiceCapture.kt")
+        assertTrue(conversation.contains("owner.bind(key, requestPermission)"))
+        assertTrue(conversation.contains("onDispose { owner.unbind(key, voiceRecordingController) }"))
+        assertTrue(conversation.contains("onDispose { voiceReview.detach() }"))
+        assertFalse(conversation.contains("voiceRecordingController.release()"))
+        assertFalse(conversation.contains("voiceRecordingController.cancel()"))
+        assertFalse(conversation.contains("voiceReview.release()"))
+        assertFalse("no screen-owned recorder", conversation.contains("VoiceRecordingController("))
+        val store = source("audio/VoiceDraftStore.kt")
+        assertTrue(store.contains("File(accountDirectory(key.accountRef), chatName(key))"))
+        assertTrue(store.contains("File(root, voiceReviewRecoveryOwner(accountRef,"))
+        assertTrue(store.contains("voiceReviewRecoveryOwner(key.accountRef, key.groupIdHex)"))
+        val helpers = source("state/AppStateCaptureOwners.kt")
+        val account = helpers.functionBody("releaseCaptureOwners")
+        assertTrue(account.contains("conversationDictation.onAccountUnavailable(") && account.contains("voiceNotes."))
+        val target = helpers.functionBody("releaseCaptureTarget")
+        assertTrue(target.contains("conversationDictation.onTargetRemoved(") && target.contains("voiceNotes."))
     }
 
     /** Checks that silencing and the time cap share finalization and recorder callback cleanup. */
@@ -68,5 +102,5 @@ class VoiceRecordingOwnershipCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$path"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$path"),
-        ).first { it.isFile }.readText()
+        ).first { it.isFile }.motionOwnerSource()
 }

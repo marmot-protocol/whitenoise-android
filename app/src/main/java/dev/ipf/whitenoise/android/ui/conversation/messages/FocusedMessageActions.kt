@@ -8,7 +8,6 @@ import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.indication
@@ -57,13 +56,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -106,7 +105,9 @@ internal data class FocusedMessageAction(
     val destructive: Boolean,
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit,
+    val onClickAt: ((Rect?) -> Unit)? = null,
     val explanation: Explanation? = null,
+    val dismissBeforeActivation: Boolean = true,
 )
 
 /**
@@ -124,48 +125,6 @@ internal object FocusedMessageOverlayFrameProvider : PopupPositionProvider {
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset = IntOffset.Zero
-}
-
-/**
- * The offsets the lifted stack may occupy inside a frame [frameHeightPx] tall.
- *
- * A stack shorter than its frame travels between the frame's edges; one that fills the frame has
- * nowhere to go and keeps the scrolling it already had. Both are the same range, so there is no
- * pair of models that have to agree about where the stack is.
- */
-internal fun focusedStackTravelRange(
-    frameHeightPx: Int,
-    stackHeightPx: Int,
-): ClosedFloatingPointRange<Float> {
-    val slack = (frameHeightPx - stackHeightPx).toFloat()
-    return minOf(0f, slack)..maxOf(0f, slack)
-}
-
-/**
- * Where the stack rests before anyone moves it: centred on the message it lifted, held in the frame.
- *
- * [anchorCenterPx] is a window coordinate, because that is what the lifted bubble reports, while the
- * offset is applied inside a frame that starts below the top inset. [topInsetPx] converts between
- * them; without it the stack rests a status bar too low.
- *
- * The stack is placed by its preview, not by its own middle: a short reaction rail sits above the
- * lifted message and a tall menu below it, so centring the stack would put the lifted message well
- * above the bubble it came from and the message would appear to jump as the overlay opened.
- * [previewCenterInStackPx] defaults to the stack's middle for a lift that draws no preview.
- *
- * A null [anchorCenterPx] means the lift reported no bubble and no touch point, so the stack has
- * nothing to sit beside and centres on the frame instead.
- */
-internal fun focusedStackRestingOffset(
-    frameHeightPx: Int,
-    stackHeightPx: Int,
-    anchorCenterPx: Int?,
-    topInsetPx: Int = 0,
-    previewCenterInStackPx: Int = stackHeightPx / 2,
-): Float {
-    val range = focusedStackTravelRange(frameHeightPx, stackHeightPx)
-    val centre = anchorCenterPx?.minus(topInsetPx) ?: (frameHeightPx / 2)
-    return (centre - previewCenterInStackPx).toFloat().coerceIn(range.start, range.endInclusive)
 }
 
 /** The lifted stack's vertical travel: where it sits now, and whether a gesture has claimed it. */
@@ -227,7 +186,12 @@ private fun rememberFocusedStackTravel(
  * rather than leaving it to land on an overlay that is no longer there.
  */
 @Composable
-private fun Modifier.focusedStackDrag(travel: FocusedStackTravel): Modifier {
+private fun Modifier.focusedStackDrag(
+    travel: FocusedStackTravel,
+    initiatingHoldActive: Boolean,
+): Modifier {
+    // The initiating hold still owns the pointer until its release.
+    if (initiatingHoldActive) return this
     val scope = rememberCoroutineScope()
     val decay = rememberSplineBasedDecay<Float>()
     return draggable(
@@ -247,7 +211,6 @@ private const val FOCUSED_MORE_DISC_ALPHA = 0.08f
 private val FocusedStackMaximumWidth = 560.dp
 private val FocusedOverlayShadowSafeInset = 8.dp
 private val FocusedReactionRailInset = 4.dp
-private val FocusedStackHorizontalPadding = 16.dp
 
 // Two rows of 48dp targets: the rail height the overlay's 200dp preview budget was sized around.
 private val FocusedReactionRailBudget = 108.dp
@@ -274,6 +237,7 @@ internal fun FocusedMessageActions(
     initiatingHoldActive: Boolean = false,
     sourceBounds: IntRect?,
     touchY: Float?,
+    touchX: Float? = null,
     mine: Boolean,
     actions: List<FocusedMessageAction>,
     quickReactions: List<String>,
@@ -292,31 +256,43 @@ internal fun FocusedMessageActions(
     // Saveable so a popup window re-shown after an app switch does not hide content it already
     // revealed; the value lives in the host composition, not in the popup's own.
     var measured by rememberSaveable { mutableStateOf(false) }
-    val currentOnDismiss by rememberUpdatedState(onDismiss)
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismiss,
         popupPositionProvider = FocusedMessageOverlayFrameProvider,
+        animateWindowContent = false,
         scrimModifier =
             Modifier.background(
                 MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = FOCUSED_BACKDROP_ALPHA),
             ),
     ) {
+        val popupMotion = this
+        val currentOnDismiss by rememberUpdatedState(popupMotion.dismiss)
+        val currentInitiatingHold by rememberUpdatedState(initiatingHoldActive)
+        val terminalActions =
+            actions.map { action ->
+                action.withTerminalCallbacks(popupMotion::close)
+            }
+        val frameInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
         BoxWithConstraints(
             modifier =
                 Modifier
                     .fillMaxSize()
                     // The overlay owns the whole window now, so the travel range is the part of it
                     // the stack may actually occupy rather than the part the system bars cover.
-                    .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
+                    .windowInsetsPadding(frameInsets)
                     // A tap reaching the frame landed beside the stack, on nothing, and dismisses
                     // exactly as the scrim underneath it would have before the frame covered it.
-                    .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
-                    .testTag(FOCUSED_OVERLAY_FRAME_TEST_TAG),
+                    .focusedDismissOnTap(
+                        initiatingHoldActive = { currentInitiatingHold },
+                        onDismiss = { currentOnDismiss() },
+                    ).testTag(FOCUSED_OVERLAY_FRAME_TEST_TAG),
         ) {
             // The lifted bubble reports a window coordinate; the frame below starts under the top
             // inset. The stack would rest a status bar too low without converting between them.
-            val topInsetPx = WindowInsets.systemBars.union(WindowInsets.displayCutout).getTop(LocalDensity.current)
+            val density = LocalDensity.current
+            val topInsetPx = frameInsets.getTop(density)
+            val actionTouchX = frameInsets.actionTouchXInPaddedFrame(touchX, density, LocalLayoutDirection.current)
             // The theme scales its typography by the app's text-size setting; sp also carries the system scale.
             val textScale = MaterialTheme.typography.bodyLarge.fontSize.value / Typography.bodyLarge.fontSize.value
             val emojiSize = with(LocalDensity.current) { (FocusedReactionEmojiSize.value * textScale).sp.toDp() }
@@ -359,6 +335,7 @@ internal fun FocusedMessageActions(
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .heightIn(max = maxHeight)
+                        .then(popupMotion.modifier())
                         .offset { IntOffset(0, travel.offset.value.roundToInt()) }
                         .onSizeChanged {
                             measured = it.width > 0 && it.height > 0
@@ -366,8 +343,10 @@ internal fun FocusedMessageActions(
                         }.focusedStackAlpha(stackVisible)
                         // Children consume their own taps first, so a tap that reaches the column
                         // landed on empty stack space or its padding and dismisses like the scrim.
-                        .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
-                        .padding(horizontal = FocusedStackHorizontalPadding, vertical = FocusedOverlayShadowSafeInset)
+                        .focusedDismissOnTap(
+                            initiatingHoldActive = { currentInitiatingHold },
+                            onDismiss = { currentOnDismiss() },
+                        ).padding(horizontal = FocusedStackHorizontalPadding, vertical = FocusedOverlayShadowSafeInset)
                         .focusedStackInputGuard(stackVisible)
                         .semantics {
                             if (stackVisible) {
@@ -375,7 +354,7 @@ internal fun FocusedMessageActions(
                                 customActions =
                                     listOf(
                                         CustomAccessibilityAction(close) {
-                                            onDismiss()
+                                            currentOnDismiss()
                                             true
                                         },
                                     )
@@ -392,9 +371,18 @@ internal fun FocusedMessageActions(
                             quickReactions = quickReactions,
                             sizing = reactionSizing,
                             selectedReactions = selectedReactions,
-                            onReact = onReact,
-                            onReactionOrigin = onReactionOrigin,
-                            onMoreReactions = onMoreReactions,
+                            onReact = { emoji ->
+                                if (popupMotion.acceptsInput) {
+                                    // The native flight replaces its source in this frame,
+                                    // rather than after a faded gap.
+                                    popupMotion.close {}
+                                    onReact(emoji)
+                                }
+                            },
+                            onReactionOrigin = { emoji, bounds ->
+                                if (popupMotion.acceptsInput) onReactionOrigin?.invoke(emoji, bounds)
+                            },
+                            onMoreReactions = { popupMotion.close(onMoreReactions) },
                         )
                     }
                 }
@@ -415,7 +403,7 @@ internal fun FocusedMessageActions(
                                 .onPlaced {
                                     previewCenterInStackPx =
                                         it.positionInParent().y.roundToInt() + it.size.height / 2
-                                }.then(if (initiatingHoldActive) Modifier else Modifier.focusedStackDrag(travel))
+                                }.focusedStackDrag(travel, initiatingHoldActive)
                                 .clearAndSetSemantics {
                                     contentDescription = previewDescription
                                     // The same dismissal the tap performs, reachable without one: a
@@ -429,15 +417,11 @@ internal fun FocusedMessageActions(
                                 // control. Tapping it used to be swallowed, which made the overlay feel
                                 // as though it dismissed only in some places; it dismisses like the
                                 // scrim, and the actions beside it consume their own taps first.
-                                .pointerInput(Unit) {
-                                    // The overlay opens under the finger that long-pressed, so the
-                                    // release of that same press would otherwise land here as a tap and
-                                    // dismiss what it just opened. Wait for the gesture to end first.
-                                    awaitPointerEventScope {
-                                        while (currentEvent.changes.any { it.pressed }) awaitPointerEvent()
-                                    }
-                                    detectTapGestures { currentOnDismiss() }
-                                },
+                                .focusedDismissOnTap(
+                                    initiatingHoldActive = { currentInitiatingHold },
+                                    onDismiss = { currentOnDismiss() },
+                                    awaitRelease = true,
+                                ),
                     ) { preview() }
                 }
                 // When the IME shortens the safe frame, only the actions overflow. Scrolling the
@@ -449,40 +433,16 @@ internal fun FocusedMessageActions(
                             .weight(1f, fill = false)
                             // Labels that need more than the column may use the whole padded window, so a
                             // wide window never wraps an action the 560dp column could not hold (#3587).
-                            .focusedColumnSlot(railWidth, actionPanelMaximumWidth, mine)
+                            .focusedColumnSlot(railWidth, actionPanelMaximumWidth, mine, actionTouchX)
                             .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
-                    FocusedActionMenu(actions)
+                    FocusedActionMenu(terminalActions)
                 }
             }
         }
     }
 }
-
-/**
- * Places a stack child as if the stack were still the centred column of [columnWidth], aligned to its end
- * edge for [mine] and its start edge otherwise, while letting it measure up to [maximumWidth].
- *
- * A child no wider than the column sits exactly where the capped stack put it. A wider one keeps that edge
- * until it would leave the window, then slides back inside it, so it grows across the window rather than
- * past either side. Offsets are start-relative, so RTL mirrors them like the column alignment did.
- */
-internal fun Modifier.focusedColumnSlot(
-    columnWidth: Dp,
-    maximumWidth: Dp,
-    mine: Boolean,
-): Modifier =
-    layout { measurable, constraints ->
-        val maxChild = maximumWidth.roundToPx().coerceIn(0, constraints.maxWidth)
-        val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maxChild))
-        val width = constraints.maxWidth
-        val column = columnWidth.roundToPx().coerceIn(0, width)
-        val columnStart = (width - column) / 2
-        val preferred = if (mine) columnStart + column - placeable.width else columnStart
-        val start = preferred.coerceIn(0, (width - placeable.width).coerceAtLeast(0))
-        layout(width, placeable.height) { placeable.placeRelative(start, 0) }
-    }
 
 /**
  * Balances the reaction rail over as few rows as the width allows, so every configured choice keeps

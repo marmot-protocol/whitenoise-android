@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -16,6 +18,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
@@ -33,6 +37,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Actual presentation controls and saved form state, independent of native mutation success. */
 @RunWith(RobolectricTestRunner::class)
@@ -59,10 +64,17 @@ class NewGroupPresentationTest {
     @Test fun nativePersonTapAndLongPressRemainDistinct() {
         var selections = 0
         var profiles = 0
-        picker(listOf(person), emptyList(), toggle = { selections++ }, profile = { profiles++ })
+        var profileBounds: Rect? = null
+        picker(listOf(person), emptyList(), toggle = { selections++ }, profile = { profiles++ }, profileOrigin = {
+            profileBounds =
+                it
+        })
         val row = composeRule.onNodeWithTag("new_group.person.${person.candidate.accountIdHex}")
         row.performTouchInput { longClick() }
         assertEquals(1, profiles)
+        val activated = row.fetchSemanticsNode().boundsInRoot
+        assertEquals(activated.size, profileBounds?.size)
+        assertTrue(profileBounds?.isEmpty == false)
         assertEquals(0, selections)
         row.performClick()
         assertEquals(1, selections)
@@ -97,6 +109,40 @@ class NewGroupPresentationTest {
         composeRule.onNodeWithText(context.getString(R.string.user_search_address_unverified)).assertIsDisplayed()
         composeRule.onNodeWithTag("address.retry").performClick()
         assertEquals(1, retries)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun descriptionGrowsWhenTextWrapsAndShrinksWhenCleared() {
+        setup(NewGroupDraft(), presentation())
+        val description = composeRule.onNodeWithTag("group_setup.description")
+        val emptyHeight = description.fetchSemanticsNode().size.height
+        val nameHeight =
+            composeRule
+                .onNodeWithTag("group_setup.name")
+                .fetchSemanticsNode()
+                .size.height
+        assertEquals(nameHeight.toDouble(), emptyHeight.toDouble(), 2.0)
+
+        val longText = "A place to plan weekend trips and share photos. ".repeat(3).trimEnd()
+        description.performTextInput(longText)
+        description.assertTextContains(longText)
+        assertTrue(description.fetchSemanticsNode().size.height > emptyHeight)
+
+        val fiveLines = "One\nTwo\nThree\nFour\nFive"
+        description.performTextReplacement(fiveLines)
+        val fiveLineHeight = description.fetchSemanticsNode().size.height
+        val sixLines = "$fiveLines\nSix"
+        description.performTextReplacement(sixLines)
+        val sixLineHeight = description.fetchSemanticsNode().size.height
+        assertTrue(sixLineHeight > fiveLineHeight)
+
+        description.performTextReplacement("$sixLines\nSeven")
+        description.assertTextContains("$sixLines\nSeven")
+        assertEquals(sixLineHeight, description.fetchSemanticsNode().size.height)
+
+        description.performTextReplacement("")
+        assertEquals(emptyHeight, description.fetchSemanticsNode().size.height)
     }
 
     /** Native image preparation disables photo and creation while surfacing the real work state. */
@@ -263,8 +309,10 @@ class NewGroupPresentationTest {
         ).forEach { (label, expected) ->
             composeRule.runOnIdle { expanded.value = true }
             composeRule.onNodeWithText(context.getString(label)).performClick()
-            assertEquals(expected, actions.last())
-            assertFalse(expanded.value)
+            composeRule.runOnIdle {
+                assertEquals(expected, actions.last())
+                assertFalse(expanded.value)
+            }
         }
     }
 
@@ -279,6 +327,7 @@ class NewGroupPresentationTest {
         toggle: (RecipientSearch.Candidate) -> Unit = {},
         profile: (RecipientSearch.Candidate) -> Unit = {},
         addressFailed: Boolean = false,
+        profileOrigin: (Rect?) -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -289,7 +338,10 @@ class NewGroupPresentationTest {
                     false,
                     false,
                     incomplete,
-                    NewGroupRecipientActions({}, confirm, review, {}, {}, retry, toggle, profile),
+                    NewGroupRecipientActions({}, confirm, review, {}, {}, retry, toggle, { candidate, origin ->
+                        profile(candidate)
+                        profileOrigin(origin)
+                    }),
                     isValidNpub = { true },
                     addressLookupFailed = addressFailed,
                 )

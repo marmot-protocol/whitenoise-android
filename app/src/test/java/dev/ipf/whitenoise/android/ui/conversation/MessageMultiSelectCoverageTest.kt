@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageActionKind
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageActionKinds
 import org.junit.Assert.assertEquals
@@ -142,7 +143,7 @@ class MessageMultiSelectCoverageTest {
         assertTrue(source.contains("messageBubbleSelectionGutterWidth"))
         assertTrue(source.contains("if (mine) Spacer(Modifier.weight(1f))"))
         assertTrue(!source.contains(".matchParentSize()"))
-        assertTrue(source.contains("canSelect = !deleted && !actionsReadOnly && batchSelectable"))
+        assertTrue(source.contains("canSelect = !actionsReadOnly && batchSelectable"))
     }
 
     /** Every action-menu entry point is gated on selection mode and resets the long-press anchor before opening. */
@@ -161,7 +162,7 @@ class MessageMultiSelectCoverageTest {
             source.contains(
                 "if (!selectionMode && !textSelectionMode) { " +
                     "pressState.longPressWindowPosition = null pressState.selectionSeedVisibleOffset = null " +
-                    "longPressWindowY = null pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
+                    "pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
                     "onActionMenuOpenChange(true)",
             ),
         )
@@ -169,7 +170,7 @@ class MessageMultiSelectCoverageTest {
             source.contains(
                 "if (!deleted && !selectionMode && !textSelectionMode) { " +
                     "pressState.longPressWindowPosition = null pressState.selectionSeedVisibleOffset = null " +
-                    "longPressWindowY = null pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
+                    "pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
                     "onActionMenuOpenChange(true)",
             ),
         )
@@ -198,7 +199,7 @@ class MessageMultiSelectCoverageTest {
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/$relativePath"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/$relativePath"),
         ).firstOrNull { it.exists() }
-            ?.readText()
+            ?.motionOwnerSource()
             ?: error("Missing conversation source: $relativePath")
 
     private fun mainShellSource(): String =
@@ -206,6 +207,6 @@ class MessageMultiSelectCoverageTest {
             File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
         ).firstOrNull { it.exists() }
-            ?.readText()
+            ?.motionOwnerSource()
             ?: error("Missing MainShell.kt source file")
 }

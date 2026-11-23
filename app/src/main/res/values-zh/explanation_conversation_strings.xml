@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">打开此聊天的详情，例如成员和设置。</string>
     <string name="explanation_conversation_jump_to_mention">滚动到下一条提到你的未读消息。</string>
     <string name="explanation_composer_draft_top">将草稿滚动到第一行。文字不会改变。</string>
+    <string name="explanation_composer_draft_bottom">将草稿滚动到最后一行。文字不会改变。</string>
     <string name="explanation_emoji_search">按名称搜索表情符号。</string>
     <string name="explanation_emoji_configure">打开设置，在那里选择你的快速回应表情符号。</string>
 
@@ -59,4 +60,5 @@
     <string name="explanation_message_action_info">显示这条消息的发送和接收时间、发送者、ID 和状态。</string>
     <string name="explanation_message_action_report">打开举报表单，可发送给此群组的管理员、White Noise 团队或两者。确认前不会发送任何内容。</string>
     <string name="explanation_message_action_delete">让你选择只在此设备上删除这条消息，或为所有人删除。为所有人删除无法撤销。在你选择之前不会删除任何内容。</string>
+    <string name="explanation_conversation_dictation_continue">立即开始录制下一段。上一段仍在转换成文字，会先插入。</string>
 </resources>

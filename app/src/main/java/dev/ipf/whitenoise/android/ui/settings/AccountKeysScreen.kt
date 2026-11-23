@@ -1,12 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import android.content.ClipData
-import android.content.ClipDescription
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import android.os.PersistableBundle
 import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -57,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
 
@@ -74,16 +69,8 @@ internal enum class CopiedProfileKey { Public, Private, Encrypted }
 /** Explicit user-selected delivery of an account-bound native export. */
 internal enum class KeyExportDestination { File, Preview, Share }
 
-/** A confirmed native result held temporarily for preview or document delivery, with one original expiry. */
-internal data class PendingKeyExport(
-    val encrypted: Boolean,
-    val content: String,
-    val createdAtMillis: Long,
-)
-
 /** Timing and geometry the prototype fixes for Profile Keys. */
 private object ProfileKeysDefaults {
-    const val EXPIRY_MILLIS = 30_000L
     const val COPIED_MILLIS = 2_000L
     const val MASK = "••••••••••••••••••••••••••••••••"
     const val FILE_STEM_LENGTH = 16
@@ -103,6 +90,7 @@ internal class ProfileKeysUiState {
     var nativeExportError by mutableStateOf<Int?>(null)
     var passwordDialog by mutableStateOf(false)
     var rawExportDialog by mutableStateOf(false)
+    var rawKeyConsent = Any()
     var saveErrorDialog by mutableStateOf(false)
     var expiredExportDialog by mutableStateOf(false)
     var exportBusy by mutableStateOf(false)
@@ -124,14 +112,20 @@ internal class ProfileKeysUiState {
         privateKey = null
     }
 
-    /** Cancels a dismissed confirmation before its suspended native export can open the file picker. */
-    fun cancelExport() {
+    /** Invalidates native work immediately while the inert confirmation finishes its exit. */
+    fun cancelExportPreparation() {
+        rawKeyConsent = Any()
         exportOperation.cancel()
         exportBusy = false
+        clearPasswords()
+    }
+
+    /** Removes the confirmation after exit, or immediately when its sensitive owner is lost. */
+    fun cancelExport() {
+        cancelExportPreparation()
         rawExportDialog = false
         passwordDialog = false
         encryptedBackup = null
-        clearPasswords()
     }
 
     /** True when no export is being prepared, picked or written. */
@@ -174,9 +168,8 @@ internal fun AccountKeysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
+    rawExportAuthenticator: RawKeyExportAuthentication? = null,
 ) {
-    // The screen surfaces the raw nsec; keep it out of Recents thumbnails and
-    // screenshots, matching the encrypted-backup sheet's posture.
     WindowSecureFlag()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -192,24 +185,23 @@ internal fun AccountKeysScreen(
     val accountRef = appState.activeAccountRef
     val runtimeGeneration = appState.runtimeGeneration
     val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
-    var showSignOut by remember(accountIdHex, accountRef, runtimeGeneration) { mutableStateOf(false) }
+    var showSignOut by remember(ui) { mutableStateOf(false) }
+    val rawAuthentication = rawExportAuthenticator ?: rememberRawKeyExportAuthentication(ui, appState)
 
-    /** True while the screen still shows the active account. */
     fun ownsAccount(): Boolean =
         accountIdHex != null &&
             appState.activeAccount?.accountIdHex == accountIdHex &&
             appState.activeAccountRef == accountRef &&
             appState.runtimeGeneration == runtimeGeneration
 
-    /** Secrets are delivered only to the owning account while started and signing locally. */
     fun canDeliverSecret(): Boolean =
         ownsAccount() &&
             lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
             appState.activeAccount?.localSigning == true &&
+            !appState.appLock.screenVisible &&
             !appState.signOutInProgress &&
             !appState.wipeInProgress
 
-    /** Writes the picked document on IO; only the still-owning, started screen hears whether it failed. */
     fun saveExport(
         uri: Uri,
         content: String,
@@ -237,7 +229,6 @@ internal fun AccountKeysScreen(
             }
         }
 
-    /** Launches the export share with the prepared content. */
     fun launchExport(
         encrypted: Boolean,
         content: String,
@@ -253,7 +244,6 @@ internal fun AccountKeysScreen(
         }
     }
 
-    /** Begins an export to the chosen destination. */
     fun beginExport(
         encrypted: Boolean,
         destination: KeyExportDestination,
@@ -307,7 +297,7 @@ internal fun AccountKeysScreen(
         )
     }
 
-    ProfileKeysEffects(ui = ui, lifecycle = lifecycle)
+    ProfileKeysEffects(ui, lifecycle, rawAuthentication::cancel)
     LaunchedEffect(hasLocalKey, appState.signOutInProgress, appState.wipeInProgress) {
         if (!hasLocalKey || appState.signOutInProgress || appState.wipeInProgress) {
             ui.stopSensitiveOperations()
@@ -334,6 +324,7 @@ internal fun AccountKeysScreen(
                 },
             npub = npub,
             hasLocalKey = hasLocalKey,
+            remoteSigner = rememberRemoteSignerAccountActions(appState, accountIdHex),
             showWipe = WIPE_ENGINE_FFI_AVAILABLE && active != null,
             ui = ui,
             onCopyPublic = {
@@ -343,34 +334,38 @@ internal fun AccountKeysScreen(
             onToggleReveal = {
                 if (ui.revealRequested) {
                     ui.hidePrivateKey()
-                } else if (canDeliverSecret()) {
-                    ui.revealRequested = true
-                    ui.revealOperation.start(
+                } else {
+                    rawAuthentication.authorize(ui, ::canDeliverSecret) {
+                        ui.revealRequested = true
+                        ui.revealOperation.start(
+                            scope = scope,
+                            canDeliver = { ui.revealRequested && canDeliverSecret() },
+                            load = { appState.exportActiveAccountNsec() },
+                            onResult = { secret ->
+                                ui.privateKey = secret
+                                if (secret == null) ui.revealRequested = false
+                            },
+                        )
+                    }
+                }
+            },
+            onCopyPrivate = {
+                rawAuthentication.authorize(ui, ::canDeliverSecret) {
+                    ui.copyOperation.start(
                         scope = scope,
-                        canDeliver = { ui.revealRequested && canDeliverSecret() },
-                        load = { appState.exportActiveAccountNsec() },
+                        canDeliver = ::canDeliverSecret,
+                        load = { ui.privateKey ?: appState.exportActiveAccountNsec() },
                         onResult = { secret ->
-                            ui.privateKey = secret
-                            if (secret == null) ui.revealRequested = false
+                            if (secret != null) {
+                                copySensitiveToClipboard(context, privateKeyLabel, secret)
+                                ui.copiedKey = CopiedProfileKey.Private
+                            }
                         },
                     )
                 }
             },
-            onCopyPrivate = {
-                ui.copyOperation.start(
-                    scope = scope,
-                    canDeliver = ::canDeliverSecret,
-                    load = { ui.privateKey ?: appState.exportActiveAccountNsec() },
-                    onResult = { secret ->
-                        if (secret != null) {
-                            copySensitiveToClipboard(context, privateKeyLabel, secret)
-                            ui.copiedKey = CopiedProfileKey.Private
-                        }
-                    },
-                )
-            },
-            onExportEncrypted = { ui.passwordDialog = true },
-            onExportRaw = { ui.rawExportDialog = true },
+            onExportEncrypted = ui::openEncryptedExport,
+            onExportRaw = ui::openRawExport,
             onWipe = { ui.wipeSheet = true },
             onSignOut = { if (ownsAccount()) showSignOut = true },
         )
@@ -378,7 +373,8 @@ internal fun AccountKeysScreen(
     ProfileKeysDialogs(
         ui = ui,
         canExport = hasLocalKey,
-        onExport = ::beginExport,
+        onExport = rawAuthentication.gateExport(ui, ::canDeliverSecret, ::beginExport),
+        cancelRawAuthentication = rawAuthentication::cancel,
         onCopyBackup = {
             val backup = ui.encryptedBackup
             if (backup != null && !backup.isExpired() && canDeliverSecret()) {
@@ -416,10 +412,11 @@ internal fun AccountKeysScreen(
 private fun ProfileKeysEffects(
     ui: ProfileKeysUiState,
     lifecycle: Lifecycle,
+    cancelAuthentication: () -> Unit,
 ) {
     LaunchedEffect(ui.privateKey) {
         if (ui.privateKey != null) {
-            delay(ProfileKeysDefaults.EXPIRY_MILLIS)
+            delay(PRIVATE_KEY_EXPIRY_MILLIS)
             ui.hidePrivateKey()
         }
     }
@@ -445,7 +442,10 @@ private fun ProfileKeysEffects(
     DisposableEffect(lifecycle, ui) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_STOP) ui.stopSensitiveOperations()
+                if (event == Lifecycle.Event.ON_STOP) {
+                    ui.stopSensitiveOperations()
+                    cancelAuthentication()
+                }
             }
         lifecycle.addObserver(observer)
         onDispose {
@@ -472,6 +472,7 @@ private fun ProfileKeysList(
     onExportRaw: () -> Unit,
     onWipe: () -> Unit,
     onSignOut: () -> Unit,
+    remoteSigner: RemoteSignerAccountActions? = null,
 ) {
     val revealed = ui.privateKey != null
     val exportsEnabled = ui.exportIdle
@@ -483,7 +484,7 @@ private fun ProfileKeysList(
         item(key = "search.AccountKeys.2") { AccountKeysIdentityHeader(identity) }
         item(key = "search.AccountKeys.3") { SettingsSection(stringResource(R.string.public_key)) }
         item(key = "search.AccountKeys.4") {
-            SettingsGroup {
+            SettingsGroup(destination = SettingsDetail.AccountKeys, surface = "account-public-key") {
                 row("public_key") { context ->
                     ProfileKeyValueRow(
                         context = context,
@@ -526,7 +527,9 @@ private fun ProfileKeysList(
         item(key = "search.AccountKeys.5") {
             ProfileKeySupportingText(stringResource(R.string.profile_public_key_help))
         }
-        if (!hasLocalKey) {
+        if (remoteSigner != null) {
+            remoteSignerAccountItems(remoteSigner)
+        } else if (!hasLocalKey) {
             item(key = "search.AccountKeys.6") {
                 SettingsCallout(
                     title = stringResource(R.string.access_amber_signed_in),
@@ -737,46 +740,3 @@ private fun ProfileKeySupportingText(text: String) {
 /** The copy action's glyph: a check while the last copy is still fresh. */
 @DrawableRes
 internal fun copyGlyph(copied: Boolean): Int = if (copied) R.drawable.ic_check else R.drawable.ic_content_copy
-
-/** Whether a pending export has outlived the prototype's 30 s window. */
-private fun PendingKeyExport.isExpired(): Boolean {
-    val age = SystemClock.elapsedRealtime() - createdAtMillis
-    return age >= ProfileKeysDefaults.EXPIRY_MILLIS
-}
-
-/** Remaining lifetime follows the native result when a preview is handed to the document picker. */
-private fun PendingKeyExport.remainingMillis(): Long {
-    val age = SystemClock.elapsedRealtime() - createdAtMillis
-    return (ProfileKeysDefaults.EXPIRY_MILLIS - age).coerceAtLeast(0L)
-}
-
-/** Restores the deliberate raw-key share transport, marking both intent and clipboard payload sensitive. */
-private fun sharePrivateKey(
-    context: Context,
-    title: String,
-    content: String,
-): Boolean =
-    runCatching {
-        val clip =
-            ClipData.newPlainText(title, content).apply {
-                description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
-            }
-        val intent =
-            Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, content)
-                putExtra(ClipDescription.EXTRA_IS_SENSITIVE, true)
-                clipData = clip
-            }
-        context.startActivity(Intent.createChooser(intent, title))
-    }.isSuccess
-
-/** Copies public [text]; secrets use [copySensitiveToClipboard], which marks them and clears them later. */
-private fun copyToClipboard(
-    context: Context,
-    label: String,
-    text: String,
-) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-}

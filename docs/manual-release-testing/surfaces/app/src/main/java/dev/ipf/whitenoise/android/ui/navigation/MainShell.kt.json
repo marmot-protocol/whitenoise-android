@@ -15,14 +15,6 @@
         ]
       },
       {
-        "surface": "ProfileGroupForegroundCoordinator",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
-        "anchor": "fun ProfileGroupForegroundCoordinator(",
-        "test_ids": [
-          "NAV-001"
-        ]
-      },
-      {
         "surface": "Opening conversation source-group identity handoff",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
         "anchor": "initialGroup = appState.conversationSourceGroup(openChat, accountRef)",
@@ -127,6 +119,22 @@
         "anchor": "shouldActivate = { pendingStagedShareOpen === pending }",
         "test_ids": [
           "SYS-005"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "surface": "The conversation route receives the list's retained group pictures",
+        "anchor": "LocalRetainedGroupAvatarPixels provides retainedAvatarPreparation,",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "surface": "A reopened conversation starts from the account's current chat-list row, not a stale list copy",
+        "anchor": "initialChatListRow = conversationEntryChatListRow(openChat, chatsController, accountRef)",
+        "test_ids": [
+          "CON-002"
         ]
       }
     ]

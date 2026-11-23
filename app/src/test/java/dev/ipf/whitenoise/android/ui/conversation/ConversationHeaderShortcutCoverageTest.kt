@@ -8,6 +8,7 @@ import org.junit.Test
 class ConversationHeaderShortcutCoverageTest {
     private val conversation = appModuleSource("$UI/conversation/ConversationScreen.kt")
     private val details = appModuleSource("$UI/group/GroupDetailsScreen.kt")
+    private val overview = appModuleSource("$UI/group/ChatInfoOverview.kt")
 
     /** Header and details mount the same mute control, duration host and timer editor. */
     @Test
@@ -18,7 +19,8 @@ class ConversationHeaderShortcutCoverageTest {
             assertContains(source, "DisappearingTimerEditor(")
             assertContains(source, "disappearingTimerEditable(")
         }
-        assertContains(details, "onClick = muteControl::toggle")
+        assertContains(details, "muteControl = muteControl")
+        assertContains(overview, "onClick = muteControl::toggle")
     }
 
     /** The header search button and the details search row open search through one handler. */

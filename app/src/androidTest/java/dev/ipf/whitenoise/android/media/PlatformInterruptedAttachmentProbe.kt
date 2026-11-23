@@ -7,13 +7,15 @@ import android.os.Build
 import android.os.Process
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.IntState
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
+import dev.ipf.whitenoise.android.media.PlatformResumeLedger.assertResumeLedger
+import dev.ipf.whitenoise.android.media.PlatformResumeLedger.currentInitialBodyHeld
+import dev.ipf.whitenoise.android.media.PlatformResumeLedger.currentResumedBodyHeld
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.AttachmentDownloadWorker
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
@@ -62,6 +64,9 @@ internal object PlatformInterruptedAttachmentProbe {
         val phase: AttachmentTransferStateFfi,
         val attempt: ULong,
         val retryAt: ULong?,
+        val hostPermissionRevision: Long,
+        val permissionRefreshInFlight: Boolean,
+        val hostInputs: JSONObject,
     )
 
     /** Both observers belong to one probe lifetime and supply its success or failure evidence. */
@@ -103,6 +108,27 @@ internal object PlatformInterruptedAttachmentProbe {
         }
     }
 
+    /** Observe existing permission ownership without refreshing permission or demand. */
+    private fun permissionCounters(state: WhiteNoiseAppState): Pair<AtomicLong, AtomicLong> {
+        val permissions =
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("nativeAttachmentPermissions")
+                .apply {
+                    isAccessible = true
+                }.get(state)
+        val permissionRevision =
+            permissions.javaClass
+                .getDeclaredField("revision")
+                .apply { isAccessible = true }
+                .get(permissions) as AtomicLong
+        val permissionInFlight =
+            permissions.javaClass
+                .getDeclaredField("inFlight")
+                .apply { isAccessible = true }
+                .get(permissions) as AtomicLong
+        return permissionRevision to permissionInFlight
+    }
+
     /** Automatic demand receives no interactive read, deliberate Retry, force-run or seeded checkpoint. */
     @Suppress("LongMethod") // One lifetime owns the generated platform job and its cleanup.
     suspend fun run(
@@ -114,6 +140,8 @@ internal object PlatformInterruptedAttachmentProbe {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
         check(shell("getprop ro.kernel.qemu").trim() == "1")
+        val (permissionRevision, permissionInFlight) = permissionCounters(state)
+        val hostDiagnostics = PlatformResumeHostDiagnostics(state, request.accountRef)
         val restoreApplication = PlatformBackgroundAttachmentProbe.bindGeneratedApplication(context, state)
         val manager = WorkManager.getInstance(context)
         val workName = attachmentDownloadWorkName(request)
@@ -134,7 +162,7 @@ internal object PlatformInterruptedAttachmentProbe {
         try {
             HeldAttachmentCancellationProbe.control(port, "/__hold-resumable-acquisition")
             ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
-                enableAutomaticDocumentPolicy(state)
+                enableAutomaticDocumentPolicy(state, request.accountRef)
                 nativeObserver =
                     launch(start = CoroutineStart.UNDISPATCHED) {
                         state
@@ -147,6 +175,9 @@ internal object PlatformInterruptedAttachmentProbe {
                                     phase = it.phase,
                                     attempt = it.attempt,
                                     retryAt = it.retryAt,
+                                    hostPermissionRevision = permissionRevision.get(),
+                                    permissionRefreshInFlight = permissionInFlight.get() != 0L,
+                                    hostInputs = hostDiagnostics.snapshot(),
                                 )
                             }.collect(observations::recordNativeSnapshot)
                     }
@@ -160,9 +191,7 @@ internal object PlatformInterruptedAttachmentProbe {
                 val progress = awaitAutomaticProgress(state, request)
                 awaitFirstNativeSnapshot(nativeStates)
                 assertEquals((bytes.size + 16).toULong(), progress.total)
-                HeldAttachmentCancellationProbe.awaitLedger(port) { events ->
-                    events.any { it.getString("kind") == "held" }
-                }
+                awaitInitialAcquisition(port, nativeStates)
                 assertFalse(store.isInteractive(request))
                 assertNull("partial ciphertext must not be published", state.openNativeAttachment(request))
                 assertOrdinaryExecution(context)
@@ -320,6 +349,24 @@ internal object PlatformInterruptedAttachmentProbe {
         }
     }
 
+    /**
+     * A setup GET can drop short of the held prefix; native recovery then retries it after a backoff longer
+     * than the ledger flush wait. Wait for a live held body, failing at once on a terminal native decision.
+     */
+    private suspend fun awaitInitialAcquisition(
+        port: Int,
+        nativeStates: List<NativeResumeSnapshot>,
+    ) = withTimeout(20_000L) {
+        while (true) {
+            val latest = nativeStates.toList().lastOrNull()
+            check(latest?.phase !in NATIVE_TRANSFER_TERMINAL_FAILURES) {
+                "initial native acquisition ended as ${latest?.phase}"
+            }
+            if (currentInitialBodyHeld(HeldAttachmentCancellationProbe.ledger(port))) return@withTimeout
+            delay(25L)
+        }
+    }
+
     /** Both admission checks require the same post-stop active native body phase. */
     private fun nativeDownloadingAfterStop(
         latest: NativeResumeSnapshot?,
@@ -363,24 +410,6 @@ internal object PlatformInterruptedAttachmentProbe {
         return current
     }
 
-    /** Require the second acquisition's held body to remain live; a historical hold cannot admit release. */
-    private fun currentResumedBodyHeld(events: List<JSONObject>): Boolean {
-        val acquisitions = events.filter { it.getString("kind") == "get" }
-        check(acquisitions.size <= 2) { "unexpected extra acquisition before release" }
-        val resumedRequest = acquisitions.getOrNull(1)?.getLong("seq") ?: return false
-        val ended =
-            events.any {
-                it.getString("kind") in setOf("disconnect", "complete") &&
-                    it.getLong("request") == resumedRequest
-            }
-        check(!ended) { "resumed acquisition ended before fixture release" }
-        return events.any {
-            it.getString("kind") == "held" &&
-                it.getLong("request") == resumedRequest &&
-                it.getLong("value") == 3L * 1024 * 1024
-        }
-    }
-
     /** Remaining delay is relative to serialization time; only closed scheduling facts leave the fixture. */
     private fun nativeResumeDiagnostics(states: List<NativeResumeSnapshot>): JSONArray {
         val nowSeconds = System.currentTimeMillis() / 1_000L
@@ -389,6 +418,9 @@ internal object PlatformInterruptedAttachmentProbe {
                 JSONObject()
                     .put("observation_index", snapshot.observationIndex)
                     .put("observed_elapsed_ms", snapshot.observedElapsedMillis)
+                    .put("host_permission_revision", snapshot.hostPermissionRevision)
+                    .put("permission_refresh_in_flight", snapshot.permissionRefreshInFlight)
+                    .put("host_inputs", snapshot.hostInputs)
                     .put("state", snapshot.phase.name)
                     .put("attempt", snapshot.attempt.toLong())
                     .put(
@@ -420,7 +452,10 @@ internal object PlatformInterruptedAttachmentProbe {
     }
 
     /** Enable only the generated account's document matrix and wait for real validated Android connectivity. */
-    private suspend fun enableAutomaticDocumentPolicy(state: WhiteNoiseAppState) {
+    private suspend fun enableAutomaticDocumentPolicy(
+        state: WhiteNoiseAppState,
+        account: String,
+    ) {
         withContext(Dispatchers.IO) {
             // The injected test constructor skips process callbacks; register the unchanged real listener explicitly.
             WhiteNoiseAppState::class.java
@@ -442,15 +477,11 @@ internal object PlatformInterruptedAttachmentProbe {
             }
         }
         // Host connectivity and Compose policy precede asynchronous native synchronization.
-        // Observe a completed real generation; do not grant permission or reset demand in the fixture.
-        val revision =
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("attachmentDownloadPolicyRevision\$delegate")
-                .apply { isAccessible = true }
-                .get(state) as IntState
-        val before = revision.intValue
-        withContext(Dispatchers.Main.immediate) { state.refreshNativeAttachmentPermissions() }
-        withTimeout(15_000L) { while (revision.intValue == before) delay(25L) }
+        // An unrelated counter increment cannot prove that this requested refresh has completed.
+        withTimeout(15_000L) {
+            val refresh = withContext(Dispatchers.Main.immediate) { state.refreshNativeAttachmentPermissions() }
+            awaitPlatformResumePermissionSetup(state, account, refresh)
+        }
         ControlledAttachmentProbe.checkpoint("automatic-policy-ready")
     }
 
@@ -473,6 +504,7 @@ internal object PlatformInterruptedAttachmentProbe {
                     .groupingBy { it.optString("kind") }
                     .eachCount()
             }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         val sinceStop = if (stoppedAt == 0L) JSONObject.NULL else SystemClock.elapsedRealtime() - stoppedAt
         ControlledAttachmentProbe.report(
             JSONObject()
@@ -485,6 +517,7 @@ internal object PlatformInterruptedAttachmentProbe {
                 ).put("resume_phase_timings", observations.phaseDiagnostics())
                 .put("native_resume_states", nativeResumeDiagnostics(observations.nativeStates))
                 .put("native_initial_states", nativeResumeDiagnostics(observations.initialNativeStates))
+                .put("platform_network", platformResumeNetworkFailureSnapshot(context))
                 .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
                 .put("ms_since_stop", sinceStop),
         )
@@ -506,19 +539,6 @@ internal object PlatformInterruptedAttachmentProbe {
         val marker = Regex("attachment_work_stopped reason=(unavailable|[-0-9]+) run_attempt=([0-9]+)")
         val parsed = diagnostic.mapNotNull(marker::find).single()
         return parsed.groupValues[1] to parsed.groupValues[2].toInt()
-    }
-
-    /** Independently committed Range and byte totals must prove compatible checkpoint reuse. */
-    private fun assertResumeLedger(
-        events: List<JSONObject>,
-        size: Int,
-    ) {
-        assertEquals(2, events.count { it.getString("kind") == "get" })
-        val prefix = 2L * 1024 * 1024
-        assertEquals(prefix, events.single { it.getString("kind") == "range_requested_offset" }.getLong("value"))
-        assertEquals(1, events.single { it.getString("kind") == "if_range_match" }.getInt("value"))
-        val transferred = events.filter { it.getString("kind") == "body_bytes" }.sumOf { it.getLong("value") }
-        assertEquals(size + 16L, transferred)
     }
 
     /** Match the actual generated WorkSpec in the own-app scheduler; do not guess an ID or stop other jobs. */

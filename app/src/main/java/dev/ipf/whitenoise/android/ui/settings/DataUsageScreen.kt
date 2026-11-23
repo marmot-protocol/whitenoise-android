@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseDialogSelection
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
 
@@ -78,9 +79,9 @@ private val MediaAutoDownloadType.iconRes: Int
     @DrawableRes get() =
         when (this) {
             MediaAutoDownloadType.Image -> R.drawable.ic_image
-            MediaAutoDownloadType.Audio -> R.drawable.ic_headphones
+            MediaAutoDownloadType.Audio -> R.drawable.ic_voice_note
             MediaAutoDownloadType.Video -> R.drawable.ic_videocam
-            MediaAutoDownloadType.Document -> R.drawable.ic_draft
+            MediaAutoDownloadType.Document -> R.drawable.ic_description
         }
 
 /**
@@ -112,12 +113,17 @@ internal fun DataUsageScreen(
     SettingsScaffold(title = stringResource(R.string.data_usage_title), onBack = onBack) {
         SettingsList {
             item(key = "search.DataUsage.10") {
-                SettingsGroup(modifier = Modifier.testTag("data_usage.storage")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("data_usage.storage"),
+                    destination = SettingsDetail.Data,
+                    surface = "data-storage",
+                ) {
                     row("manage_storage") { context ->
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.manage_storage_title),
                             subtitle = stringResource(R.string.manage_storage_entry_subtitle),
+                            routeKey = SettingsDetail.ManageStorage,
                             onClick = onOpenManageStorage,
                             modifier = Modifier.testTag("data_usage.manage_storage"),
                             explanation = stringResource(R.string.explanation_privacy_data_manage_storage),
@@ -260,7 +266,7 @@ internal fun DataUsageScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { picker = null }) { Text(stringResource(R.string.download_done)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.download_done)) }
             },
         )
     }
@@ -293,7 +299,7 @@ internal fun DataUsageScreen(
                 ) { Text(stringResource(R.string.download_stop)) }
             },
             dismissButton = {
-                TextButton(onClick = { stopConfirmation = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

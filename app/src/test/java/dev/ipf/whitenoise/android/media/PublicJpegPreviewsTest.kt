@@ -305,6 +305,21 @@ class PublicJpegPreviewsTest {
             assertTrue(preferences.setEnabled("alice", true))
         }
 
+    /** A target-specific wipe keeps both the live and the persisted preview consent of a surviving profile. */
+    @Test
+    fun inactiveWipeOnlyRevokesItsOwnPreviewChoice() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val preferences = PublicJpegPreviewPreferences(context) { true }
+            assertTrue(preferences.setEnabled("survivor", true))
+            assertTrue(preferences.setEnabled("removed", true))
+            preferences.removeAccount("removed")
+            assertTrue(preferences.enabled("survivor"))
+            val reopened = PublicJpegPreviewPreferences(context) { true }
+            assertTrue(reopened.enabled("survivor"))
+            assertFalse(reopened.enabled("removed"))
+        }
+
     /** Accounts published after a wipe's retention pass can change their setting (#3623). */
     @Test
     fun accountAddedAfterRetentionCanEnablePreviews() =

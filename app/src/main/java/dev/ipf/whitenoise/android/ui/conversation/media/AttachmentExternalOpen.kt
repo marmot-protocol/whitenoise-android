@@ -14,11 +14,16 @@ import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.SharedPlaintextWrite
+import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
+import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
+import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 
 private val documentMaterializations = SingleFlight<String, java.io.File>()
+private val documentGrantNamespace = java.util.UUID.randomUUID()
 private const val MAX_DOCUMENT_EXTENSION_LENGTH = 12
 internal const val ANDROID_PACKAGE_MIME = "application/vnd.android.package-archive"
 internal const val GENERIC_BINARY_MIME = "application/octet-stream"
@@ -78,76 +83,64 @@ private const val INERT_TEXT_EXTENSION = "txt"
 @VisibleForTesting
 internal suspend fun materializeDocumentAttachment(
     context: Context,
+    accountRef: String,
     messageIdHex: String,
     attachmentIndex: Int,
     reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
     resolveBytes: suspend () -> ByteArray,
-): java.io.File {
-    val file =
-        withContext(Dispatchers.IO) {
-            documentAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
-        }
-    val attachmentKey =
-        AttachmentCachePublication.attachmentKey(
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
-            sourceEpoch = reference.sourceEpoch,
-        )
-    return documentMaterializations.run(file.absolutePath) {
-        withContext(Dispatchers.IO) {
-            validatedAttachmentCacheFile(file)
-        } ?: run {
-            val published =
-                AttachmentCachePublication.publishAfterLoad(
-                    attachmentKey = attachmentKey,
-                    finalFile = file,
-                    loadBytes = resolveBytes,
-                )
-            if (!published) {
-                throw java.io.IOException("attachment cache publication aborted for ${file.name}")
-            }
-            file
-        }
+): java.io.File =
+    materializeDocumentAttachmentSource(context, accountRef, messageIdHex, attachmentIndex, reference) {
+        AttachmentPlaintext.Bytes(resolveBytes())
     }
-}
 
 /** Publishes a closeable document source and reuses a complete stable viewer file. */
 internal suspend fun materializeDocumentAttachmentSource(
     context: Context,
+    accountRef: String,
     messageIdHex: String,
     attachmentIndex: Int,
     reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
     resolveSource: suspend () -> AttachmentPlaintext,
 ): java.io.File {
+    val writeGeneration = captureSharedPlaintextWrite(accountRef)
     val file =
         withContext(Dispatchers.IO) {
-            documentAttachmentCacheFile(context, messageIdHex, attachmentIndex, reference)
+            documentAttachmentCacheFile(context, accountRef, messageIdHex, attachmentIndex, reference, writeGeneration)
         }
     val attachmentKey =
         AttachmentCachePublication.attachmentKey(messageIdHex, attachmentIndex, reference.sourceEpoch)
     return documentMaterializations.run(file.absolutePath) {
-        withContext(Dispatchers.IO) { validatedAttachmentCacheFile(file) } ?: run {
-            val published =
-                AttachmentCachePublication.publishSourceAfterLoad(
-                    attachmentKey = attachmentKey,
-                    finalFile = file,
-                    loadSource = resolveSource,
-                )
-            if (!published) throw java.io.IOException("attachment cache publication aborted for ${file.name}")
-            file
+        withContext(Dispatchers.IO) {
+            validatedAttachmentCacheFile(file) ?: run {
+                val permit =
+                    AttachmentCachePublication.capturePermit(attachmentKey)
+                        ?: throw java.io.IOException("attachment cache publication unavailable")
+                resolveSource().use { source ->
+                    withSharedPlaintextWrite(writeGeneration) {
+                        if (!AttachmentCachePublication.publishSourceWithPermit(attachmentKey, file, source, permit)) {
+                            throw java.io.IOException("attachment cache publication aborted")
+                        }
+                        file
+                    }
+                }
+            }
         }
     }
 }
 
 private fun documentAttachmentCacheFile(
     context: Context,
+    accountRef: String,
     messageIdHex: String,
     attachmentIndex: Int,
     reference: dev.ipf.marmotkit.MediaAttachmentReferenceFfi,
+    writeGeneration: SharedPlaintextWrite,
 ): java.io.File {
+    // A surviving OS grant to a previously evicted file cannot regain access when it is staged after a wipe or restart.
     val digestInput =
         (
-            "$messageIdHex\u0000$attachmentIndex\u0000${reference.plaintextSha256}\u0000" +
+            "$documentGrantNamespace\u0000$writeGeneration\u0000$messageIdHex\u0000$attachmentIndex\u0000" +
+                "${reference.plaintextSha256}\u0000" +
                 "${reference.ciphertextSha256}\u0000${reference.sourceEpoch}"
         ).toByteArray()
     val digest =
@@ -158,7 +151,7 @@ private fun documentAttachmentCacheFile(
     val extension = documentAttachmentExtension(reference.fileName, reference.mediaType)
     return java.io.File(
         java.io.File(context.cacheDir, MediaCacheDirs.SHARED),
-        "document_$digest.$extension",
+        "${sharedPlaintextPrefix(context, accountRef)}document_$digest.$extension",
     )
 }
 

@@ -226,6 +226,15 @@
         "test_ids": [
           "SET-058"
         ]
+      },
+      {
+        "surface": "R.string.settings_voice_notes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_voice_notes",
+        "test_ids": [
+          "MED-062",
+          "MED-038"
+        ]
       }
     ],
     "composable_surfaces": [
@@ -275,6 +284,22 @@
         "anchor": "R.string.explanation_settings_relays",
         "test_ids": [
           "SET-053"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.explanation_linked_devices_hub",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.explanation_linked_devices_hub",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.linked_devices",
+        "test_ids": [
+          "SET-060"
         ]
       }
     ],

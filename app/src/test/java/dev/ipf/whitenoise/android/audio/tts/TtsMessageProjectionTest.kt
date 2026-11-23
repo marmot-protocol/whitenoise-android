@@ -346,6 +346,7 @@ class TtsMessageProjectionTest {
         kind: ULong = 9uL,
         contentTokens: MarkdownDocumentFfi,
     ) = AppMessageRecordFfi(
+        invalidated = false,
         messageIdHex = "message",
         direction = "received",
         groupIdHex = "group",

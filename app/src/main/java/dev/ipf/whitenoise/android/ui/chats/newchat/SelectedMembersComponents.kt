@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -54,10 +55,7 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
@@ -163,7 +161,7 @@ internal fun SelectedMemberSummary(
                 )
             }
             Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                painterResource(R.drawable.ic_chevron_right),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -212,7 +210,7 @@ internal fun SelectedMembersReviewScreen(
                     navigationIcon = {
                         IconButton(onClick = onBack, enabled = !busy) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
+                                painterResource(R.drawable.ic_arrow_back),
                                 contentDescription = stringResource(R.string.back),
                             )
                         }
@@ -249,7 +247,7 @@ internal fun SelectedMembersReviewScreen(
         },
     ) { padding ->
         WhiteNoiseLazyColumn(
-            modifier = Modifier.fillMaxWidth().padding(padding),
+            modifier = Modifier.fillMaxWidth().nativePageBody(padding).padding(padding),
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             items(members, key = { it.accountIdHex }) { member ->
@@ -277,7 +275,7 @@ internal fun SelectedMembersReviewScreen(
                                 modifier = Modifier.size(48.dp),
                             ) {
                                 Icon(
-                                    Icons.Default.Close,
+                                    painterResource(R.drawable.ic_close),
                                     contentDescription = stringResource(R.string.remove_member_named, memberName),
                                 )
                             }

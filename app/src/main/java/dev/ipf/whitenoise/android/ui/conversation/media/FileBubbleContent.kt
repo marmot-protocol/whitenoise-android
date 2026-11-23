@@ -47,7 +47,6 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowUpward
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 private val FileTransferControlSize = 48.dp
@@ -472,7 +471,7 @@ private fun FileTransferIcon(
         AttachmentTransferState.Failed,
         AttachmentTransferState.StorageBlocked,
         ->
-            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(21.dp))
+            Icon(painterResource(R.drawable.ic_refresh), contentDescription = null, modifier = Modifier.size(21.dp))
         AttachmentTransferState.Remote,
         AttachmentTransferState.NotRetained,
         AttachmentTransferState.Cancelled,

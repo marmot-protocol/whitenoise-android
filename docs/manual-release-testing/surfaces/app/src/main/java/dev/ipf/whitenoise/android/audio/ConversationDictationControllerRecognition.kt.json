@@ -10,6 +10,14 @@
         "test_ids": [
           "DIC-012"
         ]
+      },
+      {
+        "surface": "Provider errors route idle caller-audio requests to the recycle path before failure accounting",
+        "anchor": "if (recycleIdleCallerAudioGeneration(sessionId, target, error, elapsedMillis)) return",
+        "test_ids": [
+          "DIC-018"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationControllerRecognition.kt"
       }
     ]
   },

@@ -1,0 +1,73 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Imported history line: Messages above came from another device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
+        "anchor": "R.string.history_imported_from_another_device",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "Imported history line: Messages above came from the named device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
+        "anchor": "R.string.history_imported_from_device",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "Imported history: R.string.history_receiving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
+        "anchor": "R.string.history_receiving",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "Imported history line: Messages above were restored from a backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
+        "anchor": "R.string.history_restored_from_backup",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "Imported history: R.string.history_retrying",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
+        "anchor": "R.string.history_retrying",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "ChatHistoryTransferNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
+        "anchor": "fun ChatHistoryTransferNotice(",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "ImportedHistoryBoundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
+        "anchor": "fun ImportedHistoryBoundary(",
+        "test_ids": [
+          "SET-067"
+        ]
+      },
+      {
+        "surface": "ImportedHistoryMarkers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ImportedHistory.kt",
+        "anchor": "fun ImportedHistoryMarkers(",
+        "test_ids": [
+          "SET-067"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

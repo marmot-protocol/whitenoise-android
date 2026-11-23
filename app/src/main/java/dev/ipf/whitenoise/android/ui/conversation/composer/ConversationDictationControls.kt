@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -49,15 +50,16 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.canContinueDictation
+import dev.ipf.whitenoise.android.audio.continueDictation
+import dev.ipf.whitenoise.android.audio.followUpAwaitingPrevious
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
+import dev.ipf.whitenoise.android.audio.supportsFollowUpCapture
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.settleControlMorph
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentPaste
 
 internal const val COMPOSER_DICTATION_STRIP_TAG = "composer-dictation-strip"
 internal const val COMPOSER_DICTATION_COMPACT_ACTIONS_TAG = "composer-dictation-compact-actions"
@@ -80,17 +82,32 @@ internal data class DictationControlFacts(
     val completionActionsEnabled: Boolean,
     val processingDeliveryMode: ConversationDictationDeliveryMode?,
     val recoveryHandedToComposer: Boolean,
-)
+    /** The previous dictation is still being transcribed and another recording may start beside it. */
+    val continueAvailable: Boolean = false,
+    /** A follow-up owns these commands while the previous dictation is still being transcribed. */
+    val previousPending: Boolean = false,
+    val keepsLeadingSlot: Boolean = false,
+) {
+    val reservesLeadingSlot: Boolean get() = captureInProgress || continueAvailable || keepsLeadingSlot
+}
 
 internal val ConversationDictationController.controlFacts: DictationControlFacts
     get() =
         DictationControlFacts(
             captureInProgress = captureInProgress,
-            deliveryInProgress = deliveryInProgress,
+            // Cancel, Paste and Send belong to a follow-up while one exists, whatever the previous send is doing.
+            deliveryInProgress = deliveryInProgress && followUp.pending == null,
             completionActionsEnabled = completionActionsEnabled,
             processingDeliveryMode = processingDeliveryMode,
             recoveryHandedToComposer = recoveryHandedToComposer,
+            continueAvailable = canContinueDictation,
+            previousPending = followUpAwaitingPrevious,
+            keepsLeadingSlot = supportsFollowUpCapture,
         )
+
+/** The composer reserves the same width as the compact controls. */
+internal val ConversationDictationController.reservesLeadingSlot: Boolean
+    get() = controlFacts.reservesLeadingSlot
 
 /** Floating app-root control used while the immutable dictation origin is not visible. */
 @Composable
@@ -170,10 +187,10 @@ internal fun ConversationDictationCompactActions(
             dictationStatusLabel(state, facts.captureInProgress)
         }
 
-    // Capture stopping and recovery both change the command width; ease each edge instead of snapping.
+    // Caller-owned capture keeps its width while the leading icon changes.
     val motion = rememberSystemAnimationsEnabled()
     val width by animateDpAsState(
-        targetValue = state.compactActionsWidth(facts.captureInProgress),
+        targetValue = state.compactActionsWidth(facts.reservesLeadingSlot),
         animationSpec = if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
         label = "dictation actions width",
     )
@@ -212,15 +229,10 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Listening ||
             this is ConversationDictationState.Processing
 
-/**
- * Active recognition keeps room for the 24dp listening pulse only while capture runs. Paste or Send
- * stops capture, and the capsule narrows with the pulse instead of keeping its blank slot. The
- * composer reserves this same width so its bubble narrows in step with the commands.
- */
-internal fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
+internal fun ConversationDictationState.compactActionsWidth(reservesLeadingSlot: Boolean) =
     when {
         !hasActiveRecognitionActions -> 96.dp
-        captureInProgress -> DICTATION_ACTIVE_ACTIONS_WIDTH
+        reservesLeadingSlot -> DICTATION_ACTIVE_ACTIONS_WIDTH
         else -> DICTATION_ACTIVE_ACTIONS_WIDTH - DICTATION_LISTENING_PULSE_WIDTH
     }
 
@@ -235,7 +247,7 @@ private fun ConversationDictationActiveActions(
 ) {
     val sendLabel = stringResource(R.string.send)
     val sendExplanation = composerExplanation(R.string.send, R.string.explanation_conversation_dictation_send)
-    ConversationDictationListeningSlot(facts.captureInProgress)
+    ConversationDictationLeadingActions(controller, facts)
     IconButton(
         onClick = settleControlMorph(controller::cancel),
         enabled = !facts.deliveryInProgress,
@@ -250,7 +262,7 @@ private fun ConversationDictationActiveActions(
                     ),
                 ),
     ) {
-        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
+        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.cancel))
     }
     ConversationDictationPasteAction(controller, facts)
     if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
@@ -331,7 +343,7 @@ private fun ConversationDictationPasteAction(
                 strokeWidth = 2.dp,
             )
         } else {
-            Icon(Icons.Default.ContentPaste, contentDescription = null)
+            Icon(painterResource(R.drawable.ic_content_paste), contentDescription = null)
         }
     }
 }
@@ -381,7 +393,7 @@ private fun ConversationDictationDismissAction(
         modifier = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget),
     ) {
         Icon(
-            Icons.Default.Close,
+            painterResource(R.drawable.ic_close),
             contentDescription = stringResource(label),
         )
     }
@@ -460,3 +472,19 @@ internal fun dictationFailureLabel(reason: ConversationDictationFailure): String
             ConversationDictationFailure.DraftWriteRefused -> R.string.toast_draft_save_failed
         },
     )
+
+@Composable
+private fun ConversationDictationLeadingActions(
+    controller: ConversationDictationController,
+    facts: DictationControlFacts,
+) {
+    val slot = if (facts.keepsLeadingSlot) Modifier.width(DICTATION_LISTENING_PULSE_WIDTH) else Modifier
+    Box(slot, contentAlignment = Alignment.Center) {
+        ConversationDictationListeningSlot(
+            visible = facts.captureInProgress,
+            previousPending = facts.previousPending,
+            resize = !facts.keepsLeadingSlot,
+        )
+        ConversationDictationContinueSlot(facts.continueAvailable) { controller.continueDictation() }
+    }
+}

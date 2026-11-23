@@ -121,6 +121,7 @@ internal class SessionHarness(
         plaintext: String,
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "received",
             groupIdHex = "group",

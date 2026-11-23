@@ -5,7 +5,6 @@ import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -37,6 +36,7 @@ import dev.ipf.whitenoise.android.state.FolderCommitRecordingPreferences
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.replaceActiveAccountForTest
+import dev.ipf.whitenoise.android.ui.common.WHITE_NOISE_TOP_BAR_BACK_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -64,18 +64,20 @@ class ChatFolderOwnershipTest {
             .commit()
     }
 
-    /** Rotation preserves the unsaved visibility draft; only Save changes the account store. */
+    /** An existing folder's visibility edit saves without Save and stays saved across rotation. */
     @Test
-    fun emptyVisibilityDraftSurvivesRotationAndOnlySavePersistsIt() {
+    fun emptyVisibilityEditAutosavesAndSurvivesRotation() {
         val state = appState()
         val store = state.chatFolderPreferences
         val folder = store.createFolder(A, "Empty")!!
         val restoration = StateRestorationTester(composeRule)
         restoration.setContent { WhiteNoiseTheme { ChatFolderEditScreen(state, A, folder.id, {}) } }
+        composeRule.onNodeWithTag("folder.save").assertDoesNotExist()
         composeRule.onNodeWithTag("folder.showWhenEmpty").performClick()
-        assertFalse(store.foldersFor(A).first { it.id == folder.id }.showWhenEmpty)
+        composeRule.waitForIdle()
+        assertTrue(store.foldersFor(A).first { it.id == folder.id }.showWhenEmpty)
         restoration.emulateSavedInstanceStateRestore()
-        composeRule.onNodeWithTag("folder.save").performClick()
+        composeRule.waitForIdle()
         assertTrue(store.foldersFor(A).first { it.id == folder.id }.showWhenEmpty)
         assertTrue(ChatFolderPreferences(app).foldersFor(A).first { it.id == folder.id }.showWhenEmpty)
     }
@@ -90,7 +92,7 @@ class ChatFolderOwnershipTest {
         composeRule.onNodeWithText("Catch up").performClick()
         composeRule.onNodeWithTag("folder.name").assertExists()
         composeRule.onNodeWithText("Catch up").assertExists()
-        composeRule.onNodeWithTag("folder.save").performClick()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
         assertEquals("Catch up", store.foldersFor(A).first { it.id == UNREAD }.name)
     }
 
@@ -189,23 +191,102 @@ class ChatFolderOwnershipTest {
         assertEquals(1, state.chatFolderPreferences.foldersFor(A).count { it.name == "Work" })
     }
 
-    /** A removed folder cannot fall through ignored store failures and report a successful save. */
-    @Test fun sameFrameDeletionBeforeSaveKeepsFailureAndDraft() {
+    /** A folder removed elsewhere is reported, keeps the draft on screen and is never recreated by autosave. */
+    @Test fun deletionDuringEditingKeepsDraftWithoutRecreatingFolder() {
         val state = appState()
         val folder = state.chatFolderPreferences.createFolder(A, "Work")!!
         var closed = false
         showEditor(state, folder.id) { closed = true }
         composeRule.onNodeWithTag("folder.addDescription").performClick()
+        composeRule.runOnIdle { state.chatFolderPreferences.deleteFolder(A, folder.id) }
         composeRule.onNodeWithTag("folder.description").performTextReplacement("Keep this draft")
-        val save = saveAction()
-        composeRule.runOnIdle {
-            state.chatFolderPreferences.deleteFolder(A, folder.id)
-            save()
-        }
         composeRule.onNodeWithText(app.getString(R.string.folder_unavailable)).assertExists()
         composeRule.onNodeWithText("Keep this draft").assertExists()
         assertFalse(closed)
         assertFalse(state.chatFolderPreferences.foldersFor(A).any { it.id == folder.id })
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        assertTrue(closed)
+        assertFalse(ChatFolderPreferences(app).foldersFor(A).any { it.id == folder.id })
+    }
+
+    /** Autosaved edits belong to the account and folder that opened the editor, even across an account switch. */
+    @Test fun autosaveStaysWithOriginatingAccountAndFolder() {
+        val state = appState()
+        val store = state.chatFolderPreferences
+        store.foldersFor(A)
+        store.foldersFor(B)
+        showEditor(state, UNREAD)
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Mine")
+        composeRule.runOnIdle { state.replaceActiveAccountForTest(B) }
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).assertDoesNotExist()
+        val reloaded = ChatFolderPreferences(app)
+        assertEquals("Mine", reloaded.foldersFor(A).first { it.id == UNREAD }.name)
+        assertEquals("", reloaded.foldersFor(B).first { it.id == UNREAD }.name)
+        assertEquals(1, reloaded.foldersFor(A).count { it.name == "Mine" })
+    }
+
+    /** A failed autosave is shown; the first Back stays to show it and retries, so the edit is not lost. */
+    @Test fun autosaveFailureIsShownAndBackRetries() {
+        val state = appState()
+        val preferences = failingFolderPreferences(state)
+        val store = state.chatFolderPreferences
+        var closed = 0
+        showEditor(state, UNREAD, onClose = { closed++ })
+        composeRule.runOnIdle { preferences.failNext = true }
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Retry rename")
+        composeRule.onNodeWithText(app.getString(R.string.folder_autosave_failed)).assertExists()
+        assertEquals("", store.foldersFor(A).first { it.id == UNREAD }.name)
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        assertEquals(1, closed)
+        assertEquals("Retry rename", ChatFolderPreferences(app).foldersFor(A).first { it.id == UNREAD }.name)
+    }
+
+    /** A Back whose retry also fails keeps the editor open with the draft; only a second Back leaves. */
+    @Test fun failedBackRetryKeepsEditorOpenOnce() {
+        val state = appState()
+        val preferences = failingFolderPreferences(state)
+        var closed = 0
+        showEditor(state, UNREAD, onClose = { closed++ })
+        composeRule.runOnIdle { preferences.failNext = true }
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Kept rename")
+        composeRule.runOnIdle { preferences.failNext = true }
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        assertEquals(0, closed)
+        composeRule.onNodeWithText("Kept rename").assertExists()
+        composeRule.onNodeWithText(app.getString(R.string.folder_autosave_failed)).assertExists()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        assertEquals(1, closed)
+    }
+
+    /** An edit the store rejected is still unsaved after a configuration change, so leaving retries it. */
+    @Test fun rejectedEditIsRetriedAfterRecreation() {
+        val state = appState()
+        val preferences = failingFolderPreferences(state)
+        val restoration = StateRestorationTester(composeRule)
+        restoration.setContent { WhiteNoiseTheme { ChatFolderEditScreen(state, A, UNREAD, {}) } }
+        composeRule.runOnIdle { preferences.failNext = true }
+        composeRule.onNodeWithTag("folder.showWhenEmpty").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_autosave_failed)).assertExists()
+        // The outgoing composition's exit save fails too, so only the recreated editor can persist the edit.
+        composeRule.runOnIdle { preferences.failNext = true }
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.waitForIdle()
+        assertTrue(ChatFolderPreferences(app).foldersFor(A).first { it.id == UNREAD }.showWhenEmpty)
+    }
+
+    /** Installs a folder store whose next preference write can be made to fail. */
+    private fun failingFolderPreferences(state: WhiteNoiseAppState): FolderCommitRecordingPreferences {
+        val preferences =
+            FolderCommitRecordingPreferences(
+                app.getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE),
+            )
+        val store = ChatFolderPreferences(app, preferences)
+        store.foldersFor(A)
+        state.javaClass
+            .getDeclaredField("chatFolderPreferences")
+            .apply { isAccessible = true }
+            .set(state, store)
+        return preferences
     }
 
     /** A failed real preference transaction keeps the draft and re-enables Save for an explicit retry. */
@@ -247,6 +328,7 @@ class ChatFolderOwnershipTest {
         showList(state)
         composeRule.onNodeWithContentDescription(app.getString(R.string.actions_for, "Work")).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_move_up)).performClick()
+        composeRule.waitForIdle()
         val reloaded = ChatFolderPreferences(app)
         val after = reloaded.foldersFor(A)
         val expected = before.toMutableList().apply { add(size - 2, removeAt(lastIndex)) }
@@ -287,7 +369,7 @@ class ChatFolderOwnershipTest {
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(inclusions))
         composeRule.onNodeWithText(inclusions).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_manual_hint)).assertExists()
-        composeRule.onNode(isToggleable() and hasAnyAncestor(hasTestTag("folder.choice.g1"))).performClick()
+        composeRule.onNode(hasTestTag("folder.choice.g1") and isToggleable()).performClick()
         composeRule.onNodeWithText(app.getString(R.string.done)).performClick()
         assertFalse(state.chatFolderPreferences.foldersFor(A).any { it.name == "Rotated" })
         restoration.emulateSavedInstanceStateRestore()

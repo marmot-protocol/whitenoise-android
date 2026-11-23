@@ -48,8 +48,29 @@ internal class AppLockController(
         private set
     var screenVisible by mutableStateOf(false)
         private set
+
+    /** Notification admission re-evaluates the monotonic deadline from the runtime's IO dispatcher. */
     val notificationActionsAllowed: Boolean
-        get() = notificationActionsAllowed(screenVisible)
+        get() =
+            notificationActionsAllowed(
+                appLockScreenVisible = screenVisible,
+                requireUnlock = required,
+                credentialAvailable = credentialAvailable,
+                authenticatedSessionAvailable =
+                    (notificationForegroundEvaluated && appInForeground()) ||
+                        notificationBackgroundGraceAllows(
+                            notificationBackgroundedAt,
+                            SystemClock.elapsedRealtime(),
+                            lockDelay,
+                        ),
+            )
+
+    @Volatile
+    private var notificationBackgroundedAt: Long? = null
+
+    @Volatile
+    private var notificationForegroundEvaluated = false
+
     var unlockError by mutableStateOf<AppText?>(null)
         private set
 
@@ -131,7 +152,9 @@ internal class AppLockController(
     fun onAppForegrounded(nowMillis: Long = System.currentTimeMillis()) {
         ttsBoundaryJob?.cancel()
         ttsBoundaryJob = null
+        notificationBackgroundedAt = null
         maybeShowForForeground(nowMillis)
+        notificationForegroundEvaluated = true
     }
 
     fun maybeShowForForeground(nowMillis: Long = System.currentTimeMillis()) {
@@ -151,7 +174,9 @@ internal class AppLockController(
 
     /** Start the away-time grace period only for an authenticated, credentialed background transition. */
     fun onAppBackgrounded(nowMillis: Long = System.currentTimeMillis()) {
+        notificationForegroundEvaluated = false
         sessions.clearForegroundReturn()
+        notificationBackgroundedAt = null
         refreshCredentialAvailability()
         if (
             !shouldRefreshAppLockDelayBaselineOnBackground(
@@ -163,6 +188,7 @@ internal class AppLockController(
             return
         }
         val normalizedNow = nowMillis.coerceAtLeast(0L)
+        notificationBackgroundedAt = SystemClock.elapsedRealtime()
         // The delay means time spent away from the app, not time since the
         // last credential prompt while the user was actively reading chats.
         lastUnlockAtMillis = normalizedNow
@@ -260,7 +286,7 @@ internal class AppLockController(
         }
     }
 
-    private companion object {
+    internal companion object {
         const val REQUIRE_APP_UNLOCK_KEY = "require_app_unlock"
         const val APP_LOCK_DELAY_KEY = "app_lock_delay"
     }

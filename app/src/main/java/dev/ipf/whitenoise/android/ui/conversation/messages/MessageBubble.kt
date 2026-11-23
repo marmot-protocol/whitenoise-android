@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -42,10 +41,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.boundsInRoot
@@ -178,9 +175,6 @@ import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
-import dev.ipf.whitenoise.android.ui.theme.LocalMessageBubbleBaseColorScheme
-import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
-import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.map
@@ -188,101 +182,6 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private const val PENDING_STICKER_ALPHA = 0.7f
-
-/** Draws semantic, saved-colour, or directional AMOLED borders in that precedence order. */
-@Composable
-internal fun messageBubbleBorder(
-    highlighted: Boolean,
-    mine: Boolean,
-    persistedFailure: Boolean = false,
-    customBorderArgb: Long? = null,
-    mentionAccentArgb: Long? = null,
-): BorderStroke? {
-    val amoledAccent = amoledDirectionalAccentColor(mine)
-    return when {
-        persistedFailure -> null
-        highlighted -> BorderStroke(2.dp, MaterialTheme.colorScheme.tertiary)
-        mentionAccentArgb != null && amoledAccent != null -> BorderStroke(2.dp, colorFromArgb(mentionAccentArgb))
-        customBorderArgb != null && amoledAccent != null -> BorderStroke(2.dp, colorFromArgb(customBorderArgb))
-        amoledAccent != null -> BorderStroke(2.dp, amoledAccent)
-        else -> null
-    }
-}
-
-/** Accent for a reply preview, inside or beside the bubble, honouring custom bubble colours. */
-internal fun replyPreviewAccentArgb(
-    insideBubble: Boolean,
-    customBubbleColorActive: Boolean,
-    presentation: BubblePresentation,
-): Long? =
-    if (customBubbleColorActive) {
-        presentation.borderOverrideArgb ?: presentation.contentArgb.takeIf { insideBubble }
-    } else {
-        null
-    }
-
-/** Bubble colours and shape for the direction, deletion state and custom colour. */
-@Composable
-internal fun messageBubblePresentation(
-    deleted: Boolean,
-    mine: Boolean,
-    customArgb: Long? = null,
-    persistedFailure: Boolean = false,
-): BubblePresentation {
-    val colorScheme = MaterialTheme.colorScheme
-    val bubbleScheme = LocalMessageBubbleBaseColorScheme.current ?: colorScheme
-    // Keep tombstone and AMOLED foregrounds stable; live bubbles use the prototype's paired roles.
-    val preserveSemanticSurface = deleted || isAmoledSurfaceTheme()
-    val surfaceBackground =
-        if (preserveSemanticSurface) {
-            colorScheme.surfaceVariant
-        } else {
-            bubbleScheme.surfaceContainerHigh
-        }
-    val surfaceContent = if (preserveSemanticSurface) colorScheme.onSurfaceVariant else bubbleScheme.onSurface
-    return resolveBubblePresentationArgb(
-        deleted = deleted,
-        amoled = isAmoledSurfaceTheme(),
-        mine = mine,
-        customArgb = customArgb,
-        tokens =
-            BubblePresentationTokens(
-                errorBackgroundArgb = colorScheme.errorContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                errorContentArgb = colorScheme.onErrorContainer.toArgb().toLong() and 0xFFFFFFFFL,
-                surfaceBackgroundArgb = surfaceBackground.toArgb().toLong() and 0xFFFFFFFFL,
-                surfaceContentArgb = surfaceContent.toArgb().toLong() and 0xFFFFFFFFL,
-                mineBackgroundArgb = bubbleScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
-                mineContentArgb = bubbleScheme.onPrimary.toArgb().toLong() and 0xFFFFFFFFL,
-                mentionAccentArgb = colorScheme.primary.toArgb().toLong() and 0xFFFFFFFFL,
-            ),
-        persistedFailure = persistedFailure,
-    )
-}
-
-/** Fill colour of a bubble for the direction, deletion state and custom colour. */
-@Composable
-internal fun messageBubbleFillColor(
-    deleted: Boolean,
-    mine: Boolean,
-    persistedFailure: Boolean = false,
-): Color = colorFromArgb(messageBubblePresentation(deleted, mine, persistedFailure = persistedFailure).backgroundArgb)
-
-/** Footer time colour for the direction and state. */
-@Composable
-internal fun messageBubbleTimestampColor(
-    mine: Boolean,
-    deleted: Boolean,
-    persistedFailure: Boolean = false,
-): Color {
-    val colorScheme = MaterialTheme.colorScheme
-    val amoledAccent = amoledDirectionalAccentColor(mine)
-    return when {
-        persistedFailure -> colorScheme.onErrorContainer
-        amoledAccent != null -> amoledAccent
-        deleted -> colorScheme.onSurfaceVariant
-        else -> colorFromArgb(messageBubblePresentation(deleted = false, mine = mine).contentArgb)
-    }
-}
 
 /** Compact accepted references for legacy callers; see [rememberMessageAttachments] for indexed use. */
 @Composable
@@ -511,7 +410,6 @@ internal fun MessageBubble(
     LaunchedEffect(isActionMenuOpen) {
         if (!isActionMenuOpen) pressState.longPressTtsStart = null
     }
-    var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     val hasReports = item.projected?.hasReports == true
     val focusedMessageLayer = if (isActionMenuOpen) rememberGraphicsLayer() else null
     var focusedMediaReady by remember(item.presentationId, focusedMessageLayer) { mutableStateOf(false) }
@@ -664,7 +562,7 @@ internal fun MessageBubble(
         } else {
             remember(record.messageIdHex) {
                 dev.ipf.whitenoise.android.ui.conversation.media
-                    .AudioTranscriptionToggleState()
+                    .AudioTranscriptionToggleState(record.messageIdHex)
             }
         }
     val translationSource =
@@ -1033,6 +931,7 @@ internal fun MessageBubble(
 
     /** Closes the action menu and shows Info, unless the message is already deleted. */
     fun openInfoSheet() {
+        surfaces.infoOrigin = null
         if (deleted) return
         onActionMenuOpenChange(false)
         surfaces.infoSheetOpen = true
@@ -1156,17 +1055,11 @@ internal fun MessageBubble(
         fallbackVisibleText: String? = null,
         fallbackVisibleOffset: Int? = null,
         literalCode: Boolean = false,
-        expectedPress: TtsLongPressStart? = null,
+        press: TtsLongPressStart? = null,
     ) {
         if (deleted) return
-        val owner =
-            expectedPress ?: captureTtsLongPressStart(
-                startRenderedHit,
-                ttsSpeakableSource?.text,
-                controller,
-                appState,
-            )
-        val canCommit = { isTtsLongPressStartCurrent(owner, record, controller, appState) }
+        val owner = press ?: captureTtsLongPressStart(startRenderedHit, ttsSpeakableSource?.text, controller, appState)
+        val canCommit = captureTtsLongPressGuard(owner, record, controller, appState)
         if (!canCommit()) return
         val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
         val locale = java.util.Locale.getDefault()
@@ -1190,6 +1083,7 @@ internal fun MessageBubble(
                         locale = locale,
                     )
                 }
+            if (!appState.confirmTtsPlaybackTrust(canCommit)) return@launchMutation
             val started =
                 appState.speakAloudAutoRead(
                     controller.group.groupIdHex,
@@ -1212,7 +1106,7 @@ internal fun MessageBubble(
         val layouts = textLayouts.selectableTextLayouts.snapshot()
         val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
         if (!selectionActive) {
-            startSpeakAloud(pressState.longPressTtsStart?.renderedHit, expectedPress = pressState.longPressTtsStart)
+            startSpeakAloud(pressState.longPressTtsStart?.renderedHit, press = pressState.longPressTtsStart)
             return
         }
         val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
@@ -1443,6 +1337,7 @@ internal fun MessageBubble(
 
     /** Opens the forward sheet on a snapshot of the message's forwardable payload. */
     fun beginForward() {
+        surfaces.forwardOrigin = null
         if (deleted || actionsReadOnly || forwardPayload == null) return
         // Keep the dimmed menu below the picker until its window is dismissed.
         onForwardMenuHandoff()
@@ -1711,6 +1606,8 @@ internal fun MessageBubble(
                     surfaces.reactionSheetOpen = true
                 },
                 MessageRowAction(stringResource(R.string.edit_history), editState != null) {
+                    // A row accessibility action has no activated edited-label rectangle.
+                    surfaces.editHistoryOrigin = null
                     surfaces.editHistoryOpen = true
                 },
             )
@@ -1771,12 +1668,6 @@ internal fun MessageBubble(
                                     androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
                                 )
                                 textLayouts.pendingLongPressLinkDestination[0] = null
-                                // A tombstone has exactly one action, so it skips
-                                // the menu and opens its confirmation directly.
-                                if (deleted) {
-                                    requestDelete()
-                                    return@longPressOrVerticalDrag
-                                }
                                 val windowPosition =
                                     pressState.rowCoordinates[0]?.let {
                                         messageBubbleLongPressPositionInWindow(it, position)
@@ -1819,7 +1710,6 @@ internal fun MessageBubble(
                                                 windowPosition,
                                             )
                                         }
-                                    longPressWindowY = windowPosition.y
                                     pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                     pressState.initiatingMenuHoldActive = true
                                     // Freeze the rendered hit now. The bubble
@@ -1837,7 +1727,7 @@ internal fun MessageBubble(
                             },
                             onDragStart = { position ->
                                 pressState.initiatingMenuHoldActive = false
-                                if (deleted) return@longPressOrVerticalDrag
+                                if (deleted && !batchSelectable) return@longPressOrVerticalDrag
                                 // A range gesture begins after the threshold
                                 // action was shown. Hand ownership over without
                                 // leaving a stale popup above selection mode.
@@ -1848,20 +1738,20 @@ internal fun MessageBubble(
                                     ?.let(onDragSelectionStart)
                             },
                             onDrag = { position ->
-                                if (deleted) return@longPressOrVerticalDrag false
+                                if (deleted && !batchSelectable) return@longPressOrVerticalDrag false
                                 pressState.rowCoordinates[0]
                                     ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
                                     ?.let(onDragSelection)
                                     ?: false
                             },
                             onDragEnd = {
-                                if (!deleted) onDragSelectionEnd()
+                                if (!deleted || batchSelectable) onDragSelectionEnd()
                             },
                             onGestureCancel = {
                                 pressState.initiatingMenuHoldActive = false
                                 textLayouts.pendingLongPressLinkDestination[0] = null
                                 onActionMenuOpenChange(false)
-                                if (!deleted) onDragSelectionCancel()
+                                if (!deleted || batchSelectable) onDragSelectionCancel()
                             },
                         ),
                     ).messageBubbleSelectionRow(
@@ -1931,9 +1821,8 @@ internal fun MessageBubble(
                                         // anchor to the bubble top and seed the first word.
                                         pressState.longPressWindowPosition = null
                                         pressState.selectionSeedVisibleOffset = null
-                                        longPressWindowY = null
                                         pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
-                                        if (deleted) requestDelete() else onActionMenuOpenChange(true)
+                                        onActionMenuOpenChange(true)
                                         true
                                     }
                                 }
@@ -2285,7 +2174,6 @@ internal fun MessageBubble(
                             if (!selectionMode && !textSelectionMode) {
                                 pressState.longPressWindowPosition = null
                                 pressState.selectionSeedVisibleOffset = null
-                                longPressWindowY = null
                                 pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                 onActionMenuOpenChange(true)
                             }
@@ -2448,7 +2336,6 @@ internal fun MessageBubble(
                                             if (!deleted && !selectionMode && !textSelectionMode) {
                                                 pressState.longPressWindowPosition = null
                                                 pressState.selectionSeedVisibleOffset = null
-                                                longPressWindowY = null
                                                 pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                                 onActionMenuOpenChange(true)
                                             }
@@ -2561,9 +2448,12 @@ internal fun MessageBubble(
                         content()
                     }
                 }
-                val onEditedClick: (() -> Unit)? =
+                val onEditedClick: ((Rect?) -> Unit)? =
                     if (editState != null && !textSelectionMode) {
-                        { surfaces.editHistoryOpen = true }
+                        { origin ->
+                            surfaces.editHistoryOrigin = origin
+                            surfaces.editHistoryOpen = true
+                        }
                     } else {
                         null
                     }
@@ -2990,15 +2880,17 @@ internal fun MessageBubble(
                         teamAvailable = appState.teamReportingAvailable,
                     )
                 MessageActionMenu(
-                    // A tombstone gets a focused delete-only menu. Batch or partial
+                    // A placeholder offers local removal and selection. Batch or partial
                     // text selection still owns the row interaction completely.
                     expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
                     initiatingHoldActive = pressState.initiatingMenuHoldActive,
                     anchorBoundsInWindow = pressState.actionMenuAnchorBounds,
-                    anchorWindowYPx = longPressWindowY,
+                    anchorWindowYPx = pressState.longPressWindowPosition?.y,
+                    anchorWindowXPx = pressState.longPressWindowPosition?.x,
                     canReply = !deleted && !actionsReadOnly,
                     canReact = !deleted && !actionsReadOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
+                    localDeleteOnly = deleted,
                     canEdit = canEditMessage,
                     canForward = !deleted && !actionsReadOnly && forwardPayload != null,
                     forwardBlockedReason =
@@ -3007,7 +2899,7 @@ internal fun MessageBubble(
                         } else {
                             null
                         },
-                    canSelect = !deleted && !actionsReadOnly && batchSelectable,
+                    canSelect = !actionsReadOnly && batchSelectable,
                     // Whole-message Copy keeps using its actual clipboard payload,
                     // including card-style bubbles whose body is rendered by the
                     // card rather than the text renderer — a poll card copies its
@@ -3032,7 +2924,10 @@ internal fun MessageBubble(
                         collapseOverride = true
                     },
                     canTranslate =
-                        translationSource != null && translationSession != null && translationPreferences != null,
+                        !deleted &&
+                            translationSource != null &&
+                            translationSession != null &&
+                            translationPreferences != null,
                     onTranslate = {
                         onActionMenuOpenChange(false)
                         if (translationPreferences?.providerNoticeAccepted() == true) {
@@ -3042,7 +2937,7 @@ internal fun MessageBubble(
                         }
                     },
                     canSpeak = !deleted && canSpeakAloud,
-                    canSpeakCodeLiterally = speakableProjection?.speechRoles?.isNotEmpty() == true,
+                    canSpeakCodeLiterally = !deleted && speakableProjection?.speechRoles?.isNotEmpty() == true,
                     canSelectText = !isPollRecord && !deleted && !bodyTextToRender.isNullOrBlank(),
                     canKeepOnScreen =
                         !isPollRecord &&
@@ -3090,12 +2985,20 @@ internal fun MessageBubble(
                     onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,
                     onSelect = {
-                        if (!deleted && !actionsReadOnly) {
+                        if (batchSelectable && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             onToggleSelection()
                         }
                     },
                     onInfo = ::openInfoSheet,
+                    onInfoAt = { origin ->
+                        openInfoSheet()
+                        surfaces.infoOrigin = origin
+                    },
+                    onForwardAt = { origin ->
+                        beginForward()
+                        surfaces.forwardOrigin = origin
+                    },
                     onReport = {
                         onActionMenuOpenChange(false)
                         surfaces.reportSheetOpen = true
@@ -3360,6 +3263,7 @@ internal fun MessageBubble(
                 }
                 if (surfaces.editHistoryOpen && !deleted && editState != null) {
                     EditHistoryDialog(
+                        origin = surfaces.editHistoryOrigin,
                         // With an engine edit summary the record's plaintext is already the edited body.
                         original = record.plaintext.takeIf { item.projected?.edit == null },
                         originalTimestamp = record.recordedAt,
@@ -3376,6 +3280,7 @@ internal fun MessageBubble(
                         surfaces.messageReports = if (hasReports) controller.reportsFor(record.messageIdHex) else null
                     }
                     MessageDetailsScreen(
+                        origin = surfaces.infoOrigin,
                         record = record,
                         reports = surfaces.messageReports?.takeIf { hasReports },
                         reporterName = appState::displayName,
@@ -3409,6 +3314,7 @@ internal fun MessageBubble(
                 }
                 if (forwardPickerVisible && openForwardPayload != null) {
                     ForwardMessageSheet(
+                        origin = surfaces.forwardOrigin,
                         appState = appState,
                         payloads = listOf(openForwardPayload),
                         sourceAccountRef = controller.boundAccountRef,

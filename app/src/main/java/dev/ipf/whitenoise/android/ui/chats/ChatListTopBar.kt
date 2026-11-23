@@ -21,6 +21,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -49,6 +51,7 @@ import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
 import dev.ipf.whitenoise.android.state.chatsAvatarOpensSelector
+import dev.ipf.whitenoise.android.state.notificationProfiles
 import dev.ipf.whitenoise.android.state.quickSwitchAvatarAccounts
 import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
@@ -56,7 +59,6 @@ import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.account.RetainedTopBarAccountAvatar
-import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoffHost
@@ -70,11 +72,10 @@ import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSearchScanStatus
 import dev.ipf.whitenoise.android.ui.conversation.allowsSearchSteps
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -128,7 +129,10 @@ internal fun ChatListTopBar(
 ) {
     var showSelector by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
-    val switchNotice = rememberQuickAccountSwitchNotice()
+    var addIdentityContour by remember(appState.runtimeGeneration) { mutableStateOf<SettingsContour?>(null) }
+    var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
+    val profileState by appState.notificationProfiles.state.collectAsState()
+    val showProfileAction = profileState.showInChatList && profileState.profiles.isNotEmpty()
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
             showSelector = false
@@ -146,19 +150,14 @@ internal fun ChatListTopBar(
         if (onSwitchToAccount != null) {
             onSwitchToAccount(targetLabel)
         } else {
-            appState.requestQuickAccountSwitchTo(
-                targetLabel = targetLabel,
-                requestSwitch = { target, activated ->
-                    appState.launchMutation {
-                        appState.setActiveAccount(
-                            label = target,
-                            preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
-                            onActivated = activated,
-                        )
-                    }
-                },
-                onSwitched = switchNotice::show,
-            )
+            appState.requestQuickAccountSwitchTo(targetLabel) { target ->
+                appState.launchMutation {
+                    appState.setActiveAccount(
+                        label = target,
+                        preloadPolicy = AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
+                    )
+                }
+            }
         }
     }
     LaunchedEffect(appState.accounts, appState.runtimeGeneration) {
@@ -229,12 +228,15 @@ internal fun ChatListTopBar(
                         searchOpen ->
                             IconButton(onClick = onSearchClose) {
                                 Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    painterResource(R.drawable.ic_arrow_back),
                                     contentDescription = stringResource(R.string.back),
                                 )
                             }
                         else -> {
                             val active = appState.activeAccount
+                            val (settingsOrigin, openSettings) =
+                                dev.ipf.whitenoise.android.ui.settings
+                                    .rememberSettingsRouteClick(onOpenSettings)
                             val avatarExplanation =
                                 if (appState.chatsAvatarOpensSelector()) {
                                     chatsExplanation(
@@ -272,7 +274,7 @@ internal fun ChatListTopBar(
                                             if (appState.chatsAvatarOpensSelector()) {
                                                 openSelector()
                                             } else {
-                                                onOpenSettings()
+                                                openSettings()
                                             }
                                         }
                                     },
@@ -280,6 +282,7 @@ internal fun ChatListTopBar(
                                         Modifier
                                             .padding(start = 8.dp)
                                             .testTag("chats.switchProfile")
+                                            .then(settingsOrigin)
                                             .explainOnLongPress(avatarExplanation),
                                     // Per-account dot: light only when the active account
                                     // itself has unread, same shared decision the other
@@ -301,7 +304,7 @@ internal fun ChatListTopBar(
                                             appState = appState,
                                             onSwitchAccount = ::switchTo,
                                             onOpenSwitcher = ::openSelector,
-                                            barWidthDp = topBarWidthDp,
+                                            barWidthDp = topBarWidthDp - if (showProfileAction) 48.dp else 0.dp,
                                             retainedAvatars = retainedAccountAvatars,
                                         )
                                     }
@@ -320,6 +323,7 @@ internal fun ChatListTopBar(
                             )
                         }
                     } else {
+                        if (showProfileAction) NotificationProfileQuickAction(appState)
                         AppUpdateIconButton(
                             info = updateInfo,
                             selfUpdateEnabled = selfUpdateEnabled,
@@ -349,6 +353,8 @@ internal fun ChatListTopBar(
         AccountSelectorSheet(
             appState = appState,
             onDismiss = { showSelector = false },
+            onAddAccountOrigin = { addIdentityOrigin = it },
+            onAddAccountContour = { addIdentityContour = it },
             onAddAccount = {
                 showSelector = false
                 showAddIdentity = true
@@ -361,7 +367,12 @@ internal fun ChatListTopBar(
         )
     }
     if (showAddIdentity) {
-        AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+        AddIdentitySheet(
+            appState = appState,
+            origin = addIdentityOrigin,
+            sourceContour = addIdentityContour,
+            onDismiss = { showAddIdentity = false },
+        )
     }
 }
 
@@ -504,7 +515,7 @@ internal fun ConversationSearchNavBar(
             if (status == ConversationSearchScanStatus.FAILED) {
                 IconButton(onClick = onRetryScan) {
                     Icon(
-                        Icons.Default.Refresh,
+                        painterResource(R.drawable.ic_refresh),
                         contentDescription = stringResource(R.string.conversation_search_retry),
                     )
                 }

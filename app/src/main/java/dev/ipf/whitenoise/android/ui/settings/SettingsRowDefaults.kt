@@ -21,7 +21,6 @@ import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
-import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
 
 internal object SettingsRowDefaults {
@@ -142,8 +141,12 @@ internal fun Color.dimmedUnless(editable: Boolean): Color =
 internal fun Modifier.settingsRowBorder(context: SettingsRowContext): Modifier {
     val shape = context.shapes.shape
     return if (shape is ConnectedRowShape) {
-        val outline = context.borderColor
-        connectedRowBorder(shape, outline, seamColor = amoledRowSeamColor(outline))
+        connectedRowBorder(
+            shape,
+            context.borderColor,
+            suppressChrome = context.suppressChrome,
+            suppressSeam = context.suppressSeam,
+        )
     } else {
         this
     }

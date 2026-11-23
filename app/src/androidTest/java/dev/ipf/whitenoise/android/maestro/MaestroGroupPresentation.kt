@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.maestro
 
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import dev.ipf.whitenoise.android.media.ImageSearchClient
 import dev.ipf.whitenoise.android.media.ImageSearchException
@@ -9,7 +10,7 @@ import dev.ipf.whitenoise.android.ui.chats.ChatLeaveAndDeleteConfirmationDialog
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
-import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
+import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerSheet
 import dev.ipf.whitenoise.android.ui.group.GroupEmojiImagePickerSheet
 import dev.ipf.whitenoise.android.ui.group.GroupInfoScreen
 import dev.ipf.whitenoise.android.ui.group.GroupRelaySettingsScreen
@@ -59,7 +60,7 @@ internal fun MaestroGroupPresentation(fixture: MaestroPresentationFixture) {
                 initialCustomDateTime = LocalDateTime.of(2027, 1, 16, 12, 0),
             )
         fixture.scenario.startsWith("group-ui-disappearing-") ->
-            DisappearingMessagesPickerDialog(
+            DisappearingMessagesPickerSheet(
                 currentSecs = 0,
                 onDismiss = { fixture.finish("dismiss") },
                 onPick = { error("Cancellation must not persist a timer") },
@@ -123,6 +124,7 @@ private fun EntityPresentation(fixture: MaestroPresentationFixture) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupImagePresentation(fixture: MaestroPresentationFixture) {

@@ -302,6 +302,7 @@ class TimelineOrderingInversionTest {
         recordedAt: ULong,
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "received",
             groupIdHex = "g",

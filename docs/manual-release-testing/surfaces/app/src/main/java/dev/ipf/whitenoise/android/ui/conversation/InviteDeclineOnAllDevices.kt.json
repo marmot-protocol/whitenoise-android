@@ -1,0 +1,64 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "InviteDeclineGate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+        "anchor": "fun InviteDeclineGate(",
+        "test_ids": [
+          "SET-068"
+        ]
+      },
+      {
+        "surface": "InviteDeclineAllDevicesDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+        "anchor": "fun InviteDeclineAllDevicesDialog(",
+        "test_ids": [
+          "SET-068"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.invite_decline_all_devices_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+        "anchor": "R.string.invite_decline_all_devices_title",
+        "test_ids": [
+          "SET-068"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.invite_decline_all_devices_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+        "anchor": "R.string.invite_decline_all_devices_message",
+        "test_ids": [
+          "SET-068"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.decline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+        "anchor": "R.string.decline",
+        "test_ids": [
+          "SET-068"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-068"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.linked_devices_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InviteDeclineOnAllDevices.kt",
+        "anchor": "R.string.linked_devices_load_failed",
+        "test_ids": [
+          "SET-068"
+        ]
+      }
+    ]
+  }
+}

@@ -6,7 +6,8 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingSubscription
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.whitenoise.android.core.MarmotClient
+import dev.ipf.whitenoise.android.state.whiteNoiseInboxRelays
+import dev.ipf.whitenoise.android.state.whiteNoiseNip65Relays
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -184,12 +185,8 @@ internal class MarmotAccountSetupClient(
             marmot.proposeOnboardingRelays(
                 account,
                 request.step,
-                if (request.step == OnboardingStepFfi.INBOX_RELAYS) {
-                    MarmotClient.bootstrapRelays
-                } else {
-                    MarmotClient.accountRelays
-                },
-                if (request.step == OnboardingStepFfi.RELAYS) MarmotClient.accountRelays else emptyList(),
+                if (request.step == OnboardingStepFfi.INBOX_RELAYS) whiteNoiseInboxRelays else whiteNoiseNip65Relays,
+                if (request.step == OnboardingStepFfi.RELAYS) whiteNoiseNip65Relays else emptyList(),
             )
         } else {
             marmot.proposeOnboardingRelayRepair(account, request.step)
@@ -202,7 +199,7 @@ internal class MarmotAccountSetupClient(
                 OnboardingActionFfi.RETRY -> marmot.retryOnboardingStep(account, step)
                 OnboardingActionFfi.CONTINUE_WITHOUT -> marmot.continueOnboardingWithout(account, step)
                 // A preview never signs; reset is a separately reviewed, explicit full replacement.
-                OnboardingActionFfi.USE_RECOMMENDED_RELAYS ->
+                OnboardingActionFfi.USE_RECOMMENDED_RELAYS, OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS ->
                     proposeRelayRepair(request)
                 OnboardingActionFfi.EDIT_RELAYS ->
                     marmot.proposeOnboardingRelays(

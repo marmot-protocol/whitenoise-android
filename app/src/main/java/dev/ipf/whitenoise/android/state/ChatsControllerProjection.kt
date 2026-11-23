@@ -22,6 +22,7 @@ internal fun ChatsController.foldGroup(
     // record stream agreeing with it.
     val folded = if (fromSubscription) withRetainedName(record) else record
     groupRecordsById = groupRecordsById + (record.groupIdHex to folded)
+    if (fromSubscription) chatRowsByGroup[chatRowKey(record.groupIdHex)]?.let { settleInvitationFromMdk(it) }
     if (invalidateMembers) invalidateMemberCacheForGroup(record.groupIdHex)
     scheduleRecompute()
 }
@@ -288,8 +289,7 @@ internal fun ChatsController.preWarmNotificationAvatars(item: ChatListItem) {
                 profiles
             }
         AvatarImageLoader.preWarm(conversationAvatar, domain)
-        GroupProjector
-            .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+        item.avatarAccount
             ?.let { appState.preWarmProfileAvatar(it, profiles) }
     }
     item.latest?.sender?.let { appState.preWarmProfileAvatar(it, profiles) }

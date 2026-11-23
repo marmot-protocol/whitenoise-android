@@ -2,15 +2,18 @@ package dev.ipf.whitenoise.android.ui.account
 
 import android.util.Log
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
@@ -18,6 +21,10 @@ import dev.ipf.whitenoise.android.state.confirmedUnreadCountForAccount
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.devices.UnlinkedProfileRemoval
+import dev.ipf.whitenoise.android.ui.devices.asksToRemoveUnlinkedProfile
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import kotlinx.coroutines.CancellationException
 
 internal const val ACCOUNT_SELECTOR_CONTENT_TAG = "account-selector-content"
@@ -28,6 +35,9 @@ internal data class AccountSelectorAccountState(
     val isReadOnly: Boolean,
     val isSignedOut: Boolean,
     val isActive: Boolean,
+    /** Another of the account's devices unlinked this one, so the profile can only be removed here. */
+    val isUnlinked: Boolean = false,
+    val signerNeedsAttention: Boolean = false,
 )
 
 internal data class AccountSelectorState(
@@ -40,6 +50,7 @@ internal fun accountSelectorState(
     accounts: List<AccountSummaryFfi>,
     activeAccountRef: String?,
     refreshing: Boolean,
+    signerNeedsAttention: (String) -> Boolean = { false },
 ): AccountSelectorState =
     AccountSelectorState(
         accounts =
@@ -50,6 +61,9 @@ internal fun accountSelectorState(
                     isReadOnly = !account.localSigning && !account.externalSigning,
                     isSignedOut = account.signedOut,
                     isActive = account.label == activeAccountRef,
+                    isUnlinked = account.unlinked,
+                    signerNeedsAttention =
+                        !account.unlinked && !account.signedOut && signerNeedsAttention(account.accountIdHex),
                 )
             },
         refreshing = refreshing,
@@ -84,7 +98,8 @@ internal fun AccountSelectorContent(
 
 /** Native refresh retains cached rows; the visible sheet owns guarded selection intent, never background completion. */
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("LongMethod", "FunctionNaming")
+// Refresh, selection and Material exit share one account-scoped composition.
+@Suppress("LongMethod", "FunctionNaming", "CyclomaticComplexMethod")
 @Composable
 internal fun AccountSelectorSheet(
     appState: WhiteNoiseAppState,
@@ -92,19 +107,39 @@ internal fun AccountSelectorSheet(
     onAddAccount: () -> Unit,
     onAccountSwitched: () -> Unit,
     onSettings: (() -> Unit)? = null,
+    onAddAccountOrigin: (Rect?) -> Unit = {},
+    onAddAccountContour: (SettingsContour?) -> Unit = {},
 ) {
     val runtime = appState.runtimeGeneration
-    val selection = remember(appState, runtime) { ProfileSwitcherSelection() }
+    val sourceAccount = appState.activeAccountRef
+    val selection = remember(appState, runtime, sourceAccount) { ProfileSwitcherSelection() }
     val dismiss by rememberUpdatedState(onDismiss)
     val switched by rememberUpdatedState(onAccountSwitched)
     val add by rememberUpdatedState(onAddAccount)
     val settings by rememberUpdatedState(onSettings)
     var refreshing by remember(appState, runtime) { mutableStateOf(true) }
 
-    /** Closes the selection and dismisses the sheet in one step. */
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, selection to sourceAccount)
+
+    // Account/runtime invalidation and successful activation must dispose immediately.
+
     fun close() {
         selection.close()
         dismiss()
+    }
+
+    fun closeWithMotion(action: () -> Unit) {
+        if (!terminal.acceptsInput || appState.profileSwitcherBlocked()) return
+        selection.cancelPending()
+        terminal.close {
+            if (appState.runtimeGeneration == runtime &&
+                appState.activeAccountRef == sourceAccount &&
+                !appState.profileSwitcherBlocked()
+            ) {
+                action()
+            }
+        }
     }
     DisposableEffect(selection) { onDispose { selection.close() } }
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress, appState.retainedAccountReactivationRef) {
@@ -121,9 +156,17 @@ internal fun AccountSelectorSheet(
             refreshing = false
         }
     }
-    WhiteNoiseModalBottomSheet(onDismissRequest = ::close) {
+    val signerStatuses by appState.remoteSigners.statuses.collectAsState()
+    WhiteNoiseModalBottomSheet(
+        onDismissRequest = { closeWithMotion { dismiss() } },
+        sheetState = sheetState,
+        interactionEnabled = terminal.acceptsInput && !appState.profileSwitcherBlocked(),
+    ) {
         ProfileSwitcherSheet(
-            state = accountSelectorState(appState.accounts, appState.activeAccountRef, refreshing),
+            state =
+                accountSelectorState(appState.accounts, appState.activeAccountRef, refreshing) {
+                    signerStatuses[it]?.health?.needsAttention == true
+                },
             displayName = appState::accountDisplayNameCached,
             shortNpub = appState::shortNpub,
             npub = appState::npubForDisplay,
@@ -131,27 +174,39 @@ internal fun AccountSelectorSheet(
             unreadCountForAccount = appState::confirmedUnreadCountForAccount,
             hasUnreadForAccount = appState::accountShowsUnreadDot,
             actionColorsForAccount = { accountRef -> accountActionColors(appState, accountRef) },
-            enabled = !appState.profileSwitcherBlocked(),
+            enabled = terminal.acceptsInput && !appState.profileSwitcherBlocked(),
             pendingLabel = selection.pendingLabel,
             onSelectProfile = { label ->
-                selection.select(appState, label) {
-                    close()
-                    switched()
+                val unlinked = appState.accounts.filter { it.unlinked }.map { it.label }
+                if (asksToRemoveUnlinkedProfile(label, unlinked)) {
+                    // An unlinked profile cannot be switched to, and its question must not sit behind this sheet.
+                    closeWithMotion {
+                        dismiss()
+                        UnlinkedProfileRemoval.ask(label)
+                    }
+                } else {
+                    selection.select(appState, label) {
+                        close()
+                        switched()
+                    }
                 }
             },
+            onAddProfileOrigin = onAddAccountOrigin,
+            onAddProfileContour = onAddAccountContour,
             onAddProfile = {
                 if (!appState.profileSwitcherBlocked()) {
-                    selection.close()
-                    add()
+                    closeWithMotion { add() }
                 }
             },
-            onDismiss = ::close,
+            onDismiss = { closeWithMotion { dismiss() } },
             onSettings =
                 settings?.let {
                     {
                         if (!appState.profileSwitcherBlocked()) {
-                            close()
-                            settings?.invoke()
+                            closeWithMotion {
+                                dismiss()
+                                settings?.invoke()
+                            }
                         }
                     }
                 },

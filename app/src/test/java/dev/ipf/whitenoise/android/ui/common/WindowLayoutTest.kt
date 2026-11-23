@@ -57,7 +57,22 @@ class WindowLayoutTest {
         val landscape = WindowLayout.fromSize(DpSize(780.dp, 360.dp))
 
         assertNotEquals(portrait, landscape)
-        assertEquals(WindowLayout(WindowWidthClass.Medium, WindowHeightClass.Compact, isLandscape = true), landscape)
+        assertEquals(
+            WindowLayout(WindowWidthClass.Medium, WindowHeightClass.Compact, isLandscape = true, fitsTwoPanes = true),
+            landscape,
+        )
+    }
+
+    /** Two panes fit from a 300dp list, a 1dp divider and a 360dp conversation; phones in portrait never do. */
+    @Test
+    fun twoPanesFitFromBothMinimumWidths() {
+        fun fits(dp: Int) = WindowLayout.fromSize(DpSize(dp.dp, 700.dp)).fitsTwoPanes
+
+        assertEquals(661.dp, TwoPaneMinWindowWidth)
+        assertFalse(fits(412))
+        assertFalse(fits(660))
+        assertTrue(fits(661))
+        assertTrue(fits(1280))
     }
 
     /** The value used outside a provider is what a portrait phone classifies as. */
@@ -94,7 +109,8 @@ class WindowLayoutTest {
         }
 
         composeRule.runOnIdle { size.value = DpSize(673.dp, 841.dp) }
-        val unfolded = WindowLayout(WindowWidthClass.Medium, WindowHeightClass.Medium, isLandscape = false)
+        val unfolded =
+            WindowLayout(WindowWidthClass.Medium, WindowHeightClass.Medium, isLandscape = false, fitsTwoPanes = true)
         composeRule.runOnIdle {
             assertEquals(unfolded, rootLayout)
             assertEquals(unfolded, dialogLayout)

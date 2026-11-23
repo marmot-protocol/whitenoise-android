@@ -11,6 +11,7 @@
     <string name="explanation_conversation_dictation_cancel">Throws away what you said. Nothing is sent or added to the message, and this cannot be undone.</string>
     <string name="explanation_conversation_dictation_send">Stops listening and sends the recognized text as a message. Use Paste transcript instead to review it before sending.</string>
     <string name="explanation_conversation_dictation_paste">Puts the recognized text into the message box without sending it, so you can edit it first.</string>
+    <string name="explanation_conversation_dictation_continue">Starts recording the next part right away. What you said before is still being turned into text and is placed first.</string>
     <string name="explanation_conversation_dictation_recovery_paste">Puts the recognized text into the message box without sending it.</string>
     <string name="explanation_conversation_dictation_recovery_retry_send">Tries again to send the recognized text as a message.</string>
     <string name="explanation_conversation_dictation_recovery_app_settings">Opens Android settings for White Noise, where you can allow microphone access.</string>
@@ -34,6 +35,7 @@
     <string name="explanation_conversation_header_details">Opens this chat\'s details, such as its members and settings.</string>
     <string name="explanation_conversation_jump_to_mention">Scrolls to the next unread message that mentions you.</string>
     <string name="explanation_composer_draft_top">Scrolls the draft back to its first line. It does not change the text.</string>
+    <string name="explanation_composer_draft_bottom">Scrolls the draft to its last line. It does not change the text.</string>
     <string name="explanation_emoji_search">Searches the emoji list by name.</string>
     <string name="explanation_emoji_configure">Opens the settings where you choose your quick reaction emoji.</string>
 

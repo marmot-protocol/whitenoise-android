@@ -138,6 +138,7 @@ class AcceptedPendingMessageReconciliationTest {
     /** Builds a sent message record from alice with the given id. */
     private fun message(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = "sent",
             groupIdHex = "group",

@@ -20,6 +20,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -50,12 +52,9 @@ import dev.ipf.whitenoise.android.state.forwardTargets
 import dev.ipf.whitenoise.android.state.forwardTargetsRevision
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
 
@@ -253,7 +252,7 @@ private fun ForwardOperationStatusRow(
             }
             if (snapshot.isActive) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    painter = painterResource(R.drawable.ic_chevron_right),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -262,7 +261,7 @@ private fun ForwardOperationStatusRow(
         if (snapshot.canRetry) TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
         if (!snapshot.isActive) {
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.dismiss))
             }
         }
     }
@@ -279,15 +278,17 @@ private fun ForwardOperationDetailsSheet(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onClose) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheet)
+    ModalBottomSheet(onDismissRequest = { terminal.close(onClose) }, sheetState = sheet) {
         ForwardProgressContent(snapshot, targetTitles, Modifier.fillMaxWidth())
         ForwardOperationActions(
             snapshot = snapshot,
-            onDetails = onClose,
+            onDetails = { terminal.close(onClose) },
             detailsLabel = stringResource(R.string.close),
             onCancel = onCancel,
             onRetry = onRetry,
-            onDismiss = onDismiss,
+            onDismiss = { terminal.close(onDismiss) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
         )
     }
@@ -302,7 +303,7 @@ private fun ForwardOperationStatusIcon(snapshot: ForwardOperationSnapshot) {
         ForwardOperationPhase.Cancelling,
         ->
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.Forward,
+                painter = painterResource(R.drawable.ic_forward),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.primary,
@@ -318,14 +319,14 @@ private fun ForwardOperationStatusIcon(snapshot: ForwardOperationSnapshot) {
         ForwardOperationPhase.Failed,
         ->
             Icon(
-                imageVector = Icons.Default.ErrorOutline,
+                painter = painterResource(R.drawable.ic_error),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.error,
             )
         ForwardOperationPhase.Cancelled ->
             Icon(
-                imageVector = Icons.Default.Close,
+                painter = painterResource(R.drawable.ic_close),
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

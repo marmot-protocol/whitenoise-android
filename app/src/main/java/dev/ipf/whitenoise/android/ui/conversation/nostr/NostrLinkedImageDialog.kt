@@ -11,13 +11,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 
 /** Created only by a user's media-link action, including its normal labelled-link confirmation. */
 @Composable
@@ -29,20 +28,26 @@ internal fun NostrLinkedImageDialog(
         AvatarImageLoader.retryBanner(url, width, dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
     },
 ) {
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = null,
+        ownerKey = url to AvatarImageLoader.currentCacheLifetime(),
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.back))
+                IconButton(onClick = dismiss) {
+                    Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                 }
                 NostrEventImagePane(
                     url = url,
                     loadImage = loadImage,
                     initiallyRequested = true,
-                    onFullscreenDismiss = onDismiss,
+                    onFullscreenDismiss = {
+                        // The inner viewer already completed its exit; retire this source without another fade.
+                        cancelCompletion()
+                        onDismiss()
+                    },
                 )
             }
         }

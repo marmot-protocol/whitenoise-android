@@ -36,6 +36,7 @@ class MarmotClient(
             .apply { mkdirs() }
             .absolutePath
 
+    /** The process runtime. MDK opens it with device groups, which the foreground and the cold worker share. */
     val marmot: Marmot =
         StartupDiagnostics.measure(StartupDiagnosticStage.NATIVE_CONSTRUCT) {
             Marmot.newWithConfiguration(

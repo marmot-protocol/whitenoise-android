@@ -39,9 +39,17 @@
       {
         "surface": "wipe_eligible_successor",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "private suspend fun signOutAndWipeActiveAccountLocked(",
+        "anchor": "internal suspend fun signOutAndWipeActiveAccountLocked(",
         "test_ids": [
           "ACC-014"
+        ]
+      },
+      {
+        "surface": "Read-aloud external engine consent and dismissal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun confirmTtsPlaybackTrust(",
+        "test_ids": [
+          "TTS-003"
         ]
       }
     ],
@@ -95,9 +103,10 @@
       {
         "surface": "Private share account wipe",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": ".leases.releaseAccount(account)",
+        "anchor": "purgeWipedAccountSources(wipedRef, wipedShareAccount)",
         "test_ids": [
-          "SYS-005"
+          "SYS-005",
+          "SET-066"
         ]
       },
       {

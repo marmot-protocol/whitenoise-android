@@ -50,6 +50,7 @@ internal fun ChatContextMenu(
     onExcludeFromFolder: (() -> Unit)? = null,
     onAbandon: ChatAbandonMenuAction? = null,
     historyDeleteBlocked: Boolean = false,
+    touchX: Float? = null,
 ) {
     val items =
         buildList {
@@ -105,7 +106,7 @@ internal fun ChatContextMenu(
                 add(
                     chatMenuItem(
                         R.string.leave_and_delete,
-                        R.drawable.ic_delete,
+                        R.drawable.ic_logout,
                         "LeaveAndDelete",
                         destructive = true,
                         explanation =
@@ -163,13 +164,13 @@ internal fun ChatContextMenu(
                 )
             }
             add(
-                chatMenuItem(R.string.chat_list_action_add_to_folder, R.drawable.ic_folder, "Folder") {
+                chatMenuItem(R.string.chat_list_action_add_to_folder, R.drawable.ic_folder_add, "Folder") {
                     onAddToFolder()
                 },
             )
             if (onExcludeFromFolder != null) {
                 add(
-                    chatMenuItem(R.string.folder_exclude_chat, R.drawable.ic_folder, "ExcludeFolder") {
+                    chatMenuItem(R.string.folder_exclude_chat, R.drawable.ic_folder_remove, "ExcludeFolder") {
                         onExcludeFromFolder()
                     },
                 )
@@ -196,6 +197,7 @@ internal fun ChatContextMenu(
         items = items,
         modifier = modifier,
         anchorSpacing = 8.dp,
+        touchX = touchX,
         focusable = focusable,
         canRunAction = canRunAction,
     )
@@ -228,8 +230,10 @@ internal fun ChatDeleteConfirmationDialog(
     onDismiss: () -> Unit,
     identity: (@Composable () -> Unit)? = null,
     confirmEnabled: Boolean = true,
+    ownerKey: Any? = Unit,
 ) {
     ConfirmDialog(
+        ownerKey = ownerKey,
         title = stringResource(R.string.delete_from_device),
         identity = identity,
         confirmEnabled = confirmEnabled,

@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -43,9 +44,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Archive
-import dev.ipf.whitenoise.android.ui.icons.filled.Edit
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
@@ -73,6 +71,12 @@ internal fun GroupDetailsHeader(
     pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
+    val (editOrigin, editClick) =
+        dev.ipf.whitenoise.android.ui.settings
+            .rememberSettingsRouteClick { onEdit?.invoke() }
+    val (descriptionOrigin, descriptionClick) =
+        dev.ipf.whitenoise.android.ui.settings
+            .rememberSettingsRouteClick { onAddDescription?.invoke() }
     val clipboard = LocalClipboardManager.current
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(pictureUrl)
     val remoteImageAvailable = rememberAvatarImageAvailable(safePictureUrl.takeIf { picture == null }, pictureDomain)
@@ -134,12 +138,13 @@ internal fun GroupDetailsHeader(
                             .padding(top = 4.dp)
                             .heightIn(min = 48.dp)
                             .testTag("chat_info.name")
+                            .then(editOrigin)
                             .onGloballyPositioned { onNameBottom(it.positionInWindow().y + it.size.height) }
                             .clickable(
                                 enabled = editEnabled,
                                 onClickLabel = stringResource(R.string.edit_group_name_and_description),
                                 role = Role.Button,
-                                onClick = onEdit,
+                                onClick = editClick,
                             ),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -153,7 +158,7 @@ internal fun GroupDetailsHeader(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Icon(
-                        Icons.Default.Edit,
+                        painterResource(R.drawable.ic_edit),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
@@ -188,7 +193,7 @@ internal fun GroupDetailsHeader(
                     )
                 }
             } else if (onAddDescription != null) {
-                TextButton(onClick = onAddDescription) {
+                TextButton(onClick = descriptionClick, modifier = descriptionOrigin) {
                     Text(
                         stringResource(R.string.add_group_description),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -211,7 +216,7 @@ internal fun GroupDetailsHeader(
                         onClick = {},
                         enabled = false,
                         label = { Text(stringResource(R.string.archive_chat)) },
-                        leadingIcon = { Icon(Icons.Default.Archive, contentDescription = null) },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_archive), contentDescription = null) },
                     )
                 }
             }

@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/LocationPickerScreen.kt",
+  "legacy_sha256": "46bbd6ed404f984dd7e25285e94939c1b27ad9e9668e27408683b5edc0681d17",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "LocationPickerScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/LocationPickerScreen.kt",
+        "anchor": "fun LocationPickerScreen(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "Location picker close button",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/LocationPickerScreen.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

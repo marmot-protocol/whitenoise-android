@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
@@ -46,8 +48,7 @@ import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Search
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.flow.filter
@@ -104,6 +105,9 @@ internal fun TransferAdminSheet(
     onPick: (AppGroupMemberRecordFfi) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal =
+        rememberSheetTerminalMotion(sheetState, Triple(appState, appState.activeAccountRef, appState.runtimeGeneration))
     var query by remember { mutableStateOf("") }
     val candidates = remember(controller.members) { controller.transferAdminCandidates() }
     val filtered =
@@ -121,7 +125,8 @@ internal fun TransferAdminSheet(
         }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        onDismissRequest = { terminal.close(onDismiss) },
         containerColor = amoledSheetContainerColor(),
     ) {
         Column(
@@ -144,7 +149,7 @@ internal fun TransferAdminSheet(
                     onValueChange = { query = it },
                     label = { Text(stringResource(R.string.conversation_search_open)) },
                     singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -174,7 +179,10 @@ internal fun TransferAdminSheet(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .clickable(enabled = !busy, role = Role.Button) { onPick(member) }
+                                        .clickable(
+                                            enabled = !busy,
+                                            role = Role.Button,
+                                        ) { terminal.close(member, onPick) }
                                         .padding(vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -186,7 +194,10 @@ internal fun TransferAdminSheet(
                                     pictureDomain = AvatarImageLoader.publicProfiles(),
                                 )
                                 Spacer(Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
                                     val keyModifier = Modifier.testTag("transfer_admin.key.${member.memberIdHex}")
                                     if (nameIsKey) {
                                         PublicKeyCopyText(memberName, memberNpub, keyModifier, enabled = !busy)
@@ -234,14 +245,20 @@ private fun soleAdminEmptyPickerTag(empty: Boolean): Modifier =
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// The member list and selection completion share one sheet terminal-motion lifetime.
+@Suppress("LongMethod", "FunctionNaming")
 internal fun SoleAdminDeletePicker(
     candidates: List<AppGroupMemberRecordFfi>,
     appState: WhiteNoiseAppState,
     onPick: (AppGroupMemberRecordFfi) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal =
+        rememberSheetTerminalMotion(sheetState, Triple(appState, appState.activeAccountRef, appState.runtimeGeneration))
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        onDismissRequest = { terminal.close(onDismiss) },
         containerColor = amoledSheetContainerColor(),
         modifier = soleAdminEmptyPickerTag(candidates.isEmpty()),
     ) {
@@ -267,7 +284,7 @@ internal fun SoleAdminDeletePicker(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .clickable(role = Role.Button) { onPick(member) }
+                                .clickable(role = Role.Button) { terminal.close(member, onPick) }
                                 .padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

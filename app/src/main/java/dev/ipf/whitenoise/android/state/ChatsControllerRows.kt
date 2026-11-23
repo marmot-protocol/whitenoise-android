@@ -21,6 +21,14 @@ internal suspend fun ChatsController.applyChatListWindowRows(
     val folderRevision = folder?.currentRevision
     val frame = windows.frame().withFolder(folder)
     val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
+    // A shown row's changed picture is decoded first, so it never drops to initials while local bytes decode.
+    if (valid && windows.isCurrent(frame)) {
+        appState.prepareChangedChatListAvatars(
+            accountRef,
+            frame.rows,
+            (items + archivedItems).associate { it.foldedId to it.selectedAvatarAsset },
+        )
+    }
     // The plain revision guards only the plain rows; a folder swap or install since capture makes this frame
     // stale too, and the change that superseded it publishes its own frame.
     val folderCurrent = folderWindows === folder && folder?.currentRevision == folderRevision
@@ -131,6 +139,7 @@ internal fun ChatsController.foldChatRow(
         )
     }
     if (folded == current) {
+        settleInvitationFromMdk(folded)
         appState.publishConversationChatListRow(accountRef, folded)
         return
     }
@@ -154,6 +163,7 @@ internal fun ChatsController.foldChatRow(
         }
     appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
     if (membershipChanged) noteMaterializedGroupMembershipChanged(removal = MembershipRemoval.None)
+    settleInvitationFromMdk(effectivePublicationRow)
     scheduleRecompute()
 }
 
@@ -220,7 +230,9 @@ internal fun ChatsController.replaceChatRows(
                 optimisticState = optimisticChatListPreviewByGroup[key],
             )
         appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
+        settleInvitationFromMdk(effectivePublicationRow)
     }
+    invitationReads.forEach { (key, read) -> if (key !in chatRowsByGroup) read.superseded = true }
     optimisticChatListPreviewByGroup.keys.retainAll(chatRowsByGroup.keys)
     val liveGroupIds = rows.mapTo(mutableSetOf()) { it.groupIdHex }
     presentationMembersByGroup = presentationMembersByGroup.filterKeys { it in liveGroupIds }
@@ -274,6 +286,7 @@ internal fun ChatsController.removeChatRow(
     removal: MembershipRemoval = MembershipRemoval.Ambiguous,
 ) {
     val rowKey = chatRowKey(groupIdHex)
+    invitationReads[rowKey]?.superseded = true
     val removedRow = chatRowsByGroup.remove(rowKey)
     if (removedRow != null) {
         activitySequenceByGroup.remove(rowKey)

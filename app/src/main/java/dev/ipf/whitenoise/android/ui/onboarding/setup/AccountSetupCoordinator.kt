@@ -8,10 +8,15 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.OnboardingOptionsFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.whitenoise.android.core.MarmotClient
+import dev.ipf.whitenoise.android.core.linkedDevicesAvailable
 import dev.ipf.whitenoise.android.state.AppPhase
+import dev.ipf.whitenoise.android.state.DeviceLinkOffers
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.appStateDebug
+import dev.ipf.whitenoise.android.state.foundOtherInstallation
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.whiteNoiseInboxRelays
+import dev.ipf.whitenoise.android.state.whiteNoiseNip65Relays
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -305,10 +310,27 @@ internal class AccountSetupCoordinator(
                     expectedSelection = selection,
                     onActivated = { onPhaseChange(AppPhase.Ready) },
                 )
-            if (activated) scope.launch { if (generation == token) close() }
+            if (activated) {
+                recordDeviceLinkOffer(app, client, account)
+                scope.launch { if (generation == token) close() }
+            }
             return activated
         }
     }
+}
+
+/**
+ * Remembers whether MDK's sign-in device check found [account] on another installation, so the chat list can offer
+ * to link this device. Nothing is recorded in a build without linked devices, and a failed read offers nothing.
+ */
+private suspend fun recordDeviceLinkOffer(
+    app: WhiteNoiseAppState,
+    client: AccountSetupClient,
+    account: String,
+) {
+    if (!linkedDevicesAvailable()) return
+    val notice = runCatchingCancellable { client.snapshot() }.getOrNull()?.singleDeviceNotice
+    DeviceLinkOffers.shared(app.appContext).recordSignIn(account, foundOtherInstallation(notice))
 }
 
 /** A cancelled or unfinished checkpoint can never certify chat readiness. */
@@ -317,9 +339,9 @@ internal fun OnboardingSnapshotFfi.requiresSetup(): Boolean = !ready || cancella
 /** Discover existing Nostr lists beyond our messaging relays before offering additive defaults. */
 internal fun setupOptions() =
     OnboardingOptionsFfi(
-        defaultRelays = MarmotClient.accountRelays,
+        defaultRelays = whiteNoiseNip65Relays,
         discoveryRelays = MarmotClient.discoveryRelays,
-        inboxRelays = MarmotClient.bootstrapRelays,
+        inboxRelays = whiteNoiseInboxRelays,
     )
 
 private data class SetupRuntimeOwner(

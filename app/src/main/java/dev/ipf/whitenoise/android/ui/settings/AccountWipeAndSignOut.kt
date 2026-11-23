@@ -51,13 +51,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SignOutCompletion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
-import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -85,6 +83,8 @@ internal fun AccountWipeFlow(
     }
 
     if (WIPE_ENGINE_FFI_AVAILABLE && ui.wipeConfirm) {
+        val requested = appState.activeAccountRef
+        val epoch = appState.runtimeGeneration
         // Type-to-confirm gate (#348): the destructive confirm button stays
         // disabled until the user types the confirmation keyword. The match is
         // case-insensitive and ignores surrounding whitespace. This is the last
@@ -111,37 +111,46 @@ internal fun AccountWipeFlow(
                 // wipeInProgress (not signOutInProgress) drives the
                 // app-root staged progress sheet (#350), which survives
                 // that nav reset.
-                appState.wipeInProgress = true
-                appState.launchMutation {
-                    runAccountWipeMutation(
-                        onUnconfirmed = { error ->
-                            Log.w("AccountWipe", "Wipe outcome could not be confirmed: ${error.javaClass.simpleName}")
-                            appState.present(R.string.toast_wipe_outcome_unconfirmed, copyable = true)
-                        },
-                        onFinished = { appState.wipeInProgress = false },
-                    ) {
-                        val outcome = appState.signOutAndWipeActiveAccount()
-                        if (outcome == null) {
-                            // Total FFI failure: nothing was wiped and the
-                            // runtime state was restored — this one is
-                            // worth a bug report, so keep it copyable.
-                            appState.present(R.string.toast_couldnt_wipe_account, copyable = true)
-                        } else {
-                            val report = wipeReport(outcome)
-                            if (report.clean) {
-                                appState.presentTransient(R.string.toast_signed_out_and_wiped)
-                            } else {
-                                // The app-root sheet lists every
-                                // incomplete stage. If local cleanup
-                                // failed, AppState restored the active
-                                // session instead of tearing it down.
-                                appState.pendingWipeReport = report
-                            }
-                        }
-                    }
-                }
+                if (requested != null) launchAccountWipe(appState, requested, epoch)
             },
         )
+    }
+}
+
+/**
+ * Signs the active account out and wipes it on the process-lifetime scope, showing the app-root staged progress and
+ * reporting the outcome. The typed confirmation runs on the app scope so navigation cannot interrupt cleanup.
+ */
+private fun launchAccountWipe(
+    appState: WhiteNoiseAppState,
+    requested: String,
+    epoch: Int,
+) {
+    appState.wipeInProgress = true
+    appState.launchMutation {
+        runAccountWipeMutation(
+            onUnconfirmed = { error ->
+                Log.w("AccountWipe", "Wipe outcome could not be confirmed: ${error.javaClass.simpleName}")
+                appState.present(R.string.toast_wipe_outcome_unconfirmed, copyable = true)
+            },
+            onFinished = { appState.wipeInProgress = false },
+        ) {
+            if (appState.activeAccountRef != requested || appState.runtimeGeneration != epoch) {
+                return@runAccountWipeMutation
+            }
+            val report = appState.signOutAndWipeActiveAccount()?.report
+            if (report == null) {
+                // Total FFI failure: nothing was wiped and the
+                // runtime state was restored — this one is
+                // worth a bug report, so keep it copyable.
+                appState.present(R.string.toast_couldnt_wipe_account, copyable = true)
+            } else if (report.clean) {
+                appState.presentTransient(R.string.toast_signed_out_and_wiped)
+            } else {
+                // The app-root sheet lists native and Android cleanup failures.
+                appState.pendingWipeReport = report
+            }
+        }
     }
 }
 
@@ -290,12 +299,14 @@ internal fun SignOutSheet(
     onConfirm: (deleteKeyPackages: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     var deleteKeyPackages by remember { mutableStateOf(true) }
     ModalBottomSheet(
         modifier = Modifier.exposePerformanceTestTags(),
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { terminal.close(onDismiss) },
+        sheetState = sheetState,
     ) {
         Column(
             Modifier.fillMaxWidth().padding(24.dp),
@@ -349,7 +360,7 @@ internal fun SignOutSheet(
                 }
                 Switch(checked = deleteKeyPackages, onCheckedChange = null)
             }
-            Button(onClick = { onConfirm(deleteKeyPackages) }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { terminal.close(deleteKeyPackages, onConfirm) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(painterResource(R.drawable.ic_logout), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_out))
@@ -371,10 +382,12 @@ private fun SignOutAndWipeSheet(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     ModalBottomSheet(
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { terminal.close(onDismiss) },
+        sheetState = sheetState,
     ) {
         Column(
             Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(24.dp),
@@ -400,14 +413,14 @@ private fun SignOutAndWipeSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedButton(
-                onClick = onConfirm,
+                onClick = { terminal.close(onConfirm) },
                 modifier = Modifier.fillMaxWidth(),
                 colors =
                     ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error,
                     ),
             ) {
-                Icon(Icons.Default.Delete, contentDescription = null)
+                Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_out_and_wipe))
             }

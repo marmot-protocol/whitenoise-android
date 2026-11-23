@@ -1,0 +1,68 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Foreground voice recording ownership and automatic-stop notices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "VoiceRecordingLifecycleEffect(voiceRecordingController)",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "ConversationVoiceRecoveryNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "fun ConversationVoiceRecoveryNotice(",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "VoiceDraftPresentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "fun VoiceDraftPresentation(",
+        "test_ids": [
+          "MED-061",
+          "MED-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.voice_message_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "R.string.voice_message_failed",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "R.string.send_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "R.string.send_failed",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "R.string.voice_message_permission_denied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "R.string.voice_message_permission_denied",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "Interrupted voice send notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVoiceCapture.kt",
+        "anchor": "R.string.voice_send_interrupted",
+        "test_ids": [
+          "MED-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -88,10 +88,12 @@ internal fun SharedContentCategories(
                         SharedContentCategory.Media -> R.drawable.ic_image
                         SharedContentCategory.Links -> R.drawable.ic_link
                         SharedContentCategory.Documents -> R.drawable.ic_description
-                        SharedContentCategory.Voice -> R.drawable.ic_mic
+                        SharedContentCategory.Voice -> R.drawable.ic_voice_note
                     }
                 SettingsAction(
                     context = it,
+                    opensRoute = true,
+                    routeKey = "media-$category",
                     title = stringResource(category.titleRes),
                     subtitle =
                         if (category != SharedContentCategory.Links) {

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AccountSetupReadinessFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
+import dev.ipf.marmotkit.IdentityCreationResultFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.UserProfileMetadataFfi
@@ -48,12 +49,12 @@ internal suspend fun MarmotInterface.listAccountsWithAppAttachmentPolicy(): List
 }
 
 /**
- * Creates an identity and returns its durable native receipt. Its NIP-65 list declares
- * [MarmotClient.accountRelays]; publication and the inbox list use the full bootstrap relay set.
+ * Creates an identity and returns its durable native receipt. Its NIP-65 list declares [whiteNoiseNip65Relays] and
+ * its Inbox list [whiteNoiseInboxRelays], while publication uses the full bootstrap relay set.
  */
 internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): AccountSummaryFfi {
     val relays = MarmotClient.bootstrapRelays
-    return createIdentity(MarmotClient.accountRelays, relays, relays)
+    return createIdentity(whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)
 }
 
 /**
@@ -61,9 +62,9 @@ internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): Accoun
  * key-derived default name before the chosen one (mdk#2216). Unlike [createIdentityWithBootstrapRelays] it
  * returns at local readiness, so the caller retains the receipt before [awaitAccountNetworkReady].
  */
-internal suspend fun MarmotInterface.createNamedIdentity(profile: UserProfileMetadataFfi): AccountSummaryFfi {
+internal suspend fun MarmotInterface.createNamedIdentity(profile: UserProfileMetadataFfi): IdentityCreationResultFfi {
     val relays = MarmotClient.bootstrapRelays
-    return createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays).account
+    return createIdentityWithInitialProfile(profile, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)
 }
 
 /**
@@ -83,11 +84,15 @@ internal suspend fun awaitAccountNetworkReady(
 ) {
     if (resume != null && readiness(accountRef) in RESUMABLE_SETUP) resume()
     withTimeoutOrNull(timeoutMillis) {
+        val initialDelays = INITIAL_ACCOUNT_NETWORK_READY_DELAYS_MILLIS.iterator()
         while (true) {
             when (readiness(accountRef)) {
                 AccountSetupReadinessFfi.NETWORK_READY -> return@withTimeoutOrNull
                 AccountSetupReadinessFfi.RECOVERY_REQUIRED -> throw MarmotKitException.AccountSetupRecoveryRequired()
-                else -> delay(ACCOUNT_NETWORK_READY_POLL_MILLIS)
+                else -> {
+                    val pollMillis = if (initialDelays.hasNext()) initialDelays.next() else STEADY_POLL_MILLIS
+                    delay(pollMillis)
+                }
             }
         }
     } ?: throw MarmotKitException.AccountSetupRetryRequired()
@@ -95,4 +100,7 @@ internal suspend fun awaitAccountNetworkReady(
 
 private val RESUMABLE_SETUP = setOf(AccountSetupReadinessFfi.LOCAL_READY, AccountSetupReadinessFfi.PUBLISHING)
 internal const val ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS = 60_000L
-private const val ACCOUNT_NETWORK_READY_POLL_MILLIS = 250L
+
+// Include the original 250 ms boundary so later polls don't drift past it.
+private val INITIAL_ACCOUNT_NETWORK_READY_DELAYS_MILLIS = listOf(50L, 100L, 100L)
+private const val STEADY_POLL_MILLIS = 250L

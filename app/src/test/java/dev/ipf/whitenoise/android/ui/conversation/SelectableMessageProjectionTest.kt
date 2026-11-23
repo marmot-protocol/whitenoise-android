@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
@@ -16,8 +17,11 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -90,6 +94,122 @@ class SelectableMessageProjectionTest {
         assertEquals(textPayload(UNEDITED, UNEDITED_TEXT), unedited.forwardPayload)
     }
 
+    /**
+     * A row the projection already marks deleted, whose id was never tombstoned locally, is a confirmed placeholder
+     * for the author and for an admin viewing another member's message. Both route to a local hide even when the
+     * whole batch is deleted for everyone, never to the protocol delete.
+     */
+    @Test
+    fun projectionDeletedPlaceholdersAreRoutedToLocalHideOnly() {
+        val own =
+            timelineRecord(OWN_DELETED, timelineAt = 1uL)
+                .copy(sender = ConversationTimelineTestIds.ACCOUNT_ID, direction = "sent", deleted = true)
+        val others = timelineRecord(OTHER_DELETED, timelineAt = 2uL).copy(deleted = true)
+        val selections = project(own, others)
+
+        for (id in listOf(OWN_DELETED, OTHER_DELETED)) {
+            val selection = selections.getValue(id)
+            assertTrue(selection.action.deleted)
+            assertFalse(selection.action.canDeleteForEveryone)
+        }
+        val operations =
+            batchDeleteAttempts(selections.values.toList(), BatchDeleteScope.EVERYONE).map { it.operation }
+        assertEquals(List(2) { BatchDeleteOperationKind.HideLocally }, operations)
+        // The same rows, if live, would be deletable for everyone: the author's and an admin's.
+        val live = project(timelineRecord(OTHER_DELETED, timelineAt = 2uL)).getValue(OTHER_DELETED)
+        assertTrue(live.action.canDeleteForEveryone)
+    }
+
+    /** A live row selects, and a deleted row selects only while local cleanup is available. */
+    @Test
+    fun placeholderSelectabilityFollowsLocalCleanupAvailability() {
+        val deleted = timelineRecord(OTHER_DELETED, timelineAt = 2uL).copy(deleted = true)
+        val live = timelineRecord(VALID, timelineAt = 1uL)
+
+        val withCleanup = project(live, deleted)
+        assertEquals(setOf(VALID, OTHER_DELETED), withCleanup.keys)
+        assertFalse(withCleanup.getValue(VALID).action.deleted)
+        assertTrue(withCleanup.getValue(OTHER_DELETED).action.deleted)
+
+        // A pending invitation cannot clean up locally, so the placeholder stays read-only.
+        val readOnly = project(live, deleted, group = conversationTimelineTestGroup().copy(pendingConfirmation = true))
+        assertEquals(setOf(VALID), readOnly.keys)
+    }
+
+    /** An optimistic id has no stored copy to hide, so a deleted one is never selectable. */
+    @Test
+    fun deletedOptimisticIdsAreNotSelectable() {
+        val optimistic = "11111111-2222-3333-4444-555555555555"
+        val selections = project(timelineRecord(optimistic, timelineAt = 1uL).copy(deleted = true))
+        assertTrue(selections.isEmpty())
+    }
+
+    /**
+     * In the Everyone scope a live row is deleted for everyone, while the author's own placeholder and an admin's view
+     * of another member's placeholder are only hidden locally: one protocol delete and two local hides.
+     */
+    @Test
+    fun everyoneScopeSendsOnlyTheLiveRowToTheProtocolDelete() =
+        runBlocking {
+            val selections =
+                project(
+                    timelineRecord(VALID, timelineAt = 1uL),
+                    timelineRecord(OWN_DELETED, timelineAt = 2uL)
+                        .copy(sender = ConversationTimelineTestIds.ACCOUNT_ID, direction = "sent", deleted = true),
+                    timelineRecord(OTHER_DELETED, timelineAt = 3uL).copy(deleted = true),
+                )
+            val protocol = mutableListOf<String>()
+            val hidden = mutableListOf<String>()
+
+            val attempts = batchDeleteAttempts(orderedBatchSelections(selections.values), BatchDeleteScope.EVERYONE)
+            val result =
+                executeBatchDelete(
+                    attempts,
+                    deleteForEveryone = {
+                        protocol += it.messageIdHex
+                        Result.success(Unit)
+                    },
+                    hideLocally = {
+                        hidden += it
+                        Result.success(Unit)
+                    },
+                )
+
+            assertEquals(3, result.outcomes.size)
+            assertEquals(listOf(VALID), protocol)
+            assertEquals(listOf(OWN_DELETED, OTHER_DELETED), hidden)
+        }
+
+    /**
+     * Eligibility is derived again from the current projection. A row that was deletable for everyone when the batch
+     * was selected but is projection-deleted by the time the dialog resolves reaches only the local hide.
+     */
+    @Test
+    fun rowDeletedAfterSelectionIsNoLongerSentToTheProtocolDelete() {
+        val first = timelineRecord(VALID, timelineAt = 1uL)
+        val second = timelineRecord(UNEDITED, timelineAt = 2uL)
+        val before = project(first, second)
+        assertEquals(
+            List(2) { BatchDeleteOperationKind.DeleteForEveryone },
+            batchDeleteAttempts(orderedBatchSelections(before.values), BatchDeleteScope.EVERYONE).map { it.operation },
+        )
+
+        val after = project(first, second.copy(deleted = true))
+        val reconciled =
+            reconcileBatchSelections(
+                selected = before,
+                selectableVisible = after,
+                deletedMessageIds = emptySet(),
+                invalidVisibleMessageIds = emptySet(),
+            )
+        val operations =
+            batchDeleteAttempts(orderedBatchSelections(reconciled.values), BatchDeleteScope.EVERYONE)
+                .associate { it.selection.action.messageId to it.operation }
+
+        assertEquals(BatchDeleteOperationKind.DeleteForEveryone, operations.getValue(VALID))
+        assertEquals(BatchDeleteOperationKind.HideLocally, operations.getValue(UNEDITED))
+    }
+
     /** The text forward payload a message in the fixture group carries. */
     private fun textPayload(
         messageId: String,
@@ -107,22 +227,23 @@ class SelectableMessageProjectionTest {
     private fun project(
         vararg records: TimelineMessageRecordFfi,
         edits: Map<String, EditState> = emptyMap(),
+        group: AppGroupRecordFfi = conversationTimelineTestGroup(),
     ): Map<String, BatchMessageSelection> {
         val scripted =
             ScriptedConversationLiveSubscriptions(
                 timelineScripts = listOf(ScriptedConversationTimelineSubscription(timelinePage(*records))),
-                group = conversationTimelineTestGroup(),
+                group = group,
             )
         val controller =
             ConversationController(
                 appState = conversationTimelineTestAppState(scripted.subscriptions),
-                initialGroup = conversationTimelineTestGroup(),
+                initialGroup = group,
                 initialMemberSnapshot = conversationTimelineMemberSnapshot(),
                 groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
                 startOnConstruction = true,
             )
         return try {
-            awaitConversationCondition { controller.timeline.size == records.size }
+            awaitConversationCondition { controller.timeline.size == records.size && controller.canSendMessages }
             if (edits.isNotEmpty()) controller.editsByTarget = edits
             projectSelectableMessages(controller.timeline, controller, eligibilityNowSeconds = 0uL)
         } finally {
@@ -139,5 +260,7 @@ class SelectableMessageProjectionTest {
         const val LOSING_BRANCH = "losing-branch"
         const val PERSISTED_FAILURE = "persisted-failure"
         const val VALID = "valid"
+        const val OWN_DELETED = "own-deleted"
+        const val OTHER_DELETED = "other-deleted"
     }
 }

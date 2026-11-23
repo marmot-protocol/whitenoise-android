@@ -132,6 +132,7 @@ class GroupSystemSubjectLinkTest {
     /** An engine-synthesized kind-1210 record. */
     private fun systemRecord() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = "11".repeat(32),
             direction = "system",
             groupIdHex = "22".repeat(32),

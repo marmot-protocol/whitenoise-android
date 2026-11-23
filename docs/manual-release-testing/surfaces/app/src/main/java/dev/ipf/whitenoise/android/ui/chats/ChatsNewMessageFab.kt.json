@@ -31,6 +31,18 @@
         "test_ids": [
           "CHL-037"
         ]
+      },
+      {
+        "surface": "Modifier.chatsFabChrome",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+        "anchor": "fun Modifier.chatsFabChrome(",
+        "test_ids": [
+          "NCH-001",
+          "DIC-002",
+          "NCH-008",
+          "DIC-011",
+          "CHL-037"
+        ]
       }
     ],
     "settings_controls": [

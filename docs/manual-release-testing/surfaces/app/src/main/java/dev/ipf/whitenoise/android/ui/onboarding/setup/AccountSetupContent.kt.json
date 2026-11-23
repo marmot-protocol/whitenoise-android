@@ -393,6 +393,14 @@
           "ONB-017",
           "ONB-018"
         ]
+      },
+      {
+        "surface": "Account setup: R.string.setup_repair_inconclusive_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "R.string.setup_repair_inconclusive_warning",
+        "test_ids": [
+          "ONB-017"
+        ]
       }
     ],
     "source_coverage": [

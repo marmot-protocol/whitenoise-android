@@ -422,11 +422,19 @@ class CampaignSummaryTest(unittest.TestCase):
                     if proof is not None:
                         row['privateKeyCopyVerified'] = proof
                     path.write_text(json.dumps(row))
+                    cleanup = leaves[0] / 'credential-restored.json'
                     with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': post}}):
                         result = self.result(root)
-                    self.assertEqual(result['evidence_complete'], proof is True)
-                    if proof is not True:
-                        self.assertIn('private-key clipboard sensitivity', result['results'][0]['failure'])
+                        self.assertFalse(result['evidence_complete'])
+                        reason = 'credential-restored.json' if proof is True else 'private-key clipboard sensitivity'
+                        self.assertIn(reason, result['results'][0]['failure'])
+                        cleanup.write_text(json.dumps({
+                            'schema': 1, 'generation': row['generation'], 'package': runtime.PACKAGE,
+                            'user': 0, 'sdk': 34, 'stage': 'restored', 'qemu': True,
+                            'noBiometricAlternative': True, 'secure': False, 'credentialAvailable': False,
+                            'credentialRestored': True,
+                        }))
+                        self.assertEqual(self.result(root)['evidence_complete'], proof is True)
 
     def test_empty_library_needs_typed_native_timeline_proof(self):
         """Empty visible UI must fail qualification if the actual SDK attachment proof is absent."""
@@ -1011,6 +1019,22 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for path in root.glob('*.kt'):
             with self.subTest(source=path.name):
                 self.assertNotRegex(path.read_text(), r'\.\s*uiAutomation|\bgetUiAutomation\s*\(|\bUiDevice\b')
+
+    def test_new_chat_reopen_requires_native_parent_and_each_modal_exit(self):
+        name = 'creation-new-chat-back-reopen'
+        case = runtime.CASES[name]
+        self.assertEqual(case['fixture'], 'creation')
+        self.assertNotIn('presentation', case)
+        path = runtime.ROOT / '.maestro/runtime' / (name + '.yaml')
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        parent = {'assertVisible': 'Maestro group'}
+        absent = {'assertNotVisible': {'id': 'new_message.screen'}}
+        opened = {'assertVisible': {'id': 'new_message.screen'}}
+        cycle = [{'tapOn': 'New Message'}, opened, 'back', absent, parent]
+        self.assertEqual(commands, [
+            {'runFlow': '../fixtures/runtime-ready.yaml'}, parent, absent,
+            *cycle, *cycle,
+        ])
 
     def test_generated_readiness_resets_a_failed_predecessors_orientation(self):
         """A failed landscape journey must not silently change the next case's initial viewport."""
@@ -1695,6 +1719,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
                          patch.object(runtime.uuid, 'uuid4', return_value=Mock(hex=generation)), \
                          patch.object(runtime, 'command', side_effect=command), \
                          patch.object(runtime.subprocess, 'Popen', side_effect=start), \
+                         patch.object(runtime, 'DisposableCredential'), \
                          patch.object(runtime, 'run_ui', side_effect=ui):
                         result = runtime.run_case(name, Path(temporary))
                     self.assertTrue(result['cleanup_safe'])
@@ -1809,9 +1834,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
 
     def test_credential_baseline_never_precedes_boot_suppression(self):
         """Read-only credential probes instantiate the same Application and need its boot guard first."""
-        names = [name for name, case in runtime.CASES.items()
-                 if case['postcondition'].startswith('app-lock-credential-')]
-        self.assertEqual(len(names), 4)
+        names = [name for name, case in runtime.CASES.items() if runtime.uses_fixture_credential(case)]
+        self.assertEqual(len(names), 12)
         for name in names:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
                 observed = []
@@ -2033,11 +2057,11 @@ class RuntimeEvidenceTest(unittest.TestCase):
             self.assertNotIn('inputText', text)
             self.assertNotIn('nsec1', text)
         reveal = (root / 'fixtures/reveal-fixture-private-key.yaml').read_text()
-        self.assertIn('- tapOn: Show private key', reveal)
+        self.assertIn('- tapOn: Show private key\n- runFlow: enter-device-pin.yaml', reveal)
         self.assertIn('- assertVisible: Private key revealed.*', reveal)
         self.assertIn('- assertVisible: Hide private key', reveal)
         copy = (root / 'fixtures/copy-hidden-fixture-private-key.yaml').read_text()
-        self.assertIn('- tapOn: Copy Private Key', copy)
+        self.assertIn('- tapOn: Copy Private Key\n- runFlow: enter-device-pin.yaml', copy)
         self.assertIn('- assertVisible: Private key hidden', copy)
         for route in ('warm-resume', 'departure', 'rotation', 'expiry'):
             text = (root / 'runtime' / f'keys-private-reveal-{route}-copy.yaml').read_text()
@@ -2621,7 +2645,7 @@ class CredentialControlTest(unittest.TestCase):
 
     def test_unsupported_pin_platform_is_rejected_before_the_fixture_build(self):
         from scripts.maestro_runtime_selection import validate_credential_platform
-        for suite in ('runtime-all', 'runtime-app-lock'):
+        for suite in ('runtime-all', 'runtime-app-lock', 'runtime-keys'):
             validate_credential_platform(suite, '34')
             for api in ('33', '36', '37.0'):
                 with self.subTest(suite=suite, api=api), self.assertRaisesRegex(ValueError, 'require API34'):

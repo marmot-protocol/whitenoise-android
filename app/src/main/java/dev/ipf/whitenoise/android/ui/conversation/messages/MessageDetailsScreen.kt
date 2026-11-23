@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -30,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
@@ -59,11 +59,13 @@ import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import java.time.ZoneId
@@ -118,6 +120,7 @@ internal fun MessageDetailsScreen(
     attachmentLabels: List<String>,
     onDismissRequest: () -> Unit,
     onCopy: (String) -> Unit,
+    origin: Rect? = null,
     // MarmotKit 0.10.1 content reports against this message; null hides the section, an empty list shows
     // it still loading. Dismissal is offered only to admins, which the engine enforces as well.
     reports: List<ContentReportFfi>? = null,
@@ -131,7 +134,8 @@ internal fun MessageDetailsScreen(
         } else {
             record.plaintext
         }
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
@@ -145,7 +149,7 @@ internal fun MessageDetailsScreen(
                     TopAppBar(
                         title = { Text(stringResource(R.string.message_details)) },
                         navigationIcon = {
-                            IconButton(onClick = onDismissRequest) {
+                            IconButton(onClick = dismiss) {
                                 Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
                             }
                         },
@@ -159,7 +163,7 @@ internal fun MessageDetailsScreen(
                 }
             },
         ) { padding ->
-            AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
+            AdaptiveContent(Modifier.fillMaxSize().nativePageBody(padding).padding(padding)) {
                 Column(
                     modifier =
                         Modifier
@@ -352,9 +356,8 @@ private fun MessageReactionsSection(reactions: List<ReactionTally>) {
             )
             reactions.forEachIndexed { index, tally ->
                 if (index > 0) {
-                    HorizontalDivider(
+                    AppDivider(
                         modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
                 ListItem(
@@ -406,9 +409,8 @@ private fun MessageReportsSection(
             )
             reports.forEachIndexed { index, report ->
                 if (index > 0) {
-                    HorizontalDivider(
+                    AppDivider(
                         modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
                 MessageReportRow(report, index, reporterName(report.reporter), locale, zone, canDismiss, onDismiss)

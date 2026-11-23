@@ -180,3 +180,9 @@ test('a head advance at the write boundary cannot leave stale links as the final
   assert.equal(calls.filter(([name]) => name === 'paginate').length, 0)
   assert.equal(calls.filter(([name]) => name === 'deleteComment').length, 0)
 })
+
+ test('renders an isolated direct download only when supplied', () => {
+  const input = { prNumber: 3931, headSha: 'abcdef012345', stableUrl: 'https://example.test/stable.apk' }
+  assert.equal(renderSection(input).includes('Isolated PR'), false)
+  assert.ok(renderSection({ ...input, isolatedUrl: 'https://example.test/isolated.apk' }).includes('[Isolated PR #3931](https://example.test/isolated.apk)'))
+})

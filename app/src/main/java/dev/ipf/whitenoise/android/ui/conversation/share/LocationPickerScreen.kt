@@ -33,7 +33,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -42,11 +44,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.nativePageFooter
+import dev.ipf.whitenoise.android.ui.common.nativePageHeader
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.LocationOn
 import dev.ipf.whitenoise.android.ui.icons.filled.MyLocation
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapListener
@@ -77,11 +79,13 @@ private fun configureOsmdroid(context: Context) {
 internal fun LocationPickerScreen(
     hasFineGrant: Boolean,
     onDismiss: () -> Unit,
+    origin: Rect? = null,
     onPick: (SharedLocation) -> Unit,
     useDataConnection: Boolean = true,
     locationLookup: suspend (Context, Boolean) -> SharedLocation? = ::fetchCurrentLocation,
 ) {
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
@@ -165,13 +169,13 @@ internal fun LocationPickerScreen(
         }
         LaunchedEffect(Unit) { centerOnCurrent() }
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().nativePageBody()) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
             // Fixed center pin — the map pans beneath it, and its map coordinate
             // at send time is the picked point (standard map-picker pattern).
             Icon(
-                Icons.Default.LocationOn,
+                painterResource(R.drawable.ic_location_on),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
                 modifier =
@@ -185,13 +189,14 @@ internal fun LocationPickerScreen(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .nativePageHeader()
                         .statusBarsPadding()
                         .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+                    IconButton(onClick = dismiss) {
+                        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
                     }
                 }
                 Spacer(Modifier.width(12.dp))
@@ -206,6 +211,7 @@ internal fun LocationPickerScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .nativePageFooter()
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(16.dp),
@@ -248,18 +254,22 @@ internal fun LocationPickerScreen(
                 Button(
                     onClick = {
                         val center = mapView.mapCenter
-                        onPick(
+                        val picked =
                             SharedLocation(
                                 latitude = center.latitude,
                                 longitude = center.longitude,
                                 accuracyMeters = null,
-                            ),
-                        )
+                            )
+                        close { onPick(picked) }
                     },
                     enabled = selectedCenter != null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        painterResource(R.drawable.ic_arrow_upward),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.location_send_this))
                 }

@@ -50,13 +50,14 @@ class DictationProviderScreenshotTest {
             }
         }
         composeRule.onNodeWithTag("dictation_provider_choices").performScrollToNode(hasText("Engine"))
-        composeRule.onNodeWithText("Engine").assertIsSelected().performClick()
-        assertEquals(choice, selected)
+        composeRule.onNodeWithText("Engine").assertIsSelected()
         composeRule.onNodeWithText("In-app support not verified").assertIsDisplayed()
         composeRule.onNodeWithText("Works inside White Noise").assertDoesNotExist()
         composeRule
             .onNodeWithTag("dictation_provider_choices")
             .captureRoboImage("src/test/snapshots/dictation_provider_unknown_light.png")
+        composeRule.onNodeWithText("Engine").performClick()
+        composeRule.runOnIdle { assertEquals(choice, selected) }
     }
 
     @Test

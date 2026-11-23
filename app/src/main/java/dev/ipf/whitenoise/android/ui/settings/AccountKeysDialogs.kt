@@ -49,10 +49,15 @@ internal fun ProfileKeysDialogs(
     onExport: (encrypted: Boolean, destination: KeyExportDestination) -> Unit,
     onCopyBackup: () -> Unit,
     onExportBackup: () -> Unit,
+    cancelRawAuthentication: () -> Unit,
 ) {
     if (ui.rawExportDialog && canExport) {
         WhiteNoiseAlertDialog(
             onDismissRequest = ui::cancelExport,
+            onDismissStart = {
+                ui.cancelExportPreparation()
+                cancelRawAuthentication()
+            },
             title = { Text(stringResource(R.string.keep_your_private_key_safe)) },
             text = {
                 Text(
@@ -66,7 +71,7 @@ internal fun ProfileKeysDialogs(
                     val fileLabel = stringResource(R.string.export_nsec)
                     TextButton(
                         enabled = !ui.exportBusy,
-                        onClick = { onExport(false, KeyExportDestination.Share) },
+                        onClick = { if (acceptsInput) onExport(false, KeyExportDestination.Share) },
                         modifier =
                             Modifier.explainOnLongPress(
                                 Explanation(
@@ -83,7 +88,7 @@ internal fun ProfileKeysDialogs(
                     }
                     TextButton(
                         enabled = !ui.exportBusy,
-                        onClick = { onExport(false, KeyExportDestination.File) },
+                        onClick = { if (acceptsInput) onExport(false, KeyExportDestination.File) },
                         modifier =
                             Modifier.explainOnLongPress(
                                 Explanation(
@@ -101,7 +106,7 @@ internal fun ProfileKeysDialogs(
                 }
             },
             dismissButton = {
-                TextButton(onClick = ui::cancelExport) {
+                TextButton(onClick = dismiss) {
                     ProfileKeyActionLabel(stringResource(R.string.cancel), R.drawable.ic_close)
                 }
             },
@@ -115,6 +120,10 @@ internal fun ProfileKeysDialogs(
             onConfirm = { onExport(true, KeyExportDestination.File) },
             onViewBackup = { onExport(true, KeyExportDestination.Preview) },
             onDismiss = ui::cancelExport,
+            onDismissStart = {
+                ui.cancelExportPreparation()
+                cancelRawAuthentication()
+            },
         )
     }
     ui.encryptedBackup?.let { backup ->
@@ -173,7 +182,7 @@ internal fun ProfileKeyFeedbackDialogs(
             onDismissRequest = onNativeErrorDismiss,
             title = { Text(stringResource(title)) },
             confirmButton = {
-                TextButton(onClick = onNativeErrorDismiss) {
+                TextButton(onClick = dismiss) {
                     ProfileKeyActionLabel(stringResource(R.string.ok), R.drawable.ic_check)
                 }
             },
@@ -184,7 +193,7 @@ internal fun ProfileKeyFeedbackDialogs(
             onDismissRequest = onShareErrorDismiss,
             title = { Text(stringResource(R.string.outbound_share_failed)) },
             confirmButton = {
-                TextButton(onClick = onShareErrorDismiss) {
+                TextButton(onClick = dismiss) {
                     ProfileKeyActionLabel(stringResource(R.string.ok), R.drawable.ic_check)
                 }
             },
@@ -196,7 +205,7 @@ internal fun ProfileKeyFeedbackDialogs(
             title = { Text(stringResource(R.string.couldnt_save_file)) },
             text = { Text(stringResource(R.string.choose_another_location_and_try_again)) },
             confirmButton = {
-                TextButton(onClick = onSaveErrorDismiss) {
+                TextButton(onClick = dismiss) {
                     ProfileKeyActionLabel(stringResource(R.string.ok), R.drawable.ic_check)
                 }
             },
@@ -208,7 +217,7 @@ internal fun ProfileKeyFeedbackDialogs(
             title = { Text(stringResource(R.string.key_export_expired_title)) },
             text = { Text(stringResource(R.string.key_export_expired_body)) },
             confirmButton = {
-                TextButton(onClick = onExpiryDismiss) {
+                TextButton(onClick = dismiss) {
                     ProfileKeyActionLabel(stringResource(R.string.close), R.drawable.ic_close)
                 }
             },
@@ -226,12 +235,14 @@ private fun ExportPasswordDialog(
     onConfirm: () -> Unit,
     onViewBackup: () -> Unit,
     onDismiss: () -> Unit,
+    onDismissStart: () -> Unit,
 ) {
     val passwordValue = password.text.toString()
     val confirmationValue = confirmation.text.toString()
     val mismatch = confirmationValue.isNotEmpty() && passwordValue != confirmationValue
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
+        onDismissStart = onDismissStart,
         title = { Text(stringResource(R.string.encrypted_private_key)) },
         text = {
             Column(
@@ -300,7 +311,7 @@ private fun ExportPasswordDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = dismiss) {
                 ProfileKeyActionLabel(stringResource(R.string.cancel), R.drawable.ic_close)
             }
         },
@@ -366,7 +377,7 @@ internal fun EncryptedBackupResultDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onHide) {
+            TextButton(onClick = dismiss) {
                 ProfileKeyActionLabel(stringResource(R.string.hide), R.drawable.ic_visibility_off)
             }
         },

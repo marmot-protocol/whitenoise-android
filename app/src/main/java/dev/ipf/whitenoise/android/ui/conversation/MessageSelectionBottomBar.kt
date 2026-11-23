@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -24,7 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -34,13 +37,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardBlockedReasonLabel
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Reply
-import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
-import dev.ipf.whitenoise.android.ui.icons.filled.Download
-import dev.ipf.whitenoise.android.ui.icons.filled.Info
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +52,7 @@ internal fun MessageSelectionBottomBar(
     onInfo: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    onRouteOrigin: (MessageSelectionBarAction, Rect?) -> Unit = { _, _ -> },
 ) {
     val density = LocalDensity.current
     val actionSlotPx = with(density) { 48.dp.roundToPx() }
@@ -108,6 +106,7 @@ internal fun MessageSelectionBottomBar(
                             row.actions.forEach { action ->
                                 SelectionActionIconButton(
                                     action = action,
+                                    onRouteOrigin = onRouteOrigin,
                                     availability = availability,
                                     onCopy = onCopy,
                                     onForward = onForward,
@@ -128,7 +127,7 @@ internal fun MessageSelectionBottomBar(
                                         ),
                                 ) {
                                     Icon(
-                                        Icons.Default.Delete,
+                                        painterResource(R.drawable.ic_delete),
                                         contentDescription = deleteLabel,
                                     )
                                 }
@@ -151,24 +150,23 @@ private fun SelectionActionIconButton(
     onSave: () -> Unit,
     onReply: () -> Unit,
     onInfo: () -> Unit,
+    onRouteOrigin: (MessageSelectionBarAction, Rect?) -> Unit,
 ) {
     val label = selectionActionLabel(action)
+    val (originModifier, activate) =
+        rememberMeasuredControlClick { origin ->
+            if (selectionActionEnabled(action, availability)) {
+                onRouteOrigin(action, origin)
+                dispatchSelectionAction(action, availability, onCopy, onForward, onSave, onReply, onInfo)
+            }
+        }
     SelectionTooltipIconButton(
         label = label,
-        onClick = {
-            dispatchSelectionAction(
-                action = action,
-                availability = availability,
-                onCopy = onCopy,
-                onForward = onForward,
-                onSave = onSave,
-                onReply = onReply,
-                onInfo = onInfo,
-            )
-        },
+        modifier = originModifier,
+        onClick = activate,
         enabled = selectionActionEnabled(action, availability),
     ) {
-        Icon(selectionActionIcon(action), contentDescription = label)
+        Icon(painterResource(selectionActionIcon(action)), contentDescription = label)
     }
 }
 
@@ -179,6 +177,7 @@ private fun SelectionTooltipIconButton(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    modifier: Modifier = Modifier,
     colors: IconButtonColors = IconButtonDefaults.iconButtonColors(),
     icon: @Composable () -> Unit,
 ) {
@@ -188,6 +187,7 @@ private fun SelectionTooltipIconButton(
         state = rememberTooltipState(),
     ) {
         IconButton(
+            modifier = modifier,
             onClick = onClick,
             enabled = enabled,
             colors = colors,
@@ -207,13 +207,15 @@ private fun selectionActionLabel(action: MessageSelectionBarAction): String =
         MessageSelectionBarAction.Save -> stringResource(R.string.shared_media_save)
     }
 
-private fun selectionActionIcon(action: MessageSelectionBarAction) =
+/** Same drawables as the single-message action menu, so a batch action looks like its single-message twin. */
+@DrawableRes
+private fun selectionActionIcon(action: MessageSelectionBarAction): Int =
     when (action) {
-        MessageSelectionBarAction.Reply -> Icons.AutoMirrored.Filled.Reply
-        MessageSelectionBarAction.Info -> Icons.Default.Info
-        MessageSelectionBarAction.Copy -> Icons.Default.ContentCopy
-        MessageSelectionBarAction.Forward -> Icons.AutoMirrored.Filled.Forward
-        MessageSelectionBarAction.Save -> Icons.Default.Download
+        MessageSelectionBarAction.Reply -> R.drawable.ic_reply
+        MessageSelectionBarAction.Info -> R.drawable.ic_info
+        MessageSelectionBarAction.Copy -> R.drawable.ic_content_copy
+        MessageSelectionBarAction.Forward -> R.drawable.ic_forward
+        MessageSelectionBarAction.Save -> R.drawable.ic_download
     }
 
 private fun selectionActionEnabled(

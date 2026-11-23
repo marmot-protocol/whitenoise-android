@@ -37,8 +37,7 @@ internal fun ChatListItem.storedNotificationAvatar(accountRef: String): StoredNo
  * own rule: the account the projector names for a direct chat or an unnamed pair, unless the group owns its picture.
  */
 internal fun ChatListItem.privatePictureContact(): String? =
-    GroupProjector
-        .avatarAccount(group, presentationOtherMemberAccount, presentationMemberCount)
+    avatarAccount
         ?.takeUnless { GroupProjector.ownsGroupPicture(this) }
 
 /** #3635: the pixels the chat list already decoded for this row's stored selected avatar, or null without them. */

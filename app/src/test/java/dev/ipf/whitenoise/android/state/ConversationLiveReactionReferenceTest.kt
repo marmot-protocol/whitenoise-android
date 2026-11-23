@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ConversationMessageReferencesFfi
 import dev.ipf.marmotkit.ConversationReactionFfi
 import dev.ipf.marmotkit.ConversationReactionsFfi
@@ -12,6 +13,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -29,6 +31,63 @@ import java.time.Duration
 class ConversationLiveReactionReferenceTest {
     private val messageId = ConversationTimelineTestIds.MESSAGE_A
     private val page = timelinePage(timelineRecord(messageId = messageId, timelineAt = 1uL))
+
+    /** A sibling send has the same ownership on the first chat-list frame and the authoritative timeline. */
+    @Test
+    fun receivedOwnMessageIsOutgoingOnBothFrames() =
+        runBlocking {
+            val preview = notifiedMessagePreview().copy(sender = ConversationTimelineTestIds.ACCOUNT_ID.uppercase())
+            val own = timelineRecord(preview.messageIdHex, preview.timelineAt).copy(sender = preview.sender)
+            val peer = timelineRecord(messageId, preview.timelineAt + 1uL)
+            val handle = InstalledWindowHandle(timelinePage(own, peer), frame(sequence = 1uL, reactions = null))
+            val controller = controller(handle, preview, startImmediately = false)
+            try {
+                assertOwnReceivedRow(controller.timeline.single())
+                controller.start()
+                awaitConversationCondition { controller.timeline.size == 2 }
+                assertOwnReceivedRow(controller.timeline.single { it.record.messageIdHex == own.messageIdHex })
+                val incoming = controller.timeline.single { it.record.messageIdHex == peer.messageIdHex }
+                assertEquals(false, incoming.fromOtherOwnDevice)
+                assertEquals(MessageStatus.Received, incoming.status)
+                assertEquals(true, incoming.isUnreadEligible())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** Sibling messages retain their local arrival direction while the bubble and unread rules use authorship. */
+    private fun assertOwnReceivedRow(message: TimelineMessage) {
+        assertEquals("received", message.record.direction)
+        assertEquals(true, message.fromOtherOwnDevice)
+        assertEquals(MessageStatus.Sent, message.status)
+        assertEquals(false, message.isUnreadEligible())
+    }
+
+    /** Once the window acknowledges our add, a later sibling removal wins while the peer's chip remains. */
+    @Test
+    fun siblingRemovalReplacesAcknowledgedOptimisticAdd() =
+        runBlocking {
+            val handle = InstalledWindowHandle(page, frame(sequence = 1uL, reactions = thumbsUp()))
+            val controller = controller(handle)
+            try {
+                awaitConversationCondition { controller.reactions[messageId] != null }
+                controller.optimisticReactionChanges["add"] = OptimisticReactionChange(messageId, "👍", add = true)
+                controller.unprojectedOwnReactions.add(messageId to "👍")
+                val both = thumbsUp().items.single().copy(count = 2uL, viewerReacted = true)
+                val two = thumbsUp().copy(totalCount = 2uL, items = listOf(both))
+                handle.replace(frame(sequence = 2uL, reactions = two))
+                awaitLiveWindowApplied(handle, calls = 2) { controller.optimisticReactionChanges.isEmpty() }
+                assertTrue(controller.unprojectedOwnReactions.isEmpty())
+
+                handle.replace(frame(sequence = 3uL, reactions = thumbsUp()))
+                awaitLiveWindowApplied(handle, calls = 3) {
+                    controller.reactions[messageId] == listOf(ReactionTally("👍", 1, mine = false))
+                }
+            } finally {
+                controller.onCleared()
+                awaitConversationCondition { handle.closed }
+            }
+        }
 
     /** A reaction arriving on an unchanged row shows its chip on the live replacement and leaves on the next. */
     @Test
@@ -123,7 +182,11 @@ class ConversationLiveReactionReferenceTest {
     }
 
     /** A started controller whose only timeline seam is [handle]. */
-    private fun controller(handle: ConversationTimelineSubscriptionHandle): ConversationController {
+    private fun controller(
+        handle: ConversationTimelineSubscriptionHandle,
+        preview: ChatListMessagePreviewFfi? = null,
+        startImmediately: Boolean = true,
+    ): ConversationController {
         val group = conversationTimelineTestGroup()
         val subscriptions =
             ConversationLiveSubscriptions(
@@ -135,7 +198,8 @@ class ConversationLiveReactionReferenceTest {
             initialGroup = conversationTimelineTestGroup(),
             initialMemberSnapshot = conversationTimelineMemberSnapshot(),
             groupRosterReader = { _, _ -> conversationTimelineGroupRoster() },
-            startOnConstruction = true,
+            startOnConstruction = startImmediately,
+            initialTimelinePreview = preview,
         )
     }
 

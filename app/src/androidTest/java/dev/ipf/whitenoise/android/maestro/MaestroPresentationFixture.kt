@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.translation.OFFLINE_TRANSLATOR_PACKAGE
 import dev.ipf.whitenoise.android.translation.OfflineTranslatorRoute
+import dev.ipf.whitenoise.android.ui.conversation.media.GiphySearchSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.json.JSONArray
 import org.json.JSONObject
@@ -160,7 +161,7 @@ internal class MaestroPresentationFixture(
             scenario.startsWith("update-") -> MaestroUpdatePresentation(this)
             scenario.startsWith("startup-") -> MaestroStartupPresentation(this)
             scenario.startsWith("text-") -> MaestroTextPresentation(this)
-            scenario.substringBefore('-') in setOf("image", "nostr", "preview") -> MediaContent()
+            scenario.substringBefore('-') in setOf("giphy", "image", "nostr", "preview") -> MediaContent()
             scenario.startsWith("dictation-") -> MaestroDictationPresentation(this)
             scenario.startsWith("feedback-") -> MaestroFeedbackPresentation(this)
             scenario.startsWith("setup-") -> MaestroSetupPresentation(this)
@@ -179,10 +180,18 @@ internal class MaestroPresentationFixture(
         if (scenario.startsWith("storage-")) MaestroStoragePresentation(this) else MaestroExtraPresentation(this)
     }
 
+    /** Opens the real media surfaces for the isolated presentation journeys. */
     @Composable
     @Suppress("FunctionNaming")
     private fun MediaContent() {
         when (scenario.substringBefore('-')) {
+            "giphy" ->
+                GiphySearchSheet(
+                    apiKey = "",
+                    onDismiss = { finish("dismiss") },
+                    onSend = { record("unexpected-send") },
+                )
+
             "image" -> MaestroImagePresentation(this)
             "nostr" -> MaestroNostrPresentation(this)
             "preview" -> MaestroPreviewPresentation(this)

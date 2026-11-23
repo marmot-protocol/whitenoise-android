@@ -41,7 +41,12 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.NostrEventReference
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
+import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
+import dev.ipf.whitenoise.android.ui.conversation.messages.BubbleFooterLayout
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleFooterColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -50,13 +55,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /**
  * A previously resolved card is complete on its first frame and a background refresh never moves it or the rows
@@ -70,6 +78,18 @@ class NostrEventPreviewTransitionScreenshotTest {
     val composeRule = createComposeRule()
 
     private var session by mutableStateOf<TransitionSession?>(null)
+
+    private val originalZone = TimeZone.getDefault()
+
+    @Before
+    fun setTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(originalZone)
+    }
 
     /**
      * For Note, Article, Video, Release, File and Generic cards in light, dark, AMOLED, large-font, narrow and RTL
@@ -106,7 +126,7 @@ class NostrEventPreviewTransitionScreenshotTest {
         composeRule.runOnUiThread { session?.close() }
     }
 
-    /** Asserts all six cards render their loaded header and that no loading indicator or label is present. */
+    /** Asserts all cards render their loaded header and that no loading indicator or label is present. */
     private fun assertCompleteWithoutProgress(configuration: TransitionConfiguration) {
         val loading = ApplicationProvider.getApplicationContext<Context>().getString(R.string.nostr_event_loading)
         assertEquals(
@@ -128,14 +148,14 @@ class NostrEventPreviewTransitionScreenshotTest {
         val cardNodes = composeRule.onAllNodesWithTag(NOSTR_EVENT_CARD_BOUNDS_TAG).fetchSemanticsNodes()
         val cards = cardNodes.map { it.boundsInRoot }
         val rows =
-            listOf(MESSAGE_TAG + 0, MESSAGE_TAG + 1, NEXT_ROW_TAG).map {
+            (CARD_KINDS.chunked(MAX_CARDS_PER_MESSAGE).indices.map { MESSAGE_TAG + it } + NEXT_ROW_TAG).map {
                 composeRule.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot
             }
         assertEquals(CARD_KINDS.size, cards.size)
         return cards + rows
     }
 
-    /** Two message bubbles of three cards each, then a following row, under [session]'s configuration. */
+    /** Message bubbles with all supported cards, then a following row, under [session]'s configuration. */
     @Composable
     private fun TransitionContent(session: TransitionSession) {
         val configuration = session.configuration
@@ -180,16 +200,35 @@ class NostrEventPreviewTransitionScreenshotTest {
             shape = MaterialTheme.shapes.large,
             modifier = Modifier.fillMaxWidth().testTag(tag),
         ) {
-            NostrEventCards(
-                references = references,
-                resolver = session.resolver,
-                authorDisplayName = { "Contact" },
-                mentionDisplayName = { null },
-                onNostrProfileTap = {},
-                parseMarkdown = session::parseAfterFirstFrame,
-                contentColor = content,
+            BubbleFooterLayout(
                 modifier = Modifier.padding(8.dp),
-            )
+                footer = {
+                    MessageInlineFooter(
+                        timeText = rememberedMessageBubbleTime(1_765_000_000uL),
+                        color =
+                            messageBubbleFooterColor(
+                                mine = false,
+                                persistedFailure = false,
+                                bubbleBackgroundColor = colorFromArgb(presentation.backgroundArgb),
+                                bubbleContentColor = content,
+                            ),
+                        showStatus = false,
+                        status = MessageStatus.Received,
+                        editedLabel = null,
+                        onEditedClick = null,
+                    )
+                },
+            ) {
+                NostrEventCards(
+                    references = references,
+                    resolver = session.resolver,
+                    authorDisplayName = { "Contact" },
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                    parseMarkdown = session::parseAfterFirstFrame,
+                    contentColor = content,
+                )
+            }
         }
     }
 
@@ -198,7 +237,16 @@ class NostrEventPreviewTransitionScreenshotTest {
         const val MESSAGE_TAG = "message-"
         const val NEXT_ROW_TAG = "next-row"
         const val CACHED_AUTHOR = "Cached author"
-        val CARD_KINDS = NostrEventCardKind.entries
+        val CARD_KINDS =
+            listOf(
+                NostrEventCardKind.Note,
+                NostrEventCardKind.Article,
+                NostrEventCardKind.Release,
+                NostrEventCardKind.Video,
+                NostrEventCardKind.File,
+                NostrEventCardKind.Git,
+                NostrEventCardKind.Generic,
+            )
     }
 
     /** One configuration's resolver, seeded snapshots and gated refreshes. */
@@ -311,17 +359,34 @@ private fun card(kind: NostrEventCardKind): NostrEventCardModel =
                 NostrEventCardKind.Video -> 34_235
                 NostrEventCardKind.Release -> 30_063
                 NostrEventCardKind.File -> 1_063
+                NostrEventCardKind.Git -> 1618
                 NostrEventCardKind.Generic -> 9_001
             },
-        title = "A ${kind.name.lowercase()} title that wraps across the reading width".takeUnless { kind.isNote() },
-        summary = "A readable ${kind.name.lowercase()} summary with enough words to fill several preview lines.",
-        metadata = if (kind == NostrEventCardKind.Note) emptyList() else listOf("2.4 MB", "1920x1080"),
+        title =
+            when (kind) {
+                NostrEventCardKind.Note -> null
+                NostrEventCardKind.Git -> "Fix event parsing in the reader"
+                else -> "A ${kind.name.lowercase()} title that wraps across the reading width"
+            },
+        summary =
+            if (kind == NostrEventCardKind.Git) {
+                "Preserve spacing when rendering multiline patch descriptions."
+            } else {
+                "A readable ${kind.name.lowercase()} summary with enough words to fill several preview lines."
+            },
+        metadata = fixtureMetadata(kind),
         readerBody = "The complete ${kind.name.lowercase()} body.",
         mediaUrl = "https://cdn.example/video.mp4".takeIf { kind == NostrEventCardKind.Video },
     )
 
-/** True for the kind-1 note card, which carries no title. */
-private fun NostrEventCardKind.isNote(): Boolean = this == NostrEventCardKind.Note
+private fun fixtureMetadata(kind: NostrEventCardKind): List<String> =
+    when (kind) {
+        NostrEventCardKind.Git -> listOf("30617:${"b".repeat(64)}:parser", "fix-event-parsing")
+        NostrEventCardKind.Video -> listOf("3:42", "1920x1080")
+        NostrEventCardKind.Release -> listOf("v0.17.0")
+        NostrEventCardKind.File -> listOf("application/pdf", "2.4 MB")
+        else -> emptyList()
+    }
 
 /** A one-paragraph Markdown document holding [text], standing in for MDK's parser. */
 private fun document(text: String): MarkdownDocumentFfi =

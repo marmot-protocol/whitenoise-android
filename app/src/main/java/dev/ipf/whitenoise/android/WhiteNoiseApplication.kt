@@ -10,12 +10,14 @@ import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
+import dev.ipf.whitenoise.android.media.recoverSharedPlaintextWipes
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.state.AttachmentTransfers
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
 import dev.ipf.whitenoise.android.state.persistedApplicationLanguageTag
+import dev.ipf.whitenoise.android.ui.BuiltinEmojiSetChoices
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.createRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.navigation.MainShellProcessState
@@ -78,6 +80,8 @@ open class WhiteNoiseApplication :
         }
     }
 
+    internal val builtinEmojiSetChoices by lazy { BuiltinEmojiSetChoices(this) }
+
     private val mainShellProcessStateDelegate =
         lazy {
             MainShellProcessState(appState)
@@ -128,6 +132,11 @@ open class WhiteNoiseApplication :
         DateTimeFormatState.refreshSystem(this)
         VoicePlaybackController.attach(this)
         AttachmentTransfers.install(this)
+        applicationScope.launch(Dispatchers.IO) {
+            recoverSharedPlaintextWipes(this@WhiteNoiseApplication) { _, _ ->
+                Log.w("WhiteNoiseApplication", "shared plaintext cleanup will retry")
+            }
+        }
         applicationScope.launch { PushWakeRecoveryScheduler.schedule(this@WhiteNoiseApplication) }
     }
 

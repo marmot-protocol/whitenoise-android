@@ -121,6 +121,21 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEmptyStates.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "chats",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-061"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
       "calls": {
         "LazyColumn": 1
@@ -160,6 +175,21 @@
         "SCR-002",
         "SCR-003",
         "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "chats",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "NTF-051"
       ]
     },
     {
@@ -333,7 +363,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseMenus.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "common",
       "policy": "ordinary",
@@ -422,7 +452,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "conversation/GroupSystemRow.kt",
       "policy": "ordinary",
@@ -464,7 +494,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "conversation/TtsTransportRatePicker.kt",
       "policy": "ordinary",
@@ -568,6 +598,21 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GiphySearchSheet.kt",
+      "calls": {
+        "WhiteNoiseLazyVerticalGrid": 1
+      },
+      "family": "conversation/composer",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "MED-057"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
       "calls": {
         "WhiteNoiseLazyVerticalGrid": 1
@@ -585,7 +630,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewSendBar.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "conversation/media",
       "policy": "ordinary",
@@ -838,7 +883,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AppMenus.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "design",
       "policy": "ordinary",
@@ -864,7 +909,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerSheet.kt",
       "calls": {
         "fadingVerticalScroll": 1
       },
@@ -896,7 +941,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
       "calls": {
-        "whiteNoiseVerticalScroll": 1
+        "fadingVerticalScroll": 1
       },
       "family": "group",
       "policy": "ordinary",
@@ -1011,7 +1056,7 @@
       "calls": {
         "WhiteNoiseLazyVerticalGrid": 1,
         "WhiteNoiseLazyColumn": 1,
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "medialibrary",
       "policy": "ordinary",
@@ -1038,6 +1083,20 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "onboarding",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerScreen.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1
       },
@@ -1095,7 +1154,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "profile",
       "policy": "ordinary",
@@ -1125,7 +1184,7 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
       "calls": {
         "WhiteNoiseLazyColumn": 1,
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "profile",
       "policy": "ordinary",
@@ -1592,6 +1651,20 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
       "calls": {
         "whiteNoiseVerticalScroll": 1
@@ -1662,6 +1735,36 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfileEditContent.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "NTF-049"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationProfilesScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "NTF-049"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
       "calls": {
         "SettingsList": 3
@@ -1702,13 +1805,26 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AddRelaySheet.kt",
       "calls": {
-        "SettingsList": 2,
         "verticalScroll": 1
       },
       "family": "settings",
-      "policy": "Relay lists retain fades; the Add Relay keyboard form retains ordinary scrolling pending its own real-IME geometry validation.",
+      "policy": "The Add Relay keyboard form retains ordinary scrolling pending its own real-IME geometry validation.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+      "calls": {
+        "SettingsList": 2
+      },
+      "family": "settings",
+      "policy": "Relay lists retain fades.",
       "test_ids": [
         "SCR-001",
         "SCR-002",
@@ -1800,7 +1916,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "settings",
       "policy": "ordinary",
@@ -1828,7 +1944,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "settings",
       "policy": "ordinary",
@@ -1953,6 +2069,20 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -2049,7 +2179,63 @@
         "SCR-003",
         "SCR-004"
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AnimatedDropdownMenu.kt",
+      "family": "design",
+      "policy": "Shared menu scroll owner; caller binds its stable fade to this same scroll state.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "calls": {
+        "verticalScroll": 1
+      }
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/DeviceLinkSteps.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceDetail.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
     }
   ],
-  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport’s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
+  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport\u2019s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
 }

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -36,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -52,12 +52,11 @@ import dev.ipf.whitenoise.android.state.POLL_DAY_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_HOUR_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import java.util.Locale
 
@@ -86,8 +85,9 @@ internal fun PollCreateDialog(
     var submitting by remember { mutableStateOf(false) }
     var issue by remember { mutableStateOf<PollDraftIssue?>(null) }
     var deadlineAttempted by remember { mutableStateOf(false) }
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = { if (!submitting) onDismiss() },
+        dismissEnabled = { !submitting },
         modifier =
             Modifier
                 .composed { windowInsetsPadding(viewportInsets ?: WindowInsets.safeDrawing.union(WindowInsets.ime)) }
@@ -152,13 +152,13 @@ internal fun PollCreateDialog(
                         deadline.durationSeconds,
                     ) { created ->
                         submitting = false
-                        if (created) onDismiss()
+                        if (created) dismiss()
                     }
                 },
             ) { Text(stringResource(R.string.poll_submit)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !submitting) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss, enabled = !submitting) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -215,14 +215,14 @@ internal fun PollCreateForm(
                     emojiOwner = options.toList(),
                     onValueChange = { onOptionChange(index, it) },
                     label = { Text(stringResource(R.string.poll_option, index + 1)) },
-                    modifier = Modifier.weight(1f),
+                    containerModifier = Modifier.weight(1f),
                     singleLine = true,
                     enabled = enabled,
                 )
                 if (index >= 2) {
                     IconButton(onClick = { onRemoveOption(index) }, enabled = enabled) {
                         Icon(
-                            Icons.Default.Close,
+                            painterResource(R.drawable.ic_close),
                             contentDescription = stringResource(R.string.poll_remove_option, index + 1),
                         )
                     }

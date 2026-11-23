@@ -1188,6 +1188,9 @@ class LocalizationResourceTest {
                 // localizedStringFilesDoNotCopyEnglishUserVisibleText.
                 "reply_media_photo",
                 "reply_media_video",
+                // The in-app camera's mode names: "Video" in DE/IT/TR and "Photo" in FR.
+                "camera_mode_photo",
+                "camera_mode_video",
                 "reply_media_voice",
                 "reply_media_document",
                 "toast_couldnt_process_video",

@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "fun ReceivedAudioTranscription(",
         "test_ids": [
-          "MED-038"
+          "MED-038",
+          "MED-058"
         ]
       },
       {
@@ -16,7 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "fun AudioTranscriptionToggle(",
         "test_ids": [
-          "MED-038"
+          "MED-038",
+          "MED-058"
         ]
       },
       {
@@ -32,7 +34,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "fun AudioTranscriptBody(",
         "test_ids": [
-          "MED-038"
+          "MED-038",
+          "MED-058"
         ]
       },
       {
@@ -160,7 +163,7 @@
       {
         "surface": "Transcribe icon",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-        "anchor": "R.drawable.ic_subtitles",
+        "anchor": "R.drawable.ic_mic",
         "test_ids": [
           "MED-038"
         ]

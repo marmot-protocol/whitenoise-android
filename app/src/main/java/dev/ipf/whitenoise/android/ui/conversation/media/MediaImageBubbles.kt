@@ -38,10 +38,12 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
@@ -77,8 +79,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMe
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
-import dev.ipf.whitenoise.android.ui.icons.filled.Image
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -303,7 +303,7 @@ internal fun MediaImageBubble(
                             )
                         load.failed ->
                             MediaCircleAction(
-                                icon = Icons.Default.Refresh,
+                                icon = ImageVector.vectorResource(R.drawable.ic_refresh),
                                 contentDescription = stringResource(R.string.media_tap_to_retry),
                                 onClick = {
                                     controller.retryAttachmentTransfer(
@@ -674,7 +674,7 @@ internal fun MediaImageGridTile(
                     load.tooLargeToPreview -> MediaTooLargeToPreviewControl(onOpen = onTap)
                     load.failed ->
                         MediaCircleAction(
-                            icon = Icons.Default.Refresh,
+                            icon = ImageVector.vectorResource(R.drawable.ic_refresh),
                             contentDescription =
                                 stringResource(
                                     if (load.storageFailed) {

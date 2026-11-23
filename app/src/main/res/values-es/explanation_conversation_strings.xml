@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Abre los detalles de este chat, como sus miembros y ajustes.</string>
     <string name="explanation_conversation_jump_to_mention">Se desplaza al siguiente mensaje sin leer en el que te mencionan.</string>
     <string name="explanation_composer_draft_top">Desplaza el borrador de vuelta a su primera línea. No cambia el texto.</string>
+    <string name="explanation_composer_draft_bottom">Desplaza el borrador hasta su última línea. No cambia el texto.</string>
     <string name="explanation_emoji_search">Busca emojis por nombre.</string>
     <string name="explanation_emoji_configure">Abre los ajustes donde eliges tus emojis de reacción rápida.</string>
 
@@ -59,4 +60,5 @@
     <string name="explanation_message_action_info">Muestra cuándo se envió y recibió este mensaje, quién lo envió, su ID y su estado.</string>
     <string name="explanation_message_action_report">Abre un formulario de denuncia para los administradores de este grupo, el equipo de White Noise o ambos. No se envía nada hasta que confirmes.</string>
     <string name="explanation_message_action_delete">Te permite eliminar este mensaje solo en este dispositivo o para todos. Eliminar para todos no se puede deshacer. No se elimina nada hasta que elijas.</string>
+    <string name="explanation_conversation_dictation_continue">Empieza a grabar la siguiente parte de inmediato. Lo que ya has dicho se sigue transcribiendo y se colocará primero.</string>
 </resources>

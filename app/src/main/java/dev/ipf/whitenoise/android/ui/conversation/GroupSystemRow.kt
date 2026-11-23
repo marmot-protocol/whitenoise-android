@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
@@ -61,9 +61,9 @@ import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -326,20 +326,22 @@ internal fun GroupSystemSummaryMenu(
     onDelete: (() -> Unit)?,
 ) {
     val menuScrollState = rememberScrollState()
-    DropdownMenu(
+    AnimatedDropdownMenu(
         scrollState = menuScrollState,
         modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
         expanded = expanded,
         onDismissRequest = onDismiss,
         shape = MenuDefaults.shape,
         border = amoledSurfaceBorderStroke(),
-    ) {
+    ) { surface ->
         DropdownMenuItem(
             text = { Text(stringResource(R.string.delete_for_me)) },
-            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_delete), contentDescription = null) },
             onClick = {
-                onDismiss()
-                onDelete?.invoke()
+                surface.close {
+                    onDismiss()
+                    onDelete?.invoke()
+                }
             },
         )
     }

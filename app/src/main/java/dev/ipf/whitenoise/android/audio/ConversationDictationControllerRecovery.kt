@@ -113,6 +113,7 @@ internal fun ConversationDictationController.handRecoveryToComposer(failed: Conv
         notificationActionGeneration += 1L
     }
     if (!foregroundMicrophoneRequired) parkClosedRecovery(failed)
+    promoteFollowUp(previousDelivered = false)
 }
 
 /** Bounds foreground protection without treating elapsed time as permission to destroy recovery data. */
@@ -143,6 +144,7 @@ internal fun ConversationDictationController.expireRetainedRecoveryIfDue() {
     pendingForegroundRecoverySessionId = null
     notificationActionGeneration += 1L
     if (!foregroundMicrophoneRequired) releaseDurableSessionLease()
+    discardFollowUps("recovery_expired")
     onRecoveryExpired()
 }
 

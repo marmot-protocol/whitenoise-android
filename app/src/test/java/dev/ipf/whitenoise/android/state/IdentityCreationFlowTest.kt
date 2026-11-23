@@ -45,9 +45,9 @@ class IdentityCreationFlowTest {
 
         assertTrue(body.contains("createIdentityWithBootstrapRelays"))
         assertTrue(body.contains("val relays = MarmotClient.bootstrapRelays"))
-        // NIP-65 gets the account defaults; the bootstrap route and inbox stay on bootstrapRelays.
-        assertTrue(body.contains("createIdentity(MarmotClient.accountRelays, relays, relays)"))
-        val initial = "createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)"
+        // NIP-65 and Inbox take White Noise's defaults, and the bootstrap route stays on bootstrapRelays.
+        assertTrue(body.contains("createIdentity(whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)"))
+        val initial = "createIdentityWithInitialProfile(profile, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays)"
         assertTrue(body.contains(initial))
         // Creation returns the receipt at local readiness; the publication stage owns the wait.
         assertFalse(body.functionBody("MarmotInterface.createNamedIdentity").contains("awaitAccountNetworkReady"))
@@ -59,7 +59,10 @@ class IdentityCreationFlowTest {
     fun profileSaveWaitsForReadinessWithoutHoldingTheAccountLifetime() {
         val adapter = appStateSource("AppProfileSignUp.kt").readText()
         val publish = adapter.substringAfter("publish = { account, metadata ->").substringBefore("finish =")
-        assertTrue(publish.indexOf("awaitOwnedNetworkReadiness(account)") in 0 until publish.indexOf("publishProfile("))
+        val reuse = "initialProfile == metadata || appState.publishProfile(metadata)"
+        assertTrue(publish.indexOf("awaitOwnedNetworkReadiness(account)") in 0 until publish.indexOf(reuse))
+        val create = adapter.functionBody("createOwnedIdentity")
+        assertTrue(create.contains("owner.copy(initialProfile = receipt?.profile)"))
         val wait = adapter.functionBody("awaitOwnedNetworkReadiness")
         assertFalse(wait.contains("withAccountLifetime"))
         assertTrue(wait.contains("ownerAvailable()"))
@@ -86,6 +89,30 @@ class IdentityCreationFlowTest {
             }
 
             assertEquals(listOf("created", "created", "created"), asked)
+        }
+
+    @Test
+    fun fastSetupCompletesWithoutWaitingForTheSteadyPollInterval() =
+        runTest {
+            val reads = mutableListOf<Long>()
+            awaitAccountNetworkReady("created") {
+                val now = testScheduler.currentTime
+                reads += now
+                if (now >= 40) AccountSetupReadinessFfi.NETWORK_READY else AccountSetupReadinessFfi.PUBLISHING
+            }
+            assertEquals(listOf(0L, 50L), reads)
+        }
+
+    @Test
+    fun slowSetupReturnsToTheSteadyPollInterval() =
+        runTest {
+            val reads = mutableListOf<Long>()
+            awaitAccountNetworkReady("created") {
+                val now = testScheduler.currentTime
+                reads += now
+                if (now >= 700) AccountSetupReadinessFfi.NETWORK_READY else AccountSetupReadinessFfi.PUBLISHING
+            }
+            assertEquals(listOf(0L, 50L, 150L, 250L, 500L, 750L), reads)
         }
 
     /** Recovery is MDK's typed setup failure, never a ready account. */

@@ -7,6 +7,9 @@ import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
+import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardPickerRestoration
+import dev.ipf.whitenoise.android.ui.conversation.messages.RestoredForwardDisposition
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -101,6 +104,72 @@ class CrossAccountForwardProcessRecreationTest {
         destinationAccountRef = destination,
         selectedGroupIds = selected,
     )
+
+    /** A cold inventory completes a wipe interrupted after native deletion while a surviving forward stays intact. */
+    @Test
+    fun interruptedAccountWipeReconcilesTheEncryptedForwardOnColdStart() =
+        runBlocking {
+            val owned = request(destination = "account-b")
+            val survivor = request(destination = null, selected = emptyList())
+            for (original in listOf(owned, survivor)) {
+                assertTrue(store().save(original))
+                // Native B is removed here; the process dies before its Android wipe callback.
+                val reopened = ForwardRequestPersistence(this) { SerializedPendingForwardRequestStore(store()) }
+                reopened.retainAccounts(setOf("account-a", "account-b")) { true }
+                assertEquals(original, store().load())
+                reopened.retainAccounts(setOf("account-a")) { false }
+                assertEquals(original, store().load())
+                reopened.retainAccounts(setOf("account-a")) { true }
+                assertEquals(original.takeIf { it.destinationAccountRef == null }, store().load())
+            }
+        }
+
+    /** A live picker writing its slot cannot open a second sheet when any account summary changes. */
+    @Test
+    fun livePickerIsNotRestoredAfterAnAccountUpdate() =
+        runBlocking {
+            val persistence = ForwardRequestPersistence(this) { SerializedPendingForwardRequestStore(store()) }
+            val live = request()
+            val first = ForwardPickerRestoration()
+            val valid = { _: PendingForwardRequest -> RestoredForwardDisposition.Restore }
+            first.refresh(persistence, true, valid) { error("nothing to discard") }
+            assertTrue(store().save(live))
+            first.refresh(persistence, true, valid) { error("live entry must stay intact") }
+            assertNull(first.visible)
+            assertEquals(live, store().load())
+
+            val waiting = ForwardPickerRestoration()
+            waiting.refresh(persistence, false, valid) { error("inventory not available") }
+            persistence.openPickerIds.add(live.requestId)
+            waiting.refresh(persistence, true, valid) { error("live picker already owns this entry") }
+            assertNull(waiting.visible)
+        }
+
+    /** A removed or replaced entry closes its restored picker; a late picker write cannot resurrect it. */
+    @Test
+    fun restoredPickerClosesWhenItsBackingRequestDisappearsOrIsReplaced() =
+        runBlocking {
+            val serialized = SerializedPendingForwardRequestStore(store())
+            val persistence = ForwardRequestPersistence(this) { serialized }
+            val original = request()
+            val replacement = request(requestId = "newer-forward")
+            val valid = { _: PendingForwardRequest -> RestoredForwardDisposition.Restore }
+            for (next in listOf(null, replacement)) {
+                val restore = ForwardPickerRestoration()
+                assertTrue(serialized.save(original))
+                restore.refresh(persistence, true, valid) { error("account is signed in") }
+                assertEquals(original, restore.visible)
+                persistence.retainAccounts(setOf("account-a", "account-b")) { true }
+                restore.refresh(persistence, true, valid) { error("failed wipe retained both owners") }
+                assertEquals(original, restore.visible)
+                persistence.removeForAccount("account-b")
+                if (next != null) assertTrue(serialized.save(next))
+                assertFalse(serialized.save(original, requireExistingId = true))
+                restore.refresh(persistence, true, valid) { error("do not discard another request") }
+                assertNull(restore.visible)
+                assertEquals(next, serialized.load())
+            }
+        }
 
     /** A request round-trips across store recreation with identity and order intact. */
     @Test

@@ -123,6 +123,7 @@ class ConvergenceRetryMediaMatchTest {
         recordedAt: ULong,
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = messageIdHex,
             direction = "sent",
             groupIdHex = "group",

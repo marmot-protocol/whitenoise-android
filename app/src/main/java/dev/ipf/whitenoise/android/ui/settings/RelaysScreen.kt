@@ -1,19 +1,10 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
-import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,29 +20,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.RelayAddressAttention
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.addAccountRelay
 import dev.ipf.whitenoise.android.state.canRemoveRelay
 import dev.ipf.whitenoise.android.state.loadAccountRelayLists
 import dev.ipf.whitenoise.android.state.publishMissingRelayLists
-import dev.ipf.whitenoise.android.state.relayAddressAttention
+import dev.ipf.whitenoise.android.state.refreshAccountRelayLists
 import dev.ipf.whitenoise.android.state.removeAccountRelay
 import dev.ipf.whitenoise.android.state.restoreDefaultAccountRelays
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.flow.first
 
@@ -66,6 +52,7 @@ internal fun RelaysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onFeedback: (dev.ipf.whitenoise.android.state.ToastMessage) -> Unit = {},
+    destination: SettingsDetail = SettingsDetail.Relays,
 ) {
     val account = appState.activeAccountRef
     val feedbackRuntime = appState.runtimeGeneration
@@ -160,11 +147,12 @@ internal fun RelaysScreen(
 
     RelaysContent(
         state = RelaysUiState(lists = lists, publication = publication, busy = busy),
+        destination = destination,
         onBack = onBack,
         onOpenRelay = { selectedUrl = it },
         onAdd = { addSheet = true },
         onRefresh = {
-            runPublication(RelayPublicationOperation.Refresh) { account?.let { appState.loadAccountRelayLists(it) } }
+            runPublication(RelayPublicationOperation.Refresh) { account?.let { appState.refreshAccountRelayLists(it) } }
         },
         onPublishMissing = {
             runPublication(RelayPublicationOperation.PublishMissing) { appState.publishMissingRelayLists(account) }
@@ -176,8 +164,9 @@ internal fun RelaysScreen(
             existing = relays,
             busy = busy,
             rejectedUrl = rejectedUrl,
+            ownerKey = account to appState.runtimeGeneration,
             onDismiss = { addSheet = false },
-            onAdd = { url, roles ->
+            onAdd = { url, roles, finishExit ->
                 rejectedUrl = null
                 runEdit {
                     var updated: AccountRelayListsFfi? = null
@@ -186,7 +175,7 @@ internal fun RelaysScreen(
                         val result = appState.addAccountRelay(account, role.kind, url)
                         if (result == null) allAdded = false else updated = result
                     }
-                    if (allAdded) addSheet = false else rejectedUrl = url
+                    if (allAdded) finishExit() else rejectedUrl = url
                     updated
                 }
             },
@@ -213,7 +202,7 @@ internal fun RelaysScreen(
                 ) { Text(stringResource(R.string.restore_defaults), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { restoreDialog = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -230,6 +219,7 @@ internal fun RelaysContent(
     onRefresh: () -> Unit,
     onPublishMissing: () -> Unit,
     onRestore: () -> Unit,
+    destination: SettingsDetail = SettingsDetail.Relays,
 ) {
     val lists = state.lists
     val relays = lists?.let(::accountRelays).orEmpty()
@@ -258,7 +248,11 @@ internal fun RelaysContent(
             item(key = "search.Relays.4") { SettingsExplainer(stringResource(relayListsHelpRes(lists))) }
             item(key = "search.Relays.5") { SettingsSection(stringResource(R.string.profile_relays)) }
             item(key = "search.Relays.6") {
-                SettingsGroup(modifier = Modifier.testTag("relays.group")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("relays.group"),
+                    destination = destination,
+                    surface = "account-relays",
+                ) {
                     relays.forEach { relay ->
                         row(relay.url) { context ->
                             SettingsLink(
@@ -519,128 +513,8 @@ internal fun RelayDetailsScreen(
                 ) { Text(stringResource(R.string.remove_relay), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { removeDialog = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
 }
-
-/** The Add relay task sheet: a secure URL, the lists it should join, and one pinned Add action. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming", "LongMethod")
-@Composable
-internal fun AddRelaySheet(
-    existing: List<AccountRelay>,
-    busy: Boolean,
-    rejectedUrl: String?,
-    onDismiss: () -> Unit,
-    onAdd: (String, Set<AccountRelayRole>) -> Unit,
-) {
-    val value: TextFieldState = rememberTextFieldState()
-    var roles by rememberSaveable { mutableStateOf(AccountRelayRole.entries.toSet()) }
-    val currentValue = value.text.toString().trim()
-    val attention = relayAddressAttention(currentValue)
-    val onion = attention == RelayAddressAttention.OnionRequiresTor
-    // Mirrors MarmotKit, which refuses onion endpoints at classify/publish: None is a structurally acceptable
-    // secure address that is not an onion relay, so an onion address is never offered for publication.
-    val acceptable = currentValue.isNotEmpty() && attention == RelayAddressAttention.None
-    val duplicate = acceptable && roles.isNotEmpty() && missingRelayRoles(existing, currentValue, roles).isEmpty()
-    val rejected = rejectedUrl != null && rejectedUrl == currentValue
-    val canAdd = acceptable && !duplicate && roles.isNotEmpty() && !busy
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.fillMaxWidth()) {
-            WhiteNoiseSheetHeader(title = stringResource(R.string.add_relay), onClose = onDismiss)
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                WhiteNoiseTextField(
-                    state = value,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
-                            .testTag("relay.add.url"),
-                    label = { Text(stringResource(R.string.relay_url)) },
-                    placeholder = { Text("wss://relay.example.com") },
-                    // An onion address needs visible guidance, not only the error announcement.
-                    supportingText = { Text(stringResource(addRelayHelpRes(onion))) },
-                    errorMessage = addRelayErrorRes(onion, duplicate || rejected)?.let { stringResource(it) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    lineLimits = TextFieldLineLimits.SingleLine,
-                )
-                SettingsSection(stringResource(R.string.use_for))
-                SettingsGroup(modifier = Modifier.testTag("relay.add.roles")) {
-                    AccountRelayRole.entries.forEach { role ->
-                        row(role.name) { context ->
-                            SettingsSwitch(
-                                context = context,
-                                title = stringResource(role.labelRes),
-                                checked = role in roles,
-                                onCheckedChange = { selected -> roles = if (selected) roles + role else roles - role },
-                                subtitle = stringResource(role.helpRes),
-                                explanation = stringResource(role.explanationRes()),
-                                leading = { SettingsLeadingIcon(role.iconRes) },
-                            )
-                        }
-                    }
-                }
-                if (roles.isEmpty()) SettingsExplainer(stringResource(R.string.choose_at_least_one_role))
-            }
-            SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
-                WhiteNoiseButton(
-                    onClick = { onAdd(currentValue, roles) },
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .testTag("relay.add.submit")
-                            .explainOnLongPress(
-                                Explanation(
-                                    stringResource(R.string.add_relay),
-                                    stringResource(R.string.explanation_relays_add_submit),
-                                ),
-                            ),
-                    enabled = canAdd,
-                    loading = busy,
-                    loadingLabel = stringResource(R.string.relay_list_publishing),
-                ) { Text(stringResource(R.string.add_relay)) }
-            }
-        }
-    }
-}
-
-/** Visible guidance under the URL field: why an onion address cannot be added, else the wss:// hint. */
-@StringRes
-private fun addRelayHelpRes(onion: Boolean): Int =
-    when {
-        onion -> R.string.relay_onion_add_error
-        else -> R.string.relay_url_help
-    }
-
-/**
- * The short error announcement; an onion address announces "Needs Tor" while its full explanation stays in the
- * visible supporting text, so TalkBack does not read the same sentence twice. Null when the field has no error.
- */
-@StringRes
-private fun addRelayErrorRes(
-    onion: Boolean,
-    duplicateOrRejected: Boolean,
-): Int? =
-    when {
-        onion -> R.string.relay_onion_needs_tor
-        duplicateOrRejected -> R.string.relay_unique_url_error
-        else -> null
-    }
-
-/** Address and, when it is not a usable secure wss:// URL, the note naming its kind of concern. */
-@Composable
-private fun relaySummary(relay: AccountRelay): String {
-    val note = relay.attention.summaryNoteRes() ?: return relay.url
-    return "${relay.url} · ${stringResource(note)}"
-}
-
-private val RelayProgressSize = 20.dp
-
-@StringRes
-private fun AccountRelayRole.explanationRes(): Int =
-    when (this) {
-        AccountRelayRole.Profile -> R.string.explanation_relays_role_profile
-        AccountRelayRole.Inbox -> R.string.explanation_relays_role_inbox
-    }

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.profile
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,7 +11,7 @@ class ProfileBannerPickerWiringTest {
     /** Profile banner uses dedicated picker upload and stale result state. */
     @Test
     fun profileBannerUsesDedicatedPickerUploadAndStaleResultState() {
-        val source = profileEditSource().readText()
+        val source = profileEditSource().motionOwnerSource()
         val body = source.functionBody("ProfileEditScreen")
 
         assertTrue("screen must delegate to the profile form", "ProfileEditContent(" in body)
@@ -40,7 +41,7 @@ class ProfileBannerPickerWiringTest {
 
     @Test
     fun galleryUploadOwnsAVisiblePickerProgressIndicator() {
-        val source = groupImageSearchSource().readText()
+        val source = groupImageSearchSource().motionOwnerSource()
 
         assertTrue(
             "gallery selection must own the pending action before upload starts",

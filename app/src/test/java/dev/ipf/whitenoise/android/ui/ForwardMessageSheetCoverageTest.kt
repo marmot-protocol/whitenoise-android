@@ -105,7 +105,10 @@ class ForwardMessageSheetCoverageTest {
         assertTrue("val titleOwner = destination.selectedAccountRef" in picker)
         assertTrue("forwardTargetDisplayTitle(it, appState, titleOwner, titleCopy)" in picker)
         assertTrue("titleOverride = title" in body)
-        val resolver = messageActionsSource().readText().functionBody("forwardTargetDisplayTitle")
+        val resolver =
+            sourceFile("ui/conversation/messages/ForwardTargetPresentation.kt")
+                .readText()
+                .functionBody("forwardTargetDisplayTitle")
         assertTrue("appState.contactDisplayNameCached(ownerAccountRef, it)" in resolver)
         assertFalse("appState.chatMemberTitleCached(" in body)
     }

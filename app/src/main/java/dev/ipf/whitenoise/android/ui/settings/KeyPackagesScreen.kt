@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -249,7 +250,7 @@ private fun KeyPackagesScreenForAccount(
                 ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -377,7 +378,7 @@ private fun PublishingActions(
     onRepublish: () -> Unit,
     onPublishNew: () -> Unit,
 ) {
-    SettingsGroup {
+    SettingsGroup(destination = SettingsDetail.KeyPackages, surface = "key-package-publishing-actions") {
         row("republish") { context ->
             SettingsGroupPanel(context) {
                 TextButton(

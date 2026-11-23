@@ -44,7 +44,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
 import dev.ipf.whitenoise.android.ui.icons.filled.SkipNext
 import dev.ipf.whitenoise.android.ui.icons.filled.SkipPrevious
@@ -168,7 +167,7 @@ internal fun TtsTransportBarContent(
                             ),
                     ) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
+                            painterResource(R.drawable.ic_arrow_back),
                             contentDescription = stringResource(R.string.tts_bar_skip_previous),
                         )
                     }

@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -14,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -24,8 +24,7 @@ import androidx.compose.ui.semantics.stateDescription
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Check
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateEditor
 import dev.ipf.whitenoise.android.ui.settings.isTtsCustomRate
 import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel
@@ -56,7 +55,7 @@ internal fun TtsTransportRatePicker(
             Text(rateLabel)
         }
         val menuScrollState = rememberScrollState()
-        DropdownMenu(
+        AnimatedDropdownMenu(
             scrollState = menuScrollState,
             modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
             expanded = menuOpen,
@@ -64,7 +63,7 @@ internal fun TtsTransportRatePicker(
                 menuOpen = false
                 customEditorOpen = false
             },
-        ) {
+        ) { surface ->
             TransportRateMenuContent(
                 rateOverride = rateOverride,
                 activeRate = activeRate,
@@ -72,9 +71,11 @@ internal fun TtsTransportRatePicker(
                 customEditorOpen = customEditorOpen,
                 onCustomEditorOpenChange = { customEditorOpen = it },
                 onRateSelected = { rate ->
-                    customEditorOpen = false
-                    menuOpen = false
-                    onRateSelected(rate)
+                    surface.close {
+                        customEditorOpen = false
+                        menuOpen = false
+                        onRateSelected(rate)
+                    }
                 },
             )
         }
@@ -130,7 +131,7 @@ private fun TransportRateMenuItem(
         onClick = onClick,
         trailingIcon =
             if (selected) {
-                { Icon(Icons.Default.Check, contentDescription = null) }
+                { Icon(painterResource(R.drawable.ic_check), contentDescription = null) }
             } else {
                 null
             },

@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       mdk_qualification:
-        description: Populated current-master runtime upgrade, cold restart and both recovery modes
+        description: Populated MarmotKit 0.17.0 upgrade, cold restart and both recovery modes
         required: false
         type: boolean
         default: false
@@ -208,6 +208,11 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/ComposerDraftNavigationAndroidTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerExplanationEdge.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/ComposerExplanationKeyboardAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/ComposerExplanationBackAndroidTest.kt'
+      - 'app/src/debug/java/dev/ipf/whitenoise/android/BackOptInFixtureActivity.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageImeTest.kt'
       - 'app/src/main/marmotkit/**'
@@ -308,6 +313,11 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/IncomingAttachmentBackgroundDownloadAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptFixtureSupport.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptNetworkDiagnostics.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformInterruptedAttachmentProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeLedger.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumeHostDiagnostics.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptSchedulingDiagnostics.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/PlatformResumePermissionSetup.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnostics.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptProcessStopDiagnostics.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnosticsAndroidTest.kt'
@@ -1033,8 +1043,14 @@ jobs:
 
   mdk-qualification:
     needs: changes
-    name: Populated MarmotKit upgrade and recovery (emulator)
+    name: Populated MarmotKit upgrade and recovery (audit ${{ matrix.audit-choice }})
     if: ${{ !cancelled() && needs.changes.outputs.media_trace_allowed == 'true' && (github.event_name == 'workflow_dispatch' && inputs.mdk_qualification && !inputs.mdk_preview_qualification) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        audit-choice: [enabled, declined]
+    env:
+      QUALIFICATION_AUDIT_CHOICE: ${{ matrix.audit-choice }}
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -1079,7 +1095,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: mdk-qualification-${{ github.sha }}
+          name: mdk-qualification-${{ github.sha }}-${{ matrix.audit-choice }}
           path: build/mdk-qualification/
           if-no-files-found: error
           retention-days: 30
@@ -1087,7 +1103,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: mdk-qualification-apks-${{ github.sha }}
+          name: mdk-qualification-apks-${{ github.sha }}-${{ matrix.audit-choice }}
           path: build/mdk-pair/
           if-no-files-found: warn
           retention-days: 30

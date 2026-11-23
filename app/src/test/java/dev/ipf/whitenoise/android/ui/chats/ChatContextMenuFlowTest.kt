@@ -6,13 +6,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -25,6 +32,8 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -40,6 +49,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,6 +88,55 @@ class ChatContextMenuFlowTest {
             composeRule.onNodeWithTag("chat.row.b").assertIsSelected()
             assertEquals(0, opens())
         }
+
+    @Test
+    fun leftCenterAndRightPressesKeepPhysicalPlacementInRtl() =
+        withScreen(layoutDirection = LayoutDirection.Rtl) { _, _, _ ->
+            val row = composeRule.onNodeWithTag("chat.row.a")
+            val frame = screenBounds(composeRule.onRoot())
+            val rowBounds = screenBounds(row)
+            val menu = composeRule.onNodeWithTag("chat.menu.a")
+            openMenu()
+            val accessibleLeft = screenBounds(menu).left
+            composeRule.onNode(isPopup()).dispatchNativePopupBack()
+            menu.assertDoesNotExist()
+            // Material reserves room for the menu shadow at the edges.
+            val menuMargin = with(composeRule.density) { 8.dp.toPx() }
+            val positions =
+                listOf(0.05f, 0.5f, 0.95f).map { fraction ->
+                    row.performTouchInput {
+                        val point = Offset(width * fraction, center.y)
+                        down(point)
+                        advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+                        moveTo(point)
+                    }
+                    menu.assertIsDisplayed()
+                    row.performTouchInput { up() }
+                    val bounds = screenBounds(menu)
+                    val pressX = rowBounds.left + rowBounds.width * fraction
+                    val expectedLeft =
+                        (pressX - bounds.width / 2).coerceIn(
+                            frame.left + menuMargin,
+                            frame.right - menuMargin - bounds.width,
+                        )
+                    assertEquals(expectedLeft, bounds.left, 2f)
+                    assertTrue(bounds.top >= frame.top && bounds.bottom <= frame.bottom)
+                    composeRule.onNode(isPopup()).dispatchNativePopupBack()
+                    menu.assertDoesNotExist()
+                    bounds.left
+                }
+            assertTrue(positions[0] < positions[1] && positions[1] < positions[2])
+
+            openMenu()
+            assertEquals(accessibleLeft, screenBounds(menu).left, 2f)
+        }
+
+    private fun screenBounds(node: androidx.compose.ui.test.SemanticsNodeInteraction): Rect {
+        val coordinates = node.fetchSemanticsNode().layoutInfo.coordinates
+        val topLeft = coordinates.localToScreen(Offset.Zero)
+        val corner = Offset(coordinates.size.width.toFloat(), coordinates.size.height.toFloat())
+        return Rect(topLeft, coordinates.localToScreen(corner))
+    }
 
     /** Accessibility long-click opens commands without pretending that the row is already selected. */
     @Test fun accessibleLongClickHighlightsWithoutSelectionUntilSelectCommand() =
@@ -180,8 +239,9 @@ class ChatContextMenuFlowTest {
     @Test fun newMessageFlowRetainsPlaybackControls() =
         withScreen(playback = true) { opens, _, _ ->
             composeRule.onNodeWithContentDescription(context.getString(R.string.new_message)).performClick()
-            composeRule.onNodeWithTag("chat.row.a").assertDoesNotExist()
-            returnFromPlayback(opens)
+            composeRule.onNodeWithTag("new_message.screen").assertIsDisplayed()
+            returnFromPlayback(opens, hasAnyAncestor(isDialog()))
+            composeRule.onNodeWithTag("new_message.screen").assertDoesNotExist()
         }
 
     /** Folder management replaces the list but must retain the same retained-player controls. */
@@ -224,13 +284,18 @@ class ChatContextMenuFlowTest {
         }
 
     /** Tests the visible source action, not a direct navigation callback or fabricated transport-only layout. */
-    private fun returnFromPlayback(opens: () -> Int) {
-        composeRule.onNodeWithTag("voice-transport").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.voice_message_play)).assertIsDisplayed()
+    private fun returnFromPlayback(
+        opens: () -> Int,
+        scope: SemanticsMatcher = SemanticsMatcher("any playback host") { true },
+    ) {
+        composeRule.onNode(hasTestTag("voice-transport") and scope).assertIsDisplayed()
         composeRule
-            .onNodeWithContentDescription(context.getString(R.string.tts_playback_action_stop))
+            .onNode(hasContentDescription(context.getString(R.string.voice_message_play)) and scope)
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Playback source").performClick()
+        composeRule
+            .onNode(hasContentDescription(context.getString(R.string.tts_playback_action_stop)) and scope)
+            .assertIsDisplayed()
+        composeRule.onNode(hasText("Playback source") and scope).performClick()
         composeRule.onNodeWithTag("chat.row.a").assertIsDisplayed()
         assertEquals(1, opens())
     }
@@ -245,6 +310,7 @@ class ChatContextMenuFlowTest {
     private fun withScreen(
         playback: Boolean = false,
         membership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         assertions: (() -> Int, (Boolean) -> Unit, WhiteNoiseAppState) -> Unit,
     ) {
         context
@@ -284,7 +350,10 @@ class ChatContextMenuFlowTest {
         try {
             composeRule.setContent {
                 WhiteNoiseTheme {
-                    CompositionLocalProvider(LocalShellPlaybackHost provides host.takeIf { playback }) {
+                    CompositionLocalProvider(
+                        LocalShellPlaybackHost provides host.takeIf { playback },
+                        LocalLayoutDirection provides layoutDirection,
+                    ) {
                         if (visible) ChatsScreen(app, controller, {}, { _, _, _, _ -> opens++ })
                     }
                 }

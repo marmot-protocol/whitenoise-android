@@ -24,6 +24,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowBiometricManager
+import org.robolectric.shadows.ShadowSystemClock
+import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -155,7 +157,7 @@ class AppLockTimestampPersistenceTest {
             }
         }
 
-    /** Drive actual background callbacks through the existing locked and authenticated branches. */
+    /** Only an authenticated background transition admits notification actions until the grace period expires. */
     @Test
     fun backgroundLifecycleKeepsTheLockedGateAndEnqueuesOnlyAnUnlockedBaseline() =
         runTest {
@@ -164,10 +166,13 @@ class AppLockTimestampPersistenceTest {
             val writes = mutableListOf<Long>()
             val state = state(dispatcher) { writes += it }
             try {
+                assertFalse(state.appLock.screenVisible)
+                assertFalse(state.appLock.notificationActionsAllowed)
                 state.appLock.requestUnlock()
                 state.setAppInForeground(false)
                 runCurrent()
                 assertTrue(writes.isEmpty())
+                assertFalse(state.appLock.notificationActionsAllowed)
                 state.appLock.sessions.clear()
                 state.appLock.markUnlockSucceeded(1_000L, dismissRetainedVisibleConversation = false)
                 runCurrent()
@@ -178,6 +183,10 @@ class AppLockTimestampPersistenceTest {
                 runCurrent()
                 assertEquals(2, writes.size)
                 assertTrue(writes.last() in before..after)
+                assertTrue(state.appLock.notificationActionsAllowed)
+                ShadowSystemClock.advanceBy(Duration.ofMillis(AppLockDelay.OneMinute.delayMillis))
+                assertFalse(state.appLock.screenVisible)
+                assertFalse(state.appLock.notificationActionsAllowed)
             } finally {
                 state.mutationsScope.cancel()
                 state.mutationsScope.coroutineContext[Job]!!.join()

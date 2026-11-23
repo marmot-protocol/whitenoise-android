@@ -18,7 +18,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 ),
             )
         }
-        addAll(settingsHubDestinationEntries())
+        addAll(settingsHubDestinationEntries() + voiceNoteSettingsSearchEntries())
         add(
             SettingsSearchEntry(
                 "Appearance.action_color",
@@ -595,7 +595,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         addAll(settingsSearchAdditionalControls())
     }
 
-private fun hubEntry(
+internal fun hubEntry(
     id: String,
     title: Int,
     category: Int,
@@ -727,4 +727,4 @@ private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
             R.string.notifications,
             SettingsDetail.NotificationDelivery,
         ),
-    )
+    ) + linkedDevicesSearchEntry()

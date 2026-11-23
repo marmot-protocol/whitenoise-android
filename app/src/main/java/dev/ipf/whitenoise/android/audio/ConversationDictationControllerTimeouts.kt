@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.os.Handler
+import android.os.Looper
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Emits elapsed, PII-free provider-readiness diagnostics. */
@@ -77,4 +79,15 @@ internal fun ConversationDictationController.diagnosticTimeout(
         }
         handle.cancel()
     }
+}
+
+/** Posts a cancellable main-thread watchdog used to bound recognizer state transitions. */
+internal fun scheduleConversationDictationTimeout(
+    delayMillis: Long,
+    callback: () -> Unit,
+): ConversationDictationTimeoutHandle {
+    val handler = Handler(Looper.getMainLooper())
+    val runnable = Runnable(callback)
+    handler.postDelayed(runnable, delayMillis)
+    return ConversationDictationTimeoutHandle { handler.removeCallbacks(runnable) }
 }

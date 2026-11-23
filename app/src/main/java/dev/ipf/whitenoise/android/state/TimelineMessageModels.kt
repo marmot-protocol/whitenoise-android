@@ -70,6 +70,11 @@ data class TimelineMessage(
     val presentationId: String = id,
     /** True when [status] shows an in-flight edit of this already-sent message rather than its own send. */
     val statusFromEdit: Boolean = false,
+    /**
+     * True for the account's own message that another of its devices sent. MDK records it as received, but it is not
+     * incoming chat: it is never unread, never an unread jump target, and expires like the account's own sends.
+     */
+    val fromOtherOwnDevice: Boolean = false,
 ) {
     /** A local send that is still unconfirmed, as opposed to a sent message whose edit is pending. */
     val isPendingSend: Boolean get() = status == MessageStatus.Pending && !statusFromEdit

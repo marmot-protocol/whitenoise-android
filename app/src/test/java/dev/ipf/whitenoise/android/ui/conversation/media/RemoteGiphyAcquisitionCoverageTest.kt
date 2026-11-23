@@ -340,6 +340,7 @@ class RemoteGiphyAcquisitionCoverageTest {
         assertFalse("SafeHttpsGet" in row)
         assertTrue("hostAllowed = { RemoteGiphyMedia.isAllowedMediaUrl" in source)
         assertTrue("maxBodyBytes = GIPHY_MAX_BODY_BYTES" in source)
+        assertTrue("requestHeaders = mapOf(\"User-Agent\" to GIPHY_USER_AGENT)" in source)
         assertTrue("continuation.invokeOnCancellation { cancelRequest() }" in source)
     }
 

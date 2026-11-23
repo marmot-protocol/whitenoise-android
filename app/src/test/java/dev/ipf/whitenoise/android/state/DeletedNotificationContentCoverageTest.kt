@@ -17,6 +17,7 @@ class DeletedNotificationContentCoverageTest {
     @Test
     fun everyCardWriteRechecksTheContentFence() {
         val content = source("state/AppStateNotificationContent.kt")
+        val eligibility = source("state/AppStateNotificationPostEligibility.kt")
         val source = source("state/AppState.kt") + content
         val shows = callArguments(source, "localNotificationPresenter.show(")
         val refreshes = callArguments(source, "localNotificationPresenter.refreshLateIdentityImage(")
@@ -32,12 +33,12 @@ class DeletedNotificationContentCoverageTest {
         assertTrue(
             "the generation fence must check the removal mark",
             "notificationContentInvalidations.isRemoved(" in
-                functionBody(content, "isNotificationGenerationPostAllowed"),
+                functionBody(eligibility, "isNotificationGenerationPostAllowed"),
         )
         assertTrue(
             "a reaction's own event id cannot verify its quoted target at the final write",
             "notificationContentInvalidations.hasRemovalInConversation(" in
-                functionBody(content, "isNotificationGenerationPostAllowed"),
+                functionBody(eligibility, "isNotificationGenerationPostAllowed"),
         )
     }
 

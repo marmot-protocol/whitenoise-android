@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.isBunkerLink
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -163,7 +164,8 @@ internal fun SignInKeyField(
                 // Only the currently open scanner may deliver once; dismiss/reopen invalidates old callbacks.
                 if (!currentBusy && active && scannerSession == session) {
                     scannerSession = null
-                    val scanned = IdentityEntryInput.scannedValue(raw)
+                    // A scanned bunker link fills the field like a pasted one; Sign in then opens the remote signer.
+                    val scanned = IdentityEntryInput.scannedValue(raw) ?: raw.trim().takeIf(::isBunkerLink)
                     val error =
                         when {
                             scanned == null -> R.string.identity_entry_error_invalid_key
@@ -187,7 +189,7 @@ internal fun SignInKeyField(
             onDismissRequest = { scanError = null },
             title = { Text(stringResource(R.string.scan_qr_code)) },
             text = { Text(stringResource(message)) },
-            confirmButton = { TextButton(onClick = { scanError = null }) { Text(stringResource(R.string.ok)) } },
+            confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.ok)) } },
         )
     }
 }

@@ -44,33 +44,9 @@
         ]
       },
       {
-        "surface": "Device-step finding: found on a date",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
-        "anchor": "R.string.setup_device_found_on_date",
-        "test_ids": [
-          "ONB-018"
-        ]
-      },
-      {
         "surface": "Device-step finding: found",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
         "anchor": "R.string.setup_device_found",
-        "test_ids": [
-          "ONB-018"
-        ]
-      },
-      {
-        "surface": "Device-step explanation: separate chats",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
-        "anchor": "R.string.setup_device_separate_chats",
-        "test_ids": [
-          "ONB-018"
-        ]
-      },
-      {
-        "surface": "Device-step explanation: new chats in either app",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
-        "anchor": "R.string.setup_device_new_chats_either_app",
         "test_ids": [
           "ONB-018"
         ]
@@ -81,6 +57,17 @@
         "anchor": "R.string.setup_device_separate_chats_if_other_app",
         "test_ids": [
           "ONB-018"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.setup_device_link_next",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "R.string.setup_device_link_next",
+        "test_ids": [
+          "ACC-025",
+          "SET-061"
         ]
       }
     ]

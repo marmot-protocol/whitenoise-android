@@ -288,6 +288,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
     private fun richRecord() =
         AppMessageRecordFfi(
             messageIdHex = MESSAGE_B,
+            invalidated = false,
             direction = "received",
             groupIdHex = GROUP_ID,
             sender = SENDER_ID,
@@ -413,6 +414,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
         plaintext: String,
     ) = AppMessageRecordFfi(
         messageIdHex = messageIdHex,
+        invalidated = false,
         direction = "received",
         groupIdHex = GROUP_ID,
         sender = SENDER_ID,

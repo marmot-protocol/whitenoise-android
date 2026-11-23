@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Открывает сведения об этом чате, например участников и настройки.</string>
     <string name="explanation_conversation_jump_to_mention">Прокручивает к следующему непрочитанному сообщению, где вас упомянули.</string>
     <string name="explanation_composer_draft_top">Прокручивает черновик к первой строке. Текст не меняется.</string>
+    <string name="explanation_composer_draft_bottom">Прокручивает черновик к последней строке. Текст не меняется.</string>
     <string name="explanation_emoji_search">Ищет эмодзи по названию.</string>
     <string name="explanation_emoji_configure">Открывает настройки, где выбираются эмодзи для быстрых реакций.</string>
 
@@ -59,4 +60,5 @@
     <string name="explanation_message_action_info">Показывает, когда сообщение отправлено и получено, кто его отправил, его ID и статус.</string>
     <string name="explanation_message_action_report">Открывает форму жалобы для администраторов этой группы, команды White Noise или обоих. Ничего не отправляется, пока вы не подтвердите.</string>
     <string name="explanation_message_action_delete">Позволяет удалить это сообщение только на этом устройстве или для всех. Удаление для всех отменить нельзя. Ничего не удаляется, пока вы не выберете.</string>
+    <string name="explanation_conversation_dictation_continue">Сразу начинает запись следующей части. Предыдущая часть ещё преобразуется в текст и будет вставлена первой.</string>
 </resources>

@@ -1,0 +1,34 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaWipe.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Destructive wipe exposes any Android media cleanup failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaWipe.kt",
+        "anchor": "R.string.wipe_media_cleanup_failed",
+        "test_ids": [
+          "ACC-009"
+        ]
+      },
+      {
+        "surface": "Account-owned share leases and inactive media cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaWipe.kt",
+        "anchor": ".leases.releaseAccount(account)",
+        "test_ids": [
+          "SET-066",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Partial wipe when files without profile ownership remain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaWipe.kt",
+        "anchor": "R.string.wipe_media_ownership_unknown",
+        "test_ids": [
+          "SET-066"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

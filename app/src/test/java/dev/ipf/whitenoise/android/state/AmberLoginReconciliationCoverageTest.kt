@@ -13,7 +13,7 @@ class AmberLoginReconciliationCoverageTest {
     fun interactiveAmberSetupTakesOwnershipBeforeLegacyActivation() {
         val source = appStateSource().readText()
         val start = source.indexOf("suspend fun loginWithAmber()")
-        val end = source.indexOf("private suspend fun reregisterExternalSigners()", start)
+        val end = source.indexOf("private suspend fun loginAmberFallback(", start)
         val body = source.substring(start, end)
         val begin = body.indexOf("beginExternalSignerOnboarding(")
         val mount = body.indexOf("accountSetup.open(snapshot, runtime, epoch)", begin)
@@ -33,7 +33,7 @@ class AmberLoginReconciliationCoverageTest {
     fun externalSignerIsReconciledBeforeTheAccountIsExposed() {
         val source = appStateSource().readText()
         val loginStart = source.indexOf("suspend fun loginWithAmber()")
-        val nextFunction = source.indexOf("private suspend fun reregisterExternalSigners()", loginStart)
+        val nextFunction = source.indexOf("private suspend fun loginAmberFallback(", loginStart)
         require(loginStart >= 0 && nextFunction > loginStart) { "Missing Amber login function" }
         val body = source.substring(loginStart, nextFunction)
         val fallback = source.functionBody("loginAmberFallback")

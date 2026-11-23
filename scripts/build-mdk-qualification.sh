@@ -7,12 +7,13 @@ export WHITENOISE_MARMOTKIT_CACHE_DIR="$RUNNER_TEMP/mdk-qualification-cache"
 reports="$root/build/mdk-qualification"
 mkdir -p "$reports" "$root/build/mdk-pair/baseline" "$root/build/mdk-pair/candidate"
 git fetch origin master --no-tags
-baseline=$(git rev-parse origin/master)
+# Last Android master revision before the 0.18.0 adoption.
+baseline=3df7e4b4f671c0c9467872943457000ef3afd848
 printf '%s\n' "$baseline" > "$reports/baseline-source.txt"
 git show "$baseline:app/src/main/marmotkit/MARMOT_VERSION" > "$reports/baseline-MARMOT_VERSION"
 cp app/src/main/marmotkit/MARMOT_VERSION "$reports/candidate-MARMOT_VERSION"
-# Fail closed if master has moved to a runtime outside this reviewed upgrade pair.
-grep -qx 'mdk-sha=a2e0558a634bbd20607cdd5afb93abc6220ee58d' "$reports/baseline-MARMOT_VERSION"
+# Bind the fixture to the reviewed pre-upgrade runtime.
+grep -qx 'mdk-sha=4df811aea99269b437a6023be9446a5141e93cbe' "$reports/baseline-MARMOT_VERSION"
 git worktree add --detach "$RUNNER_TEMP/mdk-baseline" "$baseline"
 python3 scripts/stage_mdk_baseline_fixture.py "$RUNNER_TEMP/mdk-baseline"
 for role in baseline candidate; do

@@ -2883,14 +2883,6 @@
         ]
       },
       {
-        "surface": "rememberQuickAccountSwitchNotice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/QuickAccountSwitchNotice.kt",
-        "anchor": "fun rememberQuickAccountSwitchNotice(",
-        "test_ids": [
-          "NAV-005"
-        ]
-      },
-      {
         "surface": "ChatContextMenu",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
         "anchor": "fun ChatContextMenu(",
@@ -7378,9 +7370,17 @@
         ]
       },
       {
-        "surface": "NostrEventCardModel.primaryAction",
+        "surface": "R.string.nostr_event_read_article",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
-        "anchor": "fun NostrEventCardModel.primaryAction(",
+        "anchor": "R.string.nostr_event_read_article",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "NostrEventCardModel.openDescription",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
+        "anchor": "fun NostrEventCardModel.openDescription(",
         "test_ids": [
           "RDR-001"
         ]
@@ -13151,15 +13151,6 @@
         "anchor": "R.string.switch_profile",
         "test_ids": [
           "NAV-004",
-          "NAV-006"
-        ]
-      },
-      {
-        "surface": "R.string.quick_account_switched",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/QuickAccountSwitchNotice.kt",
-        "anchor": "R.string.quick_account_switched",
-        "test_ids": [
-          "NAV-005",
           "NAV-006"
         ]
       },

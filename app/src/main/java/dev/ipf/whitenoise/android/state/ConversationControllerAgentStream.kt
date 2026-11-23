@@ -120,6 +120,7 @@ private fun ConversationController.appendStreamDebugEvent(
     val id = "$STREAM_DEBUG_ID_PREFIX$streamId:$now:${streamDebugEventSequence.toString().padStart(20, '0')}"
     val record =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = id,
             direction = STREAM_DEBUG_DIRECTION,
             groupIdHex = group.groupIdHex,
@@ -163,7 +164,7 @@ private fun ConversationController.appendStreamDebugEvent(
 }
 
 /** Creates or updates the timeline row that shows an agent stream's latest text and status. */
-private fun ConversationController.updateStreamPreview(
+internal fun ConversationController.updateStreamPreview(
     streamId: String,
     plaintext: String,
     status: MessageStatus,
@@ -172,14 +173,16 @@ private fun ConversationController.updateStreamPreview(
     if (streamId in removedStreamIds) return
     val id = "stream:$streamId"
     val existingItem = optimisticMessages[id] ?: timelineItemsById[id]
-    val existing = existingItem?.record
+    val existing = timelineItemsById[id]?.record ?: existingItem?.record
+    val sender = existing?.sender?.takeIf(String::isNotBlank) ?: inferStreamSender(streamId)
     val record =
         (
             existing ?: AppMessageRecordFfi(
+                invalidated = false,
                 messageIdHex = "stream-$streamId",
                 direction = "received",
                 groupIdHex = group.groupIdHex,
-                sender = inferStreamSender(streamId),
+                sender = sender,
                 plaintext = "",
                 contentTokens = EMPTY_MARKDOWN_DOCUMENT,
                 kind = 1200uL,
@@ -192,6 +195,7 @@ private fun ConversationController.updateStreamPreview(
                 sticker = null,
             )
         ).copy(
+            sender = sender,
             plaintext = plaintext,
             // Tokens must always describe the plaintext beside them.
             // When the caller didn't parse this revision (streaming
@@ -206,6 +210,7 @@ private fun ConversationController.updateStreamPreview(
             record,
             status,
             timelineOrder = existingItem?.timelineOrder ?: nextOptimisticTimelineOrder(),
+            fromOtherOwnDevice = record.direction == "received" && record.sender.equals(conversationAccountIdHex, true),
         )
     optimisticMessages[id] = updated
     // A streaming chunk only mutates this one item's text, and none of its

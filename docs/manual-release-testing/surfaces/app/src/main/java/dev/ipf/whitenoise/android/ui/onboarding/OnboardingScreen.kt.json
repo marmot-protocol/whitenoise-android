@@ -18,6 +18,22 @@
         "test_ids": [
           "ONB-003"
         ]
+      },
+      {
+        "surface": "Linked devices: R.string.unlinked_account_remove_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.unlinked_account_remove_failed",
+        "test_ids": [
+          "SET-066"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.error_account_unlinked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.error_account_unlinked",
+        "test_ids": [
+          "SET-066"
+        ]
       }
     ],
     "settings_controls": [

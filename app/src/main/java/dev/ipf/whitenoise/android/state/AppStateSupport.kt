@@ -5,11 +5,24 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Default time allowed for cold-start work before the shell becomes actionable. */
 internal const val BOOTSTRAP_ACTIONABLE_TIMEOUT_MILLIS = 15_000L
+
+private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
+
+internal fun appStateScopeExceptionHandler(
+    report: (Throwable) -> Unit = { throwable ->
+        if (BuildConfig.DEBUG) {
+            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
+        } else {
+            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure")
+        }
+    },
+): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
 
 /** Emits operational detail only from debug builds so release logs remain privacy-bounded. */
 internal inline fun appStateDebug(message: () -> String) {
@@ -90,9 +103,6 @@ internal suspend fun awaitBootstrapAttempt(
 
 /** Returns a trimmed non-empty value or null for absent and blank configuration. */
 internal fun String?.nonBlankOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
-
-/** Blocks notification mutations whenever the app-lock surface is protecting local state. */
-internal fun notificationActionsAllowed(appLockScreenVisible: Boolean): Boolean = !appLockScreenVisible
 
 /** Builds the account-scoped key used by cached group-member snapshots. */
 internal fun groupMemberSnapshotKey(

@@ -186,6 +186,7 @@ private val setupActionOrder =
         OnboardingActionFfi.CONTINUE_ANYWAY,
         OnboardingActionFfi.EDIT_PROFILE,
         OnboardingActionFfi.USE_RECOMMENDED_RELAYS,
+        OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS,
         OnboardingActionFfi.RECONNECT_SIGNER,
         OnboardingActionFfi.CONTINUE_WITHOUT,
         OnboardingActionFfi.RETRY,
@@ -218,10 +219,11 @@ private fun setupActionIcon(action: OnboardingActionFfi): Int =
     when (action) {
         OnboardingActionFfi.RETRY, OnboardingActionFfi.RECONNECT_SIGNER -> R.drawable.ic_refresh
         OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.EDIT_DISCOVERY_RELAYS,
+        OnboardingActionFfi.REMOVE_UNUSABLE_RELAYS,
         OnboardingActionFfi.EDIT_PROFILE, OnboardingActionFfi.EDIT_FOLLOWS,
         -> R.drawable.ic_edit
         OnboardingActionFfi.CANCEL_REPAIR, OnboardingActionFfi.CANCEL_ONBOARDING -> R.drawable.ic_close
-        OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> R.drawable.ic_refresh
+        OnboardingActionFfi.USE_RECOMMENDED_RELAYS -> R.drawable.ic_settings_backup_restore
         OnboardingActionFfi.CONTINUE_WITHOUT, OnboardingActionFfi.CONTINUE_ANYWAY -> R.drawable.ic_forward
         OnboardingActionFfi.APPROVE_REPAIR -> R.drawable.ic_check
     }

@@ -11,7 +11,7 @@
     <string name="explanation_composer_dictation">Söylediklerini Android konuşma tanıma ile yazıya döker. White Noise çevrimdışı tanıma ister, ancak cihazın yine de çevrimiçi bir hizmet kullanabilir.</string>
     <string name="explanation_composer_translate">Çeviri modunu açar veya kapatır. Açıkken Gönder, Gönderilecek satırında gösterilen çeviriyi gönderir ve bir çeviri hazır olana kadar hiçbir şey gönderilmez.</string>
     <string name="explanation_composer_voice_note">Sesli mesaj kaydetmek için basılı tut.</string>
-    <string name="explanation_composer_camera">Yeni bir fotoğraf eklemen için kamerayı açar. Android ilk seferde kamera erişimi ister.</string>
+    <string name="explanation_composer_camera">Fotoğraf çekip ya da video kaydedip eklemen için kamerayı açar. Android ilk seferde kamera erişimi, ilk kayıtta da mikrofon erişimi ister.</string>
     <string name="explanation_composer_gallery">Android fotoğraf seçiciyi açar. White Noise yalnızca seçtiğin fotoğraf ve videoları alır.</string>
     <string name="explanation_composer_files">Herhangi bir dosya eklemek için Android dosya seçiciyi açar.</string>
     <string name="explanation_composer_location">Mevcut konumunu harita bağlantısı olarak bir kez gönderir. Konumunu paylaşmaya devam etmez.</string>

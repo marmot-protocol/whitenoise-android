@@ -12,7 +12,11 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.core.mayNameNostrEventCardReference
+import dev.ipf.whitenoise.android.core.messageContainsOnlyNostrEventReferences
+import dev.ipf.whitenoise.android.core.nostrEventReferences
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -53,6 +57,44 @@ class MarkdownAutolinkIntegrationTest {
         )
     }
 
+    @Test
+    fun pinnedParserCollectsBarePublicEventReferencesLikeExplicitLinks() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        MarmotAndroid.initialize(context)
+        val root = File(context.cacheDir, "markdown-bare-event-${UUID.randomUUID()}").apply { mkdirs() }
+        val bareReferences =
+            listOf(
+                "note1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s675dzg",
+                "nevent1qqspzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygp03mhxue69uhhyetvv9ujuetcv" +
+                    "9khqmr99au8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0" +
+                    "pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rc0pu8s7rcx" +
+                    "5kvyq",
+                "naddr1qqr8qctjwdjhyq3q9g4z52329g4z52329g4z52329g4z52329g4z52329g4z52329g4qxpqqqpmej3zpr9" +
+                    "z",
+            )
+        try {
+            Marmot(root.absolutePath, emptyList(), marmotDeploymentWhiteNoise()).use { marmot ->
+                for (bare in bareReferences) {
+                    val forms = listOf(bare, "($bare).", "nostr:$bare", "https://njump.me/$bare")
+                    assertTrue(forms.all(::mayNameNostrEventCardReference))
+                    val occurrences = forms.map { nostrEventReferences(marmot.parseMarkdown(it)).single() }
+                    assertEquals(1, occurrences.map { it.reference.stableId }.distinct().size)
+                    assertEquals(bare, occurrences.first().authoredReference)
+                    assertTrue(messageContainsOnlyNostrEventReferences(bare, occurrences.take(1)))
+                }
+                val note = bareReferences.first()
+                val badChecksum = note.dropLast(1) + if (note.endsWith('q')) "p" else "q"
+                for (literal in listOf("foot$note", "njump.me/$note", "`$note`", badChecksum)) {
+                    assertTrue(nostrEventReferences(marmot.parseMarkdown(literal)).isEmpty())
+                }
+                val repeated = (bareReferences + note).joinToString(" ")
+                assertEquals(3, nostrEventReferences(marmot.parseMarkdown(repeated)).size)
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     private fun linkDestination(record: AppMessageRecordFfi): String {
         val paragraph = record.contentTokens.blocks.single() as MarkdownBlockFfi.Paragraph
         return markdownLinkDestinations(
@@ -70,6 +112,7 @@ class MarkdownAutolinkIntegrationTest {
         document: dev.ipf.marmotkit.MarkdownDocumentFfi,
     ) = AppMessageRecordFfi(
         messageIdHex = "temp",
+        invalidated = false,
         direction = "sent",
         groupIdHex = "group",
         sender = "alice",

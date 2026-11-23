@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
@@ -68,7 +69,7 @@ internal fun MessageInlineFooter(
     showStatus: Boolean,
     status: MessageStatus,
     editedLabel: String?,
-    onEditedClick: (() -> Unit)?,
+    onEditedClick: ((Rect?) -> Unit)?,
     showTime: Boolean = true,
     modifier: Modifier = Modifier,
     statusContainerColor: Color? = null,
@@ -187,7 +188,7 @@ private fun MessageInlineFooterItems(
     showStatus: Boolean,
     status: MessageStatus,
     editedLabel: String?,
-    onEditedClick: (() -> Unit)?,
+    onEditedClick: ((Rect?) -> Unit)?,
     showTime: Boolean,
     statusContainerColor: Color?,
 ) {

@@ -53,6 +53,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowSystemClock
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -80,6 +81,81 @@ class AccountKeysExportDeliveryTest {
     }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    /** Raw export waits for a fresh challenge and ignores success after its consent is dismissed. */
+    @Test
+    fun rawExportWaitsForAuthenticationInItsOwnDialog() {
+        var pending: (() -> Unit)? = null
+        val exports = mutableListOf<KeyExportDestination>()
+        val ui = ProfileKeysUiState().apply { openRawExport() }
+        val authenticate = RawKeyExportAuthentication { pending = it }
+        val export = authenticate.gateExport(ui, { true }) { _, destination -> exports += destination }
+
+        export(false, KeyExportDestination.Share)
+        assertTrue(exports.isEmpty())
+        ui.cancelExport()
+        ui.openRawExport()
+        checkNotNull(pending).invoke()
+        assertTrue(exports.isEmpty())
+
+        export(false, KeyExportDestination.File)
+        checkNotNull(pending).invoke()
+        assertEquals(listOf(KeyExportDestination.File), exports)
+    }
+
+    /** The actual save action cannot read the key or open a destination before authentication. */
+    @Test
+    fun rawSaveWaitsForTheScreenAuthenticationCallback() {
+        var pending: (() -> Unit)? = null
+        val fixture = render(authenticator = RawKeyExportAuthentication { pending = it })
+
+        beginExport(encrypted = false)
+
+        composeRule.runOnIdle {
+            assertEquals(0, fixture.native.rawCalls.get())
+            assertEquals(0, fixture.picker.launchCount)
+            checkNotNull(pending).invoke()
+        }
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
+        assertEquals(1, fixture.native.rawCalls.get())
+    }
+
+    /** A late result loses authority immediately when the dialog begins its exit. */
+    @Test
+    fun dismissalStartRejectsAuthenticationBeforeTheDialogDisappears() {
+        var pending: (() -> Unit)? = null
+        var delivered = false
+        val ui = ProfileKeysUiState().apply { openRawExport() }
+        val authentication = RawKeyExportAuthentication { pending = it }
+        val export = authentication.gateExport(ui, { true }) { _, _ -> delivered = true }
+
+        export(false, KeyExportDestination.Share)
+        ui.cancelExportPreparation()
+        assertTrue(ui.rawExportDialog)
+        checkNotNull(pending).invoke()
+
+        assertFalse(delivered)
+    }
+
+    /** Copy and reveal require an authentication result and lose ownership on stop. */
+    @Test
+    fun plaintextAccessRejectsAResultAfterTheScreenStops() {
+        var pending: (() -> Unit)? = null
+        var delivered = false
+        val ui = ProfileKeysUiState()
+        val authentication = RawKeyExportAuthentication { pending = it }
+        val action = { authentication.authorize(ui, { true }) { delivered = true } }
+
+        action()
+        assertFalse(delivered)
+        ui.stopSensitiveOperations()
+        checkNotNull(pending).invoke()
+        assertFalse(delivered)
+
+        action()
+        checkNotNull(pending).invoke()
+        assertTrue(delivered)
+    }
 
     /** Opening the file picker stops the screen, but an authorized raw export still writes on an idle return. */
     @Test
@@ -131,6 +207,42 @@ class AccountKeysExportDeliveryTest {
         assertEquals(1, fixture.native.rawCalls.get())
     }
 
+    /** Retained raw consent actions cannot start a fresh export after cancellation begins. */
+    @Test
+    fun capturedRawActionsCannotRestartExportDuringCancelledExit() {
+        val fixture = render()
+        composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
+        val export =
+            requireNotNull(
+                dialogButton(R.string.export_nsec).fetchSemanticsNode().config[SemanticsActions.OnClick].action,
+            )
+        val share =
+            requireNotNull(
+                dialogButton(R.string.share).fetchSemanticsNode().config[SemanticsActions.OnClick].action,
+            )
+        val cancel =
+            requireNotNull(
+                dialogButton(R.string.cancel).fetchSemanticsNode().config[SemanticsActions.OnClick].action,
+            )
+        val dialog = requireNotNull(ShadowDialog.getLatestDialog())
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle {
+            assertTrue(cancel())
+            assertTrue(export())
+            assertTrue(share())
+            assertTrue("cancel retains only an inert exit window", dialog.isShowing)
+        }
+        androidx.compose.runtime.snapshots.Snapshot
+            .sendApplyNotifications()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+        assertEquals(0, fixture.native.rawCalls.get())
+        assertEquals(0, fixture.picker.launchCount)
+        assertNull(shadowOf(composeRule.activity).nextStartedActivity)
+        assertFalse(dialog.isShowing)
+    }
+
     /** Password drafts are gone and inputs disabled before the synchronous native encryption returns. */
     @Test
     fun blockedEncryptionClearsAndDisablesBothPasswordsBeforeReturning() {
@@ -151,13 +263,19 @@ class AccountKeysExportDeliveryTest {
         beginExport(encrypted = true, encryptedAction = R.string.key_export_view_backup)
         composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.encryptedStarted.get() }
         assertClearedPasswordDrafts()
+        val dialog = requireNotNull(ShadowDialog.getLatestDialog())
+        composeRule.mainClock.autoAdvance = false
         dialogButton(R.string.cancel).performClick()
+        composeRule.runOnIdle { assertTrue("cancel must retain the inert exit window", dialog.isShowing) }
         fixture.native.finishEncrypted()
         composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.encryptedFinished.get() }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
         assertEquals(0, fixture.picker.launchCount)
         assertEquals(1, fixture.native.encryptedCalls.get())
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertFalse("completed exit must remove its window", dialog.isShowing) }
     }
 
     /** Copy preserves the exact sensitive native value; Hide discards it without opening a file picker. */
@@ -513,6 +631,7 @@ class AccountKeysExportDeliveryTest {
         deferRaw: Boolean = false,
         deferEncrypted: Boolean = false,
         failFirstEncryption: Boolean = false,
+        authenticator: RawKeyExportAuthentication = RawKeyExportAuthentication { authenticated -> authenticated() },
     ): Fixture {
         val native = NativeExports(deferRaw, deferEncrypted, failFirstEncryption).also { currentNative = it }
         val appState =
@@ -532,7 +651,11 @@ class AccountKeysExportDeliveryTest {
                 LocalLifecycleOwner provides owner,
             ) {
                 WhiteNoiseTheme {
-                    AccountKeysScreen(appState = appState, onBack = {})
+                    AccountKeysScreen(
+                        appState = appState,
+                        onBack = {},
+                        rawExportAuthenticator = authenticator,
+                    )
                 }
             }
         }

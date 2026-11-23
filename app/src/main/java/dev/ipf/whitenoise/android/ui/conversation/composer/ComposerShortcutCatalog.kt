@@ -29,6 +29,8 @@ internal val ComposerShortcut.labelRes: Int
             ComposerShortcut.Contact -> R.string.attachment_device_contact
             ComposerShortcut.Poll -> R.string.poll_create
             ComposerShortcut.Sticker -> R.string.stickers_title
+            ComposerShortcut.JumpTop -> R.string.scroll_to_top
+            ComposerShortcut.JumpBottom -> R.string.scroll_to_bottom
         }
 
 internal val ComposerShortcut.iconRes: Int
@@ -40,7 +42,7 @@ internal val ComposerShortcut.iconRes: Int
             ComposerShortcut.Paste -> R.drawable.ic_content_paste
             ComposerShortcut.Dictation -> R.drawable.ic_mic
             ComposerShortcut.Translate -> R.drawable.ic_translate
-            ComposerShortcut.VoiceNote -> R.drawable.ic_mic
+            ComposerShortcut.VoiceNote -> R.drawable.ic_voice_note
             ComposerShortcut.Camera -> R.drawable.ic_camera
             ComposerShortcut.Gallery -> R.drawable.ic_image
             ComposerShortcut.Files -> R.drawable.ic_folder
@@ -49,6 +51,8 @@ internal val ComposerShortcut.iconRes: Int
             ComposerShortcut.Contact -> R.drawable.ic_settings_person_add
             ComposerShortcut.Poll -> R.drawable.ic_description
             ComposerShortcut.Sticker -> R.drawable.ic_sticker
+            ComposerShortcut.JumpTop -> R.drawable.ic_jump_to_edge
+            ComposerShortcut.JumpBottom -> R.drawable.ic_jump_to_bottom
         }
 
 /** What holding each shortcut explains; every toolbar button and + menu row has one. */
@@ -70,6 +74,8 @@ internal val ComposerShortcut.explanationRes: Int
             ComposerShortcut.Contact -> R.string.explanation_composer_contact
             ComposerShortcut.Poll -> R.string.explanation_composer_poll
             ComposerShortcut.Sticker -> R.string.explanation_composer_sticker
+            ComposerShortcut.JumpTop -> R.string.explanation_composer_draft_top
+            ComposerShortcut.JumpBottom -> R.string.explanation_composer_draft_bottom
         }
 
 /** The shortcut's explanation; Customize composer lives only in the + menu and Settings. */

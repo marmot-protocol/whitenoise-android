@@ -68,6 +68,11 @@ def command(arguments, **kwargs):
     return subprocess.run(arguments, check=True, timeout=30, capture_output=True, text=True, **kwargs).stdout
 
 
+def uses_fixture_credential(case):
+    """App Lock and raw private-key access both exercise a real disposable Android PIN."""
+    return case['postcondition'].startswith(('app-lock-credential-', 'private-key-copy-'))
+
+
 def run_case(name, reports):
     """One generation owns setup, visible UI, optional peer proof, and mandatory cleanup."""
     generation = uuid.uuid4().hex
@@ -75,7 +80,7 @@ def run_case(name, reports):
     directory.mkdir()
     if CASES[name].get('presentation') == 'surface-animated-avatar':
         return run_motion_fixture(name, directory, generation)
-    if not CASES[name]['postcondition'].startswith('app-lock-credential-'):
+    if not uses_fixture_credential(CASES[name]):
         return run_fixture(name, directory, generation)
     # Baseline and restoration probes instantiate the same guarded Application as the UI host.
     # Suppress boot before the first read-only probe, not only after installing its owned PIN.
@@ -440,7 +445,7 @@ def invoke_ui(name, directory):
     if navigation not in ('button', 'gesture'):
         raise ValueError('Qualified navigation mode required')
     credential_arguments = (['-e', f'APP_LOCK_FIXTURE_PIN={PIN}']
-                            if CASES[name]['postcondition'].startswith('app-lock-credential-') else [])
+                            if uses_fixture_credential(CASES[name]) else [])
     # The driver listens on-device too; a host-free ephemeral port can collide with
     # the native loopback relay there. One sequential driver owns this emulator.
     with (directory / 'maestro-output.txt').open('w') as log:

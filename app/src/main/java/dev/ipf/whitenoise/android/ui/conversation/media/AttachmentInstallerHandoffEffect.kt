@@ -282,6 +282,7 @@ private suspend fun materializeInstallerArtifact(
             runCatchingCancellable {
                 materializeDocumentAttachmentSource(
                     context = context,
+                    accountRef = request.transfer.accountRef,
                     messageIdHex = request.transfer.messageIdHex,
                     attachmentIndex = request.transfer.attachmentIndex,
                     reference = reference,

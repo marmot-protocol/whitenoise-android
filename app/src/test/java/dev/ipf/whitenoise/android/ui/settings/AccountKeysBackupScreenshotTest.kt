@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
@@ -142,6 +143,7 @@ class AccountKeysBackupScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = largeRtl, amoled = largeRtl, fontScale = if (largeRtl) 2f else 1f) {
                     if (outcome) {
+                        val retained = stringResource(R.string.wipe_media_ownership_unknown)
                         WipeOutcomeSheet(
                             report =
                                 WipeReport(
@@ -149,7 +151,7 @@ class AccountKeysBackupScreenshotTest {
                                         WipeStageReport(
                                             WipeStage.WipingLocalData,
                                             null,
-                                            listOf(WipeFailureItem(null, "Synthetic cleanup failure")),
+                                            listOf(WipeFailureItem(null, retained)),
                                         ),
                                     ),
                                 ),
@@ -189,7 +191,11 @@ class AccountKeysBackupScreenshotTest {
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
-                    AccountKeysScreen(appState = appState, onBack = {})
+                    AccountKeysScreen(
+                        appState = appState,
+                        onBack = {},
+                        rawExportAuthenticator = RawKeyExportAuthentication { authenticated -> authenticated() },
+                    )
                 }
             }
         }

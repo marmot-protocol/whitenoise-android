@@ -44,16 +44,6 @@
         ]
       },
       {
-        "surface": "R.string.toast_disappearing_messages_updated",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupManagement.kt",
-        "anchor": "R.string.toast_disappearing_messages_updated",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "Reviewed group action context: R.string.disappearing_messages",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupManagement.kt",
         "anchor": "R.string.disappearing_messages",

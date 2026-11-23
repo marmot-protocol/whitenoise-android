@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.search
 
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -197,6 +199,48 @@ class GlobalSearchDateFilterDialogTest {
 
         composeRule.onNodeWithText(expectedSummary).assertIsDisplayed()
         composeRule.onNodeWithText(from.toString()).assertDoesNotExist()
+    }
+
+    /** The next calendar stage replaces the current window only after its exit completes. */
+    @Test
+    fun customCalendarNextWaitsForExitAndDispatchesOnce() {
+        val zone = ZoneId.of("UTC")
+        val initial = GlobalSearchDateCustomStage.FromDate(zone)
+        var stage by mutableStateOf<GlobalSearchDateCustomStage?>(initial)
+        var changes = 0
+        composeRule.setContent {
+            CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                WhiteNoiseTheme {
+                    GlobalSearchDateFilterDialog(
+                        selection = GlobalSearchDateFilterSelection.AnyTime,
+                        customStage = stage,
+                        onDismiss = {},
+                        onApply = {},
+                        nowMillis = { FIXED_NOW_MILLIS },
+                        zoneId = { zone },
+                        onCustomStageChange = {
+                            changes += 1
+                            stage = it
+                        },
+                    )
+                }
+            }
+        }
+        composeRule.mainClock.autoAdvance = false
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.onNodeWithTag(GLOBAL_SEARCH_DATE_FROM_CONFIRM_TAG).performClick()
+        composeRule.mainClock.advanceTimeBy(80)
+        composeRule.runOnIdle {
+            assertEquals(initial, stage)
+            assertEquals(0, changes)
+        }
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.runOnIdle {
+            assertEquals(GlobalSearchDateCustomStage.ToDate(LocalDate.of(2026, 8, 11), zone), stage)
+            assertEquals(1, changes)
+        }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle { assertEquals(1, changes) }
     }
 
     private fun renderInteractiveDateFilter(

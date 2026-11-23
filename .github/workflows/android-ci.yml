@@ -257,6 +257,27 @@ jobs:
       - name: Test DEX method budget reporting
         run: python3 -m unittest scripts/test_dex_method_budget.py
 
+      - name: Check Android translation resources
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 -m unittest scripts.test_translation_worklist
+          # The pull request merge commit's first parent is the current base; the event base SHA can be older.
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            BASE_SHA=$(git rev-parse HEAD^1)
+          fi
+          args=()
+          if [[ -n "$BASE_SHA" ]]; then
+            args+=(--base "$BASE_SHA")
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          python3 -u scripts/translation_worklist.py "${args[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
       - name: Test analytics, invite-localization, media-latency and tooling-test wiring
         run: python3 -m unittest scripts.test_invite_failure_localization scripts.test_media_latency_report scripts.test_product_analytics_config scripts.test_tooling_tests_are_wired
 
@@ -300,7 +321,10 @@ jobs:
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Robolectric jar prefetch
-        run: bash .github/scripts/test-prefetch-robolectric-android-all.sh
+        run: |
+          timeout --version
+          if command -v gnutimeout; then gnutimeout --version; fi
+          bash .github/scripts/test-prefetch-robolectric-android-all.sh
 
       - name: Test Android CI aggregate gate
         run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_ci_reuse.py scripts/test_unit_test_diagnostics.py scripts/test_verify_compose_release_apk.py scripts/test_kover_class_outputs.py

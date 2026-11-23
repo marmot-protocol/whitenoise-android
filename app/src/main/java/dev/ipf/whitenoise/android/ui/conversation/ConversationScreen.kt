@@ -66,6 +66,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -77,8 +78,10 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -93,13 +96,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
-import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
-import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearch
 import dev.ipf.whitenoise.android.core.RecentEmojiList
@@ -152,7 +153,6 @@ import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
 import dev.ipf.whitenoise.android.state.markInboundMessageVisibleForHostPerformance
 import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
-import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
@@ -211,6 +211,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOwner
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerSessionHost
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalPickMediaDomains
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalVoiceTranscription
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailHost
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSaver
@@ -227,6 +228,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFall
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerChromeIconProvider
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberOriginGuardedResultLauncher
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoiceTranscription
 import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOccurrences
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
@@ -270,9 +272,6 @@ import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
 import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.group.rememberConversationMuteControl
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
-import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
@@ -292,12 +291,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
-
-/** Checks the complete measured row against the usable lazy-list viewport. */
-private fun LazyListLayoutInfo.isItemFullyVisible(index: Int): Boolean {
-    val item = visibleItemsInfo.firstOrNull { it.index == index } ?: return false
-    return item.offset >= viewportStartOffset && item.offset + item.size <= viewportEndOffset
-}
 
 /** Captures only the bounded state needed to decide whether startup backfill can progress. */
 private fun ConversationController.initialTimelineBackfillSnapshot() =
@@ -321,33 +314,6 @@ private val InitialTimelineBackfillNoProgressError =
 // split into bounded chunks, so the count no longer bounds a single message's payload.
 // A reply is still one message, so ConversationMediaSender keeps it to ATTACHMENT_CHUNK_MAX_ITEMS.
 private const val MEDIA_PICKER_MAX_ITEMS = dev.ipf.whitenoise.android.state.ATTACHMENT_COLLECTION_MAX_ITEMS
-
-/** Maps recorder failures to localized, privacy-safe user presentation. */
-private fun presentVoiceRecordingFailure(
-    appState: WhiteNoiseAppState,
-    throwable: Throwable,
-    voiceTooShortMessage: String,
-) {
-    when {
-        throwable is dev.ipf.whitenoise.android.audio.VoiceRecordingSaveException ->
-            appState.present(R.string.voice_recording_save_failed)
-        throwable is IllegalStateException && throwable.message == "voice recording too short" ->
-            appState.present(voiceTooShortMessage)
-        throwable.message?.contains("audio is in use", ignoreCase = true) == true ->
-            appState.presentFailure(
-                R.string.voice_message_recording_failed,
-                "VOICE_RECORDING_START",
-                throwable,
-                AppText.Resource(R.string.voice_message_microphone_busy),
-            )
-        else ->
-            appState.presentFailure(
-                R.string.voice_message_recording_failed,
-                "VOICE_RECORDING",
-                throwable,
-            )
-    }
-}
 
 private val MEMBERSHIP_FRAME_EVENT_TYPES = setOf("member_added", "member_removed")
 
@@ -382,43 +348,6 @@ private fun LazyListScope.conversationLoadErrorItem(
         )
     }
 }
-
-/** Whether adjacent timeline items participate in one visible message-bubble sender run. */
-internal fun conversationBubbleRowsShareSenderRun(
-    first: TimelineMessage,
-    second: TimelineMessage,
-    streamingDebugEnabled: Boolean,
-    deletedMessageIds: Set<String>,
-): Boolean =
-    timelineItemRendersAsConversationBubble(first, streamingDebugEnabled, deletedMessageIds) &&
-        timelineItemRendersAsConversationBubble(second, streamingDebugEnabled, deletedMessageIds) &&
-        GroupProjector.messagesShareTranscriptSenderRun(
-            firstSender = first.record.sender,
-            firstRecordedAt = first.record.recordedAt,
-            secondSender = second.record.sender,
-            secondRecordedAt = second.record.recordedAt,
-            sameDay = !differentDay(first.record.recordedAt, second.record.recordedAt),
-        )
-
-/** Classifies rows that participate in adjacent sender grouping as message bubbles. */
-private fun timelineItemRendersAsConversationBubble(
-    item: TimelineMessage,
-    streamingDebugEnabled: Boolean,
-    deletedMessageIds: Set<String>,
-): Boolean =
-    when (timelineRowKind(item.record, streamingDebugEnabled)) {
-        TimelineRowKind.Bubble -> true
-        TimelineRowKind.AgentOperation ->
-            !shouldRenderDedicatedAgentOperationRow(
-                projectedDeleted = item.projected?.deleted == true,
-                optimisticallyDeleted = MessageProjector.isDeleted(item.record.messageIdHex, deletedMessageIds),
-                invalidated = item.projected?.invalidationStatus != null,
-            ) ||
-                AgentOperationProjector.project(item.record) == null
-        TimelineRowKind.GroupSystem,
-        TimelineRowKind.DebugRow,
-        -> false
-    }
 
 private data class ConversationBatchSelectionUiState(
     val selections: List<BatchMessageSelection>,
@@ -475,7 +404,7 @@ internal fun ConversationScreen(
     chat: ChatListItem,
     controller: ConversationController,
     onBack: () -> Unit,
-    // False beside the chat list at expanded width, where system Back must not close the visible
+    // False when the chat list is alongside the conversation, where system Back must not close the visible
     // conversation. Its own inner Back steps and the header arrow still apply (#3685).
     systemBackClosesConversation: Boolean = true,
     // When opened from a chat-list message-body search hit (issue #290), the
@@ -527,6 +456,7 @@ internal fun ConversationScreen(
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
     searchChatsController: ChatsController? = null,
     onBroadenSearch: (GlobalSearchState) -> Unit = {},
+    onStartGroupWithPeerMeasured: ((RecipientSearch.Candidate, androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
 ) {
     /** Records a conversation product observation per controller, chat, runtime and notification open. */
     @Composable
@@ -571,18 +501,21 @@ internal fun ConversationScreen(
         remember(controller, notificationOpenRequestId) {
             controller to notificationOpenRequestId
         }
-    val projectedUnreadCount = chat.unreadCount.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
-    val entryProjectionAvailable = chat.projection != null
+    // The controller row is seeded from the live chat-list row; the open item can predate newer messages.
+    val entryRow =
+        rememberConversationEntryRow(entryUnreadSessionIdentity) { controller.latestChatListRow ?: chat.projection }
+    val entryProjectionAvailable = entryRow != null
+    val projectedUnreadCount = (entryRow?.unreadCount ?: 0uL).coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     val entryUnreadSnapshot =
         rememberConversationEntryUnreadSnapshot(
             controllerIdentity = entryUnreadSessionIdentity,
             projectionUnread = projectedUnreadCount,
-            projectionFirstUnreadMessageId = chat.projection?.firstUnreadMessageIdHex,
+            projectionFirstUnreadMessageId = entryRow?.firstUnreadMessageIdHex,
             projectionAvailable = entryProjectionAvailable,
             // A one-row chat-list seed cannot establish the authoritative unread
             // boundary. Freeze only after MDK's first real page replaces it.
             timeline = if (controller.initialTimelineSeedActive) emptyList() else controller.timeline,
-            readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+            readAnchorMessageId = entryRow?.lastReadMessageIdHex,
         )
     val entryUnreadCount = entryUnreadSnapshot.count
     val entryFirstUnreadMessageId = entryUnreadSnapshot.firstUnreadMessageId
@@ -750,6 +683,12 @@ internal fun ConversationScreen(
         remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf<List<ForwardMessagePayload>?>(null)
         }
+    var batchForwardOrigin by remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<Rect?>(null)
+    }
+    var batchInfoOrigin by remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<Rect?>(null)
+    }
     var batchAttachmentSaveInFlight by
         remember(chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchInfoSelection by
@@ -1015,6 +954,7 @@ internal fun ConversationScreen(
             // so a promotion/demotion or roster verification is reflected.
             controller.isSelfAdmin,
             controller.canSendMessages,
+            controller.group.pendingConfirmation,
             selectionMediaCacheRevision,
             eligibilityNowSeconds,
         ) {
@@ -1232,7 +1172,8 @@ internal fun ConversationScreen(
             reconcileBatchSelections(
                 selected = selectedMessages,
                 selectableVisible = selectableMessages,
-                deletedMessageIds = controller.deletedMessageIds + pendingTimelineRemovals,
+                deletedMessageIds = controller.deletedMessageIds,
+                pendingTimelineRemovedMessageIds = pendingTimelineRemovals,
                 invalidVisibleMessageIds = invalidVisibleMessageIds,
             )
         selectedMessages.keys
@@ -1333,7 +1274,6 @@ internal fun ConversationScreen(
         controller.canSendMessages &&
             controller.editingMessageId == null &&
             controller.replyingTo == null
-
     val timelineUnderlayEnabled =
         composerGate == ComposerGate.COMPOSER &&
             !selectionMode &&
@@ -1909,9 +1849,8 @@ internal fun ConversationScreen(
             onRejected = { appState.presentAttachmentAdmission(context, acceptedCount = 0, offeredCount = 1) },
         )
 
-    // TakePicture needs no permission of its own, but because CAMERA is declared
-    // in the manifest (for the QR scanner) some OEMs require the runtime grant
-    // before launching the capture intent — request it first if missing.
+    // The in-app camera opens the device camera itself through CameraX, so it
+    // needs the CAMERA runtime grant — request it first if missing.
     val cameraPermissionLauncher =
         rememberOriginGuardedResultLauncher(
             ActivityResultContracts.RequestPermission(),
@@ -1933,6 +1872,9 @@ internal fun ConversationScreen(
     var pendingContactUri by rememberSaveable(conversationAccountRef, chat.id) { mutableStateOf<String?>(null) }
     // The picked point lives only here until the user sends or cancels; the
     // keyless OSM picker is the single confirmation surface.
+    var attachmentRouteOrigin by remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<Rect?>(null)
+    }
     var locationPickerOpen by remember(chat.id) { mutableStateOf(false) }
     // "Share user" (npub) — the identity-native counterpart to a phone contact.
     // Reuses the recipient picker; the selection sends a `nostr:npub…` reference
@@ -1969,6 +1911,7 @@ internal fun ConversationScreen(
         }
     }
 
+    @Suppress("MaxLineLength")
     fun hasLocationGrant(permission: String): Boolean = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
     val locationPermissionLauncher =
@@ -1994,149 +1937,24 @@ internal fun ConversationScreen(
         }
     }
 
-    // Voice-message recording surface — owned per ConversationScreen so a
-    // backgrounded recording is dropped on dispose. The recorder writes
-    // into a per-session temp dir. Completion opens review; only explicit Send
-    // transfers the file to the native sender. Unsent review files are removed on disposal.
-    val voiceOutputDir =
-        remember(context) {
-            java.io.File(context.cacheDir, "voice-recordings").apply { mkdirs() }
-        }
-    val micPermissionDeniedMsg = stringResource(R.string.voice_message_permission_denied)
-    val voiceTooShortMsg = stringResource(R.string.voice_message_too_short)
-    var voiceMicPermissionRequested by remember { mutableStateOf(false) }
-    val voiceMicPermissionLauncher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestPermission(),
-        ) { granted -> if (!granted) appState.present(micPermissionDeniedMsg) }
+    val voiceCapture = rememberConversationVoiceCapture(appState, controller, mediaSender, scope)
+    val voiceReview = voiceCapture.review
+    val voiceRecordingController = voiceCapture.recorder
 
-    val voiceReviewRecovery =
-        dev.ipf.whitenoise.android.ui.conversation.composer.rememberVoiceReviewRecoveryMarker(
-            conversationAccountRef,
-            controller.group.groupIdHex,
-        )
-    val voiceReviewRuntime = appState.runtimeGeneration
-    val voiceReview =
-        remember(controller, conversationAccountRef, voiceReviewRuntime, mediaSender, voiceReviewRecovery) {
-            dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview(
-                scope = scope,
-                ownerIsCurrent = {
-                    conversationAccountRef != null &&
-                        appState.activeAccountRef == conversationAccountRef &&
-                        appState.runtimeGeneration == voiceReviewRuntime &&
-                        controller.boundAccountRef == conversationAccountRef
-                },
-                send = { file, duration, canSend, onQueued ->
-                    mediaSender.sendVoiceAttachment(file, duration, canSend, onQueued)
-                },
-                onSendFailure = { appState.present(R.string.send_failed) },
-                onPlaybackFailure = { appState.present(R.string.voice_message_failed) },
-                onReviewPresenceChanged = voiceReviewRecovery::updatePresence,
-            )
-        }
-    DisposableEffect(voiceReview) {
-        onDispose { voiceReview.release() }
-    }
-
-    val voiceRecordingCompletedClip =
-        remember(voiceReview) {
-            mutableStateOf<dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewClip?>(null)
-        }
-    val voiceRecordingStopNotice =
-        dev.ipf.whitenoise.android.ui.conversation.composer.rememberVoiceRecordingStopNotice(
-            voiceReview,
-            appState,
-            conversationAccountRef,
-            controller.group.groupIdHex,
-        )
-    val voiceRecordingController =
-        // Re-key on every captured dependency: chat.id (basic), controller
-        // (avoids dispatching through a stale ConversationController when
-        // appState.runtimeGeneration changes), and voiceOutputDir (a fresh
-        // File reference if context/cacheDir flips — also future-proofs an
-        // account-scoped dir).
-        remember(chat.id, controller, voiceOutputDir, voiceReview) {
-            dev.ipf.whitenoise.android.audio.VoiceRecordingController(
-                context = context,
-                outputDirectory = voiceOutputDir,
-                scope = scope,
-                onPermissionRequest = {
-                    val granted =
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                            PackageManager.PERMISSION_GRANTED
-                    if (!granted && !voiceMicPermissionRequested) {
-                        voiceMicPermissionRequested = true
-                        voiceMicPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                    granted
-                },
-                onRecordingComplete = { file, durationMs ->
-                    voiceRecordingCompletedClip.value =
-                        if (voiceReview.offer(file, durationMs)) voiceReview.clip else null
-                },
-                onError = { throwable ->
-                    presentVoiceRecordingFailure(appState, throwable, voiceTooShortMsg)
-                },
-                // Honor the user's media-quality ceiling for voice notes.
-                // Read at record-start (the controller is not re-keyed on the
-                // quality state) so a setting change applies to the next clip.
-                bitrateProvider = { appState.mediaQuality.audioBitrateBps },
-                microphoneCaptures = appState.microphoneCaptureCoordinator,
-                onAutomaticStop = { reason ->
-                    val completedClip = voiceRecordingCompletedClip.value
-                    voiceRecordingCompletedClip.value = null
-                    voiceRecordingStopNotice(reason, completedClip)
-                },
-            )
-        }
-    dev.ipf.whitenoise.android.ui.conversation.composer
-        .VoiceRecordingLifecycleEffect(voiceRecordingController)
-    LaunchedEffect(voiceRecordingController.isRecording, voiceReview.clip) {
-        if (voiceRecordingController.isRecording) {
-            voiceRecordingCompletedClip.value = null
-            voiceReview.discardForNewRecording()
-            voiceReviewRecovery.updatePresence(false)
-        }
-    }
-
-    /**
-     * Shows the voice-review recovery notice, releases the recorder and chains voice playback to the next voice
-     * message.
-     */
+    /** Shows the voice-review recovery notice and chains voice playback to the next voice message. */
     @Composable
     @Suppress("LongMethod")
     fun voicePlaybackHosts() {
-        if (voiceReviewRecovery.hasReview && voiceReview.clip == null && !voiceRecordingController.isRecording) {
-            dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewUnavailableNotice(
-                onDismiss = { voiceReviewRecovery.updatePresence(false) },
-                onRecordAgain = {
-                    voiceReviewRecovery.consume {
-                        val ownsRecorder =
-                            conversationAccountRef != null &&
-                                appState.activeAccountRef == conversationAccountRef &&
-                                appState.runtimeGeneration == voiceReviewRuntime &&
-                                controller.boundAccountRef == conversationAccountRef
-                        if (ownsRecorder && voiceRecordingController.start()) {
-                            voiceReviewRecovery.updatePresence(false)
-                            voiceRecordingController.lock()
-                        }
-                    }
-                },
-            )
-        }
-        DisposableEffect(voiceRecordingController) {
-            onDispose { voiceRecordingController.release() }
-        }
+        ConversationVoiceRecoveryNotice(voiceCapture)
 
-        // Auto-chain voice playback: when one clip ends, play the IMMEDIATE
-        // next message iff it's also a voice attachment. Stops on any
-        // non-voice neighbor (text, image, system) or end-of-timeline. We do
-        // not skip past unrelated messages to find a later voice note — that
-        // would jump the user past content they hadn't consumed.
+        // Continue to the next visible message only if it contains a voice note.
+        // Unrelated messages and the end of the timeline stop playback.
         DisposableEffect(controller, chat.id) {
             val ownerKey = controller.group.groupIdHex
             val unregister =
-                dev.ipf.whitenoise.android.audio.VoicePlaybackController.registerCompletionCallback(ownerKey) { completedKey ->
+                dev.ipf.whitenoise.android.audio.VoicePlaybackController.registerCompletionCallback(
+                    ownerKey,
+                ) { completedKey ->
                     val completedMsgId = completedKey.substringBefore('#')
                     val completedIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == completedMsgId }
                     if (completedIdx >= 0) {
@@ -2162,7 +1980,7 @@ internal fun ConversationScreen(
                             val idx = audioEntry.index
                             val ref = audioEntry.value
                             scope.launch {
-                                val mine = nextMsg.record.direction != "received"
+                                val mine = controller.isMessageMine(nextMsg.record)
                                 val file =
                                     runCatching {
                                         materializeVoiceAttachment(
@@ -2419,7 +2237,8 @@ internal fun ConversationScreen(
     fun saveQuickReactionEmojis(choices: List<String>) {
         quickReactionEmojisTouched = true
         scope.launch {
-            quickReactionEmojis = withContext(Dispatchers.IO) { RecentEmojiPreferences.saveQuickReactions(context, choices) }
+            quickReactionEmojis =
+                withContext(Dispatchers.IO) { RecentEmojiPreferences.saveQuickReactions(context, choices) }
         }
     }
 
@@ -3155,7 +2974,7 @@ internal fun ConversationScreen(
             unreadCountDivergenceReport(
                 projectionUnread = projectedUnreadCount,
                 timeline = controller.timeline,
-                readAnchorMessageId = chat.projection?.lastReadMessageIdHex,
+                readAnchorMessageId = entryRow?.lastReadMessageIdHex,
             )?.let { report ->
                 logUnreadCountDivergence("DMConversation", report)
             }
@@ -3743,28 +3562,32 @@ internal fun ConversationScreen(
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
     // One card morph for the transcript and both full-screen routes, so Back animates the return.
-    // The header (or composer) becomes the next route's cards and they fold back into it, the same
+    // The composer outline becomes the next route's cards and they fold back into it, the same
     // container transform as Settings. Nothing travels with the closing keyboard.
+    val parentMorph = LocalSettingsCardMorph.current
     val routeMorph =
-        remember(controller, appState.runtimeGeneration) {
-            // Composer settings survive recreation, so their Back must still fold into the pill.
-            SettingsCardMorph().apply {
-                anchor = if (showComposerSettings) ConversationMorphAnchor.Composer else ConversationMorphAnchor.Details
+        remember(controller, appState.runtimeGeneration, parentMorph) {
+            SettingsCardMorph(fullScreen = true, parent = parentMorph).apply {
+                anchor = ConversationMorphAnchor.Composer
             }
         }
+    CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+        WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
+    }
     val transcriptRouteMotion =
         rememberSettingsCardMorphHost(
             morph = routeMorph,
             target = showDetails to showComposerSettings,
             ownerKey = controller to appState.runtimeGeneration,
             motion = surfaceMotionEnabled && !routeTransitionInProgress && !routePresentationFrozen,
+            forward = transcriptRoutedAway,
+            captureContent = transcriptRoutedAway,
         ).second
     // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
     val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
     // The header opens chat details from its title and from the member shortcuts. The keyboard starts
-    // closing as the header unfolds into the details cards, not after the composer leaves.
+    // closing as the composer unfolds into the details cards.
     val openDetailsFromHeader: () -> Unit = {
-        routeMorph.anchor = ConversationMorphAnchor.Details
         keyboardController?.hide()
         showDetails = true
     }
@@ -3855,6 +3678,7 @@ internal fun ConversationScreen(
                     onAutoOpenMembersConsumed = { openMembersOnDetails = false },
                     onOpenSearch = openConversationSearch,
                     onStartGroupWithPeer = onStartGroupWithPeer,
+                    onStartGroupWithPeerMeasured = onStartGroupWithPeerMeasured,
                 )
             }
             Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) {
@@ -4256,10 +4080,9 @@ internal fun ConversationScreen(
                 )
             },
             bottomBar = {
-                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+                ConversationBottomBarFrame(routeMorph, with(density) { (displayedMenuImeBottom ?: 0).toDp() }) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
-                            routeMorph.anchor = ConversationMorphAnchor.Composer
                             keyboardController?.hide()
                             showComposerSettings = true
                         },
@@ -4290,6 +4113,13 @@ internal fun ConversationScreen(
                             if (batchSelectionUi.copyText.isNotBlank()) {
                                 clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
                                 selectedMessages.clear()
+                            }
+                        },
+                        onSelectionRouteOrigin = { action, origin ->
+                            when (action) {
+                                MessageSelectionBarAction.Forward -> batchForwardOrigin = origin
+                                MessageSelectionBarAction.Info -> batchInfoOrigin = origin
+                                else -> Unit
                             }
                         },
                         onForwardSelection = {
@@ -4481,6 +4311,7 @@ internal fun ConversationScreen(
                         onPickDocument = {
                             documentPickerLauncher.launch(arrayOf("*/*"))
                         },
+                        onAttachmentRouteOrigin = { _, origin -> attachmentRouteOrigin = origin },
                         onShareLocation = {
                             if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
                                 hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -4508,6 +4339,14 @@ internal fun ConversationScreen(
                             } else {
                                 null
                             },
+                        onSearchGifs =
+                            rememberConversationGiphyPicker(
+                                controller,
+                                attachmentOrigin,
+                                composerGate = composerGate,
+                                presentationAvailable = !transcriptRoutedAway && !freezeRoutePresentation,
+                                onAccepted = ::revealSentMessage,
+                            ),
                         onOpenEmojiSettings =
                             if (draftAccountRef != null && draftAccountRef == appState.activeAccountRef) {
                                 { emojiLibraryPages = listOf(ConversationEmojiLibraryPage.Settings) }
@@ -4591,6 +4430,7 @@ internal fun ConversationScreen(
             CompositionLocalProvider(
                 dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
                 dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
+                LocalVoiceTranscription provides rememberVoiceTranscription(appState, controller),
                 LocalPollVotesHost provides pollVotesHost,
                 LocalKeptMessages provides keptMessagesController,
                 LocalReactionArtworkSource provides reactionArtwork,
@@ -4691,7 +4531,6 @@ internal fun ConversationScreen(
                                 EmptyGroupConversation(
                                     onAddMembers = {
                                         openAddMemberOnDetails = true
-                                        routeMorph.anchor = ConversationMorphAnchor.Details
                                         showDetails = true
                                     },
                                 )
@@ -5096,7 +4935,7 @@ internal fun ConversationScreen(
                                                 } else {
                                                     IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
                                                         Icon(
-                                                            Icons.Default.Refresh,
+                                                            painterResource(R.drawable.ic_refresh),
                                                             contentDescription = stringResource(R.string.refresh),
                                                         )
                                                     }
@@ -5359,6 +5198,7 @@ internal fun ConversationScreen(
     fun conversationOverlays() {
         batchForwardSnapshot?.let { payloads ->
             ForwardMessageSheet(
+                origin = batchForwardOrigin,
                 appState = appState,
                 payloads = payloads,
                 sourceAccountRef = controller.boundAccountRef,
@@ -5380,6 +5220,7 @@ internal fun ConversationScreen(
                         .map { it.fileName.ifBlank { it.mediaType } }
                 }
             MessageDetailsScreen(
+                origin = batchInfoOrigin,
                 record = infoRecord,
                 status = infoSelection.status,
                 mine = infoMine,
@@ -5417,6 +5258,7 @@ internal fun ConversationScreen(
 
         pendingContactShare?.let { contact ->
             ContactPreviewScreen(
+                origin = attachmentRouteOrigin,
                 contact = contact,
                 onDismiss = { pendingContactShare = null },
                 onSend = { selected ->
@@ -5466,11 +5308,16 @@ internal fun ConversationScreen(
             StickerSheet(
                 controller = controller,
                 appState = appState,
-                onSend = { sticker ->
-                    stickerSheetOpen = false
-                    // The reply is captured at the tap, so a later selection is neither sent nor cleared.
+                onSend = { sticker, onResult ->
                     val reply = controller.snapshotReply()
-                    appState.launchMutation { controller.sendSticker(sticker, reply) }
+                    appState.launchMutation {
+                        var sent = false
+                        try {
+                            sent = controller.sendSticker(sticker, reply)
+                        } finally {
+                            onResult(sent)
+                        }
+                    }
                 },
                 onDismiss = { stickerSheetOpen = false },
             )
@@ -5498,7 +5345,7 @@ internal fun ConversationScreen(
                     shareUserSelection.clear()
                     picked.forEach { sendSharedUser(it) }
                 },
-                confirmIcon = Icons.AutoMirrored.Filled.Send,
+                confirmIcon = ImageVector.vectorResource(R.drawable.ic_arrow_upward),
                 confirmLabel = stringResource(R.string.send),
                 autoSelectResolvedIdentifier = true,
                 excludeAccountIdHexes = setOfNotNull(activeHex),
@@ -5507,6 +5354,7 @@ internal fun ConversationScreen(
 
         if (locationPickerOpen) {
             LocationPickerScreen(
+                origin = attachmentRouteOrigin,
                 hasFineGrant = hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION),
                 onDismiss = { locationPickerOpen = false },
                 onPick = { location ->

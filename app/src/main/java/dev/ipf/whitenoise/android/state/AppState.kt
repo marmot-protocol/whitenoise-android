@@ -25,7 +25,6 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
-import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EventsSubscription
@@ -44,7 +43,6 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.RuntimePolicyHooks
@@ -70,7 +68,6 @@ import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
-import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
 import dev.ipf.whitenoise.android.core.DateFormatPreference
@@ -98,7 +95,6 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
-import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaThumbnail
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
@@ -130,6 +126,7 @@ import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
+import dev.ipf.whitenoise.android.ui.conversation.media.ReceivedVoiceTranscripts
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
@@ -146,7 +143,6 @@ import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -198,20 +194,6 @@ internal const val NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS = 10_000L
 private const val AUTOMATIC_ADMISSION_ATTEMPTS = 2
 internal const val INCOMING_ATTACHMENT_TAG = "DMAttachmentReceipt"
 
-/**
- * How inviting one profile to several groups went: of [attempted] groups, [failures] failed and in [waited] the user
- * chose to wait on a group-change question, so those groups were not invited either.
- */
-internal data class ProfileGroupInviteOutcome(
-    val attempted: Int,
-    val failures: Int,
-    val firstFailure: AppText? = null,
-    val waited: Int = 0,
-) {
-    val delivered: Int = attempted - failures - waited
-    val completedSuccessfully: Boolean = attempted > 0 && failures == 0 && waited == 0
-}
-
 internal fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
 internal data class AppMarmotRuntime(
@@ -227,7 +209,6 @@ internal data class HostPerformanceRuntimeOwner(
 
 private fun openMarmotRuntime(context: Context) = MarmotClient(context).let { AppMarmotRuntime(it.rootPath, it.marmot) }
 
-private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
 private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
 private const val FORWARD_TERMINAL_STATUS_DURATION_MS = 2_000L
@@ -241,16 +222,6 @@ private val processNotificationCardCancellationDispatcher: CoroutineDispatcher b
             Thread(task, "wn-notification-cancel").apply { isDaemon = true }
         }.asCoroutineDispatcher()
 }
-
-internal fun appStateScopeExceptionHandler(
-    report: (Throwable) -> Unit = { throwable ->
-        if (BuildConfig.DEBUG) {
-            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
-        } else {
-            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure")
-        }
-    },
-): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
 
 private data class PendingAccountSwitchTrace(
     val accountRef: String,
@@ -309,18 +280,7 @@ class WhiteNoiseAppState private constructor(
             mutationsScope,
             onPhaseChange = { phase = it },
             awaitActivationReadiness = ::completeReceiverGatedStartup,
-        ) { runtime, account, isMountCurrent ->
-            if (!isMountCurrent()) throw CancellationException("Setup mount was replaced")
-            val reported = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
-            withAccountLifetime {
-                if (!isMountCurrent() || marmot() !== runtime) throw CancellationException("Setup mount was replaced")
-                val canonical = withContext(Dispatchers.IO) { runtime.accountIdHex(reported) }
-                check(canonical == account) { "signer account does not match setup" }
-                withContext(Dispatchers.IO) {
-                    runtime.registerExternalSigner(account, amberSigner.buildSigner(account))
-                }
-            }
-        }
+        ) { runtime, account, isMountCurrent -> reconnectSetupSigner(runtime, account, isMountCurrent) }
     }
 
     /** Process-owned, bounded composer geometry keyed by account and conversation. */
@@ -472,14 +432,16 @@ class WhiteNoiseAppState private constructor(
         DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val swipePreferences = SwipePreferences(preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
+    internal val receivedVoiceTranscripts = ReceivedVoiceTranscripts()
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
+    internal val voiceNotes by lazy { createVoiceNoteSessionOwner() }
     private val dictationMicrophoneOwner = Any()
+    private var initializedDictation by mutableStateOf<ConversationDictationController?>(null)
     internal val conversationDictation: ConversationDictationController
         get() = conversationDictationOwner.value
 
-    /** Connection lifecycle checks must not create a speech controller in an idle process. */
-    internal fun initializedConversationDictation(): ConversationDictationController? =
-        if (conversationDictationOwner.isInitialized()) conversationDictationOwner.value else null
+    /** Lifecycle checks and the chat list observe dictation without creating a controller in an idle process. */
+    internal fun initializedConversationDictation(): ConversationDictationController? = initializedDictation
 
     private val conversationDictationOwner =
         lazy {
@@ -531,7 +493,7 @@ class WhiteNoiseAppState private constructor(
                 },
                 sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
                 onSendBlocked = { presentTransient(R.string.dictation_send_blocked) },
-            )
+            ).also { initializedDictation = it }
         }
 
     internal val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
@@ -977,7 +939,7 @@ class WhiteNoiseAppState private constructor(
 
     @Volatile
     private var bootstrapCompleted = false
-    private val ttsRefreshMutex = Mutex()
+    internal val ttsRefreshMutex = Mutex()
     private val auditLogSettingsMutex = Mutex()
     private val auditUploadConsent = AuditUploadConsent(preferences)
     val auditUploadConsentRequired: Boolean get() = auditUploadConsent.requiresChoice
@@ -1009,6 +971,14 @@ class WhiteNoiseAppState private constructor(
     internal val chatMuteOwner = ChatMuteOwner()
     internal val chatFolderPreferences = ChatFolderPreferences(appContext)
     internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
+    internal val ttsPlaybackTrust = TtsPlaybackTrustConsent(this) { attachedTtsHandle }
+
+    /** Reports whether the connected engine still requires playback consent. */
+    internal fun ttsEngineNeedsAcknowledgment(): Boolean = ttsPlaybackTrust.needsAcknowledgment()
+
+    /** Checks engine consent and the playback owner before any text can be sent. */
+    internal suspend fun confirmTtsPlaybackTrust(current: () -> Boolean): Boolean = ttsPlaybackTrust.confirm(current)
+
     internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
     internal val ttsVoicePreferences = TtsVoicePreferences(appContext)
     internal val ttsEngineResolver =
@@ -1034,12 +1004,12 @@ class WhiteNoiseAppState private constructor(
     // appends only for the owner: a manual Speak aloud replaces the queue and
     // ends the session; another chat's — or another ACCOUNT'S view of the
     // same group — must never extend it.
-    private var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
+    internal var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
     private val ttsAutoReadContinuation by lazy { createTtsAutoReadContinuation(this) }
 
     // Manual speech deliberately has no auto-read session key, but it still
     // owns decrypted text that must stop when its account is removed.
-    private var ttsSpeechAccountRef: String? = null
+    internal var ttsSpeechAccountRef: String? = null
     internal val attachmentSpeechDestination =
         MutableStateFlow<dev.ipf.whitenoise.android.audio.AttachmentSpeechDestination?>(null)
 
@@ -1051,36 +1021,34 @@ class WhiteNoiseAppState private constructor(
         return key == ttsAutoReadKey(activeAccountRef, groupIdHex)
     }
 
-    private fun ttsAutoReadKey(
-        account: String?,
-        group: String,
-    ): String? = account?.let { "$it|${group.lowercase()}" }
-
-    /** Starts read-aloud for one or more speakable messages. */
+    /** Starts read-aloud for one or more speakable messages after any required approval. */
     fun speakAloud(
         entries: List<TtsSpeakableEntry>,
         locale: java.util.Locale,
         startSentenceIndex: Int = 0,
     ): Boolean {
-        val started = ttsController.speak(entries, locale, startSentenceIndex)
-        if (started) {
-            // Only successful speech replaces prior auto-read ownership; a failed start
-            // (blank text or no engine) leaves the old queue playing and still owned.
-            ttsSpeechAccountRef = activeAccountRef
-            ttsAutoReadSessionKey = null
-            ttsHistorySession.onSessionCleared()
-            attachmentSpeechDestination.value = null
-            // The session now exists, so the mediaPlayback service must too:
-            // it mirrors the controller, keeps playback alive across app
-            // switches, and stops itself when the controller goes terminal.
-            if (!TtsPlaybackForegroundService.start(appContext)) {
-                // A rejected foreground-service start must not leave private
-                // read-aloud running without its user-visible stop surface.
-                stopSpeaking()
-                return false
+        val started =
+            synchronized(ttsController) {
+                val previousGeneration = ttsController.state.value.messageProgressGeneration
+                val previousCallbackGeneration = ttsController.playbackCallbackGeneration()
+                val accepted =
+                    !ttsEngineNeedsAcknowledgment() && ttsController.speak(entries, locale, startSentenceIndex)
+                // A pre-playback refusal (offline-language) tears down the queue without a new message generation.
+                if (accepted ||
+                    ttsController.state.value.messageProgressGeneration != previousGeneration ||
+                    ttsController.playbackCallbackGeneration() != previousCallbackGeneration
+                ) {
+                    clearTtsPlaybackOwnership()
+                }
+                if (accepted) ttsSpeechAccountRef = activeAccountRef
+                accepted
             }
-        }
-        return started
+        if (!started) return false
+
+        // Stop private speech if its foreground service fails to provide a visible stop control.
+        val foregroundStarted = TtsPlaybackForegroundService.start(appContext)
+        if (!foregroundStarted) stopSpeaking()
+        return foregroundStarted
     }
 
     /** [speakAloud] for an auto-read backlog, marking the owning conversation. */
@@ -1113,6 +1081,7 @@ class WhiteNoiseAppState private constructor(
         startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
         isCurrent: () -> Boolean = { true },
     ): Boolean {
+        if (ttsEngineNeedsAcknowledgment()) return false
         val ownerAccount = activeAccountRef
         val ownerGeneration = accountSwitchHandoff.capture()
         var preparingSessionId: Long? = null
@@ -1125,6 +1094,7 @@ class WhiteNoiseAppState private constructor(
                     startRenderedHit,
                     isCurrent = {
                         isCurrent() &&
+                            !ttsEngineNeedsAcknowledgment() &&
                             activeAccountRef == ownerAccount &&
                             accountSwitchHandoff.isCurrent(ownerGeneration)
                     },
@@ -1147,10 +1117,7 @@ class WhiteNoiseAppState private constructor(
                     state.sessionId == preparingSessionId &&
                     ttsSpeechAccountRef == ownerAccount
                 ) {
-                    ttsSpeechAccountRef = null
-                    ttsAutoReadSessionKey = null
-                    ttsHistorySession.onSessionCleared()
-                    attachmentSpeechDestination.value = null
+                    clearTtsPlaybackOwnership()
                 }
             }
         }
@@ -1306,17 +1273,15 @@ class WhiteNoiseAppState private constructor(
         // A session paged away from the live tail must not have arrivals
         // spliced next to unrelated older history — they stay reachable
         // through next-message paging instead.
-        if (!ttsHistorySession.allowsLiveAppend()) return false
+        if (ttsEngineNeedsAcknowledgment() || !ttsHistorySession.allowsLiveAppend()) return false
         return ttsController.appendSpeech(entry, locale)
     }
 
     /** Stops the active speech queue and immediately revokes every transient source-navigation credential. */
     fun stopSpeaking() {
+        ttsPlaybackTrust.cancel()
         ttsController.stop()
-        ttsSpeechAccountRef = null
-        ttsAutoReadSessionKey = null
-        ttsHistorySession.onSessionCleared()
-        attachmentSpeechDestination.value = null
+        clearTtsPlaybackOwnership()
     }
 
     fun setTtsRateOverride(rate: Float?) {
@@ -1324,17 +1289,17 @@ class WhiteNoiseAppState private constructor(
         ttsController.onSpeechRateChanged()
     }
 
-    private var attachedTtsHandle: TtsEngineHandle? = null
+    internal var attachedTtsHandle: TtsEngineHandle? = null
+        private set
 
     /** Publishes discovery state and atomically replaces the controller's engine adapter. */
-    private fun publishTtsResolution(resolution: TtsResolutionResult?) {
+    internal fun publishTtsResolution(resolution: TtsResolutionResult?) {
         ttsResolution = resolution
         val handle = resolution?.handle
-        // A refresh that kept the same engine handle must not re-attach:
-        // attachEngine treats every attach as a replacement and stops any
-        // in-flight speech. It must also preserve the utterance-locale voice
-        // resolution most recently published by the attached adapter.
+        // Reattaching the same healthy handle would stop speech and reset its current voice.
         if (handle === attachedTtsHandle) return
+        ttsPlaybackTrust.onHandleReplaced()
+        clearTtsPlaybackOwnership()
         ttsVoiceResolution = handle?.voiceResolution ?: TtsVoiceResolution.Empty
         attachedTtsHandle = handle
         if (handle != null) {
@@ -1344,6 +1309,8 @@ class WhiteNoiseAppState private constructor(
                     enginePackage = handle.enginePackage,
                     selectedVoice = { ttsVoicePreferences.selectedVoice(handle.enginePackage) },
                     onVoiceResolved = { voiceResolution -> ttsVoiceResolution = voiceResolution },
+                    requireOfflineVoice = handle.voiceResolution.effectiveKey != null,
+                    onConnectionUncertain = { retireFailedTtsConnection(handle) },
                 ),
                 engineKey = handle.enginePackage,
             )
@@ -1360,7 +1327,10 @@ class WhiteNoiseAppState private constructor(
     /** Tests inject a scripted store; production seals push state in the Keystore-backed default. */
     private val pushTokenStore = pushTokenStoreOverride ?: PushTokenStore.create(appContext)
 
-    private val amberSigner = AmberSignerController(appContext)
+    internal val amberSigner = AmberSignerController(appContext)
+
+    /** Handles to this runtime's MDK-owned remote-signer sessions and their display status. */
+    internal val remoteSigners = RemoteSignerAccounts()
 
     /** Isolated sign-in tests replace only the signer round trip. */
     internal var amberPublicKeyRequest: () -> String = amberSigner::requestPublicKey
@@ -1380,8 +1350,7 @@ class WhiteNoiseAppState private constructor(
      * ends; any other waits (#3308). A failed read clears it, since the list it leaves behind says nothing about
      * which accounts survive, so a surviving account's work is never ended by a refresh that did not complete.
      */
-    @Volatile
-    internal var accountListLoaded = initialAccounts.isNotEmpty()
+    internal var accountListLoaded by mutableStateOf(initialAccounts.isNotEmpty())
 
     internal val accountUnreadStore = AccountUnreadStore()
     internal val runtimeMirrors = RuntimeMirrors()
@@ -1516,6 +1485,8 @@ class WhiteNoiseAppState private constructor(
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
 
+    internal val voiceNotePreferences = VoiceNotePreferences(preferences)
+
     internal val composerToolbarPreference by lazy {
         ComposerToolbarPreference(preferences, mutationsScope, hostPreferenceCommitMutex)
     }
@@ -1535,6 +1506,13 @@ class WhiteNoiseAppState private constructor(
     // staleness-exempt: monotonically unique notice identity, not an async publication fence.
     private var transientNoticeSequence = 0L
 
+    /** Launch geometry belongs to this one profile presentation, never the next request. */
+    internal var pendingProfileContour: dev.ipf.whitenoise.android.ui.settings.SettingsContour? = null
+        private set
+    internal var pendingProfileOrigin by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
+        private set
+    internal var pendingProfilePresentationId by mutableLongStateOf(0L)
+        private set
     var pendingProfileNpub by mutableStateOf<String?>(null)
         private set
 
@@ -1573,6 +1551,11 @@ class WhiteNoiseAppState private constructor(
     var auditLogSettings by mutableStateOf<AuditLogSettingsFfi?>(null)
         private set
 
+    internal val deviceLinkRequests by runtimeLinkRequests()
+
+    /** Account and runtime of a locally started link awaiting this user's consent. Guarded by account lifetime. */
+    internal var unconfirmedLinkOwner: Pair<String, Int>? = null
+
     // staleness-exempt: observable process identity serialized through destructive-wipe state transitions.
     var runtimeGeneration by mutableIntStateOf(0)
         private set
@@ -1604,12 +1587,7 @@ class WhiteNoiseAppState private constructor(
     // staleness-exempt: observable profile versions invalidate narrowly keyed Compose projections.
     internal var profileRevision by mutableIntStateOf(0)
     private var contactNicknameRevision by mutableIntStateOf(0)
-    private var profileAccountRevisionEpoch by mutableIntStateOf(0)
-
-    // staleness-exempt: bounded per-account ordering value, not an async publication guard.
-    private var profileAccountRevisionSequence = 0
-    private val profileAccountRevisions = mutableStateMapOf<String, Int>()
-    private val profileAccountRevisionOrder = linkedSetOf<String>()
+    private val profileAccountRevisions = ProfileAccountRevisions(MAX_PROFILE_PRESENTATION_CACHE_ENTRIES)
 
     /**
      * Read-only Compose-tracked snapshot of profile-presentation invalidations
@@ -1621,34 +1599,9 @@ class WhiteNoiseAppState private constructor(
     internal val profileRevisionForCompose: ProfilePresentationRevision
         get() = ProfilePresentationRevision(profileRevision, contactNicknameRevision)
 
-    internal fun profileAccountRevisionForCompose(accountIdHex: String): ProfileAccountRevision {
-        val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
-        return ProfileAccountRevision(
-            epoch = profileAccountRevisionEpoch,
-            account = profileAccountRevisions[normalized] ?: 0,
-        )
-    }
+    internal fun profileAccountRevisionForCompose(accountIdHex: String) = profileAccountRevisions.revision(accountIdHex)
 
-    internal fun bumpProfileAccountRevision(accountIdHex: String) {
-        val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
-        if (normalized.isEmpty()) return
-        profileAccountRevisionSequence += 1
-        profileAccountRevisions[normalized] = profileAccountRevisionSequence
-        profileAccountRevisionOrder.remove(normalized)
-        profileAccountRevisionOrder.add(normalized)
-        if (profileAccountRevisionOrder.size > MAX_PROFILE_PRESENTATION_CACHE_ENTRIES) {
-            val evicted = profileAccountRevisionOrder.first()
-            profileAccountRevisionOrder.remove(evicted)
-            profileAccountRevisions.remove(evicted)
-        }
-    }
-
-    private fun bumpAllProfileAccountRevisions() {
-        profileAccountRevisionEpoch += 1
-        profileAccountRevisionSequence = 0
-        profileAccountRevisions.clear()
-        profileAccountRevisionOrder.clear()
-    }
+    internal fun bumpProfileAccountRevision(accountIdHex: String) = profileAccountRevisions.bump(accountIdHex)
 
     internal val profilePresentations =
         ScopedCache<String, ProfilePresentation>(
@@ -2106,13 +2059,7 @@ class WhiteNoiseAppState private constructor(
                 .orEmpty()
 
         /** Uses the receiver's chat row, including when its chat list is cold or another account is active. */
-        override suspend fun isDirectConversation(update: NotificationUpdateFfi): Boolean {
-            val cachedKind = notificationChatListItem(update)?.projection?.conversationKind
-            val kind =
-                cachedKind?.takeUnless { it == ChatConversationKindFfi.UNKNOWN }
-                    ?: presentedNotificationChatRow(update)?.row?.conversationKind
-            return kind == ChatConversationKindFfi.DIRECT
-        }
+        override suspend fun isDirectConversation(update: NotificationUpdateFfi): Boolean = isStoredDirectChat(update)
 
         override suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind =
             resolveNotificationMediaKind(
@@ -2127,7 +2074,7 @@ class WhiteNoiseAppState private constructor(
     internal val notificationAvatarCoordinator by lazy {
         NotificationAvatarCoordinator(
             appLocked = { appLock.screenVisible },
-            shouldPost = this::shouldPostNotification,
+            shouldPost = { update, engineMuted -> shouldPostNotification(update, engineMuted) },
             canPost = localNotificationPresenter::canPostNotifications,
             senderAvatarUrl = { update -> notificationSenderAvatarUrl(update, ::loadUserProfile) },
             groupAvatarUrl = { update ->
@@ -3087,7 +3034,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Restores account and notification state after a wipe fails before commit. */
     private suspend fun restoreAfterFailedDestructiveAccountWipe(
-        accountRef: String,
+        accountRef: String?,
         restartNotifications: Boolean,
     ) {
         applyDestructiveWipeRuntimeState(
@@ -3355,8 +3302,7 @@ class WhiteNoiseAppState private constructor(
         title: String,
     ): PinnedConversationPresentation {
         val peer =
-            GroupProjector
-                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+            item.avatarAccount
                 ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
         return PinnedConversationPresentation(
             title = title,
@@ -4501,8 +4447,8 @@ class WhiteNoiseAppState private constructor(
     private suspend fun engineLoginLocked(nsec: String): AccountSummaryFfi {
         val relays = MarmotClient.bootstrapRelays
         val injected = identityLoginCalls
-        if (injected != null) return injected.login(nsec, MarmotClient.accountRelays, relays)
-        return marmotIo { login(nsec, MarmotClient.accountRelays, relays, relays) }
+        if (injected != null) return injected.login(nsec, whiteNoiseNip65Relays, relays)
+        return marmotIo { login(nsec, whiteNoiseNip65Relays, relays, whiteNoiseInboxRelays) }
     }
 
     /**
@@ -4524,7 +4470,7 @@ class WhiteNoiseAppState private constructor(
         if (injected != null) {
             return injected.loginRecoveringIncompleteSetup(
                 nsec,
-                MarmotClient.accountRelays,
+                whiteNoiseNip65Relays,
                 relays,
                 acknowledgePossibleKeyPackageOrphan = true,
             )
@@ -4532,10 +4478,10 @@ class WhiteNoiseAppState private constructor(
         return marmotIo {
             loginRecoveringIncompleteSetup(
                 nsec,
-                MarmotClient.accountRelays,
+                whiteNoiseNip65Relays,
                 relays,
                 acknowledgePossibleKeyPackageOrphan = true,
-                inboxRelays = relays,
+                inboxRelays = whiteNoiseInboxRelays,
             )
         }
     }
@@ -4544,7 +4490,7 @@ class WhiteNoiseAppState private constructor(
      * Pending setup keeps its route; only a completed activation receipt can announce an imported identity.
      * An import that started without a runtime fails its ownership check like any native call.
      */
-    private suspend fun activateImportedIdentity(
+    internal suspend fun activateImportedIdentity(
         summary: AccountSummaryFfi,
         expectedRuntime: MarmotInterface?,
         expectedEpoch: Int,
@@ -4636,10 +4582,12 @@ class WhiteNoiseAppState private constructor(
                 }
             if (snapshot != null) {
                 requireRuntime()
+                rememberRemoteSignerAccount(pubkeyHex, remote = false)
                 accountSetup.open(snapshot, runtime, epoch) { accountSession.handoff.isCurrent(selection) }
                 return
             }
             val summary = loginAmberFallback(runtime, pubkeyHex, ::requireRuntime)
+            rememberRemoteSignerAccount(pubkeyHex, remote = false)
             activateImportedIdentity(summary, runtime, epoch, selection)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
@@ -4671,9 +4619,9 @@ class WhiteNoiseAppState private constructor(
                     runtime.loginExternalSigner(
                         pubkeyHex,
                         amberSigner.buildSigner(pubkeyHex),
-                        MarmotClient.accountRelays,
+                        whiteNoiseNip65Relays,
                         MarmotClient.bootstrapRelays,
-                        MarmotClient.bootstrapRelays,
+                        whiteNoiseInboxRelays,
                     )
                 }
             }
@@ -4691,24 +4639,6 @@ class WhiteNoiseAppState private constructor(
             }
         }
         return summary
-    }
-
-    /**
-     * Re-install the NIP-55 signer callback for every external-signing account
-     * after an engine (re)start. MDK persists only the account pubkey for these
-     * accounts, so the `ExternalAccountSignerFfi` must be re-registered before
-     * any signing happens. Best-effort per account: a failure (e.g. Amber
-     * uninstalled) is logged and leaves the account intact rather than aborting
-     * bootstrap; that account's signing will later surface a typed error.
-     */
-    private suspend fun reregisterExternalSigners() {
-        accounts.filter { it.externalSigning }.forEach { account ->
-            runCatchingCancellable {
-                marmotIo { registerExternalSigner(account.label, amberSigner.buildSigner(account.accountIdHex)) }
-            }.onFailure {
-                appStateDebug(it) { "external signer re-register failed for ${account.label.take(8)}: ${it.readableMessage()}" }
-            }
-        }
     }
 
     /** Publishes the newest engine account snapshot and rejects older list reads. */
@@ -4741,6 +4671,7 @@ class WhiteNoiseAppState private constructor(
                     publishedAccounts = refreshedAccounts
                 }
             if (accepted) {
+                reconcilePendingForwardOwners(refreshedAccounts, requestToken)
                 retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
             }
             if (accountListLifetime.isCurrent(requestToken)) publishedAccounts else accounts
@@ -4969,6 +4900,8 @@ class WhiteNoiseAppState private constructor(
             hideConversationShortcutsFromDirectShare()
             recordAccountSwitchMark("previous-shortcuts-hide-finished")
         }
+
+        override suspend fun cancelOutgoingDeviceLink(label: String) = cancelLinkAfterProfileSwitch(label)
 
         /** Commits the prepared projection and active label together without a suspension. */
         override fun publish(
@@ -5257,46 +5190,6 @@ class WhiteNoiseAppState private constructor(
         inFlightAttachmentAcquisitions.cancelAll()
     }
 
-    /**
-     * Wipe the device-side decrypted-media footprint that outlives the
-     * in-memory caches: the L2 disk cache (cacheDir/decrypted-media) and the
-     * decrypted voice/video plaintext and unsent pasted media that the
-     * conversation UI materializes under cacheDir. Used at sign-out, when we
-     * treat that footprint as ending with the session. Re-opening a chat after
-     * the next sign-in re-downloads from Blossom.
-     *
-     * Suspends so the sign-out flow can await completion rather than racing a
-     * fast re-sign-in against an unfinished wipe. `shared_media` is left to its
-     * age-based janitor on purpose: those files can back a live external
-     * "open with"/share reader and deleting them out from under it would break
-     * an in-progress share.
-     */
-    private suspend fun wipeDecryptedMediaFromDisk() {
-        withContext(Dispatchers.IO) {
-            AttachmentCachePublication.onWipeStarted()
-            try {
-                // Each target holds decrypted plaintext, so wipe them independently
-                // and best-effort: a failure in one (IO error, locked file) must not
-                // skip the others, and a swallowed failure should still be visible.
-                runCatchingCancellable { clearMediaDiskCaches() }
-                    .onFailure {
-                        appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
-                    }
-                dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext(appContext.cacheDir) { name, failure ->
-                    appStateDebug { "$name plaintext wipe failed: ${failure.readableMessage()}" }
-                }
-                // The single pending-forward entry can hold the wiped account's
-                // message plaintext; a destructive wipe drops it unconditionally.
-                runCatchingCancellable { forwardRequestPersistence.clear() }
-                    .onFailure {
-                        appStateDebug { "pending forward request wipe failed: ${it.readableMessage()}" }
-                    }
-            } finally {
-                AttachmentCachePublication.onWipeFinished()
-            }
-        }
-    }
-
     // Guards the window where a sign-out/wipe clears an account's contact
     // details on IO while the account can still read as active on Main: the
     // setters reject writes for guarded refs instead of racing the clear and
@@ -5342,7 +5235,7 @@ class WhiteNoiseAppState private constructor(
             }
         if (nicknamesCleared) {
             contactNicknameRevision += 1
-            bumpAllProfileAccountRevisions()
+            profileAccountRevisions.reset()
         }
     }
 
@@ -5390,7 +5283,7 @@ class WhiteNoiseAppState private constructor(
         GroupAvatarImageLoader.clear()
         pruneIdleGroupCommitLocks()
         profileRevision += 1
-        bumpAllProfileAccountRevisions()
+        profileAccountRevisions.reset()
     }
 
     /** Exercises the production account-cache invalidation boundary without starting an account switch. */
@@ -5678,6 +5571,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
     private fun clearSignedOutAccountMemory(account: String) {
+        receivedVoiceTranscripts.forgetAccount(account)
         attachmentCollections.forgetAccount(account)
         composerExpansionStateRetention.removeAccount(account)
         composerDraftExpansionBridge.removeAccount(account)
@@ -5685,19 +5579,14 @@ class WhiteNoiseAppState private constructor(
         notificationReplyDraftHandoff.removeAccount(account)
         draftWriter.removeAccount(account)
         forgetStickers(account)
-        conversationDictation.onAccountUnavailable(account)
+        releaseCaptureOwners(account)
         stopTtsForRemovedAccount(account)
     }
 
-    /**
-     * Destructive sign-out: leave MLS groups, delete relay KeyPackages, and
-     * wipe all local state for the active account via Marmot's
-     * [dev.ipf.marmotkit.Marmot.signOutAndWipe]. Returns the structured
-     * outcome so the UI can surface partial failures.
-     */
+    /** Leaves groups, deletes relay KeyPackages and reports native and Android cleanup outcomes. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
-    suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
+    internal suspend fun signOutAndWipeActiveAccount(): AccountWipeCompletion? {
         val requested = activeAccountRef ?: return null
         val runtime = marmotRuntime
         val epoch = runtimeGeneration
@@ -5711,12 +5600,15 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private suspend fun signOutAndWipeActiveAccountLocked(wipedRef: String): WipeOutcomeFfi? {
+    internal suspend fun signOutAndWipeActiveAccountLocked(
+        wipedRef: String,
+        wipedShareAccount: String? = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex,
+    ): AccountWipeCompletion? {
         var admitted = false
         return runCatchingCancellable {
             withRevokedPinnedTarget(wipedRef) {
                 admitted = true
-                finishRevokedAccountWipe(wipedRef)
+                finishRevokedAccountWipe(wipedRef, wipedShareAccount)
             }
         }.getOrElse { failure ->
             if (admitted) throw failure
@@ -5725,27 +5617,37 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** The caller holds launcher revocation through cleanup; completed native ownership is published first. */
+    /** Holds launcher revocation through cleanup and publishes native removal first. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
-    private suspend fun finishRevokedAccountWipe(wipedRef: String): WipeOutcomeFfi? {
-        val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
-        conversationDictation.onAccountUnavailable(wipedRef)
-        clearInMemoryMediaCaches()
+    private suspend fun finishRevokedAccountWipe(
+        wipedRef: String,
+        wipedShareAccount: String?,
+    ): AccountWipeCompletion? {
+        val inView = activeAccountRef
+        val wipedAccountId = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
+        val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
+        if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
+        receivedVoiceTranscripts.forgetAccount(wipedRef)
+        releaseCaptureOwners(wipedRef)
+        if (retireSession) clearInMemoryMediaCaches()
         try {
-            val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
+            val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
                 notificationDelivery.nativePushSyncMutex.withSerializedNativePushWipe {
                     runCatching { marmotIo { signOutAndWipe(wipedRef) } }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
+                                wipedAccountId?.let { rememberRemoteSignerAccount(it, remote = false) }
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
-                                // The wipe invalidates server-side registration state for this account.
-                                // withSerializedNativePushWipe already holds
-                                // notificationDelivery.nativePushSyncMutex here.
+                                // Native wipe invalidates registration while the push-sync mutex is held.
                                 notificationDelivery.perAccountSyncedFingerprints.remove(wipedRef)
-                                runCatching { pushTokenStore.clear() }
+                                val survivingSigner =
+                                    accounts.any { it.label != wipedRef && it.isSignedInSigningAccount() }
+                                if (retireSession && !survivingSigner) {
+                                    runCatching { pushTokenStore.clear() }
+                                }
                             }
                         }
                 }
@@ -5755,21 +5657,23 @@ class WhiteNoiseAppState private constructor(
                 appStateDebug(failure) {
                     "signOutAndWipe failed account=${wipedRef.take(8)}: ${failure.readableMessage()}"
                 }
-                restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                if (retireSession) restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
                 return null
             }
             val outcome =
                 wipeResult.getOrNull() ?: run {
-                    restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
+                    if (retireSession) restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
                     return null
                 }
             if (!outcome.localCleanup.completed) {
+                discardRejectedSharedPlaintextWipe(wipedRef, retireSession)
                 appStateDebug {
                     "signOutAndWipe kept active account=${wipedRef.take(8)} because engine cleanup did not complete"
                 }
-                restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
-                return outcome
+                if (retireSession) restoreAfterFailedDestructiveAccountWipe(inView, restartNotifications)
+                return AccountWipeCompletion(outcome, wipeReport(outcome))
             }
+            val mediaFailure = wipeDecryptedMediaFromDisk(wipedRef, retireSession)
             chatMutePreferences.removeAccount(wipedRef)
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             attachmentCollections.forgetAccount(wipedRef)
@@ -5781,16 +5685,15 @@ class WhiteNoiseAppState private constructor(
             forgetStickers(wipedRef)
             clearRevokedConversationShortcutsForAccount(
                 accountRef = wipedRef,
-                includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
+                includeUnscopedLegacy = retireSession && accounts.none { it.isSignedInSigningAccount() },
             )
-            AvatarImageLoader.clear()
-            clearCrossAccountCaches()
+            if (retireSession) {
+                AvatarImageLoader.clear()
+                clearCrossAccountCaches()
+            }
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
-            publicJpegPreviewPreferences
-                .retainAccounts(accounts.filter { it.label != wipedRef }.map { it.accountIdHex })
-                .forEach(publicJpegPreviewLoader::clearPixels)
             withContext(NonCancellable + Dispatchers.IO) {
                 val alertsCleared =
                     runCatching {
@@ -5800,34 +5703,15 @@ class WhiteNoiseAppState private constructor(
                     appStateDebug { "local alert preference cleanup will retry during account retention" }
                 }
             }
-            wipeDecryptedMediaFromDisk()
             if (!clearHiddenMessagesForAccount(wipedRef)) {
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
             }
-            withContext(NonCancellable + Dispatchers.IO) {
-                wipedShareAccount?.takeIf(String::isNotBlank)?.let { account ->
-                    runCatching {
-                        val files =
-                            dev.ipf.whitenoise.android.share
-                                .PrivateShareFiles(appContext)
-                        files.leases.releaseAccount(account)
-                    }.onFailure {
-                        appStateDebug(it) { "private share purge failed after wipe: ${it.readableMessage()}" }
-                    }
-                }
-                runCatching {
-                    if (editorSessionStore.removeAccount(wipedRef)) {
-                        editorSessionStore.sourceLeaseReferenceCounts()?.let(editorSourceStore::reconcile)
-                    }
-                }.onFailure {
-                    appStateDebug(it) { "editor purge failed after wipe: ${it.readableMessage()}" }
-                }
-            }
+            purgeWipedAccountSources(wipedRef, wipedShareAccount)
             val refreshedAccountsResult =
                 runCatchingCancellable {
                     marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
                 }
-            val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
+            val refreshedAccounts = refreshedAccountsResult.getOrElse { accounts.filterNot { it.label == wipedRef } }
             val retainedAccountGeneration =
                 accountListLifetime.advance {
                     publishRefreshedAccountList(refreshedAccountsResult)
@@ -5837,6 +5721,11 @@ class WhiteNoiseAppState private constructor(
                     // transient failure must not wipe every other account's mutes (#2782 follow-up).
                     refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
                         retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+                        if (retireSession) {
+                            publicJpegPreviewPreferences
+                                .retainAccounts(successfulAccounts.map(AccountSummaryFfi::accountIdHex))
+                                .forEach(publicJpegPreviewLoader::clearPixels)
+                        }
                     }
                 }
             refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
@@ -5845,7 +5734,9 @@ class WhiteNoiseAppState private constructor(
                 }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
-            val next = signOutOutcome(refreshedAccounts, wipedRef).nextActiveRef
+            val completion = AccountWipeCompletion(outcome, wipeReport(outcome, mediaFailure))
+            if (!retireSession) return completion
+            val next = nextActiveAfterWipe(refreshedAccounts, wipedRef, inView)
             activeAccountRef = next
             preferences
                 .edit()
@@ -5862,45 +5753,26 @@ class WhiteNoiseAppState private constructor(
             notificationNetworkRecovery.resumeIfPending()
             refreshLocalNotificationSettings()
             diagnostics.refresh(marmot())
-            return outcome
+            return completion
         } finally {
             // Backstop: the suppression bracket must not outlive this call
             // whatever throws above — a latched flag would silently disable
             // network-restore recovery until process death.
-            networkNotificationRecoverySuppressed = false
+            if (retireSession) networkNotificationRecoverySuppressed = false
         }
     }
 
     /**
-     * Publishes the account list a post-wipe read produced. A failed read leaves an empty list that is not
-     * authoritative, so surviving accounts' automatic work waits for the next successful read instead of ending.
+     * Publishes the account list a post-wipe read produced. A failed read retains the known survivors as a non-
+     * authoritative projection. Automatic work waits for the next successful read.
      */
     internal fun publishRefreshedAccountList(result: Result<List<AccountSummaryFfi>>) {
-        accounts = result.getOrDefault(emptyList())
+        result.onSuccess { accounts = it }
         accountListLoaded = result.isSuccess
     }
 
-    /** Commits one host preference transaction off-main and times actual durable completion. */
-    @Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
     private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) {
-        val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
-        val editor =
-            try {
-                preferences.edit().apply(edit)
-            } catch (throwable: Throwable) {
-                attempt.failure()
-                throw throwable
-            }
-        mutationsScope
-            .launch {
-                hostPreferenceCommitMutex.withLock {
-                    withContext(Dispatchers.IO) {
-                        completeHostPreferenceCommit(attempt, editor::commit)
-                    }
-                }
-            }.invokeOnCompletion { cause ->
-                if (cause is CancellationException) attempt.cancel()
-            }
+        persistHostSetting(preferences, hostPreferenceCommitMutex, edit)
     }
 
     fun updateDeveloperMode(enabled: Boolean) {
@@ -6107,13 +5979,6 @@ class WhiteNoiseAppState private constructor(
     fun acknowledgeTtsTrustWarning(enginePackage: String) {
         ttsWarningPreferences.acknowledge(enginePackage)
     }
-
-    fun runtimeTrustForTtsSelectionWarning(enginePackage: String) =
-        runtimeTrustForSelectionWarning(
-            enginePackage = enginePackage,
-            adoptedHandle = ttsResolution?.handle,
-            selectedOverride = ttsEnginePreferences.selectedEngine(),
-        )
 
     fun selectTtsEngine(enginePackage: String) {
         mutationsScope.launch {
@@ -6710,6 +6575,7 @@ class WhiteNoiseAppState private constructor(
         } else {
             appLock.onAppBackgrounded()
             conversationDictation.onAppBackgrounded()
+            voiceNotes.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
             appLock.scheduleTtsStopAtLockBoundary()
         }
@@ -6761,6 +6627,7 @@ class WhiteNoiseAppState private constructor(
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.onTaskRemoved()
+        voiceNotes.onAppBackgrounded()
         // The app-state lifecycle is authoritative even if the TTS foreground
         // service has not started yet or its start was rejected.
         stopSpeaking()
@@ -7128,7 +6995,7 @@ class WhiteNoiseAppState private constructor(
         if (isContactRefBeingCleared(account)) return
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
-            bumpProfileAccountRevision(accountIdHex)
+            profileAccountRevisions.bump(accountIdHex)
             notificationNicknameRefresh.refresh(account, accountIdHex)
         }
     }
@@ -7453,7 +7320,7 @@ class WhiteNoiseAppState private constructor(
                 }
                 warmPrivateContactAvatar(account, contact)
                 contactNicknameRevision += 1
-                bumpProfileAccountRevision(contact)
+                profileAccountRevisions.bump(contact)
                 mutationsScope.launch { refreshPrivateContactPresentation(account, contact, adoptLegacy = true) }
             }
         }
@@ -7505,13 +7372,10 @@ class WhiteNoiseAppState private constructor(
     ): Pair<String, Boolean>? {
         val existing = marmotIo { existingDirectConversation(account, contact) }?.takeIf { it.reusable } ?: return null
         val row = marmotIo { presentedChatListRow(account, existing.groupIdHex) } ?: return null
-        val item = chatListItemFromProjection(row.row, row.presentation, row.avatarAsset)
+        val owner = accounts.firstOrNull { it.label == account }?.accountIdHex
+        val item = chatListItemFromProjection(row.row, row.presentation, row.avatarAsset, activeAccountIdHex = owner)
         val peer =
-            GroupProjector.avatarAccount(
-                item.group,
-                item.presentationOtherMemberAccount,
-                item.presentationMemberCount,
-            )
+            item.avatarAccount
         if (peer != contact || row.row.groupIdHex != existing.groupIdHex) return null
         val contactIcon =
             !GroupProjector.ownsGroupPicture(item.group, row.avatarAsset, row.presentation.avatarSource.isPeerSourced())
@@ -7530,7 +7394,7 @@ class WhiteNoiseAppState private constructor(
         synchronized(profilePresentationLock) { !profilePresentations.containsKey(accountIdHex) }
 
     /** Profile publication or account-cache reset invalidates last-drawn top-bar pixels. */
-    internal val profilePresentationEpochForCompose: Int get() = profileAccountRevisionEpoch
+    internal val profilePresentationEpochForCompose: Int get() = profileAccountRevisions.epoch
 
     /**
      * Start local profile materialization and image decoding without waiting for
@@ -7675,7 +7539,7 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
-        if (accountRef != null) conversationDictation.onTargetRemoved(accountRef, groupIdHex)
+        if (accountRef != null) releaseCaptureTarget(accountRef, groupIdHex)
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {
@@ -7785,6 +7649,9 @@ class WhiteNoiseAppState private constructor(
 
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
+        pendingProfilePresentationId++
+        pendingProfileContour = null
+        pendingProfileOrigin = null
         pendingProfileGroupsInCommon = false
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
@@ -7799,7 +7666,18 @@ class WhiteNoiseAppState private constructor(
     fun presentProfile(
         npub: String,
         groupsInCommon: Boolean = false,
+        origin: androidx.compose.ui.geometry.Rect? = null,
+    ) = presentProfileWithContour(npub, groupsInCommon, origin, null)
+
+    internal fun presentProfileWithContour(
+        npub: String,
+        groupsInCommon: Boolean = false,
+        origin: androidx.compose.ui.geometry.Rect? = null,
+        contour: dev.ipf.whitenoise.android.ui.settings.SettingsContour? = null,
     ) {
+        pendingProfilePresentationId++
+        pendingProfileOrigin = origin?.takeUnless { it.isEmpty }
+        pendingProfileContour = contour
         pendingProfileGroupsInCommon = groupsInCommon
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
@@ -7809,7 +7687,11 @@ class WhiteNoiseAppState private constructor(
     fun presentDiscoveredProfile(
         npub: String,
         profile: UserProfileMetadataFfi?,
+        origin: androidx.compose.ui.geometry.Rect? = null,
     ) {
+        pendingProfilePresentationId++
+        pendingProfileContour = null
+        pendingProfileOrigin = origin?.takeUnless { it.isEmpty }
         pendingProfileGroupsInCommon = false
         pendingProfileMetadata = profile
         pendingProfileFromDiscovery = true
@@ -7913,6 +7795,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun clearPresentedProfile() {
+        pendingProfilePresentationId++
+        pendingProfileContour = null
+        pendingProfileOrigin = null
         pendingProfileGroupsInCommon = false
         pendingProfileNpub = null
         pendingProfileMetadata = null
@@ -7975,7 +7860,8 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): ChatListItem {
         val projection = loadNotificationChatListProjection(accountRef, groupIdHex)
-        return chatListItemFromNotificationProjection(projection)
+        val owner = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+        return chatListItemFromNotificationProjection(projection, owner)
     }
 
     /**
@@ -8299,7 +8185,7 @@ class WhiteNoiseAppState private constructor(
         if (canonicalNpub == null || npubs.get(accountIdHex) == canonicalNpub) return
         npubs.put(accountIdHex, canonicalNpub)
         profileRevision += 1
-        bumpProfileAccountRevision(accountIdHex)
+        profileAccountRevisions.bump(accountIdHex)
     }
 
     /** Read one persisted profile without mutating the active account caches. */
@@ -8351,7 +8237,7 @@ class WhiteNoiseAppState private constructor(
         }
         if (changed) {
             profileRevision += 1
-            bumpProfileAccountRevision(accountIdHex)
+            profileAccountRevisions.bump(accountIdHex)
             scheduleInviteNotificationIdentityRefresh(accountIdHex, presentation)
             refreshProfileNotificationChannelLabels(accountIdHex, presentation.displayName)
             val viewers = accounts.filter { !it.signedOut && contactPictureStore.hasChoice(it.label, accountIdHex) }
@@ -8371,7 +8257,7 @@ class WhiteNoiseAppState private constructor(
             profileMaterializations.clear()
         }
         profileRevision += 1
-        bumpAllProfileAccountRevisions()
+        profileAccountRevisions.reset()
     }
 
     // Keep platform callbacks at the end of instance initialization. These
@@ -8416,7 +8302,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     companion object {
-        private const val ACTIVE_ACCOUNT_KEY = "active_account"
+        internal const val ACTIVE_ACCOUNT_KEY = "active_account"
         private const val DEVELOPER_MODE_KEY = "developer_mode"
         private const val STREAMING_DEBUG_MODE_KEY = "streaming_debug_mode"
         private const val FORCE_INCOGNITO_KEYBOARD_KEY = "force_incognito_keyboard"

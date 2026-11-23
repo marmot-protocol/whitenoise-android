@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.Animatable
@@ -29,10 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +51,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.layoutId
@@ -69,11 +64,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -88,10 +81,6 @@ import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
-import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrAfter
-import dev.ipf.whitenoise.android.core.codePointBoundaryAtOrBefore
-import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrAfter
-import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.ComposerShortcut
@@ -105,7 +94,6 @@ import dev.ipf.whitenoise.android.translation.ComposerTranslationState
 import dev.ipf.whitenoise.android.translation.ComposerTranslationSync
 import dev.ipf.whitenoise.android.translation.rememberComposerTranslation
 import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary
-import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
@@ -118,8 +106,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppr
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.rememberInstalledEmojiPicker
@@ -180,16 +166,6 @@ internal fun composerBottomClusterModifier(
 }
 
 /**
- * A focus request emits its own focus callback. Ignore that callback while a
- * pane-to-IME handoff is already running so it cannot start a second keyboard
- * request and a second transcript re-anchor.
- */
-internal fun shouldStartComposerKeyboardRestore(
-    paneOpen: Boolean,
-    keyboardRestorePending: Boolean,
-): Boolean = paneOpen && !keyboardRestorePending
-
-/**
  * Starting a reply grows the bottom input cluster by inserting the preview card.
  * Re-anchor only on the null -> non-null edge; recompositions while the same
  * reply is active must not keep stealing scroll while the user types (#1109).
@@ -198,122 +174,6 @@ internal fun shouldReanchorBottomInputForReplyTargetChange(
     hadReplyTarget: Boolean,
     hasReplyTarget: Boolean,
 ): Boolean = hasReplyTarget && !hadReplyTarget
-
-/**
- * Explains the disabled composer. [deviceRemoved] says only this device left the group while the account
- * stays in through another device, so it must not read as the account's removal.
- */
-@Composable
-internal fun RemovedMemberComposerNotice(
-    modifier: Modifier = Modifier,
-    deviceRemoved: Boolean = false,
-) {
-    BottomPanelSurface(modifier = modifier.navigationBarsPadding()) {
-        Text(
-            // Explains the disabled composer for a member who left or was removed, or a device that was
-            // removed while its account stays in. The timeline system row carries the left-vs-removed distinction.
-            text =
-                stringResource(
-                    if (deviceRemoved) {
-                        R.string.device_removed_from_group_composer
-                    } else {
-                        R.string.you_are_no_longer_a_member
-                    },
-                ),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-/**
- * Inserts an emoji at the composer's current selection, replacing any selected
- * range and moving the caret just after the inserted glyph. Kept pure so the
- * cursor math is pinned by local unit tests instead of only by Compose wiring.
- */
-internal fun insertEmojiAtSelection(
-    value: TextFieldValue,
-    emoji: String,
-): TextFieldValue {
-    val text = value.text
-    val rawStart = minOf(value.selection.start, value.selection.end).coerceIn(0, text.length)
-    val rawEnd = maxOf(value.selection.start, value.selection.end).coerceIn(rawStart, text.length)
-    val collapsed = rawStart == rawEnd
-    val start =
-        if (collapsed) {
-            text.graphemeBoundaryAtOrAfter(rawStart)
-        } else {
-            text.graphemeBoundaryAtOrBefore(rawStart)
-        }
-    val end = if (collapsed) start else text.graphemeBoundaryAtOrAfter(rawEnd)
-    val updatedText =
-        buildString {
-            append(text, 0, start)
-            append(emoji)
-            append(text, end, text.length)
-        }
-    val caret = start + emoji.length
-    return value.copy(text = updatedText, selection = TextRange(caret), composition = null)
-}
-
-/** Deletes the selected range, or the code point before a clamped caret. */
-internal fun deleteComposerSelectionOrPreviousCodePoint(value: TextFieldValue): TextFieldValue? {
-    val text = value.text
-    val rawStart = minOf(value.selection.start, value.selection.end).coerceIn(0, text.length)
-    val rawEnd = maxOf(value.selection.start, value.selection.end).coerceIn(rawStart, text.length)
-    val hasSelection = rawStart != rawEnd
-    val rangeStart =
-        if (hasSelection) {
-            text.codePointBoundaryAtOrBefore(rawStart)
-        } else {
-            text.codePointBoundaryAtOrAfter(rawStart)
-        }
-    val rangeEnd = if (hasSelection) text.codePointBoundaryAtOrAfter(rawEnd) else rangeStart
-    if (rangeStart == 0 && !hasSelection) return null
-    val deleteStart = if (hasSelection) rangeStart else text.offsetByCodePoints(rangeStart, -1)
-    val updatedText = text.removeRange(deleteStart, rangeEnd)
-    return value.copy(text = updatedText, selection = TextRange(deleteStart), composition = null)
-}
-
-internal fun repairComposerMentionEdit(
-    oldValue: TextFieldValue,
-    proposedValue: TextFieldValue,
-    clampMentionSelection: Boolean,
-): TextFieldValue {
-    val repaired =
-        MentionComposer.wholeChipBackspace(
-            oldText = oldValue.text,
-            oldCaret = oldValue.selection.start,
-            newText = proposedValue.text,
-            newCaret = proposedValue.selection.start,
-        )
-            ?: MentionComposer.repairChipDeletion(
-                oldText = oldValue.text,
-                newText = proposedValue.text,
-                includeAdjacentOwnedSeparator = oldValue.selection.collapsed,
-            )
-    val edited =
-        repaired?.let { TextFieldValue(text = it.text, selection = TextRange(it.selection)) }
-            ?: proposedValue
-    if (!clampMentionSelection) return edited
-
-    val clamped =
-        MentionComposer.clampSelectionOutOfChips(
-            edited.text,
-            edited.selection.start,
-            edited.selection.end,
-        )
-    return if (clamped.start != edited.selection.start || clamped.end != edited.selection.end) {
-        edited.copy(selection = TextRange(clamped.start, clamped.end))
-    } else {
-        edited
-    }
-}
 
 /**
  * Hoisted composer text state (#1206). Sharing one instance across the main
@@ -439,6 +299,7 @@ internal fun rememberComposerTextState(
 @Composable
 internal fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
+    ownerAccountIdHex: String? = null,
     replyingToMedia: List<MediaAttachmentReferenceFfi> = emptyList(),
     replyingToDisplay: TimelineReplyDisplay? = null,
     replyingToEmoji: dev.ipf.whitenoise.android.ui.ReceivedEmoji = dev.ipf.whitenoise.android.ui.ReceivedEmoji.None,
@@ -458,10 +319,12 @@ internal fun ComposerBar(
     onCaptureFromCamera: (() -> Unit)? = null,
     onPickDocument: (() -> Unit)? = null,
     onShareLocation: (() -> Unit)? = null,
+    onAttachmentRouteOrigin: (ComposerShortcut, Rect?) -> Unit = { _, _ -> },
     onShareUser: (() -> Unit)? = null,
     onShareContact: (() -> Unit)? = null,
     onCreatePoll: (() -> Unit)? = null,
     onOpenStickers: (() -> Unit)? = null,
+    onSearchGifs: (() -> Unit)? = null,
     // Rail actions of the inline emoji keyboard; each button is hidden while its callback is null.
     onBrowseEmojiSets: (() -> Unit)? = null,
     onOpenEmojiSettings: (() -> Unit)? = null,
@@ -571,6 +434,7 @@ internal fun ComposerBar(
     val platformTextToolbar = LocalTextToolbar.current
     var voiceSlotBounds by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf<Rect?>(null) }
     var heldVoiceBounds by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf<Rect?>(null) }
+    val dictationHold = remember(draftKey, draftAccountRef, draftGroupIdHex) { DictationHoldState() }
     var toolbarParentBounds by remember { mutableStateOf(Rect.Zero) }
     var toolbarParentSize by remember { mutableStateOf(IntSize.Zero) }
     var primaryActionSize by remember { mutableStateOf(IntSize.Zero) }
@@ -1153,8 +1017,7 @@ internal fun ComposerBar(
     }
     BoxWithConstraints(modifier.fillMaxWidth().onSizeChanged { lastMeasuredHeight = it.height }) {
         val statusBarTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
-        val appliesImePadding =
-            composerBottomClusterAppliesImePadding(showEmojiPane = showEmojiPane)
+        val appliesImePadding = composerBottomClusterAppliesImePadding(showEmojiPane = showEmojiPane)
         val bottomInset =
             with(density) {
                 val navigationBottom = navigationInsets.getBottom(this)
@@ -1335,12 +1198,13 @@ internal fun ComposerBar(
                                 size.height,
                                 automaticComposerHeightPx.toInt().coerceAtLeast(0),
                             )
-                        }.padding(horizontal = 16.dp, vertical = ComposerOuterVerticalPadding),
+                        }.padding(horizontal = 16.dp, vertical = ComposerOuterVerticalPadding)
+                        .composerExplanationEdge(),
                 fillEditorHeight = composerExpansion.mode != ComposerExpansionMode.Automatic,
                 minimumEditorHeight = with(density) { minimumManualComposerHeightPx.toDp() } - 12.dp,
             ) {
-                val voiceReviewClip =
-                    voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
+                val voicePhase = voiceComposerPhase(voiceRecordingController, voiceReview)
+                val voiceReviewClip = voiceReview?.clip?.takeIf { voicePhase.showsReview }
                 val replyVisible = replyingTo != null || replyExit.exiting
                 val baseAccessoryContent: (@Composable () -> Unit)? =
                     // Edit shows its pill in the action row instead, and takes precedence over a reply.
@@ -1361,6 +1225,7 @@ internal fun ComposerBar(
                                     }
                                 }
                                 if (replyingTo != null) {
+                                    val replyingToIsOwn = MessageProjector.isMine(replyingTo, ownerAccountIdHex)
                                     val replyEntrance =
                                         rememberComposerAccessoryEntrance(
                                             key = replyingTo.messageIdHex,
@@ -1368,8 +1233,7 @@ internal fun ComposerBar(
                                             motionEnabled = accessoryMotionEnabled,
                                         )
                                     Box(
-                                        // The accessory owns its shape. A second outer clip with a different
-                                        // radius trims the AMOLED reply outline at all four corners.
+                                        // The accessory owns its shape; clipping it again trims the card corners.
                                         Modifier
                                             .padding(8.dp)
                                             .composerAccessoryEntrance(replyEntrance)
@@ -1423,13 +1287,13 @@ internal fun ComposerBar(
                                             secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                             accentColor = MaterialTheme.colorScheme.primary,
                                             senderTitle =
-                                                if (replyingTo.direction == "sent") {
+                                                if (replyingToIsOwn) {
                                                     stringResource(R.string.reply_you)
                                                 } else {
                                                     appState?.displayName(replyingTo.sender)
                                                         ?: replyingTo.sender.take(8)
                                                 },
-                                            isOwn = replyingTo.direction == "sent",
+                                            isOwn = replyingToIsOwn,
                                             body = replyBody,
                                             receivedEmoji = replyingToEmoji,
                                             mediaKind = mediaKind,
@@ -1545,8 +1409,7 @@ internal fun ComposerBar(
                         )
                     }
                 }
-                val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
-                val isRecordingVoice = activeRecordingController != null
+                val isRecordingVoice = voicePhase.capturing
                 val dictationActiveInComposer =
                     dictationControlsVisible &&
                         dictationOwnedByComposer &&
@@ -1590,13 +1453,12 @@ internal fun ComposerBar(
                         onOpenStickers?.let { put(ComposerShortcut.Sticker, it) }
                     }
                 val transactionActive =
-                    isRecordingVoice ||
-                        voiceReviewClip != null ||
+                    voicePhase != VoiceComposerPhase.Idle ||
                         (dictationOwnedByComposer && dictationController?.completionControlsRequired == true)
                 val settings = toolbarPreference?.value ?: ComposerToolbarSettings()
                 val available =
                     attachmentActions.keys +
-                        setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.More) +
+                        composerAlwaysAvailableShortcuts +
                         (
                             if (appState != null &&
                                 composerSendingAccount(appState, draftAccountRef) != null
@@ -1620,8 +1482,9 @@ internal fun ComposerBar(
                 // Unpinned text actions stay reachable from the Plus menu.
                 val hiddenMenuShortcuts =
                     hiddenAttachments + (composerMenuTextShortcuts intersect available) - selectedShortcuts.toSet()
+                val hasMoreActions = hiddenMenuShortcuts.isNotEmpty() || onSearchGifs != null
                 val liveShortcuts =
-                    selectedShortcuts.filter { it != ComposerShortcut.More || hiddenMenuShortcuts.isNotEmpty() }
+                    selectedShortcuts.filter { it != ComposerShortcut.More || hasMoreActions }
                 var idleToolbar by remember(draftKey, draftAccountRef, draftGroupIdHex) {
                     mutableStateOf(settings to liveShortcuts)
                 }
@@ -1667,7 +1530,7 @@ internal fun ComposerBar(
                     canReceiveComposerContent() &&
                         voiceRecordingController?.isRecording != true &&
                         voiceReview?.clip == null &&
-                        dictationController?.blocksNewRequest != true &&
+                        dictationController.composerToolbarOpen(dictationAccountRef, dictationGroupIdHex) &&
                         !attachmentSendInFlight
                 }
 
@@ -1689,6 +1552,7 @@ internal fun ComposerBar(
                     }
                 val toolbarBindings =
                     ComposerToolbarBindings(
+                        onRouteOrigin = onAttachmentRouteOrigin,
                         settings = renderedToolbar.first,
                         shortcuts = renderedToolbar.second,
                         attachmentActions =
@@ -1742,18 +1606,34 @@ internal fun ComposerBar(
                         )
                     }
                 }
+                val dictationLauncher =
+                    startAppOwnedDictation?.takeIf {
+                        dictationController.composerDictationOpen(accountForDictation, groupForDictation) &&
+                            !isRecordingVoice &&
+                            voiceReviewClip == null
+                    }
+                val startHeldDictation =
+                    dictationLauncher?.let { start ->
+                        {
+                            if (!configuredToolbar || canActivateToolbar()) start()
+                            controllerForDictation?.takeIf {
+                                it.heldCaptureOpenFor(accountForDictation, groupForDictation)
+                            }
+                        }
+                    }
                 BoxWithConstraints(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .onGloballyPositioned { toolbarParentBounds = it.boundsInWindow() }
-                            .onSizeChanged { toolbarParentSize = it },
+                            .onSizeChanged { toolbarParentSize = it }
+                            .then(dictationHoldGesture(dictationHold, startHeldDictation)),
                 ) {
                     // Keep the field composed and focusable throughout dictation. The
                     // app-owned controls replace only the waveform slot, so an open IME
                     // stays open and a closed IME is never raised implicitly.
-                    val openComposerOverlay =
-                        composerEmojiPickerOpen || attachmentSheetState.isOpen
+                    val openComposerOverlay = composerEmojiPickerOpen || attachmentSheetState.isOpen
+                    val closeExplanation = composerExplanationClose()
                     ComposerPill(
                         sendingIdentity =
                             if (appState != null && composerSendingAccount(appState, draftAccountRef) != null) {
@@ -1779,48 +1659,15 @@ internal fun ComposerBar(
                                 .coerceIn(ComposerShortcutTarget, ComposerToolbarMaximumHeight),
                         accessoryContent = accessoryContent.takeIf { voiceReviewClip == null },
                         voiceReviewContent =
-                            voiceReviewClip?.let { reviewedClip ->
-                                {
-                                    VoiceReviewComposer(
-                                        checkNotNull(voiceReview),
-                                        reviewedClip,
-                                        voiceRecordingController,
-                                    )
-                                }
-                            },
+                            rememberVoiceReviewSlot(voiceReview, voiceReviewClip, voiceRecordingController),
                         recordingContent =
-                            activeRecordingController?.let { recordingController ->
-                                {
-                                    RecordingStripLeading(
-                                        controller = recordingController,
-                                        modifier =
-                                            Modifier
-                                                .matchParentSize()
-                                                .padding(
-                                                    start =
-                                                        if (lockedVoiceAtStart) {
-                                                            primaryTrailingActionWidth + 4.dp
-                                                        } else {
-                                                            0.dp
-                                                        },
-                                                    end =
-                                                        if (lockedVoiceAtStart) {
-                                                            0.dp
-                                                        } else {
-                                                            primaryTrailingActionWidth +
-                                                                if (expandedControlLayout) 4.dp else 12.dp
-                                                        },
-                                                ).pointerInput(recordingController) {
-                                                    awaitPointerEventScope {
-                                                        while (true) {
-                                                            val event = awaitPointerEvent()
-                                                            event.changes.forEach { it.consume() }
-                                                        }
-                                                    }
-                                                },
-                                    )
-                                }
-                            },
+                            rememberVoiceRecordingSlot(
+                                voiceRecordingController,
+                                voicePhase,
+                                primaryTrailingActionWidth,
+                                lockedVoiceAtStart,
+                                expandedControlLayout,
+                            ),
                         textFieldValue = textFieldValue,
                         readAcceptedValue = { textState.valueState.value },
                         composerFocus = composerFocus,
@@ -1859,6 +1706,7 @@ internal fun ComposerBar(
                         attachmentSheetOpen = false,
                         attachmentMenu = { bounds, textShortcuts ->
                             ComposerAttachmentMenu(
+                                onRouteOrigin = onAttachmentRouteOrigin,
                                 anchorBounds = bounds,
                                 expanded = attachmentSheetState.isOpen,
                                 onDismiss = attachmentSheetState::dismiss,
@@ -1872,6 +1720,7 @@ internal fun ComposerBar(
                                     onPickFromGallery
                                         ?.takeIf { ComposerShortcut.Gallery in hiddenAttachments }
                                         ?.let(::guardedAttachmentAction),
+                                onSearchGifs = onSearchGifs?.let(::guardedAttachmentAction),
                                 onFiles =
                                     onPickDocument
                                         ?.takeIf { ComposerShortcut.Files in hiddenAttachments }
@@ -1898,18 +1747,13 @@ internal fun ComposerBar(
                                         ?.let(::guardedAttachmentAction),
                             )
                         },
-                        // Android13+ gives the identity confirmation its single overlay-priority Back owner.
-                        // Earlier versions need this pre-IME catch to close it without hiding the keyboard.
+                        // Which popups this pre-IME catch closes before Back reaches the keyboard, per Android version.
                         preImeBackEnabled =
-                            !openComposerOverlay &&
-                                (
-                                    closeSendingIdentity == null ||
-                                        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
-                                ),
+                            !openComposerOverlay && preImeHandlesBack(closeSendingIdentity, closeExplanation),
                         onPreImeBack = {
-                            val closeConfirmation = closeSendingIdentity
-                            if (closeConfirmation != null) {
-                                closeConfirmation()
+                            val closePopup = closeExplanation ?: closeSendingIdentity
+                            if (closePopup != null) {
+                                closePopup()
                             } else if (onComposerPreImeBack != null) {
                                 onComposerPreImeBack()
                             } else {
@@ -1928,13 +1772,7 @@ internal fun ComposerBar(
                             onPasteImageUris?.takeIf {
                                 editingMessageId == null && !isRecordingVoice && voiceReviewClip == null
                             },
-                        onDictation =
-                            startAppOwnedDictation?.takeIf {
-                                dictationController?.completionControlsRequired != true &&
-                                    dictationController?.blocksNewRequest != true &&
-                                    !isRecordingVoice &&
-                                    voiceReviewClip == null
-                            },
+                        onDictation = dictationLauncher,
                         dictationControls =
                             activeDictationController?.takeIf { voiceReviewClip == null }?.let { activeController ->
                                 {
@@ -1946,7 +1784,7 @@ internal fun ComposerBar(
                                 }
                             },
                         dictationControlsWidth =
-                            dictationState.compactActionsWidth(activeDictationController?.captureInProgress == true),
+                            dictationState.compactActionsWidth(activeDictationController?.reservesLeadingSlot == true),
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
                         enterKeyBehavior = enterKeyBehavior,
@@ -2006,7 +1844,7 @@ internal fun ComposerBar(
                             composerHeightDragState = null
                         },
                         overlayBackRegistrar = overlayBackRegistrar,
-                        inputContentVisible = !isRecordingVoice && voiceReviewClip == null,
+                        inputContentVisible = !voicePhase.showsStrip && !voicePhase.showsReview,
                         inputFocusEnabled = voiceReviewClip == null,
                         expandedTrailingActionInset = primaryTrailingActionWidth,
                         compactMeasurementWidth = maxWidth,
@@ -2138,43 +1976,7 @@ internal fun ComposerBar(
                         // This call site stays shared by idle and recording states;
                         // moving it would break the active hold gesture's identity.
                         if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
-                            ComposerToolbarTargets {
-                                IconButton(
-                                    onClick = { voiceRecordingController.cancel() },
-                                    modifier =
-                                        Modifier
-                                            .width(
-                                                actionTargetWidth,
-                                            ).height(ComposerActionRowHeight)
-                                            .explainOnLongPress(
-                                                composerExplanation(
-                                                    R.string.voice_message_cancel,
-                                                    R.string.explanation_conversation_voice_delete,
-                                                ),
-                                            ),
-                                ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = stringResource(R.string.voice_message_cancel),
-                                        tint = MaterialTheme.colorScheme.error,
-                                    )
-                                }
-                            }
-                            ComposerActionDisc(
-                                onClick = { voiceRecordingController.stop() },
-                                width = actionTargetWidth,
-                                containerColor = actionColors.container,
-                                contentColor = actionColors.content,
-                                description = stringResource(R.string.voice_recording_stop),
-                                icon = R.drawable.ic_stop,
-                                modifier =
-                                    Modifier.explainOnLongPress(
-                                        composerExplanation(
-                                            R.string.voice_recording_stop,
-                                            R.string.explanation_conversation_voice_stop,
-                                        ),
-                                    ),
-                            )
+                            VoiceLockedActions(voiceRecordingController, actionTargetWidth, actionColors)
                         } else if (showPrimaryTrailingAction && showConfiguredMic) {
                             Box(contentAlignment = Alignment.BottomCenter) {
                                 LockHintAbove(controller = voiceRecordingController)
@@ -2215,6 +2017,7 @@ internal fun ComposerBar(
                             sendAction()
                         }
                     }
+                    DictationHoldHint(dictationHold)
                 }
             }
             if (emojiPaneRendered) {

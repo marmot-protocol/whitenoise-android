@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionWorker.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Notification reaction waiting for App Lock expires with an unlock instruction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionWorker.kt",
+        "anchor": "R.string.notification_action_unlock_required",
+        "test_ids": [
+          "SEC-002"
+        ]
+      },
+      {
+        "surface": "Notification reaction send failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionWorker.kt",
+        "anchor": "R.string.toast_reaction_failed",
+        "test_ids": [
+          "SEC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

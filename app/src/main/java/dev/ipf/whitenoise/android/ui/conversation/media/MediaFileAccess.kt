@@ -51,6 +51,7 @@ internal suspend fun materializeDocumentFile(
     if (retained == null) controller.enqueueInteractiveAttachmentDownload(messageIdHex, attachmentIndex, reference)
     return materializeDocumentAttachmentSource(
         context = context,
+        accountRef = checkNotNull(controller.conversationAccountRef),
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
         reference = reference,

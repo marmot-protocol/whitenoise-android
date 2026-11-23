@@ -1,0 +1,217 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.device_move_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_detail",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_dismiss",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_dismiss_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_dismiss_detail",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_failed",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_joining",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_joining",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_finish_linking",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_finish_linking",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_made",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_made",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_old_sibling",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_old_sibling",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_old_sibling_unnamed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_old_sibling_unnamed",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_overridden",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_overridden",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_section",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_title",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_waiting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_waiting",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_add_steps",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.link_device_add_steps",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_add_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.link_device_add_title",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_external_signer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.link_device_external_signer",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_in_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.link_device_in_progress",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_this_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.link_device_this_detail",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.link_device_this_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.link_device_this_title",
+        "test_ids": [
+          "SET-060",
+          "SET-061",
+          "SET-063"
+        ]
+      },
+      {
+        "surface": "Linked devices: R.string.device_move_advanced",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "R.string.device_move_advanced",
+        "test_ids": [
+          "ACC-025",
+          "SET-061"
+        ]
+      },
+      {
+        "surface": "LinkThisDeviceRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDevicesLinking.kt",
+        "anchor": "fun LinkThisDeviceRow(",
+        "test_ids": [
+          "ACC-025",
+          "SET-061"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

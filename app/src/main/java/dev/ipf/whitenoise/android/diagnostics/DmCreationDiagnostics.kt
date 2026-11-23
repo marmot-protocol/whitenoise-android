@@ -56,7 +56,7 @@ internal fun dmCreationFailure(error: Throwable): DmCreationFailure =
         is MarmotKitException.CreatedGroupProjectionUnavailable,
         is MarmotKitException.CreatedGroupMemberReportUnavailable,
         -> DmCreationFailure.CREATED_PROJECTION_UNAVAILABLE
-        is MarmotKitException.Publish -> DmCreationFailure.PUBLISH
+        is MarmotKitException.Publish, is MarmotKitException.NoUsableRelay -> DmCreationFailure.PUBLISH
         is MarmotKitException -> DmCreationFailure.OTHER_BINDING_ERROR
         else -> DmCreationFailure.UNKNOWN
     }

@@ -20,17 +20,18 @@ internal data class NostrEventReferenceOccurrence(
 internal fun nostrEventReferences(document: MarkdownDocumentFfi): List<NostrEventReferenceOccurrence> = NostrEventReferenceCollector().collect(document)
 
 /**
- * A cheap text check for the forms [nostrEventReferences] turns into cards, so a message without one skips the parse
- * and cache read a card needs: a `nostr:note1…`, `nostr:nevent1…` or `nostr:naddr1…` URI, which MDK's Markdown parser
- * recognizes only lowercase and between word boundaries, or an HTTP(S) link carrying such a NIP-19 segment. A bare
- * `note1…` token, a word such as "footnote1" and a scheme-less `njump.me/note1…` never render a card, so they do not
- * match. A link destination is matched as MDK reads it, with its Markdown backslash escapes removed, so
- * `[post](https\://njump.me/note1…)` matches too. It may still match text whose bech32 does not decode, or a `nostr:`
- * URI inside a code span.
+ * Cheap admission to the parser and event-card cache for bare public event tokens, explicit Nostr URIs and
+ * HTTP(S) link destinations. The pinned MarmotKit parser recognizes bare identifiers at word boundaries and
+ * validates their checksum before emitting a typed NostrUri. The collector still validates the decoded payload.
+ * A shape match here may be rejected by the parser, for example inside code or when its checksum is invalid.
  */
 internal fun mayNameNostrEventCardReference(text: String): Boolean =
     EVENT_ENTITY_PREFIX.containsMatchIn(text) &&
-        (NOSTR_EVENT_URI.containsMatchIn(text) || text.withoutMarkdownEscapes().containsHttpEventLink())
+        (
+            NOSTR_EVENT_URI.containsMatchIn(text) ||
+                BARE_NOSTR_EVENT.containsMatchIn(text) ||
+                text.withoutMarkdownEscapes().containsHttpEventLink()
+        )
 
 /**
  * Whether an unbroken run of non-whitespace carries an HTTP(S) scheme and, after it, the NIP-19 event segment
@@ -227,6 +228,15 @@ private val EVENT_ENTITY_PREFIX = Regex("(?i)$NIP19_EVENT_HRP")
 /** MDK's `nostr:` URI shape: lowercase, at least six data characters, not fused to a word, digit, `_` or `/`. */
 private val NOSTR_EVENT_URI =
     Regex("(?<![A-Za-z0-9_/])nostr:$NIP19_EVENT_HRP[$NIP19_BODY_CHARS]{6,}(?![A-Za-z0-9_/])")
+
+/** MarmotKit 0.17 recognizes bare events only within its 1024-byte token bound. */
+private val BARE_NOSTR_EVENT =
+    Regex(
+        "(?<![A-Za-z0-9_/@])(?<!nostr:)" +
+            "(?:note1[$NIP19_BODY_CHARS]{6,1019}|" +
+            "nevent1[$NIP19_BODY_CHARS]{6,1017}|naddr1[$NIP19_BODY_CHARS]{6,1018})" +
+            "(?![A-Za-z0-9_/])",
+    )
 
 private val HTTP_SCHEME = Regex("(?i)https?://")
 private val NIP19_EVENT_SEGMENT =

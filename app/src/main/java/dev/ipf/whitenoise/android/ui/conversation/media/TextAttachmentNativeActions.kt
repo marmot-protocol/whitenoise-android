@@ -144,6 +144,7 @@ internal fun rememberTextAttachmentNativeActions(
                         runCatchingCancellable {
                             shareAttachmentExternally(
                                 context = context,
+                                accountRef = checkNotNull(account),
                                 attachmentIndex = attachmentIndex,
                                 reference = reference,
                                 chooserTitle = shareTitle,

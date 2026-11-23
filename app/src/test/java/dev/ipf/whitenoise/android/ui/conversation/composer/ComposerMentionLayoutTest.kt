@@ -278,6 +278,7 @@ class ComposerMentionLayoutTest {
     /** Supplies a synthetic reply owner without persistence or network access. */
     private fun replyRecord() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = "parent",
             direction = "received",
             groupIdHex = "group",

@@ -83,9 +83,13 @@ class MarmotUpgradeFixtureTest {
                         runUpgradeFault(runtime, phase, receipt)
                         return@withTimeout
                     }
+                    if (phase in setOf("upgrade", "cold")) {
+                        verifyUpgradeAuditConsent(context, runtime, phase, auditChoiceEnabled(arguments))
+                    }
                     runtime.start()
                     if (phase == "seed") {
                         seed(runtime, relay, requireNotNull(arguments.getString("blobPort")), receipt)
+                        verifyUpgradeAuditConsent(context, runtime, phase, auditChoiceEnabled(arguments))
                         if (fileStoreBaseline()) verifyUpgradeStorage(runtime, phase, beforeStart = false)
                     } else if (phase in setOf("corrupt", "lost")) {
                         recoverDamagedMedia(runtime, root, receipt)
@@ -124,6 +128,13 @@ class MarmotUpgradeFixtureTest {
                 runtime.shutdownAndClose()
             }
             recordClosedStorage(root, receipt, phase)
+        }
+
+    private fun auditChoiceEnabled(arguments: Bundle): Boolean =
+        when (arguments.getString("qualificationAuditChoice")) {
+            "enabled" -> true
+            "declined" -> false
+            else -> error("Specify the baseline audit choice")
         }
 
     /** Validates the fixture layout and applies media damage only for the two recovery phases. */
@@ -193,10 +204,12 @@ class MarmotUpgradeFixtureTest {
         if (fileStoreBaseline()) seedUpgradeAvatar(runtime, receipt)
         if (fileStoreBaseline()) seedUpgradeRemoval(runtime, receipt, blobPort)
         // Keep an uploaded-but-unsent outgoing record across 0113 as well as the published attachment.
+        // This control must retain the original upload's epoch. Peer maintenance in the history group can rotate it.
+        val pendingGroup = runtime.createQualificationGroup(sender.label, "Pending upload", emptyList(), null)
         val pending =
             runtime.uploadMedia(
                 sender.label,
-                group,
+                pendingGroup,
                 MediaUploadRequestFfi(
                     listOf(MediaUploadAttachmentRequestFfi("pending.txt", "text/plain", payload(1), null, null)),
                     null,
@@ -208,6 +221,7 @@ class MarmotUpgradeFixtureTest {
         assertEquals(reference, reference.upgradeReceipt().upgradeMediaReference())
         val value =
             JSONObject(receipt.readText())
+                .put("pendingGroup", pendingGroup)
                 .put("pendingReference", reference.upgradeReceipt())
         receipt.writeText(value.toString())
         verifyHistory(runtime, value)
@@ -347,7 +361,7 @@ class MarmotUpgradeFixtureTest {
     ) {
         val value = JSONObject(receipt.readText())
         val account = value.getString("sender")
-        val group = value.getString("group")
+        val group = value.optString("pendingGroup", value.getString("group"))
         if (phase == "promote") {
             val reference = retainedPendingReference(runtime, account, group, value)
             val sent = runtime.sendMediaReference(account, group, reference, "Promoted baseline pending upload")

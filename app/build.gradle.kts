@@ -389,6 +389,8 @@ android {
         manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // GIPHY issues platform-specific keys for direct requests from shipped clients.
+        buildConfigField("String", "WHITENOISE_GIPHY_API_KEY", runtimeConfigProperty("GIPHY_API_KEY_WN_ANDROID").asBuildConfigString())
         buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "false")
         buildConfigField("boolean", "WHITENOISE_AUDIT_RUNTIME_REQUIRED", "false")
         buildConfigField("String", "WHITENOISE_AUDIT_DATA_MODE", "".asBuildConfigString())
@@ -1257,6 +1259,7 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.emoji2.emojipicker)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.window)
     implementation("net.java.dev.jna:jna:5.19.1@aar")
     implementation(libs.zxing.core)
     implementation(libs.androidx.camera.camera2)

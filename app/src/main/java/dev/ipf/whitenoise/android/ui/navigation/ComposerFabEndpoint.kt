@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,26 +17,26 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
+import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.controlMorphSurface
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 /** The shell connects only these two real controls; no composer or draft state is shared. */
 internal enum class ComposerFabEndpoint { Composer, NewMessage }
 
 internal val LocalComposerFabHandoff = staticCompositionLocalOf<MeasuredControlHandoff?> { null }
-
-/** Retains only the last measured composer height across the account-owned route handoff. */
-internal val LocalComposerFabHeight = staticCompositionLocalOf<MutableState<Dp>?> { null }
 
 /** The live editor keeps its owner; the pen's decorative glyph travels with the measured container. */
 @Composable
@@ -51,12 +49,7 @@ internal fun Modifier.composerFabSurface(
 ): Modifier {
     if (!LocalControlHandoffEndpointCurrent.current) return clearAndSetSemantics { }.drawWithContent { }
     val density = LocalDensity.current
-    val composerHeight = LocalComposerFabHeight.current
-    return onPlaced { coordinates ->
-        if (endpoint == ComposerFabEndpoint.Composer && coordinates.size.height > 0) {
-            composerHeight?.value = with(density) { coordinates.size.height.toDp() }
-        }
-    }.controlMorphSurface(
+    return controlMorphSurface(
         LocalComposerFabHandoff.current,
         endpoint,
         ControlMorphSurface(
@@ -124,25 +117,17 @@ internal fun Modifier.composerFabPenDecoration(state: MeasuredControlHandoff): M
         }
 }
 
-/** The route body may fade/travel subtly; live bottom controls remain outside that render layer. */
+/** The retained route owns body geometry; live bottom controls remain outside that native paint region. */
 internal data class ConversationBodyMotion(
-    val visibility: State<Float>,
-    val conversation: Boolean,
-    val direction: Int,
-    val suppressed: Boolean,
+    val nativeBody: NativePageBody,
 )
 
 internal val LocalConversationBodyMotion = staticCompositionLocalOf<ConversationBodyMotion?> { null }
 
-/** Applied to list/transcript content only, never the editor, pen button or shell dictation actions. */
+/** Reports the real list/transcript boundary without moving its text or the live editor. */
 @Composable
 internal fun Modifier.conversationRouteBodyMotion(): Modifier {
     val motion = LocalConversationBodyMotion.current ?: return this
-    val travel = with(LocalDensity.current) { 8.dp.toPx() }
-    return graphicsLayer {
-        alpha = conversationRouteLayerAlpha(motion.visibility.value, motion.conversation, motion.suppressed)
-        translationX =
-            travel * motion.direction *
-            conversationRouteLayerTranslation(motion.visibility.value, motion.conversation, motion.suppressed)
-    }
+    val view = LocalView.current
+    return onGloballyPositioned { motion.nativeBody.bounds = it.settingsMorphBounds(view) }
 }

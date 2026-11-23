@@ -31,16 +31,6 @@ internal const val CONVERSATION_DICTATION_PREFERENCES_NAME = "whitenoise"
 
 private const val READINESS_UI_FRAME_MILLIS = 16L
 
-/** Native recorder closure never mutates controller ownership from a capture thread. */
-internal fun mainThreadDictationCaptureClosure(onClosed: () -> Unit): () -> Unit =
-    {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            onClosed()
-        } else {
-            Handler(Looper.getMainLooper()).post(onClosed)
-        }
-    }
-
 /** Attachment may precede generation registration, so caller-audio failures always queue to main. */
 internal fun mainThreadDictationCallerAudioFailure(
     listener: ConversationDictationRecognitionListener,
@@ -74,6 +64,10 @@ internal class AndroidConversationDictationPlatform(
     private val dictationPreferences by lazy { ConversationDictationPreferences(context) }
 
     override fun beginCaptureSession() = callerAudio.beginSession()
+
+    override fun followUpCaptureSupported(): Boolean = callerAudio.usedThisSession
+
+    override fun followUpCaptures(): ConversationDictationFollowUpCaptures = callerAudio
 
     /**
      * Remembers what each provider build answered about caller-supplied audio.
@@ -511,11 +505,16 @@ private class AndroidConversationDictationRecognitionSession(
     }
 
     /** Starts listening for one final free-form result without requesting partial hypotheses. */
-    override fun start() {
+    override fun start() = start(requireCallerAudio = false)
+
+    override fun startWithCallerAudio() = start(requireCallerAudio = true)
+
+    private fun start(requireCallerAudio: Boolean) {
         check(!started && !destroyed)
         started = true
         val capturing = callerAudio?.start() == true
         callerAudioCapturing = capturing
+        check(!requireCallerAudio || capturing) { "Caller-audio drain requires a provider audio stream" }
         conversationDictationDiagnostic("event=platform_start_listening caller_audio=$capturing")
         val intent = startIntent(capturing)
         // Both descriptors stay open until capture ends. SpeechRecognizer.startListening only
@@ -562,20 +561,20 @@ private class AndroidConversationDictationRecognitionSession(
     /** Requests a final result when no capture acknowledgement is required. */
     override fun stop() = stop {}
 
-    /** Delivers a terminal provider callback only after caller-owned audio has fully closed. */
+    /** Delivers a terminal callback after caller audio closes, queued behind any PipeFailed already posted. */
     private fun deliverAfterCallerAudioCloses(delivery: () -> Unit) {
         if (!callerAudioCapturing) {
             reportCaptureFinished()
             callerAudioCompletionBarrier.deliverImmediately(delivery)
             return
         }
-        val source = callerAudio
-        if (source == null) {
-            // Defensive only: callerAudioCapturing can become true only when this immutable stream starts.
-            callerAudioCompletionBarrier.deliverImmediately(delivery)
-            return
-        }
-        callerAudioCompletionBarrier.deliver(source::onFeedClosed, source::onCaptureClosed, delivery)
+        // Defensive only: callerAudioCapturing can become true only when this immutable stream starts.
+        val source = callerAudio ?: return callerAudioCompletionBarrier.deliverImmediately(delivery)
+        callerAudioCompletionBarrier.deliver(
+            { continuation -> source.endFeedAfterProviderTerminal { mainHandler.post(continuation) } },
+            source::onCaptureClosed,
+            delivery,
+        )
     }
 
     /** Serializes terminal callback decisions with UI actions on Android's main thread. */
@@ -660,33 +659,3 @@ private fun Bundle?.hasRecognitionText(): Boolean =
     this
         ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         ?.any { it.isNotBlank() } == true
-
-/**
- * Maps unstable Android speech errors without inventing a cause the error code does not carry.
- *
- * ERROR_SERVER used to join the two network codes, so a recognizer that never touches a network —
- * one whose model is missing, unselected or unloadable — was reported as a service that couldn't
- * connect. SpeechRecognizer has no code for "the provider has no model", and the app cannot tell an
- * on-device provider from a hosted one, so ERROR_SERVER claims only what it proves: the provider
- * could not produce a result. That is the provider's own to fix, and its recovery already opens it.
- * Only ERROR_NETWORK and ERROR_NETWORK_TIMEOUT still assert a network cause.
- */
-internal fun Int.toConversationDictationFailure(): ConversationDictationFailure =
-    when (this) {
-        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> ConversationDictationFailure.PermissionDenied
-        SpeechRecognizer.ERROR_NO_MATCH -> ConversationDictationFailure.NoMatch
-        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> ConversationDictationFailure.NoSpeech
-        SpeechRecognizer.ERROR_NETWORK,
-        SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
-        -> ConversationDictationFailure.Network
-        SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> ConversationDictationFailure.ProviderDisconnected
-        SpeechRecognizer.ERROR_AUDIO -> ConversationDictationFailure.MicrophoneInUse
-        SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
-        SpeechRecognizer.ERROR_TOO_MANY_REQUESTS,
-        -> ConversationDictationFailure.RecognizerBusy
-        SpeechRecognizer.ERROR_SERVER,
-        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
-        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
-        -> ConversationDictationFailure.ProviderUnavailable
-        else -> ConversationDictationFailure.Unknown
-    }

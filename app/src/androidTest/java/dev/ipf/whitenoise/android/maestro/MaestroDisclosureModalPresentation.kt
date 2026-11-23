@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceChoice
 import dev.ipf.whitenoise.android.ui.appendMarkdownTimestamp
 import dev.ipf.whitenoise.android.ui.common.LocalDeleteSnackbar
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
+import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceDiscardConfirmation
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewUnavailableNotice
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrLinkedImageDialog
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
@@ -53,7 +54,12 @@ internal fun MaestroDisclosureModalPresentation(fixture: MaestroPresentationFixt
         "link" -> LinkConfirmationPresentation(fixture)
         "sentences" -> SentenceChooserPresentation(fixture)
         "local" -> LocalDeletePresentation(fixture)
-        "voice" -> UnavailableRecordingPresentation(fixture)
+        "voice" ->
+            if (fixture.scenario.endsWith("-discard")) {
+                VoiceDiscardPresentation(fixture)
+            } else {
+                UnavailableRecordingPresentation(fixture)
+            }
         "nostr" -> LinkedImagePresentation(fixture)
         else -> OtherModalPresentation(fixture)
     }
@@ -244,9 +250,32 @@ private fun UnavailableRecordingPresentation(fixture: MaestroPresentationFixture
                 fixture.record("notice-dismiss")
                 showing = false
             },
-            onRecordAgain = { fixture.finish("record-again") },
+            onRecordAgain = {
+                fixture.finish("record-again")
+                true
+            },
         )
     } else {
         Button(onClick = { showing = true }) { Text("Reopen recording notice") }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun VoiceDiscardPresentation(fixture: MaestroPresentationFixture) {
+    var showing by remember { mutableStateOf(true) }
+    if (showing) {
+        VoiceDiscardConfirmation(
+            onConfirm = {
+                showing = false
+                fixture.finish("voice-discard")
+            },
+            onDismiss = {
+                fixture.record("voice-keep")
+                showing = false
+            },
+        )
+    } else {
+        Button(onClick = { showing = true }) { Text("Reopen voice discard") }
     }
 }

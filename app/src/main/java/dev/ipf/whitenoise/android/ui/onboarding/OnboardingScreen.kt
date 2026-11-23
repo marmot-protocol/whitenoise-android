@@ -17,7 +17,11 @@ import dev.ipf.whitenoise.android.state.IdentityImportOutcome
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
+import dev.ipf.whitenoise.android.state.removeUnlinkedAccount
 import dev.ipf.whitenoise.android.ui.common.clearSensitiveClipboard
+import dev.ipf.whitenoise.android.ui.devices.UnlinkedProfileRemovalDialog
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerEntry
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.RemoteSignerFlow
 import kotlinx.coroutines.launch
 
 // Single in-flight onboarding action so the two buttons can never both read as
@@ -46,12 +50,14 @@ internal fun OnboardingScreen(
     val privateKeyState = remember { TextFieldState() }
     val identity = privateKeyState.text.toString()
     var inFlightAction by remember { mutableStateOf(OnboardingAction.Idle) }
+    var remoteSigner by remember { mutableStateOf<RemoteSignerEntry?>(null) }
     var importErrorRes by remember { mutableStateOf<Int?>(null) }
     var recoveryConsentVisible by remember { mutableStateOf(false) }
     // The key an acknowledged recovery already ran for, cleared as soon as the
     // field changes, so it never outlives the attempt it belongs to. It stops a
     // failed recovery from steering the user through the prompt on every retry.
     var recoveryConsentedFor by remember { mutableStateOf<String?>(null) }
+    var unlinkedProfile by remember(identity, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -68,6 +74,7 @@ internal fun OnboardingScreen(
                 privateKeyState.setTextAndPlaceCursorAtEnd("")
                 recoveryConsentedFor = null
             }
+            is SignInStep.AskRemovalConsent -> unlinkedProfile = step.accountRef
             SignInStep.AskRecoveryConsent -> recoveryConsentVisible = true
             is SignInStep.InlineError -> importErrorRes = step.messageRes
         }
@@ -113,6 +120,42 @@ internal fun OnboardingScreen(
         }
     }
 
+    unlinkedProfile?.let { label ->
+        UnlinkedProfileRemovalDialog(
+            signingIn = true,
+            onCancel = { unlinkedProfile = null },
+            onRemove = {
+                val key = privateKeyState.text.toString().trim()
+                if (unlinkedProfile == label && key == identity.trim()) {
+                    unlinkedProfile = null
+                    runStep {
+                        val step =
+                            signInAfterRemovalConsent(
+                                label,
+                                key,
+                                appState::removeUnlinkedAccount,
+                                appState::importIdentity,
+                            )
+                        if (step is SignInStep.InlineError) appState.present(step.messageRes)
+                        step
+                    }
+                }
+            },
+        )
+    }
+
+    remoteSigner?.let { entry ->
+        RemoteSignerFlow(
+            appState,
+            onClose = { remoteSigner = null },
+            onFinished = {
+                privateKeyState.setTextAndPlaceCursorAtEnd("")
+                remoteSigner = null
+            },
+            initialLink = entry.link,
+        )
+        return
+    }
     val signUp = appState.profileSignUpForPresentation
     if (signUp != null) {
         SignUpScreen(
@@ -149,10 +192,12 @@ internal fun OnboardingScreen(
         // reused from the field rather than stashed anywhere new — it leaves
         // memory with the rest of the onboarding state.
         onRecoveryConsentConfirm = {
-            recoveryConsentVisible = false
-            val value = privateKeyState.text.toString().trim()
-            recoveryConsentedFor = value
-            runStep { recoveryStepFor(appState.recoverIncompleteIdentitySetup(value)) }
+            val value = identity.trim()
+            if (recoveryConsentVisible && privateKeyState.text.toString().trim() == value) {
+                recoveryConsentVisible = false
+                recoveryConsentedFor = value
+                runStep { recoveryStepFor(appState.recoverIncompleteIdentitySetup(value)) }
+            }
         },
         // Declining reaches no engine call at all: only the prompt closes, and
         // the entered key and sign-in button stay exactly as they were.
@@ -164,6 +209,9 @@ internal fun OnboardingScreen(
         amberSignInStage = appState.amberSignInStage,
         amberSignerAvailable = amberSignerAvailable,
         onLoginWithAmber = { startSignInAction(OnboardingAction.AmberLogin) },
+        onUseRemoteSigner = { link ->
+            if (inFlightAction == OnboardingAction.Idle) remoteSigner = RemoteSignerEntry(link)
+        },
         savedAccounts = savedAccounts,
         reactivatingAccountLabel = appState.retainedAccountReactivationRef,
         onContinueWithSavedAccount = appState::reactivateRetainedAccount,
@@ -172,14 +220,20 @@ internal fun OnboardingScreen(
                 inFlightAction = OnboardingAction.Importing
                 appState.launchMutation {
                     try {
-                        val recovered = appState.recoverSetup(accountRef)
-                        appState.presentTransient(
-                            if (recovered) {
-                                R.string.onboarding_recover_setup_success
-                            } else {
-                                R.string.onboarding_recover_setup_failed
-                            },
-                        )
+                        // The consent covered one of two things: removing an unlinked account, or recovering setup.
+                        if (savedAccounts.any { it.label == accountRef && it.unlinked }) {
+                            val removed = appState.removeUnlinkedAccount(accountRef)
+                            if (!removed) appState.present(R.string.unlinked_account_remove_failed)
+                        } else {
+                            val recovered = appState.recoverSetup(accountRef)
+                            appState.presentTransient(
+                                if (recovered) {
+                                    R.string.onboarding_recover_setup_success
+                                } else {
+                                    R.string.onboarding_recover_setup_failed
+                                },
+                            )
+                        }
                     } finally {
                         inFlightAction = OnboardingAction.Idle
                     }
@@ -215,7 +269,23 @@ internal sealed interface SignInStep {
         val messageRes: Int,
     ) : SignInStep
 
+    /** The exact saved profile MDK refused for this key. */
+    data class AskRemovalConsent(
+        val accountRef: String,
+    ) : SignInStep
+
     data object AskRecoveryConsent : SignInStep
+}
+
+/** Only a completed local cleanup permits importing the key for which the user confirmed removal. */
+internal suspend fun signInAfterRemovalConsent(
+    label: String,
+    key: String,
+    remove: suspend (String) -> Boolean,
+    signIn: suspend (String) -> IdentityImportOutcome,
+): SignInStep {
+    if (!remove(label)) return SignInStep.InlineError(R.string.unlinked_account_remove_failed)
+    return signInStepFor(signIn(key), key)
 }
 
 /**
@@ -247,6 +317,8 @@ internal fun signInStepFor(
             SignInStep.InlineError(R.string.sign_in_error_setup_key_package_retry)
         IdentityImportOutcome.SetupResetNotApplicable ->
             SignInStep.InlineError(R.string.sign_in_error_setup_unexpected_state)
+        // The key is right, so say what is wrong instead of asking the user to check it.
+        is IdentityImportOutcome.Unlinked -> SignInStep.AskRemovalConsent(outcome.accountRef)
         IdentityImportOutcome.Failed -> SignInStep.InlineError(importIdentityErrorRes(identity))
     }
 
@@ -267,6 +339,7 @@ internal fun recoveryStepFor(outcome: IdentityImportOutcome): SignInStep =
             SignInStep.InlineError(R.string.sign_in_error_setup_recovery_unexpected_state)
         // The key was well-formed enough for the engine to report a setup state a
         // moment ago, so a bare failure here is the recovery failing, not a bad key.
+        is IdentityImportOutcome.Unlinked -> SignInStep.InlineError(R.string.error_account_unlinked)
         IdentityImportOutcome.SetupRecoveryRequired,
         IdentityImportOutcome.Failed,
         -> SignInStep.InlineError(R.string.sign_in_error_setup_recovery_failed)

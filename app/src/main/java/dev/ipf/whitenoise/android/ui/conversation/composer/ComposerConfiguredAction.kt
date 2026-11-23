@@ -25,9 +25,20 @@ import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.rememberSystemPasteGuard
 import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import kotlin.math.roundToInt
 
 private const val DISABLED_VOICE_OPACITY = 0.38f
+
+/** Draws the non-interactive glyph used by the arrangement preview. */
+@Composable
+private fun ComposerShortcutPreviewGlyph(shortcut: ComposerShortcut) {
+    if (shortcut == ComposerShortcut.VoiceNote) {
+        MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        Icon(painterResource(shortcut.iconRes), null, Modifier.size(ComposerShortcutIconSize))
+    }
+}
 
 /** Reuses the existing action owners, including the trusted system Paste fallback and native attachment menu. */
 @Composable
@@ -48,13 +59,11 @@ internal fun ComposerConfiguredAction(
     onEmoji: () -> Unit,
     onDictation: (() -> Unit)?,
     sendingIdentity: (@Composable (Modifier) -> Unit)?,
+    draftJumps: ComposerDraftJumps? = null,
+    onDraftJump: (toEnd: Boolean) -> Unit = {},
 ) {
     if (preview) {
-        if (shortcut == ComposerShortcut.VoiceNote) {
-            MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
-            return
-        }
-        Icon(painterResource(shortcut.iconRes), null, Modifier.size(ComposerShortcutIconSize))
+        ComposerShortcutPreviewGlyph(shortcut)
         return
     }
     val voiceLabel = stringResource(R.string.voice_message_record)
@@ -131,6 +140,8 @@ internal fun ComposerConfiguredAction(
             }
         }
         ComposerShortcut.Translate -> ComposerTranslateAction(modifier, bindings, enabled)
+        ComposerShortcut.JumpTop, ComposerShortcut.JumpBottom ->
+            draftJumps?.let { ComposerDraftEdgeAction(shortcut, it, enabled, modifier, onDraftJump) }
         else -> ComposerOptionalShortcutAction(shortcut, modifier, bindings, enabled, onDictation)
     }
 }
@@ -172,19 +183,22 @@ private fun ComposerOptionalShortcutAction(
     onDictation: (() -> Unit)?,
 ) {
     val shortcutEnabled = enabled && (shortcut != ComposerShortcut.Dictation || onDictation != null)
-    IconButton(
-        onClick = {
-            if (bindings.canActivate()) {
+    val (originModifier, activate) =
+        rememberMeasuredControlClick { origin ->
+            if (shortcutEnabled && bindings.canActivate()) {
                 if (shortcut == ComposerShortcut.Dictation) {
                     onDictation?.invoke()
                 } else {
+                    bindings.onRouteOrigin(shortcut, origin)
                     bindings.attachmentActions[shortcut]?.invoke()
                 }
             }
-        },
+        }
+    IconButton(
+        onClick = activate,
         enabled = shortcutEnabled,
         modifier =
-            modifier.then(
+            modifier.then(originModifier).then(
                 if (shortcut == ComposerShortcut.Dictation) {
                     Modifier.dictationLauncherOrigin()
                 } else {

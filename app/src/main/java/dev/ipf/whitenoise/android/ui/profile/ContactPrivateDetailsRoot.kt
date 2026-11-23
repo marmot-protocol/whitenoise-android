@@ -17,9 +17,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropDialog
+import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 
 /** Android picker/lifecycle adapter around the existing private-details editor and pure picture controls. */
 @Composable
+// Picker launchers and editor completion must share the same contact and popup lifetime.
+@Suppress("LongMethod")
 internal fun ContactPrivateDetailsRoot(
     appState: WhiteNoiseAppState,
     account: String,
@@ -44,6 +47,13 @@ internal fun ContactPrivateDetailsRoot(
         }
     DisposableEffect(controller) { onDispose { controller.dispose() } }
     val state by controller.state.collectAsStateWithLifecycle()
+    val surface =
+        rememberPopupSurfaceMotion(
+            true,
+            onDismiss = { controller.dismiss(onDismiss) },
+            ownerKey = controller,
+            dismissEnabled = { !state.busy },
+        )
     val picker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) controller.pick(context.contentResolver, uri)
@@ -52,13 +62,14 @@ internal fun ContactPrivateDetailsRoot(
         profileName,
         nickname,
         notes,
-        onDismiss = { if (!state.busy) controller.dismiss(onDismiss) },
+        onDismiss = surface.dismiss,
+        popupMotion = surface,
         onSave = { editedNickname, editedNotes ->
             controller.save(
                 commit = { picture, current ->
                     appState.saveContactPrivateDetails(account, contact, editedNickname, editedNotes, picture, current)
                 },
-                onSaved = { controller.dismiss(onDismiss) },
+                onSaved = { surface.close { controller.dismiss(onDismiss) } },
             )
         },
         securePolicy = securePolicy,
@@ -79,6 +90,7 @@ internal fun ContactPrivateDetailsRoot(
             source.preview.asImageBitmap(),
             source.orientedSize,
             IdentityImageCropShape.Circle,
+            ownerKey = source to state.cropPresentation,
             onDismiss = controller::dismissCrop,
             onConfirm = controller::confirm,
         )

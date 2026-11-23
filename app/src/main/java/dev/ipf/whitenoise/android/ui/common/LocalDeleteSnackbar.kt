@@ -22,13 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
 
 /** A short actionable message; guidance and the privacy-safe report stay behind Details. */
 @Suppress("FunctionNaming") // Composable component follows framework naming convention.
@@ -58,7 +57,7 @@ internal fun LocalDeleteSnackbar(
         },
         dismissAction = {
             IconButton(onClick = data::dismiss) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.dismiss))
+                Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.dismiss))
             }
         },
     ) { Text(visuals.message) }
@@ -85,7 +84,7 @@ private fun LocalDeleteDetails(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.dismiss)) } },
+        confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.dismiss)) } },
         dismissButton =
             visuals.copyText?.takeIf { visuals.copyable && it.isNotBlank() }?.let { report ->
                 {

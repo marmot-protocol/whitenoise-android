@@ -1,10 +1,7 @@
 package dev.ipf.whitenoise.android
 
-import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
@@ -38,6 +35,7 @@ import dev.ipf.whitenoise.android.diagnostics.AndroidFramePerformanceReporter
 import dev.ipf.whitenoise.android.diagnostics.FramePerformanceCallbackGuard
 import dev.ipf.whitenoise.android.notifications.NotificationInboundState
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
+import dev.ipf.whitenoise.android.notifications.NotificationProfileTileRoute
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapGate
@@ -86,6 +84,7 @@ class MainActivity : AppCompatActivity() {
         set(value) {
             notificationInboundState.requestId = value
         }
+    private val notificationProfileTileRoute = NotificationProfileTileRoute()
     private var inboundAppUpdateTap by mutableIntStateOf(0)
 
     /** Pending launcher capabilities belong to this task's retained owner, never saved instance state. */
@@ -186,7 +185,7 @@ class MainActivity : AppCompatActivity() {
         pinTapGate.replayWhenDecided(lifecycleScope, ::consumeIntent)
         installAppUnlockPrompt()
         enableEdgeToEdge()
-        applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
+        window.applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
         installComposeContent()
         appState.recordHostPerformanceSince(
             HostPerformanceOperationFfi.WINDOW_INIT,
@@ -241,7 +240,7 @@ class MainActivity : AppCompatActivity() {
             // icons must follow the resolved app theme. Left on the edge-to-edge
             // default, dark icons land on a black background and disappear.
             DisposableEffect(state.themeMode, systemDarkTheme) {
-                applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
+                window.applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
                 onDispose { }
             }
             SideEffect { syncSystemBarsAndHostReadiness(darkTheme) }
@@ -253,6 +252,7 @@ class MainActivity : AppCompatActivity() {
                 appFont = state.appFont,
             ) {
                 ProvideWindowLayout {
+                    notificationProfileTileRoute.Content(state)
                     WhiteNoiseApp(
                         appState = state,
                         mainShellStateHolder = mainShellStateHolder,
@@ -282,7 +282,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun firstFrameTheme(): AppThemeMode = RuntimePolicyHooks.allowThreadDiskReads(::readPersistedThemeMode)
+    private fun firstFrameTheme(): AppThemeMode = RuntimePolicyHooks.allowThreadDiskReads(this::readPersistedThemeMode)
 
     private fun handleNotificationTarget(
         handledTarget: NotificationTarget,
@@ -397,11 +397,12 @@ class MainActivity : AppCompatActivity() {
         retainPendingShareOnRecreation: Boolean = false,
         lifecycleClass: WarmResumeLifecycleClass = warmResumeLifecycleClass,
     ) {
-        if (AppUpdateNavigation.isUpdateTap(intent)) {
-            pinTapGate.supersede()
-            inboundAppUpdateTap += 1
-            // One-shot, like the notification tap below: clear the stored intent so
-            // activity recreation cannot replay the same update tap.
+        val opensProfileChooser = notificationProfileTileRoute.accept(intent)
+        if (opensProfileChooser || AppUpdateNavigation.isUpdateTap(intent)) {
+            if (!opensProfileChooser) {
+                pinTapGate.supersede()
+                inboundAppUpdateTap += 1
+            }
             setIntent(Intent(this, MainActivity::class.java))
             return
         }
@@ -829,18 +830,6 @@ class MainActivity : AppCompatActivity() {
             recentsPreferenceSecureFlagRetained = false
         }
     }
-
-    private fun readPersistedThemeMode(): AppThemeMode =
-        AppThemeMode.fromPreference(
-            getSharedPreferences(APP_PREFERENCES_NAME, Context.MODE_PRIVATE).getString(THEME_MODE_KEY, null),
-        )
-
-    private fun applyPreComposeWindowBackground(
-        themeMode: AppThemeMode,
-        systemDarkTheme: Boolean,
-    ) {
-        window.setBackgroundDrawable(ColorDrawable(preComposeWindowBackgroundFor(themeMode, systemDarkTheme)))
-    }
 }
 
 internal const val MAX_RETAINED_SYSTEM_SPLASH_MILLIS = 300L
@@ -865,37 +854,11 @@ internal fun shouldRetainSystemSplash(
                 (phase == AppPhase.Bootstrapping || (phase == AppPhase.Ready && !firstUsefulFrameReady))
     }
 
-internal fun preComposeThemeFor(
-    themeMode: AppThemeMode,
-    systemDarkTheme: Boolean,
-): Int =
-    when (themeMode) {
-        AppThemeMode.System -> if (systemDarkTheme) R.style.Theme_WhiteNoise_Dark else R.style.Theme_WhiteNoise_Light
-        AppThemeMode.Light -> R.style.Theme_WhiteNoise_Light
-        AppThemeMode.Dark -> R.style.Theme_WhiteNoise_Dark
-        AppThemeMode.Amoled -> R.style.Theme_WhiteNoise_Amoled
-    }
-
-internal fun preComposeWindowBackgroundFor(
-    themeMode: AppThemeMode,
-    systemDarkTheme: Boolean,
-): Int =
-    when (themeMode) {
-        AppThemeMode.System -> if (systemDarkTheme) PRE_COMPOSE_BACKGROUND_DARK else PRE_COMPOSE_BACKGROUND_LIGHT
-        AppThemeMode.Light -> PRE_COMPOSE_BACKGROUND_LIGHT
-        AppThemeMode.Dark -> PRE_COMPOSE_BACKGROUND_DARK
-        AppThemeMode.Amoled -> Color.BLACK
-    }
-
 private val Configuration.isNightModeActive: Boolean
     get() = (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
-private const val APP_PREFERENCES_NAME = "whitenoise"
-private const val THEME_MODE_KEY = "theme_mode"
 internal const val BENCHMARK_RECREATE_ACTIVITY_EXTRA =
     "dev.ipf.whitenoise.android.extra.BENCHMARK_RECREATE_ACTIVITY"
-private const val PRE_COMPOSE_BACKGROUND_LIGHT = 0xFFECEEEE.toInt()
-private const val PRE_COMPOSE_BACKGROUND_DARK = 0xFF0F1112.toInt()
 private val appUnlockHostIds = AtomicLong()
 private const val APP_UNLOCK_FOREGROUND_HANDOFF_MILLIS = 5_000L
 

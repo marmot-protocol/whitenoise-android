@@ -52,14 +52,6 @@
         ]
       },
       {
-        "surface": "ProfileBannerImage",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "fun ProfileBannerImage(",
-        "test_ids": [
-          "PRO-002"
-        ]
-      },
-      {
         "surface": "ProfileSheet",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "fun ProfileSheet(",

@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/BuiltinEmojiSets.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Pre-installed set title: white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/BuiltinEmojiSets.kt",
+        "anchor": "R.string.white_noise",
+        "test_ids": [
+          "SET-059"
+        ]
+      },
+      {
+        "surface": "Pre-installed set title: emoji_name_marmot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/BuiltinEmojiSets.kt",
+        "anchor": "R.string.emoji_name_marmot",
+        "test_ids": [
+          "SET-059"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

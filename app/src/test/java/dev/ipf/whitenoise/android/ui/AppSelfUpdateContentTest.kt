@@ -145,6 +145,7 @@ class AppSelfUpdateContentTest {
         allPhases().filter { it != AppSelfUpdateState.Idle }.forEachIndexed { index, phase ->
             composeRule.runOnIdle { state.value = phase }
             composeRule.onNodeWithTag("appUpdate.cancel").performClick()
+            composeRule.waitForIdle()
             assertEquals(List(index + 1) { "cancel" }, calls)
         }
     }

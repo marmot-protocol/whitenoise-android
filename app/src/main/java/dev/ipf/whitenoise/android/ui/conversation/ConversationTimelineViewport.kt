@@ -31,6 +31,12 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.TimelineMessage
 
+/** Checks the complete measured row against the usable lazy-list viewport. */
+internal fun LazyListLayoutInfo.isItemFullyVisible(index: Int): Boolean {
+    val item = visibleItemsInfo.firstOrNull { it.index == index } ?: return false
+    return item.offset >= viewportStartOffset && item.offset + item.size <= viewportEndOffset
+}
+
 /** Separates the one native list's paint area from the measured foreground composer's reading occlusion. */
 @Stable
 internal class ConversationTimelineViewport(

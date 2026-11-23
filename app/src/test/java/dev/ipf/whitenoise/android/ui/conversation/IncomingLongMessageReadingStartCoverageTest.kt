@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.motionOwnerSource
 import dev.ipf.whitenoise.android.notifications.NotificationScenario
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
@@ -476,7 +477,7 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         sequenceOf(File("src/main"), File("app/src/main"))
             .map { File(it, "java/dev/ipf/whitenoise/android/ui/conversation/$name") }
             .first(File::isFile)
-            .readText()
+            .motionOwnerSource()
 
     /** Strips every whitespace character so a source check survives reformatting. */
     private fun String.withoutWhitespace(): String = filterNot(Char::isWhitespace)

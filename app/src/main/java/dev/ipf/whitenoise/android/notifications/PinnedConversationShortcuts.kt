@@ -280,7 +280,7 @@ internal class PinnedConversationShortcuts(
             if (privacy.allowed) {
                 notificationConversationIcon(label, capability.shortcutId, picture.bitmap?.let(::boundedPinnedAvatar))
             } else {
-                IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise)
+                IconCompat.createWithResource(context, R.drawable.ic_conversation_shortcut_mark)
             }
         val extras =
             checkNotNull(conversationShortcutAccountExtras(capability.accountRef)).apply {

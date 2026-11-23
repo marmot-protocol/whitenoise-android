@@ -13,10 +13,6 @@
           "represented_by": "home.Account"
         },
         {
-          "declaration": "\"app_updates\"",
-          "represented_by": "Home.update_controls"
-        },
-        {
           "declaration": "\"profile\"",
           "represented_by": "Account.share_connect"
         },
@@ -179,6 +175,10 @@
         {
           "declaration": "\"permission\"",
           "represented_by": "Notifications.permission"
+        },
+        {
+          "declaration": "\"profiles\"",
+          "represented_by": "Notifications.profiles"
         },
         {
           "declaration": "\"sounds\"",
@@ -776,6 +776,10 @@
           "represented_by": "home.Relays"
         },
         {
+          "declaration": "\"linked_devices\"",
+          "represented_by": "Account.linked_devices"
+        },
+        {
           "declaration": "\"chat_folders\"",
           "represented_by": "home.ChatFolders"
         },
@@ -808,6 +812,10 @@
           "represented_by": "VoiceLanguage.language"
         },
         {
+          "declaration": "\"voice_notes\"",
+          "represented_by": "home.VoiceNotes"
+        },
+        {
           "declaration": "\"read_aloud\"",
           "represented_by": "home.ReadAloud"
         },
@@ -834,6 +842,26 @@
         {
           "declaration": "\"developer_tools\"",
           "represented_by": "home.DeveloperTools"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsAppUpdates.kt": {
+      "controls": [
+        {
+          "declaration": "\"app_updates\"",
+          "represented_by": "Home.update_controls"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"voice_send_on_release\"",
+          "represented_by": "VoiceNotes.voice_send_on_release"
+        },
+        {
+          "declaration": "\"voice_transcribe_automatically\"",
+          "represented_by": "VoiceNotes.voice_transcribe_automatically"
         }
       ]
     }
@@ -956,6 +984,9 @@
     },
     "NotificationDelivery": {
       "catalog_id": "home.NotificationDelivery"
+    },
+    "VoiceNotes": {
+      "catalog_id": "home.VoiceNotes"
     }
   },
   "exclusions": {

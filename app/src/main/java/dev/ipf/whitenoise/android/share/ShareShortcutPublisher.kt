@@ -398,11 +398,7 @@ class ShareShortcutPublisher(
                     }
                 val peer =
                     item?.let {
-                        dev.ipf.whitenoise.android.core.GroupProjector.avatarAccount(
-                            it.group,
-                            it.presentationOtherMemberAccount,
-                            it.presentationMemberCount,
-                        )
+                        it.avatarAccount
                     }
                 val current = item?.let { avatarOverride(accountRef, it) }
                 if (peer != null) stampPeerShortcut(shortcut, peer, item)

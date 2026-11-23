@@ -1,5 +1,18 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.os.Handler
+import android.os.Looper
+
+/** Native recorder closure never mutates controller ownership from a capture thread. */
+internal fun mainThreadDictationCaptureClosure(onClosed: () -> Unit): () -> Unit =
+    {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            onClosed()
+        } else {
+            Handler(Looper.getMainLooper()).post(onClosed)
+        }
+    }
+
 /** Closed PCM can leave the active slot without being discarded or acquiring a microphone. */
 internal interface ConversationDictationParkedAudio {
     fun restore(): Boolean
@@ -7,25 +20,93 @@ internal interface ConversationDictationParkedAudio {
     fun discard()
 }
 
+/** Recorders that only buffer audio beside the session capture, keyed by their future session id. */
+internal interface ConversationDictationFollowUpCaptures {
+    fun beginFollowUp(sessionId: Long): Boolean
+
+    fun finishFollowUp(
+        sessionId: Long,
+        onClosed: () -> Unit,
+    ): Boolean
+
+    fun discardFollowUp(
+        sessionId: Long,
+        onClosed: () -> Unit,
+    ): Boolean
+
+    /** A follow-up becomes the session capture only when the previous one has left the slot. */
+    fun adoptFollowUp(sessionId: Long): Boolean
+}
+
 /** Main-looper owner retains a discarded recorder until its native closure is acknowledged. */
+@Suppress("TooManyFunctions")
 internal class ConversationDictationCaptureOwner(
     private val create: () -> ConversationDictationCallerAudio?,
-) {
+) : ConversationDictationFollowUpCaptures {
     private var current: ConversationDictationCallerAudio? = null
     private var closing: ConversationDictationCallerAudio? = null
+    private val followUps = LinkedHashMap<Long, ConversationDictationCallerAudio>()
+
+    /** Whether this gesture's session recorded through an app-owned capture. */
+    var usedThisSession = false
+        private set
 
     /** Old closure callbacks remain registered, but cannot claim a replacement session. */
     fun beginSession() {
         closing = null
+        usedThisSession = false
     }
 
     /** Preserve a retained recording even if a later provider lookup cannot authorize a new one. */
-    fun acquire(allowCreate: Boolean = true): ConversationDictationCallerAudio? =
-        current ?: if (allowCreate) {
-            create().also { current = it }
+    fun acquire(allowCreate: Boolean = true): ConversationDictationCallerAudio? {
+        val capture =
+            current ?: if (allowCreate) {
+                create().also { current = it }
+            } else {
+                null
+            }
+        if (capture != null) usedThisSession = true
+        return capture
+    }
+
+    /** Records beside the session capture without attaching a provider stream. */
+    override fun beginFollowUp(sessionId: Long): Boolean {
+        val capture = if (sessionId !in followUps) create() else null
+        if (capture == null) return false
+        val started = capture.start()
+        if (started) {
+            followUps[sessionId] = capture
         } else {
-            null
+            capture.discard()
         }
+        return started
+    }
+
+    override fun finishFollowUp(
+        sessionId: Long,
+        onClosed: () -> Unit,
+    ): Boolean {
+        val capture = followUps[sessionId] ?: return false
+        capture.finish(mainThreadDictationCaptureClosure(onClosed))
+        return true
+    }
+
+    override fun discardFollowUp(
+        sessionId: Long,
+        onClosed: () -> Unit,
+    ): Boolean {
+        val capture = followUps.remove(sessionId) ?: return false
+        capture.discard(mainThreadDictationCaptureClosure(onClosed))
+        return true
+    }
+
+    override fun adoptFollowUp(sessionId: Long): Boolean {
+        val capture = (if (current == null) followUps.remove(sessionId) else null) ?: return false
+        closing = null
+        current = capture
+        usedThisSession = true
+        return true
+    }
 
     fun hasPending(): Boolean = current?.hasPending() == true
 

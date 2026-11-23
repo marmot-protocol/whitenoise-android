@@ -25,7 +25,6 @@ import dev.ipf.whitenoise.android.ui.settings.ChatsScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -105,17 +104,21 @@ class QuickAccountSwitchingUiTest {
         assertEquals(listOf(B.label), switches)
     }
 
-    /** The active avatar keeps its own selector destination while the row switches directly. */
-    @Test fun activeAvatarStillOpensTheSelectorAlongsideTheRow() {
+    /** The active avatar opens Settings even with another account in the quick-switch row. */
+    @Test fun activeAvatarOpensSettingsAlongsideTheRow() {
         val app = state(listOf(A, B))
         app.updateQuickAccountSwitching(true)
-        val switches = mutableListOf<String>()
-        render(app, onSwitchTo = { switches += it })
+        var settings = 0
+        render(app, onSettings = { settings++ })
 
-        composeRule.onNodeWithTag("chats.switchProfile").performClick()
+        composeRule.onNodeWithTag(OTHER_ACCOUNT_STACK_TAG).assertExists()
+        composeRule
+            .onNodeWithTag("chats.switchProfile")
+            .assertContentDescriptionContains(context.getString(R.string.open_settings), substring = true)
+            .performClick()
 
-        composeRule.onNodeWithTag("profile_switcher.profile.b").assertExists()
-        assertTrue(switches.isEmpty())
+        assertEquals(1, settings)
+        composeRule.onNodeWithTag(ACCOUNT_SELECTOR_CONTENT_TAG).assertDoesNotExist()
     }
 
     /** Native search mode suppresses all account chrome without replacing its search/voice controls. */

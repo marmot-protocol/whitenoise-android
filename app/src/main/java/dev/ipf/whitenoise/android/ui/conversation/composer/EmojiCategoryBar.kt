@@ -31,7 +31,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.EmojiCategory
+import dev.ipf.whitenoise.android.ui.EmojiPickerTab
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Backspace
@@ -45,7 +45,7 @@ internal const val EMOJI_PICKER_BROWSE_SETS_TEST_TAG = "emoji.picker.browse_sets
 internal const val EMOJI_PICKER_SETTINGS_TEST_TAG = "emoji.picker.settings"
 
 /** Stable test tag for an emoji category toggle. */
-internal fun emojiPickerCategoryTestTag(category: EmojiCategory): String = "emoji.picker.category.${category.id}"
+internal fun emojiPickerCategoryTestTag(category: EmojiPickerTab): String = "emoji.picker.category.${category.id}"
 
 private val EmojiCategoryBarMinimumHeight = 56.dp
 private val EmojiCategoryToggleSize = 48.dp
@@ -61,13 +61,13 @@ private val EmojiCategoryBarEdgeInset = 12.dp
  */
 @Composable
 internal fun EmojiCategoryBar(
-    categories: List<EmojiCategory>,
-    selected: EmojiCategory?,
+    categories: List<EmojiPickerTab>,
+    selected: EmojiPickerTab?,
     state: LazyListState,
     onSearch: (() -> Unit)?,
     onConfigure: (() -> Unit)?,
     onBackspace: (() -> Unit)?,
-    onCategory: (EmojiCategory) -> Unit,
+    onCategory: (EmojiPickerTab) -> Unit,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -166,7 +166,7 @@ private fun EmojiCategoryBarLeadingActions(
 /** One category glyph toggle in the bar. */
 @Composable
 private fun EmojiCategoryToggle(
-    category: EmojiCategory,
+    category: EmojiPickerTab,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -190,12 +190,7 @@ private fun EmojiCategoryToggle(
                 },
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painter = painterResource(category.iconRes),
-                    contentDescription = stringResource(category.titleRes),
-                    modifier = Modifier.size(EmojiCategoryIconSize),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                EmojiPickerTabIcon(category, EmojiCategoryIconSize, MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

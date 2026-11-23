@@ -75,7 +75,7 @@ class NewGroupScreenshotTest {
     @Test fun setupDark() = setup("group_setup_dark.png", dark = true)
 
     /** AMOLED setup and primary action. */
-    @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true)
+    @Test fun setupAmoled() = setup("group_setup_amoled.png", dark = true, amoled = true, description = "")
 
     /** Native image work gets feedback and disabled competing controls. */
     @Test fun setupPreparing() = setup("group_setup_preparing.png", preparing = true)
@@ -143,7 +143,7 @@ class NewGroupScreenshotTest {
                         false,
                         false,
                         partial,
-                        NewGroupRecipientActions({}, {}, {}, {}, {}, {}, {}, {}),
+                        NewGroupRecipientActions({}, {}, {}, {}, {}, {}, {}, { _, _ -> }),
                         isValidNpub = { true },
                         startingAs = StartingAccount("a".repeat(64), "Carol", null, "npub1carol"),
                         addressLookupFailed = addressFailed,
@@ -165,11 +165,12 @@ class NewGroupScreenshotTest {
         canonical: Boolean = false,
         recovery: Boolean = false,
         unknown: Boolean = false,
+        description: String = "A place to coordinate our next trip.",
     ) {
         val draft =
             NewGroupDraft(
                 TextFieldState("Weekend plans"),
-                TextFieldState("A place to coordinate our next trip."),
+                TextFieldState(description),
                 retryGroupIdHex = if (canonical) "canonical" else null,
                 imageNeedsReselection = reselect,
             )

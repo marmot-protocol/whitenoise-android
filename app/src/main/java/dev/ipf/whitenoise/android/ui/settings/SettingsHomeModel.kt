@@ -113,7 +113,7 @@ internal enum class SettingsHomeRow(
     ),
     HelpSupport(
         R.string.settings_help_support,
-        R.drawable.ic_info,
+        R.drawable.ic_help,
         "help_support",
         SettingsDetail.HelpSupport,
         SettingsHomeSection.Assist,
@@ -257,6 +257,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         -> SettingsDetail.Chats
         SettingsDetail.EmojiSets -> SettingsDetail.CustomEmoji
         SettingsDetail.Language,
+        SettingsDetail.VoiceNotes,
         SettingsDetail.TextToSpeech,
         SettingsDetail.Translation,
         SettingsDetail.Dictation,

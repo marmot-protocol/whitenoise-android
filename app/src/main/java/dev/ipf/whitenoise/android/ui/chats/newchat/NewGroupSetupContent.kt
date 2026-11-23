@@ -44,6 +44,8 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.emojiSheetFieldAnchor
+import dev.ipf.whitenoise.android.ui.common.rememberEmojiSheetOpener
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
@@ -51,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -138,15 +141,24 @@ internal fun NewGroupSetupContent(
                     Modifier.fillMaxWidth().padding(start = 16.dp, top = 24.dp, end = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    val openBelowName = rememberEmojiSheetOpener(draft.nameEmojiAnchor)
                     WhiteNoiseTextField(
                         state = draft.name,
                         enabled = state.detailsEditable,
-                        modifier = Modifier.fillMaxWidth().testTag("group_setup.name"),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .emojiSheetFieldAnchor(draft.nameEmojiAnchor)
+                                .testTag("group_setup.name"),
                         label = { Text(stringResource(R.string.group_name)) },
                         lineLimits = TextFieldLineLimits.SingleLine,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         leadingIcon = {
-                            TextEntryEmojiAction(state.emojiOpen, state.detailsEditable, actions.emoji)
+                            TextEntryEmojiAction(
+                                pickerOpen = state.emojiOpen,
+                                enabled = state.detailsEditable,
+                                onClick = { openBelowName(actions.emoji) },
+                            )
                         },
                     )
                     WhiteNoiseTextField(
@@ -155,7 +167,7 @@ internal fun NewGroupSetupContent(
                         enabled = state.detailsEditable,
                         modifier = Modifier.fillMaxWidth().testTag("group_setup.description"),
                         label = { Text(stringResource(R.string.description)) },
-                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 6),
+                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                     )
                 }
             }
@@ -311,12 +323,15 @@ internal fun GroupCreationBottomAction(
     onClick: () -> Unit,
     tag: String,
 ) {
+    // Only the picker Continue action navigates to another full-screen page.
+    val (origin, navigate) =
+        if (tag == "new_group.continue") rememberSettingsRouteClick(onClick) else Modifier to onClick
     SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow) {
         WhiteNoiseButton(
-            onClick = onClick,
+            onClick = navigate,
             enabled = enabled,
             modifier =
-                Modifier.widthIn(max = 520.dp).fillMaxWidth().testTag(tag).let {
+                Modifier.then(origin).widthIn(max = 520.dp).fillMaxWidth().testTag(tag).let {
                     if (tag == "new_group.continue") {
                         it.performanceTestTag(PerformanceTestTags.CONTACT_PICKER_NEXT)
                     } else {

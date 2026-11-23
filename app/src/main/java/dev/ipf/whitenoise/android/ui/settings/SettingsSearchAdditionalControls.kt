@@ -109,6 +109,16 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             R.string.notification_show_previews_detail,
         )
         control(
+            "Notifications.profiles",
+            R.string.notification_profiles_title,
+            R.string.notifications,
+            SettingsDetail.Notifications,
+            "search.Notifications.2",
+            "profiles",
+            R.string.explanation_privacy_notif_profiles,
+            aliases = R.string.settings_search_alias_notification_profiles,
+        )
+        control(
             "Notifications.permission",
             R.string.notification_permission_status,
             R.string.notification_delivery_battery,

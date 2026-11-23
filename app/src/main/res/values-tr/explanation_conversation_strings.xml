@@ -34,6 +34,7 @@
     <string name="explanation_conversation_header_details">Üyeler ve ayarlar gibi bu sohbetin ayrıntılarını açar.</string>
     <string name="explanation_conversation_jump_to_mention">Sizden bahseden bir sonraki okunmamış mesaja kaydırır.</string>
     <string name="explanation_composer_draft_top">Taslağı ilk satıra kaydırır. Metin değişmez.</string>
+    <string name="explanation_composer_draft_bottom">Taslağı son satıra kaydırır. Metin değişmez.</string>
     <string name="explanation_emoji_search">Emojileri adına göre arar.</string>
     <string name="explanation_emoji_configure">Hızlı tepki emojilerinizi seçtiğiniz ayarları açar.</string>
 
@@ -59,4 +60,5 @@
     <string name="explanation_message_action_info">Bu mesajın ne zaman gönderildiğini ve alındığını, kimin gönderdiğini, kimliğini ve durumunu gösterir.</string>
     <string name="explanation_message_action_report">Bu grubun yöneticileri, White Noise ekibi veya her ikisi için bir bildirim formu açar. Siz onaylayana kadar hiçbir şey gönderilmez.</string>
     <string name="explanation_message_action_delete">Bu mesajı yalnızca bu cihazdan veya herkes için silmenizi sağlar. Herkes için silme geri alınamaz. Siz seçmeden hiçbir şey silinmez.</string>
+    <string name="explanation_conversation_dictation_continue">Sonraki bölümü hemen kaydetmeye başlar. Önceki söylediklerin hâlâ metne dönüştürülüyor ve önce onlar eklenecek.</string>
 </resources>

@@ -6,14 +6,16 @@ import androidx.annotation.StringRes
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.captureSharedPlaintextWrite
+import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
+import dev.ipf.whitenoise.android.media.sharedPlaintextSuffix
+import dev.ipf.whitenoise.android.media.withSharedPlaintextWrite
 import dev.ipf.whitenoise.android.share.OutboundShareStream
 import dev.ipf.whitenoise.android.share.launchOutboundShare
 import dev.ipf.whitenoise.android.share.outboundShareIntent
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * Stream an already-materialized video into a share-safe FileProvider temp and
@@ -29,18 +31,29 @@ internal suspend fun shareVideo(
     fileName: String,
     mediaType: String,
     chooserTitle: String,
+    accountRef: String,
     beforeLaunch: () -> Unit = {},
 ): Result<Unit> =
     runCatchingCancellable {
         var stagedFile: java.io.File? = null
         try {
             val uri =
-                withContext(Dispatchers.IO) {
+                withSharedPlaintextWrite(captureSharedPlaintextWrite(accountRef)) {
                     val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
-                    val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
+                    val file =
+                        java.io.File.createTempFile(
+                            "${sharedPlaintextPrefix(context, accountRef)}share_",
+                            sharedPlaintextSuffix(MediaPipeline.safeDisplayName(fileName)),
+                            dir,
+                        )
                     stagedFile = file
                     writeSharedMediaFile(file, source)
-                    fileProviderUri(context, file)
+                    androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file,
+                        MediaPipeline.safeDisplayName(fileName),
+                    )
                 }
             beforeLaunch()
             launchOutboundShare(
@@ -52,39 +65,6 @@ internal suspend fun shareVideo(
             runCatching { stagedFile?.delete() }
             throw failure
         }
-    }
-
-/**
- * Share [bytes] via a FileProvider Uri using the system share sheet.
- *
- * Suspends because the temp-file write is multi-megabyte for any non-trivial
- * attachment; doing it on the main dispatcher would stall the UI for the
- * write. The `startActivity` call has to run on Main, so the I/O is hopped
- * to `Dispatchers.IO` and the chooser is fired back on Main. Failures are
- * returned so each owning surface can apply its own user-visible contract.
- */
-internal suspend fun shareImage(
-    context: android.content.Context,
-    bytes: ByteArray,
-    fileName: String,
-    mediaType: String,
-): Result<Unit> =
-    runCatchingCancellable {
-        val uri =
-            withContext(Dispatchers.IO) {
-                val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
-                // Unique temp keyed off a sanitized basename — avoids
-                // collisions and path traversal from a remote-supplied
-                // filename.
-                val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
-                writeSharedMediaFile(file, bytes)
-                androidx.core.content.FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file,
-                )
-            }
-        launchImageShare(context, uri, mediaType).getOrThrow()
     }
 
 internal fun launchImageShare(
@@ -116,27 +96,6 @@ internal fun WhiteNoiseAppState.presentMediaLaunchFailure(
         present(titleRes)
     } else {
         presentFailure(titleRes, operationCode, throwable)
-    }
-}
-
-@Throws(java.io.IOException::class)
-@Suppress("TooGenericExceptionCaught")
-private fun writeSharedMediaFile(
-    file: java.io.File,
-    bytes: ByteArray,
-) {
-    var protected = false
-    try {
-        AttachmentPlaintextCache.requireEntryWithinLimit(file, bytes.size.toLong())
-        AttachmentPlaintextCache.protectPublicationFile(file)
-        protected = true
-        file.outputStream().use { it.write(bytes) }
-        AttachmentPlaintextCache.finishPublication(file)
-        protected = false
-    } catch (failure: Throwable) {
-        if (protected) AttachmentPlaintextCache.unprotectPublicationFile(file)
-        runCatching { file.delete() }
-        throw failure
     }
 }
 

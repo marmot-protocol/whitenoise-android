@@ -260,6 +260,7 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
         composeRule.onNodeWithText(string(R.string.share)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.save)).assertIsEnabled().performClick()
+        composeRule.waitForIdle()
         assertEquals(1, saved)
         composeRule.onNodeWithText(string(R.string.edit)).assertDoesNotExist()
     }

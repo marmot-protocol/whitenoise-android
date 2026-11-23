@@ -197,6 +197,7 @@ class MessageBubbleTtsProjectionContractTest {
     /** Builds a received record whose markdown is the literal text "Hello **world**". */
     private fun record() =
         AppMessageRecordFfi(
+            invalidated = false,
             messageIdHex = MESSAGE_ID,
             direction = "received",
             groupIdHex = "group",

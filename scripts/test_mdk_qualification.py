@@ -374,6 +374,36 @@ class QualificationUiTest(unittest.TestCase):
                 self.assertEqual(taps, [('20', '20'), ('60', '60')])
                 self.assertEqual((Path(directory) / 'fixture.png').read_bytes(), b'image')
 
+    def test_settled_startup_diagnostics_sheet_fails_without_dismissing_it(self):
+        window = '<hierarchy><node text="Help Improve White Noise"/></hierarchy>'
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', side_effect=['', '', '', window]) as adb:
+                with self.assertRaisesRegex(RuntimeError, 'startup prompted'):
+                    campaign.usable_chat('upgraded', consent_settled=True)
+                self.assertEqual(adb.call_count, 4)
+                self.assertEqual((Path(directory) / 'upgraded-window.xml').read_text(), window)
+
+    def test_usable_chat_recovers_from_a_missing_ui_dump(self):
+        window = ('<hierarchy><node resource-id="composer-pill-surface"/>'
+                  '<node text="Retained qualification history 0"/></hierarchy>')
+        missing = subprocess.CalledProcessError(1, 'adb shell cat')
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), patch.object(campaign.time, 'sleep'), \
+                    patch.object(campaign, 'adb', side_effect=['', '', '', missing, '', window, b'image']):
+                campaign.usable_chat('upgraded', consent_settled=True)
+                self.assertEqual((Path(directory) / 'upgraded-window.xml').read_text(), window)
+
+    def test_audit_readiness_uses_the_main_activity_pid(self):
+        for choice, log in (('enabled', 'WHITENOISE_AUDIT_READY_V1 {}'), ('declined', '')):
+            with self.subTest(choice=choice), tempfile.TemporaryDirectory() as directory:
+                with patch.object(campaign, 'REPORTS', Path(directory)), \
+                        patch.object(campaign, 'adb', side_effect=['123', log]) as adb:
+                    campaign.verify_audit_startup('upgraded', choice)
+                    adb.assert_called_with('logcat', '-d', '--pid=123', '-s', 'WhiteNoiseAudit:I')
+                    evidence = json.loads((Path(directory) / 'upgraded-audit.json').read_text())
+                    self.assertEqual(evidence['upload_ready'], choice == 'enabled')
+
     def test_restored_conversation_header_is_not_a_chat_list_row(self):
         """An already-open retained conversation must pass without tapping its identically named group header."""
         window = ('<hierarchy><node text="Nightly upgrade qualification" bounds="[0,0][120,40]"/>'
@@ -725,7 +755,7 @@ class BaselineStagingTest(unittest.TestCase):
             destination = Path(directory)
             pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'
             pin.parent.mkdir(parents=True)
-            pin.write_text('mdk-sha=a2e0558a634bbd20607cdd5afb93abc6220ee58d\n')
+            pin.write_text('mdk-sha=4df811aea99269b437a6023be9446a5141e93cbe\n')
             original = pin.read_bytes()
             with patch.object(staging.shutil, 'copytree') as copy, patch.object(staging.shutil, 'copyfile') as swap:
                 staging.stage(destination)
@@ -748,8 +778,8 @@ class BaselineStagingTest(unittest.TestCase):
     def test_other_native_revisions_cannot_seed_the_reviewed_pair(self):
         """The former baseline, candidate itself and a partial SHA all fail before any source overlay."""
         from scripts import stage_mdk_baseline_fixture as staging
-        for source in ('b3e484687968d5e1172d3c7a998c09da44e7e005',
-                       '4df811aea99269b437a6023be9446a5141e93cbe', 'a2e0558a'):
+        for source in ('a2e0558a634bbd20607cdd5afb93abc6220ee58d',
+                       '34646a577807f2b112ee031f3c164ec58aa18b64', '4df811ae'):
             with self.subTest(source=source), tempfile.TemporaryDirectory() as directory:
                 destination = Path(directory)
                 pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'

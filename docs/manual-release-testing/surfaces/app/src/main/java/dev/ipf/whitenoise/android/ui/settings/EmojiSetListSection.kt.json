@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetListSection.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "setting:emoji_sets_installed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetListSection.kt",
+        "anchor": "R.string.emoji_sets_installed",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_update_available",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetListSection.kt",
+        "anchor": "R.string.emoji_sets_update_available",
+        "test_ids": [
+          "SET-051"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_organize_emoji_set",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetListSection.kt",
+        "anchor": "R.string.explanation_organize_emoji_set",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

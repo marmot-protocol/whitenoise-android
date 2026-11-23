@@ -117,3 +117,19 @@ internal fun reconcileTerminalSelfMembership(
  * immediately allowed to surface as a new action.
  */
 internal fun InviteAcceptanceGeneration.matches(group: AppGroupRecordFfi): Boolean = this == inviteGeneration(group)
+
+/** Re-read roles after a committed legacy demotion without replaying its obsolete Welcome. */
+internal suspend fun ConversationController.refreshReplacedInviteRoster(
+    account: String,
+    groupId: String,
+) {
+    val replacement = group
+    if (!replacement.pendingConfirmation || !matchesConversation(account, groupId)) return
+    val details = runCatchingCancellable { appState.marmotIo { groupDetails(account, groupId) } }.getOrNull() ?: return
+    if (group === replacement &&
+        mutationPresentation.ownsCurrentPresentation() &&
+        canAcceptRenderedInvite(details.group, inviteGeneration(replacement))
+    ) {
+        applyMutationDetails(account, details)
+    }
+}

@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.globalBubbleColorArgb
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 internal val AppThemeMode.labelRes: Int
     @StringRes
@@ -149,7 +150,11 @@ internal fun AppearanceScreen(
         SettingsList {
             item(key = "search.Appearance.1") { SettingsSection(stringResource(R.string.appearance_colors_heading)) }
             item(key = "search.Appearance.2") {
-                SettingsGroup(modifier = Modifier.testTag("appearance.colors.group")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("appearance.colors.group"),
+                    destination = SettingsDetail.Appearance,
+                    surface = "appearance-colors",
+                ) {
                     row("theme") { context ->
                         SettingsLink(
                             context = context,
@@ -167,6 +172,7 @@ internal fun AppearanceScreen(
                             SettingsLink(
                                 context = context,
                                 title = stringResource(R.string.action_color),
+                                routeKey = SettingsDetail.ActionColor,
                                 onClick = onOpenActionColor,
                                 explanation = stringResource(R.string.explanation_appearance_action_color),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_format_color_fill) },
@@ -177,6 +183,7 @@ internal fun AppearanceScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.chat_bubble_colors),
+                            routeKey = SettingsDetail.ChatBubbleColors,
                             onClick = onOpenChatBubbleColors,
                             explanation = stringResource(R.string.explanation_appearance_chat_bubble_colors),
                             leading = { SettingsLeadingIcon(R.drawable.ic_settings_chat_bubble_outline) },

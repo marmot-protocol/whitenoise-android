@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
@@ -159,6 +160,33 @@ class MarkdownLinkCopyTest {
 
         composeRule.onNodeWithText("your-bank.example").performClick()
         composeRule.onNodeWithText(destination).assertIsDisplayed()
+    }
+
+    @Test
+    fun webLinkOpensOnlyAfterConfirmationExitCompletes() {
+        var opens = 0
+        var dismissals = 0
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                WebLinkConfirmation(
+                    url = "https://example.com/confirmed",
+                    onConfirm = { opens++ },
+                    onDismiss = { dismissals++ },
+                )
+            }
+        }
+        composeRule.mainClock.advanceTimeBy(500)
+        composeRule.onNodeWithText(string(R.string.link_confirm_open)).performClick()
+        composeRule.runOnIdle {
+            assertEquals(0, opens)
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeUntil(timeoutMillis = 2_000) { opens == 1 }
+        composeRule.runOnIdle {
+            assertEquals(1, opens)
+            assertEquals(0, dismissals)
+        }
     }
 
     @Test

@@ -17,6 +17,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalConfiguration
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 /** A ceiling, never reserved space; follow the current window and keyboard target. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -52,17 +54,23 @@ internal fun nostrEventPreviewMaximumHeight(): Dp {
 internal fun NostrEventCardLayout(
     maximumHeight: Dp,
     onExpand: () -> Unit,
+    onLaunchOrigin: (Rect?) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
+    val (expandModifier, expand) =
+        rememberMeasuredControlClick {
+            onLaunchOrigin(it)
+            onExpand()
+        }
     val density = LocalDensity.current
     val expansionHeight = 48.dp * density.fontScale.coerceAtLeast(1f)
     Layout(
         content = {
             NostrEventCardViewport(maximumHeight, expansionHeight, content)
             TextButton(
-                onClick = onExpand,
+                onClick = expand,
                 colors = ButtonDefaults.textButtonColors(contentColor = LocalContentColor.current),
-                modifier = Modifier.fillMaxWidth().height(expansionHeight).testTag(NOSTR_CARD_EXPAND_TAG),
+                modifier = expandModifier.fillMaxWidth().height(expansionHeight).testTag(NOSTR_CARD_EXPAND_TAG),
             ) {
                 Text(stringResource(R.string.nostr_event_expand))
             }

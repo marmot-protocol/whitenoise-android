@@ -8,6 +8,7 @@ internal fun ConversationDictationController.acknowledgeCaptureClosed(
     if (captureGeneration != captureClosureGeneration) return
     val releasesTerminalLease = foregroundLease.deferredReleaseCaptureGeneration == captureGeneration
     if (state.sessionId != sessionId && !releasesTerminalLease) return
+    finishTiming.captureClosed(elapsedRealtime())
     foregroundMicrophoneRequired = false
     captureClosureTimeoutHandle?.cancel()
     captureClosureTimeoutHandle = null
@@ -24,6 +25,7 @@ internal fun ConversationDictationController.acknowledgeCaptureClosed(
     if (recoveryHandedToComposer) (state as? ConversationDictationState.Failed)?.let(this::handRecoveryToComposer)
     releaseExpiredRecoveryProtection()
     reattachForegroundRecoveryAfterClosure()
+    armFollowUpCapture()
 }
 
 /** Retries only the captured deferred draft; competing edits remain intact. */
