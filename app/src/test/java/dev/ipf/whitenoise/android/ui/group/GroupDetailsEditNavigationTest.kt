@@ -102,6 +102,16 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
     }
 
+    @Test
+    @Config(qualifiers = "en-w320dp-h600dp-mdpi")
+    fun editGroupSharedFieldsAmoledCompact() {
+        render(controller(group()), darkTheme = true, amoled = true)
+
+        composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).performClick()
+        assertEditorIsOpen()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_edit_shared_fields_amoled_compact.png")
+    }
+
     /** Unavailable call actions do not occupy the primary action row. */
     @Test
     fun unavailableCallActionsDoNotOccupyThePrimaryActionRow() {
@@ -916,7 +926,7 @@ class GroupDetailsEditNavigationTest {
     /** Asserts editor is open. */
     private fun assertEditorIsOpen() {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.description)).assertIsDisplayed()
     }
 }
 
@@ -1105,7 +1115,7 @@ class GroupDetailsConfirmationNavigationTest {
     /** Asserts editor is open. */
     private fun assertEditorIsOpen() {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.description)).assertIsDisplayed()
     }
 }
 
