@@ -2539,7 +2539,9 @@ internal fun ChatsScreen(
                 ChatsNewMessageFab(
                     appState,
                     openNewMessageFlow,
-                    onNewMessageOrigin = { pen -> newChatFlowLaunch = pen?.let { NewMessageFlowLaunch(it.origin, it) } },
+                    onNewMessageOrigin = { pen ->
+                        newChatFlowLaunch = pen?.let { NewMessageFlowLaunch(it.origin, it) }
+                    },
                     hidePen = { showNewChatFlow && newChatFlowLaunch?.pen?.drawsSource?.invoke() == true },
                 )
             }
@@ -2811,7 +2813,9 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(appState, onCreate = openNewMessageFlow) { newChatFlowLaunch = NewMessageFlowLaunch(it) }
+                                EmptyChats(appState, onCreate = openNewMessageFlow) {
+                                    newChatFlowLaunch = NewMessageFlowLaunch(it)
+                                }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }

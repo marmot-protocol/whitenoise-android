@@ -33,7 +33,9 @@ internal class MeasuredPenDialogMotion(
     private var cachedBubble: SettingsBubbleGeometry? = null
     internal var drawsSource: () -> Boolean by mutableStateOf({ false })
 
-    fun debugGeometry() = "origin=$origin landing=${landing?.visibleBounds} host=$cachedHost sourceCurrent=${isSourceCurrent()}"
+    fun debugGeometry() =
+        "origin=$origin landing=${landing?.visibleBounds} host=$cachedHost " +
+            "sourceCurrent=${isSourceCurrent()}"
 
     fun reportLanding(card: SettingsBubbleCard?) {
         landing = card
@@ -55,7 +57,7 @@ internal val LocalMeasuredPenDialog = staticCompositionLocalOf<MeasuredPenDialog
 
 /** One measured outline replaces the generic measured page background for this dialog. */
 @Composable
-internal fun Modifier.measuredPenDialog(
+internal fun Modifier.measuredPenOutline(
     pen: MeasuredPenDialogMotion,
     host: Rect?,
     surface: PopupSurfaceMotion,

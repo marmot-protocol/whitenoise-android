@@ -362,7 +362,10 @@ class SettingsTopLevelBubbleMotionTest {
                 val (r, g, b) = channels(frame.getPixel(x, y))
                 if (g > r + GREEN_MARGIN && g > b + GREEN_MARGIN) {
                     val at = Offset(x + 0.5f, y + 0.5f)
-                    assertTrue("$label has travelling portrait pixels at $at", home.contains(at) || settings.contains(at))
+                    assertTrue(
+                        "$label has travelling portrait pixels at $at",
+                        home.contains(at) || settings.contains(at),
+                    )
                 }
             }
         }

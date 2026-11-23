@@ -77,7 +77,7 @@ class NewChatFlowMotionCaptureTest {
                                 origin = launch.value?.origin,
                                 penMotion = launch.value,
                                 onDismissRequest = { show.value = false },
-                                properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+                                properties = fullWindowDialog,
                             ) {
                                 NewChatFlowHost(state, onOpenConversation = { _, _ -> }, onClose = dismiss)
                             }
@@ -92,11 +92,7 @@ class NewChatFlowMotionCaptureTest {
         composeRule.mainClock.autoAdvance = false
         try {
             newMessage.performClick()
-            composeRule.runOnIdle { Snapshot.sendApplyNotifications() }
-            repeat(6) {
-                composeRule.mainClock.advanceTimeByFrame()
-                ShadowLooper.idleMainLooper(16L, TimeUnit.MILLISECONDS)
-            }
+            advanceOpeningFrames()
             composeRule.runOnIdle {
                 val motion = checkNotNull(launch.value)
                 assertTrue(motion.debugGeometry(), motion.drawsSource())
@@ -118,6 +114,20 @@ class NewChatFlowMotionCaptureTest {
             composeRule.mainClock.autoAdvance = true
         }
     }
+
+    private fun advanceOpeningFrames() {
+        composeRule.runOnIdle { Snapshot.sendApplyNotifications() }
+        repeat(6) {
+            composeRule.mainClock.advanceTimeByFrame()
+            ShadowLooper.idleMainLooper(16L, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    private val fullWindowDialog =
+        DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        )
 
     @Test
     fun captureNewMessageToNewGroupAndBack() {

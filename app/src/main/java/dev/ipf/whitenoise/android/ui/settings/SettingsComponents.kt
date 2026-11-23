@@ -96,7 +96,13 @@ internal fun SettingsGroup(
     val page = LocalSettingsCardMorph.current?.page
     val token = remember(page, destination, surface) { Any() }
     val native =
-        rememberSettingsNativeSurface(destination, containerColor, surface, registrationToken = token, onMeasured = onMeasured)
+        rememberSettingsNativeSurface(
+            destination,
+            containerColor,
+            surface,
+            registrationToken = token,
+            onMeasured = onMeasured,
+        )
     Column(
         modifier
             .fillMaxWidth()

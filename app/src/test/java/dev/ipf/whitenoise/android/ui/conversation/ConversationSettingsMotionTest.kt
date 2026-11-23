@@ -45,7 +45,8 @@ class ConversationSettingsMotionTest {
     @get:Rule val rule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
-    @Test fun theLiveViewportFadesInBothDirectionsAtItsNativeCoordinates() {
+    @Test
+    fun theLiveViewportFadesInBothDirectionsAtItsNativeCoordinates() {
         val route = mutableStateOf<ConversationSettingsRoute?>(null)
         val owner = mutableStateOf("first")
         rule.setContent {
@@ -60,7 +61,8 @@ class ConversationSettingsMotionTest {
                     }
                     if (motion.keepTranscript) {
                         ConversationSettingsLayer(Modifier.fillMaxSize(), motion.transcriptActive) {
-                            Box(Modifier.conversationSettingsHost(motion).padding(start = 32.dp, top = 160.dp).conversationSettingsBody(motion)) {
+                            val host = Modifier.conversationSettingsHost(motion).padding(start = 32.dp, top = 160.dp)
+                            Box(host.conversationSettingsBody(motion)) {
                                 Box(Modifier.size(32.dp).background(Color.Red).testTag("message"))
                             }
                         }
@@ -75,20 +77,14 @@ class ConversationSettingsMotionTest {
             route.value = ConversationSettingsRoute.Details
             Snapshot.sendApplyNotifications()
         }
-        repeat(6) {
-            rule.mainClock.advanceTimeByFrame()
-            ShadowLooper.idleMainLooper(16L, TimeUnit.MILLISECONDS)
-        }
+        advanceFrames(6)
         val openingRed = messageRed()
         assertTrue("opening transcript red=$openingRed", openingRed in 0.02f..0.98f)
         rule.onNodeWithTag("message").assertDoesNotExist()
         rule.onNodeWithTag("settings-action").assertDoesNotExist()
         rule.onNodeWithContentDescription(context.getString(R.string.back)).assertIsDisplayed().performClick()
         rule.runOnIdle { Snapshot.sendApplyNotifications() }
-        repeat(4) {
-            rule.mainClock.advanceTimeByFrame()
-            ShadowLooper.idleMainLooper(16L, TimeUnit.MILLISECONDS)
-        }
+        advanceFrames(4)
         val reversingRed = messageRed()
         assertTrue("reversing transcript red=$reversingRed", reversingRed in 0.02f..0.98f)
         rule.mainClock.advanceTimeBy(1_000L)
@@ -99,19 +95,22 @@ class ConversationSettingsMotionTest {
             route.value = ConversationSettingsRoute.Composer
             Snapshot.sendApplyNotifications()
         }
-        repeat(6) {
-            rule.mainClock.advanceTimeByFrame()
-            ShadowLooper.idleMainLooper(16L, TimeUnit.MILLISECONDS)
-        }
+        advanceFrames(6)
         val composerRed = messageRed()
         assertTrue("composer settings opening transcript red=$composerRed", composerRed in 0.02f..0.98f)
         rule.runOnUiThread {
             owner.value = "replacement"
             Snapshot.sendApplyNotifications()
         }
-        rule.mainClock.advanceTimeByFrame()
-        ShadowLooper.idleMainLooper(16L, TimeUnit.MILLISECONDS)
+        advanceFrames(1)
         assertEquals(0f, messageRed(), 0.01f)
+    }
+
+    private fun advanceFrames(count: Int) {
+        repeat(count) {
+            rule.mainClock.advanceTimeByFrame()
+            ShadowLooper.idleMainLooper(16L, TimeUnit.MILLISECONDS)
+        }
     }
 
     private fun messageRed() =

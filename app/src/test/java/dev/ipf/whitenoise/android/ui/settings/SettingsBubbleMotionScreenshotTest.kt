@@ -110,7 +110,8 @@ class SettingsBubbleMotionScreenshotTest {
 
     @Test fun measuredLightAvatarEntryCarriesOnePenOutlineInAndBack() = measuredRoundTrip("light", dark = false)
 
-    @Test fun measuredLargeRtlAvatarEntryCarriesOnePenOutlineInAndBack() = measuredRoundTrip("large_rtl", largeRtl = true)
+    @Test
+    fun measuredLargeRtlAvatarEntryCarriesOnePenOutlineInAndBack() = measuredRoundTrip("large_rtl", largeRtl = true)
 
     private fun measuredRoundTrip(
         variant: String,

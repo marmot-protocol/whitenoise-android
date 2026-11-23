@@ -45,7 +45,11 @@ internal class SettingsBubbleLanding {
             sceneHost = host
             sceneCards = cards
             scenePen = source
-            val landing = cards.asSequence().filter { it.visibleBounds.visibleIn(host) }.maxByOrNull { it.visibleBounds.bottom }
+            val landing =
+                cards
+                    .asSequence()
+                    .filter { it.visibleBounds.visibleIn(host) }
+                    .maxByOrNull { it.visibleBounds.bottom }
             scene = source?.bubbleTo(landing, host)
         }
         return scene

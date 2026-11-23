@@ -115,7 +115,7 @@ private fun measuredDialogPageModifier(
     val placement = Modifier.onGloballyPositioned { onHost(it.settingsMorphBounds(view)) }
     if (penMotion != null) {
         val penHost = host.takeIf { measuredOriginUsable(origin, host) }
-        return placement.measuredPenDialog(penMotion, penHost, surface).then(
+        return placement.measuredPenOutline(penMotion, penHost, surface).then(
             dev.ipf.whitenoise.android.ui.common.fullScreenSurfaceMotion(surface) {
                 penHost?.let(penMotion::bubble) == null
             },

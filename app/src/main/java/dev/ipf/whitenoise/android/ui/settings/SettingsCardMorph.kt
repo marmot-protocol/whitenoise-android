@@ -100,7 +100,8 @@ internal class SettingsCardMorph(
     /** Where an opening route grows from when the click recorded no origin, as [beginPage] resolves it. */
     internal val anchorOrigin: Rect? get() = anchorContour?.bounds ?: anchorBounds
 
-    internal val anchorContour: SettingsContour? get() = anchor?.let(anchorOutlines::get)?.takeIf { onScreen(it.bounds) }
+    internal val anchorContour: SettingsContour?
+        get() = anchor?.let(anchorOutlines::get)?.takeIf { onScreen(it.bounds) }
 
     init {
         page?.anchorContour = { anchorContour }

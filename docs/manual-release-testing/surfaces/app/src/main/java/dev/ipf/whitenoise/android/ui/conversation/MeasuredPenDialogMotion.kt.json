@@ -4,9 +4,9 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Modifier.measuredPenDialog",
+        "surface": "Modifier.measuredPenOutline",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/MeasuredPenDialogMotion.kt",
-        "anchor": "fun Modifier.measuredPenDialog(",
+        "anchor": "fun Modifier.measuredPenOutline(",
         "test_ids": [
           "NAV-011",
           "NCH-008"
