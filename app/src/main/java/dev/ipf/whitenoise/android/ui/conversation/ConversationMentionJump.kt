@@ -35,6 +35,8 @@ import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 /** Newer pages a jump may load past the read anchor while looking for a mention outside the loaded window. */
 internal const val MENTION_RESOLUTION_MAX_NEWER_PAGES = 20
 
+private const val MENTION_BADGE_MAX = 99
+
 /** How much of the unread range the loaded timeline can account for. */
 internal enum class ConversationMentionCoverage {
     /** The initial timeline or the read anchor is not settled yet. */
@@ -211,7 +213,10 @@ internal fun ConversationJumpToMentionButton(
             modifier = Modifier.padding(horizontal = 12.dp),
         ) {
             Text("@", style = MaterialTheme.typography.titleMedium)
-            Text(if (count > 99) "99+" else count.toString(), style = MaterialTheme.typography.labelLarge)
+            Text(
+                if (count > MENTION_BADGE_MAX) "$MENTION_BADGE_MAX+" else count.toString(),
+                style = MaterialTheme.typography.labelLarge,
+            )
         }
     }
 }

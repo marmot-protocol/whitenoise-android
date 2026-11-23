@@ -1457,7 +1457,7 @@ internal fun ConversationScreen(
     val mentionsSelf: (TimelineMessage) -> Boolean = { msg ->
         !selfAccountIdHex.isNullOrBlank() &&
             mentionDetectionCache.getOrCompute(msg.record.messageIdHex, msg.record.contentTokens) {
-                documentMentionsAccount(msg.record.contentTokens, selfAccountIdHex) { appState.accountIdHexForMention(it) }
+                documentMentionsAccount(msg.record.contentTokens, selfAccountIdHex, appState::accountIdHexForMention)
             }
     }
     val unreadMentionMessageIds by remember(controller, chat.id, selfAccountIdHex, mentionDetectionCache) {
@@ -2309,6 +2309,34 @@ internal fun ConversationScreen(
             cachedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
         )
 
+    /**
+     * The oldest unread mention, waiting for entry positioning and searching past the window if needed. Null when the
+     * request was superseded, or after a current request found nothing and retired the seed with a notice.
+     */
+    suspend fun nextUnreadMentionTarget(isCurrent: () -> Boolean): String? {
+        val target =
+            mentionSeed.jumpTarget(
+                awaitAnchored = { snapshotFlow { initialTimelineAnchored }.first { it } },
+                loadedTarget = { unreadMentionMessageIds.firstOrNull() },
+            ) {
+                resolveFirstUnreadMention(
+                    readAnchorMessageId = readAnchorMessageId,
+                    firstUnreadMessageId = entryFirstUnreadMessageId,
+                    timeline = { controller.timeline },
+                    mentionsActiveAccount = mentionsSelf,
+                    loadMessage = { controller.loadUntilMessageAvailable(it) },
+                    hasMoreAfter = { controller.hasMoreAfterTimeline },
+                    loadNewer = { controller.loadNewerTimelinePage() },
+                )
+            }
+        if (!isCurrent()) return null
+        if (target == null) {
+            mentionSeed.retire()
+            appState.present(R.string.toast_original_message_unavailable)
+        }
+        return target
+    }
+
     fun jumpToNextUnreadMention() {
         if (unreadMentionMessageIds.isEmpty() && !mentionSeed.active) return
         navigationState.searchJob?.cancel()
@@ -2318,27 +2346,7 @@ internal fun ConversationScreen(
         navigationState.navigateReplyJob =
             scope.launch {
                 tracedPagingSection(ConversationMentionJumpTrace.TOTAL) {
-                    val targetMessageId =
-                        mentionSeed.jumpTarget(
-                            awaitAnchored = { snapshotFlow { initialTimelineAnchored }.first { it } },
-                            loadedTarget = { unreadMentionMessageIds.firstOrNull() },
-                        ) {
-                            resolveFirstUnreadMention(
-                                readAnchorMessageId = readAnchorMessageId,
-                                firstUnreadMessageId = entryFirstUnreadMessageId,
-                                timeline = { controller.timeline },
-                                mentionsActiveAccount = mentionsSelf,
-                                loadMessage = { controller.loadUntilMessageAvailable(it) },
-                                hasMoreAfter = { controller.hasMoreAfterTimeline },
-                                loadNewer = { controller.loadNewerTimelinePage() },
-                            )
-                        }
-                    if (!navigationRequest.isCurrent()) return@launch
-                    if (targetMessageId == null) {
-                        mentionSeed.retire()
-                        appState.present(R.string.toast_original_message_unavailable)
-                        return@launch
-                    }
+                    val targetMessageId = nextUnreadMentionTarget { navigationRequest.isCurrent() } ?: return@launch
                     val available =
                         tracedPagingSection(ConversationMentionJumpTrace.AVAILABILITY) {
                             controller.loadUntilMessageAvailable(targetMessageId)
@@ -5061,7 +5069,8 @@ internal fun ConversationScreen(
                                         // The chip keeps its last count while it shrinks away instead of showing 0.
                                         val shownMentionCount = remember { IntArray(1) }
                                         if (unreadMentionCount > 0) shownMentionCount[0] = unreadMentionCount
-                                        ConversationNavigationControl(visible = !selectionMode && unreadMentionCount > 0) {
+                                        val showMentionJump = !selectionMode && unreadMentionCount > 0
+                                        ConversationNavigationControl(visible = showMentionJump) {
                                             ConversationJumpToMentionButton(shownMentionCount[0]) {
                                                 jumpToNextUnreadMention()
                                             }
