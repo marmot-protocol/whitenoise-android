@@ -200,7 +200,7 @@ internal fun AboutScreen(
         developerMode = appState.developerMode,
         onEnableDeveloper = {
             appState.updateDeveloperMode(true)
-            Toast.makeText(context, R.string.developer_tools_unlocked, Toast.LENGTH_SHORT).show()
+            appState.presentTransient(R.string.developer_tools_unlocked)
         },
         onDeveloperAlreadyEnabled = {
             Toast.makeText(context, R.string.developer_tools_already_enabled, Toast.LENGTH_SHORT).show()

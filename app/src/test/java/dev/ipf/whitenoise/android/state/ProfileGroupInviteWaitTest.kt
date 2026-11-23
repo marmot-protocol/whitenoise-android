@@ -54,7 +54,10 @@ class ProfileGroupInviteWaitTest {
             assertFalse("waiting escaped the fan-out as a cancellation", invite.isCancelled)
             assertFalse("a waited group cannot count as complete success", invite.await())
             assertEquals(listOf(GROUP_A, GROUP_B, GROUP_C), invites)
-            assertEquals(AppText.Resource(R.string.toast_invites_sent_to_groups_waited), state.transientNotice?.title)
+            assertEquals(
+                AppText.Resource(R.string.toast_invites_sent_to_groups_waited),
+                state.currentPartialNotice()?.title,
+            )
             assertNull("waiting is not an error", state.toast)
         }
 
@@ -77,6 +80,7 @@ class ProfileGroupInviteWaitTest {
             assertNull(state.groupChangeConfirmations.pending)
             assertNull(state.toast)
             assertNull(state.transientNotice)
+            assertNull(state.currentPartialNotice())
         }
 
     /** Starts [block] outside runBlocking's children, so a fan-out that ignores cancellation fails, not hangs. */
