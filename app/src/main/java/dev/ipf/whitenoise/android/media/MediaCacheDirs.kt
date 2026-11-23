@@ -24,6 +24,9 @@ object MediaCacheDirs {
     /** Private temporary copies of PDFs open in the in-app reader; no FileProvider path exposes them. */
     const val DOCUMENT_READER = "document_reader"
 
+    /** Private downloads of referenced Nostr videos open in the isolated player; no FileProvider path exposes them. */
+    const val NOSTR_VIDEO = "nostr_video"
+
     /** Private snapshots of large picks that the native runtime uploads from a path. */
     const val UPLOAD_SOURCES = "upload_sources"
 }
@@ -40,6 +43,7 @@ internal fun wipeSessionAttachmentPlaintext(
         MediaCacheDirs.NATIVE_ATTACHMENT_LEASES,
         MediaCacheDirs.UPLOAD_SOURCES,
         MediaCacheDirs.DOCUMENT_READER,
+        MediaCacheDirs.NOSTR_VIDEO,
     ).forEach { name ->
         runCatching {
             check(File(cacheRoot, name).deleteRecursively()) {
@@ -65,6 +69,7 @@ internal fun clearInactivePlaybackAndCheckRemaining(cacheRoot: File): Boolean {
             MediaCacheDirs.VOICE,
             MediaCacheDirs.VIDEO,
             MediaCacheDirs.DOCUMENT_READER,
+            MediaCacheDirs.NOSTR_VIDEO,
             MediaCacheDirs.NATIVE_ATTACHMENT_LEASES,
             MediaCacheDirs.COMPOSER_PASTE,
             MediaCacheDirs.UPLOAD_SOURCES,
