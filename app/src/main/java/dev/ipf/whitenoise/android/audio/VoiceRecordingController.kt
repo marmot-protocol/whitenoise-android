@@ -49,6 +49,7 @@ class VoiceRecordingController internal constructor(
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
     private val onAutomaticStop: (VoiceRecordingStopReason) -> Unit = {},
     private val onRecordingStarted: () -> Unit = {},
+    private val afterHeldRelease: (() -> ((File, Long) -> Unit)?)? = null,
 ) {
     companion object {
         // Keep the existing capture budget; the strip warns before this limit
@@ -153,7 +154,6 @@ class VoiceRecordingController internal constructor(
     private var discardJob: Job? = null
     private val startRequests = StalenessGuard()
 
-    /** Starts or resumes the single recording request accepted by this controller. */
     fun start(): Boolean {
         if (isRecording) return true
         if (!onPermissionRequest()) return false
@@ -371,11 +371,15 @@ class VoiceRecordingController internal constructor(
     /** Finalizes an ordinary release after its short trailing-audio window. */
     fun stop() = finish()
 
-    /** Preserve captured audio before Android can silence a background microphone. */
+    internal fun stopHeld() = finish(deliverImmediately = afterHeldRelease?.invoke())
+
     fun interrupt() = finish(VoiceRecordingStopReason.Interrupted)
 
     /** Detaches capture once and starts review finalization, skipping the tail for automatic stops. */
-    private fun finish(reason: VoiceRecordingStopReason? = null) {
+    private fun finish(
+        reason: VoiceRecordingStopReason? = null,
+        deliverImmediately: ((File, Long) -> Unit)? = null,
+    ) {
         if (abortPendingRestart()) return
         val r =
             recorder ?: run {
@@ -396,24 +400,20 @@ class VoiceRecordingController internal constructor(
         locked = false
         isPaused = false
         hold.reset()
-        // Finalize off the main thread: MediaRecorder.stop() flushes/finalizes
-        // the MP4 container and can block for tens-to-hundreds of ms (worse on
-        // slow storage), causing jank/ANR exactly as the record bar animates
-        // away. UI state is already reset above; deliver the result on Main once
-        // the container is finalized. See #372.
+        // MediaRecorder.stop flushes the container on IO before delivery on Main (#372).
         val cut = CompletableDeferred<Unit>()
         tailCut = cut
         finalizeJob =
             scope.launch(mainDispatcher, start = CoroutineStart.UNDISPATCHED) {
-                finalizeRecording(r, cut, reason)
+                finalizeRecording(r, cut, reason, deliverImmediately)
             }
     }
 
-    /** Finalized bytes belong either to review or to this cleanup, even if Main is cancelled. */
     private suspend fun finalizeRecording(
         recording: VoiceRecordingSession,
         cut: CompletableDeferred<Unit>,
         reason: VoiceRecordingStopReason?,
+        deliverImmediately: ((File, Long) -> Unit)?,
     ) {
         var finalized: VoiceRecordingResult? = null
         var delivered = false
@@ -436,7 +436,7 @@ class VoiceRecordingController internal constructor(
             } else {
                 // The callback owns the bytes from this point (including rejection).
                 delivered = true
-                onRecordingComplete(result.file, result.durationMs)
+                (deliverImmediately ?: onRecordingComplete)(result.file, result.durationMs)
                 if (reason != null) onAutomaticStop(reason)
             }
         } catch (c: CancellationException) {

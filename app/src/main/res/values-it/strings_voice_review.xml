@@ -2,7 +2,7 @@
 <resources>
     <string name="voice_review_title">Rivedi il messaggio vocale</string>
     <string name="voice_record_again">Registra di nuovo</string>
-    <string name="voice_message_release_to_review">Rilascia per rivedere · scorri per annullare</string>
+    <string name="voice_message_slide_to_cancel">Scorri per annullare</string>
     <string name="voice_recording_stop">Interrompi registrazione</string>
     <string name="voice_recording_pause">Metti in pausa la registrazione</string>
     <string name="voice_discard_title">Eliminare il messaggio vocale?</string>

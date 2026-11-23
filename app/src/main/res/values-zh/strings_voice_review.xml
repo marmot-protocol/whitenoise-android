@@ -2,7 +2,7 @@
 <resources>
     <string name="voice_review_title">检查语音消息</string>
     <string name="voice_record_again">重新录音</string>
-    <string name="voice_message_release_to_review">松开以检查 · 滑动以取消</string>
+    <string name="voice_message_slide_to_cancel">滑动以取消</string>
     <string name="voice_recording_stop">停止录音</string>
     <string name="voice_recording_pause">暂停录音</string>
     <string name="voice_discard_title">要丢弃语音消息吗？</string>

@@ -2,7 +2,7 @@
 <resources>
     <string name="voice_review_title">Vérifier le message vocal</string>
     <string name="voice_record_again">Réenregistrer</string>
-    <string name="voice_message_release_to_review">Relâcher pour vérifier · glisser pour annuler</string>
+    <string name="voice_message_slide_to_cancel">Glisser pour annuler</string>
     <string name="voice_recording_stop">Arrêter l’enregistrement</string>
     <string name="voice_recording_pause">Mettre l\u0027enregistrement en pause</string>
     <string name="voice_discard_title">Supprimer le message vocal ?</string>

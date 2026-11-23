@@ -120,6 +120,7 @@ private fun VoiceDraftPresentation(
     LaunchedEffect(voiceReview, draft) {
         if (draft == null || !voiceReview.adopt(draft.file, draft.durationMs)) return@LaunchedEffect
         val completedClip = voiceReview.clip
+        if (completedClip != null && owner.takeImmediateSend(key, draft.file)) voiceReview.send(completedClip)
         draft.stopReason?.let { reason ->
             voiceRecordingStopNotice(reason, completedClip)
             owner.acknowledgeStop(key)

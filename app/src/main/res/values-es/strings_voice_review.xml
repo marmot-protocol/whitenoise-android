@@ -2,7 +2,7 @@
 <resources>
     <string name="voice_review_title">Revisar mensaje de voz</string>
     <string name="voice_record_again">Volver a grabar</string>
-    <string name="voice_message_release_to_review">Suelta para revisar · desliza para cancelar</string>
+    <string name="voice_message_slide_to_cancel">Desliza para cancelar</string>
     <string name="voice_recording_stop">Detener grabación</string>
     <string name="voice_recording_pause">Pausar grabación</string>
     <string name="voice_discard_title">¿Descartar mensaje de voz?</string>

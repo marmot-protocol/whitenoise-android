@@ -12,6 +12,7 @@ internal class VoiceRecorderHooks(
     val onPermissionRequest: () -> Boolean,
     val onRecordingStarted: () -> Unit,
     val onRecordingComplete: (File, Long) -> Unit,
+    val onReleasedRecordingComplete: (File, Long) -> Unit,
     val onError: (Throwable) -> Unit,
     val onAutomaticStop: (VoiceRecordingStopReason) -> Unit,
 )
@@ -40,6 +41,7 @@ internal class VoiceNoteSessionOwner(
     private val permissionRequests = mutableMapOf<VoiceNoteKey, () -> Boolean>()
     private var persisted: Set<String>? = null
     private var foregroundRequest: Pair<VoiceNoteKey, String>? = null
+    private val sendOnArrival = mutableMapOf<VoiceNoteKey, File>()
     private val chatNames = mutableMapOf<VoiceNoteKey, String>()
 
     /**
@@ -65,6 +67,7 @@ internal class VoiceNoteSessionOwner(
     ) {
         if (controllers[key] !== controller) return
         permissionRequests.remove(key)
+        sendOnArrival.remove(key)
         when {
             controller.isRecording && !controller.locked -> controller.interrupt()
             controller.isRecording || controller.isFinalizing -> Unit
@@ -78,12 +81,24 @@ internal class VoiceNoteSessionOwner(
     /** The chat's finished, unsent take, if one is waiting. */
     fun draft(key: VoiceNoteKey): VoiceDraft? = drafts[key]
 
+    fun takeImmediateSend(
+        key: VoiceNoteKey,
+        file: File,
+    ): Boolean = sendOnArrival.remove(key, file)
+
     /** True once per lost take, so the chat can explain that a recording ended with the app. */
     fun takeLost(key: VoiceNoteKey): Boolean = lost.remove(key)
 
     /** Whether a recording in a different chat holds the microphone. */
     fun recordingElsewhere(key: VoiceNoteKey): Boolean =
         controllers.any { (other, controller) -> other != key && (controller.isRecording || controller.isFinalizing) }
+
+    /** A locked or paused recording stays controllable as navigation moves away. */
+    fun persistentRecorder(visible: VoiceNoteKey?): VoiceRecordingController? =
+        controllers.entries
+            .firstOrNull { (key, recorder) ->
+                key != visible && recorder.isRecording && (recorder.locked || recorder.isPaused)
+            }?.value
 
     /** For chat rows and notices: recording, paused, a waiting draft, or nothing. */
     fun activity(key: VoiceNoteKey): VoiceNoteActivity {
@@ -159,6 +174,7 @@ internal class VoiceNoteSessionOwner(
 
     private fun forget(key: VoiceNoteKey) {
         permissionRequests.remove(key)
+        sendOnArrival.remove(key)
         if (foregroundRequest?.first == key) foregroundRequest = null
         controllers.remove(key)?.release()
     }
@@ -177,6 +193,9 @@ internal class VoiceNoteSessionOwner(
             onPermissionRequest = { permissionRequests[key]?.invoke() == true },
             onRecordingStarted = { requestForeground(key) },
             onRecordingComplete = { file, durationMs -> complete(key, file, durationMs) },
+            onReleasedRecordingComplete = { file, durationMs ->
+                complete(key, file, durationMs, sendImmediately = true)
+            },
             onError = { error -> if (recordingElsewhere(key)) presentElsewhere() else presentError(error) },
             onAutomaticStop = { reason ->
                 drafts[key]?.let { draft -> drafts[key] = store.withStopReason(key, draft, reason) }
@@ -187,12 +206,14 @@ internal class VoiceNoteSessionOwner(
         key: VoiceNoteKey,
         file: File,
         durationMs: Long,
+        sendImmediately: Boolean = false,
     ) {
         val draft = store.commit(key, file, durationMs, stopReason = null)
         if (draft == null) {
             file.delete()
             presentError(VoiceRecordingSaveException())
         } else {
+            if (sendImmediately && key in permissionRequests) sendOnArrival[key] = draft.file
             drafts[key] = draft
         }
     }

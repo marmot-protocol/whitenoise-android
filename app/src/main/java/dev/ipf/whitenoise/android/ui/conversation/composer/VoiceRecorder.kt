@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.changedToUp
@@ -99,6 +100,8 @@ internal fun MicHoldButton(
                             // already handled stop/review/cancel.
                             down.consume()
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            var displacement = Offset.Zero
+                            var moved = false
                             var canceled = false
                             var locked = false
                             var terminated = false
@@ -113,8 +116,10 @@ internal fun MicHoldButton(
                                         break
                                     }
                                     change.consume()
-                                    val deltaX = change.position.x - down.position.x
-                                    val deltaY = change.position.y - down.position.y
+                                    displacement += change.position - change.previousPosition
+                                    val deltaX = displacement.x
+                                    val deltaY = displacement.y
+                                    moved = moved || displacement.getDistance() > viewConfiguration.touchSlop
                                     controller.updateDrag(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
                                     val towardCancel = controller.hold.cancelTravel(deltaX)
                                     if (!locked && -deltaY > lockThresholdPx && towardCancel <= cancelThresholdPx) {
@@ -135,7 +140,14 @@ internal fun MicHoldButton(
                                         canceled = false
                                     }
                                     if (change.changedToUp() || !change.pressed) {
-                                        if (canceled) controller.cancel() else controller.stop()
+                                        val duration = change.uptimeMillis - down.uptimeMillis
+                                        val heldLongEnough = duration >= viewConfiguration.longPressTimeoutMillis
+                                        when {
+                                            canceled -> controller.cancel()
+                                            heldLongEnough -> controller.stopHeld()
+                                            moved -> controller.stop()
+                                            else -> controller.lock()
+                                        }
                                         terminated = true
                                         break
                                     }

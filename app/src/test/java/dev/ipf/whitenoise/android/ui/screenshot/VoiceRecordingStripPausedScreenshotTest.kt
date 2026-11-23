@@ -1,13 +1,16 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.media.AudioManager
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -16,6 +19,7 @@ import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.audio.VoiceRecordingResult
 import dev.ipf.whitenoise.android.audio.VoiceRecordingSession
 import dev.ipf.whitenoise.android.ui.conversation.composer.RecordingStripLeading
+import dev.ipf.whitenoise.android.ui.navigation.PersistentVoiceCapture
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -68,7 +72,7 @@ class VoiceRecordingStripPausedScreenshotTest {
             composeRule.mainClock.autoAdvance = false
             composeRule.setContent {
                 WhiteNoiseTheme(darkTheme = false) {
-                    Surface(modifier = Modifier.width(320.dp).testTag(RECORDING_STRIP_TAG)) {
+                    Surface(modifier = Modifier.width(320.dp).height(48.dp).testTag(RECORDING_STRIP_TAG)) {
                         RecordingStripLeading(controller = voiceRecording)
                     }
                 }
@@ -108,7 +112,7 @@ class VoiceRecordingStripPausedScreenshotTest {
             composeRule.mainClock.autoAdvance = false
             composeRule.setContent {
                 WhiteNoiseTheme(darkTheme = false) {
-                    Surface(modifier = Modifier.width(320.dp).testTag(RECORDING_STRIP_TAG)) {
+                    Surface(modifier = Modifier.width(320.dp).height(48.dp).testTag(RECORDING_STRIP_TAG)) {
                         RecordingStripLeading(controller = voiceRecording)
                     }
                 }
@@ -120,8 +124,46 @@ class VoiceRecordingStripPausedScreenshotTest {
             composeRule
                 .onNodeWithTag(RECORDING_STRIP_TAG)
                 .captureRoboImage("src/test/snapshots/composer_voice_recording_strip_locked_light.png")
+            composeRule.onNodeWithTag("composer.voice.pause").performTouchInput { click() }
+            composeRule.mainClock.advanceTimeBy(32L)
+            assertTrue(voiceRecording.isPaused)
+            composeRule.onNodeWithTag("composer.voice.resume").performTouchInput { click() }
+            composeRule.mainClock.advanceTimeBy(32L)
+            assertTrue(!voiceRecording.isPaused)
         } finally {
             voiceRecording.release()
+        }
+    }
+
+    @Test
+    fun voiceCaptureCapsuleAmoled() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val recording =
+            VoiceRecordingController(
+                context = context,
+                outputDirectory = context.cacheDir,
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+                onPermissionRequest = { true },
+                onRecordingComplete = { _, _ -> },
+                onError = {},
+                recorderFactory = { _, file, _ -> PausableRecordingSession(file) },
+                mainDispatcher = Dispatchers.Unconfined,
+                recorderDispatcher = Dispatchers.Unconfined,
+                elapsedRealtime = { 0L },
+            )
+        try {
+            assertTrue(recording.start())
+            recording.lock()
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                    PersistentVoiceCapture(recording, padStatusBars = false)
+                }
+            }
+            composeRule
+                .onNodeWithTag("persistent-voice-capture")
+                .captureRoboImage("src/test/snapshots/voice_capture_capsule_amoled.png")
+        } finally {
+            recording.release()
         }
     }
 

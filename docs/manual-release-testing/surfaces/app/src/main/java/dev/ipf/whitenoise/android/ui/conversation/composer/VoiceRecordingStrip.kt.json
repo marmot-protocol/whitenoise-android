@@ -113,9 +113,9 @@
     ],
     "source_coverage": [
       {
-        "surface": "R.string.voice_message_release_to_review",
+        "surface": "R.string.voice_message_slide_to_cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingStrip.kt",
-        "anchor": "R.string.voice_message_release_to_review",
+        "anchor": "R.string.voice_message_slide_to_cancel",
         "test_ids": [
           "MED-008"
         ]

@@ -323,6 +323,21 @@ private fun ComposerVoicePlacementRow(
             modifier = Modifier.clearAndSetSemantics {},
         )
     }
+    if (enabled) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = ComposerShortcutTarget).toggleable(
+                value = state.draft.sendHeldVoiceOnRelease,
+                enabled = !saving,
+                role = Role.Checkbox,
+                onValueChange = { state.change(state.draft.copy(sendHeldVoiceOnRelease = it)) },
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(stringResource(R.string.voice_send_on_release), Modifier.weight(1f))
+            Checkbox(checked = state.draft.sendHeldVoiceOnRelease, onCheckedChange = null, enabled = !saving)
+        }
+    }
 }
 
 @Composable

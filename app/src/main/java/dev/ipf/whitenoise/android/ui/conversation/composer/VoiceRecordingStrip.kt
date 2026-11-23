@@ -11,7 +11,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,10 +39,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -132,7 +130,7 @@ private fun RecordingStripStatus(controller: VoiceRecordingController) {
     val timing = formatRecordingDuration(if (nearLimit) remainingForDisplay else controller.elapsedMs)
     val timerLabel = stringResource(R.string.voice_recording_stops_in, timing)
     // A locked take has a real trash button on the trailing row, so the strip's decorative one leaves.
-    if (controller.isRecording && !controller.locked) RecordingStripTrash(canceling)
+    if (controller.isRecording && !controller.locked && !controller.isPaused) RecordingStripTrash(canceling)
     RecordingStripDot(controller)
     Text(
         timing,
@@ -218,7 +216,7 @@ private fun RowScope.RecordingStripMiddle() {
 }
 
 /** What the trailing side of the strip offers in each recording state. */
-private enum class StripTrailing { Hint, Locked, Paused, None }
+private enum class StripTrailing { Hint, Controls, None }
 
 /** The release hint while holding, lock and Pause once locked, Resume while paused, and nothing while closing. */
 @Composable
@@ -228,8 +226,7 @@ private fun RecordingStripTrailing(controller: VoiceRecordingController) {
     val mode =
         when {
             !controller.isRecording -> StripTrailing.None
-            controller.isPaused -> StripTrailing.Paused
-            controller.locked -> StripTrailing.Locked
+            controller.isPaused || controller.locked -> StripTrailing.Controls
             nearLimit -> StripTrailing.None
             else -> StripTrailing.Hint
         }
@@ -237,15 +234,15 @@ private fun RecordingStripTrailing(controller: VoiceRecordingController) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             when (it) {
                 StripTrailing.Hint -> RecordingStripHint(controller)
-                StripTrailing.Locked -> RecordingStripLockedControls(controller, showLock = !nearLimit)
-                StripTrailing.Paused -> RecordingStripResume(controller)
+                StripTrailing.Controls ->
+                    RecordingStripLockedControls(controller, showLock = controller.locked && !nearLimit)
                 StripTrailing.None -> Unit
             }
         }
     }
 }
 
-/** "Release to review · slide off to cancel", fading as the finger travels toward cancel. */
+/** The cancel hint fades as the finger slides toward the cancel threshold. */
 @Composable
 @Suppress("FunctionNaming")
 private fun RecordingStripHint(controller: VoiceRecordingController) {
@@ -269,7 +266,7 @@ private fun RecordingStripHint(controller: VoiceRecordingController) {
                 },
         )
         Text(
-            stringResource(R.string.voice_message_release_to_review),
+            stringResource(R.string.voice_message_slide_to_cancel),
             style = MaterialTheme.typography.labelSmall,
             color = hint,
             maxLines = 1,
@@ -293,42 +290,19 @@ private fun RecordingStripLockedControls(
             modifier = Modifier.size(16.dp),
         )
     }
-    val pauseLabel = stringResource(R.string.voice_recording_pause)
-    // Compose extends this compact target's hit area to the 48dp minimum.
-    Icon(
-        painterResource(R.drawable.ic_pause),
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier =
-            Modifier
-                .testTag("composer.voice.pause")
-                .clip(CircleShape)
-                .clickable(role = Role.Button) { controller.pauseCapture() }
-                .semantics { contentDescription = pauseLabel }
-                .padding(4.dp)
-                .size(20.dp),
-    )
-}
-
-/** Resume after the user or another in-app sound paused the take. */
-@Composable
-@Suppress("FunctionNaming")
-private fun RecordingStripResume(controller: VoiceRecordingController) {
-    // The take is held in place and only continues when the user asks.
-    // Compose extends this compact target's hit area to the 48dp minimum.
-    Text(
-        stringResource(R.string.voice_recording_resume),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier =
-            Modifier
-                .testTag("composer.voice.resume")
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(role = Role.Button) { controller.resume() }
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-    )
+    val paused = controller.isPaused
+    IconButton(
+        onClick = { if (paused) controller.resume() else controller.pauseCapture() },
+        modifier = Modifier.testTag(if (paused) "composer.voice.resume" else "composer.voice.pause"),
+    ) {
+        Icon(
+            painterResource(if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause),
+            contentDescription =
+                stringResource(if (paused) R.string.voice_recording_resume else R.string.voice_recording_pause),
+            tint = if (paused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+    }
 }
 
 @Composable
