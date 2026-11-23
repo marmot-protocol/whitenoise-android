@@ -21,6 +21,17 @@
           "PRO-012"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Followed-person badge announced on a direct chat row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowAvatar.kt",
+        "anchor": "R.string.user_search_you_follow",
+        "test_ids": [
+          "AXY-001",
+          "PRO-012"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []
