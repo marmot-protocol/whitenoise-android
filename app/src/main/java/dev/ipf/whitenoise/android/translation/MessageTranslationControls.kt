@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -128,6 +129,7 @@ internal fun MessageSideDisc(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     stateDescription: String? = null,
+    discSize: Dp = MessageSideDiscSize,
     content: @Composable () -> Unit,
 ) {
     val outline = amoledOutlineBorder()
@@ -144,7 +146,7 @@ internal fun MessageSideDisc(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.size(MessageSideDiscSize),
+            modifier = Modifier.size(discSize),
             shape = CircleShape,
             color =
                 when {

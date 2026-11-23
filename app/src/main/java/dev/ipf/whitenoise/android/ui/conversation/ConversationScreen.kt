@@ -212,6 +212,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOwner
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerSessionHost
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalPickMediaDomains
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalVoiceTranscription
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailHost
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSaver
@@ -228,6 +229,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFall
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerChromeIconProvider
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberOriginGuardedResultLauncher
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoiceTranscription
 import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOccurrences
 import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
@@ -4586,6 +4588,7 @@ internal fun ConversationScreen(
             CompositionLocalProvider(
                 dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
                 dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
+                LocalVoiceTranscription provides rememberVoiceTranscription(appState, controller),
                 LocalPollVotesHost provides pollVotesHost,
                 LocalKeptMessages provides keptMessagesController,
                 LocalReactionArtworkSource provides reactionArtwork,

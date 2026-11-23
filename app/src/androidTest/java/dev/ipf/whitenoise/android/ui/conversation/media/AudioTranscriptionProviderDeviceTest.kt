@@ -39,7 +39,7 @@ class AudioTranscriptionProviderDeviceTest {
                 val toggle = remember { AudioTranscriptionToggleState() }
                 Column {
                     AudioTranscriptionToggle(toggle)
-                    ReceivedAudioTranscription(absent, toggle)
+                    ReceivedAudioTranscription(absent, "voice", toggle)
                 }
             }
         }

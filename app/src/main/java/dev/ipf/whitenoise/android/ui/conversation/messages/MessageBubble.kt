@@ -563,7 +563,7 @@ internal fun MessageBubble(
         } else {
             remember(record.messageIdHex) {
                 dev.ipf.whitenoise.android.ui.conversation.media
-                    .AudioTranscriptionToggleState()
+                    .AudioTranscriptionToggleState(record.messageIdHex)
             }
         }
     val translationSource =

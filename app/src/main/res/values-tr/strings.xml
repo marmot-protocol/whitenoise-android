@@ -2831,4 +2831,6 @@
     <string name="remote_signer_disconnect_body">Bu hesap cihazda kalır. Tekrar eşleştirene kadar mesaj gönderemez veya imza gerektiren diğer işlemleri yapamazsın.</string>
     <string name="remote_signer_disconnect_confirm">Bağlantıyı kes</string>
     <string name="remote_signer_switcher_attention">Uzak imzalama uygulaması ilgilenmeni bekliyor</string>
+    <string name="dictation_transcribe_voice_messages_title">Sesli mesajları otomatik olarak yazıya dök</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">İndirilen sesli mesajların dökümünü sohbeti görüntülerken gösterir. Offline Speech to Text gereklidir.</string>
 </resources>

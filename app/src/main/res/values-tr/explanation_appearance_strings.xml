@@ -59,4 +59,5 @@
     <string name="explanation_appearance_action_color_reset">Geçerli tema için kendi eylem renginizi kaldırır ve varsayılana döner. Bu cihazda etkin profil için geçerlidir.</string>
     <string name="explanation_appearance_bubble_colors_save">Seçtiğiniz balon renklerini kaydeder. Bu cihazda etkin profil için geçerlidir; ekranı bir sohbetten açtıysanız yalnızca o sohbet için geçerlidir.</string>
     <string name="explanation_appearance_bubble_colors_menu">Burada kendi balon renklerinizi silen ve varsayılan renklere dönen bir sıfırlama eylemi içeren bir menü açar.</string>
+    <string name="explanation_appearance_dictation_transcribe_voice_messages">Offline Speech to Text, dökümü bu cihazda oluşturur. Dökümü gizlemek için mesajın yanındaki düğmeyi kullanın.</string>
 </resources>

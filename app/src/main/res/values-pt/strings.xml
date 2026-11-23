@@ -2838,4 +2838,6 @@
     <string name="remote_signer_disconnect_body">Esta conta permanece no dispositivo. O envio e outras ações que exigem assinatura ficam indisponíveis até você parear novamente.</string>
     <string name="remote_signer_disconnect_confirm">Desconectar</string>
     <string name="remote_signer_switcher_attention">O assinador remoto precisa de atenção</string>
+    <string name="dictation_transcribe_voice_messages_title">Transcrever mensagens de voz automaticamente</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">Mostra na conversa as transcrições das mensagens de voz baixadas. Requer o Offline Speech to Text.</string>
 </resources>
