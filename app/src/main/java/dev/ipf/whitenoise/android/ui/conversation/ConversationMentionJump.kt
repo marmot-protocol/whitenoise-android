@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.isUnreadMention
+import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -66,9 +68,10 @@ internal fun conversationMentionCoverage(
 /**
  * Mention availability for one conversation entry. MDK's entry row already counts this account's unread mentions,
  * so the jump control can show on the first frame instead of waiting for the timeline to anchor. The loaded rows
- * supply the targets; the entry count, less the mentions read since entry, keeps the control while unread mentions
- * lie outside the loaded window. It stops counting once the rows cover the whole unread range or a jump runs out of
- * history without finding a mention.
+ * supply the targets; the outstanding count, less the mentions read since entry, keeps the control while unread
+ * mentions lie outside the loaded window. Whenever the rows cover the whole unread range, the outstanding count is
+ * reconciled to the mentions they hold, so paging those rows away later keeps them counted. A jump that runs out of
+ * history without finding a mention retires the seed.
  *
  * [entryLastReadMessageId] and [entryFirstUnreadMessageId] are the entry row's unread boundary. A mention counts as
  * read once the read anchor passes it on loaded rows known to follow that boundary.
@@ -81,9 +84,10 @@ internal class ConversationMentionJumpSeed(
 ) {
     private val readIds = mutableStateSetOf<String>()
     private val afterBoundaryIds = HashSet<String>()
+    private var outstanding by mutableIntStateOf(entryCount)
     private var retired by mutableStateOf(entryCount <= 0)
 
-    /** True while the entry count may still name a mention the loaded rows have not shown. */
+    /** True while the outstanding count may still name a mention the loaded rows have not shown. */
     val active: Boolean get() = !retired
 
     fun count(
@@ -93,13 +97,13 @@ internal class ConversationMentionJumpSeed(
         if (retired || coverage == ConversationMentionCoverage.COMPLETE) {
             loadedIds.size
         } else {
-            maxOf(loadedIds.size, entryCount - readIds.size)
+            maxOf(loadedIds.size, outstanding - readIds.size)
         }
 
     /**
      * Records the loaded mentions the read anchor has passed since entry. Rows count only from the entry boundary, or
      * from the first row an earlier window already placed after it, so paging or hiding the boundary rows never
-     * counts an older mention.
+     * counts an older mention. Complete coverage reconciles the outstanding count to the loaded unread mentions.
      */
     fun observe(
         timeline: List<TimelineMessage>,
@@ -117,7 +121,10 @@ internal class ConversationMentionJumpSeed(
                 if (row.isUnreadMention(mentionsActiveAccount)) readIds.add(row.record.messageIdHex)
             }
         }
-        if (coverage == ConversationMentionCoverage.COMPLETE) retire()
+        if (coverage == ConversationMentionCoverage.COMPLETE) {
+            val loadedUnread = unreadReceivedMentionIds(timeline, readAnchorMessageId, mentionsActiveAccount)
+            outstanding = readIds.size + loadedUnread.size
+        }
     }
 
     /** The first loaded row known to follow the entry boundary, or null when no loaded row is. */

@@ -40,8 +40,21 @@ class ConversationMentionJumpTest {
         // The read anchor already passed the mentions: the full unread range is loaded and holds none.
         assertEquals(0, seed.count(emptyList(), ConversationMentionCoverage.COMPLETE))
         seed.observe(rows, "r", ConversationMentionCoverage.COMPLETE, ::mentionsTestAccount)
-        assertFalse("a covered range retires the entry count", seed.active)
         // A later window that no longer reaches the newest row must not bring the stale count back.
+        assertEquals(0, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
+    }
+
+    @Test
+    fun aCoveredMentionPagedAwayUnreadStillCounts() {
+        val seed = ConversationMentionJumpSeed(entryCount = 3, entryLastReadMessageId = "r")
+
+        seed.observe(rows("r", "m@", "u1"), "r", ConversationMentionCoverage.COMPLETE, ::mentionsTestAccount)
+        assertEquals(1, seed.count(listOf("m@"), ConversationMentionCoverage.COMPLETE))
+        // Scrolling into older history evicts m without moving the read anchor.
+        seed.observe(rows("o1", "o2", "r"), "r", ConversationMentionCoverage.PARTIAL, ::mentionsTestAccount)
+        assertEquals(1, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
+        // Back at the newest rows, reading past m consumes it.
+        seed.observe(rows("r", "m@", "u1"), "u1", ConversationMentionCoverage.COMPLETE, ::mentionsTestAccount)
         assertEquals(0, seed.count(emptyList(), ConversationMentionCoverage.PARTIAL))
     }
 
