@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -37,7 +36,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -487,7 +485,7 @@ private fun SettingsHomeScreen(
             }
         },
         onGuideSelection = { guide ->
-            if (!appState.signOutInProgress && !appState.appLock.screenVisible && !appState.wipeInProgress) {
+            if (settingsSearchSessionInteractive(appState)) {
                 keyboard?.hide()
                 onGuideSelection(guide)
             }
@@ -575,9 +573,11 @@ private fun canActivateSettingsSearchResult(
             appState,
             if (entry.pushRequired) appState.nativePushCapability().isAvailable else pushAvailable,
         )
-    val sessionInteractive = !appState.signOutInProgress && !appState.appLock.screenVisible && !appState.wipeInProgress
-    return current.allows(entry) && sessionInteractive
+    return current.allows(entry) && settingsSearchSessionInteractive(appState)
 }
+
+private fun settingsSearchSessionInteractive(appState: WhiteNoiseAppState): Boolean =
+    !appState.signOutInProgress && !appState.appLock.screenVisible && !appState.wipeInProgress
 
 /**
  * Settings home as the prototype lays it out: profile header, optional app updates, the labelled Account,

@@ -153,7 +153,14 @@ internal fun DocumentationScreen(
     SettingsScaffold(
         title = selected?.title ?: stringResource(R.string.user_documentation),
         onBack = back,
-        titleContent = settingsSearchTitle(showingSearch, query, { query = it.take(SETTINGS_SEARCH_MAX_QUERY) }, searchCollapse, searchLabel),
+        titleContent =
+            settingsSearchTitle(
+                showingSearch,
+                query,
+                { query = it.take(SETTINGS_SEARCH_MAX_QUERY) },
+                searchCollapse,
+                searchLabel,
+            ),
         topBarModifier = Modifier.searchCollapseHost(searchCollapse),
         topBarActions = {
             if (selectedId == null) {

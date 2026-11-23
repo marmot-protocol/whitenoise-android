@@ -2222,6 +2222,3 @@ internal fun MainShell(
         }
     }
 }
-
-private const val ATTACHMENT_OPEN_DESTINATION_UNINITIALIZED = "attachment-open-uninitialized"
-private const val ATTACHMENT_OPEN_DESTINATION_NONE = "attachment-open-none"
