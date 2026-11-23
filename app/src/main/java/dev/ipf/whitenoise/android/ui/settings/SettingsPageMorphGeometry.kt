@@ -212,8 +212,3 @@ internal fun Rect.validIn(host: Rect): Boolean =
         top >= host.top &&
         right <= host.right &&
         bottom <= host.bottom
-
-internal fun Rect.visibleIn(host: Rect): Boolean =
-    listOf(left, top, right, bottom).all { it.isFinite() } &&
-        !isEmpty &&
-        !intersect(host).isEmpty

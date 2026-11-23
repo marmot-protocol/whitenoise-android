@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
+import dev.ipf.whitenoise.android.ui.common.visibleIn
 
 /** One route clock owns continuous opaque chrome and the separately permitted content picture. */
 @Suppress("TooManyFunctions")
@@ -63,12 +65,12 @@ internal class SettingsPageMorph {
     internal var childBodyTop: (() -> Float)? = null
 
     /** The cards the mounted child route measured, which a top-level bubble may land on. */
-    internal var childCards: (() -> List<SettingsBubbleCard>)? by mutableStateOf(null)
+    internal var childCards: (() -> List<SurfaceMorphCard>)? by mutableStateOf(null)
     private var bubbleRevision by mutableIntStateOf(0)
     private var cachedBubbleRevision = -1
-    private var cachedBubbleCards: List<SettingsBubbleCard> = emptyList()
+    private var cachedBubbleCards: List<SurfaceMorphCard> = emptyList()
 
-    internal fun bubbleCards(): List<SettingsBubbleCard> {
+    internal fun bubbleCards(): List<SurfaceMorphCard> {
         childCards?.invoke()?.takeIf { it.isNotEmpty() }?.let { return it }
         if (cachedBubbleRevision != bubbleRevision) {
             cachedBubbleRevision = bubbleRevision

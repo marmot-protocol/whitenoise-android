@@ -42,22 +42,22 @@ import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
 import dev.ipf.whitenoise.android.ui.common.LocalNativePageBody
 import dev.ipf.whitenoise.android.ui.common.LocalScaffoldBodyInputBlocked
 import dev.ipf.whitenoise.android.ui.common.NativePageBody
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphColors
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphGeometry
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphLanding
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphSource
+import dev.ipf.whitenoise.android.ui.common.drawAtAlpha
+import dev.ipf.whitenoise.android.ui.common.drawSurfaceArrival
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphShape
 import dev.ipf.whitenoise.android.ui.navigation.ConversationRouteTransition
 import dev.ipf.whitenoise.android.ui.navigation.rememberConversationRouteTransition
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleCard
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleColors
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleGeometry
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleLanding
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleSource
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
-import dev.ipf.whitenoise.android.ui.settings.drawAtAlpha
-import dev.ipf.whitenoise.android.ui.settings.drawSettingsArrival
-import dev.ipf.whitenoise.android.ui.settings.settingsBubbleShape
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphAnchorOutline
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.settings.settingsTransitionInputGate
 
 internal val ComposerResizeHandleWidth = 32.dp
@@ -78,10 +78,10 @@ internal class ConversationSettingsMotion(
     private var launchedWithGrip = false
     private var launchImeBottom: Int? = null
     private var composerHasGrip = false
-    private var composerPreview by mutableStateOf<List<SettingsBubbleCard>>(emptyList())
+    private var composerPreview by mutableStateOf<List<SurfaceMorphCard>>(emptyList())
     private var preparedContour: SettingsContour? = null
-    private var preparedSource: SettingsBubbleSource? = null
-    private val landing = SettingsBubbleLanding()
+    private var preparedSource: SurfaceMorphSource? = null
+    private val landing = SurfaceMorphLanding()
 
     val route by derivedStateOf {
         transition.targetState ?: transition.retainedStates.lastOrNull { it != null }.takeUnless { suppressed }
@@ -137,11 +137,11 @@ internal class ConversationSettingsMotion(
 
     fun drawsNativeComposer() = !drawsMovingOutline
 
-    fun reportComposerPreview(card: SettingsBubbleCard?) {
+    fun reportComposerPreview(card: SurfaceMorphCard?) {
         composerPreview = listOfNotNull(card)
     }
 
-    fun bubble(): SettingsBubbleGeometry? {
+    fun bubble(): SurfaceMorphGeometry? {
         // Back during entry keeps the same origin. A settled page may return to a newly placed
         // composer after the IME closed; its live bounds take precedence when available.
         val native = morph.anchorContour.takeIf { transcriptActive && transition.currentState != null }
@@ -156,7 +156,7 @@ internal class ConversationSettingsMotion(
     }
 
     private fun SettingsContour.bubbleSource() =
-        SettingsBubbleSource(
+        SurfaceMorphSource(
             bounds,
             ControlMorphSurface(
                 fill.takeIf { it.isSpecified } ?: Color.Transparent,
@@ -224,7 +224,7 @@ internal fun ConversationSettingsPage(
 ) {
     val route = motion.route ?: return
     val scheme = MaterialTheme.colorScheme
-    val colors = SettingsBubbleColors(scheme.surfaceContainerLow, scheme.outlineVariant)
+    val colors = SurfaceMorphColors(scheme.surfaceContainerLow, scheme.outlineVariant)
     val body = remember(motion) { NativePageBody() }
     val view = LocalView.current
     val inputBlocked = remember(motion) { derivedStateOf { motion.progress < 1f } }
@@ -232,7 +232,7 @@ internal fun ConversationSettingsPage(
         Modifier
             .fillMaxSize()
             .zIndex(1f)
-            .onGloballyPositioned { motion.host = it.settingsMorphBounds(view) }
+            .onGloballyPositioned { motion.host = it.motionBoundsOnScreen(view) }
             .drawWithContent { drawConversationSettings(motion, colors, body) }
     ConversationSettingsLayer(presentation.then(modifier), active = !motion.transcriptActive) {
         CompositionLocalProvider(
@@ -247,7 +247,7 @@ internal fun ConversationSettingsPage(
 /** The native toolbar stays visible and can reverse the entry while the body is still moving. */
 private fun ContentDrawScope.drawConversationSettings(
     motion: ConversationSettingsMotion,
-    colors: SettingsBubbleColors,
+    colors: SurfaceMorphColors,
     body: NativePageBody,
 ) {
     val progress = motion.progress
@@ -266,11 +266,11 @@ private fun ContentDrawScope.drawConversationSettings(
         }
     }
     clipRect(top = bodyTop) {
-        drawSettingsArrival(bubble, progress, colors, ink = 1f, pageAlpha = pageAlpha) {
+        drawSurfaceArrival(bubble, progress, colors, ink = 1f, pageAlpha = pageAlpha) {
             this@drawConversationSettings.drawContent()
         }
         if (bubble != null && motion.movingGripAlpha > 0f) {
-            val shape = settingsBubbleShape(bubble, progress)
+            val shape = surfaceMorphShape(bubble, progress)
             val width = ComposerResizeHandleWidth.roundToPx().toFloat()
             val height = ComposerResizeHandleThickness.roundToPx().toFloat()
             val top = shape.top + ((1.dp - ComposerResizeHandleThickness) / 2).roundToPx()

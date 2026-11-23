@@ -40,8 +40,10 @@ import dev.ipf.whitenoise.android.state.loadAccountRelayLists
 import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphSource
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPenDialogMotion
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
@@ -51,9 +53,7 @@ import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleSource
 import dev.ipf.whitenoise.android.ui.settings.SupportRelayState
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.settings.settingsPenSource
 import dev.ipf.whitenoise.android.ui.settings.supportRelayState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -124,7 +124,7 @@ internal fun ChatsNewMessageFab(
             } else {
                 onNewMessageOrigin(
                     fabBounds?.let { bounds ->
-                        MeasuredPenDialogMotion(SettingsBubbleSource(bounds, penSurface)) {
+                        MeasuredPenDialogMotion(SurfaceMorphSource(bounds, penSurface)) {
                             current() && !missing && fabBounds == bounds
                         }
                     },
@@ -190,7 +190,7 @@ internal fun ChatsNewMessageFabContent(
                 .padding(end = paneInset)
                 .offset(y = if (missingRelays) 0.dp else 16.dp - ComposerOuterVerticalPadding)
                 .floatingDictationAnchor(followsComposerFab = !missingRelays)
-                .onGloballyPositioned { onBounds(it.settingsMorphBounds(view)) }
+                .onGloballyPositioned { onBounds(it.motionBoundsOnScreen(view)) }
                 .settingsPenSource(!missingRelays, 16.dp, penFill, outlineVariant)
                 .drawWithContent { if (missingRelays || !hidePen()) drawContent() }
                 .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)

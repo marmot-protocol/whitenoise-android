@@ -9,7 +9,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Canvas
-import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -22,6 +21,12 @@ import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphColors
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphGeometry
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphResume
+import dev.ipf.whitenoise.android.ui.common.drawSurfaceArrival
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphInk
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphUnderlayCover
 import kotlin.math.ceil
 
 internal const val SETTINGS_BUBBLE_OPEN_MILLIS = APP_MOTION_OPEN_MILLIS
@@ -48,7 +53,6 @@ internal class SettingsCardSnapshot {
 }
 
 private const val MIN_SHRINK_FROM = 0.001f
-private const val SETTINGS_FADE_START = 0.35f
 
 /** A container growing from a measured control rectangle keeps that control's rounded-row corners at first. */
 private val SettingsRowContainerCornerRadius = 20.dp
@@ -174,12 +178,12 @@ internal fun Modifier.settingsBubbleMotion(
     opening: Boolean,
     progress: () -> Float,
     animating: () -> Boolean,
-    colors: SettingsBubbleColors,
+    colors: SurfaceMorphColors,
     snapshot: SettingsCardSnapshot?,
     closingPicture: () -> Picture? = { snapshot?.picture },
-    landing: () -> SettingsBubbleGeometry? = { null },
+    landing: () -> SurfaceMorphGeometry? = { null },
     recording: () -> Boolean = { true },
-    resume: SettingsBubbleResume? = null,
+    resume: SurfaceMorphResume? = null,
 ): Modifier =
     if (opening) {
         drawWithContent {
@@ -190,9 +194,9 @@ internal fun Modifier.settingsBubbleMotion(
             // A Back during the open closes with this first permitted frame.
             if (snapshot != null && snapshot.picture == null && recording()) record(snapshot)
             val presence = progress().coerceIn(0f, 1f)
-            drawRect(colors.backplate, alpha = settingsBubbleUnderlayCover(presence))
-            val ink = settingsBubbleInk(presence, opening = true, resume)
-            drawSettingsArrival(landing(), presence, colors, ink) { this@drawWithContent.drawContent() }
+            drawRect(colors.backplate, alpha = surfaceMorphUnderlayCover(presence))
+            val ink = surfaceMorphInk(presence, opening = true, resume)
+            drawSurfaceArrival(landing(), presence, colors, ink) { this@drawWithContent.drawContent() }
         }
     } else {
         drawWithContent {
@@ -202,41 +206,13 @@ internal fun Modifier.settingsBubbleMotion(
             val picture = closingPicture()
             val bubble = landing()
             if (picture == null && bubble == null) return@drawWithContent
-            drawRect(colors.backplate, alpha = settingsBubbleUnderlayCover(presence))
+            drawRect(colors.backplate, alpha = surfaceMorphUnderlayCover(presence))
             val content: (DrawScope.() -> Unit)? =
                 picture?.let { frame -> { drawIntoCanvas { it.nativeCanvas.drawPicture(frame) } } }
-            val ink = settingsBubbleInk(presence, opening = false, resume)
-            drawSettingsArrival(bubble, presence, colors, ink, content = content)
+            val ink = surfaceMorphInk(presence, opening = false, resume)
+            drawSurfaceArrival(bubble, presence, colors, ink, content = content)
         }
     }
-
-/** Paints the native page once around the landing card and again only inside its moving outline. */
-internal fun DrawScope.drawSettingsArrival(
-    landing: SettingsBubbleGeometry?,
-    presence: Float,
-    colors: SettingsBubbleColors,
-    ink: Float,
-    pageAlpha: Float =
-        if (landing == null) {
-            ((presence - SETTINGS_FADE_START) / (1f - SETTINGS_FADE_START)).coerceAtLeast(0f)
-        } else {
-            presence
-        },
-    content: (DrawScope.() -> Unit)?,
-) {
-    val effectivePageAlpha = pageAlpha * ink
-    if (content != null && effectivePageAlpha > 0f) {
-        drawAtAlpha(Rect(0f, 0f, size.width, size.height), effectivePageAlpha) {
-            val card = landing?.card?.visibleBounds
-            if (card == null) {
-                content()
-            } else {
-                clipRect(card.left, card.top, card.right, card.bottom, ClipOp.Difference, content)
-            }
-        }
-    }
-    landing?.let { drawClippedBubble(it, presence, colors, ink, content) }
-}
 
 /** Records this route's current frame into [snapshot] without drawing it. */
 private fun ContentDrawScope.record(snapshot: SettingsCardSnapshot) {

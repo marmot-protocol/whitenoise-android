@@ -13,35 +13,35 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.painterResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphColors
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphGeometry
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphSource
+import dev.ipf.whitenoise.android.ui.common.drawSurfaceArrival
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphUnderlayCover
 import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleCard
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleColors
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleGeometry
-import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleSource
-import dev.ipf.whitenoise.android.ui.settings.drawSettingsArrival
-import dev.ipf.whitenoise.android.ui.settings.settingsBubbleUnderlayCover
 
 /** Geometry shared by Home and its dialog. The popup still owns all timing and dismissal. */
 internal class MeasuredPenDialogMotion(
-    private val source: SettingsBubbleSource,
+    private val source: SurfaceMorphSource,
     private val isSourceCurrent: () -> Boolean = { true },
 ) {
     val origin get() = source.bounds
-    private var landing by mutableStateOf<SettingsBubbleCard?>(null)
+    private var landing by mutableStateOf<SurfaceMorphCard?>(null)
     private var cachedHost = Rect.Zero
-    private var cachedLanding: SettingsBubbleCard? = null
-    private var cachedBubble: SettingsBubbleGeometry? = null
+    private var cachedLanding: SurfaceMorphCard? = null
+    private var cachedBubble: SurfaceMorphGeometry? = null
     internal var drawsSource: () -> Boolean by mutableStateOf({ false })
 
     fun debugGeometry() =
         "origin=$origin landing=${landing?.visibleBounds} host=$cachedHost " +
             "sourceCurrent=${isSourceCurrent()}"
 
-    fun reportLanding(card: SettingsBubbleCard?) {
+    fun reportLanding(card: SurfaceMorphCard?) {
         landing = card
     }
 
-    fun bubble(host: Rect): SettingsBubbleGeometry? {
+    fun bubble(host: Rect): SurfaceMorphGeometry? {
         if (!isSourceCurrent()) return null
         val measured = landing
         if (cachedHost != host || cachedLanding !== measured) {
@@ -70,7 +70,7 @@ internal fun Modifier.measuredPenOutline(
     }
     val scheme = MaterialTheme.colorScheme
     val colors =
-        SettingsBubbleColors(
+        SurfaceMorphColors(
             scheme.surfaceContainerLow,
             scheme.outlineVariant,
             painterResource(R.drawable.ic_edit),
@@ -82,8 +82,8 @@ internal fun Modifier.measuredPenOutline(
         if (bubble == null || progress >= 1f) {
             drawContent()
         } else {
-            drawRect(colors.backplate, alpha = settingsBubbleUnderlayCover(progress))
-            drawSettingsArrival(bubble, progress, colors, ink = 1f) { this@drawWithContent.drawContent() }
+            drawRect(colors.backplate, alpha = surfaceMorphUnderlayCover(progress))
+            drawSurfaceArrival(bubble, progress, colors, ink = 1f) { this@drawWithContent.drawContent() }
         }
     }
 }

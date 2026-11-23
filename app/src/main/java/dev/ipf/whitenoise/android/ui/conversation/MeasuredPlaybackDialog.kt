@@ -17,13 +17,13 @@ import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.drawMeasuredPage
 import dev.ipf.whitenoise.android.ui.common.drawNativePage
 import dev.ipf.whitenoise.android.ui.common.measuredPageBounds
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
 import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 /** Opt-in page presentation; thumbnail viewers keep their existing gesture owner. No page is captured. */
 @Composable
@@ -112,7 +112,7 @@ private fun measuredDialogPageModifier(
 ): Modifier {
     val view = LocalView.current
     val background = androidx.compose.material3.MaterialTheme.colorScheme.background
-    val placement = Modifier.onGloballyPositioned { onHost(it.settingsMorphBounds(view)) }
+    val placement = Modifier.onGloballyPositioned { onHost(it.motionBoundsOnScreen(view)) }
     if (penMotion != null) {
         val penHost = host.takeIf { measuredOriginUsable(origin, host) }
         return placement.measuredPenOutline(penMotion, penHost, surface).then(

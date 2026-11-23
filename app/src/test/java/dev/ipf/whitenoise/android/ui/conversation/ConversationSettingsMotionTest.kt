@@ -31,11 +31,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphShape
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
-import dev.ipf.whitenoise.android.ui.settings.settingsBubbleShape
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -210,7 +210,7 @@ class ConversationSettingsMotionTest {
         val (x, y) =
             rule.runOnIdle {
                 val bubble = checkNotNull(motion.bubble())
-                val shape = settingsBubbleShape(bubble, motion.progress)
+                val shape = surfaceMorphShape(bubble, motion.progress)
                 assertTrue(shape.top > bubble.card.bounds.top + 5f)
                 assertTrue(shape.top < bubble.origin.top - 5f)
                 ((shape.left + shape.right) / 2f).toInt() to shape.top.toInt()

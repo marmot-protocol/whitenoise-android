@@ -46,6 +46,17 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphColors
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphGeometry
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphResume
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphSource
+import dev.ipf.whitenoise.android.ui.common.drawClippedSurfaceMorph
+import dev.ipf.whitenoise.android.ui.common.drawSurfaceArrival
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphCardAlpha
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphInk
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphShape
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphUnderlayCover
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -83,21 +94,21 @@ class SettingsTopLevelBubbleMotionTest {
 
     @Test fun thePenStartsAndEndsAtItsMeasuredNativeOutline() {
         val card = fixedCard(Rect(16f, 100f, 344f, 260f))
-        val bubble = SettingsBubbleGeometry(PEN, card, PEN_SURFACE)
-        val start = settingsBubbleShape(bubble, 0f)
+        val bubble = SurfaceMorphGeometry(PEN, card, PEN_SURFACE)
+        val start = surfaceMorphShape(bubble, 0f)
         assertEquals(PEN, Rect(start.left, start.top, start.right, start.bottom))
         assertEquals(PEN_SURFACE.radius, start.topLeftCornerRadius.x, 0f)
-        val end = settingsBubbleShape(bubble, 1f)
+        val end = surfaceMorphShape(bubble, 1f)
         assertEquals(card.bounds, Rect(end.left, end.top, end.right, end.bottom))
         assertEquals(card.radius, end.topLeftCornerRadius.x, 0f)
-        assertEquals(0f, settingsBubbleUnderlayCover(0f), 0f)
-        assertEquals(1f, settingsBubbleUnderlayCover(0.5f), 0f)
-        assertEquals(0f, settingsBubbleCardAlpha(0f), 0f)
-        assertEquals(1f, settingsBubbleCardAlpha(1f), 0f)
+        assertEquals(0f, surfaceMorphUnderlayCover(0f), 0f)
+        assertEquals(1f, surfaceMorphUnderlayCover(0.5f), 0f)
+        assertEquals(0f, surfaceMorphCardAlpha(0f), 0f)
+        assertEquals(1f, surfaceMorphCardAlpha(1f), 0f)
     }
 
     @Test fun thePenLandsOnTheBottomMostVisibleCard() {
-        val handoff = SettingsTopLevelHandoff().apply { pen = SettingsBubbleSource(PEN, PEN_SURFACE) }
+        val handoff = SettingsTopLevelHandoff().apply { pen = SurfaceMorphSource(PEN, PEN_SURFACE) }
         val bubble = checkNotNull(handoff.bubble(HOST, CARDS))
         assertEquals(BOTTOM, bubble.card)
         assertEquals(PEN, bubble.origin)
@@ -109,7 +120,7 @@ class SettingsTopLevelBubbleMotionTest {
         assertNull(handoff.bubble(HOST, CARDS))
         val pixels =
             drawFrame {
-                drawSettingsArrival(null, 0.5f, BUBBLE_COLORS, 1f) {
+                drawSurfaceArrival(null, 0.5f, BUBBLE_COLORS, 1f) {
                     drawRect(Color.Red, Offset(165f, 635f), Size(30f, 30f))
                 }
             }
@@ -119,17 +130,17 @@ class SettingsTopLevelBubbleMotionTest {
     @Test fun aMissingOrOffscreenEndpointUsesOnlyTheFade() {
         val handoff = SettingsTopLevelHandoff()
         val offscreen = Rect(16f, 900f, 56f, 940f)
-        handoff.pen = SettingsBubbleSource(offscreen, PEN_SURFACE)
+        handoff.pen = SurfaceMorphSource(offscreen, PEN_SURFACE)
         assertNull(handoff.bubble(HOST, CARDS))
-        handoff.pen = SettingsBubbleSource(PEN, PEN_SURFACE)
+        handoff.pen = SurfaceMorphSource(PEN, PEN_SURFACE)
         assertNull(handoff.bubble(HOST, listOf(fixedCard(offscreen))))
     }
 
     @Test fun theOutlineMovesWhileSiblingInkStaysInPlace() {
-        val bubble = SettingsBubbleGeometry(PEN, BOTTOM, PEN_SURFACE)
+        val bubble = SurfaceMorphGeometry(PEN, BOTTOM, PEN_SURFACE)
         val pixels =
             drawFrame {
-                drawSettingsArrival(bubble, 0.5f, BUBBLE_COLORS, 1f) {
+                drawSurfaceArrival(bubble, 0.5f, BUBBLE_COLORS, 1f) {
                     drawRect(Color.Red, Offset(165f, 590f), Size(30f, 20f))
                 }
             }
@@ -141,12 +152,12 @@ class SettingsTopLevelBubbleMotionTest {
     @Test fun aSoleProfileCardKeepsItsPortraitAtItsNativePosition() {
         val profile = BOTTOM.copy(fill = Color.Yellow)
         val target = Rect(84f, 634f, 116f, 666f)
-        val handoff = SettingsTopLevelHandoff().apply { pen = SettingsBubbleSource(PEN, PEN_SURFACE) }
+        val handoff = SettingsTopLevelHandoff().apply { pen = SurfaceMorphSource(PEN, PEN_SURFACE) }
         val bubble = checkNotNull(handoff.bubble(HOST, listOf(profile)))
         assertEquals(profile, bubble.card)
         val pixels =
             drawFrame {
-                drawSettingsArrival(bubble, 0.95f, BUBBLE_COLORS, 1f) {
+                drawSurfaceArrival(bubble, 0.95f, BUBBLE_COLORS, 1f) {
                     drawRect(Color.Yellow, profile.bounds.topLeft, profile.bounds.size)
                     drawCircle(Color.Green, target.width / 2, target.center)
                 }
@@ -163,12 +174,12 @@ class SettingsTopLevelBubbleMotionTest {
             fixedCard(Rect(16f, 600f, 344f, 800f))
                 .copy(visibleBounds = Rect(16f, 600f, 344f, 740f), fill = Color.Blue)
         val pen = PEN_SURFACE.copy(fill = Color.Blue)
-        val bubbles = listOf(SettingsBubbleGeometry(AVATAR, top, pen), SettingsBubbleGeometry(PEN, low, pen))
+        val bubbles = listOf(SurfaceMorphGeometry(AVATAR, top, pen), SurfaceMorphGeometry(PEN, low, pen))
         listOf(1f, CLOSING_PRESENCE, 0.9f, 0.6f).forEach { presence ->
             val pixels =
                 drawFrame {
                     bubbles.forEach { bubble ->
-                        drawClippedBubble(bubble, presence, SettingsBubbleColors(Color.Black, Color.Red), 1f) {
+                        drawClippedSurfaceMorph(bubble, presence, SurfaceMorphColors(Color.Black, Color.Red), 1f) {
                             drawRect(Color.Green)
                         }
                     }
@@ -186,12 +197,12 @@ class SettingsTopLevelBubbleMotionTest {
 
     @Test fun aReversedLegKeepsTheInkItTurnedAroundWith() {
         // A reopen after a pictureless close ramps its ink from none; turning back keeps the drawn ink.
-        val reopened = SettingsBubbleResume(presence = 0.4f, ink = 0f)
-        val drawn = settingsBubbleInk(0.6f, opening = true, reopened)
+        val reopened = SurfaceMorphResume(presence = 0.4f, ink = 0f)
+        val drawn = surfaceMorphInk(0.6f, opening = true, reopened)
         assertEquals(1f / 3f, drawn, 0.001f)
-        assertEquals(1f, settingsBubbleInk(1f, opening = true, reopened), 0f)
-        assertEquals(drawn, settingsBubbleInk(0.6f, opening = false, SettingsBubbleResume(0.6f, drawn)), 0f)
-        assertEquals(1f, settingsBubbleInk(0.3f, opening = false, null), 0f)
+        assertEquals(1f, surfaceMorphInk(1f, opening = true, reopened), 0f)
+        assertEquals(drawn, surfaceMorphInk(0.6f, opening = false, SurfaceMorphResume(0.6f, drawn)), 0f)
+        assertEquals(1f, surfaceMorphInk(0.3f, opening = false, null), 0f)
     }
 
     @Test fun amoledPenMorphsIntoTheBottomCardAndBack() {
@@ -459,7 +470,7 @@ class SettingsTopLevelBubbleMotionTest {
         const val PEN_SLACK = 12f
         const val FAR_X = 18
         const val FAR_Y = 394
-        val BUBBLE_COLORS = SettingsBubbleColors(Color.Black, Color.White)
+        val BUBBLE_COLORS = SurfaceMorphColors(Color.Black, Color.White)
         val HOST = Rect(0f, 0f, 360f, 780f)
         val AVATAR = Rect(12f, 12f, 52f, 52f)
         val TARGET = Rect(32f, 196f, 88f, 252f)
@@ -548,4 +559,4 @@ private fun SettingsStandIn() {
     }
 }
 
-private fun fixedCard(bounds: Rect) = SettingsBubbleCard(bounds, bounds, 16f, Color.Black, Color.White, 1f)
+private fun fixedCard(bounds: Rect) = SurfaceMorphCard(bounds, bounds, 16f, Color.Black, Color.White, 1f)

@@ -133,6 +133,7 @@ import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
@@ -1494,7 +1495,7 @@ internal fun GroupDetailsScreen(
                                 // The title actually shown decides: a member titled by their own key copies it (#3565).
                                 val titleIsKey = opensProfile && abbreviatesPublicKey(memberTitle, profileNpub)
                                 val profileLaunch =
-                                    dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
+                                    dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick { origin ->
                                         appState.presentProfile(profileNpub, origin = origin)
                                     }
                                 ChatInfoMemberCard(
@@ -1754,7 +1755,7 @@ internal fun GroupDetailsScreen(
                         SettingsGroup(modifier = Modifier.testTag("chat_info.group_actions")) {
                             row("start_group") { rowContext ->
                                 val launch =
-                                    dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
+                                    dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick { origin ->
                                         val candidate =
                                             RecipientSearch.Candidate(
                                                 dmPeerAccountIdHex,

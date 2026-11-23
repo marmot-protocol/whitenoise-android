@@ -29,7 +29,7 @@ import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.controlMorphSurface
 import dev.ipf.whitenoise.android.ui.common.drawControlMorphPen
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import kotlin.math.ceil
 
 /** The shell connects only these two real controls; no composer or draft state is shared. */
@@ -122,5 +122,5 @@ internal val LocalConversationBodyMotion = staticCompositionLocalOf<Conversation
 internal fun Modifier.conversationRouteBodyMotion(): Modifier {
     val motion = LocalConversationBodyMotion.current ?: return this
     val view = LocalView.current
-    return onGloballyPositioned { motion.nativeBody.bounds = it.settingsMorphBounds(view) }
+    return onGloballyPositioned { motion.nativeBody.bounds = it.motionBoundsOnScreen(view) }
 }

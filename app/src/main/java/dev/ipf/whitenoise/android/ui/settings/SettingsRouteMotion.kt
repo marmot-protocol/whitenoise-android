@@ -36,7 +36,12 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphColors
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphResume
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.common.surfaceMorphInk
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import kotlin.math.roundToInt
 
@@ -65,7 +70,7 @@ private class SettingsMotionHistory<T>(
 
     /** The last top-level leg's direction and the Settings ink it continued from, for the next reversal. */
     var opening = true
-    var resume: SettingsBubbleResume? = null
+    var resume: SurfaceMorphResume? = null
 }
 
 /**
@@ -215,7 +220,7 @@ private fun <T> SettingsTopLevelRouteLayers(
  */
 internal class SettingsContainerRouteHooks(
     val onSettled: () -> Unit = {},
-    val cards: () -> List<SettingsBubbleCard> = { emptyList() },
+    val cards: () -> List<SurfaceMorphCard> = { emptyList() },
     val handoff: SettingsTopLevelHandoff? = null,
 )
 
@@ -271,8 +276,8 @@ internal fun <T> rememberRouteMotionModifier(
         remember(ownerKey, target, motion) {
             history.progress?.takeIf { bubble && interrupted && motion }?.let { old ->
                 val presence = if (history.opening) old.value else 1f - old.value
-                val ink = if (history.pictureless) 0f else settingsBubbleInk(presence, history.opening, history.resume)
-                SettingsBubbleResume(presence, ink)
+                val ink = if (history.pictureless) 0f else surfaceMorphInk(presence, history.opening, history.resume)
+                SurfaceMorphResume(presence, ink)
             }
         }
     SideEffect {
@@ -299,7 +304,7 @@ internal fun <T> rememberRouteMotionModifier(
         // Settings pages rest on surfaceContainerLow; the bubble's backplate is that page surface.
         val scheme = MaterialTheme.colorScheme
         val pen = painterResource(R.drawable.ic_edit)
-        val colors = SettingsBubbleColors(scheme.surfaceContainerLow, scheme.outlineVariant, pen, scheme.onSurface)
+        val colors = SurfaceMorphColors(scheme.surfaceContainerLow, scheme.outlineVariant, pen, scheme.onSurface)
         val leavingHost = remember(ownerKey, target) { host.value }
         val geometryCurrent = { opening || host.value == leavingHost }
         val landing = { hooks.handoff?.takeIf { geometryCurrent() }?.bubble(host.value, hooks.cards()) }
@@ -307,7 +312,7 @@ internal fun <T> rememberRouteMotionModifier(
             hooks.handoff?.hidePen = { motion && progress.value < 1f && landing() != null }
         }
         return Modifier
-            .onGloballyPositioned { host.value = it.settingsMorphBounds(view) }
+            .onGloballyPositioned { host.value = it.motionBoundsOnScreen(view) }
             .settingsTransitionInputGate(opening && motion && progress.value < 1f)
             .settingsBubbleMotion(
                 opening = opening,

@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.boundingRect
 import androidx.compose.ui.graphics.Color
@@ -8,7 +7,7 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import dev.ipf.whitenoise.android.ui.common.drawAtAlpha
 
 /** Below this presence an origin container shows no route ink; closing, the ink is gone by then. */
 internal const val SETTINGS_CONTAINER_BODY_FADE_START = 0.22f
@@ -61,16 +60,4 @@ internal fun DrawScope.drawContainer(
     drawPath(clip, colors.fill, alpha = shapeAlpha)
     val body = content?.takeIf { bodyAlpha > 0f } ?: return
     clipPath(clip) { drawAtAlpha(shape.boundingRect, bodyAlpha, body) }
-}
-
-/** Draws [block] composited at [alpha] within [bounds]. */
-internal fun DrawScope.drawAtAlpha(
-    bounds: Rect,
-    alpha: Float,
-    block: DrawScope.() -> Unit,
-) {
-    val layered = alpha < 1f
-    if (layered) drawIntoCanvas { it.saveLayer(bounds, Paint().apply { this.alpha = alpha }) }
-    block()
-    if (layered) drawIntoCanvas { it.restore() }
 }

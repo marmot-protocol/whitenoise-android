@@ -220,22 +220,8 @@ internal class MeasuredControlHandoff(
         end = target
         progress.snapTo(0f)
         awaitingFrame = false
-        progress.animateTo(
-            1f,
-            tween(
-                if (previous != null && previous == closeDestination) {
-                    APP_MOTION_CLOSE_MILLIS
-                } else {
-                    APP_MOTION_OPEN_MILLIS
-                },
-                easing =
-                    if (previous != null && previous == closeDestination) {
-                        AppMotionCloseEasing
-                    } else {
-                        AppMotionOpenEasing
-                    },
-            ),
-        )
+        val motion = if (previous != null && previous == closeDestination) SurfaceMotion.Close else SurfaceMotion.Open
+        progress.animateTo(1f, motion.spec())
         if (request === token) finish()
     }
 

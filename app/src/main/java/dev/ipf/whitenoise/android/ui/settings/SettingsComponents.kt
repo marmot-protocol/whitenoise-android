@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -88,7 +89,7 @@ internal fun SettingsGroup(
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
     destination: Any? = null,
     surface: Any = destination ?: Unit,
-    onMeasured: ((SettingsBubbleCard?) -> Unit)? = null,
+    onMeasured: ((SurfaceMorphCard?) -> Unit)? = null,
     content: SettingsGroupScope.() -> Unit,
 ) {
     val group = SettingsGroupScope().apply(content)

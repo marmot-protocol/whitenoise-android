@@ -42,6 +42,8 @@ import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import dev.ipf.whitenoise.android.ui.common.visibleIn
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlin.math.ceil
 
@@ -353,7 +355,7 @@ internal fun Modifier.settingsCardMorph(
     DisposableEffect(morph, token) { onDispose { morph.remove(token) } }
     // Reported outside the card's own layer, so the bounds stay the settled ones while it travels.
     // An anchor may report only the visible control inside its larger touch target.
-    val positioned = onGloballyPositioned { morph.report(token, it.settingsMorphBounds(view).deflate(inset)) }
+    val positioned = onGloballyPositioned { morph.report(token, it.motionBoundsOnScreen(view).deflate(inset)) }
     // An anchor only marks where routes grow from; it neither travels nor is recorded.
     return if (anchor != null || morph.page != null) {
         positioned
@@ -383,7 +385,7 @@ internal fun Modifier.settingsMorphAnchorOutline(
     val direction = LocalLayoutDirection.current
     DisposableEffect(morph, anchor) { onDispose { morph.removeAnchorOutline(anchor) } }
     return onGloballyPositioned { coordinates ->
-        val bounds = coordinates.settingsMorphBounds(view)
+        val bounds = coordinates.motionBoundsOnScreen(view)
         val corners =
             when (val outline = shape.createOutline(bounds.size, direction, density)) {
                 is Outline.Rounded -> outline.roundRect
@@ -562,7 +564,7 @@ internal fun Modifier.settingsCardMorphHost(
     colors: SettingsMorphColors,
     view: android.view.View? = null,
 ): Modifier =
-    onGloballyPositioned { morph.placeHost(if (view != null) it.settingsMorphBounds(view) else it.boundsInWindow()) }
+    onGloballyPositioned { morph.placeHost(if (view != null) it.motionBoundsOnScreen(view) else it.boundsInWindow()) }
         .onPreviewKeyEvent { morph.blocksPointerInput && it.key != Key.Back && it.key != Key.Escape }
         .pointerInput(morph) {
             awaitPointerEventScope {
