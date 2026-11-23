@@ -5,7 +5,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import dev.ipf.marmotkit.AttachmentEntryFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.ui.conversation.media.OutboundShareAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentsExternally
@@ -92,25 +91,20 @@ internal fun SharedPhotoShare.backOr(leave: () -> Unit): () -> Unit =
         if (selection.active) exit() else leave()
     }
 
-/** The pager's photos and videos from its live state, which can be newer than the last composed projection. */
-internal fun GroupAttachmentPager.liveVisuals(accountId: () -> String?): suspend () -> List<SharedMediaTile> =
-    { liveAttachmentVisuals({ state.entries }, accountId) }
+/** Returns the gallery's current tiles for the given selected photos; a photo that no longer exists is absent. */
+internal typealias SelectedPhotoResolver = suspend (List<SharedMediaTile>) -> List<SharedMediaTile>
 
 /**
- * Projects the current [entries] off the main thread, projecting again if they or the account changed meanwhile, so
- * the caller resumes with photos matching the gallery's state at that moment.
+ * Resolves selected photos from MDK's attachment history, not from the rows the gallery shows: a refresh empties those
+ * while it reloads and a restart keeps only the first page, so a present photo would look removed. Slots MDK no longer
+ * lists are simply absent from the result, which the availability check then reports.
  */
-internal suspend fun liveAttachmentVisuals(
-    entries: () -> List<AttachmentEntryFfi>,
-    accountId: () -> String?,
-): List<SharedMediaTile> {
-    while (true) {
-        val read = entries()
+internal fun GroupAttachmentPager.selectedPhotoResolver(accountId: () -> String?): SelectedPhotoResolver =
+    { photos ->
+        val entries = entriesFor(photos.mapTo(mutableSetOf()) { it.messageIdHex to it.attachmentIndex.toUInt() })
         val account = accountId()
-        val visuals = withContext(Dispatchers.Default) { attachmentLibraryTiles(read, account).visuals }
-        if (entries() === read && accountId() == account) return visuals
+        withContext(Dispatchers.Default) { attachmentLibraryTiles(entries, account).visuals }
     }
-}
 
 /**
  * Selected photos that no longer resolve, by slot, to the same photo in the gallery's [current] tiles: the slot is

@@ -433,7 +433,7 @@ internal fun MediaLibraryRoute(
                 onJumpToMessage,
                 paging = state,
                 onLoadMore = { scope.launch { pager?.loadMore() } },
-                liveVisuals = pager?.liveVisuals { controller.boundAccountIdHex },
+                resolvePhotos = pager?.selectedPhotoResolver { controller.boundAccountIdHex },
             )
         }
     }
@@ -451,10 +451,10 @@ private fun MediaLibraryContent(
     onJumpToMessage: (String) -> Unit,
     paging: GroupAttachmentState? = null,
     onLoadMore: () -> Unit = {},
-    liveVisuals: (suspend () -> List<SharedMediaTile>)? = null,
+    resolvePhotos: SelectedPhotoResolver? = null,
 ) {
     var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
-    val photoShare = rememberSharedPhotoShare(tiles, controller, appState, liveVisuals)
+    val photoShare = rememberSharedPhotoShare(tiles, controller, appState, resolvePhotos)
     val viewerSelection = remember { SharedMediaViewerSelection() }
     val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
     val forwardActions = rememberMediaViewerForwardActions(controller, appState)

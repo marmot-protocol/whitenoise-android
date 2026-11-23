@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AttachmentEntryFfi
 import dev.ipf.marmotkit.AttachmentHistoryChangeFfi
 import dev.ipf.marmotkit.AttachmentHistoryCursor
 import dev.ipf.marmotkit.AttachmentHistoryVersion
+import dev.ipf.marmotkit.AttachmentPageFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import kotlinx.coroutines.CancellationException
@@ -93,6 +94,17 @@ internal class GroupAttachmentPager(
                 }
             }
         }
+
+    /**
+     * Reads [slots] from MDK's attachment history with this owner's reader but none of its rows or cursor, which a
+     * refresh empties and a restart cuts to the first page. Stops at the page that completes the set. A removal
+     * restarts the read once from the head, since a slot can only vanish then; a history that keeps changing fails
+     * rather than reporting present slots as gone. Additions never remove a slot, so they don't restart it.
+     */
+    internal suspend fun entriesFor(slots: Set<Pair<String, UInt>>): List<AttachmentEntryFfi> {
+        repeat(SLOT_READ_ATTEMPTS) { reader.readSlots(slots, ::checkCurrent)?.let { return it } }
+        throw IOException("Attachment history changed during the slot read")
+    }
 
     /** Refreshes only as far as the previous tail, publishing every bounded page progressively. */
     private suspend fun restoreRange() {
@@ -214,6 +226,89 @@ internal class GroupAttachmentPager(
         closed = true
         state = GroupAttachmentState()
         if (!busy) clearCollection()
+    }
+}
+
+/** A slot read gets one fresh start after a removal before it gives up. */
+private const val SLOT_READ_ATTEMPTS = 2
+
+/** Where one page leaves a slot read: start over, finished, or continue from a cursor. */
+private sealed interface SlotRead {
+    data object Restart : SlotRead
+
+    data object Done : SlotRead
+
+    class More(
+        val cursor: AttachmentHistoryCursor,
+    ) : SlotRead
+}
+
+/**
+ * One stable-generation read of [slots] from the head, or null when a removal invalidated it. Every cursor and
+ * version handle it receives is closed before it returns.
+ */
+private suspend fun GroupAttachmentReader.readSlots(
+    slots: Set<Pair<String, UInt>>,
+    checkCurrent: suspend () -> Unit,
+): List<AttachmentEntryFfi>? {
+    checkCurrent()
+    val baseline = version()
+    val found = mutableMapOf<Pair<String, UInt>, AttachmentEntryFfi>()
+    var cursor: AttachmentHistoryCursor? = null
+    try {
+        while (true) {
+            val previous = cursor
+            cursor = null
+            val read =
+                try {
+                    page(previous)
+                } finally {
+                    previous?.close()
+                }
+            val step =
+                when (read) {
+                    is AttachmentPageReadFfi.Page -> read.page.readSlotPage(slots, baseline, found, checkCurrent)
+                    AttachmentPageReadFfi.RestartRequired, AttachmentPageReadFfi.CursorMismatch -> SlotRead.Restart
+                    AttachmentPageReadFfi.InvalidLimit -> throw IOException("Attachment page limit rejected")
+                }
+            when (step) {
+                SlotRead.Restart -> return null
+                SlotRead.Done -> return found.values.toList()
+                is SlotRead.More -> cursor = step.cursor
+            }
+        }
+    } finally {
+        cursor?.close()
+        baseline.close()
+    }
+}
+
+/** Adds this page's [slots] to [found]; only a returned [SlotRead.More] keeps the page's next cursor open. */
+private suspend fun AttachmentPageFfi.readSlotPage(
+    slots: Set<Pair<String, UInt>>,
+    baseline: AttachmentHistoryVersion,
+    found: MutableMap<Pair<String, UInt>, AttachmentEntryFfi>,
+    checkCurrent: suspend () -> Unit,
+): SlotRead {
+    var kept = false
+    try {
+        checkCurrent()
+        val step =
+            if (version.changeSince(baseline) == AttachmentHistoryChangeFfi.RESTART_REQUIRED) {
+                SlotRead.Restart
+            } else {
+                entries.filter { it.slotKey() in slots }.associateByTo(found) { it.slotKey() }
+                if (found.size == slots.size || !hasMore) {
+                    SlotRead.Done
+                } else {
+                    SlotRead.More(nextCursor ?: throw IOException("Attachment page omitted its cursor"))
+                }
+            }
+        kept = step is SlotRead.More
+        return step
+    } finally {
+        if (!kept) nextCursor?.close()
+        version.close()
     }
 }
 
