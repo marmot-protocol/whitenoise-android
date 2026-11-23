@@ -20,7 +20,8 @@ import kotlinx.coroutines.delay
  * visible-boundary inserts can all move a keyed row while keeping the same
  * head. Using the exact tween duration makes the input boundary coincide with
  * settled visual geometry instead of guessing how long a spring may run
- * (#1828).
+ * (#1828). A zero duration places rows without motion, so input stays open.
+ * A new [resumeEpoch] replaces a gate closed before the app was hidden (#3780).
  */
 @Composable
 internal fun rememberChatListRowPlacementGate(
@@ -28,6 +29,7 @@ internal fun rememberChatListRowPlacementGate(
     pinnedBoundaryIndex: Int?,
     leadingItemCount: Int,
     placementDurationMillis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS,
+    resumeEpoch: Int = 0,
 ): Boolean {
     var firstLayoutPublished by remember { mutableStateOf(false) }
     val layoutKey =
@@ -35,12 +37,12 @@ internal fun rememberChatListRowPlacementGate(
             Triple(orderedRowIds, pinnedBoundaryIndex, leadingItemCount)
         }
     var placementInProgress by
-        remember(layoutKey) {
-            mutableStateOf(firstLayoutPublished && orderedRowIds.isNotEmpty())
+        remember(layoutKey, resumeEpoch) {
+            mutableStateOf(firstLayoutPublished && orderedRowIds.isNotEmpty() && placementDurationMillis > 0)
         }
 
     SideEffect { firstLayoutPublished = true }
-    LaunchedEffect(layoutKey) {
+    LaunchedEffect(layoutKey, resumeEpoch) {
         if (!placementInProgress) return@LaunchedEffect
         delay(placementDurationMillis.toLong())
         placementInProgress = false
