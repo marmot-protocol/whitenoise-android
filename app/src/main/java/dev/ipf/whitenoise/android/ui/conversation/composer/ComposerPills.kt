@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -359,6 +360,7 @@ internal fun ComposerPill(
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
+    accessoryTopInset: Dp = ComposerResizeStripHeight,
     sendingIdentity: (@Composable (Modifier) -> Unit)? = null,
     toolbar: ComposerToolbarBindings? = null,
     toolbarHeightLimit: Dp = ComposerToolbarMaximumHeight,
@@ -1436,14 +1438,12 @@ internal fun ComposerPill(
                 }
                 Column(modifier = Modifier.then(expandedHeightModifier)) {
                     if (accessoryContent != null) {
-                        Spacer(Modifier.height(if (multilineControlsSuppressed) 12.dp else CompactEditorTopInset))
                         Box(
                             Modifier
+                                .onSizeChanged { onAccessoryHeightChanged(with(density) { it.height.toDp() }) }
+                                .padding(top = accessoryTopInset)
                                 .boundedComposerAccessory()
-                                .onSizeChanged { size ->
-                                    // Accessories insert 12dp beyond the ordinary editor padding in either layout.
-                                    onAccessoryHeightChanged(with(density) { size.height.toDp() } + 12.dp)
-                                }.fadingVerticalScroll(rememberScrollState()),
+                                .fadingVerticalScroll(rememberScrollState()),
                         ) {
                             accessoryContent()
                         }
