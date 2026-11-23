@@ -30,8 +30,9 @@ class EntityPickerSheetScreenshotTest {
 
     @Test
     @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
-    fun filteredChoicesAmoledLargeRtl() =
+    fun filteredChoicesAmoledLargeRtl() {
         captureChoices("filtered_amoled_large_rtl", dark = true, amoled = true, filtered = true)
+    }
 
     private fun captureChoices(
         name: String,

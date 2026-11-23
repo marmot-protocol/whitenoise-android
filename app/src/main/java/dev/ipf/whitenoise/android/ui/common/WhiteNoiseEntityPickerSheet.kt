@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -194,6 +195,7 @@ private fun PickerRow(
         subtitle = null,
         avatarSeed = item.avatarSeed,
         avatarUrl = item.avatarUrl,
+        avatarDomain = MediaTrustDomain.Unique,
         modifier = modifier.then(interaction).semantics { collectionItemInfo = CollectionItemInfo(index, 1, 0, 1) },
         trailing =
             if (multiple && onSelect != null) {
