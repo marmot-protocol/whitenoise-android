@@ -76,8 +76,9 @@ internal const val PROFILE_BANNER_TARGET_BUCKET_PX: Int = 256
 internal fun profileImageDecodeTarget(
     bytes: ByteArray,
     maxDimension: Int,
-): Int? {
-    if (maxDimension <= PROFILE_AVATAR_MAX_DIMENSION) return maxDimension
-    val info = IsolatedMediaDecoder.inspect(bytes) ?: return null
-    return boundedDecodeDimension(info.width, info.height, maxDimension)
-}
+): Int? =
+    if (maxDimension <= PROFILE_AVATAR_MAX_DIMENSION) {
+        maxDimension
+    } else {
+        IsolatedMediaDecoder.inspect(bytes)?.let { boundedDecodeDimension(it.width, it.height, maxDimension) }
+    }
