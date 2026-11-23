@@ -132,7 +132,6 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
-import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
@@ -2683,16 +2682,14 @@ internal fun ChatsScreen(
                                     preservePendingAnchor = preservePendingSearchAnchor,
                                 )
                         if (keepChatListMounted) {
-                            PreparedVisibleGroupAvatarContent(
+                            PreparedChatListAvatarContent(
                                 appState,
                                 visibleItems,
                                 chatListState,
                                 ::visibleRowId,
-                                { it.selectedAvatarAsset },
                                 accountRef = controller.boundAccountRef,
                                 surfaceIdentity = controller,
                                 retainedPreparation = retainedAvatarPreparation,
-                                compatibilityId = { it.group.groupIdHex },
                             ) {
                                 LazyColumn(
                                     modifier =

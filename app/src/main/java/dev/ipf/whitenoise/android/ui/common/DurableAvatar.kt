@@ -33,15 +33,14 @@ internal fun rememberDurableAvatar(
     asset: AvatarAssetFfi?,
     accountRef: String? = appState.activeAccountRef,
     domain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
+    seededImage: ImageBitmap? = null,
 ): ImageBitmap? {
     val ownedAsset = asset?.copy()
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val cacheKey = accountRef?.let { ownedAsset?.takeIf { it.isRenderable() }?.cacheKey(it) }
     val pins =
         LocalPreparedGroupAvatarPixels.current?.takeIf {
-            it.accountRef == accountRef &&
-                it.runtimeGeneration == appState.runtimeGeneration &&
-                it.lifetime == AvatarImageLoader.currentCacheLifetime()
+            it.matchesOwner(accountRef, appState.runtimeGeneration, lifetime)
         }
     val displayed = remember(appState) { DisplayedAvatarPixels() }
     val owner = displayedAvatarOwner(ownedAsset, accountRef, appState.runtimeGeneration, lifetime)
@@ -50,7 +49,8 @@ internal fun rememberDurableAvatar(
     val loaded =
         key(appState, appState.runtimeGeneration, accountRef, lifetime, cacheKey, ownedAsset?.availability) {
             produceState<ImageBitmap?>(
-                initialValue = cacheKey?.let { pins?.images?.get(it) ?: AvatarImageLoader.cachedImage(it) },
+                initialValue =
+                    cacheKey?.let { pins?.images?.get(it) ?: AvatarImageLoader.cachedImage(it) ?: seededImage },
                 ownedAsset?.target,
                 ownedAsset?.acquisition,
             ) {
@@ -69,12 +69,13 @@ internal fun rememberDurableAvatar(
                 }
             }.value
         }
-    val shown = loaded ?: displayed.retainedFor(owner) ?: pins?.retainedFor(ownedAsset)
+    val exact = loaded ?: seededImage
+    val shown = exact ?: displayed.retainedFor(owner) ?: pins?.retainedFor(ownedAsset)
     SideEffect {
         displayed.owner = owner
         displayed.image = shown
         // Only exact loaded pixels may enter the window; a prior revision used as fallback stays prior.
-        pins?.recordCompleted(ownedAsset, loaded)
+        pins?.recordCompleted(ownedAsset, exact)
     }
     return shown
 }
