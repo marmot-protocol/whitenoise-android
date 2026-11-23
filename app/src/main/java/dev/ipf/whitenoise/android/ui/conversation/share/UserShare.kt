@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileLink
+import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 
@@ -104,13 +105,15 @@ internal fun UserMessageBubble(
             } else {
                 // An unresolved reference gets a neutral glyph: an initial taken from "npub1"
                 // would read as a name the sender never supplied.
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                    Icon(
-                        painterResource(R.drawable.ic_person),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(10.dp).size(24.dp),
-                    )
+                FollowedPersonAvatarFrame(followedAccount, 44.dp) {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                        Icon(
+                            painterResource(R.drawable.ic_person),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(10.dp).size(24.dp),
+                        )
+                    }
                 }
             }
             Spacer(Modifier.width(12.dp))

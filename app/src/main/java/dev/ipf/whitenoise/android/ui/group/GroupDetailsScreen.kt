@@ -1642,7 +1642,7 @@ internal fun GroupDetailsScreen(
                                             picture = encryptedGroupAvatar,
                                             groupAnimation = groupAvatar.groupAnimation,
                                             pictureDomain = groupAvatar.pictureDomain,
-                                            followedAccount = controller.dmNicknamePeerAccount,
+                                            followedAccount = controller.avatarAccount?.takeIf { isDm },
                                         )
                                     }
                                     Text(
@@ -1716,7 +1716,7 @@ internal fun GroupDetailsScreen(
                             groupAnimation = groupAvatar.groupAnimation,
                             archived = controller.presentedArchived,
                             readLocalBytes = groupAvatar.readOriginalBytes,
-                            followedAccount = controller.dmNicknamePeerAccount,
+                            followedAccount = controller.avatarAccount?.takeIf { isDm },
                             // A group's URL picture decodes single-use, a direct chat's peer picture
                             // in the public profiles.
                             pictureDomain = groupAvatar.pictureDomain,

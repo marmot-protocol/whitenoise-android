@@ -9,10 +9,10 @@ import org.junit.Test
 
 class FollowedPeopleTest {
     @Test
-    fun matchesCanonicalHexAndNeverTheAccountItself() {
+    fun matchesFollowedKeysAndNeverTheAccountItself() {
         val own = "d".repeat(64)
         val ada = "a".repeat(64)
-        val people = FollowedPeople.of(listOf(ada.uppercase(), own), ownAccountIdHex = own.uppercase())
+        val people = FollowedPeople.of(listOf(ada, own), ownAccountIdHex = own)
 
         assertTrue(people.contains(ada))
         assertFalse(people.contains(own))

@@ -302,7 +302,7 @@ internal fun ConversationTopBar(
                                         durableAvatarIsPersonPicture =
                                             selectedAssetIsPersonPicture ||
                                                 avatarSource?.avatarSource?.isPeerSourced() == true,
-                                        followedAccount = controller.dmNicknamePeerAccount,
+                                        followedAccount = presentedAvatarAccount?.takeIf { controller.isDm },
                                     )
                                 }
                                 Column(

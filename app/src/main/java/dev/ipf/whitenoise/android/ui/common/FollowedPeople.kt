@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +31,7 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.HowToReg
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * The people the active account follows, as canonical lowercase public-key hex. MDK owns the list; this is the
@@ -56,8 +58,8 @@ internal class FollowedPeople(
             follows: Collection<String>,
             ownAccountIdHex: String?,
         ): FollowedPeople {
-            val ids = follows.mapTo(HashSet(follows.size)) { it.lowercase() }
-            ownAccountIdHex?.let { ids.remove(it.lowercase()) }
+            val ids = follows.toHashSet()
+            ownAccountIdHex?.let(ids::remove)
             return if (ids.isEmpty()) None else FollowedPeople(ids)
         }
     }
@@ -82,25 +84,34 @@ internal fun rememberFollowedPeople(appState: WhiteNoiseAppState): FollowedPeopl
     var followed by remember(accountRef) { mutableStateOf(FollowedPeople.None) }
     var foregroundCount by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { foregroundCount++ }
-    LaunchedEffect(
-        accountRef,
-        ownAccountIdHex,
-        appState.relationshipRevision,
-        appState.profileRevisionForCompose.profiles,
-        foregroundCount,
-    ) {
+    LaunchedEffect(accountRef, ownAccountIdHex) {
         if (accountRef == null) return@LaunchedEffect
-        // Profile batches land together; one read covers the burst.
-        delay(FOLLOWED_PEOPLE_READ_DEBOUNCE_MILLIS)
-        val follows =
-            try {
-                appState.marmotIo { accountFollows(accountRef) }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                return@LaunchedEffect
+        var readRelationship: Long? = null
+        var readForeground: Int? = null
+        snapshotFlow {
+            FollowedPeopleTrigger(
+                appState.relationshipRevision,
+                foregroundCount,
+                appState.profileRevisionForCompose.profiles,
+            )
+        }.collectLatest { trigger ->
+            // Profile batches land in bursts and are coalesced; a follow change or a return to the app reads at once,
+            // and a burst that cancels such a read leaves it still owed.
+            if (trigger.relationship == readRelationship && trigger.foreground == readForeground) {
+                delay(FOLLOWED_PEOPLE_READ_DEBOUNCE_MILLIS)
             }
-        followed = FollowedPeople.of(follows, ownAccountIdHex)
+            val follows =
+                try {
+                    appState.marmotIo { accountFollows(accountRef) }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    return@collectLatest
+                }
+            readRelationship = trigger.relationship
+            readForeground = trigger.foreground
+            followed = FollowedPeople.of(follows, ownAccountIdHex)
+        }
     }
     return followed
 }
@@ -174,3 +185,9 @@ private const val OUTER_RING_RATIO = 0.1f
 private const val INNER_RING_RATIO = 0.05f
 private const val ICON_RATIO = 0.65f
 private const val FOLLOWED_PEOPLE_READ_DEBOUNCE_MILLIS = 250L
+
+private data class FollowedPeopleTrigger(
+    val relationship: Long,
+    val foreground: Int,
+    val profiles: Int,
+)
