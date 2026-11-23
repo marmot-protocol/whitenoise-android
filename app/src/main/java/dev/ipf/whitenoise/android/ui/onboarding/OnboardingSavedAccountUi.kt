@@ -171,11 +171,12 @@ internal fun RetainedProfilesSheet(
                             EmojiLabel(account.displayName)
                         }
                     },
-                    supportingContent = if (titleIsKey) {
-                        null
-                    } else {
-                        { PublicKeyCopyText(account.shortIdentity, account.npub, enabled = enabled) }
-                    },
+                    supportingContent =
+                        if (titleIsKey) {
+                            null
+                        } else {
+                            { PublicKeyCopyText(account.shortIdentity, account.npub, enabled = enabled) }
+                        },
                     leadingContent = {
                         Avatar(
                             title = account.displayName,

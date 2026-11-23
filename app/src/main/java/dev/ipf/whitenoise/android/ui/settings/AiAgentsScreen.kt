@@ -142,21 +142,22 @@ internal fun AiAgentsContent(
                                 }
                             },
                             modifier = Modifier.testTag("ai_agents.copy_public_key"),
-                            supportingContent = npub?.let { key ->
-                                {
-                                    if (keyExpanded) {
-                                        Text(
-                                            publicKeyDisplayGroups(key).joinToString(" "),
-                                            modifier = Modifier.animatePublicKeyExpansion(keyExpanded),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontFamily = FontFamily.Monospace,
-                                            textAlign = TextAlign.Center,
-                                        )
-                                    } else {
-                                        SettingsRowSupportingText(abbreviatedNpub(key), editable = true)
+                            supportingContent =
+                                npub?.let { key ->
+                                    {
+                                        if (keyExpanded) {
+                                            Text(
+                                                publicKeyDisplayGroups(key).joinToString(" "),
+                                                modifier = Modifier.animatePublicKeyExpansion(keyExpanded),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontFamily = FontFamily.Monospace,
+                                                textAlign = TextAlign.Center,
+                                            )
+                                        } else {
+                                            SettingsRowSupportingText(abbreviatedNpub(key), editable = true)
+                                        }
                                     }
-                                }
-                            },
+                                },
                             enabled = npub != null,
                             explanation = stringResource(R.string.explanation_organize_ai_copy_public_key),
                             leading = {
