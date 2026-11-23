@@ -144,6 +144,19 @@ class ComposerEmojiTextTest {
         assertEquals(moved, repairComposerMentionEdit(old, moved, false, CODES))
     }
 
+    @Test
+    fun compositionIsComparedAfterTheDeletionShiftsIt() {
+        // The keyboard deletes around the caret and composes the emoji's first letter: edit it as text.
+        val spaced = TextFieldValue(" :marmot:", selection = TextRange(1))
+        val composing = TextFieldValue("marmot:", selection = TextRange(1), composition = TextRange(0, 1))
+        assertNull(repairComposerEmojiDeletion(spaced, composing, CODES))
+
+        // Composition on the following word shifts onto the emoji's old offsets; the emoji still deletes whole.
+        val trailing = TextFieldValue(":marmot: x", selection = TextRange(9), composition = TextRange(9, 10))
+        val split = TextFieldValue(":marmotx", selection = TextRange(7), composition = TextRange(7, 8))
+        assertEquals("x", repairComposerEmojiDeletion(trailing, split, CODES)?.text)
+    }
+
     private fun visual(text: String): ComposerVisualText =
         composerVisualText(
             text,
