@@ -147,10 +147,16 @@ internal fun SettingsScreen(
     }
     // The profile photo on the home header opens Profile directly, so back returns home instead of Account.
     var profileFromHeader by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
+    var shareFromWalkthrough by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
     val parentOf: (SettingsDetail) -> SettingsDetail? = { target ->
-        if (target == SettingsDetail.Profile && profileFromHeader) null else settingsDetailParent(target)
+        when {
+            target == SettingsDetail.Profile && profileFromHeader -> null
+            target == SettingsDetail.ShareConnect && shareFromWalkthrough -> SettingsDetail.LearnWhiteNoise
+            else -> settingsDetailParent(target)
+        }
     }
     val changeDetail: (SettingsDetail?) -> Unit = { destination ->
+        shareFromWalkthrough = detail == SettingsDetail.LearnWhiteNoise && destination == SettingsDetail.ShareConnect
         if (searchOrigin != null &&
             detail == searchOrigin.destination &&
             destination == detail?.let(parentOf)
@@ -363,7 +369,11 @@ private fun SettingsDetailRoute(
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = onBack)
         SettingsDetail.Gestures -> GestureSettingsScreen(appState, onBack = onBack)
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = onBack)
-        SettingsDetail.LearnWhiteNoise -> LearnWhiteNoiseScreen(onBack)
+        SettingsDetail.LearnWhiteNoise ->
+            LearnWhiteNoiseScreen(
+                onBack = onBack,
+                onShareProfile = { onDetailChange(SettingsDetail.ShareConnect) },
+            )
         SettingsDetail.Help ->
             HelpScreen(
                 onBack = onBack,

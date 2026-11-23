@@ -1035,7 +1035,7 @@
     <string name="notification_background_on">A conexão em segundo plano está ativada.</string>
     <string name="notification_background_off">A conexão em segundo plano está desativada.</string>
     <string name="notification_categories_detail">O Android define som, vibração e importância por categoria.</string>
-    <string name="chat_with_support">Conversar com o suporte</string>
+    <string name="chat_with_support">Fale com a equipe do White Noise</string>
     <string name="theme">Tema</string>
     <string name="theme_system">Sistema</string>
     <string name="theme_light">Claro</string>
@@ -2248,7 +2248,7 @@
     <string name="app_unlock_checking">Verificando a proteção do aplicativo…</string>
     <string name="support_contact_title">Suporte do White Noise</string>
     <string name="support_contact_subtitle">Perguntas, problemas e sugestões</string>
-    <string name="support_contact_explainer">Faça uma pergunta, informe um problema ou sugira algo.</string>
+    <string name="support_contact_explainer">Faça uma pergunta, relate um problema ou envie sugestões para quem desenvolve o White Noise.</string>
     <string name="support_relays_attention">Os relés do perfil precisam de atenção</string>
     <string name="support_open_relays">Abrir relés</string>
     <string name="support_relays_review">Confira a lista de relés de recepção deste perfil.</string>

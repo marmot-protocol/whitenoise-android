@@ -1033,7 +1033,7 @@
     <string name="notification_background_on">Die Hintergrundverbindung ist an.</string>
     <string name="notification_background_off">Die Hintergrundverbindung ist aus.</string>
     <string name="notification_categories_detail">Android legt Ton, Vibration und Wichtigkeit pro Kategorie fest.</string>
-    <string name="chat_with_support">Mit dem Support chatten</string>
+    <string name="chat_with_support">Mit dem White-Noise-Team chatten</string>
     <string name="theme">Design</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Hell</string>
@@ -2260,7 +2260,7 @@
     <string name="app_unlock_checking">App-Schutz wird geprüft…</string>
     <string name="support_contact_title">Hilfe von White Noise</string>
     <string name="support_contact_subtitle">Fragen, Probleme und Vorschläge</string>
-    <string name="support_contact_explainer">Stelle eine Frage, melde ein Problem oder mache einen Vorschlag.</string>
+    <string name="support_contact_explainer">Stelle dem Team, das White Noise entwickelt, eine Frage, melde ein Problem oder teile Feedback.</string>
     <string name="support_relays_attention">Profil-Relays benötigen Aufmerksamkeit</string>
     <string name="support_open_relays">Relays öffnen</string>
     <string name="support_relays_review">Prüfe die Empfangs-Relay-Liste dieses Profils.</string>

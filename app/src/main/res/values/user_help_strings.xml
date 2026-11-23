@@ -1,16 +1,15 @@
 <resources>
     <string name="learn_white_noise">Learn White Noise</string>
     <string name="learn_find_title">Find someone</string>
-    <string name="learn_find_body">Open New Chat and paste the profile link they gave you, or scan their QR code. If a name search comes up empty, ask for their profile link.</string>
+    <string name="learn_find_body">Have a friend’s link or QR code? Open New Chat and paste the link or scan the code to find them. If a name search comes up empty, ask them to share their profile.</string>
     <string name="learn_share_title">Share your profile</string>
-    <string name="learn_share_body">Open Share &amp; connect to show your QR code or send your profile link. Keep your private sign-in key to yourself.</string>
+    <string name="learn_share_body">Give someone your public profile link or show them your QR code so they can find you on White Noise. Keep your private sign-in key to yourself.</string>
     <string name="learn_actions_title">Reply or react</string>
-    <string name="learn_actions_body">Touch and hold a message to find its actions. Try it on this example.</string>
+    <string name="learn_actions_body">Want to respond to one message in a busy chat? Touch and hold it for replies and reactions. Try it on the example below.</string>
     <string name="learn_example_message">See you tomorrow!</string>
     <string name="learn_show_actions">Show message actions</string>
     <string name="learn_actions_explanation">Choose Reply to quote the message in your response, or choose an emoji to react.</string>
-    <string name="learn_page_number">%1$d of %2$d</string>
-    <string name="learn_previous">Previous</string>
-    <string name="learn_next">Next</string>
-    <string name="learn_close">Close</string>
+    <string name="learn_open_share">Open Share &amp; connect</string>
+    <string name="learn_group_title">Make a private group</string>
+    <string name="learn_group_body">Bring the right people into one conversation. Start a group from New Chat and choose who to invite. Your messages are end-to-end encrypted.</string>
 </resources>

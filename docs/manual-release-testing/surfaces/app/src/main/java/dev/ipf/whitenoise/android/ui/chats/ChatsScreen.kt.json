@@ -14,30 +14,6 @@
         ]
       },
       {
-        "surface": "ChatListIdentifierResult",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "fun ChatListIdentifierResult(",
-        "test_ids": [
-          "CHL-001"
-        ]
-      },
-      {
-        "surface": "ChatListJumpToTopButton",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "fun ChatListJumpToTopButton(",
-        "test_ids": [
-          "CHL-036"
-        ]
-      },
-      {
-        "surface": "ChatListJumpToTopControl",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "fun ChatListJumpToTopControl(",
-        "test_ids": [
-          "CHL-036"
-        ]
-      },
-      {
         "surface": "ChatsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "fun ChatsScreen(",
@@ -152,16 +128,6 @@
         ]
       },
       {
-        "surface": "R.string.chat_list_search_resolving",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.chat_list_search_resolving",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.string.delete_from_device",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.delete_from_device",
@@ -175,16 +141,6 @@
         "surface": "R.string.leave_and_delete",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.leave_and_delete",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.scroll_to_top",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.scroll_to_top",
         "test_ids": [
           "CHL-026",
           "CHL-027",
@@ -260,14 +216,6 @@
       }
     ],
     "source_coverage": [
-      {
-        "surface": "Chats upward endpoint navigation icon",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.drawable.ic_jump_to_edge",
-        "test_ids": [
-          "CHL-017"
-        ]
-      },
       {
         "surface": "Opening the unread filter clears a failure from while it was closed, and a participant folder's unresolved rosters open pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",

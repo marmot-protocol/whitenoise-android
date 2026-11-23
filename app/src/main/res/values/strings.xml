@@ -1425,7 +1425,7 @@
     <string name="notification_categories_detail">Android sets sound, vibration and importance per category.</string>
     <!-- Release-channel name shown on staging builds only; not a translatable word. -->
     <string name="settings_staging_badge" translatable="false">STAGING</string>
-    <string name="chat_with_support">Chat with support</string>
+    <string name="chat_with_support">Talk to the White Noise team</string>
     <string name="theme">Theme</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
@@ -2423,7 +2423,7 @@
     <string name="app_unlock_checking">Checking app protection…</string>
     <string name="support_contact_title">White Noise Support</string>
     <string name="support_contact_subtitle">Questions, problems, and suggestions</string>
-    <string name="support_contact_explainer">Ask a question, report a problem or suggest something.</string>
+    <string name="support_contact_explainer">Ask a question, report a problem or share feedback with the people building White Noise.</string>
     <string name="support_relays_attention">Profile relays need attention</string>
     <string name="support_open_relays">Open Relays</string>
     <string name="support_relays_review">Review this profile’s receiving relay list.</string>

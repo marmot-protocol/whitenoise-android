@@ -1033,7 +1033,7 @@
     <string name="notification_background_on">Arka plan bağlantısı açık.</string>
     <string name="notification_background_off">Arka plan bağlantısı kapalı.</string>
     <string name="notification_categories_detail">Android ses, titreşim ve önemi kategori başına ayarlar.</string>
-    <string name="chat_with_support">Destek ile sohbet</string>
+    <string name="chat_with_support">White Noise ekibiyle konuş</string>
     <string name="theme">Tema</string>
     <string name="theme_system">Sistem</string>
     <string name="theme_light">Açık</string>
@@ -2241,7 +2241,7 @@
     <string name="app_unlock_checking">Uygulama koruması kontrol ediliyor…</string>
     <string name="support_contact_title">White Noise Destek</string>
     <string name="support_contact_subtitle">Sorular, sorunlar ve öneriler</string>
-    <string name="support_contact_explainer">Soru sorun, sorun bildirin veya öneride bulunun.</string>
+    <string name="support_contact_explainer">White Noise’u geliştiren ekibe soru sor, sorun bildir veya geri bildirim gönder.</string>
     <string name="support_relays_attention">Profil aktarıcıları dikkat gerektiriyor</string>
     <string name="support_open_relays">Aktarıcıları Aç</string>
     <string name="support_relays_review">Bu profilin alıcı aktarıcı listesini inceleyin.</string>

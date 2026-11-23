@@ -9,8 +9,7 @@
     <string name="learn_example_message">Até amanhã!</string>
     <string name="learn_show_actions">Mostrar ações da mensagem</string>
     <string name="learn_actions_explanation">Escolha Responder para citar a mensagem ou escolha um emoji para reagir.</string>
-    <string name="learn_page_number">%1$d de %2$d</string>
-    <string name="learn_previous">Anterior</string>
-    <string name="learn_next">Próximo</string>
-    <string name="learn_close">Fechar</string>
+    <string name="learn_open_share">Abrir Compartilhar e conectar</string>
+    <string name="learn_group_title">Crie um grupo privado</string>
+    <string name="learn_group_body">Reúna as pessoas certas em uma conversa. Crie um grupo em Nova conversa e escolha quem convidar. Suas mensagens têm criptografia de ponta a ponta.</string>
 </resources>

@@ -9,8 +9,7 @@
     <string name="learn_example_message">Yarın görüşürüz!</string>
     <string name="learn_show_actions">Mesaj işlemlerini göster</string>
     <string name="learn_actions_explanation">Mesajı alıntılamak için Yanıtla’yı seç veya tepki vermek için bir emoji seç.</string>
-    <string name="learn_page_number">%1$d / %2$d</string>
-    <string name="learn_previous">Önceki</string>
-    <string name="learn_next">Sonraki</string>
-    <string name="learn_close">Kapat</string>
+    <string name="learn_open_share">Paylaş ve bağlan bölümünü aç</string>
+    <string name="learn_group_title">Özel grup oluştur</string>
+    <string name="learn_group_body">İstediğin kişileri aynı sohbette buluştur. Yeni Sohbet bölümünden bir grup başlat ve davet edeceğin kişileri seç. Mesajların uçtan uca şifrelenir.</string>
 </resources>

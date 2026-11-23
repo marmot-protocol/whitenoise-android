@@ -12,7 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
@@ -106,9 +109,31 @@ class SettingsHubScreenshotTest {
     @Test
     @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
     fun firstRunWalkthrough() =
-        capture("learn_white_noise_amoled", true, amoled = true) {
-            LearnWhiteNoiseScreen(onBack = {})
+        capture(
+            "learn_white_noise_amoled",
+            true,
+            amoled = true,
+            afterCapture = {
+                advanceWalkthrough("Find someone", "learn_white_noise_connect_amoled")
+                advanceWalkthrough("Make a private group", "learn_white_noise_groups_amoled")
+                advanceWalkthrough("Reply or react", "learn_white_noise_actions_amoled")
+            },
+        ) {
+            LearnWhiteNoiseScreen(onBack = {}, onShareProfile = {})
         }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+    fun firstRunWalkthroughRtlLargeFont() =
+        capture("learn_white_noise_rtl_large_font", false, rtl = true) {
+            LearnWhiteNoiseScreen(onBack = {}, onShareProfile = {})
+        }
+
+    private fun advanceWalkthrough(label: String, snapshot: String) {
+        composeRule.onNodeWithText(label).performScrollTo().performClick()
+        composeRule.onNodeWithText(label).assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot.png")
+    }
 
     @Test fun soundsLight() = capture("notification_sounds_light", false) { NotificationSoundsScreen(it, {}) }
 
@@ -151,6 +176,7 @@ class SettingsHubScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
         pushAvailable: Boolean = false,
+        afterCapture: () -> Unit = {},
         content: @Composable (WhiteNoiseAppState) -> Unit,
     ) {
         val appState =
@@ -174,5 +200,6 @@ class SettingsHubScreenshotTest {
             }
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+        afterCapture()
     }
 }

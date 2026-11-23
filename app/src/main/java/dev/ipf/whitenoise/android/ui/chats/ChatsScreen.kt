@@ -6,15 +6,10 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -31,8 +26,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -67,7 +60,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatListViewFfi
@@ -3009,183 +3001,6 @@ internal fun ChatsScreen(
         )
     }
 }
-
-/**
- * Resolution state for a chat-list search query that parsed as a Nostr
- * identifier (npub / NIP-05) — issue #344. An npub resolves synchronously to
- * its key; a NIP-05 address has to be looked up over the network, so it passes
- * through [Resolving] before landing on [Resolved] or [Failed]. [None] is the
- * ordinary plain-text-query case where the chat list filters as before.
- */
-private sealed interface IdentifierResolution {
-    data object None : IdentifierResolution
-
-    data object Resolving : IdentifierResolution
-
-    /** Resolved to a profile; [npub] is ready to hand to the profile sheet. */
-    data class Resolved(
-        val npub: String,
-    ) : IdentifierResolution
-
-    /** Resolution failed; [messageRes] is the inline error to show. */
-    data class Failed(
-        @StringRes val messageRes: Int,
-        val arg: String? = null,
-    ) : IdentifierResolution
-}
-
-internal fun presentableIdentifierNpub(
-    resolvedAccountIdHex: String?,
-    npubForDisplay: (String) -> String,
-): String? =
-    resolvedAccountIdHex
-        ?.let(npubForDisplay)
-        ?.takeIf { it.startsWith("npub1") }
-
-/**
- * Inline chat-list search result for a pasted Nostr identifier (#344). Renders
- * the resolve lifecycle: a spinner while a NIP-05 lookup is in flight; once
- * resolved, either the existing 1:1 chat row (when the active account already
- * has a DM with the resolved key — tapping opens that conversation directly,
- * issue #344 step 2) or an "open profile" row (no existing chat — tapping
- * routes into the shared profile sheet, which surfaces the Start-chat
- * affordance, step 3); or an inline error on failure. Plain-text queries never
- * reach here — they keep filtering the list as before.
- */
-@Composable
-private fun ChatListIdentifierResult(
-    resolution: IdentifierResolution,
-    appState: WhiteNoiseAppState,
-    accountRef: String?,
-    existingDirectChat: (String) -> ChatListItem?,
-    onOpenChat: (ChatListItem) -> Unit,
-    onOpenProfile: (String) -> Unit,
-) {
-    when (resolution) {
-        IdentifierResolution.None -> Unit
-        IdentifierResolution.Resolving ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text(
-                    stringResource(R.string.chat_list_search_resolving),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        is IdentifierResolution.Resolved -> {
-            // Surface the existing 1:1 chat as the top result so a single tap
-            // opens the conversation (issue #344 step 2). existingDirectChat
-            // reads snapshot-backed projected items, so this recomposes if the
-            // chat list lands the DM after the npub already resolved. Only when
-            // there is no existing DM do we fall back to the profile preview /
-            // Start-chat path (step 3).
-            val existing = existingDirectChat(resolution.npub)
-            if (existing != null) {
-                ChatRow(
-                    item = existing,
-                    appState = appState,
-                    accountRef = accountRef,
-                    onClick = { onOpenChat(existing) },
-                    onOpenProfile = onOpenProfile,
-                )
-            } else {
-                dev.ipf.whitenoise.android.ui.search.GlobalPersonRow(
-                    npub = resolution.npub,
-                    onOpen = onOpenProfile,
-                )
-            }
-        }
-        is IdentifierResolution.Failed ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_error),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp),
-                )
-                Text(
-                    resolution.arg
-                        ?.let { stringResource(resolution.messageRes, it) }
-                        ?: stringResource(resolution.messageRes),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-    }
-}
-
-/**
- * Jump-to-top control (#413): the top of the bottom-end floating stack. It rests just above the
- * navigation bar and lifts above the dictation capsule and the pen, centred on the pen's column, so
- * it never overlaps either of them.
- */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListJumpToTopControl(
-    visible: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    BoxWithConstraints(modifier) {
-        val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
-        FloatingControlVisibility(
-            visible = visible,
-            motionEnabled = rememberSystemAnimationsEnabled(),
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = paneInset + JUMP_TO_TOP_END_INSET, bottom = FloatingControlGap)
-                    .floatingDictationCapsuleClearance(clearColumnObstacles = true),
-        ) {
-            ChatListJumpToTopButton(onClick = onClick)
-        }
-    }
-}
-
-/** The chat list's jump-to-top control: a 34dp disc inside a 42dp touch box. */
-@Suppress("FunctionNaming")
-@Composable
-internal fun ChatListJumpToTopButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val scrollToTopLabel = stringResource(R.string.scroll_to_top)
-    Box(
-        modifier =
-            modifier
-                .size(42.dp)
-                .semantics { contentDescription = scrollToTopLabel }
-                .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            shadowElevation = 2.dp,
-            modifier = Modifier.size(34.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painterResource(R.drawable.ic_jump_to_edge),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-    }
-}
-
-// Centres the 42dp jump control on the 48dp pen, which the Scaffold insets 16dp from the end edge:
-// 19 + 42 / 2 == 16 + 48 / 2.
-internal val JUMP_TO_TOP_END_INSET = 19.dp
 
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back

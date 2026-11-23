@@ -4,6 +4,22 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "LearnMessageActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "fun LearnMessageActions(",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
+        "surface": "LearnTopicPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "fun LearnTopicPage(",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
+      {
         "surface": "LearnWhiteNoiseScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "fun LearnWhiteNoiseScreen(",
@@ -13,6 +29,14 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "R.string.done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "SET-069"
+        ]
+      },
       {
         "surface": "R.string.learn_actions_body",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
@@ -33,14 +57,6 @@
         "surface": "R.string.learn_actions_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
         "anchor": "R.string.learn_actions_title",
-        "test_ids": [
-          "SET-069"
-        ]
-      },
-      {
-        "surface": "R.string.learn_close",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
-        "anchor": "R.string.learn_close",
         "test_ids": [
           "SET-069"
         ]
@@ -70,25 +86,25 @@
         ]
       },
       {
-        "surface": "R.string.learn_next",
+        "surface": "R.string.learn_group_body",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
-        "anchor": "R.string.learn_next",
+        "anchor": "R.string.learn_group_body",
         "test_ids": [
           "SET-069"
         ]
       },
       {
-        "surface": "R.string.learn_page_number",
+        "surface": "R.string.learn_group_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
-        "anchor": "R.string.learn_page_number",
+        "anchor": "R.string.learn_group_title",
         "test_ids": [
           "SET-069"
         ]
       },
       {
-        "surface": "R.string.learn_previous",
+        "surface": "R.string.learn_open_share",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
-        "anchor": "R.string.learn_previous",
+        "anchor": "R.string.learn_open_share",
         "test_ids": [
           "SET-069"
         ]

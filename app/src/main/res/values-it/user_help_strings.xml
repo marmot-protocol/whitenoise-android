@@ -9,8 +9,7 @@
     <string name="learn_example_message">A domani!</string>
     <string name="learn_show_actions">Mostra le azioni del messaggio</string>
     <string name="learn_actions_explanation">Scegli Rispondi per citare il messaggio oppure scegli un’emoji per reagire.</string>
-    <string name="learn_page_number">%1$d di %2$d</string>
-    <string name="learn_previous">Indietro</string>
-    <string name="learn_next">Avanti</string>
-    <string name="learn_close">Chiudi</string>
+    <string name="learn_open_share">Apri Condividi e connettiti</string>
+    <string name="learn_group_title">Crea un gruppo privato</string>
+    <string name="learn_group_body">Riunisci le persone giuste in una conversazione. Crea un gruppo da Nuova chat e scegli chi invitare. I tuoi messaggi sono crittografati end-to-end.</string>
 </resources>
