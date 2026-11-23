@@ -18,8 +18,12 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.removePreparedVideoMetadata
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -161,6 +165,43 @@ class ConversationFileBackedDraftsTest {
             val written = copyDraftFileBody(target) { if (reads++ == 0) byteArrayOf(1) else null }
 
             assertEquals(-1L, written)
+        }
+
+    /** A draft read cancelled after its copy finished closes that copy, so no private file is left behind. */
+    @Test
+    fun cancelledDraftReadClosesItsCopy() =
+        runTest {
+            val copy = privateCopy(4)
+            val read =
+                launch {
+                    ownedDraftRead { staging ->
+                        staging.staged(copy)
+                        awaitCancellation()
+                    }
+                }
+            runCurrent()
+            read.cancelAndJoin()
+
+            assertFalse(copy.file.exists())
+        }
+
+    /** A delivered attachment keeps its own copy, while any other copy the read made is closed. */
+    @Test
+    fun deliveredDraftReadKeepsOnlyItsOwnCopy() =
+        runTest {
+            val kept = privateCopy(4)
+            val stray = privateCopy(2)
+
+            val delivered =
+                ownedDraftRead { staging ->
+                    staging.staged(stray)
+                    staging.staged(kept)
+                    pending(kept)
+                }
+
+            assertTrue(delivered?.sourceFile === kept)
+            assertTrue(kept.file.exists())
+            assertFalse(stray.file.exists())
         }
 
     /** A body-less draft entry for [id], as a stored file reads. */

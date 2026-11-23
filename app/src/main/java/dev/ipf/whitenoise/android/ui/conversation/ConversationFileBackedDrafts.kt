@@ -9,6 +9,8 @@ import dev.ipf.whitenoise.android.media.editor.RevisionedMessageDraft
 import dev.ipf.whitenoise.android.media.editor.editorDigest
 import dev.ipf.whitenoise.android.media.editor.hasInlineBody
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendStaging
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -16,6 +18,24 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
+
+/**
+ * Runs one draft read, handing [read] a staging that records each private copy it makes. Every copy except the
+ * returned attachment's own file is closed, so a read cancelled or failing after its copy finished leaves none behind;
+ * the caller owns the returned attachment's file.
+ */
+internal suspend fun ownedDraftRead(read: suspend (FileBackedSendStaging) -> PendingAttachment?): PendingAttachment? {
+    val copies = CopyOnWriteArrayList<StagedUploadSource>()
+    var delivered: PendingAttachment? = null
+    try {
+        delivered = read(FileBackedSendStaging { copies += it })
+        return delivered
+    } finally {
+        val unowned = copies.filter { it !== delivered?.sourceFile }
+        if (unowned.isNotEmpty()) withContext(NonCancellable + Dispatchers.IO) { unowned.forEach { it.closeQuietly() } }
+    }
+}
 
 /** The most bytes one read of a stored draft file asks MarmotKit for, its own per-call ceiling. */
 internal const val DRAFT_FILE_READ_CHUNK_BYTES = 1024 * 1024

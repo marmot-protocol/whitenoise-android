@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.net.Uri
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.FileBackedDraftNative
@@ -18,8 +19,10 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -140,6 +143,59 @@ class DraftRestoreAttemptTest {
 
             assertNull(attempt.materialize(attachment(read, "clip")))
 
+            assertFalse(attempt.interrupted)
+            assertEquals(emptyList<String>(), presentationFiles())
+        }
+
+    /** A file removed mid-stream does not stop the attempt reading the other stored files the draft still holds. */
+    @Test
+    fun removedFileLeavesTheOthersReadable() =
+        runTest {
+            val native =
+                FileBackedDraftNative("caption").apply {
+                    holdFile("a", 2uL, byteArrayOf(1, 2))
+                    holdFile("b", 3uL, byteArrayOf(3, 4, 5))
+                }
+            native.beforeChunk = { id, offset -> if (id == "a" && offset > 0L) native.dropFile(id) }
+            val (attempt, read) = attemptFor(native)
+
+            assertNull(attempt.materialize(attachment(read, "a")))
+            assertNotNull(attempt.materialize(attachment(read, "b")))
+
+            assertFalse(attempt.interrupted)
+            assertArrayEquals(byteArrayOf(3, 4, 5), File(folder.root, "b").readBytes())
+        }
+
+    /** A draft that cannot be read again after a conflict interrupts the attempt rather than reading as a removal. */
+    @Test
+    fun failedReReadInterruptsTheAttempt() =
+        runTest {
+            val native = FileBackedDraftNative("caption").apply { holdFile("clip", 3uL, byteArrayOf(1, 2, 3)) }
+            val (attempt, read) = attemptFor(native)
+            native.beforeChunk = { _, offset ->
+                if (offset > 0L) {
+                    native.moveRevision()
+                    native.selectedReadFailure = MarmotKitException.TransportClosed()
+                }
+            }
+
+            assertNull(attempt.materialize(attachment(read, "clip")))
+
+            assertTrue(attempt.interrupted)
+            assertEquals(emptyList<String>(), presentationFiles())
+        }
+
+    /** A draft that keeps moving past the follow limit interrupts the attempt. */
+    @Test
+    fun endlesslyMovingDraftInterruptsTheAttempt() =
+        runTest {
+            val native = FileBackedDraftNative("caption").apply { holdFile("clip", 3uL, byteArrayOf(1, 2, 3)) }
+            native.beforeChunk = { _, offset -> if (offset > 0L) native.moveRevision() }
+            val (attempt, read) = attemptFor(native)
+
+            assertNull(attempt.materialize(attachment(read, "clip")))
+
+            assertTrue(attempt.interrupted)
             assertEquals(emptyList<String>(), presentationFiles())
         }
 

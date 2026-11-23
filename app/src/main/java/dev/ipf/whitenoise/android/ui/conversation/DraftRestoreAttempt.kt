@@ -62,6 +62,14 @@ internal class DraftRestoreAttempt(
     private var revision: MessageDraftRevisionFfi? = read.revision
 
     /**
+     * Whether a stored body the draft may still hold went unread because the draft could not be read again after a
+     * revision conflict, or kept moving. Unlike a confirmed removal, such a restore must not be published as done.
+     */
+    @Volatile
+    var interrupted = false
+        private set
+
+    /**
      * Gives one restored attachment a shelf file: inline bytes are written out, and a stored body is streamed from
      * MarmotKit, reusing a file already there with the stored size. Returns null, keeping no new file, when the body
      * cannot be written or the shelf cannot be given a URI for it.
@@ -120,8 +128,9 @@ internal class DraftRestoreAttempt(
     /**
      * Reads one chunk of a stored body. When a save moved the draft meanwhile, such as typing while a large file
      * streams back, the chunk is read again under the draft's new revision as long as that draft still holds the same
-     * stored file. Returns null when the draft no longer holds it, or keeps moving after [MAX_DRAFT_REVISION_FOLLOWS]
-     * reads.
+     * stored file. Returns null when the draft no longer holds it, keeping the revision for the attempt's other files.
+     * Also returns null, marking the attempt [interrupted], when the draft cannot be read again or keeps moving after
+     * [MAX_DRAFT_REVISION_FOLLOWS] reads.
      */
     @Suppress("ReturnCount", "SwallowedException") // A moved draft is followed, never reported as a failed read.
     private suspend fun readStoredChunk(
@@ -135,20 +144,25 @@ internal class DraftRestoreAttempt(
             try {
                 return drafts.files.readChunk(accountRef, current, attachmentId, offset, DRAFT_FILE_READ_CHUNK_BYTES)
             } catch (moved: MarmotKitException.MessageDraftRevisionConflict) {
-                if (follows++ == MAX_DRAFT_REVISION_FOLLOWS) return null
-                revision = revisionStillHolding(attachmentId, size)
+                if (follows++ == MAX_DRAFT_REVISION_FOLLOWS) return interrupt()
+                val fresh = freshRead() ?: return interrupt()
+                // A draft that no longer holds this file says nothing about the attempt's other stored files.
+                if (fresh.fileBacked[attachmentId]?.plaintextSize?.toLong() != size) return null
+                revision = fresh.revision
             }
         }
     }
 
-    /** The selected draft's revision when it still holds [attachmentId] as a stored file of [size] bytes, else null. */
-    private suspend fun revisionStillHolding(
-        attachmentId: String,
-        size: Long,
-    ): MessageDraftRevisionFfi? {
+    /** The selected draft read again, or null when it cannot be read. */
+    private suspend fun freshRead(): RevisionedMessageDraft? {
         val group = read.draft?.groupIdHex ?: return null
-        val fresh = drafts.files.revisioned(accountRef, group).getOrNull()
-        return fresh?.revision?.takeIf { fresh.fileBacked[attachmentId]?.plaintextSize?.toLong() == size }
+        return drafts.files.revisioned(accountRef, group).getOrNull()
+    }
+
+    /** Marks this attempt [interrupted] and gives up on the chunk being read. */
+    private fun interrupt(): ByteArray? {
+        interrupted = true
+        return null
     }
 }
 

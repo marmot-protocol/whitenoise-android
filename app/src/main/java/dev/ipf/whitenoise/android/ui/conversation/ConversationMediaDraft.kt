@@ -81,12 +81,6 @@ internal data class RestoredConversationAttachments(
     val documentUris: List<Uri>,
 )
 
-private data class DraftRestorationVersion(
-    val owner: DraftDocumentOwner,
-    val nativeRevision: Long,
-    val inputsRevision: Long,
-)
-
 /**
  * Owns the transient photo-draft workflow for one conversation.
  *
@@ -456,29 +450,34 @@ internal class ConversationMediaDraftState(
         preparedDocuments = preparedDocuments.filterKeys { it !in documentUris }
     }
 
-    /** Reconciles native-restored shelf entries when the authoritative draft presentation changes. */
+    /**
+     * Reconciles native-restored shelf entries when the authoritative draft presentation changes. A pass that could not
+     * read a stored body the draft may still hold is neither published nor recorded, and runs again.
+     */
+    suspend fun restorePersistedAttachments(canPublish: () -> Boolean = { true }): RestoredConversationAttachments? =
+        restoreRetryingInterruptions { restorePass(canPublish) }
+
+    /** One guarded restoration pass over a fresh native read. */
     @Suppress("LongMethod", "ReturnCount") // One guarded pass reads, materializes and publishes one native snapshot.
-    suspend fun restorePersistedAttachments(
-        canPublish: () -> Boolean = { true },
-    ): RestoredConversationAttachments? =
+    private suspend fun restorePass(canPublish: () -> Boolean): DraftRestorePass<RestoredConversationAttachments> =
         preparationMutex.withLock {
-            val owner = documentOwnerFence.current() ?: return@withLock null
+            val owner = documentOwnerFence.current() ?: return@withLock DraftRestorePass.Finished(null)
             val cleanupRevision = appState.nativeComposerCleanupRevision(owner.accountRef, controller.group.groupIdHex)
             val requested = DraftRestorationVersion(owner, cleanupRevision, inputsRevision)
             val restored = restoredDraftRevision
             if (restored?.owner == owner && restored.nativeRevision == requested.nativeRevision) {
-                return@withLock null
+                return@withLock DraftRestorePass.Finished(null)
             }
             val accountRef = owner.accountRef
             val read =
                 readDraftForRestoration(appState.messageDraftRepository, accountRef, controller.group.groupIdHex)
-                    .getOrElse { return@withLock null }
+                    .getOrElse { return@withLock DraftRestorePass.Finished(null) }
             val attachments = read.draft?.mediaAttachments.orEmpty()
             if (
                 !documentOwnerFence.isCurrent(owner) ||
                 appState.nativeComposerCleanupRevision(owner.accountRef, controller.group.groupIdHex) != cleanupRevision
             ) {
-                return@withLock null
+                return@withLock DraftRestorePass.Finished(null)
             }
             // Reconcile against picks/removals made while the native read was suspended.
             // A later change during materialization still invalidates the publication below.
@@ -508,11 +507,13 @@ internal class ConversationMediaDraftState(
                         inputsRevision,
                     )
                 ) {
-                    return@withLock null
+                    return@withLock DraftRestorePass.Finished(null)
                 }
                 // Check the screen snapshot before committing owner state or its restored version.
                 // The caller applies the result on the main thread without another suspension.
-                if (!canPublish()) return@withLock null
+                if (!canPublish()) return@withLock DraftRestorePass.Finished(null)
+                // Not recorded as restored, so the pass runs again rather than dropping a file the draft still holds.
+                if (attempt.interrupted) return@withLock DraftRestorePass.Interrupted
                 restoredDraftRevision = version
                 val projection =
                     projectDraftRestoration(
@@ -528,7 +529,7 @@ internal class ConversationMediaDraftState(
                 backedPhotos = projection.inputs.backedPhotos
                 nonEditableDescriptions = projection.inputs.descriptions
                 attempt.adopt()
-                RestoredConversationAttachments(projection.media, projection.documents)
+                DraftRestorePass.Finished(RestoredConversationAttachments(projection.media, projection.documents))
             } finally {
                 // A restore cancelled or abandoned before the composer took its files leaves none behind.
                 attempt.releaseUnadopted()
@@ -809,16 +810,6 @@ internal fun rememberConversationMediaDraftState(
     }
     return state
 }
-
-private fun restorationIsCurrent(
-    version: DraftRestorationVersion,
-    ownerFence: DraftDocumentOwnerFence,
-    cleanupRevision: Long,
-    inputsRevision: Long,
-): Boolean =
-    ownerFence.isCurrent(version.owner) &&
-        cleanupRevision == version.nativeRevision &&
-        inputsRevision == version.inputsRevision
 
 /** Retains one caption acceptance generation across preview recompositions and staged-media edits. */
 @Composable

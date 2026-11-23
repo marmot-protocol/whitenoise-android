@@ -45,6 +45,12 @@ internal class FileBackedDraftNative(
     /** When set, the next input save loses a revision race to another writer, as a send saving its caption would. */
     var conflictNextSave = false
 
+    /** When set, every input save fails with this, as a save the native layer refuses would. */
+    var saveFailure: Exception? = null
+
+    /** When set, every read of the selected draft fails with this, as a transient native failure would. */
+    var selectedReadFailure: Exception? = null
+
     /** Moves the draft to a new revision without changing what it holds, as a text save elsewhere would. */
     fun moveRevision() {
         revision = newRevision()
@@ -101,7 +107,11 @@ internal class FileBackedDraftNative(
         override fun selectedMessageDraft(
             accountRef: String,
             groupIdHex: String,
-        ): SelectedMessageDraftFfi = record("selectedMessageDraft") { selected() }
+        ): SelectedMessageDraftFfi =
+            record("selectedMessageDraft") {
+                selectedReadFailure?.let { throw it }
+                selected()
+            }
 
         /** Refuses a whole-draft read, as MarmotKit does once a draft holds a stored file. */
         override fun messageDraft(
@@ -149,6 +159,7 @@ internal class FileBackedDraftNative(
             mediaAttachments: List<MessageDraftAttachmentInputFfi>,
         ): SelectedMessageDraftFfi =
             record("saveMessageDraftInputsIfRevision") {
+                saveFailure?.let { throw it }
                 if (conflictNextSave) {
                     conflictNextSave = false
                     moveRevision()

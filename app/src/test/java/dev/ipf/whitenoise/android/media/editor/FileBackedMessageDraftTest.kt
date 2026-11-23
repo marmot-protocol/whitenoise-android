@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -232,6 +233,30 @@ class FileBackedMessageDraftTest {
             assertEquals(MessageDraftConditionalSaveResult.Superseded, saved)
             assertEquals("old", native.content)
             assertEquals(0, native.calls.count { it == "saveMessageDraftInputsIfRevision" })
+        }
+
+    /**
+     * A failed text save keeps blocking hydration after a file is added, since an attachment-only change leaves its
+     * text current, so reloading the draft cannot overwrite the edit the native draft never took.
+     */
+    @Test
+    fun failedTextSaveBlocksHydrationAcrossAnAttachmentChange() =
+        runTest {
+            val native = FileBackedDraftNative("native text")
+            val repository = repositoryFor(native)
+            val writer = CoalescingMessageDraftWriter(scope = this, drafts = repository, debounceMillis = 0L)
+            native.saveFailure = MarmotKitException.TransportClosed()
+            writer.submit("acct", "group", "unsaved edit")
+            writer.flush()
+            native.saveFailure = null
+
+            val added = repository.files.add("acct", "group", request("video"), control())
+            assertTrue(added is MessageDraftMutationResult.Success)
+            val current = repository.coordinated.generation("acct", "group")
+
+            assertFalse(writer.runHydrationIfCurrent("acct", "group", current) {})
+            assertNull(writer.loadIfCurrent("acct", "group", current))
+            assertEquals("native text", native.content)
         }
 
     /** A held id is a duplicate without copying, and a lost revision is reported, never copied again. */
