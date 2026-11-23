@@ -1537,7 +1537,7 @@ internal fun ComposerBar(
                     canReceiveComposerContent() &&
                         voiceRecordingController?.isRecording != true &&
                         voiceReview?.clip == null &&
-                        dictationController?.blocksNewRequest != true &&
+                        dictationController.composerToolbarOpen(dictationAccountRef, dictationGroupIdHex) &&
                         !attachmentSendInFlight
                 }
 
@@ -1615,8 +1615,7 @@ internal fun ComposerBar(
                 }
                 val dictationLauncher =
                     startAppOwnedDictation?.takeIf {
-                        dictationController?.completionControlsRequired != true &&
-                            dictationController?.blocksNewRequest != true &&
+                        dictationController.composerDictationOpen(accountForDictation, groupForDictation) &&
                             !isRecordingVoice &&
                             voiceReviewClip == null
                     }
@@ -1624,14 +1623,8 @@ internal fun ComposerBar(
                     dictationLauncher?.let { start ->
                         {
                             if (!configuredToolbar || canActivateToolbar()) start()
-                            controllerForDictation?.takeIf { controller ->
-                                accountForDictation != null &&
-                                    groupForDictation != null &&
-                                    controller.isOwnedBy(accountForDictation, groupForDictation) &&
-                                    (
-                                        controller.captureInProgress ||
-                                            controller.state is ConversationDictationState.CheckingProvider
-                                    )
+                            controllerForDictation?.takeIf {
+                                it.heldCaptureOpenFor(accountForDictation, groupForDictation)
                             }
                         }
                     }

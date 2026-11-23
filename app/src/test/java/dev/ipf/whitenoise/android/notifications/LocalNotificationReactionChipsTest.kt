@@ -115,47 +115,78 @@ class LocalNotificationReactionChipsTest {
         assertNull(live.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY))
     }
 
-    /** Android draws choice chips as text only, so shortcode chips show their exact code and tapping one sends it. */
     @Test
-    fun shortcodeChipsShowTheirExactCodeAndSendIt() {
-        val choices = listOf(":marmot:", ":wn:", "👍")
-        postConversationCard(presenter(choices))
-        val reply = replyAction()
-        val remoteInput = checkNotNull(reply.remoteInputs).single()
+    fun artworkChoicesStayBoundToTheOriginalMessageAndExactReaction() {
+        val choices = listOf(":marmot:", ":wn:", "👍", ":missing:")
+        val presenter = presenter(choices)
+        postConversationCard(presenter, "message-a")
+        val initial = manager.activeNotifications.single()
+        val target = NotificationActions.targetFromUpdate(update("message-a"), initial.tag, initial.id)
+        val factory = NotificationInteractionFactory(context, NotificationTapTokens.create(context))
+        val tap = factory.reactionPendingIntent(checkNotNull(target), ":wn:")
+        assertTrue(shadowOf(tap).isImmutable)
 
-        assertEquals(choices, remoteInput.choices?.map(CharSequence::toString))
-        val tapped =
-            Intent(shadowOf(reply.actionIntent).savedIntent).also { intent ->
-                RemoteInput.addResultsToIntent(
-                    arrayOf(remoteInput),
-                    intent,
-                    Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, ":wn:") },
-                )
-                RemoteInput.setResultsSource(intent, RemoteInput.SOURCE_CHOICE)
-            }
+        postConversationCard(presenter, "message-b")
+        val tapped = shadowOf(tap).savedIntent
+        assertEquals("message-a", NotificationActions.parse(tapped)?.target?.messageIdHex)
+        assertEquals(NotificationActionKind.REACT, NotificationActions.parse(tapped)?.kind)
         assertEquals(":wn:", notificationReactionChoice(tapped, choices))
+        assertNull(notificationReactionChoice(tapped, choices - ":wn:"))
     }
 
-    /** Built-in choices keep Android's conversation card: no custom expanded view, Reply and Mark as read stay. */
     @Test
-    fun builtInChoicesKeepTheStandardConversationCard() {
+    fun artworkUsesAnExpandedRowAndKeepsReplyMarkReadAndMessageHistory() {
         postConversationCard(presenter(listOf(":marmot:", ":wn:", "👍")))
         val live = manager.activeNotifications.single().notification
 
-        assertNull(live.bigContentView)
-        assertEquals(Notification.MessagingStyle::class.java.name, live.extras.getString(Notification.EXTRA_TEMPLATE))
+        assertNotNull(live.bigContentView)
+        assertEquals(
+            Notification.DecoratedCustomViewStyle::class.java.name,
+            live.extras.getString(Notification.EXTRA_TEMPLATE),
+        )
+        assertNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(live))
+        assertNull(replyAction().remoteInputs?.single()?.choices)
+        assertTrue(checkNotNull(replyAction().remoteInputs?.single()).allowFreeFormInput)
         assertEquals(
             listOf(context.getString(R.string.reply), context.getString(R.string.chat_row_action_mark_read)),
-            actions().map { it.title.toString() },
+            actions().filterNot { it.isContextual }.map { it.title.toString() },
         )
         assertFalse(live.extras.containsKey(LEGACY_EXTRA_EXPANDED_REACTION_CHOICES))
         assertFalse(live.extras.containsKey(LEGACY_EXTRA_FIXED_REACTION_TARGET))
     }
 
+    @Test
+    fun rejectsExpandedArtworkAndRetriesWithNativeChoices() {
+        val choices = listOf(":marmot:", "👍")
+        val presenter =
+            LocalNotificationPresenter(
+                context,
+                groupReconciliation = {},
+                quickReactionChoices = { choices },
+                notificationPoster = { target, tag, id, card ->
+                    require(card.bigContentView == null)
+                    target.notify(tag, id, card)
+                },
+            ).also(LocalNotificationPresenter::ensureChannels)
+
+        postConversationCard(presenter)
+        val live = manager.activeNotifications.single().notification
+        assertNull(live.bigContentView)
+        assertFalse(live.extras.containsKey(EXTRA_QUICK_REACTION_ROWS))
+        assertEquals(
+            choices,
+            replyAction()
+                .remoteInputs
+                ?.single()
+                ?.choices
+                ?.map(CharSequence::toString),
+        )
+    }
+
     /** A card left by the earlier expanded-choice build loses that layout on its next write and keeps its thread. */
     @Test
     fun earlierExpandedChoiceCardReturnsToTheStandardCardOnItsNextWrite() {
-        val presenter = presenter(listOf(":marmot:", ":wn:", "👍"))
+        val presenter = presenter(defaultChoices())
         postConversationCard(presenter, "message-a")
         val posted = manager.activeNotifications.single()
         val legacy =
@@ -181,7 +212,7 @@ class LocalNotificationReactionChipsTest {
         assertNull(live.bigContentView)
         assertFalse(live.extras.containsKey(LEGACY_EXTRA_EXPANDED_REACTION_CHOICES))
         assertFalse(live.extras.containsKey(LEGACY_EXTRA_FIXED_REACTION_TARGET))
-        assertEquals(2, actions().size)
+        assertEquals(2, actions().count { !it.isContextual })
         val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(live))
         assertEquals(
             "message-a",

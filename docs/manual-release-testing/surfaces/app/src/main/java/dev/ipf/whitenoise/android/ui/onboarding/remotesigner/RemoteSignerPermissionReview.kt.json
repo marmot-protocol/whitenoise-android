@@ -1,0 +1,290 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "RemoteSignerGrantRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "fun RemoteSignerGrantRow(",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "RemoteSignerPermissionReview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "fun RemoteSignerPermissionReview(",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "RemoteSignerReviewSupporting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "fun RemoteSignerReviewSupporting(",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.remote_signer_grant_backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_backup",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_decrypt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_decrypt",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_delete",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_encrypt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_encrypt",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_follows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_follows",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_group_proof",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_group_proof",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_inbox_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_inbox_relays",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_key_package",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_mute_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_mute_list",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_profile",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_push",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_push",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_relay_auth",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_relay_auth",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_relay_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_relay_list",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_seal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_seal",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_grant_upload",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_grant_upload",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_group_access",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_group_access",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_group_access_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_group_access_detail",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_group_backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_group_backup",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_group_backup_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_group_backup_detail",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_group_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_group_messages",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_group_messages_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_group_messages_detail",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_group_other",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_group_other",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_group_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_group_profile",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_group_profile_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_group_profile_detail",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_review_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_review_body",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_review_hide_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_review_hide_all",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_review_show_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_review_show_all",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      },
+      {
+        "surface": "R.string.remote_signer_review_version",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerPermissionReview.kt",
+        "anchor": "R.string.remote_signer_review_version",
+        "test_ids": [
+          "ONB-027",
+          "ONB-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

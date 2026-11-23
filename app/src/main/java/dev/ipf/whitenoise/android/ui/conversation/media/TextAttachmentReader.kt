@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +57,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
@@ -289,7 +289,7 @@ internal fun TextAttachmentReaderScreen(
             // Follow can place the active sentence at the viewport edge; keep its highlight legible.
             Column(Modifier.fillMaxSize().fadingVerticalScroll(scroll, fadeEnabled = playback == null)) {
                 TextAttachmentMetadata(candidate = candidate, byteCount = preview?.byteCount, onCopy = onCopy)
-                HorizontalDivider()
+                AppDivider()
                 TextAttachmentReaderContent(
                     state = state,
                     selection = selection,

@@ -109,7 +109,7 @@ class SettingsContinuousContourPixelsTest {
                                     .size(
                                         200.dp,
                                         52.dp,
-                                    ).connectedRowBorder(shape, Color.White, amoledRowSeamColor(Color.White)),
+                                    ).connectedRowBorder(shape, Color.White),
                             )
                         }
                     }
