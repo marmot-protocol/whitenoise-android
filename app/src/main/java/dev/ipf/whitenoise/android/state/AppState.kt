@@ -6461,14 +6461,6 @@ class WhiteNoiseAppState private constructor(
         notificationNetworkRecovery.noteNetworkRestored(validatedConnectivityRecoveryGenerationMutable.value)
     }
 
-    private fun networkTypesFor(caps: android.net.NetworkCapabilities): Set<MediaAutoDownloadNetwork> =
-        MediaAutoDownloadNetwork.matching(
-            hasWifiTransport = caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI),
-            hasCellularTransport = caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR),
-            isRoaming = !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING),
-            isMetered = !caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
-        )
-
     /**
      * Refreshes [mediaAutoDownloadMatrix] for the current active account.
      * Called whenever [activeAccountRef] changes so per-account toggles follow
