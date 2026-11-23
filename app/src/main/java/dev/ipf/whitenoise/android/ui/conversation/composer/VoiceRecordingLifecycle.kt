@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.audio.VoiceRecordingStopReason
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
 /** Capture belongs to the visible conversation; backgrounding preserves a reviewable take. */
@@ -135,6 +136,7 @@ internal fun rememberVoiceRecordingStopNotice(
                                 VoiceRecordingStopReason.LimitReached -> R.string.voice_recording_limit_reached
                                 VoiceRecordingStopReason.Interrupted -> R.string.voice_recording_interrupted
                             },
+                            kind = TransientNoticeKind.Information,
                         ),
                     )
             }

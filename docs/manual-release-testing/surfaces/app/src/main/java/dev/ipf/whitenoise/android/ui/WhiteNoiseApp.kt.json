@@ -23,15 +23,6 @@
         ]
       },
       {
-        "surface": "TransientNoticeTimeoutEffect",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "fun TransientNoticeTimeoutEffect(",
-        "test_ids": [
-          "INT-004",
-          "SET-023"
-        ]
-      },
-      {
         "surface": "WarmResumeFrameSurface",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "fun WarmResumeFrameSurface(",

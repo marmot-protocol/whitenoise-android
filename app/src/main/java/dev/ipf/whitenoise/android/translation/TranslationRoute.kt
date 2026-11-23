@@ -21,6 +21,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -63,7 +64,13 @@ internal fun rememberConversationTranslation(
         ownedNotice?.let { appState.clearTransientNotice(it) }
         ownedNotice = null
         if (session.failure != null && account != null) {
-            ownedNotice = appState.presentConversationTransient(account, group, recoveryNotice(session.failure))
+            ownedNotice =
+                appState.presentConversationTransient(
+                    account,
+                    group,
+                    recoveryNotice(session.failure),
+                    kind = TransientNoticeKind.Information,
+                )
         }
     }
     TranslationOwnerResetEffect(session, onReset = session::clear) {

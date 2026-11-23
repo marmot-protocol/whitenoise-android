@@ -416,7 +416,6 @@ class StalenessGuardCoverageTest {
                 "AppState.kt" to
                     listOf(
                         "mediaCacheRevisionState",
-                        "transientNoticeSequence",
                         "relationshipRevision",
                         "runtimeGeneration",
                         "profileRevision",
@@ -425,6 +424,7 @@ class StalenessGuardCoverageTest {
                         "draftHydrationRevision",
                         "notificationDrainSequence",
                     ),
+                "TransientNotices.kt" to listOf("transientNoticeSequence"),
                 "ProfilePresentationNames.kt" to
                     listOf("profileAccountRevisionEpoch", "profileAccountRevisionSequence"),
                 "ChatsController.kt" to

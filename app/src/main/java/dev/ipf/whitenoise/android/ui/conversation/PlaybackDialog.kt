@@ -16,6 +16,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.observePlaybackTransportVisible
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.TopNoticeRegion
@@ -34,13 +35,14 @@ private val LocalPlaybackDismissals = staticCompositionLocalOf<List<(() -> Unit)
  */
 @Composable
 // One composition owns the secure window, transport/banner insets and inherited exit chain.
-@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod", "LongParameterList")
 internal fun PlaybackDialog(
     onDismissRequest: () -> Unit,
     properties: DialogProperties = DialogProperties(),
     onSourceDismiss: (() -> Unit)? = onDismissRequest,
     onSourceExit: (((() -> Unit) -> Unit))? = null,
     rootModifier: @Composable () -> Modifier = { Modifier },
+    noticeScope: ConversationNoticeDestination? = LocalTopNoticeScope.current,
     content: @Composable () -> Unit,
 ) {
     val host = LocalShellPlaybackHost.current
@@ -74,6 +76,7 @@ internal fun PlaybackDialog(
                 CompositionLocalProvider(
                     LocalPlaybackDismissals provides dismissals,
                     LocalPlaybackSourceAllowed provides sourceAllowed,
+                    LocalTopNoticeScope provides noticeScope,
                 ) {
                     val visible =
                         host.appState.observePlaybackTransportVisible() && !host.appState.appLock.screenVisible
@@ -82,7 +85,7 @@ internal fun PlaybackDialog(
                     val bannerOwnsStatusBar =
                         !visible &&
                             !properties.decorFitsSystemWindows &&
-                            noticeSlot.presents(noticeSlot.hostNotice, LocalTopNoticeScope.current)
+                            noticeSlot.presents(noticeSlot.hostNotice, noticeScope)
                     Column(Modifier.fillMaxSize()) {
                         if (visible) {
                             Box(if (properties.decorFitsSystemWindows) Modifier else Modifier.statusBarsPadding()) {
@@ -104,6 +107,7 @@ internal fun PlaybackDialog(
                         }
                         TopNoticeRegion(
                             slot = noticeSlot,
+                            confirmationNeedsStatusInset = !visible && !properties.decorFitsSystemWindows,
                             modifier = if (bannerOwnsStatusBar) Modifier.statusBarsPadding() else Modifier,
                         )
                         val statusBarOwned = visible || bannerOwnsStatusBar
