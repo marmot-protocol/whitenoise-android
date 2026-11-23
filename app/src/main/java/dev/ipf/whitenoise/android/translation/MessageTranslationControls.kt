@@ -186,8 +186,8 @@ internal fun MessageSideDisc(
                     .drawBehind {
                         val stateAlpha =
                             when {
-                                focused -> 0.12f
-                                hovered -> 0.08f
+                                focused -> DISC_PRESSED_OR_FOCUSED_ALPHA
+                                hovered -> DISC_HOVERED_ALPHA
                                 else -> 0f
                             }
                         val alpha = maxOf(pressAlpha, stateAlpha)
@@ -210,9 +210,9 @@ private fun rememberMessageSideDiscPressAlpha(interactions: MutableInteractionSo
             .filterIsInstance<PressInteraction>()
             .collectLatest { interaction ->
                 when (interaction) {
-                    is PressInteraction.Press -> pressAlpha.snapTo(0.12f)
+                    is PressInteraction.Press -> pressAlpha.snapTo(DISC_PRESSED_OR_FOCUSED_ALPHA)
                     is PressInteraction.Release -> {
-                        pressAlpha.snapTo(0.12f)
+                        pressAlpha.snapTo(DISC_PRESSED_OR_FOCUSED_ALPHA)
                         pressAlpha.animateTo(0f, tween(durationMillis = 150))
                     }
                     is PressInteraction.Cancel -> pressAlpha.snapTo(0f)
@@ -259,6 +259,8 @@ private fun MessageSidePendingRing(
 }
 
 private const val DISABLED_ALPHA = 0.38f
+private const val DISC_PRESSED_OR_FOCUSED_ALPHA = 0.12f
+private const val DISC_HOVERED_ALPHA = 0.08f
 
 internal const val MESSAGE_TRANSLATION_TOGGLE_TEST_TAG = "message-translation-toggle"
 internal const val MESSAGE_TRANSLATION_PENDING_TEST_TAG = "message-translation-pending"
