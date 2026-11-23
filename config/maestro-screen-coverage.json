@@ -171,6 +171,12 @@
     "HelpSupport": [
       "settings-help-support"
     ],
+    "LearnWhiteNoise": [
+      "settings-help-support"
+    ],
+    "Documentation": [
+      "settings-help-support"
+    ],
     "NotificationSounds": [
       "settings-notification-sounds"
     ],

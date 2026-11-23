@@ -7097,6 +7097,38 @@
         }
       ],
       "remaining": "Video mode, recording, the microphone prompt and a real capture need a camera-backed emulator; ConversationCameraContentTest, ConversationCameraCaptureKindTest and a manual emulator run cover them."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+      "symbol": "DocumentationScreen",
+      "bindings": [
+        {
+          "case": "settings-help-support",
+          "selector": {
+            "text": "Search documentation"
+          },
+          "scope": "Help hub navigation to the first visible control.",
+          "opened_by": {
+            "text": "View all topics"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+      "symbol": "LearnWhiteNoiseScreen",
+      "bindings": [
+        {
+          "case": "settings-help-support",
+          "selector": {
+            "text": "Find someone"
+          },
+          "scope": "Help hub navigation to the first visible control.",
+          "opened_by": {
+            "text": "Learn White Noise"
+          }
+        }
+      ]
     }
   ]
 }

@@ -13,6 +13,15 @@ name: settings-help-support
 - tapOn: "Help & support"
 - assertVisible:
     id: "settings.help_support.group"
+- tapOn: "Learn White Noise"
+- assertVisible: "Find someone"
+- tapOn: "Next"
+- assertVisible: "Share your profile"
+- tapOn: "View all topics"
+- assertVisible: "Search documentation"
+- tapOn: "Back"
+- assertVisible:
+    id: "settings.help_support.group"
 - tapOn: "Back"
 - assertVisible: "Settings"
 - tapOn: "Back"

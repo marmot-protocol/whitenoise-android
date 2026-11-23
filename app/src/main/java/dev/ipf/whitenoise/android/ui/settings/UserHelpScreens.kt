@@ -45,17 +45,25 @@ import java.io.IOException
 private const val GUIDE_DIRECTORY = "user-guides"
 private const val DOCS_URL = "https://www.whitenoise.chat/docs/"
 
-private data class UserGuide(val id: String, val title: String, val body: String)
+private data class UserGuide(
+    val id: String,
+    val title: String,
+    val body: String,
+)
 
 private fun AssetManager.readUserGuides(): List<UserGuide> =
-    list(GUIDE_DIRECTORY).orEmpty().filter { it.endsWith(".md") }.map { file ->
-        val contents = open("$GUIDE_DIRECTORY/$file").bufferedReader().use { it.readText() }
-        UserGuide(
-            id = file.removeSuffix(".md"),
-            title = contents.lineSequence().first().removePrefix("# "),
-            body = contents.substringAfter('\n'),
-        )
-    }.sortedBy { it.title }
+    list(GUIDE_DIRECTORY)
+        .orEmpty()
+        .filter { it.endsWith(".md") }
+        .map { file ->
+            val contents = open("$GUIDE_DIRECTORY/$file").bufferedReader().use { it.readText() }
+            UserGuide(
+                id = file.removeSuffix(".md"),
+                title = contents.lineSequence().first().removePrefix("# "),
+                body = contents.substringAfter('\n'),
+            )
+        }
+        .sortedBy { it.title }
 
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 @Composable
@@ -87,7 +95,8 @@ internal fun DocumentationScreen(
         if (selected != null) {
             GuideArticle(appState, selected, onOpenShare) { url ->
                 val linkedId =
-                    url.takeIf { it.startsWith(DOCS_URL) }
+                    url
+                        .takeIf { it.startsWith(DOCS_URL) }
                         ?.removePrefix(DOCS_URL)
                         ?.substringBefore('#')
                         ?.trimEnd('/')
@@ -174,7 +183,10 @@ private fun GuideArticle(
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Suppress("FunctionNaming")
 @Composable
-internal fun LearnWhiteNoiseScreen(onBack: () -> Unit, onOpenDocumentation: () -> Unit) {
+internal fun LearnWhiteNoiseScreen(
+    onBack: () -> Unit,
+    onOpenDocumentation: () -> Unit,
+) {
     val titles = listOf(R.string.learn_find_title, R.string.learn_share_title, R.string.learn_actions_title)
     val descriptions = listOf(R.string.learn_find_body, R.string.learn_share_body, R.string.learn_actions_body)
     val pager = rememberPagerState { titles.size }
@@ -192,11 +204,12 @@ internal fun LearnWhiteNoiseScreen(onBack: () -> Unit, onOpenDocumentation: () -
                     if (page == titles.lastIndex) {
                         Text(
                             stringResource(R.string.learn_example_message),
-                            Modifier.combinedClickable(
-                                onClick = { actionsVisible = true },
-                                onLongClick = { actionsVisible = true },
-                                onLongClickLabel = stringResource(R.string.learn_show_actions),
-                            ).padding(12.dp),
+                            Modifier
+                                .combinedClickable(
+                                    onClick = { actionsVisible = true },
+                                    onLongClick = { actionsVisible = true },
+                                    onLongClickLabel = stringResource(R.string.learn_show_actions),
+                                ).padding(12.dp),
                         )
                         TextButton(onClick = { actionsVisible = !actionsVisible }) {
                             Text(stringResource(R.string.learn_show_actions))
