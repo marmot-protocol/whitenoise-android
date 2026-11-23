@@ -7194,14 +7194,40 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
       "symbol": "ComposerPdfMetadataDialog",
-      "bindings": [],
-      "remaining": "This question appears only when a staged PDF is signed, password protected or cannot be cleaned, which the runner's media fixtures do not provide yet. Its wording, Send as is and Cancel paths are covered by ComposerPdfMetadataChoicesTest, ComposerPdfAttachmentScreenshotTest and DocumentUploadPrivacyCoverageTest, and manually by MED-065; add a direct assertion when a signed PDF fixture can be picked in the runner."
+      "bindings": [
+        {
+          "case": "presentation-modal-pdfmeta-send",
+          "selector": {
+            "text": "Send with metadata\\?"
+          },
+          "scope": "Actual composer PDF metadata question from fixture choices with one signed PDF: Cancel, Back and reopen keep the send waiting; Send as is dispatches once. No file is read and nothing is uploaded.",
+          "entry_assertion": {
+            "text": "Send with metadata\\?"
+          },
+          "opened_by": {
+            "text": "Send fixture PDF"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
       "symbol": "ComposerPdfMetadataDialogContent",
-      "bindings": [],
-      "remaining": "This question appears only when a staged PDF is signed, password protected or cannot be cleaned, which the runner's media fixtures do not provide yet. Its wording, Send as is and Cancel paths are covered by ComposerPdfMetadataChoicesTest, ComposerPdfAttachmentScreenshotTest and DocumentUploadPrivacyCoverageTest, and manually by MED-065; add a direct assertion when a signed PDF fixture can be picked in the runner."
+      "bindings": [
+        {
+          "case": "presentation-modal-pdfmeta-send",
+          "selector": {
+            "text": "Send with metadata\\?"
+          },
+          "scope": "Actual composer PDF metadata question from fixture choices with one signed PDF: Cancel, Back and reopen keep the send waiting; Send as is dispatches once. No file is read and nothing is uploaded.",
+          "entry_assertion": {
+            "text": "Send with metadata\\?"
+          },
+          "opened_by": {
+            "text": "Send fixture PDF"
+          }
+        }
+      ]
     }
   ]
 }
