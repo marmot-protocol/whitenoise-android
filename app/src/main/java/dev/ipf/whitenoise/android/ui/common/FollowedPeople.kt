@@ -31,8 +31,11 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.HowToReg
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.merge
 
 /**
  * The people the active account follows, as canonical lowercase public-key hex. MDK owns the list; this is the
@@ -88,6 +91,7 @@ internal fun followedPeopleFor(appState: WhiteNoiseAppState): ProvidedValue<Foll
  * last answer; another account starts from [FollowedPeople.None], so one account's follows never badge the next.
  */
 @Composable
+@OptIn(FlowPreview::class)
 internal fun rememberFollowedPeople(appState: WhiteNoiseAppState): FollowedPeople {
     val accountRef = appState.activeAccountRef
     val ownAccountIdHex = appState.activeAccount?.accountIdHex
@@ -98,30 +102,22 @@ internal fun rememberFollowedPeople(appState: WhiteNoiseAppState): FollowedPeopl
     val ready = appState.phase == AppPhase.Ready
     LaunchedEffect(accountRef, ownAccountIdHex, ready, appState.runtimeGeneration) {
         if (accountRef == null || !ready) return@LaunchedEffect
-        var readRelationship: Long? = null
-        var readForeground: Int? = null
-        snapshotFlow {
-            FollowedPeopleTrigger(
-                appState.relationshipRevision,
-                foregroundCount,
-                appState.profileRevisionForCompose.profiles,
-            )
-        }.collectLatest { trigger ->
-            // Profile batches land in bursts and are coalesced; a follow change or a return to the app reads at once,
-            // and a burst that cancels such a read leaves it still owed.
-            if (trigger.relationship == readRelationship && trigger.foreground == readForeground) {
-                delay(FOLLOWED_PEOPLE_READ_DEBOUNCE_MILLIS)
-            }
+        // A follow change or a return to the app reads at once; profile batches land in bursts and are coalesced.
+        // Reads run one at a time to completion, and triggers arriving meanwhile fold into the next read.
+        merge(
+            snapshotFlow { appState.relationshipRevision to foregroundCount },
+            snapshotFlow { appState.profileRevisionForCompose.profiles }
+                .drop(1)
+                .debounce(FOLLOWED_PEOPLE_READ_DEBOUNCE_MILLIS),
+        ).conflate().collect {
             val follows =
                 try {
                     appState.marmotIo { accountFollows(accountRef) }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
-                    return@collectLatest
+                    return@collect
                 }
-            readRelationship = trigger.relationship
-            readForeground = trigger.foreground
             followed = FollowedPeople.of(follows, ownAccountIdHex)
         }
     }
@@ -199,9 +195,3 @@ private const val OUTER_RING_RATIO = 0.1f
 private const val INNER_RING_RATIO = 0.05f
 private const val ICON_RATIO = 0.65f
 private const val FOLLOWED_PEOPLE_READ_DEBOUNCE_MILLIS = 250L
-
-private data class FollowedPeopleTrigger(
-    val relationship: Long,
-    val foreground: Int,
-    val profiles: Int,
-)
