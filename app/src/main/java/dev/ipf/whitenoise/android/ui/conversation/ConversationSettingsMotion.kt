@@ -150,7 +150,8 @@ internal class ConversationSettingsMotion(
             preparedContour = contour
             preparedSource = contour?.bubbleSource()
         }
-        val cards = if (route == ConversationSettingsRoute.Composer) composerPreview else morph.page?.bubbleCards().orEmpty()
+        val cards =
+            if (route == ConversationSettingsRoute.Composer) composerPreview else morph.page?.bubbleCards().orEmpty()
         return landing.measure(host, cards, preparedSource)
     }
 

@@ -760,25 +760,21 @@ class DetailRouteMotionScreenshotTest {
         profile: Boolean,
     ) {
         val frames = if (captureFrames) File("build/detail-route-motion/$name").apply { mkdirs() } else null
-        var firstNativeBody: Bitmap? = null
         var intermediate: Bitmap? = null
         var settled: Bitmap? = null
         var handoff: Bitmap? = null
         val composerEntry = name.startsWith("composer_") && name.endsWith("_entry")
         // Only AMOLED cards draw outlines, so only there do details cards visibly fold into the composer.
         val borderlessPage = "_light" in name || "_dark" in name
-        val morphs =
-            !borderlessPage &&
-                (
-                    (profile && "_light" !in name && "_dark" !in name) ||
-                        name.startsWith("composer_") ||
-                        name.endsWith("_entry") ||
-                        (name.endsWith("_entry_back") && "_light" !in name && "_dark" !in name)
-                )
+        val settingsEntry = name.endsWith("_entry") || name.endsWith("_entry_back")
+        val canMorph = profile || name.startsWith("composer_") || settingsEntry
+        val morphs = !borderlessPage && canMorph
         val capturesSettledBody = morphs || profile || borderlessPage
         // Ordinary checks retain their timing; private exports include settled frames after preparation.
         for (frame in 0..(if (captureFrames) 31 else 22)) {
-            if (captureFrames || frame in listOf(0, 6, 20) || (composerEntry && frame == 16)) {
+            val snapshotFrame = frame in listOf(0, 6, 20)
+            val handoffFrame = composerEntry && frame == 16
+            if (captureFrames || snapshotFrame || handoffFrame) {
                 val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
                 val bitmap = node.captureToImage().asAndroidBitmap()
                 if ((morphs || borderlessPage) && frame == 6) {
@@ -787,18 +783,14 @@ class DetailRouteMotionScreenshotTest {
                 if (capturesSettledBody && frame == 20) {
                     settled = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
-                if (composerEntry && frame == 16) {
+                if (handoffFrame) {
                     handoff = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
                 exportTransitionFrame(frames, name, frame, bitmap)
-                if (frame == 0) {
-                    if (borderlessPage) {
-                        firstNativeBody = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                    } else {
-                        assertFirstFrameBackplate(name, bitmap)
-                    }
+                if (frame == 0 && !borderlessPage) {
+                    assertFirstFrameBackplate(name, bitmap)
                 }
-                if (!captureFrames && frame in listOf(0, 6, 20)) {
+                if (!captureFrames && snapshotFrame) {
                     bitmap.captureRoboImage(
                         "src/test/snapshots/detail_motion_${name}_$frame.png",
                     )
@@ -806,7 +798,7 @@ class DetailRouteMotionScreenshotTest {
             }
             rule.mainClock.advanceTimeBy(16)
         }
-        firstNativeBody?.let {
+        if (borderlessPage) {
             // Borderless themes move the route (a container from its control, or a slide back) instead of cutting.
             org.junit.Assert.assertFalse(
                 "$name must move instead of cutting",

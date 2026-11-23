@@ -4074,7 +4074,9 @@ internal fun ConversationScreen(
                 ConversationBottomBarFrame(routeMorph, with(density) { (presentedImeBottom ?: 0).toDp() }) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
-                            settingsMotion.launchFromComposer(captureMenuImeBackdrop(displayedMenuImeBottom, imeInsets.getBottom(density)))
+                            settingsMotion.launchFromComposer(
+                                captureMenuImeBackdrop(displayedMenuImeBottom, imeInsets.getBottom(density)),
+                            )
                             keyboardController?.hide()
                             showComposerSettings = true
                         },
