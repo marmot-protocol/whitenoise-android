@@ -28579,7 +28579,7 @@ Ldev/ipf/whitenoise/android/state/ConversationController;
 SPLdev/ipf/whitenoise/android/state/ConversationController;-><clinit>()V
 Ldev/ipf/whitenoise/android/state/ConversationControllerCopy;
 SPLdev/ipf/whitenoise/android/state/ConversationControllerCopy;-><clinit>()V
-SPLdev/ipf/whitenoise/android/state/ConversationControllerCopy;-><init>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+SPLdev/ipf/whitenoise/android/state/ConversationControllerCopy;-><init>(Ljava/lang/String;Ljava/lang/String;)V
 Ldev/ipf/whitenoise/android/state/ConversationDictationMediaHandoff;
 SPLdev/ipf/whitenoise/android/state/ConversationDictationMediaHandoff;-><clinit>()V
 SPLdev/ipf/whitenoise/android/state/ConversationDictationMediaHandoff;-><init>(Ldev/ipf/whitenoise/android/state/ConversationDictationPlaybackHandoff;Ldev/ipf/whitenoise/android/audio/ConversationDictationAudioFocusLease;)V

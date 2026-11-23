@@ -28,8 +28,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -53,7 +51,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.layoutId
@@ -66,9 +63,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.SoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -92,6 +87,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
 import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
@@ -895,6 +891,7 @@ internal fun ComposerBar(
                 draftAccountRef,
                 draftGroupIdHex,
                 R.string.translation_composer_dictation_off,
+                kind = TransientNoticeKind.Information,
             )
         }
     }
@@ -1208,8 +1205,8 @@ internal fun ComposerBar(
                 fillEditorHeight = composerExpansion.mode != ComposerExpansionMode.Automatic,
                 minimumEditorHeight = with(density) { minimumManualComposerHeightPx.toDp() } - 12.dp,
             ) {
-                val voiceReviewClip =
-                    voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
+                val voicePhase = voiceComposerPhase(voiceRecordingController, voiceReview)
+                val voiceReviewClip = voiceReview?.clip?.takeIf { voicePhase.showsReview }
                 val replyVisible = replyingTo != null || replyExit.exiting
                 val baseAccessoryContent: (@Composable () -> Unit)? =
                     // Edit shows its pill in the action row instead, and takes precedence over a reply.
@@ -1414,8 +1411,7 @@ internal fun ComposerBar(
                         )
                     }
                 }
-                val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
-                val isRecordingVoice = activeRecordingController != null
+                val isRecordingVoice = voicePhase.capturing
                 val dictationActiveInComposer =
                     dictationControlsVisible &&
                         dictationOwnedByComposer &&
@@ -1459,8 +1455,7 @@ internal fun ComposerBar(
                         onOpenStickers?.let { put(ComposerShortcut.Sticker, it) }
                     }
                 val transactionActive =
-                    isRecordingVoice ||
-                        voiceReviewClip != null ||
+                    voicePhase != VoiceComposerPhase.Idle ||
                         (dictationOwnedByComposer && dictationController?.completionControlsRequired == true)
                 val settings = toolbarPreference?.value ?: ComposerToolbarSettings()
                 val available =
@@ -1537,7 +1532,7 @@ internal fun ComposerBar(
                     canReceiveComposerContent() &&
                         voiceRecordingController?.isRecording != true &&
                         voiceReview?.clip == null &&
-                        dictationController?.blocksNewRequest != true &&
+                        dictationController.composerToolbarOpen(dictationAccountRef, dictationGroupIdHex) &&
                         !attachmentSendInFlight
                 }
 
@@ -1615,8 +1610,7 @@ internal fun ComposerBar(
                 }
                 val dictationLauncher =
                     startAppOwnedDictation?.takeIf {
-                        dictationController?.completionControlsRequired != true &&
-                            dictationController?.blocksNewRequest != true &&
+                        dictationController.composerDictationOpen(accountForDictation, groupForDictation) &&
                             !isRecordingVoice &&
                             voiceReviewClip == null
                     }
@@ -1624,14 +1618,8 @@ internal fun ComposerBar(
                     dictationLauncher?.let { start ->
                         {
                             if (!configuredToolbar || canActivateToolbar()) start()
-                            controllerForDictation?.takeIf { controller ->
-                                accountForDictation != null &&
-                                    groupForDictation != null &&
-                                    controller.isOwnedBy(accountForDictation, groupForDictation) &&
-                                    (
-                                        controller.captureInProgress ||
-                                            controller.state is ConversationDictationState.CheckingProvider
-                                    )
+                            controllerForDictation?.takeIf {
+                                it.heldCaptureOpenFor(accountForDictation, groupForDictation)
                             }
                         }
                     }
@@ -1673,48 +1661,15 @@ internal fun ComposerBar(
                                 .coerceIn(ComposerShortcutTarget, ComposerToolbarMaximumHeight),
                         accessoryContent = accessoryContent.takeIf { voiceReviewClip == null },
                         voiceReviewContent =
-                            voiceReviewClip?.let { reviewedClip ->
-                                {
-                                    VoiceReviewComposer(
-                                        checkNotNull(voiceReview),
-                                        reviewedClip,
-                                        voiceRecordingController,
-                                    )
-                                }
-                            },
+                            rememberVoiceReviewSlot(voiceReview, voiceReviewClip, voiceRecordingController),
                         recordingContent =
-                            activeRecordingController?.let { recordingController ->
-                                {
-                                    RecordingStripLeading(
-                                        controller = recordingController,
-                                        modifier =
-                                            Modifier
-                                                .matchParentSize()
-                                                .padding(
-                                                    start =
-                                                        if (lockedVoiceAtStart) {
-                                                            primaryTrailingActionWidth + 4.dp
-                                                        } else {
-                                                            0.dp
-                                                        },
-                                                    end =
-                                                        if (lockedVoiceAtStart) {
-                                                            0.dp
-                                                        } else {
-                                                            primaryTrailingActionWidth +
-                                                                if (expandedControlLayout) 4.dp else 12.dp
-                                                        },
-                                                ).pointerInput(recordingController) {
-                                                    awaitPointerEventScope {
-                                                        while (true) {
-                                                            val event = awaitPointerEvent()
-                                                            event.changes.forEach { it.consume() }
-                                                        }
-                                                    }
-                                                },
-                                    )
-                                }
-                            },
+                            rememberVoiceRecordingSlot(
+                                voiceRecordingController,
+                                voicePhase,
+                                primaryTrailingActionWidth,
+                                lockedVoiceAtStart,
+                                expandedControlLayout,
+                            ),
                         textFieldValue = textFieldValue,
                         readAcceptedValue = { textState.valueState.value },
                         composerFocus = composerFocus,
@@ -1831,7 +1786,7 @@ internal fun ComposerBar(
                                 }
                             },
                         dictationControlsWidth =
-                            dictationState.compactActionsWidth(activeDictationController?.leadingSlotOccupied == true),
+                            dictationState.compactActionsWidth(activeDictationController?.reservesLeadingSlot == true),
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
                         enterKeyBehavior = enterKeyBehavior,
@@ -1891,7 +1846,7 @@ internal fun ComposerBar(
                             composerHeightDragState = null
                         },
                         overlayBackRegistrar = overlayBackRegistrar,
-                        inputContentVisible = !isRecordingVoice && voiceReviewClip == null,
+                        inputContentVisible = !voicePhase.showsStrip && !voicePhase.showsReview,
                         inputFocusEnabled = voiceReviewClip == null,
                         expandedTrailingActionInset = primaryTrailingActionWidth,
                         compactMeasurementWidth = maxWidth,
@@ -2023,43 +1978,7 @@ internal fun ComposerBar(
                         // This call site stays shared by idle and recording states;
                         // moving it would break the active hold gesture's identity.
                         if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
-                            ComposerToolbarTargets {
-                                IconButton(
-                                    onClick = { voiceRecordingController.cancel() },
-                                    modifier =
-                                        Modifier
-                                            .width(
-                                                actionTargetWidth,
-                                            ).height(ComposerActionRowHeight)
-                                            .explainOnLongPress(
-                                                composerExplanation(
-                                                    R.string.voice_message_cancel,
-                                                    R.string.explanation_conversation_voice_delete,
-                                                ),
-                                            ),
-                                ) {
-                                    Icon(
-                                        painterResource(R.drawable.ic_delete),
-                                        contentDescription = stringResource(R.string.voice_message_cancel),
-                                        tint = MaterialTheme.colorScheme.error,
-                                    )
-                                }
-                            }
-                            ComposerActionDisc(
-                                onClick = { voiceRecordingController.stop() },
-                                width = actionTargetWidth,
-                                containerColor = actionColors.container,
-                                contentColor = actionColors.content,
-                                description = stringResource(R.string.voice_recording_stop),
-                                icon = R.drawable.ic_stop,
-                                modifier =
-                                    Modifier.explainOnLongPress(
-                                        composerExplanation(
-                                            R.string.voice_recording_stop,
-                                            R.string.explanation_conversation_voice_stop,
-                                        ),
-                                    ),
-                            )
+                            VoiceLockedActions(voiceRecordingController, actionTargetWidth, actionColors)
                         } else if (showPrimaryTrailingAction && showConfiguredMic) {
                             Box(contentAlignment = Alignment.BottomCenter) {
                                 LockHintAbove(controller = voiceRecordingController)

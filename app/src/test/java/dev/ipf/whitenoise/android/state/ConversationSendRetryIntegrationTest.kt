@@ -1448,6 +1448,7 @@ class ConversationSendRetryIntegrationTest {
             val appState = appState()
             appState.setDraft(GROUP_ID, TextFieldValue("typed"))
             val releasePublish = CompletableDeferred<Unit>()
+            val settlements = mutableListOf<Boolean>()
             var pendingShown = 0
             val controller =
                 ConversationController(
@@ -1468,6 +1469,7 @@ class ConversationSendRetryIntegrationTest {
                     expectedDraftText = "typed",
                     payload = "typed spoken",
                     onPendingShown = { pendingShown += 1 },
+                    onTextSendSettled = { settlements.add(it) },
                 )
 
             try {
@@ -1478,10 +1480,12 @@ class ConversationSendRetryIntegrationTest {
 
                 assertEquals(1, pendingShown)
                 assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+                assertTrue(settlements.isEmpty())
                 assertFalse(send.isCompleted)
 
                 releasePublish.complete(Unit)
                 assertTrue(send.await())
+                assertEquals(listOf(true), settlements)
             } finally {
                 releasePublish.complete(Unit)
                 appState.detachConversationController(controller)
@@ -1497,9 +1501,10 @@ class ConversationSendRetryIntegrationTest {
                     MarmotKitException.Publish("send event timed out"),
                 )
 
-            failures.forEach { failure ->
+            failures.forEachIndexed { index, failure ->
                 val appState = appState()
                 appState.setDraft(GROUP_ID, TextFieldValue("typed"))
+                val settlements = mutableListOf<Boolean>()
                 val reply = timelineAppMessage(REPLY_MESSAGE_ID)
                 val controller =
                     ConversationController(
@@ -1521,11 +1526,13 @@ class ConversationSendRetryIntegrationTest {
                         expectedDraftText = "typed",
                         payload = "spoken reply",
                         replyToMessageIdHex = REPLY_MESSAGE_ID,
+                        onTextSendSettled = { settlements.add(it) },
                     )
 
                 try {
                     assertFalse(appState.sendDictationTranscriptIfOriginUnchanged(request))
                     assertEquals(reply, controller.replyingTo)
+                    assertEquals(if (index == 0) listOf(false) else emptyList(), settlements)
                 } finally {
                     appState.detachConversationController(controller)
                 }
@@ -3164,6 +3171,7 @@ class ConversationSendRetryIntegrationTest {
             )
         }
 
+    /** An accepted-pending send settles the projection that arrived before the send returned. */
     @Test
     fun acceptedPendingSendReturnSettlesAProjectionThatArrivedFirst() =
         runTest {
@@ -3184,7 +3192,7 @@ class ConversationSendRetryIntegrationTest {
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
-                        controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                        controller.testApplyLiveTimelineChanges(
                             listOf(
                                 TimelineMessageChangeFfi.Upsert(
                                     trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -3325,6 +3333,7 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(null, sent.record.retentionExpiresAt)
         }
 
+    /** The send-time retention hint survives its projection and a page refresh while MDK's expiry is pending. */
     @Test
     fun retentionHintSurvivesProjectionAndPageRefreshWhileExpiryIsPending() =
         runTest {
@@ -3342,7 +3351,7 @@ class ConversationSendRetryIntegrationTest {
                     initialGroup = group(disappearingMessageSecs = 30uL),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
-                        controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                        controller.testApplyLiveTimelineChanges(
                             listOf(
                                 TimelineMessageChangeFfi.Upsert(
                                     trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -3831,6 +3840,7 @@ class ConversationSendRetryIntegrationTest {
             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
         )
 
+    /** A controller whose publisher projects the send before returning an accepted-pending summary. */
     private fun acceptedPendingConversationController(appState: WhiteNoiseAppState): ConversationController {
         lateinit var controller: ConversationController
         controller =
@@ -3839,7 +3849,7 @@ class ConversationSendRetryIntegrationTest {
                 initialGroup = group(),
                 initialMemberSnapshot = memberSnapshot(),
                 textPublisher = { _, _, _, _ ->
-                    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                    controller.testApplyLiveTimelineChanges(
                         listOf(
                             TimelineMessageChangeFfi.Upsert(
                                 trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
@@ -4177,7 +4187,7 @@ class ConversationSendRetryIntegrationTest {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         hasReports = false,
@@ -4244,11 +4254,12 @@ private fun attachedChatsController(
         chatsController.applyChatListRow(row)
     }
 
+/** Delivers [message] to [controller] as a new live message. */
 private fun applyProjection(
     controller: ConversationController,
     message: TimelineMessageRecordFfi,
 ) {
-    controller.testApplyLiveTimelineChangesAndRegisterStreams(
+    controller.testApplyLiveTimelineChanges(
         listOf(
             TimelineMessageChangeFfi.Upsert(
                 trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,

@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-voice-discard
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Discard voice message\?
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Discard voice message\?
+- tapOn:
+    text: Reopen voice discard
+- assertVisible:
+    text: Discard voice message\?
+- tapOn:
+    text: Discard
+- assertVisible:
+    id: presentation.complete

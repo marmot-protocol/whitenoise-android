@@ -5,9 +5,9 @@ import shutil
 import sys
 
 
-BASELINE = '4df811aea99269b437a6023be9446a5141e93cbe'
+BASELINE = '34646a577807f2b112ee031f3c164ec58aa18b64'
 # Qualification sources whose MarmotKit API differs on the baseline, swapped in after the copy. None differ between
-# the 0.17.0 baseline and the candidate, so the directory holds no overlay now.
+# the 0.18.0 baseline and the candidate, so the directory holds no overlay now.
 OVERLAY = Path('scripts/mdk-baseline-overlay')
 
 

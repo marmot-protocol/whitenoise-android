@@ -162,7 +162,7 @@ class MessageMultiSelectCoverageTest {
             source.contains(
                 "if (!selectionMode && !textSelectionMode) { " +
                     "pressState.longPressWindowPosition = null pressState.selectionSeedVisibleOffset = null " +
-                    "longPressWindowY = null pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
+                    "pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
                     "onActionMenuOpenChange(true)",
             ),
         )
@@ -170,7 +170,7 @@ class MessageMultiSelectCoverageTest {
             source.contains(
                 "if (!deleted && !selectionMode && !textSelectionMode) { " +
                     "pressState.longPressWindowPosition = null pressState.selectionSeedVisibleOffset = null " +
-                    "longPressWindowY = null pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
+                    "pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
                     "onActionMenuOpenChange(true)",
             ),
         )

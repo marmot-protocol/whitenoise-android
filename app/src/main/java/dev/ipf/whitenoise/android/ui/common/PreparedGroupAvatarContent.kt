@@ -45,34 +45,38 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
     accountRef: String? = appState.activeAccountRef,
     surfaceIdentity: Any? = null,
     retainedPreparation: RetainedGroupAvatarPreparation? = null,
-    compatibilityId: ((T) -> String)? = null,
+    compatibilityForRow: ((T) -> CompatibilityAvatarSelection)? = null,
     content: @Composable () -> Unit,
 ) {
-    val window by remember(rows, listState, rowKey, assetForRow, compatibilityId) {
+    val indexes = remember(rows, rowKey) { rows.withIndex().associate { (index, row) -> rowKey(row) to index } }
+    val viewport by remember(rows, indexes, listState) {
         derivedStateOf {
-            val visibleKeys =
+            val visible =
                 listState.layoutInfo.visibleItemsInfo
-                    .map { it.key }
-                    .toSet()
-            val visibleRows = visibleGroupAvatarWindow(rows, visibleKeys, rowKey)
-            VisibleGroupAvatarAssets(
-                assets = visibleRows.mapNotNull(assetForRow),
-                hasVisibleRows = visibleRows.any { rowKey(it) in visibleKeys },
-                compatibilityRows =
-                    compatibilityId
-                        ?.let { id -> visibleRows.filter { assetForRow(it) == null }.mapTo(mutableSetOf(), id) }
-                        .orEmpty(),
-            )
+                    .mapNotNull { (it.key as? String)?.let(indexes::get) }
+                    .sorted()
+            avatarViewport(rows.size, visible)
         }
     }
     if (retainedPreparation == null) {
-        PreparedGroupAvatarContent(appState, window.assets, accountRef, surfaceIdentity, content)
+        PreparedGroupAvatarContent(
+            appState,
+            viewport.nearby.mapNotNull { assetForRow(rows[it]) },
+            accountRef,
+            surfaceIdentity,
+            content,
+        )
     } else {
         // A returning LazyColumn has no layout yet. Keep its last real viewport until layout restores it.
-        if (window.hasVisibleRows) {
+        if (viewport.visible.isNotEmpty()) {
             SideEffect {
-                retainedPreparation.updateVisible(window.assets)
-                retainedPreparation.compatibility.select(window.compatibilityRows)
+                retainedPreparation.updateVisible(
+                    viewport = viewport,
+                    keyAt = { rowKey(rows[it]) },
+                    indexFor = indexes::get,
+                    assetAt = { assetForRow(rows[it]) },
+                    compatibilityAt = { compatibilityForRow?.invoke(rows[it]) },
+                )
             }
         }
         key(accountRef) {
@@ -84,28 +88,119 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
     }
 }
 
-/** The actual row window distinguishes a restored viewport from a not-yet-measured lazy list. */
-private data class VisibleGroupAvatarAssets(
-    val assets: List<AvatarAssetFfi>,
-    val hasVisibleRows: Boolean,
-    val compatibilityRows: Set<String>,
+internal data class AvatarViewport(
+    val visible: List<Int>,
+    val nearby: List<Int>,
 )
 
-/** Transfers the existing bounded preparation between a shell and its disposable chat-list slot. */
-internal class RetainedGroupAvatarPreparation(
-    private val readPixels: () -> PreparedGroupAvatarPixels,
-    val updateVisible: (List<AvatarAssetFfi>) -> Unit,
-    val compatibility: RetainedGroupCompatibilityPixels,
-) {
-    /** Pixel changes belong to the consuming content's restart scope, never the shell owner factory. */
-    val pixels: PreparedGroupAvatarPixels get() = readPixels()
+/** Prepare visible rows first, then the closest neighbors on either side. Lazy headers are absent from [visible]. */
+internal fun avatarViewport(
+    rowCount: Int,
+    visible: List<Int>,
+): AvatarViewport {
+    if (visible.isEmpty()) {
+        return AvatarViewport(visible, (0 until minOf(rowCount, VISIBLE_GROUP_AVATAR_LIMIT)).toList())
+    }
+    var before = visible.first() - 1
+    var after = visible.last() + 1
+    val nearby =
+        buildList {
+            addAll(visible.take(VISIBLE_GROUP_AVATAR_LIMIT))
+            while (size < VISIBLE_GROUP_AVATAR_LIMIT && (before >= 0 || after < rowCount)) {
+                if (after < rowCount) add(after++)
+                if (size < VISIBLE_GROUP_AVATAR_LIMIT && before >= 0) add(before--)
+            }
+        }
+    return AvatarViewport(visible, nearby)
 }
 
-/**
- * Keeps one list's existing sixteen-image preparation alive during conversation navigation. Replacement
- * owners get an empty selection; callbacks from an outgoing account/runtime/cache lifetime own only the
- * retired state. The selected descriptors and pixels are presentation-only and never enter saved state.
- */
+/** Transfers the list's pixel preparation between a shell and its disposable chat-list slot. */
+internal class RetainedGroupAvatarPreparation(
+    private val accountRef: String?,
+    private val runtimeGeneration: Int,
+    private val lifetime: Long,
+) {
+    var assets by mutableStateOf<List<AvatarAssetFfi>>(emptyList())
+        private set
+    private var retained by mutableStateOf<List<PreparedAvatarImage>>(emptyList())
+    private var recentRows = emptyList<String>()
+    private var allowedAssets = emptyList<AvatarAssetFfi>()
+    private val compatibility = RetainedGroupCompatibilityPixels()
+
+    /** Pixel changes belong to the consuming content's restart scope, never the shell owner factory. */
+    val pixels: PreparedGroupAvatarPixels
+        get() =
+            PreparedGroupAvatarPixels(
+                accountRef,
+                runtimeGeneration,
+                lifetime,
+                images =
+                    retained
+                        .mapNotNull { known -> accountRef?.let(known.asset::cacheKey)?.let { it to known.image } }
+                        .toMap(),
+                retained = retained,
+                recordLoaded = ::recordLoaded,
+                compatibility = compatibility,
+            )
+
+    /** Protect visible and nearby rows first, then the most recently visible rows still in this list. */
+    fun updateVisible(
+        viewport: AvatarViewport,
+        keyAt: (Int) -> String,
+        indexFor: (String) -> Int?,
+        assetAt: (Int) -> AvatarAssetFfi?,
+        compatibilityAt: (Int) -> CompatibilityAvatarSelection? = { null },
+    ) {
+        val visibleKeys = viewport.visible.map(keyAt).toSet()
+        recentRows =
+            (recentRows.filter { it !in visibleKeys && indexFor(it) != null } + visibleKeys)
+                .takeLast(RECENT_AVATAR_ROW_LIMIT)
+        val nearby = viewport.nearby
+        val allowedRows = (nearby + recentRows.mapNotNull(indexFor)).distinct()
+        allowedAssets = allowedRows.mapNotNull(assetAt).filter { it.isRenderable() }
+        retained = retained.filter { known -> allowedAssets.any { sameSelection(it, known.asset) } }
+        compatibility.select(allowedRows.filter { assetAt(it) == null }.mapNotNull(compatibilityAt))
+        assets =
+            nearby
+                .mapNotNull(assetAt)
+                .filter { it.isRenderable() }
+                .distinctBy { Triple(it.target, it.reference, it.contentRevision) }
+                .map { it.copy() }
+    }
+
+    /** Accept exact loaded pixels only for a still-selected revision, with at most one image per selection. */
+    fun recordLoaded(
+        asset: AvatarAssetFfi,
+        image: ImageBitmap,
+    ) {
+        val key =
+            accountRef?.let { account ->
+                asset.cacheKey(account)?.takeIf { candidate ->
+                    allowedAssets.any { sameSelection(it, asset) && it.cacheKey(account) == candidate }
+                }
+            } ?: return
+        val previous = retained.firstOrNull { sameSelection(it.asset, asset) }
+        if (previous?.asset == asset && previous.image === image) return
+        val classification =
+            AvatarImageLoader.cachedAnimationClassification(key)
+                ?: previous?.takeIf { it.asset.contentRevision == asset.contentRevision }?.animationClassification
+        retained = retained.filterNot { sameSelection(it.asset, asset) } +
+            PreparedAvatarImage(asset.copy(), image, classification)
+    }
+
+    fun hasExactRevision(asset: AvatarAssetFfi): Boolean =
+        retained.any {
+            sameSelection(it.asset, asset) && it.asset.contentRevision == asset.contentRevision
+        }
+
+    /** Target and reference identify a drawable picture independently of a content refresh. */
+    private fun sameSelection(
+        first: AvatarAssetFfi,
+        second: AvatarAssetFfi,
+    ): Boolean = first.target == second.target && first.reference == second.reference
+}
+
+/** Keep only presentation pixels for this account, runtime and cache lifetime, including during navigation. */
 @Composable
 internal fun rememberRetainedGroupAvatarPreparation(
     appState: WhiteNoiseAppState,
@@ -116,43 +211,26 @@ internal fun rememberRetainedGroupAvatarPreparation(
     val runtimeGeneration = appState.runtimeGeneration
     val window =
         remember(appState, accountRef, runtimeGeneration, lifetime, surfaceIdentity) {
-            RetainedAvatarWindow(accountRef)
+            RetainedGroupAvatarPreparation(accountRef, runtimeGeneration, lifetime)
         }
     PrepareRetainedAvatarWindow(appState, accountRef, window)
-    return remember(window) {
-        val compatibility = RetainedGroupCompatibilityPixels()
-        RetainedGroupAvatarPreparation(
-            readPixels = {
-                PreparedGroupAvatarPixels(
-                    accountRef,
-                    runtimeGeneration,
-                    lifetime,
-                    images = window.exactImages(),
-                    retained = window.retained,
-                    recordLoaded = window::recordLoaded,
-                    compatibility = compatibility,
-                )
-            },
-            updateVisible = window::select,
-            compatibility = compatibility,
-        )
-    }
+    return window
 }
 
-/** Window changes restart only local preparation; the shell does not observe selection or decode state. */
+/** Overlapping selections keep preparing even when the viewport moves by a row. */
 @Composable
 @Suppress("FunctionNaming")
 private fun PrepareRetainedAvatarWindow(
     appState: WhiteNoiseAppState,
     accountRef: String?,
-    window: RetainedAvatarWindow,
+    window: RetainedGroupAvatarPreparation,
 ) {
-    val selected = window.assets.filter { it.isRenderable() }
-    LaunchedEffect(window, selected) {
-        if (accountRef == null) return@LaunchedEffect
-        withTimeoutOrNull(LOCAL_GROUP_AVATAR_PREPARATION_BUDGET_MILLIS) {
-            for (asset in selected) {
-                if (!window.hasExactRevision(asset)) {
+    if (accountRef == null) return
+    for (asset in window.assets) {
+        key(asset.target, asset.reference, asset.contentRevision) {
+            LaunchedEffect(window, asset.availability) {
+                if (window.hasExactRevision(asset)) return@LaunchedEffect
+                withTimeoutOrNull(LOCAL_GROUP_AVATAR_PREPARATION_BUDGET_MILLIS) {
                     appState.durableAvatar(asset, accountRef, acquireMissing = false, abandonable = true)?.let {
                         window.recordLoaded(asset, it)
                     }
@@ -160,56 +238,6 @@ private fun PrepareRetainedAvatarWindow(
             }
         }
     }
-}
-
-/** One owner retains only its latest measured window, including row loads that outlive preparation. */
-private class RetainedAvatarWindow(
-    private val accountRef: String?,
-) {
-    var assets by mutableStateOf<List<AvatarAssetFfi>>(emptyList())
-        private set
-    var retained by mutableStateOf<List<PreparedAvatarImage>>(emptyList())
-        private set
-
-    /** Drops departed or invalidated selections, keeping valid prior revisions until their replacement loads. */
-    fun select(visible: List<AvatarAssetFfi>) {
-        assets = visible.take(VISIBLE_GROUP_AVATAR_LIMIT).map { it.copy() }
-        retained = retained.filter { known -> assets.any { it.isRenderable() && sameSelection(it, known.asset) } }
-    }
-
-    /** Existing exact pins need neither a new preparation read nor a second retained bitmap map. */
-    fun hasExactRevision(selectedAsset: AvatarAssetFfi): Boolean =
-        retained.any { known ->
-            sameSelection(known.asset, selectedAsset) && known.asset.contentRevision == selectedAsset.contentRevision
-        }
-
-    /** Accepts exact loaded pixels only for a still-selected revision, with at most one image per selection. */
-    fun recordLoaded(
-        asset: AvatarAssetFfi,
-        image: ImageBitmap,
-    ) {
-        val current = assets.firstOrNull { it.isRenderable() && sameSelection(it, asset) }
-        if (current == null || accountRef == null || current.cacheKey(accountRef) != asset.cacheKey(accountRef)) return
-        val previous = retained.firstOrNull { sameSelection(it.asset, asset) }
-        if (previous?.asset == asset && previous.image === image) return
-        val classification =
-            AvatarImageLoader.cachedAnimationClassification(checkNotNull(asset.cacheKey(accountRef)))
-                ?: previous?.takeIf { it.asset.contentRevision == asset.contentRevision }?.animationClassification
-        retained = retained.filterNot { sameSelection(it.asset, asset) } +
-            PreparedAvatarImage(asset.copy(), image, classification)
-    }
-
-    /** Seeds only the revision these pixels actually depict; revision fallback remains a separate lookup. */
-    fun exactImages(): Map<String, ImageBitmap> =
-        retained
-            .mapNotNull { known -> accountRef?.let(known.asset::cacheKey)?.let { it to known.image } }
-            .toMap()
-
-    /** Target and selected reference jointly identify a drawable picture independently of content refresh. */
-    private fun sameSelection(
-        first: AvatarAssetFfi,
-        second: AvatarAssetFfi,
-    ): Boolean = first.target == second.target && first.reference == second.reference
 }
 
 /**
@@ -326,10 +354,7 @@ private fun retainedHandoff(
     Snapshot
         .withoutReadObservation { source?.pixels }
         ?.takeIf {
-            accountRef != null &&
-                it.accountRef == accountRef &&
-                it.runtimeGeneration == runtimeGeneration &&
-                it.lifetime == lifetime
+            accountRef != null && it.matchesOwner(accountRef, runtimeGeneration, lifetime)
         }
 
 private data class AvatarPixelPreparation(
@@ -341,15 +366,7 @@ private data class AvatarPixelPreparation(
 
 internal const val VISIBLE_GROUP_AVATAR_LIMIT = 16
 
-/** Lazy headers and banners do not count as rows when choosing the bounded avatar window. */
-internal fun <T> visibleGroupAvatarWindow(
-    rows: List<T>,
-    visibleKeys: Collection<Any>,
-    rowKey: (T) -> String,
-): List<T> {
-    val keys = visibleKeys.toHashSet()
-    val firstRow = rows.indexOfFirst { rowKey(it) in keys }.coerceAtLeast(0)
-    return rows.subList(firstRow, minOf(rows.size, firstRow + VISIBLE_GROUP_AVATAR_LIMIT))
-}
+// A viewport may prepare sixteen more. Recency is tracked by row, not encoded asset or bitmap data.
+internal const val RECENT_AVATAR_ROW_LIMIT = 32
 
 private const val LOCAL_GROUP_AVATAR_PREPARATION_BUDGET_MILLIS = 1_000L

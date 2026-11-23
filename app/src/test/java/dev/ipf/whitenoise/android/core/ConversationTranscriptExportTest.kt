@@ -469,7 +469,7 @@ class ConversationTranscriptExportTest {
         replyPreview = null,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = groupSystem,
         hasReports = false,

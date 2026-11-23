@@ -33,7 +33,7 @@ class ConversationRecipientConfirmationReplayTest {
                     "Delivery not confirmed",
                     TimelineProjector.invalidationWarning(controller.timelineRecords.getValue(ID)),
                 )
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(confirmed)))
+                controller.testApplyLiveTimelineChanges(listOf(upsert(confirmed)))
                 assertSettled(controller)
             }
             withSnapshot(page(confirmed)) { controller -> assertSettled(controller) }
@@ -66,7 +66,7 @@ class ConversationRecipientConfirmationReplayTest {
             val confirmed = receipt(failed).copy(recipientConfirmed = true, invalidationStatus = null)
             withSnapshot(page(confirmed)) { controller ->
                 assertSettled(controller)
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(failed)))
+                controller.testApplyLiveTimelineChanges(listOf(upsert(failed)))
                 val item = controller.timeline.single()
                 assertEquals(MessageStatus.Pending, item.status)
                 assertTrue(controller.awaitingDelivery(item))
@@ -91,7 +91,7 @@ class ConversationRecipientConfirmationReplayTest {
                 )
             withSnapshot(page(failed)) { controller ->
                 reactions.forEach { record ->
-                    controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(record)))
+                    controller.testApplyLiveTimelineChanges(listOf(upsert(record)))
                     val item = controller.timeline.single()
                     assertEquals(MessageStatus.Pending, item.status)
                     assertTrue(controller.awaitingDelivery(item))

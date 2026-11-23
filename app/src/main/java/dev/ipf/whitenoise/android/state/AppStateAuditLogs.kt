@@ -34,7 +34,11 @@ suspend fun WhiteNoiseAppState.prepareAuditLogArchiveForExport(): java.io.File? 
                 sourcePaths,
                 nativePerformanceLogBytes = nativePerformance,
             )
-        }.also { if (it == null) presentTransient(R.string.toast_no_audit_logs_to_export) }
+        }.also {
+            if (it == null) {
+                presentTransient(R.string.toast_no_audit_logs_to_export, kind = TransientNoticeKind.Information)
+            }
+        }
     }.getOrElse {
         present(R.string.toast_couldnt_export_audit_logs)
         return null
@@ -70,7 +74,7 @@ suspend fun WhiteNoiseAppState.deleteAuditLogs(): Boolean {
             presentTransient(R.string.toast_audit_logs_deleted)
             return true
         }
-        presentTransient(R.string.toast_no_audit_logs_to_delete)
+        presentTransient(R.string.toast_no_audit_logs_to_delete, kind = TransientNoticeKind.Information)
         return false
     }
     for (file in files) {

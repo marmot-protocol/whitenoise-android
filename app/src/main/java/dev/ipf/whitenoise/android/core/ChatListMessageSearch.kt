@@ -16,14 +16,18 @@ import java.util.Locale
 object ChatListMessageSearch {
     // Kinds whose plaintext body is user-authored conversation text and is
     // therefore searchable. Per the issue's scope decision: kind:1 (legacy
-    // note), kind:9 (chat), kind:1209 (agent stream final). Everything else --
-    // reactions (7), deletes (5), edits (1009), stream-start (1200), and
-    // group-system events (1210) -- is excluded so search never matches on
-    // machine-authored content or raw JSON the user never typed.
+    // note), kind:9 (chat), kind:1209 (agent stream final), plus kind:1111
+    // thread messages MDK places under a parent ([isThreadMessage]). Everything
+    // else -- reactions (7), deletes (5), edits (1009), group-system events
+    // (1210) and a kind 1111 without a parent -- is excluded so search never
+    // matches on machine-authored content or raw JSON the user never typed.
     private val SearchableBodyKinds: Set<ULong> = setOf(1uL, 9uL, 1209uL)
 
-    /** Whether records of [kind] are user-authored conversation text that search can list. */
-    fun isSearchableKind(kind: ULong): Boolean = kind in SearchableBodyKinds
+    /** Whether records of [kind] are user-authored conversation text that search can list, thread messages included. */
+    fun isSearchableKind(
+        kind: ULong,
+        inThread: Boolean = false,
+    ): Boolean = kind in SearchableBodyKinds || isThreadMessage(kind, inThread)
 
     /**
      * Whether a timeline record's body is eligible to match a chat-list
@@ -152,6 +156,10 @@ object ChatListMessageSearch {
         /** Human labels for the attachments (file name, else MIME type) for needle-less snippets. */
         val mediaLabels: List<String>
             get() = emptyList()
+
+        /** Whether MDK placed the row in a NIP-22 thread (its projected `thread` is set). */
+        val inThread: Boolean
+            get() = false
     }
 
     /**
@@ -172,7 +180,7 @@ object ChatListMessageSearch {
                 hasBody && bodyMatches(record.plaintext, ciNeedle, bodyScanLimit)
             }
         return !record.deleted &&
-            record.kind in SearchableBodyKinds &&
+            isSearchableKind(record.kind, record.inThread) &&
             needleSatisfied &&
             (constraints == null || constraints.matches(record))
     }

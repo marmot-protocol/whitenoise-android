@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppDivider.kt",
+  "legacy_sha256": "93d434e56b85ebbf9eaff59a5dba57e5b48211dc27af9c07a982dea34219b3dd",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AppDivider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppDivider.kt",
+        "anchor": "fun AppDivider(",
+        "test_ids": [
+          "AXY-001",
+          "GRP-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

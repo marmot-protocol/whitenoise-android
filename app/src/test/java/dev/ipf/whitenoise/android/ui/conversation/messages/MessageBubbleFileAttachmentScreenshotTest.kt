@@ -849,7 +849,7 @@ open class MessageBubbleFileAttachmentFixtures {
                     MessageAttachments.acceptedOutcomes(
                         attachments.map { (name, attachmentMediaType) -> fileReference(name, attachmentMediaType) },
                     ),
-                agentTextStreamJson = null,
+                thread = null,
                 poll = null,
                 groupSystem = null,
                 hasReports = false,
@@ -937,7 +937,8 @@ open class MessageBubbleFileAttachmentFixtures {
             kind = 9uL,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            replyToMessageIdHex = null,
+            thread = null,
             deleted = false,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,

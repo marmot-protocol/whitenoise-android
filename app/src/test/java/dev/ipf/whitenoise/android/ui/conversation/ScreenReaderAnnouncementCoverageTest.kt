@@ -4,9 +4,11 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.TimelineThreadRefFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.projectedTimelineMessage
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingPhase
 import dev.ipf.whitenoise.android.ui.conversation.composer.voiceRecordingAnnouncementRes
 import dev.ipf.whitenoise.android.ui.conversation.composer.voiceRecordingOpensLocked
@@ -20,9 +22,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Events a screen reader cannot see are spoken. A live append announces only new messages someone else sent, naming a
- * single sender and counting a burst; a replaced timeline or a reordered existing row announces nothing. The voice
- * recorder speaks only after the microphone is released, so nothing spoken lands in the take.
+ * Events a screen reader cannot see are spoken. A live append announces only new chat and thread messages someone else
+ * sent, naming a single sender and counting a burst; a replaced timeline or a reordered existing row announces
+ * nothing. The voice recorder speaks only after the microphone is released, so nothing spoken lands in the take.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -47,6 +49,20 @@ class ScreenReaderAnnouncementCoverageTest {
             resources.getString(R.string.conversation_new_message_from, "Bob"),
             conversationArrivalAnnouncement(arrivals, { "Bob" }, resources),
         )
+    }
+
+    /** A kind-1111 row MDK placed under a parent is announced like chat; a kind 1111 without a parent is not. */
+    @Test
+    fun appendAnnouncesThreadMessagesButNotParentlessComments() {
+        val comment = projectedTimelineMessage(row("comment", sender = "bob", kind = 1111uL).record)
+        val reply = projectedTimelineMessage(row("reply", sender = "bob", kind = 1111uL).record)
+        val thread = TimelineThreadRefFfi(rootMessageIdHex = "anchor", parentMessageIdHex = "anchor")
+        val placed = reply.copy(projected = reply.projected?.copy(thread = thread))
+        val timeline = listOf(row("anchor"), comment, placed)
+
+        val arrivals = conversationIncomingArrivals(timeline, "msg:anchor", emptySet()) { false }
+
+        assertEquals(listOf("reply"), arrivals.map { it.record.messageIdHex })
     }
 
     @Test

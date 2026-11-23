@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,6 +26,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
@@ -87,7 +87,7 @@ internal fun ProfileReadinessChecklist(readiness: ProfileReadiness) {
                 }
             }
             if (expanded && hasFields) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                AppDivider()
                 ProfileReadinessFields(readiness)
             }
         }

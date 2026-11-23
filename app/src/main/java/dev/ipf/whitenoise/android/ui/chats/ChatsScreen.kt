@@ -100,6 +100,7 @@ import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SystemFolderKind
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
@@ -132,7 +133,6 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
-import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
@@ -365,7 +365,10 @@ internal fun ChatsScreen(
                             directBatchResult = null
                             pendingStateBatch = null
                         } else if (previous == null) {
-                            appState.presentTransient(resources.getString(R.string.toast_couldnt_update_chat))
+                            appState.presentTransient(
+                                resources.getString(R.string.toast_couldnt_update_chat),
+                                kind = TransientNoticeKind.Information,
+                            )
                         }
                     } else {
                         directBatchResult = null
@@ -1412,7 +1415,7 @@ internal fun ChatsScreen(
                         ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
                         else -> R.string.chat_batch_order_failed
                     }
-                appState.presentTransient(resources.getString(message))
+                appState.presentTransient(resources.getString(message), kind = TransientNoticeKind.Information)
             }
         }
     }
@@ -2105,12 +2108,10 @@ internal fun ChatsScreen(
                         onOpenProfile = { npub ->
                             if (menuActionsCurrent()) presentProfileFromVisibleList(npub)
                         },
-                        onOpenActions = {
+                        onOpenActions = { touchX ->
                             if (menuActionsCurrent()) {
-                                val continuingHold =
-                                    actionMenuOwner.isCurrent(heldMenuToken[0]) &&
-                                        actionSheetChatId == rowId
-                                if (!continuingHold) actionMenuOwner.open(held = false)
+                                val held = heldMenuToken[0].takeIf { actionSheetChatId == rowId }
+                                actionMenuOwner.openAt(touchX, held)
                                 actionSheetChatId = rowId
                             }
                         },
@@ -2223,6 +2224,7 @@ internal fun ChatsScreen(
                                 }
                             },
                             expanded = actionSheetChatId == rowId,
+                            touchX = actionMenuOwner.touchX,
                             focusable = !actionMenuOwner.pointerHeld,
                             modifier = Modifier.testTag("chat.menu.$rowId"),
                             canRunAction = {
@@ -2508,6 +2510,7 @@ internal fun ChatsScreen(
                                         if (controller.chatListActionIsCurrent(owner)) {
                                             appState.presentTransient(
                                                 resources.getString(R.string.toast_chat_list_select_all_loaded_only),
+                                                kind = TransientNoticeKind.Information,
                                             )
                                         }
                                     }
@@ -2684,16 +2687,14 @@ internal fun ChatsScreen(
                                     preservePendingAnchor = preservePendingSearchAnchor,
                                 )
                         if (keepChatListMounted) {
-                            PreparedVisibleGroupAvatarContent(
+                            PreparedChatListAvatarContent(
                                 appState,
                                 visibleItems,
                                 chatListState,
                                 ::visibleRowId,
-                                { it.selectedAvatarAsset },
                                 accountRef = controller.boundAccountRef,
                                 surfaceIdentity = controller,
                                 retainedPreparation = retainedAvatarPreparation,
-                                compatibilityId = { it.group.groupIdHex },
                             ) {
                                 LazyColumn(
                                     modifier =
@@ -3011,14 +3012,6 @@ private sealed interface IdentifierResolution {
         val arg: String? = null,
     ) : IdentifierResolution
 }
-
-internal fun presentableIdentifierNpub(
-    resolvedAccountIdHex: String?,
-    npubForDisplay: (String) -> String,
-): String? =
-    resolvedAccountIdHex
-        ?.let(npubForDisplay)
-        ?.takeIf { it.startsWith("npub1") }
 
 /**
  * Inline chat-list search result for a pasted Nostr identifier (#344). Renders

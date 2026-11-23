@@ -33,10 +33,10 @@ import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.ProfilePictureDraftProcessor
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
-import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
 import dev.ipf.whitenoise.android.state.defaultDisappearingMessagesSeconds
@@ -198,7 +198,13 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
         val skipped = owner.takeSkippedMembers(submittedMembers, memberIds, appState::displayName)
         val title = createdGroupNoticeTitle(showCreatedToast, skipped)
         if (title != null) {
-            appState.presentConversationTransient(accountRef, groupIdHex, title, skipped)
+            appState.presentConversationTransient(
+                accountRef,
+                groupIdHex,
+                title,
+                skipped,
+                kind = if (skipped == null) TransientNoticeKind.Confirmation else TransientNoticeKind.Partial,
+            )
         }
         onCreateCompletedOpen(item, createRequestToken)
     }.onFailure {
@@ -207,17 +213,6 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
         onAuthoritativeReadFailed(it)
     }
 }
-
-/** Shows the skipped-recipient report even when opening needed a projection retry. */
-internal fun createdGroupNoticeTitle(
-    showCreatedToast: Boolean,
-    skipped: AppText?,
-): Int? =
-    when {
-        skipped != null -> R.string.toast_some_members_not_added
-        showCreatedToast -> R.string.toast_chat_created
-        else -> null
-    }
 
 /**
  * Same authoritative projection mapper, with a captured account and an IO-boundary owner check. Also returns the
@@ -556,7 +551,10 @@ private fun NewGroupSetupAccountScreen(
                 members =
                     members.map { member ->
                         GroupCreationPerson(
-                            member.copy(displayName = selectedMemberDisplayName(member, appState)),
+                            member.copy(
+                                displayName = selectedMemberDisplayName(member, appState),
+                                npub = appState.npubForDisplay(member.accountIdHex).ifBlank { member.npub },
+                            ),
                             appState.shortNpub(member.accountIdHex).takeIf { it.isNotBlank() },
                             selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
                         )

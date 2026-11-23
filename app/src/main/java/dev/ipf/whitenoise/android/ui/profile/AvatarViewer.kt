@@ -480,7 +480,7 @@ internal fun AvatarViewerFrame(
                     .statusBarsPadding()
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                     .padding(top = AVATAR_VIEWER_TOP_CONTROLS_HEIGHT),
-            snackbar = { SwipeDismissibleSnackbar(it) },
+            snackbar = { SwipeDismissibleSnackbar(it, overlayConfirmation = true) },
         )
     }
 }

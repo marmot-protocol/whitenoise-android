@@ -15,8 +15,6 @@ internal fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
         -> true
         TimelineUpdateTriggerFfi.NEW_MESSAGE,
         TimelineUpdateTriggerFfi.REPLY_PREVIEW_CHANGED,
-        TimelineUpdateTriggerFfi.AGENT_STREAM_STARTED,
-        TimelineUpdateTriggerFfi.AGENT_STREAM_FINISHED,
         TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
         // Typed agent, group-system, and custom-event updates do not mutate
         // reaction tallies, so they fall in the false bucket — kept explicit

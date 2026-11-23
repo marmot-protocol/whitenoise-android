@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
+import dev.ipf.whitenoise.android.ui.conversation.media.ReceivedVoiceTranscripts
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
@@ -142,7 +143,6 @@ import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -209,7 +209,6 @@ internal data class HostPerformanceRuntimeOwner(
 
 private fun openMarmotRuntime(context: Context) = MarmotClient(context).let { AppMarmotRuntime(it.rootPath, it.marmot) }
 
-private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
 private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
 private const val FORWARD_TERMINAL_STATUS_DURATION_MS = 2_000L
@@ -223,16 +222,6 @@ private val processNotificationCardCancellationDispatcher: CoroutineDispatcher b
             Thread(task, "wn-notification-cancel").apply { isDaemon = true }
         }.asCoroutineDispatcher()
 }
-
-internal fun appStateScopeExceptionHandler(
-    report: (Throwable) -> Unit = { throwable ->
-        if (BuildConfig.DEBUG) {
-            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
-        } else {
-            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure")
-        }
-    },
-): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
 
 private data class PendingAccountSwitchTrace(
     val accountRef: String,
@@ -291,18 +280,7 @@ class WhiteNoiseAppState private constructor(
             mutationsScope,
             onPhaseChange = { phase = it },
             awaitActivationReadiness = ::completeReceiverGatedStartup,
-        ) { runtime, account, isMountCurrent ->
-            if (!isMountCurrent()) throw CancellationException("Setup mount was replaced")
-            val reported = withContext(Dispatchers.IO) { amberSigner.requestPublicKey() }
-            withAccountLifetime {
-                if (!isMountCurrent() || marmot() !== runtime) throw CancellationException("Setup mount was replaced")
-                val canonical = withContext(Dispatchers.IO) { runtime.accountIdHex(reported) }
-                check(canonical == account) { "signer account does not match setup" }
-                withContext(Dispatchers.IO) {
-                    runtime.registerExternalSigner(account, amberSigner.buildSigner(account))
-                }
-            }
-        }
+        ) { runtime, account, isMountCurrent -> reconnectSetupSigner(runtime, account, isMountCurrent) }
     }
 
     /** Process-owned, bounded composer geometry keyed by account and conversation. */
@@ -454,7 +432,9 @@ class WhiteNoiseAppState private constructor(
         DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val swipePreferences = SwipePreferences(preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
+    internal val receivedVoiceTranscripts = ReceivedVoiceTranscripts()
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
+    internal val voiceNotes by lazy { createVoiceNoteSessionOwner() }
     private val dictationMicrophoneOwner = Any()
     private var initializedDictation by mutableStateOf<ConversationDictationController?>(null)
     internal val conversationDictation: ConversationDictationController
@@ -512,7 +492,9 @@ class WhiteNoiseAppState private constructor(
                     conversationDictationPreferences.current().silenceDeliveryMode
                 },
                 sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
-                onSendBlocked = { presentTransient(R.string.dictation_send_blocked) },
+                onSendBlocked = {
+                    presentTransient(R.string.dictation_send_blocked, kind = TransientNoticeKind.Information)
+                },
             ).also { initializedDictation = it }
         }
 
@@ -1347,7 +1329,10 @@ class WhiteNoiseAppState private constructor(
     /** Tests inject a scripted store; production seals push state in the Keystore-backed default. */
     private val pushTokenStore = pushTokenStoreOverride ?: PushTokenStore.create(appContext)
 
-    private val amberSigner = AmberSignerController(appContext)
+    internal val amberSigner = AmberSignerController(appContext)
+
+    /** Handles to this runtime's MDK-owned remote-signer sessions and their display status. */
+    internal val remoteSigners = RemoteSignerAccounts()
 
     /** Isolated sign-in tests replace only the signer round trip. */
     internal var amberPublicKeyRequest: () -> String = amberSigner::requestPublicKey
@@ -1381,7 +1366,7 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Developer-only streaming-debug toggle. When ON, the conversation renders
-     * agent-stream and MLS-signaling kinds as debug rows inline. Stored
+     * MLS-signaling and other non-chat kinds as debug rows inline. Stored
      * independently, but only takes effect through
      * [streamingDebugEnabled], which also requires [developerMode] — turning
      * developer mode off suppresses the debug rows without clearing this value.
@@ -1502,6 +1487,8 @@ class WhiteNoiseAppState private constructor(
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
 
+    internal val voiceNotePreferences = VoiceNotePreferences(preferences)
+
     internal val composerToolbarPreference by lazy {
         ComposerToolbarPreference(preferences, mutationsScope, hostPreferenceCommitMutex)
     }
@@ -1515,11 +1502,12 @@ class WhiteNoiseAppState private constructor(
     /** Queued-change size refusals already shown, so a redelivered refusal is not shown twice. Main thread only. */
     internal val shownQueuedSizeRefusals = ShownQueuedRefusals()
 
-    var transientNotice by mutableStateOf<TransientNotice?>(null)
-        private set
+    private val transientNotices = TransientNotices { NoticeOwner(activeAccountRef, runtimeGeneration) }
 
-    // staleness-exempt: monotonically unique notice identity, not an async publication fence.
-    private var transientNoticeSequence = 0L
+    val transientNotice: TransientNotice?
+        get() = transientNotices.transient
+
+    internal fun currentPartialNotice(): TransientNotice? = transientNotices.partial()
 
     /** Launch geometry belongs to this one profile presentation, never the next request. */
     internal var pendingProfileContour: dev.ipf.whitenoise.android.ui.settings.SettingsContour? = null
@@ -2435,10 +2423,15 @@ class WhiteNoiseAppState private constructor(
         var durablyAccepted = false
         return try {
             durablyAccepted =
-                sendConversationText(controller, request.payload, onAccepted = {
-                    pendingShown = true
-                    request.onPendingShown()
-                })
+                sendConversationText(
+                    controller,
+                    request.payload,
+                    onSendSettled = request.onTextSendSettled,
+                    onAccepted = {
+                        pendingShown = true
+                        request.onPendingShown()
+                    },
+                )
             if (!durablyAccepted && !pendingShown) rejectDictationDispatchBeforeTransport(request) else durablyAccepted
         } finally {
             if (!durablyAccepted && replyTarget != null && controller.replyingTo == null) {
@@ -2514,6 +2507,7 @@ class WhiteNoiseAppState private constructor(
         controller: ConversationController,
         text: String,
         onPresentationAccepted: (String) -> Unit = {},
+        onSendSettled: (durablyAccepted: Boolean) -> Unit = {},
         onAccepted: () -> Unit = {},
     ): Boolean {
         val pendingClear = captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
@@ -2530,11 +2524,13 @@ class WhiteNoiseAppState private constructor(
             onDurablyAccepted = {
                 durablyAccepted = true
                 pendingClear?.let(::clearDraftAfterSuccessfulSend)
+                onSendSettled(true)
             },
             onTerminalFailure = {
                 if (accepted && !durablyAccepted) {
                     pendingClear?.let(composerDraftExpansionBridge::restoreAfterTerminalFailure)
                 }
+                onSendSettled(false)
             },
         )
         return durablyAccepted
@@ -4505,7 +4501,7 @@ class WhiteNoiseAppState private constructor(
      * Pending setup keeps its route; only a completed activation receipt can announce an imported identity.
      * An import that started without a runtime fails its ownership check like any native call.
      */
-    private suspend fun activateImportedIdentity(
+    internal suspend fun activateImportedIdentity(
         summary: AccountSummaryFfi,
         expectedRuntime: MarmotInterface?,
         expectedEpoch: Int,
@@ -4597,15 +4593,17 @@ class WhiteNoiseAppState private constructor(
                 }
             if (snapshot != null) {
                 requireRuntime()
+                rememberRemoteSignerAccount(pubkeyHex, remote = false)
                 accountSetup.open(snapshot, runtime, epoch) { accountSession.handoff.isCurrent(selection) }
                 return
             }
             val summary = loginAmberFallback(runtime, pubkeyHex, ::requireRuntime)
+            rememberRemoteSignerAccount(pubkeyHex, remote = false)
             activateImportedIdentity(summary, runtime, epoch, selection)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             if (error is MarmotKitException.ExternalSignerRejected) {
-                presentTransient(R.string.toast_amber_sign_in_cancelled)
+                presentTransient(R.string.toast_amber_sign_in_cancelled, kind = TransientNoticeKind.Information)
             } else {
                 appStateDebug(error) { "amber login failed: ${error.readableMessage()}" }
                 presentFailure(
@@ -4652,24 +4650,6 @@ class WhiteNoiseAppState private constructor(
             }
         }
         return summary
-    }
-
-    /**
-     * Re-install the NIP-55 signer callback for every external-signing account
-     * after an engine (re)start. MDK persists only the account pubkey for these
-     * accounts, so the `ExternalAccountSignerFfi` must be re-registered before
-     * any signing happens. Best-effort per account: a failure (e.g. Amber
-     * uninstalled) is logged and leaves the account intact rather than aborting
-     * bootstrap; that account's signing will later surface a typed error.
-     */
-    private suspend fun reregisterExternalSigners() {
-        accounts.filter { it.externalSigning }.forEach { account ->
-            runCatchingCancellable {
-                marmotIo { registerExternalSigner(account.label, amberSigner.buildSigner(account.accountIdHex)) }
-            }.onFailure {
-                appStateDebug(it) { "external signer re-register failed for ${account.label.take(8)}: ${it.readableMessage()}" }
-            }
-        }
     }
 
     /** Publishes the newest engine account snapshot and rejects older list reads. */
@@ -5599,6 +5579,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
     private fun clearSignedOutAccountMemory(account: String) {
+        receivedVoiceTranscripts.forgetAccount(account)
         attachmentCollections.forgetAccount(account)
         composerExpansionStateRetention.removeAccount(account)
         composerDraftExpansionBridge.removeAccount(account)
@@ -5606,7 +5587,7 @@ class WhiteNoiseAppState private constructor(
         notificationReplyDraftHandoff.removeAccount(account)
         draftWriter.removeAccount(account)
         forgetStickers(account)
-        conversationDictation.onAccountUnavailable(account)
+        releaseCaptureOwners(account)
         stopTtsForRemovedAccount(account)
     }
 
@@ -5651,9 +5632,11 @@ class WhiteNoiseAppState private constructor(
         wipedShareAccount: String?,
     ): AccountWipeCompletion? {
         val inView = activeAccountRef
+        val wipedAccountId = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         val retireSession = inView == wipedRef || (inView == null && accounts.none { it.label != wipedRef })
         if (!prepareSharedPlaintextWipe(wipedRef, retireSession)) return null
-        conversationDictation.onAccountUnavailable(wipedRef)
+        receivedVoiceTranscripts.forgetAccount(wipedRef)
+        releaseCaptureOwners(wipedRef)
         if (retireSession) clearInMemoryMediaCaches()
         try {
             val restartNotifications = retireSession && prepareForDestructiveAccountWipe(wipedRef)
@@ -5662,6 +5645,7 @@ class WhiteNoiseAppState private constructor(
                     runCatching { marmotIo { signOutAndWipe(wipedRef) } }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
+                                wipedAccountId?.let { rememberRemoteSignerAccount(it, remote = false) }
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
                                 runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
@@ -5795,27 +5779,8 @@ class WhiteNoiseAppState private constructor(
         accountListLoaded = result.isSuccess
     }
 
-    /** Commits one host preference transaction off-main and times actual durable completion. */
-    @Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
     private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) {
-        val attempt = beginHostPerformance(HostPerformanceOperationFfi.SETTINGS_SAVE)
-        val editor =
-            try {
-                preferences.edit().apply(edit)
-            } catch (throwable: Throwable) {
-                attempt.failure()
-                throw throwable
-            }
-        mutationsScope
-            .launch {
-                hostPreferenceCommitMutex.withLock {
-                    withContext(Dispatchers.IO) {
-                        completeHostPreferenceCommit(attempt, editor::commit)
-                    }
-                }
-            }.invokeOnCompletion { cause ->
-                if (cause is CancellationException) attempt.cancel()
-            }
+        persistHostSetting(preferences, hostPreferenceCommitMutex, edit)
     }
 
     fun updateDeveloperMode(enabled: Boolean) {
@@ -5990,10 +5955,7 @@ class WhiteNoiseAppState private constructor(
                                             }
                                         }
                                     }
-                                    if (revision == fontScaleSaveRevision) {
-                                        fontScale = durableFontScale
-                                        if (commitAttempted) presentTransient(R.string.font_size_save_failed)
-                                    }
+                                    restoreDurableFontScaleIfCurrent(revision, reportFailure = commitAttempted)
                                 }
                                 reconciled = true
                             }
@@ -6004,7 +5966,7 @@ class WhiteNoiseAppState private constructor(
                         // Cancellation before acquiring the mutex must wait for prior saves to settle.
                         withContext(NonCancellable) {
                             hostPreferenceCommitMutex.withLock {
-                                if (revision == fontScaleSaveRevision) fontScale = durableFontScale
+                                restoreDurableFontScaleIfCurrent(revision, reportFailure = false)
                             }
                         }
                     }
@@ -6012,6 +5974,17 @@ class WhiteNoiseAppState private constructor(
             }.invokeOnCompletion { cause ->
                 if (cause is CancellationException) attempt.cancel()
             }
+    }
+
+    private fun restoreDurableFontScaleIfCurrent(
+        revision: Long,
+        reportFailure: Boolean,
+    ) {
+        if (revision != fontScaleSaveRevision) return
+        fontScale = durableFontScale
+        if (reportFailure) {
+            presentTransient(R.string.font_size_save_failed, kind = TransientNoticeKind.Information)
+        }
     }
 
     fun updateAppFont(font: AppFont) {
@@ -6618,6 +6591,7 @@ class WhiteNoiseAppState private constructor(
         } else {
             appLock.onAppBackgrounded()
             conversationDictation.onAppBackgrounded()
+            voiceNotes.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
             appLock.scheduleTtsStopAtLockBoundary()
         }
@@ -6669,6 +6643,7 @@ class WhiteNoiseAppState private constructor(
     fun onTaskRemoved() {
         updateNotificationSuppression(suppression.onTaskRemoved())
         conversationDictation.onTaskRemoved()
+        voiceNotes.onAppBackgrounded()
         // The app-state lifecycle is authoritative even if the TTS foreground
         // service has not started yet or its start was rejected.
         stopSpeaking()
@@ -7580,7 +7555,7 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ) {
-        if (accountRef != null) conversationDictation.onTargetRemoved(accountRef, groupIdHex)
+        if (accountRef != null) releaseCaptureTarget(accountRef, groupIdHex)
         val key = groupMemberSnapshotKey(accountRef, groupIdHex) ?: return
         val activeAccountIdHex = activeAccount?.accountIdHex
         synchronized(groupMemberSnapshotLock) {
@@ -8019,15 +7994,17 @@ class WhiteNoiseAppState private constructor(
     fun presentTransient(
         @StringRes titleRes: Int,
         detail: AppText? = null,
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
     ) {
-        presentTransient(AppText.Resource(titleRes), detail)
+        presentTransient(AppText.Resource(titleRes), detail, kind)
     }
 
     fun presentTransient(
         title: AppText,
         detail: AppText? = null,
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
     ) {
-        setTransientNotice(title, detail)
+        transientNotices.publish(title, detail, kind)
     }
 
     fun presentConversationTransient(
@@ -8035,42 +8012,29 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         @StringRes titleRes: Int,
         detail: AppText? = null,
-    ): TransientNotice = presentConversationTransient(accountRef, groupIdHex, AppText.Resource(titleRes), detail)
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
+    ): TransientNotice = presentConversationTransient(accountRef, groupIdHex, AppText.Resource(titleRes), detail, kind)
 
     fun presentConversationTransient(
         accountRef: String,
         groupIdHex: String,
         title: AppText,
         detail: AppText? = null,
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
     ): TransientNotice =
-        setTransientNotice(
+        transientNotices.publish(
             title = title,
             detail = detail,
             conversation = ConversationNoticeDestination(accountRef, groupIdHex),
+            kind = kind,
         )
-
-    private fun setTransientNotice(
-        title: AppText,
-        detail: AppText? = null,
-        conversation: ConversationNoticeDestination? = null,
-    ): TransientNotice {
-        transientNoticeSequence += 1L
-        val notice =
-            TransientNotice(
-                id = transientNoticeSequence,
-                title = title,
-                detail = detail,
-                conversation = conversation,
-            )
-        transientNotice = notice
-        return notice
-    }
 
     fun presentTransient(
         title: String,
         detail: String? = null,
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
     ) {
-        presentTransient(AppText.Plain(title), detail?.let(AppText::Plain))
+        presentTransient(AppText.Plain(title), detail?.let(AppText::Plain), kind)
     }
 
     /** Retire only the toast observed by the caller, preserving a newer notice. */
@@ -8078,9 +8042,7 @@ class WhiteNoiseAppState private constructor(
         if (toast === notice) toast = null
     }
 
-    fun clearTransientNotice(notice: TransientNotice? = transientNotice) {
-        if (transientNotice === notice) transientNotice = null
-    }
+    fun clearTransientNotice(notice: TransientNotice? = transientNotice) = transientNotices.dismiss(notice)
 
     private suspend fun configurePrivacyRuntime() {
         runCatchingCancellable {

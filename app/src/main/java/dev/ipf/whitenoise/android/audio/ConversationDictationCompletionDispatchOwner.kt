@@ -126,6 +126,11 @@ internal class ConversationDictationCompletionDispatchOwner(
         val (sessionId, target, request) = context
         val admissionTarget = context.admissionTarget
         return request.copy(
+            onTextSendSettled = { durablyAccepted ->
+                val outcome = if (durablyAccepted) "durably_accepted" else "terminal_failure"
+                // The next dictation may already be active when this transport finishes.
+                conversationDictationDiagnostic("event=send_outcome outcome=$outcome session=$sessionId")
+            },
             beginDispatch = {
                 if (dispatchClaim !== claim ||
                     guards.currentSessionId() != sessionId ||

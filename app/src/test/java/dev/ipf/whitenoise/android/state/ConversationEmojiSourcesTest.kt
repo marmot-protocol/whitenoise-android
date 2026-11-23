@@ -113,7 +113,7 @@ class ConversationEmojiSourcesTest {
             replyPreview = null,
             mediaJson = null,
             media = MessageAttachments.acceptedOutcomes(listOf(reference)),
-            agentTextStreamJson = null,
+            thread = null,
             poll = null,
             groupSystem = null,
             hasReports = false,

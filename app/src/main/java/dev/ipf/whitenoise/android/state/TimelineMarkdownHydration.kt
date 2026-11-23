@@ -13,8 +13,8 @@ private typealias HeldRecords = Map<String, TimelineMessageRecordFfi>
 
 /**
  * Parse [text] into the same Markdown AST the Rust core attaches to projected
- * records, for the state Android synthesizes locally (optimistic sends,
- * finished agent streams, chat-list previews). `parseMarkdown` is a blocking
+ * records, for the state Android synthesizes locally (optimistic sends and
+ * chat-list previews). `parseMarkdown` is a blocking
  * FFI call, so it rides [WhiteNoiseAppState.marmotIo]'s IO hop. Any failure
  * degrades to an empty document, which renders as plain text.
  */

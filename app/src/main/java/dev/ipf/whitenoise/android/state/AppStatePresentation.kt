@@ -148,11 +148,18 @@ data class ToastMessage(
     val localDeleteNotice: LocalDeleteNotice? = null,
 )
 
+enum class TransientNoticeKind {
+    Confirmation,
+    Information,
+    Partial,
+}
+
 data class TransientNotice(
     val id: Long,
     val title: AppText,
     val detail: AppText? = null,
     val conversation: ConversationNoticeDestination? = null,
+    val kind: TransientNoticeKind = TransientNoticeKind.Information,
 )
 
 data class ConversationNoticeDestination(
@@ -191,13 +198,11 @@ internal fun refreshedProfilePresentation(
     rawDisplayName: String?,
 ): ProfilePresentation {
     val refreshedDisplayName =
-        ProfileSanitizer.displayName(
-            if (profile != null) {
-                profile.displayName ?: profile.name
-            } else {
-                rawDisplayName
-            },
-        )
+        if (profile != null) {
+            ProfileSanitizer.displayName(profile.displayName ?: profile.name)
+        } else {
+            mdkFallbackDisplayName(rawDisplayName)
+        }
     return ProfilePresentation(
         displayName =
             if (profile != null) {

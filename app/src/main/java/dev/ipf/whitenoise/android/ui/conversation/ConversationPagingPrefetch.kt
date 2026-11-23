@@ -25,9 +25,9 @@ internal fun olderPagingRequests(readDemand: () -> ConversationOlderPagingDemand
  * The message a conversation list item key stands for, or null when the row is not an authoritative
  * message.
  *
- * Keys are the projected item ids: `msg:<hex>` for an ordinary row and `stream:<id>` for an agent
- * stream. Only a real message id may be reported to MDK as the window anchor — an optimistic row
- * carries a local id the engine never issued, and headers and dividers carry no message at all.
+ * Keys are the projected item ids, `msg:<hex>`. Only a real message id may be reported to MDK as the
+ * window anchor — an optimistic row carries a local id the engine never issued, and headers and
+ * dividers carry no message at all.
  */
 internal fun conversationAnchorMessageId(key: Any?): String? =
     (key as? String)

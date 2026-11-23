@@ -1,66 +1,48 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 
 /**
- * Hold-to-record voice button. Press → start; release inside the button
- * bounds → stop and review. Drag the finger outside the button before
- * releasing → cancel. The cancel threshold is `cancelThresholdPx` away
- * from the down position; the gesture stays as a pointerInput input so
- * Compose doesn't fight us for the up event.
+ * Hold-to-record voice button. Press → start; release → stop and review.
+ * Slide 120dp toward the far side of the composer and release → cancel;
+ * slide 80dp up → lock, so the take continues hands-free. A tap starts a
+ * locked take. The gesture stays as a pointerInput input so Compose doesn't
+ * fight us for the up event.
  */
 @Composable
 internal fun MicHoldButton(
@@ -99,7 +81,12 @@ internal fun MicHoldButton(
                     .width(slotWidth)
                     .height(48.dp)
                     .semantics { contentDescription = label }
-                    .pointerInput(controller) {
+                    .onGloballyPositioned { coordinates ->
+                        // Cancel lies across the composer from the microphone, in either layout direction.
+                        val center = coordinates.positionInRoot().x + coordinates.size.width / 2f
+                        val rootWidth = coordinates.findRootCoordinates().size.width
+                        controller.hold.aimCancel(if (center > rootWidth / 2f) -1f else 1f)
+                    }.pointerInput(controller) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             if (!latestCanStart()) return@awaitEachGesture
@@ -112,6 +99,8 @@ internal fun MicHoldButton(
                             // already handled stop/review/cancel.
                             down.consume()
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            var displacement = Offset.Zero
+                            var moved = false
                             var canceled = false
                             var locked = false
                             var terminated = false
@@ -119,45 +108,50 @@ internal fun MicHoldButton(
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull { it.id == down.id }
-                                    if (change == null) {
-                                        // Parent stole the pointer — cancel rather than orphan the recorder.
-                                        controller.cancel()
-                                        terminated = true
-                                        break
-                                    }
+                                    if (change == null || (!change.pressed && change.isConsumed)) break
                                     change.consume()
-                                    val deltaX = change.position.x - down.position.x
-                                    val deltaY = change.position.y - down.position.y
+                                    displacement += change.position - change.previousPosition
+                                    val deltaX = displacement.x
+                                    val deltaY = displacement.y
+                                    moved = moved || displacement.getDistance() > viewConfiguration.touchSlop
                                     controller.updateDrag(deltaX, deltaY, cancelThresholdPx, lockThresholdPx)
-                                    if (!locked && -deltaY > lockThresholdPx && -deltaX <= cancelThresholdPx) {
+                                    val towardCancel = controller.hold.cancelTravel(deltaX)
+                                    if (!locked && -deltaY > lockThresholdPx && towardCancel <= cancelThresholdPx) {
                                         locked = true
                                         haptics.performHapticFeedback(
-                                            HapticFeedbackType.LongPress,
+                                            HapticFeedbackType.Confirm,
                                         )
                                         controller.lock()
                                         terminated = true
                                         return@awaitEachGesture
                                     }
-                                    if (!canceled && -deltaX > cancelThresholdPx) {
+                                    if (!canceled && towardCancel > cancelThresholdPx) {
                                         canceled = true
                                         haptics.performHapticFeedback(
-                                            HapticFeedbackType.LongPress,
+                                            HapticFeedbackType.Reject,
                                         )
-                                    } else if (canceled && -deltaX <= cancelThresholdPx) {
+                                    } else if (canceled && towardCancel <= cancelThresholdPx) {
                                         canceled = false
                                     }
-                                    if (change.changedToUp() || !change.pressed) {
-                                        if (canceled) controller.cancel() else controller.stop()
+                                    if (!change.pressed) {
+                                        val duration = change.uptimeMillis - down.uptimeMillis
+                                        val heldLongEnough = duration >= viewConfiguration.longPressTimeoutMillis
+                                        when {
+                                            canceled -> controller.cancel()
+                                            heldLongEnough -> controller.stopHeld()
+                                            moved -> controller.stop()
+                                            else -> controller.lock()
+                                        }
                                         terminated = true
                                         break
                                     }
                                 }
                             } finally {
                                 // Composable removal / coroutine cancellation while still
-                                // recording-unlocked → cancel cleanly instead of letting
-                                // the recorder tick to the MAX_RECORDING_MS auto-stop.
+                                // recording-unlocked (leaving the chat mid-hold) keeps the
+                                // take as this chat's draft instead of orphaning the recorder.
                                 if (!terminated && controller.isRecording && !controller.locked) {
-                                    controller.cancel()
+                                    controller.interrupt()
                                 }
                             }
                         }
@@ -199,165 +193,6 @@ internal fun MiniWaveformGlyph(
             )
         }
     }
-}
-
-/** Leading part of the recording strip: the pulsing microphone glyph. */
-@Composable
-internal fun RecordingStripLeading(
-    controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
-    modifier: Modifier = Modifier,
-) {
-    val pulseScale by rememberInfiniteRecordingPulse()
-    val canceling = controller.willCancel
-    val locked = controller.locked
-    val paused = controller.isPaused
-    val cancelTint = MaterialTheme.colorScheme.error
-    val nearLimit = controller.isNearLimit
-    val remainingForDisplay = ((controller.remainingMs + 999L) / 1000L) * 1000L
-    val timing = formatRecordingDuration(if (nearLimit) remainingForDisplay else controller.elapsedMs)
-    val timerLabel = stringResource(R.string.voice_recording_stops_in, timing)
-
-    Row(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(
-            painterResource(R.drawable.ic_delete),
-            contentDescription = null,
-            tint = if (canceling) cancelTint else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .size(10.dp)
-                    .graphicsLayer {
-                        val scale = if (paused) 1f else pulseScale
-                        scaleX = scale
-                        scaleY = scale
-                    }.clip(CircleShape)
-                    .background(
-                        if (paused) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                    ),
-        )
-        Text(
-            timing,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (canceling || nearLimit) cancelTint else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = if (nearLimit) Modifier.clearAndSetSemantics { contentDescription = timerLabel } else Modifier,
-        )
-        Spacer(Modifier.weight(1f))
-        if (paused) {
-            // Another in-app sound took the microphone's focus: the take is
-            // held in place and only continues when the user asks.
-            // Compose extends this compact target's hit area to the 48dp minimum.
-            Text(
-                stringResource(R.string.voice_recording_resume),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier =
-                    Modifier
-                        .testTag("composer.voice.resume")
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable(role = Role.Button) { controller.resume() }
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-        } else if (locked && !nearLimit) {
-            // Locked: the user has handed off control. The hint copy
-            // collapses to a compact "Locked" indicator so the row stays
-            // visually quiet while the trailing Stop+Trash do the work.
-            Icon(
-                painterResource(R.drawable.ic_lock),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp),
-            )
-            Text(
-                stringResource(R.string.voice_message_locked),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        } else if (!nearLimit) {
-            Icon(
-                painterResource(R.drawable.ic_arrow_back),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.size(14.dp),
-            )
-            Text(
-                stringResource(R.string.voice_message_release_to_review),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun LockHintAbove(
-    controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
-    modifier: Modifier = Modifier,
-) {
-    if (controller.locked || !controller.isRecording) return
-    val density = LocalDensity.current
-    val rawDp = with(density) { (-controller.verticalOffsetPx).toDp() }
-    val rise = rawDp.value.coerceIn(0f, 80f).dp
-    val armed = controller.willLock
-    Box(
-        modifier =
-            modifier
-                .offset(y = -rise - 56.dp)
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(
-                    if (armed) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            painterResource(R.drawable.ic_lock),
-            contentDescription = null,
-            tint =
-                if (armed) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            modifier = Modifier.size(18.dp),
-        )
-    }
-}
-
-@Composable
-internal fun rememberInfiniteRecordingPulse(): State<Float> {
-    // With animations off the dot rests at its 10 dp base size instead of the 1.6x peak Compose would park it on.
-    if (!rememberSystemAnimationsEnabled()) return remember { mutableFloatStateOf(1f) }
-    val transition = rememberInfiniteTransition(label = "rec-pulse")
-    return transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.6f,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = 700, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-        label = "rec-pulse-scale",
-    )
 }
 
 internal fun formatRecordingDuration(elapsedMs: Long): String {

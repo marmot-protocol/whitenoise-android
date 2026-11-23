@@ -19,6 +19,15 @@
           "PRO-001",
           "ACC-019"
         ]
+      },
+      {
+        "surface": "Profile QR expanding public key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "CopyablePublicKey(",
+        "test_ids": [
+          "PRO-001",
+          "ACC-019"
+        ]
       }
     ],
     "settings_controls": [
@@ -53,23 +62,6 @@
         "surface": "profile-qr:string:share_profile_url",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
         "anchor": "R.string.share_profile_url",
-        "test_ids": [
-          "PRO-001",
-          "ACC-019"
-        ]
-      },
-      {
-        "surface": "Full public key caption: R.string.public_key",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
-        "anchor": "R.string.public_key",
-        "test_ids": [
-          "ACC-019"
-        ]
-      },
-      {
-        "surface": "profile-qr:string:copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
-        "anchor": "R.string.copied",
         "test_ids": [
           "PRO-001",
           "ACC-019"
