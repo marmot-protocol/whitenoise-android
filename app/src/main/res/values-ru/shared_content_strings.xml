@@ -16,4 +16,18 @@
     <string name="shared_content_partial">Подходящие вложения ещё не загружены</string>
     <string name="shared_content_page_failed">Не удалось загрузить общие материалы. Повторите попытку.</string>
     <string name="shared_content_history_end">Конец локальной истории вложений</string>
+    <plurals name="shared_media_photos_selected_count">
+        <item quantity="one">Выбрано фото: %1$d</item>
+        <item quantity="few">Выбрано фото: %1$d</item>
+        <item quantity="many">Выбрано фото: %1$d</item>
+        <item quantity="other">Выбрано фото: %1$d</item>
+    </plurals>
+    <string name="shared_media_select_photo">Выбрать фото</string>
+    <string name="shared_media_cancel_selection">Отменить выбор</string>
+    <string name="shared_media_share_selected_photos">Поделиться выбранными фото</string>
+    <string name="shared_media_photo_from">Фото от %1$s</string>
+    <string name="shared_media_video_not_selectable">Видео, выбрать нельзя</string>
+    <string name="shared_media_share_photos_failed">Не удалось поделиться фото</string>
+    <string name="shared_media_share_photos_unavailable">Некоторые выбранные фото больше недоступны, поэтому ничего не отправлено. Выбор с них снят. Попробуйте ещё раз.</string>
+    <string name="shared_media_share_photos_too_large">Эти фото слишком большие, чтобы поделиться ими вместе. Выберите меньше и попробуйте ещё раз.</string>
 </resources>

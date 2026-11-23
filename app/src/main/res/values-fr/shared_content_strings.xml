@@ -14,4 +14,16 @@
     <string name="shared_content_partial">Aucune pièce jointe correspondante chargée</string>
     <string name="shared_content_page_failed">Impossible de charger le contenu partagé. Réessayez.</string>
     <string name="shared_content_history_end">Fin des pièces jointes locales</string>
+    <plurals name="shared_media_photos_selected_count">
+        <item quantity="one">%1$d photo sélectionnée</item>
+        <item quantity="other">%1$d photos sélectionnées</item>
+    </plurals>
+    <string name="shared_media_select_photo">Sélectionner la photo</string>
+    <string name="shared_media_cancel_selection">Annuler la sélection</string>
+    <string name="shared_media_share_selected_photos">Partager les photos sélectionnées</string>
+    <string name="shared_media_photo_from">Photo de %1$s</string>
+    <string name="shared_media_video_not_selectable">Vidéo, impossible à sélectionner</string>
+    <string name="shared_media_share_photos_failed">Impossible de partager les photos</string>
+    <string name="shared_media_share_photos_unavailable">Certaines photos sélectionnées ne sont plus disponibles, rien n’a donc été partagé. Elles ont été désélectionnées. Réessayez.</string>
+    <string name="shared_media_share_photos_too_large">Ces photos sont trop volumineuses pour être partagées ensemble. Sélectionnez-en moins et réessayez.</string>
 </resources>
