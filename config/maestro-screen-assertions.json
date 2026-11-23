@@ -1985,7 +1985,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
       "symbol": "NostrVideoPlayerDialog",
       "bindings": [
         {
