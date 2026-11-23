@@ -841,9 +841,9 @@ private fun SettingsProfileRow(
                 account.npub,
                 Modifier
                     .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
-                    .padding(bottom = WhiteNoiseSpacing.Related)
+                    .padding(bottom = SettingsHomeDefaults.ProfileKeyBottomInset)
                     .testTag("settings.active_profile_public_key"),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 keyboardFocusable = true,
             )
@@ -929,5 +929,6 @@ private fun SignOutGroup(onSignOut: () -> Unit) {
 /** Sizes the Settings home fixes independently of the row components. */
 private object SettingsHomeDefaults {
     val ProfileAvatarSize = 56.dp
+    val ProfileKeyBottomInset = 12.dp
     val IconSize = 24.dp
 }
