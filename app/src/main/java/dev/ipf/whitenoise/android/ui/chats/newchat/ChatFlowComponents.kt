@@ -125,7 +125,8 @@ internal fun FlowSearchField(
  * Renders a reusable person row while keeping relationship and selection states independent.
  *
  * [isFollowed] adds the followed-person avatar badge and exports the localized `You follow`
- * state once from the row; a row naming its person as [followedAccount] gets both while the active account follows them. [selectionState] remains separate so multi-select pickers can expose
+ * state once from the row; a row naming its person as [followedAccount] gets both while the
+ * active account follows them. [selectionState] remains separate so multi-select pickers can expose
  * selected and followed at the same time without making the badge look like a selection control.
  * [avatarAnimationKey] lets a stored person picture in [avatarImage] animate under the profile policy.
  * [avatarDomain] is the worker domain that decodes [avatarUrl], single-use unless the caller names one: a person

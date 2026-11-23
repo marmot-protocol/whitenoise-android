@@ -41,7 +41,9 @@ internal fun ChatRowAvatar(
     pinned: Boolean,
     onOpenProfile: (String) -> Unit,
 ) {
-    ChatRowAvatarMarkers(openableDmAvatarAccount, pinned) {
+    // Follows belong to the active account; a row listed for another account (the forward picker) gets no badge.
+    val followedAccount = openableDmAvatarAccount?.takeIf { accountRef == appState.activeAccountRef }
+    ChatRowAvatarMarkers(followedAccount, pinned) {
         Box(
             modifier =
                 if (profileTapEnabled && openableDmAvatarAccount != null) {

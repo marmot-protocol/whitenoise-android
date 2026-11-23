@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.HowToReg
@@ -84,8 +85,10 @@ internal fun rememberFollowedPeople(appState: WhiteNoiseAppState): FollowedPeopl
     var followed by remember(accountRef) { mutableStateOf(FollowedPeople.None) }
     var foregroundCount by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_START) { foregroundCount++ }
-    LaunchedEffect(accountRef, ownAccountIdHex) {
-        if (accountRef == null) return@LaunchedEffect
+    // The native runtime is readable only once the app is ready, and a restarted runtime is read afresh.
+    val ready = appState.phase == AppPhase.Ready
+    LaunchedEffect(accountRef, ownAccountIdHex, ready, appState.runtimeGeneration) {
+        if (accountRef == null || !ready) return@LaunchedEffect
         var readRelationship: Long? = null
         var readForeground: Int? = null
         snapshotFlow {
