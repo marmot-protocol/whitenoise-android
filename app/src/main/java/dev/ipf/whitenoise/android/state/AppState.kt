@@ -1497,8 +1497,11 @@ class WhiteNoiseAppState private constructor(
     var toast by mutableStateOf<ToastMessage?>(null)
         private set
 
-    /** Group-change notices already shown, so a change MDK reports again is not shown twice. Main thread only. */
+    /** Group-change notices already seen, so a change MDK reports again is not shown twice. Main thread only. */
     internal val shownGroupChangeNotices = ShownQueuedRefusals()
+
+    /** Group-change notices on screen and not yet seen, by account and change ID. Main thread only. */
+    internal val showingGroupChangeNotices = mutableSetOf<String>()
 
     var transientNotice by mutableStateOf<TransientNotice?>(null)
         private set

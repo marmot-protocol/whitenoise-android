@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.EventSizeClassFfi
@@ -10,7 +11,10 @@ import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -84,6 +88,7 @@ class GroupChangeNoticeTest {
     fun upkeepChangesAreSilent() {
         assertNull(groupChangeNotice(notDelivered("self_update", "not_delivered")))
         assertNull(groupChangeNotice(notDelivered("add_own_account_devices", "refused")))
+        assertNull(groupChangeNotice(notDelivered("self_update", QUEUED_INTENT_REFUSED_TOO_LARGE)))
     }
 
     /** A replaced commit tells the user unless MDK sent it again; one another change already made says so instead. */
@@ -139,28 +144,61 @@ class GroupChangeNoticeTest {
         assertEquals(size.reason to null, groupChangeToast(null, size))
     }
 
-    /** The active account sees the notice; with no chat-list title it shows what happened over why. */
+    /** The active account sees the notice until its snackbar retires it; with no chat title it shows what over why. */
     @Test
-    fun activeAccountSeesTheNotice() {
-        val state = appState(active = ACCOUNT)
-        val notice = groupChangeNotice(notDelivered("invite", "not_delivered"))!!
-        assertTrue(state.presentGroupChangeNotice(notice))
-        assertEquals(notice.headline, state.toast?.title)
-        assertEquals(notice.reason, state.toast?.detail)
-    }
+    fun activeAccountSeesTheNoticeUntilItsSnackbarEnds() =
+        runBlocking {
+            val state = appState(active = ACCOUNT)
+            val notice = groupChangeNotice(notDelivered("invite", "not_delivered"))!!
+            val seen = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(notice) }
+            assertEquals(notice.headline, state.toast?.title)
+            assertEquals(notice.reason, state.toast?.detail)
+            assertFalse(seen.isCompleted)
+            retireToast(state)
+            assertTrue(seen.await())
+        }
 
-    /** A change MDK reports again is shown once; a different change still shows. */
+    /** A toast that replaces the notice before it is seen is waited out, and the notice shows again after it. */
     @Test
-    fun repeatedChangeIsShownOnce() {
-        val state = appState(active = ACCOUNT)
-        val notice = groupChangeNotice(refusal(OversizedArtifactFfi.COMMIT))!!
-        assertTrue(state.presentGroupChangeNotice(notice))
-        state.clearToast()
-        assertFalse(state.presentGroupChangeNotice(groupChangeNotice(refusal(OversizedArtifactFfi.COMMIT))!!))
-        assertNull(state.toast)
-        assertTrue(state.presentGroupChangeNotice(notice.copy(changeIdHex = "12".repeat(32))))
-        assertEquals(notice.reason, state.toast?.title)
-    }
+    fun aReplacedNoticeShowsAgainAfterTheToastThatReplacedIt() =
+        runBlocking {
+            val state = appState(active = ACCOUNT)
+            val notice = groupChangeNotice(notDelivered("invite", "refused"))!!
+            val seen = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(notice) }
+            state.presentText(AppText.Plain("Other"))
+            Snapshot.sendApplyNotifications()
+            yield()
+            assertEquals(AppText.Plain("Other"), state.toast?.title)
+            retireToast(state)
+            assertEquals(notice.headline, state.toast?.title)
+            assertFalse(seen.isCompleted)
+            retireToast(state)
+            assertTrue(seen.await())
+        }
+
+    /**
+     * A change MDK reports again while its notice is showing is left to that notice; once seen, it returns at once so a
+     * failed acknowledgement can be retried, without showing again. A different change still shows.
+     */
+    @Test
+    fun aChangeIsShownOnceAndItsAcknowledgementCanBeRetried() =
+        runBlocking {
+            val state = appState(active = ACCOUNT)
+            val notice = groupChangeNotice(refusal(OversizedArtifactFfi.COMMIT))!!
+            val seen = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(notice) }
+            assertFalse(state.showGroupChangeNotice(groupChangeNotice(refusal(OversizedArtifactFfi.COMMIT))!!))
+            retireToast(state)
+            assertTrue(seen.await())
+            assertTrue(state.showGroupChangeNotice(notice))
+            assertNull(state.toast)
+            val other =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    state.showGroupChangeNotice(notice.copy(changeIdHex = "12".repeat(32)))
+                }
+            assertEquals(notice.reason, state.toast?.title)
+            retireToast(state)
+            assertTrue(other.await())
+        }
 
     /** The shown set stays bounded, so the oldest change can be shown again once evicted. */
     @Test
@@ -175,10 +213,18 @@ class GroupChangeNoticeTest {
 
     /** Another account's change shows nothing, so its record is left for when that account is active. */
     @Test
-    fun anotherAccountsChangeShowsNothing() {
-        val state = appState(active = "other")
-        assertFalse(state.presentGroupChangeNotice(groupChangeNotice(notDelivered("invite", "refused"))!!))
-        assertNull(state.toast)
+    fun anotherAccountsChangeShowsNothing() =
+        runBlocking {
+            val state = appState(active = "other")
+            assertFalse(state.showGroupChangeNotice(groupChangeNotice(notDelivered("invite", "refused"))!!))
+            assertNull(state.toast)
+        }
+
+    /** Retires the current toast as its snackbar does when it ends, then lets the waiting notice run. */
+    private suspend fun retireToast(state: WhiteNoiseAppState) {
+        state.clearToast()
+        Snapshot.sendApplyNotifications()
+        repeat(SETTLE_YIELDS) { yield() }
     }
 
     /** A given-up commit is acknowledged by its own ID, without reading the group's records. */
@@ -348,5 +394,8 @@ class GroupChangeNoticeTest {
         val GROUP = "ef".repeat(32)
         val INTENT = "cd".repeat(32)
         val COMMIT = "c0".repeat(32)
+
+        /** Enough turns of the test's event loop for a waiting notice to see a toast change and act on it. */
+        const val SETTLE_YIELDS = 3
     }
 }

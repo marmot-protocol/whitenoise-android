@@ -1,11 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.snapshotFlow
 import dev.ipf.marmotkit.GroupChangeNotDeliveredFfi
 import dev.ipf.marmotkit.GroupEventKindFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
+import kotlinx.coroutines.flow.first
 
 /** MDK's stable refusal tag for a change whose commit or Welcome fits none of its relays. */
 internal const val QUEUED_INTENT_REFUSED_TOO_LARGE = "event_too_large"
@@ -82,8 +84,8 @@ private data class RefusedChange(
 )
 
 /**
- * The notice for [change], or null for a change MDK makes for its own upkeep, which the user never asked for. A size
- * refusal keeps its own sentence whatever the change was.
+ * The notice for [change], or null for a change MDK makes for its own upkeep, which the user never asked for, whatever
+ * the reason. A size refusal keeps its own sentence whatever else the change was.
  */
 private fun refusedChangeNotice(
     change: RefusedChange,
@@ -91,8 +93,8 @@ private fun refusedChangeNotice(
 ): GroupChangeNotice? {
     val (headline, reason) =
         when {
-            change.reason == QUEUED_INTENT_REFUSED_TOO_LARGE -> null to sizeRefusalReason(change.artifact)
             change.intentKind in UPKEEP_INTENT_KINDS -> return null
+            change.reason == QUEUED_INTENT_REFUSED_TOO_LARGE -> null to sizeRefusalReason(change.artifact)
             else ->
                 AppText.Resource(changeHeadline(change.intentKind)) to AppText.Resource(refusalReason(change.reason))
         }
@@ -158,21 +160,43 @@ private fun refusalReason(reason: String): Int =
     }
 
 /**
- * Shows [notice] while its account is still active, titled with the chat's name when the chat list knows it, so the
- * notice says which chat it is about even when it arrives after the user has moved elsewhere. Another account's notice
- * shows nothing, because its group is not on screen, and a change MDK reports again (the event stream resubscribes
- * after a failure, or the retained record is read again) is shown once. Returns whether it was shown. Must run on the
- * main thread.
+ * Shows [notice] until the user has seen it, and returns whether they have, so only a seen change is acknowledged.
+ * Another account's notice shows nothing and returns false, because its group is not on screen. A change already seen
+ * in this process returns true without showing again, so an acknowledgement that failed is retried. One another call
+ * is still showing returns false, because that call acknowledges it. Must run on the main thread.
  */
-internal fun WhiteNoiseAppState.presentGroupChangeNotice(notice: GroupChangeNotice): Boolean {
-    val shows =
-        activeAccountRef == notice.accountRef &&
-            shownGroupChangeNotices.firstShowing(notice.accountRef, notice.changeIdHex)
-    if (shows) {
-        val (title, detail) = groupChangeToast(chatTitle(notice.accountRef, notice.groupIdHex), notice)
-        presentText(title, detail)
+internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(notice: GroupChangeNotice): Boolean {
+    val showing = "${notice.accountRef}|${notice.changeIdHex.lowercase()}"
+    return when {
+        activeAccountRef != notice.accountRef || showing in showingGroupChangeNotices -> false
+        shownGroupChangeNotices.contains(notice.accountRef, notice.changeIdHex) -> true
+        else -> {
+            showingGroupChangeNotices += showing
+            try {
+                showUntilSeen(notice).also { seen ->
+                    if (seen) shownGroupChangeNotices.firstShowing(notice.accountRef, notice.changeIdHex)
+                }
+            } finally {
+                showingGroupChangeNotices -= showing
+            }
+        }
     }
-    return shows
+}
+
+/**
+ * Presents [notice], titled with the chat's name when the chat list knows it, and waits until its own snackbar retires
+ * it. The toast has one slot, so a toast that replaces it first is waited out and the notice presented again. Returns
+ * false once its account is no longer active before it is seen.
+ */
+private suspend fun WhiteNoiseAppState.showUntilSeen(notice: GroupChangeNotice): Boolean {
+    val (title, detail) = groupChangeToast(chatTitle(notice.accountRef, notice.groupIdHex), notice)
+    while (activeAccountRef == notice.accountRef) {
+        presentText(title, detail)
+        val shown = toast
+        if (snapshotFlow { toast }.first { it !== shown } == null) return true
+        snapshotFlow { toast }.first { it == null }
+    }
+    return false
 }
 
 /**
@@ -210,11 +234,22 @@ internal class ShownQueuedRefusals(
         accountRef: String,
         intentIdHex: String,
     ): Boolean {
-        val key = "$accountRef|${intentIdHex.lowercase()}"
-        if (!shown.add(key)) return false
+        if (!shown.add(key(accountRef, intentIdHex))) return false
         if (shown.size > capacity) shown.remove(shown.first())
         return true
     }
+
+    /** Whether this notice was shown already, without recording it. */
+    fun contains(
+        accountRef: String,
+        intentIdHex: String,
+    ): Boolean = key(accountRef, intentIdHex) in shown
+
+    /** The record's key: IDs compare without case. */
+    private fun key(
+        accountRef: String,
+        intentIdHex: String,
+    ) = "$accountRef|${intentIdHex.lowercase()}"
 }
 
 /** Changes MDK sends for its own upkeep of a group or the account's devices, which the user never asked for. */

@@ -21,7 +21,7 @@ internal fun WhiteNoiseAppState.presentEventNotices(
     // MDK retries no group change it could not make, so the user is told, and its record is cleared once seen.
     groupChangeNotice(event)?.let { notice ->
         scope.launch(Dispatchers.Main) {
-            if (presentGroupChangeNotice(notice)) {
+            if (showGroupChangeNotice(notice)) {
                 withContext(Dispatchers.IO) { runCatchingCancellable { marmot.acknowledgeGroupChange(notice) } }
             }
         }

@@ -40,13 +40,13 @@ internal suspend fun MarmotInterface.newestRetainedGroupChange(accountRef: Strin
 }
 
 /**
- * Raises the active account's newest retained change when the event stream opens and acknowledges it once shown. A
- * toast shows one notice at a time, so any older change waits for a later open.
+ * Raises the active account's newest retained change when the event stream opens and acknowledges it once the user has
+ * seen it. A toast shows one notice at a time, so any older change waits for a later open.
  */
 internal suspend fun WhiteNoiseAppState.presentRetainedGroupChange(marmot: MarmotInterface) {
     val account = withContext(Dispatchers.Main) { activeAccountRef } ?: return
     val notice = marmot.newestRetainedGroupChange(account) ?: return
-    if (withContext(Dispatchers.Main) { presentGroupChangeNotice(notice) }) {
+    if (withContext(Dispatchers.Main) { showGroupChangeNotice(notice) }) {
         runCatchingCancellable { marmot.acknowledgeGroupChange(notice) }
     }
 }

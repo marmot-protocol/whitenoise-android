@@ -22,7 +22,7 @@
       {
         "surface": "Group change not made notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
-        "anchor": "internal fun WhiteNoiseAppState.presentGroupChangeNotice(",
+        "anchor": "internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(",
         "test_ids": [
           "GRP-045"
         ]
