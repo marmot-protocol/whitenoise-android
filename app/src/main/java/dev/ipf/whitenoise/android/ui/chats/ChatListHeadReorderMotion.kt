@@ -85,6 +85,7 @@ private data class ChatListHeadMotionState(
     val pinnedOrder: List<String>,
     val userGestureGeneration: Long,
     val resumeBaseline: Boolean,
+    val resumeEpoch: Int,
 )
 
 private data class ChatListHeadScrollSnapshot(
@@ -94,6 +95,7 @@ private data class ChatListHeadScrollSnapshot(
     val isScrollInProgress: Boolean,
     val correctionOwnsViewport: Boolean,
     val resumeBaseline: Boolean,
+    val resumeEpoch: Int,
 )
 
 internal fun LazyListState.chatListViewportAnchor(visibleChatIds: Set<String>): ChatListViewportAnchor? =
@@ -283,6 +285,7 @@ internal fun ChatListActiveHeadScrollEffect(
                 pinnedOrder = pinnedOrder,
                 userGestureGeneration = userGestureGeneration,
                 resumeBaseline = resumeBaseline.active,
+                resumeEpoch = resumeBaseline.epoch,
             ),
         )
     chatListResumeHeadSnap(listState, activeHeadId, pinnedOrder, datasetKey, isActiveList, resumeBaseline.active)
@@ -308,9 +311,12 @@ internal fun ChatListActiveHeadScrollEffect(
                     isScrollInProgress = listState.isScrollInProgress && !correctionOwnsViewport,
                     correctionOwnsViewport = correctionOwnsViewport,
                     resumeBaseline = headMotionState.resumeBaseline,
+                    resumeEpoch = headMotionState.resumeEpoch,
                 )
             }.collect { current ->
-                if (current.resumeBaseline) {
+                // The epoch also catches a return whose short-lived baseline this conflated flow skipped.
+                val resumed = current.resumeBaseline || previous?.resumeEpoch?.let { it != current.resumeEpoch } == true
+                if (resumed) {
                     // Finish a correction the stop froze; its cleanup releases the gate. Hidden
                     // promotions never animate: chatListResumeHeadSnap places them before layout (#3780).
                     correctionJob?.takeIf { it.isActive }?.let { frozen ->

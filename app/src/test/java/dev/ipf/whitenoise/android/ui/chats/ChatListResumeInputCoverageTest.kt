@@ -15,7 +15,7 @@ import org.junit.Test
  */
 class ChatListResumeInputCoverageTest {
     private val baselineBranchSkipsCorrection =
-        Regex("""if \(current\.resumeBaseline\) \{[\s\S]*?\} else if \(shouldCorrectHeadScroll""")
+        Regex("""if \(resumed\) \{[\s\S]*?\} else if \(shouldCorrectHeadScroll""")
     private val chatsDir = "src/main/java/dev/ipf/whitenoise/android/ui/chats"
     private val screen = appModuleSource("$chatsDir/ChatsScreen.kt").functionBody("ChatsScreen")
 
@@ -85,6 +85,10 @@ class ChatListResumeInputCoverageTest {
         assertTrue(
             "the resume baseline must never launch the animated head correction",
             baselineBranchSkipsCorrection.containsMatchIn(headEffect),
+        )
+        assertTrue(
+            "a resume must be recognised by its epoch even when the collector skipped the baseline frame",
+            "previous?.resumeEpoch" in headEffect,
         )
     }
 }
