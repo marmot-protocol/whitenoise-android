@@ -14,10 +14,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,14 +61,12 @@ import dev.ipf.whitenoise.android.state.StalenessGuard
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.insertTextEntryEmoji
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
@@ -217,12 +213,15 @@ internal fun GroupEditScreen(
         val hasGroupImage =
             ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl) != null ||
                 controller.group.imageHashHex != null
+        val detailsChanged =
+            name.text.toString() != controller.group.name ||
+                description.text.toString() != controller.group.description
         // A photo being prepared or uploaded holds Save too, so a save cannot close the editor under it.
         val saveEnabled =
             !saving &&
                 !imageSaving &&
                 !controller.mutationInFlight &&
-                (name.text.toString() != controller.group.name || description.text.toString() != controller.group.description)
+                detailsChanged
 
         LaunchedEffect(nameEditable) {
             if (!nameEditable) showEmojiPicker = false
@@ -234,9 +233,14 @@ internal fun GroupEditScreen(
             controller.clearLastMutationError()
             appState.launchMutation {
                 try {
-                    if (controller.updateGroupProfile(name.text.toString(), description.text.toString(), openedName, openedDescription)) {
-                        onBack()
-                    }
+                    val saved =
+                        controller.updateGroupProfile(
+                            name.text.toString(),
+                            description.text.toString(),
+                            openedName,
+                            openedDescription,
+                        )
+                    if (saved) onBack()
                 } finally {
                     saving = false
                 }
@@ -635,33 +639,15 @@ internal fun GroupEditScreen(
                         )
                     }
                 }
-                Column(
-                    modifier =
-                        Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .widthIn(max = 520.dp)
-                            .fillMaxWidth()
-                            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
-                ) {
-                    GroupNameEmojiField(
-                        state = name,
-                        label = stringResource(R.string.group_name),
-                        emojiPickerOpen = showEmojiPicker,
-                        onEmojiPickerClick = { if (nameEditable) showEmojiPicker = true },
-                        enabled = nameEditable,
-                        modifier = Modifier.fillMaxWidth(),
-                        emojiAnchor = nameEmojiAnchor,
-                    )
-                    WhiteNoiseTextField(
-                        state = description,
-                        emojiAction = true,
-                        label = { Text(stringResource(R.string.description)) },
-                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
-                        enabled = nameEditable,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                GroupEditFields(
+                    name = name,
+                    description = description,
+                    enabled = nameEditable,
+                    nameEmojiAnchor = nameEmojiAnchor,
+                    emojiPickerOpen = showEmojiPicker,
+                    onEmojiPickerClick = { if (nameEditable) showEmojiPicker = true },
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
             }
         }
 

@@ -1212,7 +1212,12 @@ internal fun ComposerBar(
                 val replyVisible = replyingTo != null || replyExit.exiting
                 // The composer already reserves the resize strip above the accessory slot.
                 val replyInsets =
-                    PaddingValues(start = 8.dp, top = if (isAmoledSurfaceTheme()) 0.dp else 8.dp, end = 8.dp, bottom = 8.dp)
+                    PaddingValues(
+                        start = 8.dp,
+                        top = if (isAmoledSurfaceTheme()) 0.dp else 8.dp,
+                        end = 8.dp,
+                        bottom = 8.dp,
+                    )
                 val baseAccessoryContent: (@Composable () -> Unit)? =
                     // Edit shows its pill in the action row instead, and takes precedence over a reply.
                     if (editingMessageId == null && (replyVisible || attachmentContent != null)) {
