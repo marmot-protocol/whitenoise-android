@@ -50,6 +50,7 @@ internal fun ChatContextMenu(
     onExcludeFromFolder: (() -> Unit)? = null,
     onAbandon: ChatAbandonMenuAction? = null,
     historyDeleteBlocked: Boolean = false,
+    touchX: Float? = null,
 ) {
     val items =
         buildList {
@@ -196,6 +197,7 @@ internal fun ChatContextMenu(
         items = items,
         modifier = modifier,
         anchorSpacing = 8.dp,
+        touchX = touchX,
         focusable = focusable,
         canRunAction = canRunAction,
     )

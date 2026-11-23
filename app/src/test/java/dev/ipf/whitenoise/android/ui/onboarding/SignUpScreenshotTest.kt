@@ -5,11 +5,13 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -40,15 +42,15 @@ class SignUpScreenshotTest {
     @Test fun dark() = render("signup_dark", dark = true)
 
     /** True black form and photo action outlines. */
-    @Test fun amoled() = render("signup_amoled", dark = true, amoled = true)
+    @Test fun amoled() = render("signup_amoled", dark = true, amoled = true, initialAbout = "")
 
     /** Bounded content column at tablet width. */
     @Config(qualifiers = "en-rUS-w1000dp-h780dp-mdpi")
     @Test
     fun tablet() = render("signup_tablet")
 
-    /** Wrapped form and retained pinned action at 200 percent RTL. */
-    @Test fun rtlLargeText() = render("signup_rtl_200", rtl = true, scale = 2f)
+    /** Focused empty About and retained pinned action at 200 percent RTL. */
+    @Test fun rtlLargeText() = render("signup_rtl_200", rtl = true, scale = 2f, initialAbout = "", focusAbout = true)
 
     /** Failed profile stage describes the accepted identity and same-account retry. */
     @Test fun publicationFailure() = render("signup_publication_failed", stage = SignUpStage.PublishFailed)
@@ -87,7 +89,9 @@ class SignUpScreenshotTest {
         offline: Boolean = false,
         stage: SignUpStage = SignUpStage.Editing,
         initialName: String = "Alice",
+        initialAbout: String = "A local profile description",
         showNameHelp: Boolean = false,
+        focusAbout: Boolean = false,
     ) {
         composeRule.mainClock.autoAdvance = showNameHelp
         composeRule.setContent {
@@ -98,7 +102,7 @@ class SignUpScreenshotTest {
                     ExplanationHost {
                         SignUpContent(
                             TextFieldState(initialName),
-                            TextFieldState("A local profile description"),
+                            TextFieldState(initialAbout),
                             null,
                             stage,
                             editable = stage == SignUpStage.Editing,
@@ -123,6 +127,10 @@ class SignUpScreenshotTest {
             }
         }
         composeRule.mainClock.advanceTimeBy(160)
+        if (focusAbout) {
+            composeRule.onNodeWithTag("onboarding.sign_up.about").performSemanticsAction(SemanticsActions.RequestFocus)
+            composeRule.mainClock.advanceTimeBy(160)
+        }
         if (showNameHelp) {
             composeRule.onNodeWithTag("onboarding.sign_up.suggest_name").performTouchInput { longClick() }
             composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
