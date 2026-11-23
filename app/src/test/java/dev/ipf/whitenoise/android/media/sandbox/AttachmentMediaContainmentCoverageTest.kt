@@ -94,8 +94,9 @@ class AttachmentMediaContainmentCoverageTest {
             "localVideoPlayer(context, Uri.fromFile(file))" in player.functionBody("rememberNostrVideoPlayer"),
         )
         assertTrue(
-            "Each player must delete its download directory on disposal",
-            "onDispose { directory.deleteRecursively() }" in player.functionBody("NostrVideoPlayback"),
+            "Each player must delete its download directory after its download ends",
+            "withContext(NonCancellable + Dispatchers.IO) { directory.deleteRecursively() }" in
+                player.functionBody("NostrVideoPlayback"),
         )
         val download = source("ui/conversation/nostr/NostrVideoDownload.kt").readText()
         assertTrue(

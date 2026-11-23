@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -50,6 +51,10 @@ import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.localVideoPlayer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
@@ -88,15 +93,22 @@ private fun NostrVideoPlayback(
     val context = LocalContext.current
     val directory =
         remember(mediaUrl) { File(nostrVideoDirectory(context.cacheDir), UUID.randomUUID().toString()) }
-    DisposableEffect(directory) { onDispose { directory.deleteRecursively() } }
     var attempt by remember(directory) { mutableIntStateOf(0) }
     var download by remember(directory) { mutableStateOf<File?>(null) }
     var downloadFailed by remember(directory) { mutableStateOf(false) }
-    LaunchedEffect(directory, attempt) {
-        downloadFailed = false
-        val file = if (directory.isDirectory || directory.mkdirs()) downloadNostrVideo(directory, mediaUrl) else null
-        download = file
-        downloadFailed = file == null
+    LaunchedEffect(directory) {
+        try {
+            snapshotFlow { attempt }.collectLatest {
+                downloadFailed = false
+                val ready = withContext(Dispatchers.IO) { directory.isDirectory || directory.mkdirs() }
+                val file = if (ready) downloadNostrVideo(directory, mediaUrl) else null
+                download = file
+                downloadFailed = file == null
+            }
+        } finally {
+            // Runs only after the download has returned or aborted, so no file can appear after this deletion.
+            withContext(NonCancellable + Dispatchers.IO) { directory.deleteRecursively() }
+        }
     }
     val file = download
     if (file == null) {
