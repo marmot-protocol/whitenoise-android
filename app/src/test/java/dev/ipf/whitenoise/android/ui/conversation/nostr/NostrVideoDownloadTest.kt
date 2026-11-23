@@ -24,7 +24,7 @@ class NostrVideoDownloadTest {
 
     @Test
     fun publicHttpsVideoIsCopiedIntoThePlayerDirectory() {
-        val bytes = ByteArray(10_000) { it.toByte() }
+        val bytes = ByteArray(3_000) { it.toByte() }
         val directory = temporary.newFolder("player")
         val file = download(directory, "https://media.example/clip.mp4") { bytes.toResponseBody() }
         assertNotNull(file)
