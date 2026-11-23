@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -38,6 +39,7 @@ class GlobalSearchRecentStripTest {
 
     @After fun close() {
         val model = fixture
+        model?.releaseLookup?.complete(Unit)
         try {
             settle()
         } finally {
@@ -96,6 +98,24 @@ class GlobalSearchRecentStripTest {
         assertTrue(opened.isEmpty())
         assertEquals(listOf(GlobalSearchRecent.Chat(ACTION_SURVIVOR)), recents.entries)
         rule.onNodeWithTag(tag(ACTION_TARGET)).assertDoesNotExist()
+    }
+
+    /** Removing a chat while its tap is still reading it wins: the read neither restores nor opens it. */
+    @Test fun removeDuringPendingOpenIsNotUndone() {
+        val (model, recents) = mount()
+        awaitProgress { tileExists(ACTION_TARGET) }
+        val entered = CompletableDeferred<Unit>()
+        model.lookupEntered = entered
+        model.releaseLookup = CompletableDeferred()
+
+        rule.onNodeWithTag(tag(ACTION_TARGET)).performClick()
+        awaitProgress { entered.isCompleted }
+        rule.runOnIdle { recents.remove(GlobalSearchRecent.Chat(ACTION_TARGET)) }
+        requireNotNull(model.releaseLookup).complete(Unit)
+        settle()
+
+        assertTrue(opened.isEmpty())
+        assertEquals(listOf(GlobalSearchRecent.Chat(ACTION_SURVIVOR)), recents.entries)
     }
 
     /** Remove drops one destination for screen readers too; Clear empties the list and hides it. */

@@ -428,6 +428,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchRecentStrip.kt",
+      "symbol": "GlobalSearchRecentTile",
+      "bindings": [],
+      "remaining": "The Recent row and each tile's long-press Remove menu appear only after a chat or profile was opened from search earlier in the same process, and no Maestro fixture seeds that in-memory list yet. Ordering, Remove, Clear, off-window reopen and unreadable-chat handling are covered by GlobalSearchRecentStripTest and GlobalSearchRecentsTest, the rendering by GlobalSearchRecentScreenshotTest, and the device flow by manual case FIND-021."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
       "symbol": "ColumnScope.NotificationProfileQuickSheetContent",
       "bindings": [

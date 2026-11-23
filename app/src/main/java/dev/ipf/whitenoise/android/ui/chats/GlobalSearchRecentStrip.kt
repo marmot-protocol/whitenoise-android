@@ -85,9 +85,11 @@ internal fun GlobalSearchRecentStrip(
                         // The shown row can be stale; a chat that is no longer readable leaves the list instead.
                         val owner = controller.captureChatListActionOwner() ?: return@launch
                         val item = controller.resolveChatListActionItem(destination.entry.groupIdHex, owner)
+                        // Remove or Clear during the read wins: the entry is neither restored nor opened.
+                        val stillListed = recents.entries.any { it.key == entry.key }
                         if (item == null) {
                             recents.remove(entry)
-                        } else if (recents.record(scopeToken, entry)) {
+                        } else if (stillListed && recents.record(scopeToken, entry)) {
                             onOpenChat(item)
                         }
                     }
