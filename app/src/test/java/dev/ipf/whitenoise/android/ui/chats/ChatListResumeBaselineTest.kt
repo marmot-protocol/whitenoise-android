@@ -17,6 +17,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -40,6 +41,7 @@ class ChatListResumeBaselineTest {
     private val filler = (0 until 27).map { "R$it" }
     private var itemIds by mutableStateOf(order("A", "B", "C"))
     private val openedIds = mutableListOf<String>()
+    private var interactionsEnabled = true
     private lateinit var listState: LazyListState
 
     private fun order(vararg head: String): List<String> = head.toList() + filler
@@ -53,6 +55,7 @@ class ChatListResumeBaselineTest {
                     listState = listState,
                     rowHeight = rowHeight,
                     onOpen = openedIds::add,
+                    onRowsComposed = { _, enabled -> interactionsEnabled = enabled },
                 )
             }
         }
@@ -108,12 +111,13 @@ class ChatListResumeBaselineTest {
         composeRule.runOnUiThread { lifecycleOwner.currentState = Lifecycle.State.RESUMED }
     }
 
-    private fun assertFlushResumedOrder() {
-        // No placement tween or scroll correction is running: every row is in its final slot.
-        assertEquals(0f, rowTop("C"), 0.5f)
-        assertEquals(48f, rowTop("A"), 0.5f)
-        assertEquals(96f, rowTop("B"), 0.5f)
-        composeRule.runOnIdle { assertEquals(0, listState.firstVisibleItemIndex) }
+    /** Every row is in its final slot with the list flush at the top (bounds clip, so check the scroll too). */
+    private fun assertFlushResumedOrder(expected: List<String> = listOf("C", "A", "B")) {
+        composeRule.runOnIdle {
+            assertEquals(0, listState.firstVisibleItemIndex)
+            assertEquals(0, listState.firstVisibleItemScrollOffset)
+        }
+        expected.forEachIndexed { index, id -> assertEquals(48f * index, rowTop(id), 0.5f) }
     }
 
     @Test
@@ -216,12 +220,13 @@ class ChatListResumeBaselineTest {
             "C should be moving up from its resumed slot, was at $movingTop",
             movingTop > 0.5f && movingTop <= 96.5f,
         )
-        tap("C")
-        composeRule.runOnIdle { assertEquals(emptyList<String>(), openedIds) }
+        // Read the gate rather than tapping: a press on the scrolling list would catch the
+        // head correction like a user drag.
+        composeRule.runOnIdle { assertFalse("live motion must close row input", interactionsEnabled) }
 
         composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
-        composeRule.runOnIdle { }
-        assertEquals(0f, rowTop("C"), 0.5f)
+        composeRule.runOnIdle { assertTrue(interactionsEnabled) }
+        assertFlushResumedOrder(listOf("C", "B", "A"))
         tap("C")
         composeRule.runOnIdle { assertEquals(listOf("C"), openedIds) }
     }

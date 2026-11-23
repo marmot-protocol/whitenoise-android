@@ -33,8 +33,7 @@ import kotlinx.coroutines.launch
 internal fun LazyItemScope.chatListRowMotion(
     targetIndex: Int,
     placementDurationMillis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS,
-): Modifier =
-    chatListPlacementMotion(placementDurationMillis).zIndex(chatListTargetZIndex(targetIndex))
+): Modifier = chatListPlacementMotion(placementDurationMillis).zIndex(chatListTargetZIndex(targetIndex))
 
 internal fun chatListTargetZIndex(targetIndex: Int): Float = -targetIndex.toFloat()
 
