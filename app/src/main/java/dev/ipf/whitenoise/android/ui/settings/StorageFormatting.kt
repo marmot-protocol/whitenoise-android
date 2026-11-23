@@ -102,3 +102,80 @@ private fun removedText(
         context.resources.getQuantityString(R.plurals.storage_removed_freed, quantity, count, freed)
     }
 }
+
+/** Longest file name a row keeps, long enough for any real name and short enough to bound layout work. */
+private const val STORAGE_FILE_NAME_MAX_CHARS = 120
+
+/**
+ * The sender's file name made safe to show: only the last path segment, without control, bidirectional override or
+ * other invisible characters, trimmed and bounded. Null when nothing readable is left, so the row falls back to the
+ * attachment's kind. The name comes from another device and is never trusted for layout or direction.
+ */
+internal fun storageDisplayName(raw: String): String? {
+    val cleaned = storageNameCodePoints(raw.substringAfterLast('/').substringAfterLast('\\'))
+    // A name of only dots, marks or spaces would draw as nothing, so it reads as no name at all.
+    val readable = cleaned.codePoints().anyMatch { it.isVisibleNameCharacter() } && !cleaned.all { it == '.' }
+    return if (readable) boundedStorageName(cleaned) else null
+}
+
+/**
+ * Keeps the code points of [segment] that draw: controls become spaces, format, unassigned and default-ignorable
+ * points go, and runs of spaces collapse. Whole code points are filtered, so a supplementary format character such as
+ * a Unicode tag cannot slip through as a surrogate pair.
+ */
+private fun storageNameCodePoints(segment: String): String =
+    buildString {
+        segment.codePoints().forEach { point ->
+            when {
+                Character.isISOControl(point) -> append(' ')
+                Character.getType(point) in StorageNameDroppedTypes || point.isDefaultIgnorable() -> Unit
+                else -> appendCodePoint(point)
+            }
+        }
+    }.replace(Regex("\\s+"), " ").trim()
+
+/** Keeps both ends of an over-long name, so it still shows how it starts and its extension. */
+private fun boundedStorageName(name: String): String {
+    if (name.length <= STORAGE_FILE_NAME_MAX_CHARS) return name
+    val half = STORAGE_FILE_NAME_MAX_CHARS / 2
+    val head = name.take(half).let { if (it.last().isHighSurrogate()) it.dropLast(1) else it }
+    val tail = name.takeLast(half).let { if (it.first().isLowSurrogate()) it.drop(1) else it }
+    return "$head…$tail"
+}
+
+/** Character types a file name never shows: invisible formatting, unassigned and lone surrogate code points. */
+private val StorageNameDroppedTypes =
+    setOf(Character.FORMAT.toInt(), Character.UNASSIGNED.toInt(), Character.SURROGATE.toInt())
+
+/** Default-ignorable code points outside the format category that draw as nothing: fillers and variation selectors. */
+@Suppress("MagicNumber") // Unicode code points, named by the property they share.
+private val StorageNameIgnorables =
+    listOf(
+        0x034F..0x034F,
+        0x115F..0x1160,
+        0x17B4..0x17B5,
+        0x180B..0x180F,
+        0x3164..0x3164,
+        0xFE00..0xFE0F,
+        0xFFA0..0xFFA0,
+        0xE0100..0xE01EF,
+    )
+
+private fun Int.isDefaultIgnorable(): Boolean = StorageNameIgnorables.any { this in it }
+
+/** Marks that only decorate their neighbour, so a name made of them alone draws nothing. */
+private val StorageNameMarkTypes =
+    setOf(
+        Character.NON_SPACING_MARK.toInt(),
+        Character.ENCLOSING_MARK.toInt(),
+        Character.COMBINING_SPACING_MARK.toInt(),
+    )
+
+/** A character that draws on its own: not a space, a blank Braille cell or a mark. */
+private fun Int.isVisibleNameCharacter(): Boolean {
+    val mark = Character.getType(this) in StorageNameMarkTypes
+    return !mark && !Character.isWhitespace(this) && this != BRAILLE_PATTERN_BLANK
+}
+
+/** A symbol that draws as an empty cell, so it never counts as a readable character on its own. */
+private const val BRAILLE_PATTERN_BLANK = 0x2800

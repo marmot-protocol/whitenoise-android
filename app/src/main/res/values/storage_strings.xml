@@ -17,6 +17,12 @@
     <string name="storage_pictures">Profile and group pictures</string>
     <string name="storage_temporary">Temporary files</string>
     <string name="storage_temporary_detail">Shared by all profiles on this device</string>
+    <!-- Shown under a highlighted storage category's size. %1$s: category, such as "Attachments"; %2$s: its share, such as "79%"; %3$s: this profile's total, such as "2.4 GB". -->
+    <string name="storage_highlight_share">%1$s · %2$s of %3$s</string>
+    <!-- Shown under the size of highlighted temporary files, which every profile shares. %1$s: category name. -->
+    <string name="storage_highlight_shared">%1$s · shared by all profiles, not in this total</string>
+    <!-- A share too small to round to a whole percent. %1$s: one percent in the device's format, such as "1%". -->
+    <string name="storage_share_under_one">under %1$s</string>
     <string name="storage_load_failed">Couldn\'t load storage usage</string>
     <string name="storage_retry">Try again</string>
     <string name="storage_migration_moving_title">Updating attachment storage</string>
@@ -32,6 +38,9 @@
     <string name="storage_clear_cache_subtitle">Pictures download again when you need them</string>
     <string name="storage_removal_help">Removed attachments stay in their messages. You can download them again while the sender\'s copy is still available.</string>
     <string name="storage_keep_media">Keep media</string>
+    <string name="storage_automatic_cleanup">Automatic cleanup</string>
+    <!-- A size ahead of a row's explanation. %1$s: size, such as "150 MB"; %2$s: the explanation. -->
+    <string name="storage_size_detail">%1$s · %2$s</string>
     <string name="storage_keep_media_help">Attachments older than this are removed from this device now and as they age. Downloading one again keeps it for the full period.</string>
     <string name="storage_keep_media_failed">Couldn\'t load</string>
     <string name="storage_keep_forever">Forever</string>

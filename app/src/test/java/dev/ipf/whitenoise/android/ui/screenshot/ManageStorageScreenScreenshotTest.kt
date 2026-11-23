@@ -5,7 +5,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -64,6 +66,22 @@ class ManageStorageScreenScreenshotTest {
         overview("manage_storage_rtl_large_font", Populated, darkTheme = false, fontScale = 2f, rtl = true)
     }
 
+    /** Tapping a legend row highlights its category: the header names its size and share, other segments fade. */
+    @Test
+    @Config(qualifiers = "w360dp-h1500dp-mdpi")
+    fun overviewHighlighted() =
+        overview("manage_storage_highlighted", Populated, darkTheme = false) {
+            composeRule.onAllNodesWithTag("storage.legend")[0].performClick()
+        }
+
+    /** The highlight in the dark theme, on a smaller category. */
+    @Test
+    @Config(qualifiers = "w360dp-h1500dp-mdpi")
+    fun overviewHighlightedDark() =
+        overview("manage_storage_highlighted_dark", Populated, darkTheme = true) {
+            composeRule.onAllNodesWithTag("storage.legend")[1].performClick()
+        }
+
     /** Before the first figures: Calculating over a pulsing track, actions disabled. */
     @Test
     fun overviewLoading() = overview("manage_storage_loading", ManageStorageUiState(), darkTheme = false)
@@ -89,11 +107,14 @@ class ManageStorageScreenScreenshotTest {
         amoled: Boolean = false,
         fontScale: Float = 1f,
         rtl: Boolean = false,
+        interact: () -> Unit = {},
     ) {
         val appState = testAppState(name)
         render(darkTheme, amoled, fontScale, rtl) {
             ManageStorageContent(appState, state, onBack = {}, actions = ManageStorageActions({}, {}, {}, {}))
         }
+        interact()
+        composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
@@ -195,21 +216,33 @@ class ManageStorageScreenScreenshotTest {
                 keepMedia = KeepMediaPeriod.ThirtyDays,
             )
 
+        /** Noon UTC on fixed days, so the dates read the same in any test time zone. */
+        const val MAR_14_2026 = 1_773_489_600L
+        const val SEP_2_2025 = 1_756_814_400L
+        const val JAN_20_2026 = 1_768_910_400L
+        const val OCT_30_2026 = 1_793_361_600L
+
         val LargestRows =
             listOf(
-                stored(DESIGN, "m1", 412 * MB, "video/mp4"),
-                stored(FAMILY, "m2", 188 * MB, "video/mp4"),
-                stored(DESIGN, "m3", 64 * MB, "application/pdf"),
-                stored(ANA, "m4", 12 * MB, "image/jpeg"),
-                stored(DESIGN, "m5", 3 * MB, "audio/ogg"),
+                stored(DESIGN, "m1", 412 * MB, "video/mp4", "Offsite recap - full session recording.mp4", MAR_14_2026),
+                stored(FAMILY, "m2", 188 * MB, "video/mp4", "", SEP_2_2025),
+                stored(DESIGN, "m3", 64 * MB, "application/pdf", "Q3 roadmap.pdf", JAN_20_2026),
+                stored(ANA, "m4", 12 * MB, "image/jpeg", "IMG_2041.jpg", OCT_30_2026),
+                stored(DESIGN, "m5", 3 * MB, "audio/ogg", "voice-note.ogg", 0),
             )
 
-        /** A retained attachment received at a fixed instant, so relative times stay stable. */
+        /** A retained attachment named [fileName] and received at [receivedAt], zero when unknown. */
+        @Suppress("LongParameterList")
         fun stored(
             group: String,
             message: String,
             bytes: Long,
             type: String,
-        ) = StoredAttachment(group, message.padEnd(64, '0'), message.padEnd(64, '0'), 0, bytes, type, 0)
+            fileName: String,
+            receivedAt: Long,
+        ): StoredAttachment {
+            val id = message.padEnd(64, '0')
+            return StoredAttachment(group, id, id, 0, bytes, type, receivedAt, fileName)
+        }
     }
 }

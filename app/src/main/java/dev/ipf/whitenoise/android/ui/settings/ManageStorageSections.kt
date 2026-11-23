@@ -118,20 +118,17 @@ internal fun LazyListScope.storageFreeUpItems(
                 )
             }
             row("cache") { context ->
+                // The size leads the subtitle rather than sitting at the end, so the title keeps the row's width at
+                // large text sizes, and it is left out until the figures arrive instead of reading as zero.
+                val cacheBytes = usage?.clearableCacheBytes?.let { storageBytes(it) }
+                val help = stringResource(R.string.storage_clear_cache_subtitle)
                 SettingsLink(
                     context = context,
                     title = stringResource(R.string.storage_clear_cache),
-                    subtitle = stringResource(R.string.storage_clear_cache_subtitle),
+                    subtitle = cacheBytes?.let { stringResource(R.string.storage_size_detail, it, help) } ?: help,
                     onClick = { dialogs.clearCache.value = true },
                     enabled = ready && (usage?.clearableCacheBytes ?: 0) > 0,
                     busy = state.action == StorageAction.ClearCaches,
-                    trailing = {
-                        Text(
-                            storageBytes(usage?.clearableCacheBytes ?: 0),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
                     modifier = Modifier.testTag("storage.clear_cache"),
                     explanation = stringResource(R.string.explanation_privacy_storage_clear_cache),
                     leading = { SettingsLeadingIcon(R.drawable.ic_cleaning_services) },
@@ -147,7 +144,7 @@ internal fun LazyListScope.storageKeepMediaItems(
     state: ManageStorageUiState,
     dialogs: StorageDialogs,
 ) {
-    item(key = "search.ManageStorage.5") { SettingsSection(stringResource(R.string.storage_keep_media)) }
+    item(key = "search.ManageStorage.5") { SettingsSection(stringResource(R.string.storage_automatic_cleanup)) }
     item(key = "search.ManageStorage.6") {
         SettingsGroup(modifier = Modifier.testTag("storage.keep_media")) {
             row("keep") { context ->

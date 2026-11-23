@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
@@ -109,6 +113,8 @@ internal fun StoredAttachmentsContent(
 ) {
     val dialogs = rememberStorageDialogs(actions.ownerKey)
     var confirm by rememberSaveable { mutableStateOf<String?>(null) }
+    // Back clears a selection before it leaves the list, as Android's selection modes do.
+    BackHandler(enabled = list.selecting) { actions.onSelectAll(false) }
     val title =
         groupIdHex?.let { storageChatTitle(appState, it) } ?: stringResource(R.string.storage_largest_attachments)
     SettingsScaffold(
@@ -119,7 +125,7 @@ internal fun StoredAttachmentsContent(
     ) {
         // No list-wide spacing: attachment rows sit on the segmented gap, other items pad themselves.
         SettingsList(listTag = "storage.attachments", verticalArrangement = Arrangement.Top) {
-            if (groupIdHex != null) storageChatActionItems(storage, list, dialogs) { confirm = groupIdHex }
+            if (groupIdHex != null) storageChatActionItems(storage, list, groupIdHex, dialogs) { confirm = groupIdHex }
             storageAttachmentItems(appState, list, groupIdHex == null, storage.busy, actions)
         }
     }
@@ -176,30 +182,20 @@ internal fun chatFigures(
 /** The confirmation key for removing the selection rather than a whole chat. */
 private const val SELECTION = "selection"
 
-/** Remove all attachments and Remove older attachments for one chat. */
+/**
+ * Remove older attachments, then Remove all attachments with the chat's size and count once known, so the sweeping
+ * action is the second choice and says how much it takes.
+ */
 private fun LazyListScope.storageChatActionItems(
     storage: ManageStorageUiState,
     list: StoredAttachmentsUiState,
+    groupIdHex: String,
     dialogs: StorageDialogs,
     onRemoveAll: () -> Unit,
 ) {
     val enabled = storage.available && !storage.busy && list.items.isNotEmpty()
     item(key = "storage.chat.actions") {
         SettingsGroup(modifier = Modifier.testTag("storage.chat.actions")) {
-            row("remove_all") { context ->
-                SettingsAction(
-                    context = context,
-                    title = stringResource(R.string.storage_remove_all_in_chat),
-                    onClick = onRemoveAll,
-                    enabled = enabled,
-                    destructive = true,
-                    modifier = Modifier.testTag("storage.chat.remove_all"),
-                    explanation = stringResource(R.string.explanation_privacy_storage_remove_all_chat),
-                    leading = {
-                        SettingsLeadingIcon(R.drawable.ic_delete_sweep, tint = MaterialTheme.colorScheme.error)
-                    },
-                )
-            }
             row("older") { context ->
                 SettingsLink(
                     context = context,
@@ -211,11 +207,38 @@ private fun LazyListScope.storageChatActionItems(
                     leading = { SettingsLeadingIcon(R.drawable.ic_auto_delete) },
                 )
             }
+            row("remove_all") { context ->
+                val figures = chatFigures(storage, list, groupIdHex)
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.storage_remove_all_in_chat),
+                    subtitle = figures?.let { (count, bytes) -> storageCountAndSize(count, bytes) },
+                    onClick = onRemoveAll,
+                    enabled = enabled,
+                    destructive = true,
+                    modifier = Modifier.testTag("storage.chat.remove_all"),
+                    explanation = stringResource(R.string.explanation_privacy_storage_remove_all_chat),
+                    leading = {
+                        SettingsLeadingIcon(R.drawable.ic_delete_sweep, tint = MaterialTheme.colorScheme.error)
+                    },
+                )
+            }
         }
         Box(Modifier.padding(top = WhiteNoiseSpacing.Related, bottom = WhiteNoiseSpacing.Related)) {
             SettingsExplainer(stringResource(R.string.storage_removal_help))
         }
     }
+}
+
+/** "1.1 GB · 88 attachments". */
+@Composable
+private fun storageCountAndSize(
+    count: Long,
+    bytes: Long,
+): String {
+    val quantity = count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    val attachments = pluralStringResource(R.plurals.storage_attachment_count, quantity, count)
+    return stringResource(R.string.storage_size_detail, storageBytes(bytes), attachments)
 }
 
 /**
@@ -276,7 +299,8 @@ private fun StorageSelectionBar(
         ) {
             Text(
                 pluralStringResource(R.plurals.storage_selected, count, count, storageBytes(list.selectedBytes)),
-                modifier = Modifier.weight(1f),
+                // TalkBack hears the running count and size as rows are checked.
+                modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
                 style = MaterialTheme.typography.titleMedium,
             )
             WhiteNoiseButton(

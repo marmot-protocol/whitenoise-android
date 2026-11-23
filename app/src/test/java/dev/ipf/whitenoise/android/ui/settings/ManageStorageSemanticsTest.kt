@@ -1,14 +1,20 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -25,6 +31,7 @@ import dev.ipf.whitenoise.android.state.StorageUsage
 import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.StoredAttachmentsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -120,38 +127,125 @@ class ManageStorageSemanticsTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     /**
-     * The usage panel reads as one sentence naming this profile's total and every category with its size, each as its
-     * own sentence. The total leaves out the temporary files every profile shares.
+     * The usage header reads this profile's total, and each legend row reads its category and size as its own
+     * sentence. Empty unused space is left out.
      */
-    @Test fun usagePanelReadsOneSentenceWithEveryCategory() {
+    @Test fun usagePanelReadsTotalAndEachCategory() {
         val usage = StorageUsage(2_000_000, 3, 500_000, 0, 100_000, 50_000)
         composeRule.setContent {
             WhiteNoiseTheme { StorageUsagePanel(usage) }
         }
-        val description =
-            composeRule
-                .onNodeWithTag("storage.usage")
-                .fetchSemanticsNode()
-                .config[SemanticsProperties.ContentDescription]
-                .single()
         val size = { bytes: Long -> formatStorageBytes(context, bytes) }
+        val header = description(composeRule.onNodeWithTag("storage.usage"))
+        assert(header.contains("Storage used: ${size(usage.profileBytes)}.")) { header }
+        val rows = composeRule.onAllNodesWithTag("storage.legend")
+        val spoken = (0 until rows.fetchSemanticsNodes().size).map { description(rows[it]) }
         listOf(
-            "Storage used: ${size(usage.profileBytes)}.",
-            "Attachments, ${size(usage.attachmentBytes)}, 3 attachments.",
-            "Messages and chat data, ${size(usage.chatDataBytes)}.",
+            "Attachments, ${size(usage.attachmentBytes)}, 77%, 3 attachments.",
+            "Messages and chat data, ${size(usage.chatDataBytes)}, 19%.",
             "Temporary files, ${size(usage.temporaryBytes)}, Shared by all profiles on this device.",
-        ).forEach { assert(description.contains(it)) { "$it missing from $description" } }
-        assert(!description.contains("Unused database space")) { "Empty unused space must be left out" }
+        ).forEach { expected -> assert(expected in spoken) { "$expected missing from $spoken" } }
+        assert(spoken.none { it.contains("Unused database space") }) { "Empty unused space must be left out" }
     }
 
-    /** A selected attachment row reports its selected state, and select-all names its effect. */
+    /** Tapping a legend row highlights it and the header announces its share, a second tap clears it. */
+    @Test fun legendRowTogglesHighlight() {
+        val usage = StorageUsage(2_000_000, 3, 500_000, 0, 100_000, 50_000)
+        composeRule.setContent {
+            WhiteNoiseTheme { StorageUsagePanel(usage) }
+        }
+        val size = { bytes: Long -> formatStorageBytes(context, bytes) }
+        val attachments = composeRule.onAllNodesWithTag("storage.legend")[0]
+        attachments.assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, false))
+        attachments.performClick()
+        attachments.assertIsSelected()
+        val header = description(composeRule.onNodeWithTag("storage.usage"))
+        assert(header.contains(size(usage.attachmentBytes)) && header.contains("Attachments · 77% of")) { header }
+        attachments.performClick()
+        attachments.assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, false))
+        assert(description(composeRule.onNodeWithTag("storage.usage")).startsWith("Storage used:"))
+    }
+
+    /** On a profile with nothing stored yet, a highlighted profile category reads 0%, never as shared. */
+    @Test fun emptyProfileHighlightIsNotShared() {
+        composeRule.setContent {
+            WhiteNoiseTheme { StorageUsagePanel(StorageUsage(0, 0, 0, 0, 0, 0)) }
+        }
+        composeRule.onAllNodesWithTag("storage.legend")[0].performClick()
+        val header = description(composeRule.onNodeWithTag("storage.usage"))
+        assert(header.contains("Attachments · 0% of") && !header.contains("shared")) { header }
+    }
+
+    /** A highlighted category that a refresh leaves out stays cleared when it comes back. */
+    @Test fun highlightDoesNotReturnAfterItsCategoryLeaves() {
+        var usage by mutableStateOf(StorageUsage(2_000_000, 3, 500_000, 40_000, 100_000, 50_000))
+        composeRule.setContent {
+            WhiteNoiseTheme { StorageUsagePanel(usage) }
+        }
+        composeRule.onAllNodesWithTag("storage.legend")[2].performClick()
+        assert(description(composeRule.onNodeWithTag("storage.usage")).contains("Unused database space"))
+        usage = usage.copy(unusedDatabaseBytes = 0)
+        composeRule.waitForIdle()
+        usage = usage.copy(unusedDatabaseBytes = 40_000)
+        composeRule.waitForIdle()
+        assert(description(composeRule.onNodeWithTag("storage.usage")).startsWith("Storage used:"))
+    }
+
+    /** The single content description a node reads. */
+    private fun description(node: SemanticsNodeInteraction): String {
+        val config = node.fetchSemanticsNode().config
+        return config[SemanticsProperties.ContentDescription].single()
+    }
+
+    /** A chosen attachment row reports itself checked, and select-all names its effect. */
     @Test fun attachmentRowsReportSelectionAndSelectAllNamesItsEffect() {
         val rows = listOf(attachment("a", 9_000_000), attachment("b", 4_000_000))
         renderList(StoredAttachmentsUiState(items = rows, complete = true, selected = setOf(rows.first().key)))
         val nodes = composeRule.onAllNodesWithTag("storage.attachment", useUnmergedTree = true)
-        nodes[0].assertIsSelected()
-        nodes[1].assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, false))
+        nodes[0].assertIsOn()
+        nodes[1].assertIsOff()
         composeRule.onNodeWithContentDescription("Select all").assertExists()
+    }
+
+    /** System Back first clears a selection and keeps the list open, then leaves the list. */
+    @Test fun backClearsSelectionBeforeLeaving() {
+        val rows = listOf(attachment("a", 9_000_000), attachment("b", 4_000_000))
+        var list by mutableStateOf(
+            StoredAttachmentsUiState(items = rows, complete = true, selected = setOf(rows[0].key)),
+        )
+        var left = 0
+        val appState = appState()
+        lateinit var activity: ComponentActivity
+        composeRule.setContent {
+            activity = LocalView.current.context.lifecycleOwner() as ComponentActivity
+            BackHandler { left++ }
+            WhiteNoiseTheme {
+                StoredAttachmentsContent(
+                    appState = appState,
+                    storage = ManageStorageUiState(),
+                    list = list,
+                    groupIdHex = null,
+                    onBack = {},
+                    actions =
+                        StoredAttachmentsActions(
+                            onToggle = {},
+                            onSelectAll = { all -> if (!all) list = list.copy(selected = emptySet()) },
+                            onLoadMore = {},
+                            onRetry = {},
+                            onAction = {},
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithTag("storage.selection").assertExists()
+        composeRule.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.waitForIdle()
+        assertEquals(0, left)
+        composeRule.onNodeWithTag("storage.selection").assertDoesNotExist()
+        composeRule.onAllNodesWithTag("storage.attachment", useUnmergedTree = true)[0].assertIsOff()
+        composeRule.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.waitForIdle()
+        assertEquals(1, left)
     }
 
     /** Before the last page loads, select-all says it selects only the rows shown. */
