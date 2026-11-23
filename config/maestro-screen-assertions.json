@@ -7190,6 +7190,18 @@
         }
       ],
       "remaining": "Exercise the permission review and disconnect dialogs with a paired account, and confirm disconnect keeps the account on the device (ONB-029)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataDialog",
+      "bindings": [],
+      "remaining": "This question appears only when a staged PDF is signed, password protected or cannot be cleaned, which the runner's media fixtures do not provide yet. Its wording, Send as is and Cancel paths are covered by ComposerPdfMetadataChoicesTest, ComposerPdfAttachmentScreenshotTest and DocumentUploadPrivacyCoverageTest, and manually by MED-065; add a direct assertion when a signed PDF fixture can be picked in the runner."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+      "symbol": "ComposerPdfMetadataDialogContent",
+      "bindings": [],
+      "remaining": "This question appears only when a staged PDF is signed, password protected or cannot be cleaned, which the runner's media fixtures do not provide yet. Its wording, Send as is and Cancel paths are covered by ComposerPdfMetadataChoicesTest, ComposerPdfAttachmentScreenshotTest and DocumentUploadPrivacyCoverageTest, and manually by MED-065; add a direct assertion when a signed PDF fixture can be picked in the runner."
     }
   ]
 }
