@@ -59,7 +59,10 @@ class IdentityCreationFlowTest {
     fun profileSaveWaitsForReadinessWithoutHoldingTheAccountLifetime() {
         val adapter = appStateSource("AppProfileSignUp.kt").readText()
         val publish = adapter.substringAfter("publish = { account, metadata ->").substringBefore("finish =")
-        assertTrue(publish.indexOf("awaitOwnedNetworkReadiness(account)") in 0 until publish.indexOf("publishProfile("))
+        val reuse = "initialProfile == metadata || appState.publishProfile(metadata)"
+        assertTrue(publish.indexOf("awaitOwnedNetworkReadiness(account)") in 0 until publish.indexOf(reuse))
+        val create = adapter.functionBody("createOwnedIdentity")
+        assertTrue(create.contains("owner.copy(initialProfile = receipt?.profile)"))
         val wait = adapter.functionBody("awaitOwnedNetworkReadiness")
         assertFalse(wait.contains("withAccountLifetime"))
         assertTrue(wait.contains("ownerAvailable()"))
@@ -86,6 +89,30 @@ class IdentityCreationFlowTest {
             }
 
             assertEquals(listOf("created", "created", "created"), asked)
+        }
+
+    @Test
+    fun fastSetupCompletesWithoutWaitingForTheSteadyPollInterval() =
+        runTest {
+            val reads = mutableListOf<Long>()
+            awaitAccountNetworkReady("created") {
+                val now = testScheduler.currentTime
+                reads += now
+                if (now >= 40) AccountSetupReadinessFfi.NETWORK_READY else AccountSetupReadinessFfi.PUBLISHING
+            }
+            assertEquals(listOf(0L, 50L), reads)
+        }
+
+    @Test
+    fun slowSetupReturnsToTheSteadyPollInterval() =
+        runTest {
+            val reads = mutableListOf<Long>()
+            awaitAccountNetworkReady("created") {
+                val now = testScheduler.currentTime
+                reads += now
+                if (now >= 700) AccountSetupReadinessFfi.NETWORK_READY else AccountSetupReadinessFfi.PUBLISHING
+            }
+            assertEquals(listOf(0L, 50L, 150L, 250L, 500L, 750L), reads)
         }
 
     /** Recovery is MDK's typed setup failure, never a ready account. */

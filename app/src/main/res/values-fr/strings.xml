@@ -2838,4 +2838,6 @@
     <string name="remote_signer_disconnect_body">Ce compte reste sur cet appareil. L’envoi et les autres actions nécessitant une signature seront de nouveau possibles après une nouvelle association.</string>
     <string name="remote_signer_disconnect_confirm">Déconnecter</string>
     <string name="remote_signer_switcher_attention">L’application de signature demande votre attention</string>
+    <string name="dictation_transcribe_voice_messages_title">Transcrire automatiquement les messages vocaux</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">Affiche les transcriptions des messages vocaux téléchargés dans la conversation. Nécessite Offline Speech to Text.</string>
 </resources>

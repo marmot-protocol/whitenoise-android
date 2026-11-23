@@ -2923,4 +2923,6 @@
     <string name="remote_signer_disconnect_body">Аккаунт останется на этом устройстве. Отправка сообщений и другие действия, требующие подписи, станут доступны после повторного подключения.</string>
     <string name="remote_signer_disconnect_confirm">Отключить</string>
     <string name="remote_signer_switcher_attention">Приложение для подписи требует внимания</string>
+    <string name="dictation_transcribe_voice_messages_title">Автоматически расшифровывать голосовые сообщения</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">Показывает расшифровки загруженных голосовых сообщений в чате. Требуется Offline Speech to Text.</string>
 </resources>

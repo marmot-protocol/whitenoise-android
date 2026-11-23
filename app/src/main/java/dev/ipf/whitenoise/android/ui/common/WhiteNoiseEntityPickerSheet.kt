@@ -2,14 +2,11 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.BasicTextField
@@ -17,12 +14,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -32,7 +26,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -53,11 +46,11 @@ import androidx.compose.ui.semantics.collectionItemInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -142,7 +135,6 @@ fun WhiteNoiseEntityPickerSheet(
                         horizontal = WhiteNoiseSpacing.CompactScreenMargin,
                         vertical = WhiteNoiseSpacing.Related,
                     ),
-                verticalArrangement = Arrangement.spacedBy(PickerRowGap),
             ) {
                 if (visible.isEmpty()) {
                     item { Text(stringResource(R.string.no_results), Modifier.padding(WhiteNoiseSpacing.Related)) }
@@ -151,7 +143,6 @@ fun WhiteNoiseEntityPickerSheet(
                     PickerRow(
                         item = item,
                         index = index,
-                        count = visible.size,
                         checked = item.id in selectedIds,
                         multiple = multiple,
                         onSelect =
@@ -176,20 +167,17 @@ fun WhiteNoiseEntityPickerSheet(
     }
 }
 
-/** One picker row on the segmented group shape: avatar, title and, for multi-select, a checkbox. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** One full-width row with an avatar, title and, for multi-select, a checkbox. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 private fun PickerRow(
     item: WhiteNoisePickerItem,
     index: Int,
-    count: Int,
     checked: Boolean,
     multiple: Boolean,
     onSelect: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    val shape = ListItemDefaults.segmentedShapes(index, count).shape
     val interaction =
         when {
             onSelect == null -> Modifier
@@ -202,40 +190,27 @@ private fun PickerRow(
                 )
             else -> Modifier.toggleable(value = false, enabled = item.enabled, role = Role.Button) { onSelect(item.id) }
         }
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = amoledOutlineBorder(item.enabled),
-    ) {
-        Row(
-            Modifier
-                .then(interaction)
-                .semantics { collectionItemInfo = CollectionItemInfo(index, 1, 0, 1) }
-                .heightIn(min = PickerRowMinHeight)
-                .padding(horizontal = WhiteNoiseSpacing.FormField, vertical = WhiteNoiseSpacing.Related),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
-        ) {
-            // Items may be groups or people, so a picture this starts decoding stays single-use.
-            Avatar(
-                title = item.title,
-                seed = item.avatarSeed,
-                size = PickerAvatarSize,
-                pictureUrl = item.avatarUrl,
-                pictureDomain = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
-            )
-            EmojiLabel(item.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    ContactRow(
+        title = item.title,
+        subtitle = null,
+        avatarSeed = item.avatarSeed,
+        avatarUrl = item.avatarUrl,
+        avatarDomain = MediaTrustDomain.Unique,
+        modifier = modifier.then(interaction).semantics { collectionItemInfo = CollectionItemInfo(index, 1, 0, 1) },
+        trailing =
             if (multiple && onSelect != null) {
-                Checkbox(
-                    checked = checked,
-                    onCheckedChange = null,
-                    enabled = item.enabled,
-                    modifier = Modifier.clearAndSetSemantics {},
-                )
-            }
-        }
-    }
+                {
+                    Checkbox(
+                        checked = checked,
+                        onCheckedChange = null,
+                        enabled = item.enabled,
+                        modifier = Modifier.clearAndSetSemantics {},
+                    )
+                }
+            } else {
+                null
+            },
+    )
 }
 
 /**
@@ -263,8 +238,7 @@ fun WhiteNoiseCompactSearchField(
     val interactionSource = remember { MutableInteractionSource() }
     val outline =
         if (outlined) {
-            dev.ipf.whitenoise.android.ui.theme
-                .amoledOutlineBorder()
+            amoledOutlineBorder()
         } else {
             null
         }
@@ -342,7 +316,4 @@ data class WhiteNoisePickerItem(
 )
 
 private const val SHEET_HEIGHT_SHARE = 0.88f
-private val PickerRowGap = 2.dp
-private val PickerRowMinHeight = 56.dp
-private val PickerAvatarSize = 40.dp
 private val SearchFieldMinHeight = 48.dp

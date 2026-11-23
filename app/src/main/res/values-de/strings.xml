@@ -2850,4 +2850,6 @@
     <string name="remote_signer_disconnect_body">Dieses Konto bleibt auf dem Gerät. Senden und andere Aktionen, die eine Signatur erfordern, sind erst nach erneuter Kopplung wieder möglich.</string>
     <string name="remote_signer_disconnect_confirm">Trennen</string>
     <string name="remote_signer_switcher_attention">Signier-App benötigt deine Aufmerksamkeit</string>
+    <string name="dictation_transcribe_voice_messages_title">Sprachnachrichten automatisch transkribieren</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">Zeigt Transkripte heruntergeladener Sprachnachrichten beim Lesen des Chats an. Offline Speech to Text ist erforderlich.</string>
 </resources>

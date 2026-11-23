@@ -42,6 +42,14 @@
         "test_ids": [
           "ONB-003"
         ]
+      },
+      {
+        "surface": "Sign Up reuses MDK's confirmed initial profile when it matches the submission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
+        "anchor": "initialProfile == metadata || appState.publishProfile(metadata)",
+        "test_ids": [
+          "ONB-003"
+        ]
       }
     ]
   },
