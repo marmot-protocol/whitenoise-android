@@ -7,11 +7,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -19,8 +21,10 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.BackupRestorePhaseFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.HistoryBackupAction
 import dev.ipf.whitenoise.android.state.HistoryBackupProblem
 import dev.ipf.whitenoise.android.state.HistoryBackupStatus
@@ -156,7 +160,7 @@ class HistoryBackupsScreenshotTest {
         compose.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
-    /** Typed restore words are handed over once, then cleared, and never come back from saved state. */
+    /** Restore words survive refusal, clear when restore starts, and stay out of saved state. */
     @Test fun restoreWordsAreClearedAndNeverRestoredFromSavedState() {
         val restored = mutableListOf<String>()
         val state = mutableStateOf(HistoryBackupsState(status = HistoryBackupStatus.Off))
@@ -190,6 +194,9 @@ class HistoryBackupsScreenshotTest {
         button.performClick()
         assertEquals(listOf(fixture), restored)
         compose.runOnIdle { state.value = state.value.copy(problem = HistoryBackupProblem.InvalidRestoreWords) }
+        val error = ApplicationProvider.getApplicationContext<android.app.Application>()
+            .getString(R.string.history_backups_problem_restore_words)
+        compose.onNodeWithText(error).assertIsDisplayed()
         assertTrue(
             compose
                 .onNodeWithTag("history_backups.restore_words")

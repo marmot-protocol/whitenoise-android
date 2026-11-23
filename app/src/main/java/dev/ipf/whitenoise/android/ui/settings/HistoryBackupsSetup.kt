@@ -254,7 +254,7 @@ internal fun RecoveryWordsInput(
         enabled = enabled,
         modifier = modifier,
         label = { Text(label) },
-        supportingText = supporting?.let { { Text(it) } },
+        supportingText = (error ?: supporting)?.let { { Text(it) } },
         errorMessage = error,
         keyboardOptions =
             KeyboardOptions(
