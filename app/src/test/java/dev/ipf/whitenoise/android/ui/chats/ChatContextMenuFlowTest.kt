@@ -115,7 +115,10 @@ class ChatContextMenuFlowTest {
                     val bounds = screenBounds(menu)
                     val pressX = rowBounds.left + rowBounds.width * fraction
                     val expectedLeft =
-                        (pressX - bounds.width / 2).coerceIn(frame.left + menuMargin, frame.right - menuMargin - bounds.width)
+                        (pressX - bounds.width / 2).coerceIn(
+                            frame.left + menuMargin,
+                            frame.right - menuMargin - bounds.width,
+                        )
                     assertEquals(expectedLeft, bounds.left, 2f)
                     assertTrue(bounds.top >= frame.top && bounds.bottom <= frame.bottom)
                     composeRule.onNode(isPopup()).dispatchNativePopupBack()
