@@ -306,11 +306,13 @@ internal fun FullScreenMediaViewer(
     }
 
     // Render ownership is independent of action retirement during a valid visual exit.
-    val accountOwnerCurrent = actionOwner.accountRef != null && currentActionOwner() == actionOwner
-    val sourceOwnerCurrent =
-        accountOwnerCurrent &&
+    fun viewerSourceIsCurrent(): Boolean =
+        actionOwner.accountRef != null &&
+            currentActionOwner() == actionOwner &&
             controller.ownsRetainedForegroundPresentation &&
             controller.boundAccountRef == actionOwner.accountRef
+
+    val sourceOwnerCurrent = viewerSourceIsCurrent()
     val privacyBlocked = viewerPrivacyBlocked()
     LaunchedEffect(sourceOwnerCurrent, privacyBlocked) {
         if (!sourceOwnerCurrent || privacyBlocked) onDismiss()
@@ -735,7 +737,11 @@ internal fun FullScreenMediaViewer(
                     val sourceController = pageController(pageDescriptor)
                     // Retained cross-chat pages can outlive their controller lookup. Reject the opener's
                     // fallback before either renderer reads thumbnails, pending media, files or decoded pixels.
-                    if (!exportPageOwnerIsCurrent(pageDescriptor, sourceController)) {
+                    val pageSourceCurrent =
+                        viewerSourceIsCurrent() &&
+                            !viewerPrivacyBlocked() &&
+                            actionOwner.matchesPageSource(pageDescriptor, sourceController)
+                    if (!pageSourceCurrent) {
                         Box(Modifier.fillMaxSize())
                         return@StableMediaViewerPager
                     }
