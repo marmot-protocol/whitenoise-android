@@ -218,12 +218,14 @@ internal object EmojiShortcodes {
     }
 
     /** Nonliteral shortcodes for non-Compose presentation; reuse the same code/link exclusions. */
-    fun presentationShortcodes(text: String): List<String> =
+    fun presentationShortcodes(text: String): List<String> = presentationRanges(text).map { it.item }.distinct()
+
+    /** Each nonliteral shortcode in [text] with its range, in text order. */
+    fun presentationRanges(text: String): List<AnnotatedString.Range<String>> =
         annotate(AnnotatedString(text))
             .getStringAnnotations(0, text.length)
             .filter { it.tag == inlineContentTag }
-            .map { it.item }
-            .distinct()
+            .sortedBy { it.start }
 
     /** Inline artwork for every shortcode defined here, with user files taking precedence. */
     @Composable

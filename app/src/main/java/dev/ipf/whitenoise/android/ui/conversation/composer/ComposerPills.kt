@@ -117,18 +117,13 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.scrollBy
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -467,91 +462,15 @@ internal fun ComposerPill(
                 }
             }
         }
-    // #414/#442: paint stored `@npub1…` chip runs as friendly visible labels
-    // (`@alice` when the profile is resolved, short `@npub1…` otherwise)
-    // while keeping the backing TextFieldValue canonical for send/markdown.
-    // A filled chip with black-or-white content reads on any accent, including ones that vanish as text.
-    val chipColor = actionColors.container
-    val chipContentColor = actionColors.content
-    val mentionCandidateLookup =
-        remember(highlightMentionChips, mentionCandidates) {
-            if (highlightMentionChips) MentionComposer.candidatesByNpub(mentionCandidates) else emptyMap()
-        }
-    val mentionComposition = textFieldValue.composition
+    val emojiPainters = rememberComposerEmojiPainters(textFieldValue.text)
     val mentionVisualTransformation =
-        remember(highlightMentionChips, chipColor, chipContentColor, mentionCandidateLookup, mentionComposition) {
-            if (!highlightMentionChips) {
-                VisualTransformation.None
-            } else {
-                VisualTransformation { text ->
-                    // #607: the chip renderer must never crash the composer. The
-                    // primary fix (MentionComposer.repairChipDeletion in
-                    // onValueChange) makes a partial `@npub1…` chip state
-                    // impossible, but degrade gracefully — fall back to the
-                    // untransformed text — if any unforeseen malformed input
-                    // state still drives buildAnnotatedString / the offset
-                    // mapping out of bounds, rather than letting it throw.
-                    runCatching {
-                        val visual = MentionComposer.editingVisualText(text.text, mentionCandidateLookup)
-                        // Legacy BasicTextField reports the IME's composing-character
-                        // bounds through CursorAnchorInfo. A shortened mention label can
-                        // map both ends of a non-empty composing range inside the stored
-                        // `@npub...` to the same visible offset; Compose then forwards an
-                        // empty range to fillBoundingBoxes and crashes. Keep the canonical
-                        // text and identity mapping only for that transient composition.
-                        // Friendly mention labels return as soon as the IME commits it.
-                        val compositionCollapses =
-                            mentionComposition?.takeUnless { it.collapsed }?.let { composition ->
-                                visual.originalToTransformed(composition.min) >=
-                                    visual.originalToTransformed(composition.max)
-                            } == true
-                        if (compositionCollapses) {
-                            return@runCatching TransformedText(text, OffsetMapping.Identity)
-                        }
-                        val visualLength = visual.text.length
-                        val styled =
-                            buildAnnotatedString {
-                                append(visual.text)
-                                visual.ranges.forEach { range ->
-                                    // Clamp span bounds into the transformed text
-                                    // so a stale/oversized range can't trip
-                                    // addStyle's range check.
-                                    val spanStart = range.transformed.first.coerceIn(0, visualLength)
-                                    val spanEnd = (range.transformed.last + 1).coerceIn(spanStart, visualLength)
-                                    if (spanEnd > spanStart) {
-                                        addStyle(
-                                            SpanStyle(
-                                                color = chipContentColor,
-                                                fontWeight = FontWeight.Medium,
-                                                background = chipColor,
-                                            ),
-                                            spanStart,
-                                            spanEnd,
-                                        )
-                                    }
-                                }
-                            }
-                        val offsetMapping =
-                            object : OffsetMapping {
-                                /** Maps the source caret into the bounded mention-chip text. */
-                                override fun originalToTransformed(offset: Int): Int =
-                                    visual
-                                        .originalToTransformed(offset)
-                                        .coerceIn(0, visualLength)
-
-                                /** Maps chip selections into the current source draft bounds. */
-                                override fun transformedToOriginal(offset: Int): Int =
-                                    visual
-                                        .transformedToOriginal(offset)
-                                        .coerceIn(0, text.text.length)
-                            }
-                        TransformedText(styled, offsetMapping)
-                    }.getOrElse {
-                        TransformedText(text, OffsetMapping.Identity)
-                    }
-                }
-            }
-        }
+        rememberComposerVisualTransformation(
+            highlightMentionChips,
+            mentionCandidates,
+            actionColors,
+            textFieldValue.composition,
+            emojiShortcodes = emojiPainters.keys.toSet(),
+        )
     val transformedText =
         remember(textFieldValue.text, mentionVisualTransformation) {
             mentionVisualTransformation.filter(AnnotatedString(textFieldValue.text))
@@ -1737,7 +1656,7 @@ internal fun ComposerPill(
                                                 } else {
                                                     false
                                                 }
-                                            },
+                                            }.composerEmojiArtwork(emojiPainters) { textLayoutSnapshot?.result },
                                     textStyle = composerTextStyle,
                                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                                     visualTransformation = mentionVisualTransformation,

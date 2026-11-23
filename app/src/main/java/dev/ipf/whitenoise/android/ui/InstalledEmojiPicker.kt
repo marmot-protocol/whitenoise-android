@@ -91,6 +91,20 @@ internal fun ComposerEmojiLibrary(
     CompositionLocalProvider(LocalCustomEmoji provides library, content = content)
 }
 
+/**
+ * Artwork the composer sends for [emoji]: installed or conversation sets when they own the code,
+ * otherwise bundled or device-local files. Null for Unicode and for codes whose artwork has not loaded.
+ */
+@Composable
+internal fun composerEmojiArtwork(emoji: String): EmojiArt? {
+    val library = LocalCustomEmoji.current
+    return if (library.usesInstalledArtwork(emoji) || library.usesConversationArtwork(emoji)) {
+        libraryEmojiArtwork(emoji)
+    } else {
+        EmojiShortcodes.art(emoji, library, emptyMap())
+    }
+}
+
 /** Resolves one visible shortcode without retaining stale pixels when its set or account changes. */
 @Composable
 internal fun libraryEmojiArtwork(shortcode: String): EmojiArt? {

@@ -408,6 +408,7 @@ internal fun ComposerBar(
 ) {
     var lastMeasuredHeight by remember { mutableStateOf(0) }
     val routeDensity = LocalDensity.current
+    val composerEmojiShortcodes = rememberComposerEmojiShortcodes()
     if (!LocalControlHandoffEndpointCurrent.current) {
         // Retain only layout, never an outgoing input connection, focus target or action callback.
         Box(modifier.fillMaxWidth().height(with(routeDensity) { lastMeasuredHeight.toDp() }))
@@ -967,7 +968,8 @@ internal fun ComposerBar(
     /** Deletes the current selection or previous code point and repairs mention tokens before publishing. */
     fun deleteFromComposer() {
         val proposedValue = deleteComposerSelectionOrPreviousCodePoint(textFieldValue) ?: return
-        val updatedValue = repairComposerMentionEdit(textFieldValue, proposedValue, mentionPickerEnabled)
+        val updatedValue =
+            repairComposerMentionEdit(textFieldValue, proposedValue, mentionPickerEnabled, composerEmojiShortcodes)
         applyComposerFieldValue(updatedValue)
     }
 
@@ -1693,7 +1695,13 @@ internal fun ComposerBar(
                         onValueChange = { value ->
                             finishControlMorph()
                             if (!isRecordingVoice && voiceReviewClip == null) {
-                                val applied = repairComposerMentionEdit(textFieldValue, value, mentionPickerEnabled)
+                                val applied =
+                                    repairComposerMentionEdit(
+                                        textFieldValue,
+                                        value,
+                                        mentionPickerEnabled,
+                                        composerEmojiShortcodes,
+                                    )
                                 applyComposerFieldValue(applied)
                             }
                         },

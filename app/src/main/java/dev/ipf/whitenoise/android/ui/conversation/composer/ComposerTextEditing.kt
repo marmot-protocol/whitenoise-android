@@ -57,10 +57,15 @@ internal fun deleteComposerSelectionOrPreviousCodePoint(value: TextFieldValue): 
     return value.copy(text = updatedText, selection = TextRange(deleteStart), composition = null)
 }
 
+/**
+ * Keeps mention chips and rendered [emojiShortcodes] whole across deletions and caret moves, then clamps the
+ * selection out of chips when [clampMentionSelection] is set.
+ */
 internal fun repairComposerMentionEdit(
     oldValue: TextFieldValue,
     proposedValue: TextFieldValue,
     clampMentionSelection: Boolean,
+    emojiShortcodes: Set<String> = emptySet(),
 ): TextFieldValue {
     val repaired =
         MentionComposer.wholeChipBackspace(
@@ -75,8 +80,13 @@ internal fun repairComposerMentionEdit(
                 includeAdjacentOwnedSeparator = oldValue.selection.collapsed,
             )
     val edited =
-        repaired?.let { TextFieldValue(text = it.text, selection = TextRange(it.selection)) }
-            ?: proposedValue
+        clampComposerEmojiSelection(
+            oldValue,
+            repaired?.let { TextFieldValue(text = it.text, selection = TextRange(it.selection)) }
+                ?: repairComposerEmojiDeletion(oldValue, proposedValue, emojiShortcodes)
+                ?: proposedValue,
+            emojiShortcodes,
+        )
     if (!clampMentionSelection) return edited
 
     val clamped =
