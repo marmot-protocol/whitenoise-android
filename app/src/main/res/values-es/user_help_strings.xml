@@ -1,9 +1,5 @@
 <resources>
     <string name="learn_white_noise">Conoce White Noise</string>
-    <string name="user_documentation">Documentación</string>
-    <string name="search_documentation">Buscar en la documentación</string>
-    <string name="documentation_unavailable">No se pudieron abrir las guías incluidas.</string>
-    <string name="help_open_share_connect">Abrir Compartir y conectar</string>
     <string name="learn_find_title">Encontrar a alguien</string>
     <string name="learn_find_body">Abre un chat nuevo y pega el enlace del perfil o escanea su código QR. Si no encuentras el nombre, pide el enlace del perfil.</string>
     <string name="learn_share_title">Comparte tu perfil</string>
@@ -17,5 +13,4 @@
     <string name="learn_previous">Anterior</string>
     <string name="learn_next">Siguiente</string>
     <string name="learn_close">Cerrar</string>
-    <string name="learn_view_topics">Ver todos los temas</string>
 </resources>

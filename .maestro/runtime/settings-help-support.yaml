@@ -17,16 +17,10 @@ name: settings-help-support
 - assertVisible: "Find someone"
 - tapOn: "Next"
 - assertVisible: "Share your profile"
-- tapOn: "View all topics"
-- assertVisible:
-    id: "documentation.search.open"
-- tapOn:
-    id: "documentation.search.open"
-- assertVisible: "Search documentation"
-- tapOn: "Back"
-- assertVisible:
-    id: "documentation.search.open"
-- tapOn: "Back"
+- tapOn: "Next"
+- tapOn: "Show message actions"
+- assertVisible: "Choose Reply to quote the message in your response, or choose an emoji to react."
+- tapOn: "Close"
 - assertVisible:
     id: "settings.help_support.group"
 - tapOn: "Back"

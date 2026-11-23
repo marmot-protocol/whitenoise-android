@@ -1,9 +1,5 @@
 <resources>
     <string name="learn_white_noise">White Noise’u keşfet</string>
-    <string name="user_documentation">Belgeler</string>
-    <string name="search_documentation">Belgelerde ara</string>
-    <string name="documentation_unavailable">Uygulamayla gelen kılavuzlar açılamadı.</string>
-    <string name="help_open_share_connect">Paylaş ve bağlan ekranını aç</string>
     <string name="learn_find_title">Birini bul</string>
     <string name="learn_find_body">Yeni bir sohbet açıp profil bağlantısını yapıştır veya QR kodunu tara. Adla arama sonuç vermezse profil bağlantısını iste.</string>
     <string name="learn_share_title">Profilini paylaş</string>
@@ -17,5 +13,4 @@
     <string name="learn_previous">Önceki</string>
     <string name="learn_next">Sonraki</string>
     <string name="learn_close">Kapat</string>
-    <string name="learn_view_topics">Tüm konuları göster</string>
 </resources>

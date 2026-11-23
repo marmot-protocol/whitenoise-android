@@ -7137,22 +7137,6 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
-      "symbol": "DocumentationScreen",
-      "bindings": [
-        {
-          "case": "settings-help-support",
-          "selector": {
-            "id": "documentation.search.open"
-          },
-          "scope": "Help hub navigation to the first visible control.",
-          "opened_by": {
-            "text": "View all topics"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
       "symbol": "LearnWhiteNoiseScreen",
       "bindings": [
         {

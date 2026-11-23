@@ -108,6 +108,15 @@
         ]
       },
       {
+        "surface": "SettingsHomeSearchAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsHomeSearchAction(",
+        "test_ids": [
+          "SET-042",
+          "SET-044"
+        ]
+      },
+      {
         "surface": "Settings home hold-to-explain: profile row",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "explanation_settings_profile_row",
@@ -183,6 +192,16 @@
         "test_ids": [
           "SET-001",
           "ONB-009"
+        ]
+      },
+      {
+        "surface": "setting:settings_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_search",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
         ]
       },
       {

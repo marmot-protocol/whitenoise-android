@@ -50,7 +50,7 @@
         "SET-001",
         "SET-069"
       ],
-      "assertions": "Help hub opens the walkthrough, advances one card and opens Documentation; toolbar Back returns to the hub, Settings and Chats.",
+      "assertions": "Help hub opens the walkthrough, advances through its cards and reveals the sample message actions. Close returns to the hub, then toolbar Back returns to Settings and Chats.",
       "postcondition": "none"
     },
     "settings-notification-sounds": {

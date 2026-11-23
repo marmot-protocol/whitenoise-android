@@ -77,23 +77,6 @@ class SettingsSearchNavigationTest {
         composeRule.onNodeWithTag("settings.search.result.Appearance.font_size").assertIsDisplayed()
     }
 
-    @Test fun guideResultOpensArticleAndReturnsToSettingsQuery() {
-        mount()
-        search("account access")
-        val guide = composeRule.onNodeWithText("Account access")
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText("Account access").fetchSemanticsNodes().isNotEmpty()
-        }
-        guide.performClick()
-        composeRule.onNodeWithTag("settings.search.field").assertDoesNotExist()
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithText("Account access").fetchSemanticsNodes().isNotEmpty()
-        }
-        guide.assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
-        composeRule.onNodeWithTag("settings.search.field").assertTextContains("account access")
-    }
-
     @Test fun settingsListKeepsMultipleItemRootsVerticallySeparated() {
         composeRule.setContent {
             WhiteNoiseTheme {

@@ -11,10 +11,4 @@ internal fun userHelpSearchEntries(): List<SettingsSearchEntry> =
             R.string.settings_help_support,
             SettingsDetail.LearnWhiteNoise,
         ),
-        hubEntry(
-            "home.Documentation",
-            R.string.user_documentation,
-            R.string.settings_help_support,
-            SettingsDetail.Documentation,
-        ),
     )

@@ -768,10 +768,6 @@
           "represented_by": "home.LearnWhiteNoise"
         },
         {
-          "declaration": "\"documentation\"",
-          "represented_by": "home.Documentation"
-        },
-        {
           "declaration": "\"profile\"",
           "represented_by": "home.Profile"
         },
@@ -989,9 +985,6 @@
     },
     "LearnWhiteNoise": {
       "catalog_id": "home.LearnWhiteNoise"
-    },
-    "Documentation": {
-      "catalog_id": "home.Documentation"
     },
     "NotificationSounds": {
       "catalog_id": "home.NotificationSounds"

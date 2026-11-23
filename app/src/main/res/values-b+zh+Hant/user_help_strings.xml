@@ -1,9 +1,5 @@
 <resources>
     <string name="learn_white_noise">了解 White Noise</string>
-    <string name="user_documentation">說明文件</string>
-    <string name="search_documentation">搜尋說明文件</string>
-    <string name="documentation_unavailable">無法開啟內建指南。</string>
-    <string name="help_open_share_connect">開啟「分享與連線」</string>
     <string name="learn_find_title">尋找聯絡人</string>
     <string name="learn_find_body">開啟新聊天，貼上對方的個人資料連結或掃描 QR 碼。如果搜尋姓名找不到，請向對方索取個人資料連結。</string>
     <string name="learn_share_title">分享你的個人資料</string>
@@ -17,5 +13,4 @@
     <string name="learn_previous">上一頁</string>
     <string name="learn_next">下一頁</string>
     <string name="learn_close">關閉</string>
-    <string name="learn_view_topics">查看所有主題</string>
 </resources>

@@ -270,7 +270,6 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         -> SettingsDetail.DevicePrivacy
         SettingsDetail.Help,
         SettingsDetail.LearnWhiteNoise,
-        SettingsDetail.Documentation,
         SettingsDetail.Support,
         SettingsDetail.Donate,
         SettingsDetail.Developer,

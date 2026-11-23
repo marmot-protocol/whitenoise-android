@@ -1,9 +1,5 @@
 <resources>
     <string name="learn_white_noise">Знакомство с White Noise</string>
-    <string name="user_documentation">Документация</string>
-    <string name="search_documentation">Поиск в документации</string>
-    <string name="documentation_unavailable">Не удалось открыть встроенные руководства.</string>
-    <string name="help_open_share_connect">Открыть «Поделиться и связаться»</string>
     <string name="learn_find_title">Найти человека</string>
     <string name="learn_find_body">Откройте новый чат и вставьте ссылку на профиль или отсканируйте QR-код. Если поиск по имени не дал результатов, попросите ссылку на профиль.</string>
     <string name="learn_share_title">Поделиться профилем</string>
@@ -17,5 +13,4 @@
     <string name="learn_previous">Назад</string>
     <string name="learn_next">Далее</string>
     <string name="learn_close">Закрыть</string>
-    <string name="learn_view_topics">Все темы</string>
 </resources>

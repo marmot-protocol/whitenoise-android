@@ -5,7 +5,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -88,12 +87,6 @@ class SettingsSearchScreenshotTest {
                         searchResults = searchSettings(documents, query),
                     )
                 }
-            }
-        }
-        if (query == "font") {
-            // The bundled guide index is loaded on the IO dispatcher.
-            composeRule.waitUntil(5_000) {
-                composeRule.onAllNodesWithText("Android settings").fetchSemanticsNodes().isNotEmpty()
             }
         }
         composeRule.onNodeWithTag(SETTINGS_HOME_CONTENT_TAG).captureRoboImage("src/test/snapshots/$name.png")

@@ -2239,8 +2239,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
       "calls": {
-        "SettingsList": 1,
-        "fadingVerticalScroll": 2
+        "fadingVerticalScroll": 1
       },
       "family": "settings",
       "policy": "ordinary",

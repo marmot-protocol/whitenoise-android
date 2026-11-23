@@ -311,7 +311,7 @@ internal fun VoiceLanguageScreen(
     }
 }
 
-/** Help & support hub: guides, the support chat, donations and the developer tools. */
+/** Help & support hub: first-run help, the support chat, donations and the developer tools. */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun HelpSupportScreen(
@@ -334,15 +334,6 @@ internal fun HelpSupportScreen(
                             routeKey = SettingsDetail.LearnWhiteNoise,
                             leading = { SettingsLeadingIcon(R.drawable.ic_help) },
                             onClick = { onOpenDetail(SettingsDetail.LearnWhiteNoise) },
-                        )
-                    }
-                    row("documentation") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.user_documentation),
-                            routeKey = SettingsDetail.Documentation,
-                            leading = { SettingsLeadingIcon(R.drawable.ic_help) },
-                            onClick = { onOpenDetail(SettingsDetail.Documentation) },
                         )
                     }
                     row("help") { context ->

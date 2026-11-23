@@ -205,9 +205,6 @@ jobs:
       - name: Test Maestro production-source and screen contracts
         run: python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_screen_coverage.py scripts/test_maestro_modal_discovery.py
 
-      - name: Validate offline Android user guides
-        run: python3 scripts/check_user_guides.py
-
       - name: Validate manual release guide
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
