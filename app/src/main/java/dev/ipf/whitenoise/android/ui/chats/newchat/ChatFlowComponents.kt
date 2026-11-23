@@ -48,8 +48,10 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.FollowedPersonBadge
 import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.isFollowedPerson
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.icons.filled.RadioButtonUnchecked
@@ -123,7 +125,8 @@ internal fun FlowSearchField(
  * Renders a reusable person row while keeping relationship and selection states independent.
  *
  * [isFollowed] adds the followed-person avatar badge and exports the localized `You follow`
- * state once from the row. [selectionState] remains separate so multi-select pickers can expose
+ * state once from the row; a row naming its person as [followedAccount] gets both while the
+ * active account follows them. [selectionState] remains separate so multi-select pickers can expose
  * selected and followed at the same time without making the badge look like a selection control.
  * [avatarAnimationKey] lets a stored person picture in [avatarImage] animate under the profile policy.
  * [avatarDomain] is the worker domain that decodes [avatarUrl], single-use unless the caller names one: a person
@@ -143,6 +146,7 @@ internal fun ContactRow(
     avatarImage: ImageBitmap? = null,
     avatarAnimationKey: String? = null,
     isFollowed: Boolean = false,
+    followedAccount: String? = null,
     selectionState: Boolean? = null,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
@@ -158,8 +162,9 @@ internal fun ContactRow(
     avatarDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
+    val followed = isFollowedPerson(isFollowed, followedAccount)
     val followedStateDescription =
-        if (isFollowed) {
+        if (followed) {
             stringResource(R.string.user_search_you_follow)
         } else {
             null
@@ -205,7 +210,7 @@ internal fun ContactRow(
                 groupAnimation = groupAnimation,
                 pictureDomain = avatarDomain,
             )
-            if (isFollowed) {
+            if (followed) {
                 FollowedPersonBadge(modifier = Modifier.align(Alignment.BottomEnd))
             }
         }

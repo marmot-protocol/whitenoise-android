@@ -302,6 +302,7 @@ private fun ReactionParticipantRow(
             seed = participant.sender,
             size = 48.dp,
             pictureUrl = appState.contactAvatarSource(participant.sender),
+            followedAccount = participant.sender,
         )
     }
     val trailing: @Composable () -> Unit = {

@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
@@ -200,29 +201,31 @@ internal fun AgentOperationRow(
             verticalAlignment = Alignment.Bottom,
         ) {
             if (sender != null) {
-                Box(
-                    modifier =
-                        if (onSenderClick != null) {
-                            Modifier
-                                .then(senderModifier)
-                                .clip(CircleShape)
-                                .semantics { contentDescription = sender.name }
-                                .clickable(
-                                    onClickLabel = stringResource(R.string.chat_list_search_open_profile),
-                                    role = Role.Button,
-                                    onClick = senderClick,
-                                )
-                        } else {
-                            Modifier
-                        },
-                ) {
-                    Avatar(
-                        title = sender.name,
-                        seed = sender.seed,
-                        size = 32.dp,
-                        pictureUrl = sender.avatarUrl,
-                        pictureDomain = AvatarImageLoader.publicProfiles(),
-                    )
+                FollowedPersonAvatarFrame(sender.seed, 32.dp) {
+                    Box(
+                        modifier =
+                            if (onSenderClick != null) {
+                                Modifier
+                                    .then(senderModifier)
+                                    .clip(CircleShape)
+                                    .semantics { contentDescription = sender.name }
+                                    .clickable(
+                                        onClickLabel = stringResource(R.string.chat_list_search_open_profile),
+                                        role = Role.Button,
+                                        onClick = senderClick,
+                                    )
+                            } else {
+                                Modifier
+                            },
+                    ) {
+                        Avatar(
+                            title = sender.name,
+                            seed = sender.seed,
+                            size = 32.dp,
+                            pictureUrl = sender.avatarUrl,
+                            pictureDomain = AvatarImageLoader.publicProfiles(),
+                        )
+                    }
                 }
                 Spacer(Modifier.width(8.dp))
             }

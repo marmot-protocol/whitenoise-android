@@ -79,6 +79,7 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSnackbarTimeoutEffect
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
+import dev.ipf.whitenoise.android.ui.common.followedPeopleFor
 import dev.ipf.whitenoise.android.ui.common.rememberExplanationHostState
 import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalPendingCameraCaptureFiles
@@ -214,7 +215,6 @@ internal fun WhiteNoiseApp(
     val profileEntryTicket = remember(inboundProfilePayload) { appState.diagnostics.observations.ticket() }
     val notificationEntryTicket = remember(inboundNotificationRequestId) { appState.diagnostics.observations.ticket() }
     val shareEntryTicket = remember(inboundShareRequest) { appState.diagnostics.observations.ticket() }
-
     val diagnosticsPromptOwner = mainShellStateHolder.startupDiagnosticsPrompt(appState.runtimeGeneration)
     val diagnosticsPromptOpen = diagnosticsPromptOwner.prompt.visible || diagnosticsPromptOwner.busy
     val diagnosticsEligible = appState.phase == AppPhase.Ready && appState.activeAccountRef != null
@@ -575,7 +575,6 @@ internal fun WhiteNoiseApp(
             dictation.cancel()
         }
     }
-
     val explanationHost = rememberExplanationHostState()
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
     // whole app UI so every descendant text field requests incognito mode from
@@ -588,6 +587,7 @@ internal fun WhiteNoiseApp(
             LocalHiddenBuiltinEmojiSets provides rememberBuiltinEmojiSetChoices(context).pickerHidden,
             LocalInAppLinkHandler provides inAppLinkHandler,
             LocalExplanationHost provides explanationHost,
+            followedPeopleFor(appState),
         ) {
             // Holding a control explains it; the lock drops any open explanation.
             ExplanationSheetHost(explanationHost, visible = !appState.appLock.screenVisible)

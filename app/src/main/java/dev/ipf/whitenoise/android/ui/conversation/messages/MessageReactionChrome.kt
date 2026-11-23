@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import kotlin.math.roundToInt
 
@@ -67,26 +68,29 @@ internal fun RowScope.MessageSenderAvatarSlot(
                 .then(avatarAlignment),
     ) {
         if (showSenderAvatar) {
-            Box(
-                modifier =
-                    Modifier
-                        .clip(CircleShape)
-                        .messageRowChrome(rowOwnsSemantics)
-                        .clickable(enabled = enabled, onClick = onClick),
-            ) {
-                Avatar(
-                    title = title,
-                    seed = seed,
-                    size = 30.dp,
-                    pictureUrl =
-                        pictureUrl.takeIf {
-                            picture == null ||
-                                dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
-                                    .isPrivate(it)
-                        },
-                    picture = picture,
-                    pictureDomain = AvatarImageLoader.publicProfiles(),
-                )
+            // [seed] is the sender's key; the clip shapes the profile ripple, so the followed badge sits outside it.
+            FollowedPersonAvatarFrame(seed, 30.dp) {
+                Box(
+                    modifier =
+                        Modifier
+                            .clip(CircleShape)
+                            .messageRowChrome(rowOwnsSemantics)
+                            .clickable(enabled = enabled, onClick = onClick),
+                ) {
+                    Avatar(
+                        title = title,
+                        seed = seed,
+                        size = 30.dp,
+                        pictureUrl =
+                            pictureUrl.takeIf {
+                                picture == null ||
+                                    dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+                                        .isPrivate(it)
+                            },
+                        picture = picture,
+                        pictureDomain = AvatarImageLoader.publicProfiles(),
+                    )
+                }
             }
         }
     }

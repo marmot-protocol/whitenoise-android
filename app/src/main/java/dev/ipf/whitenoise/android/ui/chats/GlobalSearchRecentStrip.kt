@@ -106,7 +106,8 @@ internal fun GlobalSearchRecentStrip(
         when (val destination = byKey[entry.key]) {
             is GlobalSearchRecentDestination.Chat -> {
                 val title = chatListItemDisplayTitle(destination.item, appState, groupTitleCopy)
-                ChatListItemAvatar(destination.item, appState, accountRef, title, GlobalSearchRecentAvatarSize)
+                val peer = chatListItemFollowedPeer(destination.item, accountRef, appState.activeAccountRef)
+                ChatListItemAvatar(destination.item, appState, accountRef, title, GlobalSearchRecentAvatarSize, peer)
                 GlobalSearchRecentTitle(title)
             }
             is GlobalSearchRecentDestination.Profile -> {
@@ -118,6 +119,7 @@ internal fun GlobalSearchRecentStrip(
                     GlobalSearchRecentAvatarSize,
                     pictureUrl = appState.avatarUrl(account),
                     pictureDomain = AvatarImageLoader.publicProfiles(),
+                    followedAccount = account,
                 )
                 GlobalSearchRecentTitle(name)
             }
