@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.controlMorphSurface
 import dev.ipf.whitenoise.android.ui.common.drawControlMorphPen
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
+import kotlin.math.ceil
 
 /** The shell connects only these two real controls; no composer or draft state is shared. */
 internal enum class ComposerFabEndpoint { Composer, NewMessage }
@@ -54,7 +55,7 @@ internal fun Modifier.composerFabSurface(
             fill,
             border,
             with(density) { radiusDp.dp.toPx() },
-            with(density) { 1.dp.toPx() },
+            with(density) { ceil(1.dp.toPx()) },
             decorationAlpha = if (endpoint == ComposerFabEndpoint.NewMessage) 1f else 0f,
         ),
         nativeChromeSettled = !morphing,

@@ -206,7 +206,7 @@ internal fun Modifier.settingsBubbleMotion(
             val content: (DrawScope.() -> Unit)? =
                 picture?.let { frame -> { drawIntoCanvas { it.nativeCanvas.drawPicture(frame) } } }
             val ink = settingsBubbleInk(presence, opening = false, resume)
-            drawSettingsArrival(bubble, presence, colors, ink, content)
+            drawSettingsArrival(bubble, presence, colors, ink, content = content)
         }
     }
 
@@ -216,12 +216,17 @@ internal fun DrawScope.drawSettingsArrival(
     presence: Float,
     colors: SettingsBubbleColors,
     ink: Float,
+    pageAlpha: Float =
+        if (landing == null) {
+            ((presence - SETTINGS_FADE_START) / (1f - SETTINGS_FADE_START)).coerceAtLeast(0f)
+        } else {
+            presence
+        },
     content: (DrawScope.() -> Unit)?,
 ) {
-    val alpha = if (landing == null) ((presence - SETTINGS_FADE_START) / (1f - SETTINGS_FADE_START)) else presence
-    val pageAlpha = alpha.coerceAtLeast(0f) * ink
-    if (content != null && pageAlpha > 0f) {
-        drawAtAlpha(Rect(0f, 0f, size.width, size.height), pageAlpha) {
+    val effectivePageAlpha = pageAlpha * ink
+    if (content != null && effectivePageAlpha > 0f) {
+        drawAtAlpha(Rect(0f, 0f, size.width, size.height), effectivePageAlpha) {
             val card = landing?.card?.visibleBounds
             if (card == null) {
                 content()

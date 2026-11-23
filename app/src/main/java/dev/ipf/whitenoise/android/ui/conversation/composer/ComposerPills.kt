@@ -149,7 +149,11 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
+import dev.ipf.whitenoise.android.ui.conversation.ComposerResizeHandleThickness
+import dev.ipf.whitenoise.android.ui.conversation.ComposerResizeHandleWidth
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationSettingsMotion
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
+import dev.ipf.whitenoise.android.ui.conversation.conversationSettingsGrip
 import dev.ipf.whitenoise.android.ui.conversation.conversationSettingsOutline
 import dev.ipf.whitenoise.android.ui.design.platformBackCallbacksEnabled
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
@@ -181,8 +185,6 @@ private val ComposerOutlineThickness = 1.dp
 
 // The drag strip's visible grip: Material's drag-handle proportions, drawn in the outline colour so it
 // reads as chrome rather than content.
-private val ComposerResizeHandleWidth = 32.dp
-private val ComposerResizeHandleThickness = 4.dp
 private val ExpandedEditorBottomInset = 48.dp
 
 /** Interpolates one layout-space distance without allocating an animation object. */
@@ -1355,6 +1357,8 @@ internal fun ComposerPill(
         val morphing = LocalComposerFabHandoff.current?.active == true
         val nativePreview =
             if (toolbarPreview) {
+                val settingsMotion = LocalConversationSettingsMotion.current
+                val reportPreview = remember(settingsMotion) { settingsMotion?.let { it::reportComposerPreview } }
                 dev.ipf.whitenoise.android.ui.settings
                     .rememberSettingsNativeSurface(
                         destination = "composer.editor",
@@ -1362,9 +1366,16 @@ internal fun ComposerPill(
                         fill = sourceFill,
                         shape = sourceShape,
                         strokeColor = sourceBorder,
+                        onMeasured = reportPreview,
                     ).first
             } else {
-                Modifier.conversationSettingsOutline(sourceShape, sourceFill, sourceBorder, ComposerOutlineThickness)
+                Modifier.conversationSettingsOutline(
+                    sourceShape,
+                    sourceFill,
+                    sourceBorder,
+                    ComposerOutlineThickness,
+                    hasGrip = inputContentVisible,
+                )
             }
         Surface(
             color = if (morphing) Color.Transparent else sourceFill,
@@ -2128,6 +2139,7 @@ private fun ComposerResizeGestureStrip(modifier: Modifier = Modifier) {
                 .offset(y = (ComposerOutlineThickness - ComposerResizeHandleThickness) / 2)
                 .size(width = ComposerResizeHandleWidth, height = ComposerResizeHandleThickness)
                 .composerFabGrip()
+                .conversationSettingsGrip()
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.outlineVariant)
                 .testTag(COMPOSER_RESIZE_HANDLE_TAG),

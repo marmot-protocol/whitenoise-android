@@ -20,7 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
@@ -31,6 +34,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -38,19 +42,26 @@ import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
 import dev.ipf.whitenoise.android.ui.common.LocalNativePageBody
 import dev.ipf.whitenoise.android.ui.common.LocalScaffoldBodyInputBlocked
 import dev.ipf.whitenoise.android.ui.common.NativePageBody
+import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
 import dev.ipf.whitenoise.android.ui.navigation.ConversationRouteTransition
 import dev.ipf.whitenoise.android.ui.navigation.rememberConversationRouteTransition
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
+import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleCard
 import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleColors
 import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleGeometry
 import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleLanding
 import dev.ipf.whitenoise.android.ui.settings.SettingsBubbleSource
 import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
+import dev.ipf.whitenoise.android.ui.settings.drawAtAlpha
 import dev.ipf.whitenoise.android.ui.settings.drawSettingsArrival
+import dev.ipf.whitenoise.android.ui.settings.settingsBubbleShape
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphAnchorOutline
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.settings.settingsTransitionInputGate
+
+internal val ComposerResizeHandleWidth = 32.dp
+internal val ComposerResizeHandleThickness = 4.dp
 
 internal enum class ConversationSettingsRoute { Details, Composer }
 
@@ -64,7 +75,10 @@ internal class ConversationSettingsMotion(
 ) {
     var host by mutableStateOf(Rect.Zero)
     private var launch: SettingsContour? = null
-    private var launchHost = Rect.Zero
+    private var launchedWithGrip = false
+    private var launchImeBottom: Int? = null
+    private var composerHasGrip = false
+    private var composerPreview by mutableStateOf<List<SettingsBubbleCard>>(emptyList())
     private var preparedContour: SettingsContour? = null
     private var preparedSource: SettingsBubbleSource? = null
     private val landing = SettingsBubbleLanding()
@@ -86,25 +100,58 @@ internal class ConversationSettingsMotion(
         }
     val bodyAlpha get() = (1f - progress).coerceIn(0f, 1f)
 
-    /** Retire the launched geometry when the receiving host changes size or position. */
-    fun rememberLaunch(
-        contour: SettingsContour?,
-        bounds: Rect,
-    ) {
-        if (transition.targetState == null && !transition.isRunning) {
-            launch = contour
-            launchHost = bounds
+    /** Capture the real source before the activation dismisses the keyboard or popup. */
+    fun launchFromComposer(imeBottom: Int? = null) {
+        if (!suppressed && !transition.isRunning) {
+            launch = morph.anchorContour
+            launchedWithGrip = composerHasGrip
+            launchImeBottom = imeBottom
         }
     }
 
+    val outgoingImeBottom get() = launchImeBottom.takeUnless { transcriptActive }
+
+    fun clearLaunchWhenSettled() {
+        if (transcriptActive && !transition.isRunning) {
+            launch = null
+            launchImeBottom = null
+            launchedWithGrip = false
+        }
+    }
+
+    fun reportComposerGrip(visible: Boolean) {
+        composerHasGrip = visible
+    }
+
+    val movingGripAlpha: Float
+        get() =
+            if (!launchedWithGrip) {
+                0f
+            } else if (route == ConversationSettingsRoute.Composer) {
+                1f
+            } else {
+                nativePageBodyPresence(progress, destination = false)
+            }
+
+    private val drawsMovingOutline get() = route != null && progress > 0f && progress < 1f && bubble() != null
+
+    fun drawsNativeComposer() = !drawsMovingOutline
+
+    fun reportComposerPreview(card: SettingsBubbleCard?) {
+        composerPreview = listOfNotNull(card)
+    }
+
     fun bubble(): SettingsBubbleGeometry? {
-        val native = morph.anchorContour.takeIf { transcriptActive }
-        val contour = native ?: launch.takeIf { launchHost == host }
+        // Back during entry keeps the same origin. A settled page may return to a newly placed
+        // composer after the IME closed; its live bounds take precedence when available.
+        val native = morph.anchorContour.takeIf { transcriptActive && transition.currentState != null }
+        val contour = native ?: launch
         if (preparedContour !== contour) {
             preparedContour = contour
             preparedSource = contour?.bubbleSource()
         }
-        return landing.measure(host, morph.page?.bubbleCards().orEmpty(), preparedSource)
+        val cards = if (route == ConversationSettingsRoute.Composer) composerPreview else morph.page?.bubbleCards().orEmpty()
+        return landing.measure(host, cards, preparedSource)
     }
 
     private fun SettingsContour.bubbleSource() =
@@ -128,10 +175,8 @@ internal fun rememberConversationSettingsMotion(
 ): ConversationSettingsMotion {
     val transition = rememberConversationRouteTransition(target, suppressMotion = !animate, ownerKey = owner)
     val state = remember(transition, morph, animate) { ConversationSettingsMotion(transition, morph, !animate) }
-    // A launched outline stays at the pre-IME position until the outgoing leg ends.
-    val contour = morph.anchorContour
-    val bounds = state.host
-    SideEffect { state.rememberLaunch(contour, bounds) }
+    val running = transition.isRunning
+    SideEffect { if (!running) state.clearLaunchWhenSettled() }
     return state
 }
 
@@ -180,14 +225,18 @@ internal fun ConversationSettingsPage(
     val scheme = MaterialTheme.colorScheme
     val colors = SettingsBubbleColors(scheme.surfaceContainerLow, scheme.outlineVariant)
     val body = remember(motion) { NativePageBody() }
+    val view = LocalView.current
     val inputBlocked = remember(motion) { derivedStateOf { motion.progress < 1f } }
     val presentation =
-        Modifier.fillMaxSize().zIndex(1f).conversationSettingsHost(motion).drawWithContent {
-            drawConversationSettings(motion, colors, body)
-        }
+        Modifier
+            .fillMaxSize()
+            .zIndex(1f)
+            .onGloballyPositioned { motion.host = it.settingsMorphBounds(view) }
+            .drawWithContent { drawConversationSettings(motion, colors, body) }
     ConversationSettingsLayer(presentation.then(modifier), active = !motion.transcriptActive) {
         CompositionLocalProvider(
             LocalSettingsCardMorph provides motion.morph,
+            LocalConversationSettingsMotion provides motion,
             LocalNativePageBody provides body,
             LocalScaffoldBodyInputBlocked provides inputBlocked,
         ) { content(route) }
@@ -205,18 +254,34 @@ private fun ContentDrawScope.drawConversationSettings(
         drawContent()
         return
     }
-    val header = body.nativeBounds?.takeUnless { motion.transcriptActive }?.top
+    if (progress <= 0f) return
+    val header = body.nativeBounds?.top
     val bodyTop = header?.let { (it - motion.host.top).coerceIn(0f, size.height) } ?: 0f
-    if (bodyTop > 0f) clipRect(bottom = bodyTop) { this@drawConversationSettings.drawContent() }
-    clipRect(top = bodyTop) {
-        drawSettingsArrival(motion.bubble(), progress, colors, ink = 1f) { this@drawConversationSettings.drawContent() }
+    val bubble = motion.bubble()
+    val pageAlpha = if (bubble == null) progress else nativePageBodyPresence(progress, destination = true)
+    if (bodyTop > 0f && pageAlpha > 0f) {
+        clipRect(bottom = bodyTop) {
+            drawAtAlpha(Rect(0f, 0f, size.width, bodyTop), pageAlpha) { this@drawConversationSettings.drawContent() }
+        }
     }
-}
-
-@Composable
-internal fun Modifier.conversationSettingsHost(motion: ConversationSettingsMotion): Modifier {
-    val view = LocalView.current
-    return onGloballyPositioned { motion.host = it.settingsMorphBounds(view) }
+    clipRect(top = bodyTop) {
+        drawSettingsArrival(bubble, progress, colors, ink = 1f, pageAlpha = pageAlpha) {
+            this@drawConversationSettings.drawContent()
+        }
+        if (bubble != null && motion.movingGripAlpha > 0f) {
+            val shape = settingsBubbleShape(bubble, progress)
+            val width = ComposerResizeHandleWidth.roundToPx().toFloat()
+            val height = ComposerResizeHandleThickness.roundToPx().toFloat()
+            val top = shape.top + ((1.dp - ComposerResizeHandleThickness) / 2).roundToPx()
+            drawRoundRect(
+                color = colors.edge,
+                topLeft = Offset((shape.left + shape.right - width) / 2, top),
+                size = Size(width, height),
+                cornerRadius = CornerRadius(height / 2),
+                alpha = motion.movingGripAlpha,
+            )
+        }
+    }
 }
 
 internal fun Modifier.conversationSettingsBody(motion: ConversationSettingsMotion): Modifier =
@@ -231,10 +296,17 @@ internal fun Modifier.conversationSettingsOutline(
     fill: Color,
     border: Color,
     width: Dp,
+    hasGrip: Boolean = false,
 ): Modifier {
     val source = settingsMorphAnchorOutline(ConversationMorphAnchor.Composer, shape, border, width, fill)
     val motion = LocalConversationSettingsMotion.current ?: return source
-    return source.drawWithContent {
-        if (motion.route == null || motion.progress >= 1f || motion.bubble() == null) drawContent()
-    }
+    SideEffect { motion.reportComposerGrip(hasGrip) }
+    return source.drawWithContent { if (motion.drawsNativeComposer()) drawContent() }
+}
+
+/** One outline owns the resize grip while it moves between the two native surfaces. */
+@Composable
+internal fun Modifier.conversationSettingsGrip(): Modifier {
+    val motion = LocalConversationSettingsMotion.current ?: return this
+    return drawWithContent { if (motion.drawsNativeComposer()) drawContent() }
 }

@@ -34,9 +34,9 @@
         ]
       },
       {
-        "surface": "Modifier.conversationSettingsHost",
+        "surface": "Modifier.conversationSettingsOutline",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
-        "anchor": "fun Modifier.conversationSettingsHost(",
+        "anchor": "fun Modifier.conversationSettingsOutline(",
         "test_ids": [
           "CON-037",
           "GRP-041",
@@ -44,9 +44,9 @@
         ]
       },
       {
-        "surface": "Modifier.conversationSettingsOutline",
+        "surface": "Modifier.conversationSettingsGrip",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
-        "anchor": "fun Modifier.conversationSettingsOutline(",
+        "anchor": "fun Modifier.conversationSettingsGrip(",
         "test_ids": [
           "CON-037",
           "GRP-041",
@@ -59,6 +59,16 @@
         "surface": "Live transcript fade",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
         "anchor": "fun Modifier.conversationSettingsBody(",
+        "test_ids": [
+          "CON-037",
+          "GRP-041",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "Capture the composer before opening settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
+        "anchor": "fun launchFromComposer(",
         "test_ids": [
           "CON-037",
           "GRP-041",
