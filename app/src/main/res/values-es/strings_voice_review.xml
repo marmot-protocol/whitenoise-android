@@ -2,6 +2,17 @@
 <resources>
     <string name="voice_review_title">Revisar mensaje de voz</string>
     <string name="voice_record_again">Volver a grabar</string>
-    <string name="voice_message_release_to_review">Suelta para revisar · desliza para cancelar</string>
+    <string name="voice_message_slide_to_cancel">Desliza para cancelar</string>
     <string name="voice_recording_stop">Detener grabación</string>
+    <string name="voice_recording_pause">Pausar grabación</string>
+    <string name="voice_discard_title">¿Descartar mensaje de voz?</string>
+    <string name="voice_discard_message">Esta grabación no se ha enviado y se eliminará.</string>
+    <string name="voice_send_interrupted">No se envió el mensaje de voz</string>
+    <string name="voice_recording_elsewhere">Se está grabando un mensaje de voz en otro chat.</string>
+    <string name="voice_row_recording">Grabando mensaje de voz</string>
+    <string name="voice_row_unsent">Mensaje de voz sin enviar</string>
+    <string name="voice_recording_paused">Grabación de voz en pausa</string>
+    <string name="voice_send_on_release">Enviar mensajes de voz al soltar después de mantener pulsado</string>
+    <string name="voice_transcribe_automatically">Transcribir automáticamente los mensajes de voz recibidos</string>
+    <string name="settings_voice_notes">Mensajes de voz</string>
 </resources>

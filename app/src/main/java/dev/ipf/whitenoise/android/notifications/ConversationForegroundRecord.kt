@@ -4,10 +4,12 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.pm.ServiceInfo
 import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
+import dev.ipf.whitenoise.android.audio.VoiceNoteForegroundService
 import dev.ipf.whitenoise.android.audio.conversationDictationDiagnostic
 import dev.ipf.whitenoise.android.audio.isForegroundServiceStartRejection
 
 /** Main-owned leases and presentation for one concrete Android foreground-service record. */
+@Suppress("TooManyFunctions") // Connection and capture share one Android foreground record.
 internal class ConversationForegroundRecord(
     private val service: NotificationStreamForegroundService,
     private val isCurrent: () -> Boolean,
@@ -16,13 +18,22 @@ internal class ConversationForegroundRecord(
     private val onConnectionReleased: () -> Unit,
 ) {
     val dictation = ConversationDictationForegroundService(service)
+    val voice = VoiceNoteForegroundService(service)
+    private val microphoneServiceType: Int
+        get() = dictation.foregroundServiceType or voice.serviceType
+    private val hasCaptureLease: Boolean
+        get() = dictation.hasForegroundLease || voice.notification != null
+
     var connectionServiceType = 0
         private set
     private var foregroundPromoted = false
     private var publishedServiceType = 0
     private var publishedNotificationId = 0
 
-    fun foregroundNotification(): Notification = dictation.notificationOrNull() ?: connectionNotification
+    fun foregroundNotification(): Notification {
+        val capture = voice.notification ?: dictation.notificationOrNull()
+        return capture ?: connectionNotification
+    }
 
     private val connectionNotification: Notification
         get() = BackgroundConnectionNotification.build(service)
@@ -32,15 +43,15 @@ internal class ConversationForegroundRecord(
         // takes specialUse while visible, so a new connection can share that existing protection.
         val type =
             connectionServiceType.takeIf { it != 0 }
-                ?: if (dictation.hasForegroundLease) {
+                ?: if (hasCaptureLease) {
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
                 } else {
                     foregroundServiceTypeForTrigger(trigger)
                 }
         publishForeground(
             foregroundNotification(),
-            type or dictation.foregroundServiceType,
-            replaceRecord = !dictation.hasForegroundLease,
+            type or microphoneServiceType,
+            replaceRecord = !hasCaptureLease,
         )
         connectionServiceType = type
     }
@@ -91,8 +102,13 @@ internal class ConversationForegroundRecord(
                 // A rejected identity switch must clear controls on the still-authorized channel.
                 Notification.Builder
                     .recoverBuilder(service, notification)
-                    .setChannelId(ConversationDictationForegroundService.CHANNEL_ID)
-                    .build()
+                    .setChannelId(
+                        if (publishedNotificationId == NotificationStreamForegroundService.VOICE_NOTIFICATION_ID) {
+                            VoiceNoteForegroundService.CHANNEL_ID
+                        } else {
+                            ConversationDictationForegroundService.CHANNEL_ID
+                        },
+                    ).build()
             } else {
                 notification
             }
@@ -105,7 +121,7 @@ internal class ConversationForegroundRecord(
     /** An earlier rejected narrowing must retry even when dictation has already completed. */
     fun reconcileAfterForegroundReturn() {
         if (!isCurrent() || !foregroundPromoted) return
-        val type = connectionServiceType or dictation.foregroundServiceType
+        val type = connectionServiceType or microphoneServiceType
         val notification = foregroundNotification()
         val sameId =
             NotificationStreamForegroundService.foregroundNotificationId(notification) == publishedNotificationId
@@ -115,6 +131,24 @@ internal class ConversationForegroundRecord(
             removeForegroundAndStop(serviceStartId())
         } else {
             publishForeground(notification, type, replaceRecord = true)
+        }
+    }
+
+    fun promoteVoice(notification: Notification) {
+        publishForeground(
+            notification,
+            connectionServiceType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            acquireMicrophone = true,
+        )
+    }
+
+    fun releaseVoice(startId: Int = serviceStartId()) {
+        if (!isCurrent() || voice.notification != null || dictation.hasForegroundLease) return
+        if (connectionServiceType != 0) {
+            publishForeground(connectionNotification, connectionServiceType, replaceRecord = true)
+        } else {
+            removeForegroundAndStop(startId)
         }
     }
 
@@ -132,7 +166,7 @@ internal class ConversationForegroundRecord(
 
     fun updateDictationNotification(notification: Notification) {
         if (isCurrent() && dictation.hasForegroundLease) {
-            val type = connectionServiceType or dictation.foregroundServiceType
+            val type = connectionServiceType or microphoneServiceType
             publishForeground(
                 notification,
                 type,
@@ -149,7 +183,7 @@ internal class ConversationForegroundRecord(
             "event=foreground_service_stop source=teardown active=$current " +
                 "durable=${dictation.hasForegroundLease} pending=${connectionServiceType != 0}",
         )
-        if (dictation.hasForegroundLease || !current) return
+        if (hasCaptureLease || !current) return
         if (connectionServiceType != 0) {
             publishForeground(connectionNotification, connectionServiceType, replaceRecord = true)
         } else {
@@ -161,12 +195,14 @@ internal class ConversationForegroundRecord(
     fun releaseConnection(expectedStartId: Int = connectionStartId()) {
         if (expectedStartId != connectionStartId() || !isCurrent()) return
         if (connectionServiceType == 0) {
-            if (!dictation.hasForegroundLease) removeForegroundAndStop(serviceStartId())
+            if (!hasCaptureLease) removeForegroundAndStop(serviceStartId())
             return
         }
         connectionServiceType = 0
         try {
-            if (dictation.hasForegroundLease) {
+            if (voice.notification != null) {
+                publishForeground(foregroundNotification(), microphoneServiceType)
+            } else if (dictation.hasForegroundLease) {
                 dictation.refreshNotification()
             } else {
                 removeForegroundAndStop(serviceStartId())
@@ -192,6 +228,7 @@ internal class ConversationForegroundRecord(
     fun onDestroy() {
         connectionServiceType = 0
         dictation.onDestroy()
+        voice.onDestroy()
         removeForegroundAndStop(serviceStartId())
     }
 }

@@ -1,0 +1,73 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "VoiceNoteSettingsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+        "anchor": "fun VoiceNoteSettingsScreen(",
+        "test_ids": [
+          "MED-038",
+          "MED-062"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.voice_send_on_release",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+        "anchor": "R.string.voice_send_on_release",
+        "test_ids": [
+          "MED-062"
+        ]
+      },
+      {
+        "surface": "R.string.voice_transcribe_automatically",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+        "anchor": "R.string.voice_transcribe_automatically",
+        "test_ids": [
+          "MED-058"
+        ]
+      },
+      {
+        "surface": "R.string.settings_voice_notes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+        "anchor": "R.string.settings_voice_notes",
+        "test_ids": [
+          "MED-038",
+          "MED-062"
+        ]
+      },
+      {
+        "surface": "setting:dictation_transcribe_voice_messages_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+        "anchor": "R.string.dictation_transcribe_voice_messages_subtitle",
+        "test_ids": [
+          "MED-058"
+        ]
+      },
+      {
+        "surface": "R.string.settings_voice_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+        "anchor": "R.string.settings_voice_language",
+        "test_ids": [
+          "MED-058",
+          "MED-062"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_dictation_transcribe_voice_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+        "anchor": "R.string.explanation_appearance_dictation_transcribe_voice_messages",
+        "test_ids": [
+          "SET-054",
+          "MED-058"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

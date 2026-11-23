@@ -259,43 +259,104 @@ class VoiceRecordingReviewTest {
             assertEquals(1, failures)
         }
 
-    /** Bubble Retry can settle the original clip after its failed preparation attempt released the UI token. */
+    /**
+     * Seeding hands the take to its timeline row in the same turn: the review clears and deletes the file once,
+     * and a late or repeated callback for that send can neither fail nor resend it, nor touch a newer take.
+     */
     @Test
-    fun delayedDurableAcceptanceConsumesOnlyTheOriginalRetainedClip() =
+    fun acceptanceAtSeedReleasesTheTakeExactlyOnce() =
         runTest {
-            for (replaceClip in listOf(false, true)) {
-                lateinit var completion: (Boolean) -> Unit
-                lateinit var guard: () -> Boolean
+            lateinit var completion: (Boolean) -> Unit
+            lateinit var guard: () -> Boolean
+            var failures = 0
+            val presence = mutableListOf<Boolean>()
+            val review =
+                VoiceRecordingReview(
+                    this,
+                    { true },
+                    { _, _, canQueue, completed ->
+                        guard = canQueue
+                        completion = completed
+                    },
+                    onSendFailure = { failures++ },
+                    playback = FakePlayback(),
+                    onReviewPresenceChanged = presence::add,
+                )
+            val original = take()
+            review.offer(original, 1_000L)
+            val clip = checkNotNull(review.clip)
+            assertTrue(review.send(clip))
+            completion(true)
+            assertNull(review.clip)
+            assertFalse(review.isSending)
+            assertFalse(original.exists())
+            assertFalse(guard())
+            assertFalse(review.send(clip))
+            assertEquals(listOf(true, false), presence)
+
+            val replacement = take()
+            review.offer(replacement, 2_000L)
+            val next = checkNotNull(review.clip)
+            completion(true)
+            completion(false)
+            assertTrue(review.clip === next)
+            assertTrue(replacement.exists())
+            assertEquals(0, failures)
+            review.release()
+        }
+
+    /** A Discard press while Send prepares is refused, so it can never revoke the send the user just made. */
+    @Test
+    fun userDiscardIsRefusedWhileSending() =
+        runTest {
+            lateinit var completion: (Boolean) -> Unit
+            lateinit var guard: () -> Boolean
+            val review =
+                VoiceRecordingReview(
+                    this,
+                    { true },
+                    { _, _, canQueue, completed ->
+                        guard = canQueue
+                        completion = completed
+                    },
+                    playback = FakePlayback(),
+                )
+            val file = take()
+            review.offer(file, 1_000L)
+            val clip = checkNotNull(review.clip)
+            review.send(clip)
+            assertFalse(review.discardByUser(clip))
+            assertTrue(review.clip === clip)
+            assertTrue(guard())
+            completion(false)
+            assertTrue(review.discardByUser(clip))
+            assertNull(review.clip)
+            assertFalse(file.exists())
+        }
+
+    /** Leaving while Send prepares revokes it and says so; disposal of an idle review stays silent. */
+    @Test
+    fun disposalDuringSendReportsTheInterruptedSend() =
+        runTest {
+            for (sending in listOf(true, false)) {
+                var guard: (() -> Boolean)? = null
+                var interrupted = 0
                 val review =
                     VoiceRecordingReview(
                         this,
                         { true },
-                        { _, _, canQueue, completed ->
-                            guard = canQueue
-                            completion = completed
-                        },
+                        { _, _, canQueue, _ -> guard = canQueue },
                         playback = FakePlayback(),
+                        onSendInterrupted = { interrupted++ },
                     )
-                val original = take()
-                review.offer(original, 1_000L)
-                val clip = checkNotNull(review.clip)
-                review.send(clip)
-                completion(false)
-                assertFalse(guard())
-                assertTrue(review.clip === clip)
-                assertTrue(original.exists())
-                if (replaceClip) review.offer(take(), 2_000L)
-                val replacement = review.clip
-                completion(true)
-                if (replaceClip) {
-                    assertTrue(review.clip === replacement)
-                    assertTrue(checkNotNull(replacement).file.exists())
-                } else {
-                    assertNull(review.clip)
-                    assertFalse(original.exists())
-                    assertFalse(review.send(clip))
-                }
+                val file = take()
+                review.offer(file, 1_000L)
+                if (sending) review.send(checkNotNull(review.clip))
                 review.release()
+                review.release()
+                assertEquals(if (sending) 1 else 0, interrupted)
+                assertEquals(false, guard?.invoke() ?: false)
+                assertFalse(file.exists())
             }
         }
 
@@ -358,6 +419,44 @@ class VoiceRecordingReviewTest {
             assertTrue(newFile.exists())
             review.release()
             assertFalse(newFile.exists())
+        }
+
+    /** Closing the chat stops presenting a draft without deleting it; the next visit adopts the same file. */
+    @Test
+    fun detachKeepsTheDraftAndAdoptPresentsItAgain() =
+        runTest {
+            val deleted = mutableListOf<File>()
+            var interrupted = 0
+            var guard: (() -> Boolean)? = null
+
+            /** Opens the review step under test. */
+            fun review() =
+                VoiceRecordingReview(
+                    this,
+                    { true },
+                    { _, _, canQueue, _ -> guard = canQueue },
+                    playback = FakePlayback(),
+                    deleteFile = deleted::add,
+                    onSendInterrupted = { interrupted++ },
+                )
+            val file = take()
+            val first = review()
+            assertTrue(first.adopt(file, 1_500L))
+            val clip = checkNotNull(first.clip)
+            assertTrue(first.adopt(file, 1_500L))
+            assertTrue("re-adopting the same draft keeps the same clip", first.clip === clip)
+            first.send(clip)
+            first.detach()
+            assertEquals(1, interrupted)
+            assertFalse(checkNotNull(guard)())
+            assertNull(first.clip)
+            assertTrue(deleted.isEmpty())
+            assertTrue(file.exists())
+
+            val second = review()
+            assertTrue(second.adopt(file, 1_500L))
+            assertTrue(second.discardByUser(checkNotNull(second.clip)))
+            assertEquals(listOf(file), deleted)
         }
 
     /** Creates a private stand-in for one finalized native take. */

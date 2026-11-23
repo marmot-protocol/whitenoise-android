@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -50,7 +48,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -86,10 +83,9 @@ import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
 import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
+import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceSendingIndicator
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -289,6 +285,7 @@ internal fun MediaVoiceBubble(
     focusPlaybackMessage: Boolean = true,
     onLongPress: () -> Unit = {},
     audioTranscription: AudioTranscriptionToggleState? = null,
+    sending: Boolean = false,
 ) {
     val playbackTitleCopy =
         dev.ipf.whitenoise.android.ui.common
@@ -558,6 +555,7 @@ internal fun MediaVoiceBubble(
             onCycleSpeed = presentationRuntime::cycleSpeed,
             onLongPress = onLongPress,
             transfer = transfer,
+            sending = sending,
             onRetryTransfer = {
                 controller.retryAttachmentTransfer(
                     messageIdHex,
@@ -638,6 +636,7 @@ internal fun VoiceAttachmentContent(
     onCycleSpeed: () -> Unit = {},
     modifier: Modifier = Modifier,
     storageBlocked: Boolean = false,
+    sending: Boolean = false,
 ) {
     val bubbleContent = LocalContentColor.current
     val tinted = outgoing && !isAmoledSurfaceTheme()
@@ -652,7 +651,8 @@ internal fun VoiceAttachmentContent(
         }
     val actionVisual = voiceActionVisual(loading, failed, startDownload, localFileAvailable, isPlaying, storageBlocked)
     val action = voiceAction(transfer?.takeUnless { localFileAvailable }, actionVisual, onActionClick, onRetryTransfer)
-    val actionDescription = action.description
+    val sendingLabel = stringResource(R.string.sending)
+    val actionDescription = if (sending) "${action.description}, $sendingLabel" else action.description
     Surface(
         color = container,
         contentColor = content,
@@ -676,6 +676,8 @@ internal fun VoiceAttachmentContent(
                         ),
                 contentAlignment = Alignment.Center,
             ) {
+                // An own clip still sending keeps Play live inside the ring: its bytes are already on the device.
+                if (sending) VoiceSendingIndicator(46.dp, 2.dp, Modifier.testTag(VOICE_SENDING_RING_TAG), content)
                 Surface(
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -724,6 +726,7 @@ internal fun VoiceAttachmentContent(
 }
 
 internal const val VOICE_SEEK_TRACK_TAG = "voice-seek-track"
+internal const val VOICE_SENDING_RING_TAG = "voice-sending-ring"
 
 /**
  * The progress bar is the seek surface: the whole 48dp-tall strip accepts a tap or a horizontal drag
@@ -852,71 +855,6 @@ private fun Modifier.voiceSeekGesture(
         }
     }
 
-/** What the voice row's one 48 dp action looks, sounds and does like for the current step. */
-private class VoiceAction(
-    val description: String,
-    val clickLabel: String?,
-    val onClick: () -> Unit,
-    /** Non-null while the transfer owns the action, so the row draws its ring and text instead of play. */
-    val transfer: TileTransfer?,
-)
-
-/**
- * Resolves the action: a visible [transfer] owns it (Cancel while active, nothing while Cancel awaits acknowledgement,
- * Retry or Download again otherwise), and otherwise it is the ordinary play, pause or download action.
- */
-@Composable
-private fun voiceAction(
-    transfer: TileTransfer?,
-    visual: VoiceActionVisual,
-    onActionClick: () -> Unit,
-    onRetryTransfer: () -> Unit,
-): VoiceAction {
-    if (transfer == null || !transfer.visible) {
-        return VoiceAction(stringResource(visual.descriptionResource), null, onActionClick, null)
-    }
-    val onClick =
-        when {
-            transfer.cancelling -> ({})
-            transfer.active -> transfer.onCancel
-            else -> onRetryTransfer
-        }
-    val label = if (transfer.active) stringResource(R.string.media_cancel_download) else null
-    return VoiceAction(tileTransferDescription(transfer), label, onClick, transfer)
-}
-
-/** The 24dp glyph inside the play button for each action variant. */
-@Suppress("FunctionNaming")
-@Composable
-private fun VoiceActionGlyph(actionVisual: VoiceActionVisual) {
-    when (actionVisual) {
-        VoiceActionVisual.LOADING ->
-            CircularProgressIndicator(
-                modifier = Modifier.size(22.dp),
-                strokeWidth = 2.dp,
-                color = LocalContentColor.current,
-            )
-        VoiceActionVisual.FAILED,
-        VoiceActionVisual.STORAGE_BLOCKED,
-        ->
-            Icon(painterResource(R.drawable.ic_refresh), contentDescription = null, modifier = Modifier.size(24.dp))
-        VoiceActionVisual.DOWNLOAD ->
-            Icon(imageVector = Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(24.dp))
-        VoiceActionVisual.PAUSE ->
-            Icon(
-                painter = painterResource(R.drawable.ic_pause),
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-            )
-        VoiceActionVisual.PLAY ->
-            Icon(
-                painter = painterResource(R.drawable.ic_play_arrow),
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-            )
-    }
-}
-
 private const val VOICE_CARD_TINT_ALPHA = 0.12f
 private const val VOICE_CARD_SECONDARY_ALPHA = 0.78f
 private const val VOICE_TRACK_ALPHA = 0.24f
@@ -927,40 +865,6 @@ private val VoiceSeekTargetHeight = 48.dp
 private val VoiceSpeedPillCorner = 10.dp
 private val VoiceSpeedPillHorizontalPadding = 8.dp
 private val VoiceSpeedPillVerticalPadding = 4.dp
-
-/** Stable action variants keep accessibility copy and glyph selection in lockstep. */
-private enum class VoiceActionVisual(
-    val descriptionResource: Int,
-) {
-    LOADING(R.string.media_downloading),
-    FAILED(R.string.voice_message_failed),
-    STORAGE_BLOCKED(R.string.media_storage_blocked),
-    DOWNLOAD(R.string.media_tap_to_download),
-    PAUSE(R.string.voice_message_pause),
-    PLAY(R.string.voice_message_play),
-}
-
-/**
- * Resolves one action variant without coupling presentation to materialization owners. A clip that is not on the
- * device yet never reads as Play: it offers Download, or shows loading once its download is accepted.
- */
-private fun voiceActionVisual(
-    loading: Boolean,
-    failed: Boolean,
-    startDownload: Boolean,
-    localFileAvailable: Boolean,
-    isPlaying: Boolean,
-    storageBlocked: Boolean = false,
-): VoiceActionVisual =
-    when {
-        loading -> VoiceActionVisual.LOADING
-        failed && storageBlocked -> VoiceActionVisual.STORAGE_BLOCKED
-        failed -> VoiceActionVisual.FAILED
-        !startDownload && !localFileAvailable -> VoiceActionVisual.DOWNLOAD
-        !localFileAvailable -> VoiceActionVisual.LOADING
-        isPlaying -> VoiceActionVisual.PAUSE
-        else -> VoiceActionVisual.PLAY
-    }
 
 /** Formats the fixed-height time label for download, ready, and active playback phases. */
 private fun voiceTimeText(
