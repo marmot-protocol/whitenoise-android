@@ -249,7 +249,10 @@ private fun LazyListScope.historyBackupsCallouts(state: HistoryBackupsState) {
         item(key = "history_backups.schedule") { SettingsExplainer(stringResource(R.string.history_backups_schedule)) }
     }
     val problem = state.problem
-    if (problem != null && problem != HistoryBackupProblem.Unavailable && problem != HistoryBackupProblem.InvalidRestoreWords) {
+    if (problem != null &&
+        problem != HistoryBackupProblem.Unavailable &&
+        problem != HistoryBackupProblem.InvalidRestoreWords
+    ) {
         item(key = "history_backups.problem") {
             SettingsCallout(
                 text = stringResource(historyBackupProblemText(problem)),
