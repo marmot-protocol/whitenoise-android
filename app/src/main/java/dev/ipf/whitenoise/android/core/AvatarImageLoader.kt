@@ -734,10 +734,17 @@ object AvatarImageLoader {
     ): android.graphics.Bitmap? {
         if (variant == ProfileImageVariant.AVATAR) AvatarCacheDiagnostics.decode(AvatarCacheKind.PROFILE)
         return dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope.within(domain) {
-            val info =
-                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-                    .inspect(bytes) ?: return@within null
-            val target = boundedDecodeDimension(info.width, info.height, maxDimension)
+            // A 512px avatar always fits the byte budget. The isolated decode still inspects
+            // and admits the source, so only larger targets need a separate sizing request.
+            val target =
+                if (maxDimension <= PROFILE_AVATAR_MAX_DIMENSION) {
+                    maxDimension
+                } else {
+                    val info =
+                        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                            .inspect(bytes) ?: return@within null
+                    boundedDecodeDimension(info.width, info.height, maxDimension)
+                }
             dev.ipf.whitenoise.android.media.MediaPipeline
                 .decodeSampledBitmap(bytes, target)
         }
