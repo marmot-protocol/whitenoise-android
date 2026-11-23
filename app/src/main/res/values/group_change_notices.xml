@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A group change the user asked for that MarmotKit could not make and never retries. The toast title is the
+         chat's name; its detail joins what did not happen with why. -->
+    <string name="group_change_invite_not_sent">Invitation not sent</string>
+    <string name="group_change_member_not_removed">Member not removed</string>
+    <string name="group_change_details_not_updated">Group details not updated</string>
+    <string name="group_change_leave_failed">Couldn’t leave the group</string>
+    <string name="group_change_end_failed">Couldn’t end the group</string>
+    <string name="group_change_message_not_sent">Message not sent</string>
+    <string name="group_change_not_made">Group change not made</string>
+    <string name="group_change_reason_not_admin">You’re no longer an admin of this group.</string>
+    <string name="group_change_reason_not_member">You’re no longer a member of this group.</string>
+    <string name="group_change_reason_not_delivered">It didn’t reach any of the group’s relays. Check your connection, then try again.</string>
+    <string name="group_change_reason_refused">The group’s relays refused it. Check the chat, then try again.</string>
+    <string name="group_change_reason_group_changed">The group changed while it was waiting to send. Check the chat, then try again.</string>
+    <string name="group_change_reason_superseded">Another change to the group was made at the same time. Check the chat, then try again.</string>
+    <string name="group_change_already_done">Another change to this group already did what yours would have.</string>
+    <!-- %1$s is what did not happen, such as "Invitation not sent"; %2$s says why, as a full sentence. -->
+    <string name="group_change_notice_detail">%1$s. %2$s</string>
+</resources>

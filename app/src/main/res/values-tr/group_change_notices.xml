@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_change_invite_not_sent">Davet gönderilmedi</string>
+    <string name="group_change_member_not_removed">Üye çıkarılmadı</string>
+    <string name="group_change_details_not_updated">Grup ayrıntıları güncellenmedi</string>
+    <string name="group_change_leave_failed">Gruptan ayrılınamadı</string>
+    <string name="group_change_end_failed">Grup sonlandırılamadı</string>
+    <string name="group_change_message_not_sent">Mesaj gönderilmedi</string>
+    <string name="group_change_not_made">Grup değişikliği yapılmadı</string>
+    <string name="group_change_reason_not_admin">Artık bu grubun yöneticisi değilsiniz.</string>
+    <string name="group_change_reason_not_member">Artık bu grubun üyesi değilsiniz.</string>
+    <string name="group_change_reason_not_delivered">Değişiklik grubun rölelerinin hiçbirine ulaşmadı. Bağlantınızı kontrol edin, sonra tekrar deneyin.</string>
+    <string name="group_change_reason_refused">Grubun röleleri değişikliği reddetti. Sohbeti kontrol edin, sonra tekrar deneyin.</string>
+    <string name="group_change_reason_group_changed">Değişiklik gönderilmeyi beklerken grup değişti. Sohbeti kontrol edin, sonra tekrar deneyin.</string>
+    <string name="group_change_reason_superseded">Aynı anda gruba başka bir değişiklik yapıldı. Sohbeti kontrol edin, sonra tekrar deneyin.</string>
+    <string name="group_change_already_done">Bu gruptaki başka bir değişiklik, sizinkinin yapacağını zaten yaptı.</string>
+    <string name="group_change_notice_detail">%1$s. %2$s</string>
+</resources>

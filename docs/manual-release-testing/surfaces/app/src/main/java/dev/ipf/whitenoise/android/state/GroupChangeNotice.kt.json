@@ -1,0 +1,153 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Queued invitation dropped for size",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.error_invite_welcome_too_large",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "Queued group change dropped for size",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.error_group_change_too_large",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "Group change not made notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "internal fun WhiteNoiseAppState.presentGroupChangeNotice(",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change not made: what did not happen and why",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_notice_detail",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change replaced by another change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_already_done",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change refused because the user is no longer an admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_reason_not_admin",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change that reached no relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_reason_not_delivered",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change not made: invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_invite_not_sent",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change not made: member removal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_member_not_removed",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change not made: group details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_details_not_updated",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change not made: leaving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_leave_failed",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change not made: ending the group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_end_failed",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change not made: message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_message_not_sent",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change not made: other change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_not_made",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change refused because the user is no longer a member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_reason_not_member",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change refused by every relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_reason_refused",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change refused after the group changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_reason_group_changed",
+        "test_ids": [
+          "GRP-045"
+        ]
+      },
+      {
+        "surface": "Group change lost to a simultaneous change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupChangeNotice.kt",
+        "anchor": "R.string.group_change_reason_superseded",
+        "test_ids": [
+          "GRP-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

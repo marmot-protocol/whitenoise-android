@@ -1217,12 +1217,14 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                         launch(Dispatchers.Main) { presentRewindRestoreFailure(failure) }
                     }
                 }
+                // A group change MDK gave up while no stream listened still tells the user, once.
+                launch { runCatchingCancellable { presentRetainedGroupChange(marmot) } }
                 runCatchingCancellable {
                     var event = subscription.next()
                     while (event != null) {
                         backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                         handleNotificationContentEvent(event, readReconciliations, scope = this)
-                        presentEventNotices(event, scope = this)
+                        presentEventNotices(event, marmot, scope = this)
                         val received = (event as? MarmotEventFfi.MessageReceived)?.received
                         // Only the cheap kind and sender check runs here; the suppression reads run with the
                         // lookup, as a child of this loop, so they never delay the next event.
