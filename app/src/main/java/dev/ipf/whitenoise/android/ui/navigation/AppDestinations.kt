@@ -53,7 +53,4 @@ internal enum class SettingsDetail {
     NotificationDelivery,
 }
 
-internal fun firstRunHelpDetail(support: Boolean): SettingsDetail = when (support) {
-    true -> SettingsDetail.Support
-    false -> SettingsDetail.LearnWhiteNoise
-}
+internal fun firstRunHelpDetail(team: Boolean) = if (team) SettingsDetail.Support else SettingsDetail.LearnWhiteNoise
