@@ -8,7 +8,10 @@ import dev.ipf.whitenoise.android.state.isPeerSourced
 import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 
-/** The picture a chat row draws for [item], shared by every surface that lists chats. */
+/**
+ * The picture a chat row draws for [item], shared by every surface that lists chats. [followedAccount] is the direct
+ * chat's peer, as public-key hex, for the followed-person badge; a caller whose avatar is clipped draws it outside.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatListItemAvatar(
@@ -17,6 +20,7 @@ internal fun ChatListItemAvatar(
     accountRef: String?,
     title: String,
     size: Dp,
+    followedAccount: String? = null,
 ) {
     val avatarAccount = chatListItemAvatarAccount(item)
     GroupAvatar(
@@ -41,5 +45,6 @@ internal fun ChatListItemAvatar(
         durableAvatar = item.selectedAvatarAsset,
         durableAvatarIsPersonPicture = item.selectedPresentation?.avatarSource?.isPeerSourced() == true,
         retainCompatibility = true,
+        followedAccount = followedAccount,
     )
 }

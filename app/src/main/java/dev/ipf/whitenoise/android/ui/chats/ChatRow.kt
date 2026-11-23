@@ -311,7 +311,6 @@ internal fun ChatRow(
                 item = item,
                 title = title,
                 accountRef = accountRef,
-                avatarAccount = avatarAccount,
                 openableDmAvatarAccount = openableDmAvatarAccount,
                 profileTapEnabled = !selectionMode,
                 interactionsEnabled = interactionsEnabled,
