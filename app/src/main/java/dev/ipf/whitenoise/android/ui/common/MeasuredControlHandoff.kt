@@ -207,8 +207,8 @@ internal class MeasuredControlHandoff(
             (previous != destination || continuesSameOwner || hasLauncher) &&
             from != null
 
-    private fun motionDirection(): SurfaceMotion =
-        if (previous != null && previous == closeDestination) SurfaceMotion.Close else SurfaceMotion.Open
+    private val motionDirection: SurfaceMotion
+        get() = if (previous != null && previous == closeDestination) SurfaceMotion.Close else SurfaceMotion.Open
 
     /** New placement supplies the destination; a missing endpoint never waits or revives later. */
     suspend fun animatePrepared(token: Any) {
@@ -222,7 +222,7 @@ internal class MeasuredControlHandoff(
         end = target
         progress.snapTo(0f)
         awaitingFrame = false
-        progress.animateTo(1f, motionDirection().spec())
+        progress.animateTo(1f, motionDirection.spec())
         if (request === token) finish()
     }
 
@@ -311,7 +311,7 @@ internal class MeasuredControlHandoff(
         start = origin
         end = target
         progress.snapTo(0f)
-        progress.animateTo(1f, motionDirection().spec())
+        progress.animateTo(1f, motionDirection.spec())
         start = null
         end = null
     }
