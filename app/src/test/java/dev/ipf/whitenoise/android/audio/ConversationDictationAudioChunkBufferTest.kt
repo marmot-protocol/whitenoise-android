@@ -54,7 +54,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertFalse(buffer.isFinalChunk(first.chunkId))
         assertTrue(buffer.acknowledge(first.chunkId))
         val second = checkNotNull(buffer.poll())
-        assertEquals(426_236, second.pcm.size)
+        assertEquals(input.size - first.pcm.size - CALLER_AUDIO_MINIMUM_TAIL_BYTES, second.pcm.size)
         assertArrayEquals(input.copyOfRange(first.pcm.size, first.pcm.size + second.pcm.size), second.pcm)
         assertTrue(buffer.acknowledge(second.chunkId))
         val last = checkNotNull(buffer.poll())
@@ -72,22 +72,23 @@ class ConversationDictationAudioChunkBufferTest {
         val buffer =
             ConversationDictationAudioChunkBuffer(
                 sessionId = 1L,
-                chunkBytes = 12,
-                maxBufferedBytes = 24,
-                minimumTailBytes = 4,
+                minimumTailBytes = CALLER_AUDIO_MINIMUM_TAIL_BYTES,
             )
-        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6, hasSpeech = true))
-        assertTrue(buffer.sealCurrentIfAtLeast(6))
+        val sentence = ByteArray(320_000) { 1 }
+        val silence = ByteArray(31_998)
+        val finalSample = byteArrayOf(1, 0)
+        assertTrue(buffer.append(sentence, sentence.size, hasSpeech = true))
+        assertTrue(buffer.sealCurrentIfAtLeast(sentence.size))
         assertNull(buffer.poll())
-        assertTrue(buffer.append(byteArrayOf(7, 8), 2, hasSpeech = false))
+        assertTrue(buffer.append(silence, silence.size, hasSpeech = false))
         assertNull(buffer.poll())
-        assertTrue(buffer.append(byteArrayOf(9, 10), 2, hasSpeech = true))
+        assertTrue(buffer.append(finalSample, finalSample.size, hasSpeech = true))
         val first = checkNotNull(buffer.poll())
-        assertArrayEquals(byteArrayOf(1, 2, 3, 4, 5, 6), first.pcm)
+        assertArrayEquals(sentence, first.pcm)
         assertTrue(buffer.acknowledge(first.chunkId))
         buffer.finish()
         val tail = checkNotNull(buffer.poll())
-        assertArrayEquals(byteArrayOf(7, 8, 9, 10), tail.pcm)
+        assertArrayEquals(silence + finalSample, tail.pcm)
         assertEquals(first.lastSampleExclusive, tail.firstSample)
         assertTrue(tail.hasSpeech)
     }

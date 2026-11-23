@@ -27,7 +27,7 @@ class DictationDiagnosticStoreTest {
             requireNotNull(
                 DictationDiagnosticSchema.parse(
                     "event=finish_timing action=send tap_to_capture_closed_ms=12 tap_to_last_result_ms=640 " +
-                        "tap_to_delivered_ms=700 generations_after_tap=2 retries_after_tap=1 settle_wait_ms=50 " +
+                        "tap_to_transcript_ready_ms=700 generations_after_tap=2 retries_after_tap=1 settle_wait_ms=50 " +
                         "audio_ms=4300 session=3",
                 ),
             )
@@ -37,7 +37,7 @@ class DictationDiagnosticStoreTest {
                 "action" to "send",
                 "tap_to_capture_closed_ms" to 12L,
                 "tap_to_last_result_ms" to 640L,
-                "tap_to_delivered_ms" to 700L,
+                "tap_to_transcript_ready_ms" to 700L,
                 "generations_after_tap" to 2L,
                 "retries_after_tap" to 1L,
                 "settle_wait_ms" to 50L,
@@ -48,6 +48,7 @@ class DictationDiagnosticStoreTest {
         )
         assertEquals(0L, parsed.filteredFields)
         assertEquals("paste", event("event=finish_timing action=paste")["action"])
+        assertEquals(700L, event("event=finish_timing tap_to_delivered_ms=700")["tap_to_delivered_ms"])
         val dropped =
             requireNotNull(
                 DictationDiagnosticSchema.parse(
@@ -87,6 +88,10 @@ class DictationDiagnosticStoreTest {
                     mapOf("reason" to "provider_disconnected", "retry" to 2L),
                 "event=foreground_service_start requested=true" to
                     mapOf("requested" to true),
+                "event=send_outcome outcome=durably_accepted session=7" to
+                    mapOf("outcome" to "durably_accepted", "session" to 7L),
+                "event=send_outcome outcome=terminal_failure session=7" to
+                    mapOf("outcome" to "terminal_failure", "session" to 7L),
                 "event=retry path=retained_transcript" to
                     mapOf("path" to "retained_transcript"),
                 "event=completion_action reason=already_finishing" to

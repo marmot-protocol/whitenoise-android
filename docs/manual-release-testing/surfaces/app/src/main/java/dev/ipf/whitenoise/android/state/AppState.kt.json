@@ -205,7 +205,8 @@
         "anchor": "internal suspend fun sendDictationTranscriptIfOriginUnchanged(",
         "test_ids": [
           "DIC-002",
-          "DIC-010"
+          "DIC-010",
+          "DIC-018"
         ]
       },
       {

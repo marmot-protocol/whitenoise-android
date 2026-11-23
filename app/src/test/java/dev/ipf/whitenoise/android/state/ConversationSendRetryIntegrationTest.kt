@@ -1448,6 +1448,7 @@ class ConversationSendRetryIntegrationTest {
             val appState = appState()
             appState.setDraft(GROUP_ID, TextFieldValue("typed"))
             val releasePublish = CompletableDeferred<Unit>()
+            val settlements = mutableListOf<Boolean>()
             var pendingShown = 0
             val controller =
                 ConversationController(
@@ -1468,6 +1469,7 @@ class ConversationSendRetryIntegrationTest {
                     expectedDraftText = "typed",
                     payload = "typed spoken",
                     onPendingShown = { pendingShown += 1 },
+                    onTextSendSettled = { settlements.add(it) },
                 )
 
             try {
@@ -1478,10 +1480,12 @@ class ConversationSendRetryIntegrationTest {
 
                 assertEquals(1, pendingShown)
                 assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+                assertTrue(settlements.isEmpty())
                 assertFalse(send.isCompleted)
 
                 releasePublish.complete(Unit)
                 assertTrue(send.await())
+                assertEquals(listOf(true), settlements)
             } finally {
                 releasePublish.complete(Unit)
                 appState.detachConversationController(controller)
@@ -1497,9 +1501,10 @@ class ConversationSendRetryIntegrationTest {
                     MarmotKitException.Publish("send event timed out"),
                 )
 
-            failures.forEach { failure ->
+            failures.forEachIndexed { index, failure ->
                 val appState = appState()
                 appState.setDraft(GROUP_ID, TextFieldValue("typed"))
+                val settlements = mutableListOf<Boolean>()
                 val reply = timelineAppMessage(REPLY_MESSAGE_ID)
                 val controller =
                     ConversationController(
@@ -1521,11 +1526,13 @@ class ConversationSendRetryIntegrationTest {
                         expectedDraftText = "typed",
                         payload = "spoken reply",
                         replyToMessageIdHex = REPLY_MESSAGE_ID,
+                        onTextSendSettled = { settlements.add(it) },
                     )
 
                 try {
                     assertFalse(appState.sendDictationTranscriptIfOriginUnchanged(request))
                     assertEquals(reply, controller.replyingTo)
+                    assertEquals(if (index == 0) listOf(false) else emptyList(), settlements)
                 } finally {
                     appState.detachConversationController(controller)
                 }

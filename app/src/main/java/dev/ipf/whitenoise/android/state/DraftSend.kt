@@ -55,6 +55,11 @@ internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: Conve
     if (summary.messageIds.isEmpty() && summary.acceptDisposition != SendAcceptDispositionFfi.PUBLISHED) return false
     pendingClear?.let(::clearDraftAfterSuccessfulSend)
     runCatching(request.onPendingShown)
+    if (summary.acceptDisposition == SendAcceptDispositionFfi.PUBLISHED ||
+        summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING
+    ) {
+        request.onTextSendSettled(true)
+    }
     return true
 }
 

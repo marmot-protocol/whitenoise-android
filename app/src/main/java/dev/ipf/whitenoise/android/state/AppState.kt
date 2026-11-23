@@ -2427,10 +2427,15 @@ class WhiteNoiseAppState private constructor(
         var durablyAccepted = false
         return try {
             durablyAccepted =
-                sendConversationText(controller, request.payload, onAccepted = {
-                    pendingShown = true
-                    request.onPendingShown()
-                })
+                sendConversationText(
+                    controller,
+                    request.payload,
+                    onSendSettled = request.onTextSendSettled,
+                    onAccepted = {
+                        pendingShown = true
+                        request.onPendingShown()
+                    },
+                )
             if (!durablyAccepted && !pendingShown) rejectDictationDispatchBeforeTransport(request) else durablyAccepted
         } finally {
             if (!durablyAccepted && replyTarget != null && controller.replyingTo == null) {
@@ -2506,6 +2511,7 @@ class WhiteNoiseAppState private constructor(
         controller: ConversationController,
         text: String,
         onPresentationAccepted: (String) -> Unit = {},
+        onSendSettled: (durablyAccepted: Boolean) -> Unit = {},
         onAccepted: () -> Unit = {},
     ): Boolean {
         val pendingClear = captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
@@ -2522,11 +2528,13 @@ class WhiteNoiseAppState private constructor(
             onDurablyAccepted = {
                 durablyAccepted = true
                 pendingClear?.let(::clearDraftAfterSuccessfulSend)
+                onSendSettled(true)
             },
             onTerminalFailure = {
                 if (accepted && !durablyAccepted) {
                     pendingClear?.let(composerDraftExpansionBridge::restoreAfterTerminalFailure)
                 }
+                onSendSettled(false)
             },
         )
         return durablyAccepted
