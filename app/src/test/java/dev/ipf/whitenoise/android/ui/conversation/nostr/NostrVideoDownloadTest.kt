@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
-import kotlinx.coroutines.runBlocking
 import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_DISK_RESERVE_BYTES
+import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol

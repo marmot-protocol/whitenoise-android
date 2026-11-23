@@ -254,7 +254,11 @@ class NostrEventCardRendererTest {
     @Test
     fun hlsPlaylistsAreSkippedForTheNextFileVariant() {
         fun video(vararg variants: List<String>) =
-            event(id = "a".repeat(64), kind = 34_236, tags = variants.map { listOf("imeta") + it }).toCardModel()
+            event(
+                id = "a".repeat(64),
+                kind = 34_236,
+                tags = variants.map { listOf("imeta") + it },
+            ).toCardModel()
 
         val typed = video(listOf("url https://media.example/watch/stream", "m application/vnd.apple.mpegurl"))
         assertNull(typed.mediaUrl)
