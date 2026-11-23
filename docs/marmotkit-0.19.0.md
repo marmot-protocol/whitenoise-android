@@ -25,12 +25,31 @@ lists every host contract this section relies on.
 The manifest does not enumerate Cargo features, so feature selection remains
 **unverified by the manifest**. Builder-side evidence comes from successful
 [publishing run 45026933984](https://github.com/marmot-protocol/mdk/actions/runs/45026933984),
-whose four ABI jobs and Kotlin job all ran with `OTLP_EXPORT: 1` and
-`PRODUCT_ANALYTICS_EXPORT: 1`, its exact-builder
+its exact-builder
 [workflow](https://github.com/marmot-protocol/mdk/blob/3fce95465cdea1edc8456dbd1c6691d1c8dc1f2e/.github/workflows/bindings.yaml)
 and [Kotlin builder](https://github.com/marmot-protocol/mdk/blob/3fce95465cdea1edc8456dbd1c6691d1c8dc1f2e/crates/marmot-uniffi/kotlin-bindings.sh),
-which turn those inputs into `--features otlp-export` and
-`--features product-analytics-export`.
+which turn `OTLP_EXPORT` and `PRODUCT_ANALYTICS_EXPORT` into
+`--features otlp-export` and `--features product-analytics-export`. Each
+Android input job ran
+`ANDROID_ABIS="$PART" ./crates/marmot-uniffi/kotlin-bindings.sh native` in its
+"Build one Android input" step, whose log shows this environment:
+
+```text
+OTLP_EXPORT: 1
+PRODUCT_ANALYTICS_EXPORT: 1
+PART: <the job's input>
+```
+
+| Input (`PART`) | Job | Build step started (UTC) | Uploaded artifact SHA-256 |
+| --- | --- | --- | --- |
+| `arm64-v8a` | [137222007676](https://github.com/marmot-protocol/mdk/actions/runs/45026933984/job/137222007676) | 2026-11-22 13:21:32 | `f9bea686005c71a05df28559919c9be0dca9259c337a25e6acecd87da819cd61` |
+| `armeabi-v7a` | [137222007664](https://github.com/marmot-protocol/mdk/actions/runs/45026933984/job/137222007664) | 2026-11-22 13:21:25 | `b740f00b62862c568e17907dbfa3b3fd900046518cfb1f207db3c1490fcd5079` |
+| `x86` | [137222007646](https://github.com/marmot-protocol/mdk/actions/runs/45026933984/job/137222007646) | 2026-11-22 13:21:25 | `a0ea8616c84e3606717237a69d47ba38231c77cb2df1df414d8d16edccd32f6b` |
+| `x86_64` | [137222007649](https://github.com/marmot-protocol/mdk/actions/runs/45026933984/job/137222007649) | 2026-11-22 13:21:25 | `7cdf628fe61ebc17aefabfd793866533525433d72ceeaf56279f1bf95f905325` |
+| `kotlin` | [137222007642](https://github.com/marmot-protocol/mdk/actions/runs/45026933984/job/137222007642) | 2026-11-22 13:21:00 | `dd066b7a93841e595e3d2b679c7a1047604d3e6099d38ca364d884e825e4d129` |
+
+Each digest is the one the job's "Upload Android input" step logged for its
+`marmotkit-input-android-<PART>-3fce9546…` artifact.
 
 ## Consumer changes
 
