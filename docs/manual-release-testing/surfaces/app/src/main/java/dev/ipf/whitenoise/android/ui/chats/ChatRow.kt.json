@@ -17,6 +17,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
         "anchor": "fun ChatListRow(",
         "test_ids": [
+          "CHL-006",
           "CHL-001",
           "CHL-002",
           "CHL-011",

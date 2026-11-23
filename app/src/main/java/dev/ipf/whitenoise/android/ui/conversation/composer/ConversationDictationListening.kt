@@ -4,6 +4,8 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -36,6 +38,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
@@ -58,17 +61,16 @@ internal const val DICTATION_CONTINUE_TAG = "dictation-continue"
 internal const val DICTATION_PREVIOUS_PENDING_TAG = "dictation-previous-pending"
 
 /**
- * The listening pulse takes and gives back its width as capture starts and stops, in step with the
- * compact actions' own width so the capsule closes the gap instead of keeping blank space. While a
- * follow-up records and the previous dictation is still being transcribed, a thin ring around the
- * pulse says so without any text.
+ * While a follow-up records and the previous dictation is still being transcribed, a thin ring
+ * around the pulse shows that work is pending.
  */
 @Composable
 internal fun ConversationDictationListeningSlot(
     visible: Boolean,
-    previousPending: Boolean = false,
+    previousPending: Boolean,
+    resize: Boolean,
 ) {
-    DictationLeadingSlot(visible) {
+    DictationLeadingSlot(visible, resize = resize) {
         Box(contentAlignment = Alignment.Center) {
             ConversationDictationListeningIndicator()
             if (previousPending) {
@@ -87,7 +89,7 @@ internal fun ConversationDictationListeningSlot(
 }
 
 /**
- * Starts the next recording from the slot the pulse gave back, while the previous dictation is
+ * Starts the next recording from the same slot as the listening pulse, while the previous dictation is
  * still being transcribed. It is icon-only; its label and long-press explanation carry the words.
  */
 @Composable
@@ -98,6 +100,7 @@ internal fun ConversationDictationContinueSlot(
     DictationLeadingSlot(visible) {
         IconButton(
             onClick = onContinue,
+            enabled = visible,
             modifier =
                 Modifier
                     .width(DICTATION_LISTENING_PULSE_WIDTH)
@@ -119,27 +122,20 @@ internal fun ConversationDictationContinueSlot(
     }
 }
 
-/** Both occupants of the slot left of Cancel resize it on the compact actions' clock. */
 @Composable
 private fun DictationLeadingSlot(
     visible: Boolean,
+    resize: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val motion = rememberSystemAnimationsEnabled()
+    val resizeSpec = if (motion) tween<IntSize>(DICTATION_ACTIONS_RESIZE_MILLIS) else snap()
+    val expand = if (resize) expandHorizontally(resizeSpec, expandFrom = Alignment.Start) else EnterTransition.None
+    val shrink = if (resize) shrinkHorizontally(resizeSpec, shrinkTowards = Alignment.Start) else ExitTransition.None
     AnimatedVisibility(
         visible = visible,
-        enter =
-            fadeIn(if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap()) +
-                expandHorizontally(
-                    animationSpec = if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
-                    expandFrom = Alignment.Start,
-                ),
-        exit =
-            fadeOut(if (motion) tween(DICTATION_PULSE_FADE_MILLIS) else snap()) +
-                shrinkHorizontally(
-                    animationSpec = if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
-                    shrinkTowards = Alignment.Start,
-                ),
+        enter = fadeIn(if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap()) + expand,
+        exit = fadeOut(if (motion) tween(DICTATION_PULSE_FADE_MILLIS) else snap()) + shrink,
     ) {
         content()
     }

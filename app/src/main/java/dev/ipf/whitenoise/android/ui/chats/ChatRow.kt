@@ -105,7 +105,7 @@ internal fun ChatListRow(
     selected: Boolean,
     onOpen: () -> Unit,
     onOpenProfile: (String) -> Unit,
-    onOpenActions: () -> Unit,
+    onOpenActions: (Float?) -> Unit,
     onDragSelectionStart: (Float) -> Unit,
     onDragSelection: (Float) -> Boolean,
     onDragSelectionEnd: () -> Unit,
@@ -159,7 +159,7 @@ internal fun ChatRow(
     dictationActivity: ConversationDictationActivity? = appState.chatListDictationActivity(accountRef, item),
     onClick: () -> Unit,
     onOpenProfile: (String) -> Unit,
-    onLongClick: (() -> Unit)? = null,
+    onLongClick: ((Float?) -> Unit)? = null,
     onDragSelectionStart: ((Float) -> Unit)? = null,
     onDragSelection: ((Float) -> Boolean)? = null,
     onDragSelectionEnd: (() -> Unit)? = null,
@@ -220,10 +220,10 @@ internal fun ChatRow(
                         if (interactionsEnabled) {
                             Modifier
                                 .longPressOrVerticalDrag(
-                                    onLongPressStart = {
+                                    onLongPressStart = { position ->
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         onActionsHeldChange(true)
-                                        onLongClick()
+                                        onLongClick(rowCoordinates[0]?.localToWindow(position)?.x)
                                     },
                                     // The nonfocusable menu is visible at the threshold; this gesture
                                     // still owns movement until release transfers popup focus.
@@ -243,7 +243,7 @@ internal fun ChatRow(
                                 ).semantics {
                                     onLongClick(label = actionsLabel) {
                                         onActionsHeldChange(false)
-                                        onLongClick()
+                                        onLongClick(null)
                                         true
                                     }
                                 }.onGloballyPositioned { rowCoordinates[0] = it }

@@ -33,6 +33,10 @@ internal val ConversationDictationController.continueTarget: ConversationDictati
 internal val ConversationDictationController.canContinueDictation: Boolean
     get() = continueTarget?.let { canQueueDictation(it.accountRef, it.groupIdHex) } == true
 
+/** Whether the current session has app-owned audio that can support a follow-up. */
+internal val ConversationDictationController.supportsFollowUpCapture: Boolean
+    get() = runCatching(platform::followUpCaptureSupported).getOrDefault(false)
+
 /** Whether a recording for this conversation may wait behind the dictations already in progress. */
 internal fun ConversationDictationController.canQueueDictation(
     accountRef: String,
@@ -49,7 +53,7 @@ internal fun ConversationDictationController.canQueueDictation(
         retainedAudioFailure == null &&
         state.target?.mode == ConversationDictationMode.InApp &&
         !hasParkedComposerAudio(accountRef, groupIdHex) &&
-        runCatching(platform::followUpCaptureSupported).getOrDefault(false) &&
+        supportsFollowUpCapture &&
         runCatching { targetAvailable(accountRef, groupIdHex) }.getOrDefault(false)
 
 /** Accepts the Continue gesture for the active dictation's conversation. */

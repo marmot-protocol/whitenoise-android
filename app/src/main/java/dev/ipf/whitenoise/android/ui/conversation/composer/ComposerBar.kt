@@ -1784,7 +1784,7 @@ internal fun ComposerBar(
                                 }
                             },
                         dictationControlsWidth =
-                            dictationState.compactActionsWidth(activeDictationController?.leadingSlotOccupied == true),
+                            dictationState.compactActionsWidth(activeDictationController?.reservesLeadingSlot == true),
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
                         enterKeyBehavior = enterKeyBehavior,
