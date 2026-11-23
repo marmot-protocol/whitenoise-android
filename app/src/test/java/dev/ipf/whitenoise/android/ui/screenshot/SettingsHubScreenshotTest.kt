@@ -3,8 +3,12 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -91,12 +95,16 @@ class SettingsHubScreenshotTest {
     fun helpSupportRtlLargeFont() = capture("settings_help_support_rtl_large_font", false, rtl = true) { HelpSupportScreen(it, {}, {}) }
 
     @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
     fun emptyChatsFirstRunHelp() =
         capture("empty_chats_first_run_help_amoled", true, amoled = true) {
-            EmptyChats(onCreate = {}, onFirstRunHelp = {})
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                EmptyChats(onCreate = {}, onFirstRunHelp = {})
+            }
         }
 
     @Test
+    @Config(qualifiers = "en-rUS-w360dp-h780dp-mdpi")
     fun firstRunWalkthrough() =
         capture("learn_white_noise_amoled", true, amoled = true) {
             LearnWhiteNoiseScreen(onBack = {})
