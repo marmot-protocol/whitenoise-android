@@ -423,6 +423,7 @@ private fun MediaLibraryContent(
 ) {
     var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
     val photoShare = rememberSharedPhotoShare(tiles, controller, appState, liveVisuals)
+    var pendingDay by rememberSaveable { mutableStateOf<LocalDate?>(null) }
     val viewerSelection = remember { SharedMediaViewerSelection() }
     val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
     val forwardActions = rememberMediaViewerForwardActions(controller, appState)
@@ -464,18 +465,29 @@ private fun MediaLibraryContent(
             SharedVisualFilter.Images -> tiles.imageSections
             SharedVisualFilter.Videos -> tiles.videoSections
         }
+    val gridState =
+        when (filter) {
+            SharedVisualFilter.All -> allGridState
+            SharedVisualFilter.Images -> imagesGridState
+            SharedVisualFilter.Videos -> videosGridState
+        }
+    // A refresh restores its pages one at a time, so a chosen day waits for the whole range to return.
+    val jumpReady = !tiles.isLoading && paging?.loading != true
+    MediaDateJumpEffect(pendingDay, sections, gridState, jumpReady) { pendingDay = null }
     SharedContentScaffold(
         category = category,
         filter = filter,
         onFilter = {
             photoShare.exit()
             filter = it
+            pendingDay = null
         },
         onBack = photoShare.backOr(onBack),
         loading = tiles.isLoading,
         paging = paging,
         onLoadMore = onLoadMore,
         selectionBar = photoShare.selectionBar(tiles.isLoading),
+        filterRowAction = { MediaDateJumpAction(sections, gridState, jumpReady) { pendingDay = it } },
     ) {
         val selectedEmpty =
             when (category) {
@@ -489,20 +501,11 @@ private fun MediaLibraryContent(
         } else {
             when (category) {
                 SharedContentCategory.Media ->
-                    MediaTileGrid(
-                        sections = sections,
-                        gridState =
-                            when (filter) {
-                                SharedVisualFilter.All -> allGridState
-                                SharedVisualFilter.Images -> imagesGridState
-                                SharedVisualFilter.Videos -> videosGridState
-                            },
-                        controller = controller,
-                        appState = appState,
-                        emptyLabel = stringResource(R.string.shared_content_empty),
-                        share = photoShare,
-                        onTapTile = { viewerSelection.select(it.messageIdHex, it.attachmentIndex) },
-                    )
+                    MediaTileGrid(sections, gridState, stringResource(R.string.shared_content_empty)) { tile ->
+                        SharedMediaGridTile(tile, controller, appState, photoShare) {
+                            viewerSelection.select(it.messageIdHex, it.attachmentIndex)
+                        }
+                    }
                 SharedContentCategory.Links ->
                     UrlLibraryTab(
                         tiles = tiles,

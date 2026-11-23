@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.ui.medialibrary
 
+import android.text.format.DateFormat
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Calendar
+import java.util.Locale
 
 // Month bucketing keyed off the local-time calendar so the separators match
 // what the user sees on each message. `recordedAt` is epoch SECONDS.
@@ -14,6 +18,12 @@ internal fun monthKeyForMedia(
     // monthLabel() decodes the month with Calendar.MONTH (0-based).
     return date.year * MONTH_KEY_YEAR_SCALE + (date.monthValue - 1)
 }
+
+/** Local calendar day of a recorded time, in the same zone as the month buckets. */
+internal fun mediaDayForMedia(
+    recordedAtSeconds: ULong,
+    zone: ZoneId = mediaMonthGroupingZone,
+): LocalDate = IdentityFormatter.clampedLocalDate(recordedAtSeconds, zone)
 
 // Group already-newest-first items by calendar month, preserving order so
 // section headers read newest → oldest. Runs during tile projection on a
@@ -35,18 +45,22 @@ internal fun <T> groupIntoMonthSections(
 
 private val mediaMonthGroupingZone: ZoneId = ZoneId.systemDefault()
 
-// Localized month/year header for a [monthKeyForMedia] key.
-internal fun monthLabel(key: Int): String {
-    val year = key / MONTH_KEY_YEAR_SCALE
-    val month = key % MONTH_KEY_YEAR_SCALE
-    val cal = Calendar.getInstance()
-    cal.set(Calendar.YEAR, year)
-    cal.set(Calendar.MONTH, month)
-    cal.set(Calendar.DAY_OF_MONTH, 1)
-    val monthName =
-        cal.getDisplayName(Calendar.MONTH, Calendar.LONG, java.util.Locale.getDefault())
-            ?: (month + 1).toString()
-    return "$monthName $year"
+/** Month and year in the locale's own order, such as "November 2023" or "2023年11月". */
+internal fun monthLabel(
+    key: Int,
+    locale: Locale = Locale.getDefault(),
+): String {
+    // Buckets are Gregorian months: override only the calendar, keeping choices such as -u-nu-latn digits.
+    val gregorian =
+        Locale
+            .Builder()
+            .setLocale(locale)
+            .setUnicodeLocaleKeyword("ca", "gregory")
+            .build()
+    val calendar = Calendar.getInstance(gregorian)
+    calendar.clear()
+    calendar.set(key / MONTH_KEY_YEAR_SCALE, key % MONTH_KEY_YEAR_SCALE, 1)
+    return SimpleDateFormat(DateFormat.getBestDateTimePattern(gregorian, "LLLLy"), gregorian).format(calendar.time)
 }
 
 /** A month key is `year * 100 + zero-based month`. */
