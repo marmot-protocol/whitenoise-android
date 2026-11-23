@@ -66,7 +66,7 @@ class ChatListResumeBaselineTest {
         composeRule.mainClock.autoAdvance = false
     }
 
-    /** Compose does not recompose a stopped window, so background changes land with ON_START. */
+    /** Models a background change that lands in the same main-thread turn as ON_START. */
     private fun resumeWith(order: List<String>) {
         composeRule.runOnUiThread { lifecycleOwner.currentState = Lifecycle.State.CREATED }
         composeRule.runOnUiThread {
@@ -128,6 +128,21 @@ class ChatListResumeBaselineTest {
         setHarness()
 
         resumeWith(order("C", "A", "B"))
+        advanceFrames(1)
+
+        assertFlushResumedOrder()
+        tapListTop()
+        composeRule.runOnIdle { assertEquals(listOf("C"), openedIds) }
+    }
+
+    @Test
+    fun listFirstComposedWhileStoppedGetsABaselineWhenItStarts() {
+        // The observer is added after the stop, so only the seeded state knows the list is hidden.
+        lifecycleOwner.currentState = Lifecycle.State.CREATED
+        setHarness()
+        composeRule.runOnUiThread { itemIds = order("C", "A", "B") }
+        advanceFrames(1)
+        composeRule.runOnUiThread { lifecycleOwner.currentState = Lifecycle.State.RESUMED }
         advanceFrames(1)
 
         assertFlushResumedOrder()

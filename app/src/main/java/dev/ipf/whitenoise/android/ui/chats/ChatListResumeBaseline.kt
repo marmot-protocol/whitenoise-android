@@ -40,7 +40,12 @@ internal data class ChatListResumeBaseline(
 @Composable
 internal fun rememberChatListResumeBaseline(): ChatListResumeBaseline {
     val lifecycleOwner = LocalLifecycleOwner.current
-    val state = remember(lifecycleOwner) { ChatListResumeBaselineState() }
+    val state =
+        remember(lifecycleOwner) {
+            // An observer added while stopped only sees ON_CREATE replayed, so seed from the current state.
+            val started = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            ChatListResumeBaselineState(stopped = !started)
+        }
     DisposableEffect(lifecycleOwner, state) {
         val observer =
             LifecycleEventObserver { _, event ->
@@ -68,8 +73,10 @@ internal fun rememberChatListResumeBaseline(): ChatListResumeBaseline {
     return baseline
 }
 
-private class ChatListResumeBaselineState {
-    var stopped by mutableStateOf(false)
+private class ChatListResumeBaselineState(
+    stopped: Boolean,
+) {
+    var stopped by mutableStateOf(stopped)
     var resumeEpoch by mutableIntStateOf(0)
     var composedEpoch by mutableIntStateOf(0)
 }
