@@ -26,6 +26,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
 
+private typealias MountedRecents = Pair<OffWindowActionFixture, GlobalSearchRecents>
+
 /** Recent chats on the blank search page (#4004), read by ID even when the Chats window never loaded them. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -154,9 +156,7 @@ class GlobalSearchRecentStripTest {
         assertEquals(2, recents.entries.size)
     }
 
-    private fun mount(
-        prepare: (OffWindowActionFixture) -> Unit = {},
-    ): Pair<OffWindowActionFixture, GlobalSearchRecents> {
+    private fun mount(prepare: (OffWindowActionFixture) -> Unit = {}): MountedRecents {
         val model = OffWindowActionFixture(scope)
         fixture = model
         prepare(model)
@@ -184,8 +184,10 @@ class GlobalSearchRecentStripTest {
 
     private fun tag(groupIdHex: String) = globalSearchRecentTag(GlobalSearchRecent.Chat(groupIdHex))
 
-    private fun tileExists(groupIdHex: String): Boolean =
-        rule.onAllNodes(hasTestTag(tag(groupIdHex))).fetchSemanticsNodes().isNotEmpty()
+    private fun tileExists(groupIdHex: String): Boolean {
+        val nodes = rule.onAllNodes(hasTestTag(tag(groupIdHex))).fetchSemanticsNodes()
+        return nodes.isNotEmpty()
+    }
 
     private fun awaitProgress(ready: () -> Boolean) {
         rule.waitUntil(WAIT_MILLIS) {

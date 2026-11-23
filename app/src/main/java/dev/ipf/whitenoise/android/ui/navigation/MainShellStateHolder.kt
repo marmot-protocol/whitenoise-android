@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.SavedComposerExpansion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecentsOwner
 
 /**
  * Activity-owned saved-route adapter over [MainShellProcessState]. Only
@@ -55,10 +56,10 @@ internal class MainShellStateHolder(
      * process-global state to bridge separate tasks.
      */
     val inboundShareRequest = mutableStateOf<ShareRequest?>(null)
+    val pendingShareRequest = mutableStateOf<ShareRequest?>(null)
 
     /** Recent global-search destinations (#4004): kept across Activity recreation, never in saved state. */
-    val globalSearchRecents = dev.ipf.whitenoise.android.ui.chats.GlobalSearchRecentsOwner()
-    val pendingShareRequest = mutableStateOf<ShareRequest?>(null)
+    val globalSearchRecents = GlobalSearchRecentsOwner()
 
     // The account-switch handoff must outlive lock-driven shell disposal, but only for its own share.
     private var stagedShareOpen by mutableStateOf(

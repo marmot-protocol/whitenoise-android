@@ -35,11 +35,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
@@ -67,7 +67,7 @@ internal fun GlobalSearchRecentStrip(
     onOpenChat: (ChatListItem) -> Unit,
     onOpenProfile: (String) -> Unit,
 ) {
-    val entries = recents?.entries.orEmpty().takeIf { visible }.orEmpty()
+    val entries = if (visible) recents?.entries.orEmpty() else emptyList()
     val chats = rememberGlobalSearchRecentChats(controller, entries)
     val destinations =
         remember(entries, chats) { resolveGlobalSearchRecents(entries, chats, appState::profileReferenceAccountIdHex) }
@@ -112,8 +112,13 @@ internal fun GlobalSearchRecentStrip(
             is GlobalSearchRecentDestination.Profile -> {
                 val account = destination.accountIdHex
                 val name = appState.displayName(account)
-                val picture = appState.privateContactAvatarSource(account, accountRef) ?: appState.avatarUrl(account)
-                Avatar(name, account, GlobalSearchRecentAvatarSize, pictureUrl = picture)
+                Avatar(
+                    name,
+                    account,
+                    GlobalSearchRecentAvatarSize,
+                    pictureUrl = appState.avatarUrl(account),
+                    pictureDomain = AvatarImageLoader.publicProfiles(),
+                )
                 GlobalSearchRecentTitle(name)
             }
             null -> Unit

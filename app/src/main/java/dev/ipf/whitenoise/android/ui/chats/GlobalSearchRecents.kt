@@ -72,8 +72,10 @@ internal class GlobalSearchRecentsOwner {
 }
 
 /** The list replaces nothing: it shows only on the blank search page, never beside a query, filter or library. */
-internal fun globalSearchRecentsVisible(state: GlobalSearchState): Boolean =
-    state.isOpen && state.query.isBlank() && !state.hasActiveFilters
+internal fun globalSearchRecentsVisible(state: GlobalSearchState): Boolean {
+    val blankQuery = state.query.isBlank()
+    return state.isOpen && blankQuery && !state.hasActiveFilters
+}
 
 /** A recent destination ready to draw; chats resolve to their current row, profiles to their key. */
 internal sealed interface GlobalSearchRecentDestination {
