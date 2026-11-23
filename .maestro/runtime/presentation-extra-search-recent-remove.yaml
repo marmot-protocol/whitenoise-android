@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-search-recent-remove
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Recent
+- assertVisible:
+    text: Fixture Alice
+- longPressOn:
+    text: Fixture Alice
+- assertVisible:
+    text: Remove from recent
+- tapOn:
+    text: Remove from recent
+- assertVisible:
+    id: presentation.complete

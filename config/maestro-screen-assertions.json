@@ -428,6 +428,27 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchRecentStrip.kt",
+      "symbol": "GlobalSearchRecentTile",
+      "bindings": [
+        {
+          "case": "presentation-extra-search-recent-remove",
+          "selector": {
+            "text": "Remove from recent"
+          },
+          "scope": "Recent search row with fixed entries; long press opens the tile menu and Remove dispatches removal of that profile only.",
+          "entry_assertion": {
+            "text": "Remove from recent"
+          },
+          "opened_by": {
+            "longPressOn": {
+              "text": "Fixture Alice"
+            }
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/NotificationProfileQuickSheet.kt",
       "symbol": "ColumnScope.NotificationProfileQuickSheetContent",
       "bindings": [
