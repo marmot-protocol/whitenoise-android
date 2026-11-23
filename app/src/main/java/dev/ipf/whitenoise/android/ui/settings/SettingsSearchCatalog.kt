@@ -700,18 +700,6 @@ private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
             R.string.settings_voice_language,
             SettingsDetail.Translation,
         ),
-        hubEntry(
-            "home.LearnWhiteNoise",
-            R.string.learn_white_noise,
-            R.string.settings_help_support,
-            SettingsDetail.LearnWhiteNoise,
-        ),
-        hubEntry(
-            "home.Documentation",
-            R.string.user_documentation,
-            R.string.settings_help_support,
-            SettingsDetail.Documentation,
-        ),
         hubEntry("home.Help", R.string.help, R.string.settings_help_support, SettingsDetail.Help),
         hubEntry(
             "home.ChatWithSupport",
@@ -739,4 +727,4 @@ private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
             R.string.notifications,
             SettingsDetail.NotificationDelivery,
         ),
-    ) + linkedDevicesSearchEntry()
+    ) + linkedDevicesSearchEntry() + userHelpSearchEntries()

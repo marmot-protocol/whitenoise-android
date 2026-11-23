@@ -26,6 +26,14 @@
         "test_ids": [
           "SET-069"
         ]
+      },
+      {
+        "surface": "UserHelpRoute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UserHelpScreens.kt",
+        "anchor": "fun UserHelpRoute(",
+        "test_ids": [
+          "SET-069"
+        ]
       }
     ],
     "source_coverage": [

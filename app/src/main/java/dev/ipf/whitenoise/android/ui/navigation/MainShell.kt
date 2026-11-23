@@ -1830,11 +1830,7 @@ internal fun MainShell(
                                 onFirstRunHelp = { support ->
                                     sectionName = MainSection.Settings.name
                                     settingsDetailName =
-                                        if (support) {
-                                            SettingsDetail.Support.name
-                                        } else {
-                                            SettingsDetail.LearnWhiteNoise.name
-                                        }
+                                        (if (support) SettingsDetail.Support else SettingsDetail.LearnWhiteNoise).name
                                 },
                                 onOpenSettings = {
                                     pendingConversationOpen = null

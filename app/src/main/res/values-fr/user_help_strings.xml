@@ -1,6 +1,6 @@
 <resources>
     <string name="learn_white_noise">Découvrir White Noise</string>
-    <string name="user_documentation">Documentation</string>
+    <string name="user_documentation">Guide d’utilisation</string>
     <string name="search_documentation">Rechercher dans la documentation</string>
     <string name="documentation_unavailable">Impossible d’ouvrir les guides intégrés.</string>
     <string name="help_open_share_connect">Ouvrir Partager et se connecter</string>

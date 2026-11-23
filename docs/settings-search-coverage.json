@@ -971,6 +971,12 @@
     "HelpSupport": {
       "catalog_id": "home.HelpSupport"
     },
+    "LearnWhiteNoise": {
+      "catalog_id": "home.LearnWhiteNoise"
+    },
+    "Documentation": {
+      "catalog_id": "home.Documentation"
+    },
     "NotificationSounds": {
       "catalog_id": "home.NotificationSounds"
     },

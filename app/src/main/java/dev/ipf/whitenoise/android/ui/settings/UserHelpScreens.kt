@@ -37,10 +37,34 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
+
+@Suppress("FunctionNaming")
+@Composable
+internal fun UserHelpRoute(
+    detail: SettingsDetail,
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+    onDetailChange: (SettingsDetail) -> Unit,
+) {
+    when (detail) {
+        SettingsDetail.LearnWhiteNoise ->
+            LearnWhiteNoiseScreen(onBack, { onDetailChange(SettingsDetail.Documentation) })
+        SettingsDetail.Documentation ->
+            DocumentationScreen(appState, onBack, { onDetailChange(SettingsDetail.ShareConnect) })
+        SettingsDetail.Help ->
+            HelpScreen(
+                onBack = onBack,
+                onOpenBugReport = { onDetailChange(SettingsDetail.BugReport) },
+                onOpenAbout = { onDetailChange(SettingsDetail.About) },
+            )
+        else -> error("Unexpected help destination: $detail")
+    }
+}
 
 private const val GUIDE_DIRECTORY = "user-guides"
 private const val DOCS_URL = "https://www.whitenoise.chat/docs/"

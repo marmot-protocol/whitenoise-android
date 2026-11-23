@@ -22,22 +22,6 @@
         ]
       },
       {
-        "surface": "ChatListJumpToTopButton",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "fun ChatListJumpToTopButton(",
-        "test_ids": [
-          "CHL-036"
-        ]
-      },
-      {
-        "surface": "ChatListJumpToTopControl",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "fun ChatListJumpToTopControl(",
-        "test_ids": [
-          "CHL-036"
-        ]
-      },
-      {
         "surface": "ChatsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "fun ChatsScreen(",
@@ -216,16 +200,6 @@
         ]
       },
       {
-        "surface": "R.string.scroll_to_top",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.scroll_to_top",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "Reviewed group action context: R.string.delete_from_device",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.delete_from_device",
@@ -274,14 +248,6 @@
         "anchor": "R.string.chat_list_voice_unavailable",
         "test_ids": [
           "FIND-010"
-        ]
-      },
-      {
-        "surface": "Chats upward endpoint navigation icon",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.drawable.ic_jump_to_edge",
-        "test_ids": [
-          "CHL-017"
         ]
       },
       {
