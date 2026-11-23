@@ -154,13 +154,22 @@ class GlobalSearchPresentationTest {
         try {
             composeRule.setContent {
                 WhiteNoiseTheme {
-                    ChatListIdentifierResult(IdentifierResolution.Resolved(npub, accountIdHex), app, null, { null }, {}, {})
+                    ChatListIdentifierResult(
+                        resolution = IdentifierResolution.Resolved(npub, accountIdHex),
+                        appState = app,
+                        accountRef = null,
+                        existingDirectChat = { null },
+                        onOpenChat = {},
+                        onOpenProfile = {},
+                    )
                 }
             }
             composeRule.onNodeWithText(fallback).assertExists()
             composeRule.waitUntil(5_000) { refreshStarted.isCompleted }
             composeRule.runOnIdle { profileAvailable.complete(Unit) }
-            composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText("Alice Rivera").fetchSemanticsNodes().isNotEmpty() }
+            composeRule.waitUntil(5_000) {
+                composeRule.onAllNodesWithText("Alice Rivera").fetchSemanticsNodes().isNotEmpty()
+            }
             composeRule.waitUntil(5_000) {
                 AvatarImageLoader.peek(picture) != null &&
                     composeRule.onAllNodesWithText("A", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
