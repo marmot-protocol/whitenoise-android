@@ -95,15 +95,27 @@ private fun NostrVideoPlayback(
         remember(mediaUrl) { File(nostrVideoDirectory(context.cacheDir), UUID.randomUUID().toString()) }
     var attempt by remember(directory) { mutableIntStateOf(0) }
     var download by remember(directory) { mutableStateOf<File?>(null) }
-    var downloadFailed by remember(directory) { mutableStateOf(false) }
+    var failed by remember(directory) { mutableStateOf(false) }
+    // Consumed synchronously, so one failure starts at most one new download.
+    val retry = {
+        if (failed) {
+            failed = false
+            download = null
+            attempt++
+        }
+    }
     LaunchedEffect(directory) {
         try {
-            snapshotFlow { attempt }.collectLatest {
-                downloadFailed = false
-                val ready = withContext(Dispatchers.IO) { directory.isDirectory || directory.mkdirs() }
+            snapshotFlow { attempt }.collect {
+                val ready =
+                    withContext(Dispatchers.IO) {
+                        // A retry replaces the copy that failed to play; its released player no longer reads it.
+                        directory.listFiles()?.forEach(File::delete)
+                        directory.isDirectory || directory.mkdirs()
+                    }
                 val file = if (ready) downloadNostrVideo(directory, mediaUrl) else null
                 download = file
-                downloadFailed = file == null
+                failed = file == null
             }
         } finally {
             // Runs only after the download has returned or aborted, so no file can appear after this deletion.
@@ -112,34 +124,11 @@ private fun NostrVideoPlayback(
     }
     val file = download
     if (file == null) {
-        NostrVideoPlayerSurface(
-            player = null,
-            playbackFailed = downloadFailed,
-            onRetry = { attempt++ },
-            onDismiss = onDismiss,
-        )
+        NostrVideoPlayerSurface(player = null, playbackFailed = failed, onRetry = retry, onDismiss = onDismiss)
     } else {
-        NostrDownloadedVideo(file, onDismiss)
+        val player = rememberNostrVideoPlayer(file) { failed = true }
+        NostrVideoPlayerSurface(player = player, playbackFailed = failed, onRetry = retry, onDismiss = onDismiss)
     }
-}
-
-@Composable
-private fun NostrDownloadedVideo(
-    file: File,
-    onDismiss: () -> Unit,
-) {
-    var playbackFailed by remember(file) { mutableStateOf(false) }
-    val player = rememberNostrVideoPlayer(file) { playbackFailed = true }
-    NostrVideoPlayerSurface(
-        player = player,
-        playbackFailed = playbackFailed,
-        onRetry = {
-            playbackFailed = false
-            player.prepare()
-            player.playWhenReady = true
-        },
-        onDismiss = onDismiss,
-    )
 }
 
 /** Plays a downloaded copy; compressed parsing stays in the isolated decoder behind [localVideoPlayer]. */
@@ -175,7 +164,8 @@ private fun rememberNostrVideoPlayer(
     LaunchedEffect(player) {
         VoicePlaybackController.pause()
         player.prepare()
-        player.playWhenReady = true
+        // A download can finish after ON_STOP, which this observer never sees; only a started screen plays.
+        player.playWhenReady = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
     }
     return player
 }
@@ -202,6 +192,7 @@ private fun NostrVideoPlayerSurface(
                         controllerShowTimeoutMs = VIDEO_CONTROLS_TIMEOUT_MILLIS
                     }
                 },
+                update = { playerView -> playerView.player = player },
                 onRelease = { playerView -> playerView.player = null },
             )
         } else if (!playbackFailed) {

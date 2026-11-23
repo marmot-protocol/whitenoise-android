@@ -38,14 +38,6 @@
         "test_ids": [
           "RDR-004"
         ]
-      },
-      {
-        "surface": "NostrDownloadedVideo",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
-        "anchor": "fun NostrDownloadedVideo(",
-        "test_ids": [
-          "RDR-004"
-        ]
       }
     ],
     "source_coverage": [

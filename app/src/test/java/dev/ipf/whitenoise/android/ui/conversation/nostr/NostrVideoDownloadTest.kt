@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
+import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -24,9 +25,14 @@ class NostrVideoDownloadTest {
 
     @Test
     fun publicHttpsVideoIsCopiedIntoThePlayerDirectory() {
-        val bytes = ByteArray(3_000) { it.toByte() }
+        val bytes = ByteArray(MAX_TEST_BYTES.toInt()) { it.toByte() }
         val directory = temporary.newFolder("player")
-        val file = download(directory, "https://media.example/clip.mp4") { bytes.toResponseBody() }
+        var encoding: String? = null
+        val file =
+            download(directory, VIDEO_URL, onRequest = { encoding = it.header("Accept-Encoding") }) {
+                bytes.toResponseBody()
+            }
+        assertEquals("identity", encoding)
         assertNotNull(file)
         assertEquals(directory, file!!.parentFile)
         assertArrayEquals(bytes, file.readBytes())
@@ -71,6 +77,10 @@ class NostrVideoDownloadTest {
         assertNull(download(missing, VIDEO_URL, code = 404) { "not found".toResponseBody() })
         assertEquals(0, missing.listFiles()!!.size)
 
+        val compressed = temporary.newFolder()
+        assertNull(download(compressed, VIDEO_URL, contentEncoding = "gzip") { "small".toResponseBody() })
+        assertEquals(0, compressed.listFiles()!!.size)
+
         val empty = temporary.newFolder()
         assertNull(download(empty, VIDEO_URL) { ByteArray(0).toResponseBody() })
         assertEquals(0, empty.listFiles()!!.size)
@@ -99,12 +109,15 @@ class NostrVideoDownloadTest {
         directory: File,
         url: String,
         code: Int = 200,
+        contentEncoding: String? = null,
+        onRequest: (Request) -> Unit = {},
         body: () -> ResponseBody,
     ): File? {
         val client =
             OkHttpClient
                 .Builder()
                 .addInterceptor { chain ->
+                    onRequest(chain.request())
                     Response
                         .Builder()
                         .request(chain.request())
@@ -112,6 +125,7 @@ class NostrVideoDownloadTest {
                         .code(code)
                         .message("test")
                         .body(body())
+                        .apply { contentEncoding?.let { header("Content-Encoding", it) } }
                         .build()
                 }.build()
         return runBlocking { downloadNostrVideo(directory, url, client, MAX_TEST_BYTES) }

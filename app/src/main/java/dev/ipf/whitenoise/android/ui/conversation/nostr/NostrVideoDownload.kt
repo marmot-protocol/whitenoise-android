@@ -49,10 +49,12 @@ internal suspend fun downloadNostrVideo(
 ): File? =
     withContext(Dispatchers.IO) {
         val target = url.toHttpUrlOrNull()?.takeIf { it.isSafeMediaDestination() } ?: return@withContext null
-        val call = client.newCall(Request.Builder().url(target).build())
-        // A blocking connect or read does not observe coroutine cancellation; this child aborts the call instead.
+        // Identity encoding keeps the declared length and the streamed bytes in the same representation.
+        val call = client.newCall(Request.Builder().url(target).header("Accept-Encoding", "identity").build())
+        // A blocking connect or read does not observe coroutine cancellation; this child aborts the call instead,
+        // on the cancelling thread rather than waiting for a slot in the I/O pool the blocked call occupies.
         val canceller =
-            launch(start = CoroutineStart.UNDISPATCHED) {
+            launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
                 try {
                     awaitCancellation()
                 } finally {
@@ -64,7 +66,8 @@ internal suspend fun downloadNostrVideo(
         try {
             call.execute().use { response ->
                 val body = response.body
-                if (!response.isSuccessful || body.contentLength() > maxBytes) return@use
+                val encoded = response.header("Content-Encoding")?.equals("identity", ignoreCase = true) == false
+                if (!response.isSuccessful || encoded || body.contentLength() > maxBytes) return@use
                 val download = File.createTempFile("video-", ".bin", directory).also { file = it }
                 body.byteStream().use { input ->
                     download.outputStream().use { output -> copyBounded(input, output, maxBytes) }

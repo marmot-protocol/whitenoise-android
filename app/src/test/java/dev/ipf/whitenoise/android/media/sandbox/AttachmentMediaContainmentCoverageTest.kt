@@ -65,7 +65,7 @@ class AttachmentMediaContainmentCoverageTest {
         val sources =
             root
                 .walkTopDown()
-                .filter { it.isFile && it.extension == "kt" }
+                .filter { it.isFile && it.extension in setOf("kt", "java") }
                 .associate { it.relativeTo(root).invariantSeparatorsPath to it.readText() }
         assertTrue("The production source tree must be scanned", sources.size > 100)
         sources.forEach { (path, text) ->
@@ -223,6 +223,7 @@ class AttachmentMediaContainmentCoverageTest {
             "val decoder = android.media.MediaMetadataRetriever()",
             "val codec = android.media.MediaCodec.createDecoderByType(mime)",
             "import androidx.media3.exoplayer.ExoPlayer as LocalPlayer",
+            "val extractor = androidx.media3.extractor.mp4.Mp4Extractor()",
             "val player = MediaPlayer()",
         )) {
             assertTrue("A compressed-parser alias or factory escaped the guard", containsPrivilegedParser(source))
@@ -263,7 +264,7 @@ class AttachmentMediaContainmentCoverageTest {
         // Import declarations are included, so aliases cannot hide a platform parser.
         Regex(
             """\b(?:android\.media\.)?(?:MediaMetadataRetriever|MediaExtractor|MediaPlayer|MediaCodec)\b|""" +
-                """\b(?:androidx\.media3\.exoplayer\.)?ExoPlayer\b""",
+                """\b(?:androidx\.media3\.exoplayer\.)?ExoPlayer\b|\bandroidx\.media3\.(?:exoplayer|extractor)\b""",
         ).containsMatchIn(executable(source))
 
     /** Checks source text for platform or bundled still-image, animation, EXIF, SVG and PDF parsers. */
