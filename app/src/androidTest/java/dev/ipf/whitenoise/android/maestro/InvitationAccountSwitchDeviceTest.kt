@@ -18,7 +18,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.CreateGroupOptionsFfi
-import dev.ipf.marmotkit.GroupCreationResultFfi
+import dev.ipf.marmotkit.DetailedGroupCreationResultFfi
 import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
@@ -131,12 +131,13 @@ class InvitationAccountSwitchDeviceTest {
         var started = CompletableDeferred<Unit>()
         var finished = CompletableDeferred<Unit>()
 
-        override suspend fun createGroupWithOptions(
+        override suspend fun createGroupWithOptionsDetailed(
             accountRef: String,
             name: String,
             memberRefs: List<String>,
             options: CreateGroupOptionsFfi,
-        ): GroupCreationResultFfi = observe { native.createGroupWithOptions(accountRef, name, memberRefs, options) }
+        ): DetailedGroupCreationResultFfi =
+            observe { native.createGroupWithOptionsDetailed(accountRef, name, memberRefs, options) }
 
         override suspend fun inviteMembersDetailedWithInitialAdmins(
             accountRef: String,

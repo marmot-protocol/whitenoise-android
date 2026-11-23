@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.state.MarmotTraceSection
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
+import dev.ipf.whitenoise.android.state.chatListItemFromProjection
 import dev.ipf.whitenoise.android.state.defaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
@@ -88,9 +89,14 @@ private suspend fun createOrRecoverNewGroup(
                 val result =
                     appState.marmotIo(MarmotTraceSection.CREATE_GROUP) {
                         owner.ensureCurrent()
-                        createGroupWithOptions(account, name, members, options)
+                        createGroupWithOptionsDetailed(account, name, members, options)
                     }
-                owner.acceptCreatedGroup(result, appState::displayName)
+                owner.acceptCreatedGroup(
+                    result.created?.groupIdHex,
+                    result.memberOutcomes,
+                    result.created?.chatListRow,
+                    appState::displayName,
+                )
             }.also {
                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
                 if (owner.isCurrent()) {
@@ -232,6 +238,10 @@ private suspend fun loadCreatedGroupForOwner(
 ): Pair<ChatListItem, List<String>> {
     owner.ensureCurrent()
     val accountHex = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+    // The conversation loads its full roster after opening from this committed row.
+    owner.createdRow?.takeIf { it.groupIdHex == groupIdHex }?.let { row ->
+        return chatListItemFromProjection(row = row, activeAccountIdHex = accountHex) to emptyList()
+    }
     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
     val details =
         appState.marmotIo(MarmotTraceSection.CREATED_GROUP_DETAILS) {

@@ -97,6 +97,14 @@
         "test_ids": [
           "STB-001"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "surface": "Conversation open from the native committed chat row",
+        "anchor": "owner.createdRow?.takeIf",
+        "test_ids": [
+          "NCH-002"
+        ]
       }
     ]
   },

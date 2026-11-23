@@ -1,11 +1,12 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
-import dev.ipf.marmotkit.GroupCreationResultFfi
+import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.whitenoise.android.diagnostics.CreationOperation
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.groupMemberSelectionFailure
 import dev.ipf.whitenoise.android.state.missingGroupMembersDetail
-import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -22,16 +23,23 @@ internal class GroupCreationSession(
 
     /** Whether [skippedMembers] came from MDK's member report rather than being unknown until the roster is read. */
     private var memberReportCaptured = false
+
+    /** Committed chat row for this screen's accepted create, when native projection succeeded. */
+    var createdRow: ChatListRowFfi? = null
+        private set
     val diagnostics = DmCreationInteraction(operation = CreationOperation.GROUP_CREATE)
 
     /** Records MDK's skipped-member report for this screen, then returns the committed group ID. */
     fun acceptCreatedGroup(
-        result: GroupCreationResultFfi,
+        groupId: String?,
+        memberOutcomes: List<MemberResolutionOutcomeFfi>,
+        row: ChatListRowFfi? = null,
         displayName: (String) -> String,
     ): String {
-        val groupId = result.requireCreatedGroupId()
+        if (groupId == null) throw groupMemberSelectionFailure(memberOutcomes)
         ensureCurrent()
-        skippedMembers = result.memberOutcomes.skippedGroupMembersDetail(displayName)
+        createdRow = row?.takeIf { it.groupIdHex == groupId }
+        skippedMembers = memberOutcomes.skippedGroupMembersDetail(displayName)
         memberReportCaptured = true
         return groupId
     }
