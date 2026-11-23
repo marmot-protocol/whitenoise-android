@@ -103,7 +103,7 @@ internal fun NostrEventCards(
     }
     videoSelection?.let { (card, origin) ->
         card.mediaUrl?.let { url ->
-            NostrVideoPlayerDialog(url, card.mediaMimeType, origin = origin, onDismiss = { videoSelection = null })
+            NostrVideoPlayerDialog(url, origin = origin, onDismiss = { videoSelection = null })
         }
     }
 }

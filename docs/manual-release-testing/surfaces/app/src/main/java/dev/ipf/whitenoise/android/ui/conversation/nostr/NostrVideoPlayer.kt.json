@@ -1,0 +1,63 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NostrVideoPlaybackFailure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "fun NostrVideoPlaybackFailure(",
+        "test_ids": [
+          "RDR-001",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "NostrVideoPlayerDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "fun NostrVideoPlayerDialog(",
+        "test_ids": [
+          "RDR-001",
+          "MED-028",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "NostrVideoPlayerSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "fun NostrVideoPlayerSurface(",
+        "test_ids": [
+          "RDR-001",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "NostrVideoPlayback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "fun NostrVideoPlayback(",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "NostrDownloadedVideo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "fun NostrDownloadedVideo(",
+        "test_ids": [
+          "RDR-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Referenced Nostr video pauses when headphones disconnect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "setHandleAudioBecomingNoisy(true)",
+        "test_ids": [
+          "MED-047"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

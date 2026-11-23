@@ -1,12 +1,13 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
 import dev.ipf.whitenoise.android.functionBody
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Guards the selected attachment routes; remote embedded videos and debug experiments are separate. */
+/** Guards attachment and referenced-media routes; debug experiments are separate. */
 class AttachmentMediaContainmentCoverageTest {
     @Test
     fun pdfConstructionStaysInTheIsolatedService() {
@@ -54,6 +55,56 @@ class AttachmentMediaContainmentCoverageTest {
         assertFalse(
             "Descriptor platform probing must remain fixture/debug-only",
             source("media/sandbox/MediaProbeDecoder.kt").readText().contains("probeMediaFromDescriptor"),
+        )
+    }
+
+    /** No Production Source Outside The Isolated Workers Parses Compressed Media. */
+    @Test
+    fun productionSourcesParseCompressedMediaOnlyInIsolatedWorkers() {
+        val root = source(".").canonicalFile
+        val sources =
+            root
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .associate { it.relativeTo(root).invariantSeparatorsPath to it.readText() }
+        assertTrue("The production source tree must be scanned", sources.size > 100)
+        sources.forEach { (path, text) ->
+            if (path !in BUNDLED_TONE_PLAYERS) {
+                assertFalse("Audio/video parser outside the isolated worker: $path", containsPrivilegedParser(text))
+            }
+            if (path !in IMAGE_PARSER_HOSTS) {
+                assertFalse("Compressed image parser outside the isolated worker: $path", containsImageParser(text))
+            }
+        }
+        // These helpers decode in the caller's process; only the isolated decode service may call them.
+        val helper = Regex("""\b(?:decodeSampledBitmapInDecoder|readExifOrientationInDecoder|rasterizeInDecoder)\(""")
+        val callers =
+            sources
+                .filter { (_, text) -> helper.containsMatchIn(executable(text)) }
+                .keys
+        assertEquals(IN_DECODER_HELPER_HOSTS, callers)
+    }
+
+    /** Referenced Nostr Videos Download Before The Isolated Player Parses Them. */
+    @Test
+    fun referencedNostrVideosDownloadBeforeTheIsolatedPlayerParsesThem() {
+        val player = source("ui/conversation/nostr/NostrVideoPlayer.kt").readText()
+        assertTrue(
+            "Referenced videos must play their private download through the isolated factory",
+            "localVideoPlayer(context, Uri.fromFile(file))" in player.functionBody("rememberNostrVideoPlayer"),
+        )
+        assertTrue(
+            "Each player must delete its download directory on disposal",
+            "onDispose { directory.deleteRecursively() }" in player.functionBody("NostrVideoPlayback"),
+        )
+        val download = source("ui/conversation/nostr/NostrVideoDownload.kt").readText()
+        assertTrue(
+            "Downloads must stay on validated public HTTPS",
+            "isSafeMediaDestination()" in download && "client: OkHttpClient = nostrMediaHttpClient" in download,
+        )
+        assertTrue(
+            "Downloads must stay within the isolated decoder's input limit",
+            "maxBytes: Long = MAX_MEDIA_SOURCE_BYTES" in download,
         )
     }
 
@@ -207,19 +258,27 @@ class AttachmentMediaContainmentCoverageTest {
     /**
      * Checks source text for forbidden compressed-parser factories, including qualified and aliased forms.
      */
-    private fun containsPrivilegedParser(source: String): Boolean {
+    private fun containsPrivilegedParser(source: String): Boolean =
         // Import declarations are included, so aliases cannot hide a platform parser.
-        val executable =
-            source
-                .replace(Regex("""(?s)/\*.*?\*/"""), "")
-                .lineSequence()
-                .filterNot { it.trimStart().startsWith("//") }
-                .joinToString("\n")
-        return Regex(
+        Regex(
             """\b(?:android\.media\.)?(?:MediaMetadataRetriever|MediaExtractor|MediaPlayer|MediaCodec)\b|""" +
                 """\b(?:androidx\.media3\.exoplayer\.)?ExoPlayer\b""",
-        ).containsMatchIn(executable)
-    }
+        ).containsMatchIn(executable(source))
+
+    /** Checks source text for platform or bundled still-image, animation, EXIF, SVG and PDF parsers. */
+    private fun containsImageParser(source: String): Boolean =
+        Regex(
+            """\b(?:BitmapFactory|ImageDecoder|BitmapRegionDecoder|ExifInterface)\b|""" +
+                """\b(?:PdfRenderer|AnimatedImageDrawable)\b|\bcom\.caverock\.androidsvg\b|\bSVG\.getFrom""",
+        ).containsMatchIn(executable(source))
+
+    /** Drops comments, so historical explanations are not mistaken for executable parsers. */
+    private fun executable(source: String): String =
+        source
+            .replace(Regex("""(?s)/\*.*?\*/"""), "")
+            .lineSequence()
+            .filterNot { it.trimStart().startsWith("//") }
+            .joinToString("\n")
 
     /** Loads the checked-in source text used by the containment wiring assertion. */
     private fun source(path: String): File =
@@ -227,4 +286,33 @@ class AttachmentMediaContainmentCoverageTest {
             File("src/main/java/dev/ipf/whitenoise/android/$path"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$path"),
         ).firstOrNull(File::exists) ?: File("src/main/java/dev/ipf/whitenoise/android/$path")
+
+    private companion object {
+        /** Plays bundled or system notification tones chosen in Settings, never attachment bytes. */
+        val BUNDLED_TONE_PLAYERS = setOf("ui/settings/NotificationTonePreview.kt")
+
+        /**
+         * Files allowed to name an image parser: isolated-worker code, the `*InDecoder` helpers below and the encrypted
+         * thumbnail cache, which re-decodes only pixels a worker already produced.
+         */
+        val IMAGE_PARSER_HOSTS =
+            setOf(
+                "media/MediaPipeline.kt",
+                "media/GroupSvgRasterizer.kt",
+                "media/PersistentDisplayThumbnails.kt",
+                "media/sandbox/PdfPageDecoder.kt",
+                "media/sandbox/PlatformMediaDecoder.kt",
+                "media/sandbox/ViewerSvgDecoder.kt",
+                "media/sandbox/WorkerAnimation.kt",
+            )
+
+        /** Definitions and isolated-service call sites of helpers that decode in the caller's process. */
+        val IN_DECODER_HELPER_HOSTS =
+            setOf(
+                "media/MediaPipeline.kt",
+                "media/GroupSvgRasterizer.kt",
+                "media/sandbox/MediaDecodeService.kt",
+                "media/sandbox/PlatformMediaDecoder.kt",
+            )
+    }
 }

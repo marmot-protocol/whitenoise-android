@@ -1993,7 +1993,7 @@
           "selector": {
             "text": "Couldn’t play this video\\."
           },
-          "scope": "ExoPlayer local missing-file failure and Close; no successful playback claim.",
+          "scope": "Refused non-HTTPS video source failure and Close; no successful playback claim.",
           "entry_assertion": {
             "text": "Couldn’t play this video\\."
           },
