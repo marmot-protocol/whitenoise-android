@@ -146,8 +146,12 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
-import dev.ipf.whitenoise.android.ui.conversation.ConversationMorphAnchor
+import dev.ipf.whitenoise.android.ui.conversation.ComposerResizeHandleThickness
+import dev.ipf.whitenoise.android.ui.conversation.ComposerResizeHandleWidth
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationSettingsMotion
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
+import dev.ipf.whitenoise.android.ui.conversation.conversationSettingsGrip
+import dev.ipf.whitenoise.android.ui.conversation.conversationSettingsOutline
 import dev.ipf.whitenoise.android.ui.design.platformBackCallbacksEnabled
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Key
@@ -158,7 +162,6 @@ import dev.ipf.whitenoise.android.ui.navigation.composerFabGrip
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphAnchorOutline
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
@@ -179,8 +182,6 @@ private val ComposerOutlineThickness = 1.dp
 
 // The drag strip's visible grip: Material's drag-handle proportions, drawn in the outline colour so it
 // reads as chrome rather than content.
-private val ComposerResizeHandleWidth = 32.dp
-private val ComposerResizeHandleThickness = 4.dp
 private val ExpandedEditorBottomInset = 48.dp
 
 /** Interpolates one layout-space distance without allocating an animation object. */
@@ -1270,6 +1271,7 @@ internal fun ComposerPill(
     ) {
         val sourceFill = MaterialTheme.colorScheme.surfaceContainerHigh
         val sourceBorder = MaterialTheme.colorScheme.outlineVariant
+        val sourceShape = RoundedCornerShape(24.dp)
         SideEffect {
             sendMotion?.sourceFill = sourceFill
             sendMotion?.sourceBorder = sourceBorder
@@ -1280,27 +1282,29 @@ internal fun ComposerPill(
         val morphing = LocalComposerFabHandoff.current?.active == true
         val nativePreview =
             if (toolbarPreview) {
+                val settingsMotion = LocalConversationSettingsMotion.current
+                val reportPreview = remember(settingsMotion) { settingsMotion?.let { it::reportComposerPreview } }
                 dev.ipf.whitenoise.android.ui.settings
                     .rememberSettingsNativeSurface(
                         destination = "composer.editor",
                         surface = "composer.editor.preview",
                         fill = sourceFill,
-                        shape = RoundedCornerShape(24.dp),
+                        shape = sourceShape,
                         strokeColor = sourceBorder,
+                        onMeasured = reportPreview,
                     ).first
             } else {
-                // Composer settings open from this outline and fold back into it.
-                Modifier.settingsMorphAnchorOutline(
-                    ConversationMorphAnchor.Composer,
-                    RoundedCornerShape(24.dp),
+                Modifier.conversationSettingsOutline(
+                    sourceShape,
+                    sourceFill,
                     sourceBorder,
                     ComposerOutlineThickness,
+                    hasGrip = inputContentVisible,
                 )
             }
         Surface(
             color = if (morphing) Color.Transparent else sourceFill,
-            // Custom clipping owns motion; settled chrome remains the original Material surface.
-            shape = if (morphing) RectangleShape else RoundedCornerShape(24.dp),
+            shape = if (morphing) RectangleShape else sourceShape,
             border = if (morphing) null else BorderStroke(ComposerOutlineThickness, sourceBorder),
             modifier =
                 Modifier
@@ -2032,14 +2036,6 @@ internal fun ComposerPill(
     }
 }
 
-/** Keeps accessory overflow scrollable while reserving at least half the finite viewport for input. */
-private fun Modifier.boundedComposerAccessory(): Modifier =
-    layout { measurable, constraints ->
-        val limit = if (constraints.hasBoundedHeight) constraints.maxHeight / 2 else constraints.maxHeight
-        val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = limit))
-        layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
-    }
-
 /** The grip marks the parent-owned drag region without intercepting child controls. */
 @Composable
 @Suppress("FunctionNaming")
@@ -2058,6 +2054,7 @@ private fun ComposerResizeGestureStrip(modifier: Modifier = Modifier) {
                 .offset(y = (ComposerOutlineThickness - ComposerResizeHandleThickness) / 2)
                 .size(width = ComposerResizeHandleWidth, height = ComposerResizeHandleThickness)
                 .composerFabGrip()
+                .conversationSettingsGrip()
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.outlineVariant)
                 .testTag(COMPOSER_RESIZE_HANDLE_TAG),

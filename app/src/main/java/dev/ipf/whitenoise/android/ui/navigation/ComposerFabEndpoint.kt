@@ -10,10 +10,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -31,7 +28,9 @@ import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.controlMorphSurface
-import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
+import dev.ipf.whitenoise.android.ui.common.drawControlMorphPen
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
+import kotlin.math.ceil
 
 /** The shell connects only these two real controls; no composer or draft state is shared. */
 internal enum class ComposerFabEndpoint { Composer, NewMessage }
@@ -56,7 +55,7 @@ internal fun Modifier.composerFabSurface(
             fill,
             border,
             with(density) { radiusDp.dp.toPx() },
-            with(density) { 1.dp.toPx() },
+            with(density) { ceil(1.dp.toPx()) },
             decorationAlpha = if (endpoint == ComposerFabEndpoint.NewMessage) 1f else 0f,
         ),
         nativeChromeSettled = !morphing,
@@ -105,13 +104,7 @@ internal fun Modifier.composerFabPenDecoration(state: MeasuredControlHandoff): M
             if (state.presentationActive) {
                 val alpha = state.presentationDecorationAlpha
                 state.presentationBounds?.takeIf { alpha > 0f }?.let { bounds ->
-                    val center = bounds.center - origin
-                    val iconSize = 24.dp.toPx()
-                    translate(center.x - iconSize / 2f, center.y - iconSize / 2f) {
-                        with(painter) {
-                            draw(Size(iconSize, iconSize), alpha = alpha, colorFilter = ColorFilter.tint(tint))
-                        }
-                    }
+                    drawControlMorphPen(bounds.translate(-origin), painter, tint, alpha)
                 }
             }
         }
@@ -129,5 +122,5 @@ internal val LocalConversationBodyMotion = staticCompositionLocalOf<Conversation
 internal fun Modifier.conversationRouteBodyMotion(): Modifier {
     val motion = LocalConversationBodyMotion.current ?: return this
     val view = LocalView.current
-    return onGloballyPositioned { motion.nativeBody.bounds = it.settingsMorphBounds(view) }
+    return onGloballyPositioned { motion.nativeBody.bounds = it.motionBoundsOnScreen(view) }
 }

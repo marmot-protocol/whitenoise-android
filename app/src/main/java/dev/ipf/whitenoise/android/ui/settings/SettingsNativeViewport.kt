@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 
 /** Measures a real scroll boundary; callers provide its token to the native containers inside. */
 @Composable
@@ -14,7 +15,7 @@ internal fun rememberViewport(page: SettingsPageMorph? = LocalSettingsCardMorph.
     val token = remember(page) { Any() }
     val view = LocalView.current
     DisposableEffect(page, token) { onDispose { page?.removeViewport(token) } }
-    return token to Modifier.onGloballyPositioned { page?.reportViewport(token, it.settingsMorphBounds(view)) }
+    return token to Modifier.onGloballyPositioned { page?.reportViewport(token, it.motionBoundsOnScreen(view)) }
 }
 
 /** Associates existing native containers with their actual scroll viewport without adding a surface. */
