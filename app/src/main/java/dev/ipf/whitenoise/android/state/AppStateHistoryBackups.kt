@@ -29,29 +29,39 @@ internal class NativeHistoryBackupsAccess(
     private val owns: () -> Boolean,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : HistoryBackupsAccess {
+    /** Checks whether the captured account and runtime still own the screen. */
     override fun isCurrent(): Boolean = owns()
 
+    /** Reads the account’s enablement and writer role. */
     override suspend fun settings(): BackupSettingsFfi = call { backupSettings(account) }
 
+    /** Starts setup and returns the words and confirmation positions. */
     override suspend fun beginWords(): RecoveryWordsFfi = call { beginRecoveryWords(account) }
 
+    /** Submits the answers in the order requested by MarmotKit. */
     override suspend fun confirmWords(answers: List<String>) = call { confirmRecoveryWords(account, answers) }
 
+    /** Clears any unfinished setup for the captured account. */
     override suspend fun forgetWords() = withContext(dispatcher) { marmot.cancelRecoveryWords(account) }
 
+    /** Stops future backups while retaining existing archives. */
     override suspend fun turnOff() = call { turnOffBackups(account) }
 
+    /** Starts a history-only restore and returns its initial status. */
     override suspend fun beginRestore(words: String): BackupRestoreStatusFfi =
         call {
             beginBackupRestore(account, words)
         }
 
+    /** Requests cancellation of the specified restore operation. */
     override suspend fun cancelRestore(operation: String) {
         call { cancelBackupRestore(account, operation) }
     }
 
+    /** Reads the latest restore state for the captured account. */
     override suspend fun restoreStatus(): BackupRestoreStatusFfi = call { backupRestoreStatus(account) }
 
+    /** Delivers restore updates and closes the subscription when observation ends. */
     override suspend fun followRestore(onStatus: (BackupRestoreStatusFfi) -> Unit) =
         call {
             // Acquisition, reads and close all enter the binding off the main thread; a cancelled acquisition still

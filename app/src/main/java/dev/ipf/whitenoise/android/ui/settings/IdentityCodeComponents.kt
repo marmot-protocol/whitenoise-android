@@ -10,11 +10,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,7 +22,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,15 +38,17 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.QrCodeEncoder
 import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 /** Black-on-white QR code on a large-corner white card sized from the available width. */
@@ -104,9 +110,9 @@ private fun IdentityQrCode(
 }
 
 /**
- * 48 dp copy target around a 240 dp capsule that shows a middle-ellipsized identifier and a copy glyph, which turns
- * into a check while [copied]. [explanationRes] defaults to the wording for the user's own key. The whole target is
- * the button; the capsule is the visual.
+ * The collapsed 240 dp capsule shows an abbreviated identifier beside a copy glyph. On copy, the capsule uses
+ * the available width to display the grouped key, and the glyph turns into a check while [copied].
+ * [explanationRes] defaults to the wording for the user's own key.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -124,12 +130,12 @@ internal fun IdentifierCopyCapsule(
     @StringRes explanationRes: Int = R.string.explanation_organize_copy_public_key,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    var expanded by rememberSaveable(value) { mutableStateOf(false) }
     val actionDescription = if (copied) copiedContentDescription else copyContentDescription
     val state = if (copied) copiedStateDescription else notCopiedStateDescription
     Box(
         modifier =
             modifier
-                .widthIn(max = IdentityCodeDefaults.CapsuleMaxWidth)
                 .heightIn(min = IdentityCodeDefaults.CapsuleMinHeight)
                 .explainOnLongPress(
                     Explanation(
@@ -140,10 +146,12 @@ internal fun IdentifierCopyCapsule(
                     interactionSource = interactionSource,
                     indication = null,
                     role = Role.Button,
-                    onClick = onCopy,
+                    onClick = {
+                        onCopy()
+                        expanded = true
+                    },
                 ).testTag(targetTestTag)
                 .semantics {
-                    role = Role.Button
                     contentDescription = actionDescription
                     stateDescription = state
                 },
@@ -152,7 +160,7 @@ internal fun IdentifierCopyCapsule(
         Row(
             modifier =
                 Modifier
-                    .width(IdentityCodeDefaults.CapsuleWidth)
+                    .then(if (expanded) Modifier.fillMaxWidth() else Modifier.width(IdentityCodeDefaults.CapsuleWidth))
                     .testTag(visualTestTag)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -162,11 +170,13 @@ internal fun IdentifierCopyCapsule(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = value,
-                modifier = Modifier.weight(1f),
+                text = if (expanded) publicKeyDisplayGroups(value).joinToString(" ") else value,
+                modifier = Modifier.weight(1f).animatePublicKeyExpansion(expanded),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis,
+                maxLines = if (expanded) Int.MAX_VALUE else 1,
+                overflow = if (expanded) TextOverflow.Clip else TextOverflow.MiddleEllipsis,
+                fontFamily = if (expanded) FontFamily.Monospace else null,
+                textAlign = if (expanded) TextAlign.Center else null,
                 style = MaterialTheme.typography.bodySmall,
             )
             Icon(
@@ -182,7 +192,6 @@ internal fun IdentifierCopyCapsule(
 /** Geometry the identity surfaces share: capsule width and the QR surface's size band. */
 internal object IdentityCodeDefaults {
     val CapsuleWidth = 240.dp
-    val CapsuleMaxWidth = 360.dp
     val CapsuleMinHeight = 48.dp
     val CapsuleIconSize = 16.dp
     val QrSurfaceInset = 12.dp

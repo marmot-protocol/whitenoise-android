@@ -63,6 +63,7 @@ internal class RecoveryWordsSetup(
     /** The words are shown once: confirmation keeps only the positions, so they cannot be displayed again. */
     fun confirming(): RecoveryWordsSetup = RecoveryWordsSetup(emptyList(), confirmPositions, confirming = true)
 
+    /** Formats setup state without exposing the words. */
     override fun toString(): String = "RecoveryWordsSetup(words=[${words.size} redacted], confirming=$confirming)"
 }
 
@@ -79,6 +80,7 @@ internal data class HistoryRestoreProgress(
         get() = phase == BackupRestorePhaseFfi.DISCOVERING || phase == BackupRestorePhaseFfi.RESTORING
 
     companion object {
+        /** Projects the native restore status into screen state. */
         fun from(status: BackupRestoreStatusFfi): HistoryRestoreProgress =
             HistoryRestoreProgress(
                 phase = status.phase,
@@ -108,6 +110,7 @@ internal data class HistoryBackupsState(
     val problem: HistoryBackupProblem? = null,
 )
 
+/** Maps known MarmotKit refusal codes to recovery advice. */
 internal fun historyBackupProblem(error: Throwable): HistoryBackupProblem =
     when (deviceGroupRefusal(error)?.trim()) {
         "roster_unsupported" -> HistoryBackupProblem.Unavailable
@@ -125,22 +128,31 @@ internal fun historyBackupProblem(error: Throwable): HistoryBackupProblem =
  * refuses once [isCurrent] turns false; forgetting unconfirmed words is always safe, so cleanup still reaches MDK.
  */
 internal interface HistoryBackupsAccess {
+    /** Checks whether the captured account and runtime still own the screen. */
     fun isCurrent(): Boolean
 
+    /** Reads the account’s enablement and writer role. */
     suspend fun settings(): BackupSettingsFfi
 
+    /** Starts setup and returns the words and confirmation positions. */
     suspend fun beginWords(): RecoveryWordsFfi
 
+    /** Submits the answers in the order requested by MarmotKit. */
     suspend fun confirmWords(answers: List<String>)
 
+    /** Clears any unfinished setup for the captured account. */
     suspend fun forgetWords()
 
+    /** Stops future backups while retaining existing archives. */
     suspend fun turnOff()
 
+    /** Starts a history-only restore and returns its initial status. */
     suspend fun beginRestore(words: String): BackupRestoreStatusFfi
 
+    /** Requests cancellation of the specified restore operation. */
     suspend fun cancelRestore(operation: String)
 
+    /** Reads the latest restore state for the captured account. */
     suspend fun restoreStatus(): BackupRestoreStatusFfi
 
     /** Reports restore progress until the owner retires or MDK ends the watch. Never cancels a restore. */

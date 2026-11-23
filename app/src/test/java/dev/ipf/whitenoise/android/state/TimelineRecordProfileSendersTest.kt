@@ -37,7 +37,8 @@ class TimelineRecordProfileSendersTest {
             kind = 9uL,
             mediaJson = null,
             media = emptyList(),
-            agentTextStreamJson = null,
+            replyToMessageIdHex = null,
+            thread = null,
             deleted = false,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,
@@ -68,7 +69,7 @@ class TimelineRecordProfileSendersTest {
         replyPreview = replyPreview,
         mediaJson = null,
         media = emptyList(),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         reactions =

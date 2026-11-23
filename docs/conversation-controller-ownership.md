@@ -12,7 +12,7 @@ The chat-list projection/action owner from #3242 and #3318 remains separate.
 | `ConversationTimelineSession` | Start/retry admission, controller read scope, per-attempt scope, bounded initial open/snapshot, reconnect wait, installed subscription handles, foreground handoff receipt | Attempt finalization retires its handles; account teardown fences future opens; screen disposal cancels reads and receipts. Paging and close share the same active-call mutex. |
 | `ConversationMutationPresentation` | Transient mutation slot, errors, archive overlay identity and the existing group-authority counter | Each command releases its own slot/overlay in `finally`; timeline reconnect/disposal does not own command execution. |
 | `ConversationAttachmentPresentation` | Row transfer observers, availability waiters, open-intent adapters, pinned cache/source identities and bounded byte/thumbnail adapters | Screen disposal cancels presentation waiters. Native downloads/retries/cancellation acknowledgements remain app-owned. |
-| Existing `inviteStreamScope` | Post-accept warm-up and agent stream observation | Controller disposal, never a single failed/ended timeline attempt. |
+| Existing `inviteStreamScope` | Post-accept warm-up | Controller disposal, never a single failed/ended timeline attempt. |
 | Existing AppState/native owners | Optimistic sends/edits, retained upload bytes, durable command acceptance, transfer acquisition/retry and encrypted caches | Existing command/native lifetime, including acknowledgement arriving after screen disposal. |
 
 `runStart` installs the session's current read scope inside its load-error boundary.

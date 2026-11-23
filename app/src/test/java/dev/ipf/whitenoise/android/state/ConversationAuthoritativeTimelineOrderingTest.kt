@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.state
 import android.os.Looper
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
-import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import kotlinx.coroutines.CoroutineDispatcher
@@ -70,27 +69,11 @@ class ConversationAuthoritativeTimelineOrderingTest {
                 dispatcher.runPending()
                 advanceUntilIdle()
 
-                assertEquals(emptyList<String>(), stale.await())
+                stale.await()
                 newest.await()
                 assertAuthoritativePair(controller)
             } finally {
                 controller.onCleared()
-            }
-        }
-
-    @Test
-    fun pageDoesNotRestartFinalStream() =
-        runBlocking {
-            val subscription = ScriptedConversationTimelineSubscription(timelinePage(appRecord(100uL)))
-            withController(subscription) { controller, _ ->
-                awaitConversationCondition { controller.timeline.size == 1 }
-                val streams =
-                    controller.applyTimelinePage(
-                        timelinePage(streamFinalRecord(103uL), streamStartRecord(102uL), appRecord(100uL)),
-                        replaceWindow = true,
-                        updatePagination = true,
-                    )
-                assertTrue(streams.isEmpty())
             }
         }
 
@@ -237,29 +220,6 @@ class ConversationAuthoritativeTimelineOrderingTest {
             }
         }
 
-    /** Earlier-timestamp stream rows remain chained below their MDK-ranked prompt. */
-    @Test
-    fun durableStreamChainCannotCrossPrecedingMembershipRow() =
-        runBlocking {
-            val subscription =
-                ScriptedConversationTimelineSubscription(
-                    timelinePage(
-                        membershipRecord(timelineAt = 200uL),
-                        appRecord(timelineAt = 100uL),
-                        streamStartRecord(timelineAt = 98uL),
-                        streamFinalRecord(timelineAt = 99uL),
-                    ),
-                )
-            withController(subscription) { controller, _ ->
-                awaitConversationCondition { controller.timeline.size == 4 }
-
-                assertEquals(
-                    listOf(SYSTEM_MESSAGE_ID, APP_MESSAGE_ID, STREAM_START_MESSAGE_ID, STREAM_FINAL_MESSAGE_ID),
-                    timelineMessageIds(controller),
-                )
-            }
-        }
-
     /** An app-first live delivery settles when the next full MDK window arrives. */
     @Test
     fun liveWindowSettlesAppFirstArrivalIntoAuthoritativeOrder() =
@@ -382,7 +342,7 @@ class ConversationAuthoritativeTimelineOrderingTest {
                 ),
         )
 
-    /** Builds the authorized application message and durable stream prompt. */
+    /** Builds the authorized application message. */
     private fun appRecord(timelineAt: ULong) =
         timelineRecord(
             messageId = APP_MESSAGE_ID,
@@ -412,33 +372,6 @@ class ConversationAuthoritativeTimelineOrderingTest {
             sourceMessageIdHex = null,
             direction = "sent",
             sender = ConversationTimelineTestIds.ACCOUNT_ID,
-        )
-
-    /** Builds the durable stream start linked to the authoritative prompt. */
-    private fun streamStartRecord(timelineAt: ULong) =
-        timelineRecord(
-            messageId = STREAM_START_MESSAGE_ID,
-            timelineAt = timelineAt,
-        ).copy(
-            kind = 1200uL,
-            tags =
-                listOf(
-                    MessageTagFfi(listOf("stream", STREAM_ID)),
-                    MessageTagFfi(listOf("parent", APP_MESSAGE_ID)),
-                ),
-        )
-
-    /** Builds the durable stream final linked through the stream-start row. */
-    private fun streamFinalRecord(timelineAt: ULong) =
-        timelineRecord(
-            messageId = STREAM_FINAL_MESSAGE_ID,
-            timelineAt = timelineAt,
-        ).copy(
-            tags =
-                listOf(
-                    MessageTagFfi(listOf("stream", STREAM_ID)),
-                    MessageTagFfi(listOf("stream-start", STREAM_START_MESSAGE_ID)),
-                ),
         )
 
     /** Builds an authoritative page with explicit pagination flags. */
@@ -507,12 +440,9 @@ class ConversationAuthoritativeTimelineOrderingTest {
 
     private companion object {
         const val SOURCE_EPOCH = 7uL
-        const val STREAM_ID = "reply"
         val SYSTEM_MESSAGE_ID = "ff".repeat(32)
         val APP_MESSAGE_ID = "00".repeat(32)
         val UNCONFIRMED_MESSAGE_ID = "33".repeat(32)
         val PENDING_MESSAGE_ID = "44".repeat(32)
-        val STREAM_START_MESSAGE_ID = "11".repeat(32)
-        val STREAM_FINAL_MESSAGE_ID = "22".repeat(32)
     }
 }

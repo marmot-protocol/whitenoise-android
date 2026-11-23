@@ -163,7 +163,7 @@ internal fun swipeTestProjectedRecord(
         replyPreview = null,
         mediaJson = null,
         media = MessageAttachments.acceptedOutcomes(if (media) listOf(reference) else emptyList()),
-        agentTextStreamJson = null,
+        thread = null,
         poll = null,
         groupSystem = null,
         reactions = swipeTestReactions(reacted),

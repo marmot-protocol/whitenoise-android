@@ -35,6 +35,7 @@ internal fun ChatHistoryBackupHint(
     if (hinted) ChatHistoryBackupHintCard(modifier.padding(horizontal = Dimens.spaceLg).padding(top = 8.dp))
 }
 
+/** Explains when entering recovery words again may bring more chat history back. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ChatHistoryBackupHintCard(modifier: Modifier = Modifier) {

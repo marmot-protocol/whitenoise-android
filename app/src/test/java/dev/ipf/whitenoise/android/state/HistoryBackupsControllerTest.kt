@@ -17,6 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HistoryBackupsControllerTest {
+    /** Tracks the enablement and writer role returned by MarmotKit. */
     @Test fun statusFollowsMdkSettings() =
         runTest {
             val fake = FakeBackups()
@@ -35,6 +36,7 @@ class HistoryBackupsControllerTest {
             assertEquals(HistoryBackupStatus.On(thisDeviceWrites = true), controller.state.value.status)
         }
 
+    /** Leaves the screen in loading state when there is no eligible owner. */
     @Test fun withoutAnEligibleAccountTheScreenStaysLoadingAndSendsNothing() =
         runTest {
             val controller = HistoryBackupsController(access = null, scope = this)
@@ -44,6 +46,7 @@ class HistoryBackupsControllerTest {
             assertEquals(HistoryBackupsState(), controller.state.value)
         }
 
+    /** Explains why backups are unavailable when device groups are disabled. */
     @Test fun aBuildWithoutDeviceGroupsShowsUnavailableRatherThanAFailure() =
         runTest {
             val fake = FakeBackups().apply { settingsError = refused("roster_unsupported") }
@@ -57,6 +60,7 @@ class HistoryBackupsControllerTest {
             assertEquals(HistoryBackupStatus.LoadFailed, controller.state.value.status)
         }
 
+    /** Allows a confirmation retry without generating new words. */
     @Test fun wrongWordsKeepTheSetupAndARightAnswerTurnsBackupsOn() =
         runTest {
             val fake = FakeBackups()
@@ -104,6 +108,7 @@ class HistoryBackupsControllerTest {
             assertEquals(0, fake.cancelledWords)
         }
 
+    /** Clears unfinished words when setup is dismissed or the screen leaves. */
     @Test fun cancellingOrLeavingSetupForgetsTheWordsHereAndInMdk() =
         runTest {
             val fake = FakeBackups()
@@ -128,6 +133,7 @@ class HistoryBackupsControllerTest {
             assertEquals(2, fake.begun)
         }
 
+    /** Discards words created by an in-flight request after the screen leaves. */
     @Test fun leavingWhileWordsAreBeingMadeStillForgetsThem() =
         runTest {
             val fake = FakeBackups()
@@ -146,6 +152,7 @@ class HistoryBackupsControllerTest {
             assertNull(controller.state.value.setup)
         }
 
+    /** Keeps setup alive while confirmation is in progress. */
     @Test fun setupCannotBeCancelledWhileAConfirmationIsSent() =
         runTest {
             val fake = FakeBackups()
@@ -167,6 +174,7 @@ class HistoryBackupsControllerTest {
             assertEquals(0, fake.cancelledWords)
         }
 
+    /** Ends setup once confirmation succeeds even if status cannot reload. */
     @Test fun anAcceptedConfirmationEndsSetupEvenIfTheFollowUpReadFails() =
         runTest {
             val fake = FakeBackups()
@@ -180,6 +188,7 @@ class HistoryBackupsControllerTest {
             assertEquals(HistoryBackupStatus.LoadFailed, controller.state.value.status)
         }
 
+    /** Lets an admitted confirmation settle before cleaning up the screen. */
     @Test fun leavingDuringAConfirmationLetsItSettleBeforeForgetting() =
         runTest {
             val fake = FakeBackups()
@@ -200,6 +209,7 @@ class HistoryBackupsControllerTest {
             assertEquals(1, fake.cancelledWords)
         }
 
+    /** Cleans up words received after the account or runtime changes. */
     @Test fun wordsMadeForARetiredOwnerAreForgottenAtOnce() =
         runTest {
             val fake = FakeBackups()
@@ -216,6 +226,7 @@ class HistoryBackupsControllerTest {
             assertEquals(1, fake.cancelledWords)
         }
 
+    /** Distinguishes an expired setup from a refusal that allows a retry. */
     @Test fun anExpiredSetupIsDroppedAndBusyKeepsIt() =
         runTest {
             val fake = FakeBackups()
@@ -234,6 +245,7 @@ class HistoryBackupsControllerTest {
             assertNull(controller.state.value.setup)
         }
 
+    /** Ignores another action until the current action settles. */
     @Test fun oneActionRunsAtATime() =
         runTest {
             val fake = FakeBackups()
@@ -253,6 +265,7 @@ class HistoryBackupsControllerTest {
             assertNull(controller.state.value.running)
         }
 
+    /** Drops native results that arrive after ownership changes. */
     @Test fun aRetiredOwnerNeverAppliesLateAnswers() =
         runTest {
             val fake = FakeBackups()
@@ -269,6 +282,7 @@ class HistoryBackupsControllerTest {
             assertNull(controller.state.value.problem)
         }
 
+    /** Follows restore state and maps refusals and cancellation into screen updates. */
     @Test fun restoreReportsProgressRefusalsAndCancellation() =
         runTest {
             val fake = FakeBackups()
@@ -308,6 +322,7 @@ class HistoryBackupsControllerTest {
             )
         }
 
+    /** Redacts recovery words in the state’s string representation. */
     @Test fun recoveryWordsNeverAppearInStateText() =
         runTest {
             val fake = FakeBackups()
@@ -319,6 +334,7 @@ class HistoryBackupsControllerTest {
             assertTrue(text.contains("12 redacted"))
         }
 
+    /** Maps native refusal codes to the matching user-facing guidance. */
     @Test fun refusalCodesMapToTheirAdvice() {
         assertEquals(HistoryBackupProblem.Unavailable, historyBackupProblem(refused("roster_unsupported")))
         assertEquals(HistoryBackupProblem.RosterUnavailable, historyBackupProblem(refused("roster_unavailable")))
@@ -335,6 +351,7 @@ class HistoryBackupsControllerTest {
         )
     }
 
+    /** Visits multiple accounts within a shared time budget and reports failures. */
     @Test fun aVisitRunsEveryAccountWithinOneBudgetAndReportsFailures() =
         runTest {
             val passes = mutableListOf<String>()

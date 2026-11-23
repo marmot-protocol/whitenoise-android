@@ -200,6 +200,7 @@ class ChatListMessageSearchTest {
         override val sender: String = "",
         override val mediaTypes: List<String> = emptyList(),
         override val mediaLabels: List<String> = emptyList(),
+        override val inThread: Boolean = false,
     ) : ChatListMessageSearch.SearchableRecord
 
     // ---- prototype filters (senders / date / content) ------------------------
@@ -315,6 +316,16 @@ class ChatListMessageSearchTest {
             )
         val match = records.firstOrNull { ChatListMessageSearch.isEligibleMatch(it, "marmot") }
         assertEquals("a6", match?.messageIdHex)
+    }
+
+    /** MDK counts a thread message as chat, so search lists it like kind 9; a parentless kind 1111 stays excluded. */
+    @Test
+    fun threadMessagesMatchLikeChatButParentlessCommentsDoNot() {
+        val comment = Rec(kind = 1111uL, deleted = false, plaintext = "marmot comment", messageIdHex = "t1")
+        val thread = comment.copy(messageIdHex = "t2", inThread = true)
+
+        assertFalse(ChatListMessageSearch.isEligibleMatch(comment, "marmot"))
+        assertTrue(ChatListMessageSearch.isEligibleMatch(thread, "marmot"))
     }
 
     /** In engine order the newest eligible row is the first match. */

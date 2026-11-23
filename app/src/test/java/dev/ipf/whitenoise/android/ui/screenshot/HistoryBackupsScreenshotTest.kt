@@ -45,8 +45,10 @@ import org.robolectric.annotation.GraphicsMode
 class HistoryBackupsScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
+    /** Captures the off state and its setup entry point. */
     @Test fun offLight() = capture("history_backups_off_light", HistoryBackupsState(status = HistoryBackupStatus.Off))
 
+    /** Captures the writer status in dark theme. */
     @Test fun onThisDeviceDark() =
         capture(
             "history_backups_on_dark",
@@ -54,6 +56,7 @@ class HistoryBackupsScreenshotTest {
             dark = true,
         )
 
+    /** Shows restore progress alongside the reader status. */
     @Test fun onAnotherDeviceWithRestoreRunning() =
         capture(
             "history_backups_restore_running_light",
@@ -64,6 +67,7 @@ class HistoryBackupsScreenshotTest {
             scrollTo = "history_backups.cancel_restore",
         )
 
+    /** Shows validation guidance while editing the restore phrase. */
     @Test fun restorePartialWithInvalidWordsProblem() =
         capture(
             "history_backups_restore_partial_dark",
@@ -76,18 +80,21 @@ class HistoryBackupsScreenshotTest {
             scrollTo = "history_backups.restore",
         )
 
+    /** Captures the explanation shown without backup support. */
     @Test fun unavailableLight() =
         capture(
             "history_backups_unavailable_light",
             HistoryBackupsState(status = HistoryBackupStatus.Unavailable),
         )
 
+    /** Captures the numbered words and copy control. */
     @Test fun wordsLight() =
         capture(
             "history_backups_words_light",
             HistoryBackupsState(status = HistoryBackupStatus.Off, setup = setup()),
         )
 
+    /** Captures a recoverable confirmation error in dark theme. */
     @Test fun confirmWrongWordsDark() =
         capture(
             "history_backups_confirm_wrong_dark",
@@ -120,6 +127,7 @@ class HistoryBackupsScreenshotTest {
             rtl = true,
         )
 
+    /** Captures the recovery hint on Chat Info in light theme. */
     @Test fun chatInfoHintLight() = captureHint("history_backups_chat_hint_light", dark = false, rtl = false)
 
     @Test

@@ -60,8 +60,6 @@ data class MessageTextCopy(
     val partialVisibility: String,
     val nonCanonicalHistory: String,
     val deliveryNotConfirmed: String,
-    val agentStreamStarted: String,
-    val streamFinished: String,
     val mediaAttachment: String,
     val mediaPhoto: String = "Photo",
     val mediaVideo: String = "Video",
@@ -116,8 +114,6 @@ data class MessageTextCopy(
                 partialVisibility = "May not be visible to everyone",
                 nonCanonicalHistory = "Not confirmed in the group's current history",
                 deliveryNotConfirmed = "Delivery not confirmed",
-                agentStreamStarted = "Agent stream started",
-                streamFinished = "Stream finished",
                 mediaAttachment = "Media attachment",
                 mediaPhoto = "Photo",
                 mediaVideo = "Video",
@@ -163,7 +159,6 @@ object MessageProjector {
     private val KindChat = 9uL
     private val KindEdit = 1009uL
     private const val KindPoll = 1068uL
-    private val KindAgentStreamStart = 1200uL
     private const val KindAgentOperation = 1202uL
     private val KindGroupSystem = 1210uL
 
@@ -171,9 +166,6 @@ object MessageProjector {
     internal const val QuoteRefTag = "q"
     internal const val ImetaTag = "imeta"
     private const val PendingMediaTag = "_media_pending"
-    private const val StreamTag = "stream"
-    private const val StreamStartTag = "stream-start"
-    private const val StreamHashTag = "stream-hash"
     private val RestrictedMediaForwardingTags = setOf("view_once", "view-once")
 
     /** Returns safe bubble copy for special records, including projected polls and system events. */
@@ -185,7 +177,6 @@ object MessageProjector {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
             isPollKind(message.kind) -> copy.poll
-            isStreamStart(message) -> message.plaintext.ifBlank { copy.agentStreamStarted }
             // Never the raw JSON: kind-1210 content must not render as a chat
             // body. The conversation row builds the name-resolved summary;
             // this name-free form covers reply previews and copy-text.
@@ -210,9 +201,7 @@ object MessageProjector {
             isReaction(message) -> copy.reacted(message.plaintext.ifBlank { copy.reactionFallback })
             isDelete(message) -> copy.deleted
             isPollKind(message.kind) -> copy.poll
-            isStreamStart(message) -> copy.agentStreamStarted
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
-            isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
             isChatKind(message.kind) && RemoteGiphyMedia.isEnvelopeText(message.plaintext) -> copy.giphyMedia
             isMedia(message) -> mediaBodyText(message, copy)
             isBareSticker(message) -> copy.sticker
@@ -326,7 +315,7 @@ object MessageProjector {
      * plaintext itself, rather than derived/fallback copy. This is the exact
      * complement of the special-cased arms in
      * [ChatListItem.projectedPreviewText]: edit records (kind-1009),
-     * polls (kind-1068), agent-stream starts (kind-1200) and group-system events (kind-1210)
+     * polls (kind-1068) and group-system events (kind-1210)
      * surface synthetic copy, so they are excluded; every other kind falls
      * through to the verbatim `preview.plaintext` arm. Naming the predicate
      * here keeps the markdown parse gate
@@ -341,7 +330,6 @@ object MessageProjector {
     fun rendersRawBodyPreview(kind: ULong): Boolean =
         kind != KindEdit &&
             kind != KindPoll &&
-            kind != KindAgentStreamStart &&
             !isGroupSystemKind(kind)
 
     fun isReaction(message: AppMessageRecordFfi): Boolean = message.kind == KindReaction
@@ -353,16 +341,7 @@ object MessageProjector {
     /** True for mutation records that update another bubble instead of rendering a new row. */
     fun isControlMutationKind(kind: ULong): Boolean = kind == KindReaction || kind == KindDelete || kind == KindEdit
 
-    fun isStreamStart(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentStreamStart
-
     fun isAgentOperation(message: AppMessageRecordFfi): Boolean = message.kind == KindAgentOperation
-
-    fun isStreamFinal(message: AppMessageRecordFfi): Boolean =
-        message.kind == KindChat &&
-            tagValue(message, StreamTag) != null &&
-            (tagValue(message, StreamStartTag) != null || tagValue(message, StreamHashTag) != null)
-
-    fun streamId(message: AppMessageRecordFfi): String? = tagValue(message, StreamTag)
 
     /**
      * Normalize a requested forward fan-out target list into the distinct,
@@ -387,24 +366,23 @@ object MessageProjector {
      * Forwarding re-sends the raw text body verbatim into the target group, so
      * the predicate must exclude every record whose user-facing rendering is a
      * *synthetic surrogate* rather than the original text — otherwise a media,
-     * reaction, delete, agent-stream, or group-system bubble would be forwarded
+     * reaction, delete, or group-system bubble would be forwarded
      * as misleading fallback copy (e.g. a filename, "Reacted 👍", or a generated
      * summary) even though those kinds are out of v1 scope.
      *
      * Forwardable iff the record is a kind-9 chat message that is NOT confirmed
      * or pending media, NOT a sticker (forwarding its caption alone would drop the
-     * sticker), NOT an agent-stream message (no `stream` tag), and carries
-     * non-blank text. Reactions (kind-7), deletes (kind-5),
-     * agent-stream starts (kind-1200), group-system events (kind-1210) and edit
+     * sticker), and carries non-blank text. An agent's reply is an ordinary kind-9
+     * message and forwards like any other. Reactions (kind-7), deletes (kind-5),
+     * group-system events (kind-1210) and edit
      * records (kind-1009) are all non-kind-9 and therefore excluded by the
-     * kind check; the tag checks then strip the kind-9 media/stream variants.
+     * kind check; the tag checks then strip the kind-9 media variants.
      */
     fun isForwardableText(message: AppMessageRecordFfi): Boolean =
         message.kind == KindChat &&
             !isMedia(message) &&
             !isPendingMedia(message) &&
             message.sticker == null &&
-            streamId(message) == null &&
             message.plaintext.isNotBlank()
 
     /**
@@ -493,13 +471,14 @@ object MessageProjector {
         }
     }
 
+    /** Why [message] cannot forward whatever it carries, or null when its content decides. */
     private fun forwardInitialBlockReason(
         message: AppMessageRecordFfi,
         nowSeconds: ULong,
     ): ForwardBlockedReason? =
         when {
             // A sticker forwards only as its caption, so it would lose the sticker itself.
-            message.kind != KindChat || streamId(message) != null || message.sticker != null ->
+            message.kind != KindChat || message.sticker != null ->
                 ForwardBlockedReason.Unsupported
             isPendingMedia(message) -> ForwardBlockedReason.PendingAttachment
             message.retentionExpiresAt
@@ -567,14 +546,14 @@ object MessageProjector {
     /**
      * Plain text copied by multi-select. Unlike forwarding, media records are
      * accepted when they carry a user-authored caption; filename and media-type
-     * fallbacks are never copied. Reactions, system events, and agent streams
-     * are not user-authored chat text and are skipped.
+     * fallbacks are never copied. Reactions and system events are not
+     * user-authored chat text and are skipped.
      */
     fun copyableText(
         message: AppMessageRecordFfi,
         editedText: String? = null,
     ): String? {
-        if (message.kind != KindChat || streamId(message) != null) return null
+        if (message.kind != KindChat) return null
         val editedBody = editedText?.takeIf { it.isNotBlank() }
         val body = editedBody ?: message.plaintext
         if (editedBody == null && isPendingMedia(message) && body == pendingMediaPlaceholder(message)) return null
@@ -618,8 +597,6 @@ object MessageProjector {
     fun eventTag(targetMessageId: String): MessageTagFfi = MessageTagFfi(listOf(EventRefTag, targetMessageId))
 
     fun quoteTag(targetMessageId: String): MessageTagFfi = MessageTagFfi(listOf(QuoteRefTag, targetMessageId))
-
-    fun streamTag(streamId: String): MessageTagFfi = MessageTagFfi(listOf(StreamTag, streamId))
 
     private fun isMedia(message: AppMessageRecordFfi): Boolean = message.kind == KindChat && message.tags.any { it.values.firstOrNull() == ImetaTag }
 

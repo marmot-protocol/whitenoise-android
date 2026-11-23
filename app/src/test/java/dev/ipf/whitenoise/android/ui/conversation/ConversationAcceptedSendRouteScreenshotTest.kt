@@ -209,7 +209,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 blankLinesBefore = ByteArray(0),
             )
         composeRule.runOnIdle {
-            conversation.testApplyLiveTimelineChangesAndRegisterStreams(
+            conversation.testApplyLiveTimelineChanges(
                 listOf(
                     dev.ipf.marmotkit.TimelineMessageChangeFfi.Upsert(
                         trigger = dev.ipf.marmotkit.TimelineUpdateTriggerFfi.NEW_MESSAGE,

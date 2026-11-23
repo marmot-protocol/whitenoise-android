@@ -28,9 +28,7 @@ import org.junit.Test
  * Covers every arm of [ChatListItem.projectedPreviewText] — the chat row's
  * one-line preview. The special-kind arms encode real regressions: kind-1009
  * edits must not replace the preview with the edit payload, kind-1210 group
- * system rows must never leak their raw JSON content (issue #577), and a
- * kind-1200 agent stream start falls back to derived copy while its body is
- * still empty.
+ * system rows must never leak their raw JSON content (issue #577).
  */
 class ProjectedPreviewTextTest {
     private val copy = MessageTextCopy.Default
@@ -115,20 +113,6 @@ class ProjectedPreviewTextTest {
         val item = item(preview = preview(plaintext = "gone", deleted = true))
 
         assertEquals(copy.deleted, item.projectedPreviewText(copy))
-    }
-
-    @Test
-    fun agentStreamStartWithBlankBodyShowsStreamStartedCopy() {
-        val item = item(preview = preview(plaintext = "", kind = 1200uL))
-
-        assertEquals(copy.agentStreamStarted, item.projectedPreviewText(copy))
-    }
-
-    @Test
-    fun agentStreamStartWithBodyShowsTheStreamedText() {
-        val item = item(preview = preview(plaintext = "thinking...", kind = 1200uL))
-
-        assertEquals("thinking...", item.projectedPreviewText(copy))
     }
 
     @Test

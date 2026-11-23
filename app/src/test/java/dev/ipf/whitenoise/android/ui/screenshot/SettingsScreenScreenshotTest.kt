@@ -73,6 +73,13 @@ class SettingsScreenScreenshotTest {
         capture("settings_screen_default_light")
     }
 
+    @Test
+    fun settingsProfileKeyExpandedAmoled() {
+        render(darkTheme = true, amoled = true)
+        composeRule.onNodeWithTag("settings.active_profile_public_key", useUnmergedTree = true).performClick()
+        capture("settings_screen_profile_key_expanded_amoled")
+    }
+
     /** Captures the settings home on AMOLED: black groups with white connected outlines. */
     @Test
     fun settingsScreenDefaultAmoled() {
@@ -405,6 +412,7 @@ class SettingsScreenScreenshotTest {
                     title = "Alice",
                     subtitle = SHORT_NPUB,
                     seed = "alice-account-id",
+                    npub = PROFILE_NPUB,
                     pictureUrl = null,
                 ),
             profileCount = profileCount,
@@ -465,6 +473,7 @@ class SettingsScreenScreenshotTest {
 
     private companion object {
         const val SETTINGS_WITH_CONFIRMATION_TAG = "settings-with-global-confirmation"
-        const val SHORT_NPUB = "npub1alice…9x2k"
+        const val SHORT_NPUB = "npub14242…rcaj"
+        const val PROFILE_NPUB = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
     }
 }

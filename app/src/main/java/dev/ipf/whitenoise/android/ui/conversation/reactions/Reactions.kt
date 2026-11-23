@@ -40,8 +40,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
@@ -262,20 +264,37 @@ private fun ReactionParticipantRow(
         appState.shortNpub(participant.sender).ifBlank {
             IdentityFormatter.short(participant.sender, prefix = 10, suffix = 8)
         }
+    val npub = appState.npubForDisplay(participant.sender)
     val displayName = appState.displayName(participant.sender).ifBlank { shortIdentity }
     val headline: @Composable () -> Unit = {
-        EmojiLabel(
-            text = if (mine) stringResource(R.string.you) else displayName,
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (!mine && abbreviatesPublicKey(displayName, npub)) {
+            PublicKeyCopyText(displayName, npub, style = MaterialTheme.typography.bodyLarge, keyboardFocusable = true)
+        } else {
+            EmojiLabel(
+                text = if (mine) stringResource(R.string.you) else displayName,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
     val removeHint = stringResource(R.string.reaction_tap_to_remove)
     val subtitle = if (mine) removeHint.takeIf { onRemove != null } else shortIdentity.takeUnless { it == displayName }
     val supporting: (@Composable () -> Unit)? =
         subtitle?.let { text ->
-            { ReactionParticipantSupportingText(text) }
+            {
+                if (!mine && abbreviatesPublicKey(text, npub)) {
+                    PublicKeyCopyText(
+                        text,
+                        npub,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        keyboardFocusable = true,
+                    )
+                } else {
+                    ReactionParticipantSupportingText(text)
+                }
+            }
         }
     val leading: @Composable () -> Unit = {
         PersonAvatar(

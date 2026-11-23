@@ -25,6 +25,7 @@ class HistoryBackupWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+    /** Runs due backup passes for eligible accounts and retries an unsettled visit. */
     override suspend fun doWork(): Result {
         val app = applicationContext as? WhiteNoiseApplication ?: return Result.success()
         val settled =
@@ -46,6 +47,7 @@ class HistoryBackupWorker(
         /** Stays under WorkManager's ten-minute execution limit. */
         private const val PASS_BUDGET_MILLIS = 8L * 60L * 1000L
 
+        /** Limits visits to charging devices on unmetered networks with sufficient battery. */
         internal fun constraints(): Constraints =
             Constraints
                 .Builder()

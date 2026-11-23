@@ -202,6 +202,7 @@ private fun CopyRecoveryWordsRow(words: List<String>) {
     }
 }
 
+/** Shows the current setup action and its cancel control. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 private fun SetupButtons(

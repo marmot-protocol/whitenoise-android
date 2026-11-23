@@ -154,6 +154,7 @@ internal fun HistoryBackupsContent(
     }
 }
 
+/** Shows the backup status and actions available for the current account. */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
 private fun HistoryBackupsStatusGroup(
@@ -254,6 +255,7 @@ private fun LazyListScope.historyBackupsCallouts(state: HistoryBackupsState) {
     }
 }
 
+/** Shows restore input or progress with the matching actions. */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
 private fun HistoryRestoreGroup(
@@ -328,6 +330,7 @@ private fun hasTwelveRecoveryWords(text: CharSequence): Boolean =
         !text[index].isWhitespace() && (index == 0 || text[index - 1].isWhitespace())
     } == RECOVERY_WORD_COUNT
 
+/** Selects the localized label for the current backup status. */
 internal fun historyBackupStatusText(status: HistoryBackupStatus): Int =
     when (status) {
         HistoryBackupStatus.Loading -> R.string.history_backups_status_loading
@@ -342,6 +345,7 @@ internal fun historyBackupStatusText(status: HistoryBackupStatus): Int =
         HistoryBackupStatus.LoadFailed -> R.string.history_backups_status_failed
     }
 
+/** Selects localized guidance for a backup or restore failure. */
 internal fun historyBackupProblemText(problem: HistoryBackupProblem): Int =
     when (problem) {
         HistoryBackupProblem.Unavailable -> R.string.history_backups_unavailable
@@ -354,6 +358,7 @@ internal fun historyBackupProblemText(problem: HistoryBackupProblem): Int =
         HistoryBackupProblem.Failed -> R.string.history_backups_problem_failed
     }
 
+/** Formats the current restore phase and message counts. */
 @Composable
 private fun historyRestoreProgressText(restore: HistoryRestoreProgress): String {
     val count = restore.importedMessages.toInt()

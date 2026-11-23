@@ -35,7 +35,9 @@ private fun Context.isCharging(): Boolean {
     // The sticky battery broadcast is read without registering a receiver.
     val battery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return false
     val status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
-    return status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+    val plugged = battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+    return status == BatteryManager.BATTERY_STATUS_CHARGING ||
+        (plugged && status == BatteryManager.BATTERY_STATUS_FULL)
 }
 
 /**

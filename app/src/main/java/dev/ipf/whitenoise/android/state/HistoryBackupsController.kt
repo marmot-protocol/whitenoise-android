@@ -46,8 +46,10 @@ internal class HistoryBackupsController(
     private var watchJob: Job? = null
     private var closed = false
 
+    /** Checks that the screen and its native owner are still active. */
     private fun current(): Boolean = !closed && access?.isCurrent() == true
 
+    /** Cancels an action once the account or runtime retires. */
     private fun requireCurrent() {
         if (!current()) throw CancellationException("History backups owner retired")
     }
@@ -67,6 +69,7 @@ internal class HistoryBackupsController(
         return result
     }
 
+    /** Reloads backup settings for the current account. */
     fun refresh() = run(HistoryBackupAction.Refresh) { reloadSettings() }
 
     /** Asks MDK for new words. Words already on screen are replaced; MDK forgets the old ones too. */
@@ -91,6 +94,7 @@ internal class HistoryBackupsController(
             }
         }
 
+    /** Drops the displayed words before opening confirmation. */
     fun continueToConfirm() = mutableState.update { it.copy(setup = it.setup?.confirming(), problem = null) }
 
     /** Sends the typed words in position order. A refusal keeps the setup so the user can try again. */
@@ -110,6 +114,7 @@ internal class HistoryBackupsController(
         }
     }
 
+    /** Disables future backups and reloads the status. */
     fun turnOff() =
         run(HistoryBackupAction.TurnOff) {
             owned { turnOff() }
@@ -123,6 +128,7 @@ internal class HistoryBackupsController(
         }
     }
 
+    /** Cancels the visible restore by operation ID and refreshes its state. */
     fun cancelRestore() {
         val operation = mutableState.value.restore?.operation ?: return
         run(HistoryBackupAction.CancelRestore) {
@@ -163,6 +169,7 @@ internal class HistoryBackupsController(
         actionJob?.cancel()
     }
 
+    /** Reads backup settings and maps refusal or read failure to a status row. */
     private suspend fun reloadSettings() {
         val status =
             runCatchingCancellable { owned { settings() } }.fold(
@@ -180,6 +187,7 @@ internal class HistoryBackupsController(
         mutableState.update { it.copy(status = status) }
     }
 
+    /** Publishes restore progress unless a newer revision is already visible. */
     private fun applyRestore(status: BackupRestoreStatusFfi) {
         val progress = HistoryRestoreProgress.from(status)
         mutableState.update { current ->
@@ -191,6 +199,7 @@ internal class HistoryBackupsController(
         }
     }
 
+    /** Admits one action at a time and clears its running state when it settles. */
     private fun run(
         action: HistoryBackupAction,
         block: suspend (HistoryBackupsAccess) -> Unit,
@@ -208,6 +217,7 @@ internal class HistoryBackupsController(
             }
     }
 
+    /** Shows recovery advice for an error from the current owner. */
     private fun applyProblem(error: Throwable) {
         if (!current()) return
         val problem = historyBackupProblem(error)
