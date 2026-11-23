@@ -12,15 +12,17 @@ import kotlinx.coroutines.withContext
 /**
  * Tells the user about an [event] that needs saying wherever they are in the app. Each notice is presented on the
  * main thread as a child of [scope], so none delays the next event; [marmot] clears MDK's record of one once shown.
+ * A group-change notice runs in [streamScope] instead, so the end of the stream that reported it withdraws it unseen.
  */
 internal fun WhiteNoiseAppState.presentEventNotices(
     event: MarmotEventFfi,
     marmot: MarmotInterface,
     scope: CoroutineScope,
+    streamScope: CoroutineScope,
 ) {
     // MDK retries no group change it could not make, so the user is told, and its record is cleared once seen.
     groupChangeNotice(event)?.let { notice ->
-        scope.launch(Dispatchers.Main) {
+        streamScope.launch(Dispatchers.Main) {
             if (showGroupChangeNotice(notice)) {
                 withContext(Dispatchers.IO) { runCatchingCancellable { marmot.acknowledgeGroupChange(notice) } }
             }
