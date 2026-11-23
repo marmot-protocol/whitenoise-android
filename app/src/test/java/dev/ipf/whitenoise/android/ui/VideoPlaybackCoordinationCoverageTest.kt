@@ -104,7 +104,7 @@ class VideoPlaybackCoordinationCoverageTest {
     /** Nostr event videos follow the attachment viewer's focus, voice and headphone contract. */
     @Test
     fun nostrEventVideoPausesWhenHeadphonesDisconnect() {
-        val body = mainSource("ui/conversation/nostr/NostrEventViewers.kt").functionBody("rememberNostrVideoPlayer")
+        val body = mainSource("ui/conversation/nostr/NostrVideoPlayer.kt").functionBody("rememberNostrVideoPlayer")
 
         assertTrue(
             "the Nostr video player must delegate audio focus to Media3",

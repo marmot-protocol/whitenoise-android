@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 /**
- * Measures one session's finish, from the first accepted Paste or Send to delivery.
+ * Measures the interval from the first accepted Paste or Send until the transcript is ready.
  *
  * Holds durations and counts only, never transcript text. Main-thread confined like the controller.
  */
@@ -47,7 +47,7 @@ internal class ConversationDictationFinishTiming {
     }
 
     /** Returns the content-free diagnostic once per tap, or null when no completion action was timed. */
-    fun delivered(
+    fun transcriptReady(
         now: Long,
         mode: ConversationDictationDeliveryMode,
     ): String? {
@@ -58,7 +58,7 @@ internal class ConversationDictationFinishTiming {
                 append("event=finish_timing action=").append(action)
                 captureClosedAt?.let { append(" tap_to_capture_closed_ms=").append(it - tap) }
                 lastResultAt?.let { append(" tap_to_last_result_ms=").append(it - tap) }
-                append(" tap_to_delivered_ms=").append(now - tap)
+                append(" tap_to_transcript_ready_ms=").append(now - tap)
                 append(" generations_after_tap=").append(generations)
                 append(" retries_after_tap=").append(retries)
                 append(" settle_wait_ms=").append(settleWaitMillis)

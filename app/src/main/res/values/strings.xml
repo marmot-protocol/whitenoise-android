@@ -110,6 +110,12 @@
         <item quantity="other">%1$d filters active</item>
     </plurals>
     <string name="chat_list_search_clear_all_filters">Clear All</string>
+    <!-- Heading above recently opened chats and profiles on the blank search page. -->
+    <string name="chat_list_search_recent">Recent</string>
+    <!-- Empties the recently opened list on the blank search page. -->
+    <string name="chat_list_search_recent_clear">Clear</string>
+    <!-- Long-press and screen-reader action that drops one chat or profile from the recent list. -->
+    <string name="chat_list_search_recent_remove">Remove from recent</string>
     <string name="chat_list_search_filter_chat">Chats</string>
     <string name="chat_list_search_filter_sender">Senders</string>
     <string name="chat_list_search_filter_date">Date</string>

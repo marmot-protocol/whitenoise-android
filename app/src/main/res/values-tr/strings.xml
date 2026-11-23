@@ -105,6 +105,9 @@
         <item quantity="other">%1$d aktif filtre</item>
     </plurals>
     <string name="chat_list_search_clear_all_filters">Tümünü temizle</string>
+    <string name="chat_list_search_recent">Son açılanlar</string>
+    <string name="chat_list_search_recent_clear">Temizle</string>
+    <string name="chat_list_search_recent_remove">Son açılanlardan kaldır</string>
     <string name="chat_list_search_filter_chat">Sohbetler</string>
     <string name="chat_list_search_filter_sender">Gönderenler</string>
     <string name="chat_list_search_filter_date">Tarih</string>

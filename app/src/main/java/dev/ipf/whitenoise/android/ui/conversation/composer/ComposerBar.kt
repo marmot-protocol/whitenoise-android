@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.absoluteOffset
@@ -87,6 +88,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
 import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
@@ -110,6 +112,7 @@ import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.rememberInstalledEmojiPicker
 import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
@@ -890,6 +893,7 @@ internal fun ComposerBar(
                 draftAccountRef,
                 draftGroupIdHex,
                 R.string.translation_composer_dictation_off,
+                kind = TransientNoticeKind.Information,
             )
         }
     }
@@ -1206,6 +1210,11 @@ internal fun ComposerBar(
                 val voicePhase = voiceComposerPhase(voiceRecordingController, voiceReview)
                 val voiceReviewClip = voiceReview?.clip?.takeIf { voicePhase.showsReview }
                 val replyVisible = replyingTo != null || replyExit.exiting
+                val amoled = isAmoledSurfaceTheme()
+                val replyLeadsAccessory = replyVisible && attachmentContent == null && editingMessageId == null
+                val replyTopInset = if (amoled && replyLeadsAccessory) 0.dp else 8.dp
+                val replyInsets = PaddingValues(start = 8.dp, top = replyTopInset, end = 8.dp, bottom = 8.dp)
+                val accessoryTopInset = if (amoled && replyLeadsAccessory) 8.dp else ComposerResizeStripHeight
                 val baseAccessoryContent: (@Composable () -> Unit)? =
                     // Edit shows its pill in the action row instead, and takes precedence over a reply.
                     if (editingMessageId == null && (replyVisible || attachmentContent != null)) {
@@ -1218,7 +1227,7 @@ internal fun ComposerBar(
                                     with(density) {
                                         Box(
                                             Modifier
-                                                .padding(8.dp)
+                                                .padding(replyInsets)
                                                 .size(replyExit.widthPx.toDp(), replyExit.heightPx.toDp())
                                                 .composerAccessoryExitGhost(replyExit),
                                         )
@@ -1235,7 +1244,7 @@ internal fun ComposerBar(
                                     Box(
                                         // The accessory owns its shape; clipping it again trims the card corners.
                                         Modifier
-                                            .padding(8.dp)
+                                            .padding(replyInsets)
                                             .composerAccessoryEntrance(replyEntrance)
                                             .composerAccessoryExitSource(replyExit),
                                     ) {
@@ -1658,6 +1667,7 @@ internal fun ComposerBar(
                             (maximumComposerHeight - editorLineHeight - ComposerShortcutTarget)
                                 .coerceIn(ComposerShortcutTarget, ComposerToolbarMaximumHeight),
                         accessoryContent = accessoryContent.takeIf { voiceReviewClip == null },
+                        accessoryTopInset = accessoryTopInset,
                         voiceReviewContent =
                             rememberVoiceReviewSlot(voiceReview, voiceReviewClip, voiceRecordingController),
                         recordingContent =

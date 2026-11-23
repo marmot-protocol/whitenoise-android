@@ -192,6 +192,7 @@ internal fun TransferAdminSheet(
                                     size = 40.dp,
                                     pictureUrl = controller.memberAvatarUrl(member),
                                     pictureDomain = AvatarImageLoader.publicProfiles(),
+                                    followedAccount = member.memberIdHex,
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Column(
@@ -296,6 +297,7 @@ internal fun SoleAdminDeletePicker(
                             seed = member.memberIdHex,
                             size = 40.dp,
                             pictureUrl = appState.contactAvatarSource(member.memberIdHex),
+                            followedAccount = member.memberIdHex,
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

@@ -88,13 +88,23 @@ private suspend fun ConversationController.applyDiscardOutcome(
             true
         }
         DiscardFailedSendOutcomeFfi.STILL_SENDING -> {
-            if (owns()) presentConversationTransient(R.string.message_discard_still_sending)
+            if (owns()) {
+                presentConversationTransient(
+                    R.string.message_discard_still_sending,
+                    kind = TransientNoticeKind.Information,
+                )
+            }
             false
         }
         DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND -> {
             // MDK has no failed send by that id, which does not prove the group got it, so the row is left as it is
             // and can still be deleted for everyone.
-            if (owns()) presentConversationTransient(R.string.message_discard_not_failed)
+            if (owns()) {
+                presentConversationTransient(
+                    R.string.message_discard_not_failed,
+                    kind = TransientNoticeKind.Information,
+                )
+            }
             false
         }
     }

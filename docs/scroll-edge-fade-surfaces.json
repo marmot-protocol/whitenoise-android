@@ -1054,9 +1054,22 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
       "calls": {
-        "WhiteNoiseLazyVerticalGrid": 1,
         "WhiteNoiseLazyColumn": 1,
         "AnimatedDropdownMenu": 1
+      },
+      "family": "medialibrary",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedMediaTileGrid.kt",
+      "calls": {
+        "WhiteNoiseLazyVerticalGrid": 1
       },
       "family": "medialibrary",
       "policy": "ordinary",

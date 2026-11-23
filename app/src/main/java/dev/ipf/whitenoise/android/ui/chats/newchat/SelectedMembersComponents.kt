@@ -267,6 +267,7 @@ internal fun SelectedMembersReviewScreen(
                         publicKeyInTitle = nameIsKey,
                         avatarSeed = member.accountIdHex,
                         avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
+                        followedAccount = member.accountIdHex,
                         titleMaxLines = Int.MAX_VALUE,
                         trailing = {
                             IconButton(

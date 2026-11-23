@@ -11,12 +11,15 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToKey
 import androidx.lifecycle.SavedStateHandle
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.whitenoise.android.core.AvatarCacheDiagnostics
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
@@ -65,6 +68,83 @@ class ChatListAvatarReturnScreenshotTest {
     /** Dark rendering follows the same retained working-set contract. */
     @Test
     fun knownAvatarsSurviveConversationReturnInDarkTheme() = verifyReturn(dark = true)
+
+    /** Deep rows reuse both group and peer pictures even while every post-eviction read is held. */
+    @Test
+    fun scrollReversalKeepsPreviouslyVisibleGroupAndPeerAvatars() {
+        val holdReads = AtomicBoolean(false)
+        val releaseReads = CompletableDeferred<Unit>()
+        val fixture =
+            avatarFixture(
+                revision = AtomicLong(1),
+                firstReads = CompletableDeferred(Unit),
+                holdReads = holdReads,
+                releaseReads = releaseReads,
+                stale = false,
+                rowCount = 68,
+            )
+        val group = fixture.rows[28].groupIdHex
+        val peer = fixture.rows[29].groupIdHex
+        val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
+        val controller = holder.chatsController(ACCOUNT, fixture.appState.runtimeGeneration)
+        val mounted = mutableStateOf(true)
+        fixture.appState.setAppInForeground(true)
+        rule.setContent {
+            if (mounted.value) WhiteNoiseTheme(darkTheme = false) { MainShell(fixture.appState, holder) }
+        }
+        try {
+            rule.waitUntil(10_000) {
+                rule.waitForIdle()
+                controller.items.size == fixture.rows.size && !controller.isLoading
+            }
+            val list = rule.onNodeWithTag("chats.list")
+            list.performScrollToKey(group)
+            rule.waitUntil(10_000) {
+                listOf(group, peer).all {
+                    AvatarImageLoader.cachedImage(checkNotNull(asset(it).cacheKey(ACCOUNT))) != null
+                }
+            }
+            assertAvatarPixels(group)
+            assertAvatarPixels(peer)
+            assertEquals(
+                PresentationSourceFfi.PEER_PROFILE,
+                controller.currentGroupAvatarItem(peer)?.selectedPresentation?.avatarSource,
+            )
+
+            list.performScrollToKey(fixture.rows[52].groupIdHex)
+            rule.onNodeWithTag("chat.row.$group").assertDoesNotExist()
+            holdReads.set(true)
+            evictQuiescentWorkingSet(fixture)
+            assertNull(controller.items.first { it.group.groupIdHex == group }.firstFrameAvatar)
+            assertNull(controller.items.first { it.group.groupIdHex == peer }.firstFrameAvatar)
+
+            list.performScrollToKey(group)
+            captureReversalAvatars(group, peer)
+            assertEquals("READY local assets need no acquisition", 0, fixture.avatarRequests.get())
+        } finally {
+            releaseReads.complete(Unit)
+            rule.runOnIdle {
+                mounted.value = false
+                holder.release()
+            }
+            rule.waitForIdle()
+        }
+    }
+
+    /** Capture the picture pixels while both new local reads are still blocked. */
+    private fun captureReversalAvatars(
+        group: String,
+        peer: String,
+    ) {
+        assertAvatarPixels(group)
+        assertAvatarPixels(peer)
+        rule
+            .onNodeWithTag("chat.row.$group")
+            .captureRoboImage("src/test/snapshots/chat_list_avatar_reversal_group.png")
+        rule
+            .onNodeWithTag("chat.row.$peer")
+            .captureRoboImage("src/test/snapshots/chat_list_avatar_reversal_peer.png")
+    }
 
     /** A row that loads after the bounded preparation deadline still joins the returning working set. */
     @Test
@@ -163,10 +243,15 @@ class ChatListAvatarReturnScreenshotTest {
         holdReads: AtomicBoolean,
         releaseReads: CompletableDeferred<Unit>,
         stale: Boolean,
+        rowCount: Int = 6,
     ): ReturnFixture {
         val bytes = avatarPng()
         val replacementBytes = avatarPng(REPLACEMENT_COLOR)
         return ReturnFixture(
+            rowCount = rowCount,
+            customizeRow = { index, row ->
+                if (index == 29) row.copy(groupName = "", conversationKind = ChatConversationKindFfi.DIRECT) else row
+            },
             avatarAssetForRow = {
                 asset(it.groupIdHex).copy(
                     contentRevision = revision.get().toULong(),

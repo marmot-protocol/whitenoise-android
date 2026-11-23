@@ -176,7 +176,7 @@ internal fun rememberGroupAvatarClassification(
     val key = accountRef?.let { asset.takeIf { it.isRenderable() }?.cacheKey(it) }
     val pins =
         LocalPreparedGroupAvatarPixels.current?.takeIf {
-            it.accountRef == accountRef && it.runtimeGeneration == appState.runtimeGeneration && it.lifetime == lifetime
+            it.matchesOwner(accountRef, appState.runtimeGeneration, lifetime)
         }
     return remember(appState, appState.runtimeGeneration, accountRef, lifetime, key, image) {
         key?.let(AvatarImageLoader::cachedAnimationClassification)
@@ -202,7 +202,7 @@ internal fun rememberSelectedDurableGroupAvatar(
 ): GroupAvatarPresentation {
     val key = accountRef?.let { asset.takeIf { it.isRenderable() }?.cacheKey(it) }
     val ownedSeed = seed?.takeIf { it.source == ChatListAvatarSource.DURABLE && it.key == key }
-    val image = rememberDurableAvatar(appState, asset, accountRef, domain) ?: ownedSeed?.image
+    val image = rememberDurableAvatar(appState, asset, accountRef, domain, seededImage = ownedSeed?.image)
     val classification = rememberGroupAvatarClassification(appState, asset, accountRef, image, ownedSeed)
     return appState.durableGroupAvatarPresentation(group, asset, accountRef, image, personPicture, classification)
 }

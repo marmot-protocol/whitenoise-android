@@ -748,6 +748,7 @@ internal fun ChatListHeadReorderMotionHarness(
     rowContent: (@Composable (String, Modifier, Boolean) -> Unit)? = null,
 ) {
     var scrollCorrectionInProgress by remember { mutableStateOf(false) }
+    val resumeBaseline = rememberChatListResumeBaseline()
     val viewportGeneration = rememberChatListUserGestureGeneration(listState)
     val pinnedOrder = pinnedCount?.let(itemIds::take).orEmpty()
     val userHeadDemotionTargetIndex =
@@ -773,6 +774,7 @@ internal fun ChatListHeadReorderMotionHarness(
             if (it && !scrollCorrectionInProgress) onHeadScrollCorrectionStarted()
             scrollCorrectionInProgress = it
         },
+        resumeBaseline = resumeBaseline,
     )
     val headReorderInProgress =
         rememberChatListHeadReorderGate(
@@ -780,6 +782,7 @@ internal fun ChatListHeadReorderMotionHarness(
             datasetKey = datasetKey,
             isActiveList = true,
             scrollCorrectionInProgress = scrollCorrectionInProgress,
+            resumeBaseline = resumeBaseline,
         )
     val rowPlacementDurationMillis =
         rememberChatListRowPlacementDurationMillis(
@@ -788,6 +791,7 @@ internal fun ChatListHeadReorderMotionHarness(
             datasetKey = datasetKey,
             headPromotionEligible =
                 listState.firstVisibleItemIndex == 0 && !listState.isScrollInProgress,
+            resumeBaseline = resumeBaseline,
         )
     val rowPlacementInProgress =
         rememberChatListRowPlacementGate(
@@ -795,6 +799,7 @@ internal fun ChatListHeadReorderMotionHarness(
             pinnedBoundaryIndex = pinnedCount,
             leadingItemCount = leadingItemCount,
             placementDurationMillis = rowPlacementDurationMillis,
+            resumeEpoch = resumeBaseline.epoch,
         )
     val interactionsEnabled = !headReorderInProgress && !rowPlacementInProgress
     SideEffect {
