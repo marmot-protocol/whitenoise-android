@@ -454,8 +454,7 @@ internal class ConversationMediaSender(
                 failures += read.failures
                 overflowed = overflowed || read.albumOverflowed
             }
-            val keepsOriginal = pdfChoices.keepsOriginal(uri)
-            withContext(Dispatchers.IO) { attachments.dropUnconfirmedPdfMetadata(firstOfUri, keepsOriginal, failures) }
+            totalBytes -= withContext(Dispatchers.IO) { attachments.dropUnconfirmedPdfMetadata(firstOfUri, failures) }
         }
         return DocumentReadOutcome(attachments, failures, overflowed, totalBytes)
     }

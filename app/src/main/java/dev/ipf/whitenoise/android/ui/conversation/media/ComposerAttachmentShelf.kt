@@ -29,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -148,7 +149,10 @@ internal fun ComposerAttachmentShelf(
     val pdfs = remember(pdfChoices, pdfRenderer) { pdfChoices?.let { ComposerShelfPdfs(it, pdfRenderer) } }
     if (pdfChoices != null) {
         LaunchedEffect(pdfChoices, documentUris) { pdfChoices.retainOnly(documentUris) }
+        ReadComposerPdfMetadata(pdfChoices, documentUris, preparedDocuments)
         ComposerPdfMetadataDialog(pdfChoices)
+        // A send still waiting for an answer when the shelf leaves keeps its attachments.
+        DisposableEffect(pdfChoices) { onDispose { pdfChoices.cancel() } }
     }
     Column(Modifier.fillMaxWidth()) {
         LazyRow(

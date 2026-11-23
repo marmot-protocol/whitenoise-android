@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataResult
 import dev.ipf.whitenoise.android.media.pdf.PdfMetadataScrubber
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.ui.conversation.DocumentReadFailure
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
@@ -52,9 +53,8 @@ internal fun <K> removePreparedDocumentMetadata(prepared: Map<K, PendingAttachme
 }
 
 private fun PendingAttachment.withoutPdfMetadata(): PendingAttachment {
-    if (sourceFile != null || keepsPdfMetadata) return this
-    val clean = PdfMetadataScrubber.cleanedCopyOrNull(plaintextBytes) ?: return this
-    return if (clean === plaintextBytes) this else copy(plaintextBytes = clean)
+    val clean = if (sourceFile != null) null else PdfMetadataScrubber.cleanedCopyOrNull(plaintextBytes)
+    return if (clean == null || clean === plaintextBytes) this else copy(plaintextBytes = clean)
 }
 
 /** What this attachment's content says about PDF metadata. Reads its staged file when it has one. Call off Main. */
@@ -62,22 +62,26 @@ internal fun PendingAttachment.pdfMetadata(): PdfMetadataResult =
     sourceFile?.let { PdfMetadataScrubber.inspect(it.file) } ?: PdfMetadataScrubber.inspect(plaintextBytes)
 
 /**
- * Drops the attachments from [from] on that are PDFs still carrying metadata which nobody chose to send as they are,
- * adding [DocumentReadFailure.PDF_METADATA] for each. [keepsOriginal] says whether the person chose that for the
- * pick these attachments were read from. Call off Main.
+ * Drops the attachments from [from] on that are PDFs still carrying metadata, adding
+ * [DocumentReadFailure.PDF_METADATA] for each: one whose removal failed, and one that keeps it without the person's
+ * choice to send it as it is. Returns the in-memory bytes it dropped, so the caller can give them back to its budget.
+ * Call off Main.
  */
 internal fun MutableList<PendingAttachment>.dropUnconfirmedPdfMetadata(
     from: Int,
-    keepsOriginal: Boolean,
-    failures: MutableSet<dev.ipf.whitenoise.android.ui.conversation.DocumentReadFailure>,
-) {
-    if (keepsOriginal) return
+    failures: MutableSet<DocumentReadFailure>,
+): Long {
+    var dropped = 0L
     val iterator = listIterator(from)
     while (iterator.hasNext()) {
         val attachment = iterator.next()
-        if (!attachment.keepsPdfMetadata && attachment.pdfMetadata() is PdfMetadataResult.Refused) {
+        val metadata = attachment.pdfMetadata()
+        val unconfirmed = metadata is PdfMetadataResult.Refused && !attachment.keepsPdfMetadata
+        if (metadata is PdfMetadataResult.Removable || unconfirmed) {
             iterator.remove()
-            failures += dev.ipf.whitenoise.android.ui.conversation.DocumentReadFailure.PDF_METADATA
+            failures += DocumentReadFailure.PDF_METADATA
+            dropped += attachment.inMemoryBytes?.size ?: 0
         }
     }
+    return dropped
 }

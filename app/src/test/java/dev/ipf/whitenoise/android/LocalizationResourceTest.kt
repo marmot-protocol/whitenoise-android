@@ -1298,6 +1298,8 @@ class LocalizationResourceTest {
                     ),
                 "values-fr" to
                     setOf(
+                        // "PDF · 12 pages" is spelled the same in French.
+                        "composer_pdf_pages",
                         // "emoji" is the loan word used for emoji counts in this locale.
                         "emoji_sets_item_count",
                         // "sticker" is the established French term in messaging apps.

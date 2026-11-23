@@ -26,6 +26,7 @@ internal fun planMetadataStreams(
                     val packet = PdfXmpPacket.replacing(data.data)
                     val encoded =
                         if (data.compressed) data.encode(packet.head, packet.tail) else packet.fitted(data.data.size)
+                    // A packet that does not fit its stream is refused rather than left as invalid XML.
                     if (encoded == null) {
                         plan.refuse(PdfMetadataRefusal.Unsupported)
                     } else {
@@ -38,38 +39,53 @@ internal fun planMetadataStreams(
         }
 
 /**
- * Replaces any other plainly stored XMP packet, such as one in an uncompressed stream that does not declare itself
- * as metadata, with [PdfXmpPacket] at the same length. A packet with no end is left to the reader, since nothing
- * marks where it stops. [covered] ranges were already handled.
+ * Replaces any other XMP packet stored in an unfiltered stream, such as one in a stream that does not declare itself
+ * as metadata, with [PdfXmpPacket] at the same length. Each packet must open and close inside one of [plainStreams];
+ * one that does not, or that has no end, refuses the plan because its extent cannot be trusted. [covered] ranges
+ * were already handled.
  */
 internal fun planLoosePackets(
     bytes: PdfBytes,
+    plainStreams: List<IntRange>,
     covered: List<IntRange>,
     plan: PdfMetadataPlan,
 ) {
     var position = bytes.indexOf(PACKET_BEGIN, 0)
-    while (position >= 0) {
-        val end = packetEnd(bytes, position)
-        if (end < 0) return
-        if (covered.none { position in it }) {
-            val packet = bytes.copy(position, end)
-            if (!PdfXmpPacket.isReplacement(packet)) {
+    while (position >= 0 && plan.refusal == null) {
+        val begin = position
+        val handled = covered.firstOrNull { begin in it }
+        if (handled != null) {
+            position = bytes.indexOf(PACKET_BEGIN, handled.last + 1)
+            continue
+        }
+        val stream = plainStreams.firstOrNull { begin in it }
+        val end = stream?.let { packetEnd(bytes, begin, it.last + 1) } ?: -1
+        val replacement = if (end < 0) null else replacementFor(bytes.copy(begin, end))
+        when {
+            end < 0 || replacement == null -> plan.refuse(PdfMetadataRefusal.Unsupported)
+            replacement.isEmpty() -> Unit
+            else -> {
                 plan.fields += PdfMetadataField.Xmp
-                plan.replace(position, PdfXmpPacket.replacing(packet).fitted(packet.size))
+                plan.replace(begin, replacement)
             }
         }
-        position = bytes.indexOf(PACKET_BEGIN, end)
+        position = if (end < 0) -1 else bytes.indexOf(PACKET_BEGIN, end)
     }
 }
 
-/** Where the packet opened at [begin] ends, just after its `<?xpacket end ... ?>`, or -1. */
+/** The same-length replacement for [packet], empty when it already is one, or null when none fits. */
+private fun replacementFor(packet: ByteArray): ByteArray? =
+    if (PdfXmpPacket.isReplacement(packet)) ByteArray(0) else PdfXmpPacket.replacing(packet).fitted(packet.size)
+
+/** Where the packet opened at [begin] ends, just after its `<?xpacket end ... ?>`, before [limit], or -1. */
 private fun packetEnd(
     bytes: PdfBytes,
     begin: Int,
+    limit: Int,
 ): Int {
-    val limit = minOf(bytes.size, begin + MAX_PACKET_BYTES)
-    val end = bytes.indexOf(PACKET_END, begin, limit)
+    val bound = minOf(limit, begin + MAX_PACKET_BYTES)
+    val end = bytes.indexOf(PACKET_END, begin, bound)
     if (end < 0) return -1
-    val close = bytes.indexOf(PROCESSING_END, end, minOf(limit, end + PACKET_END.size + 32))
+    val close = bytes.indexOf(PROCESSING_END, end, minOf(bound, end + PACKET_END.size + 32))
     return if (close < 0) -1 else close + PROCESSING_END.size
 }

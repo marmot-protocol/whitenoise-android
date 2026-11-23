@@ -22,18 +22,21 @@ internal fun decodeObjectStreams(
     plan: PdfMetadataPlan,
 ): List<PdfObjectStream> {
     var total = 0L
-    return layout.streams.filter { it.dict.name("Type") == "ObjStm" }.mapNotNull { stream ->
+    val decoded = mutableListOf<PdfObjectStream>()
+    for (stream in layout.streams.filter { it.dict.name("Type") == "ObjStm" }) {
         val data = decodeStreamData(bytes, layout, stream)
         total += data?.data?.size ?: 0
         val offsets = data?.let { objectOffsets(it.data, stream.dict) }
         if (data == null || offsets == null || total > MAX_OBJECT_STREAM_BYTES) {
             plan.refuse(PdfMetadataRefusal.Unsupported)
-            return@mapNotNull null
+            break
         }
-        val decoded = PdfObjectStream(data, offsets)
-        if (decoded.bytes.indexOf(BYTE_RANGE, 0) >= 0) plan.refuse(PdfMetadataRefusal.Signed)
-        decoded
+        val objectStream = PdfObjectStream(data, offsets)
+        // A plain search is enough here: a false match only refuses, which leaves the file unchanged.
+        if (objectStream.bytes.indexOf(BYTE_RANGE, 0) >= 0) plan.refuse(PdfMetadataRefusal.Signed)
+        decoded += objectStream
     }
+    return decoded
 }
 
 /** Reads the `/N` number-and-offset pairs at the start of an object stream's [data]. */

@@ -16,12 +16,12 @@ internal fun infoField(key: String): PdfMetadataField =
 /**
  * Empties every string in a document-information dictionary [dict], however deeply nested, by overwriting it with
  * `()` or `<>` and spaces. Keys, names such as `/Trapped` and the dictionary's length stay. [edit] receives each
- * overwrite; strings the dictionary refers to indirectly are added to [references] for the caller to empty.
+ * overwrite; each indirect reference is added to [references], once per use, for the caller to empty.
  */
 internal fun blankInfoStrings(
     dict: PdfDict,
     fields: MutableSet<PdfMetadataField>,
-    references: MutableSet<Int>,
+    references: MutableList<PdfRef>,
     edit: (Int, ByteArray) -> Unit,
 ) {
     dict.entries.forEach { (key, value) -> blankValue(value, infoField(key), fields, references, edit) }
@@ -31,7 +31,7 @@ private fun blankValue(
     value: PdfValue,
     field: PdfMetadataField,
     fields: MutableSet<PdfMetadataField>,
-    references: MutableSet<Int>,
+    references: MutableList<PdfRef>,
     edit: (Int, ByteArray) -> Unit,
 ) {
     when (value) {
@@ -40,7 +40,7 @@ private fun blankValue(
                 fields += field
                 edit(value.start, blankString(value))
             }
-        is PdfRef -> references += value.number
+        is PdfRef -> references += value
         is PdfArray -> value.items.forEach { blankValue(it, field, fields, references, edit) }
         is PdfDict -> value.entries.forEach { (_, nested) -> blankValue(nested, field, fields, references, edit) }
         else -> Unit

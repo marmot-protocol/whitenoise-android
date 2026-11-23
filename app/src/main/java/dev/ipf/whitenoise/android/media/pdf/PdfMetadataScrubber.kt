@@ -76,6 +76,8 @@ internal object PdfMetadataScrubber {
             verified = again.refusal == null && again.edits.isEmpty()
         } catch (_: PdfSyntaxException) {
             verified = false
+        } catch (_: PdfLimitException) {
+            verified = false
         } finally {
             if (!verified) undo.asReversed().forEach { bytes.write(it.position, it.bytes) }
         }
@@ -95,6 +97,8 @@ internal object PdfMetadataScrubber {
         return try {
             block()
         } catch (_: PdfSyntaxException) {
+            PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)
+        } catch (_: PdfLimitException) {
             PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)
         } catch (_: IndexOutOfBoundsException) {
             PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported)

@@ -16,13 +16,16 @@ private const val SEGMENT_HEADER = 4
 private const val LENGTH_SHIFT = 8
 
 /**
- * Finds the private segments of a baseline JPEG embedded as a `/DCTDecode` image: EXIF and XMP (APP1), IPTC and
+ * Finds the private segments of a JPEG embedded as a `/DCTDecode` image: EXIF and XMP (APP1), IPTC and
  * Photoshop records (APP13), vendor segments and comments. Their payloads are zeroed in place, which keeps every
  * segment length and leaves only empty segments that decoders skip. JFIF (APP0), ICC colour profiles (APP2) and
  * Adobe colour transforms (APP14) stay, because the image renders with them.
  */
 internal object PdfJpegMetadata {
-    /** Adds zeroing edits for the JPEG in [start] until [end] to [plan], or returns false when it is malformed. */
+    /**
+     * Adds zeroing edits for the JPEG in [start] until [end] to [plan], walking every segment through EOI, including
+     * those between scans. Returns false when it is malformed. Data that ends after a scan without EOI is accepted.
+     */
     fun plan(
         bytes: PdfBytes,
         start: Int,
@@ -31,22 +34,43 @@ internal object PdfJpegMetadata {
     ): Boolean {
         if (end - start < 2 || bytes[start] != MARKER || bytes[start + 1] != SOI) return false
         var position = start + 2
-        while (position + SEGMENT_HEADER <= end) {
+        var scanned = false
+        while (position + 2 <= end) {
             if (bytes[position] != MARKER) return false
             val marker = bytes[position + 1]
             when {
                 marker == MARKER -> position++
-                marker == SOS || marker == EOI -> return true
+                marker == EOI -> return true
                 marker == TEM || marker in RST0..RST7 -> position += 2
+                position + SEGMENT_HEADER > end -> return false
                 else -> {
                     val length = (bytes[position + 2] shl LENGTH_SHIFT) or bytes[position + 3]
                     if (length < 2 || position + 2 + length > end) return false
                     if (isPrivate(marker)) plan.zero(bytes, position + SEGMENT_HEADER, length - 2)
                     position += 2 + length
+                    if (marker == SOS) {
+                        scanned = true
+                        position = nextMarker(bytes, position, end)
+                    }
                 }
             }
         }
-        return false
+        return scanned
+    }
+
+    /** The next marker after entropy-coded data from [from]: `FF` not followed by stuffing `00` or a restart. */
+    private fun nextMarker(
+        bytes: PdfBytes,
+        from: Int,
+        end: Int,
+    ): Int {
+        var position = from
+        while (position + 1 < end) {
+            val next = bytes[position + 1]
+            if (bytes[position] == MARKER && next != 0 && next != MARKER && next !in RST0..RST7) return position
+            position++
+        }
+        return end
     }
 
     private fun isPrivate(marker: Int): Boolean =

@@ -25,16 +25,25 @@ internal class ComposerPdfDecision(
     internal val cancel: () -> Unit,
 )
 
+/** A send waiting until every staged PDF has been read. */
+private class ComposerPdfPendingSend(
+    val uris: List<Uri>,
+    val onCancel: () -> Unit,
+    val send: () -> Unit,
+)
+
 /**
  * The composer's staged PDFs whose metadata cannot be removed, and the person's choice to send them as they are
- * (#3377). The choice belongs to the PDFs on the shelf: removing one, or sending it, forgets it, and it is never
- * saved with a draft. Prepared PDFs carry it into the send as [PendingAttachment.keepsPdfMetadata], so it holds for
- * a collection read in later chunks.
+ * (#3377). The shelf reads every prepared PDF into [record], whether or not its card is on screen. A choice covers
+ * one send: [marked] attaches it to that send's prepared attachments as [PendingAttachment.keepsPdfMetadata], which
+ * carries it through a collection's later chunks, and forgets it. It is never saved with a draft.
  */
 @Stable
 internal class ComposerPdfMetadataChoices {
     private val states = mutableStateMapOf<Uri, ComposerPdfState>()
+    private val reading = mutableStateMapOf<Uri, Unit>()
     private var keepOriginal by mutableStateOf(emptySet<Uri>())
+    private var pendingSend: ComposerPdfPendingSend? = null
 
     /** The send waiting for a choice, shown as a dialog until it is confirmed or cancelled. */
     var decision by mutableStateOf<ComposerPdfDecision?>(null)
@@ -42,11 +51,31 @@ internal class ComposerPdfMetadataChoices {
 
     fun state(uri: Uri): ComposerPdfState? = states[uri]
 
+    /** Marks [uri] as being read, so a send waits for its result. */
+    fun reading(uri: Uri) {
+        reading[uri] = Unit
+    }
+
     fun record(
         uri: Uri,
         state: ComposerPdfState,
     ) {
         states[uri] = state
+        stopReading(uri)
+    }
+
+    /** Marks [uri] as no longer being read, for a document that is not prepared yet, and resumes a waiting send. */
+    fun stopReading(uri: Uri) {
+        reading -= uri
+        resumeWaitingSend()
+    }
+
+    private fun resumeWaitingSend() {
+        val waiting = pendingSend
+        if (waiting != null && waiting.uris.none { it in reading }) {
+            pendingSend = null
+            confirmThen(waiting.uris, waiting.onCancel, waiting.send)
+        }
     }
 
     fun keepsOriginal(uri: Uri): Boolean = uri in keepOriginal
@@ -55,30 +84,41 @@ internal class ComposerPdfMetadataChoices {
     fun retainOnly(uris: Collection<Uri>) {
         val staged = uris.toSet()
         states.keys.filter { it !in staged }.forEach(states::remove)
+        reading.keys.filter { it !in staged }.forEach(reading::remove)
         if (!staged.containsAll(keepOriginal)) keepOriginal = keepOriginal intersect staged
+        resumeWaitingSend()
     }
 
-    /** [prepared] with the person's choice to send a PDF as it is attached to that PDF's own attachment. */
-    fun marked(prepared: Map<Uri, PendingAttachment>): Map<Uri, PendingAttachment> =
-        prepared.mapValues { (uri, attachment) ->
-            if (uri in keepOriginal) attachment.copy(keepsPdfMetadata = true) else attachment
+    /**
+     * [prepared] with the person's choice to send a PDF as it is attached to that PDF's own attachment. The choice is
+     * used up: a later send of the same file asks again.
+     */
+    fun marked(prepared: Map<Uri, PendingAttachment>): Map<Uri, PendingAttachment> {
+        val chosen = keepOriginal
+        keepOriginal = emptySet()
+        return prepared.mapValues { (uri, attachment) ->
+            if (uri in chosen) attachment.copy(keepsPdfMetadata = true) else attachment
         }
+    }
 
     /**
      * Runs [send] at once unless some of [uris] are PDFs that keep their metadata and have no choice yet. Then it
-     * asks first: confirming records the choice for those PDFs and sends, cancelling runs [onCancel].
+     * asks first: confirming records the choice for those PDFs and sends, cancelling runs [onCancel]. A send that
+     * names a PDF still being read waits for it.
      */
     fun confirmThen(
         uris: List<Uri>,
         onCancel: () -> Unit,
         send: () -> Unit,
     ) {
-        val undecided =
-            uris.distinct().filter { it !in keepOriginal && states[it]?.metadata is PdfMetadataResult.Refused }
-        if (undecided.isEmpty() || decision != null) {
-            if (decision == null) send() else onCancel()
+        if (decision != null || pendingSend != null) return onCancel()
+        if (uris.any { it in reading }) {
+            pendingSend = ComposerPdfPendingSend(uris, onCancel, send)
             return
         }
+        val undecided =
+            uris.distinct().filter { it !in keepOriginal && states[it]?.metadata is PdfMetadataResult.Refused }
+        if (undecided.isEmpty()) return send()
         val pending = undecided.mapNotNull(states::get)
         decision =
             ComposerPdfDecision(
@@ -98,10 +138,13 @@ internal class ComposerPdfMetadataChoices {
         waiting.send()
     }
 
-    /** Keeps the waiting send on the shelf. */
+    /** Keeps the waiting send on the shelf, including one still waiting for a PDF to be read. */
     fun cancel() {
-        val waiting = decision ?: return
+        val waiting = decision
+        val queued = pendingSend
         decision = null
-        waiting.cancel()
+        pendingSend = null
+        waiting?.cancel?.invoke()
+        queued?.onCancel?.invoke()
     }
 }

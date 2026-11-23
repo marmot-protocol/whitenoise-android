@@ -85,8 +85,33 @@ internal fun rememberComposerPdfPageRenderer(): ComposerPdfPageRenderer {
 }
 
 /**
- * One staged PDF on the shelf: reads what its prepared bytes say about metadata into [choices] and renders its
- * first page. A PDF still being prepared shows its name only.
+ * Reads what every prepared document on the shelf says about PDF metadata into [choices], whether or not its card is
+ * on screen, so a send can ask about all of them at once. Content decides, so a PDF with another name is read too.
+ */
+@Composable
+internal fun ReadComposerPdfMetadata(
+    choices: ComposerPdfMetadataChoices,
+    documentUris: List<Uri>,
+    preparedDocuments: Map<Uri, DraftPreparedPhoto>,
+) {
+    val read = remember(choices) { mutableMapOf<Uri, DraftPreparedPhoto>() }
+    LaunchedEffect(choices, documentUris, preparedDocuments) {
+        documentUris.distinct().forEach { uri ->
+            val document = preparedDocuments[uri]
+            if (document == null) choices.stopReading(uri)
+            if (document == null || read[uri] === document) return@forEach
+            choices.reading(uri)
+            val attachment = document.attachment
+            val metadata = withContext(Dispatchers.Default) { PdfMetadataScrubber.inspect(attachment.plaintext) }
+            read[uri] = document
+            choices.record(uri, ComposerPdfState(safeDocumentDisplayName(attachment.fileName), metadata))
+        }
+    }
+}
+
+/**
+ * One staged PDF on the shelf: its first page and what [choices] read about it. A PDF still being prepared shows its
+ * name only.
  */
 @Composable
 @Suppress("LongParameterList")
@@ -101,11 +126,6 @@ internal fun ComposerPdfShelfItem(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    LaunchedEffect(uri, document) {
-        val bytes = document?.attachment?.plaintext ?: return@LaunchedEffect
-        val metadata = withContext(Dispatchers.Default) { PdfMetadataScrubber.inspect(bytes) }
-        choices.record(uri, ComposerPdfState(label, metadata))
-    }
     val firstPage by produceState<ComposerPdfFirstPage?>(null, uri, document) {
         value = document?.attachment?.plaintext?.let { renderer.firstPage(uri, it) }
     }

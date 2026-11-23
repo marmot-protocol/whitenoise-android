@@ -5,9 +5,9 @@
         <item quantity="one">PDF · %d page</item>
         <item quantity="other">PDF · %d pages</item>
     </plurals>
-    <string name="composer_pdf_first_page">First page of %1$s</string>
     <!-- Composer card states for the PDF's hidden document details: author, apps, dates and similar. -->
     <string name="composer_pdf_metadata_removed">Metadata removed</string>
+    <string name="composer_pdf_metadata_removed_on_send">Metadata removed on send</string>
     <string name="composer_pdf_metadata_signed">Signed: metadata stays</string>
     <string name="composer_pdf_metadata_encrypted">Protected: metadata stays</string>
     <string name="composer_pdf_metadata_unsupported">Metadata can\'t be removed</string>
@@ -23,5 +23,5 @@
     </plurals>
     <string name="composer_pdf_metadata_dialog_consequence">Everyone in this chat will be able to see details such as the author, the apps that made it and when it was created or changed.</string>
     <string name="composer_pdf_metadata_send_as_is">Send as is</string>
-    <string name="media_file_pdf_metadata_kept">Couldn\'t remove this PDF\'s metadata, so it wasn\'t sent. Send it again to choose whether to send it as it is.</string>
+    <string name="media_file_pdf_metadata_kept">This PDF wasn\'t sent because its metadata couldn\'t be removed. Send it from the message box to choose whether to send it as is.</string>
 </resources>

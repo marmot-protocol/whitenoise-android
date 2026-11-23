@@ -67,6 +67,7 @@ private val PAGE_SHAPE = RoundedCornerShape(4.dp)
 /** What a staged PDF's card says about its metadata. */
 internal enum class ComposerPdfPrivacy {
     Removed,
+    RemovedOnSend,
     Signed,
     Encrypted,
     Unsupported,
@@ -80,9 +81,9 @@ internal fun composerPdfPrivacy(
 ): ComposerPdfPrivacy? =
     when (metadata) {
         null, PdfMetadataResult.NotPdf -> null
-        // A draft saved before PDFs were cleaned reads as removable; the send cleans it first.
-        PdfMetadataResult.Clean, is PdfMetadataResult.Scrubbed, is PdfMetadataResult.Removable ->
-            ComposerPdfPrivacy.Removed
+        PdfMetadataResult.Clean, is PdfMetadataResult.Scrubbed -> ComposerPdfPrivacy.Removed
+        // A draft saved before PDFs were cleaned still carries its metadata; the send cleans it first.
+        is PdfMetadataResult.Removable -> ComposerPdfPrivacy.RemovedOnSend
         is PdfMetadataResult.Refused ->
             when {
                 keepsOriginal -> ComposerPdfPrivacy.SendingAsIs
@@ -220,10 +221,10 @@ private fun ComposerPdfPrivacyLine(
     privacy: ComposerPdfPrivacy,
     text: String,
 ) {
-    val removed = privacy == ComposerPdfPrivacy.Removed
+    val removed = privacy == ComposerPdfPrivacy.Removed || privacy == ComposerPdfPrivacy.RemovedOnSend
     val color =
         when (privacy) {
-            ComposerPdfPrivacy.Removed -> MaterialTheme.colorScheme.primary
+            ComposerPdfPrivacy.Removed, ComposerPdfPrivacy.RemovedOnSend -> MaterialTheme.colorScheme.primary
             ComposerPdfPrivacy.SendingAsIs -> MaterialTheme.colorScheme.onSurfaceVariant
             else -> MaterialTheme.colorScheme.error
         }
@@ -245,6 +246,7 @@ private val ComposerPdfPrivacy.labelRes: Int
     get() =
         when (this) {
             ComposerPdfPrivacy.Removed -> R.string.composer_pdf_metadata_removed
+            ComposerPdfPrivacy.RemovedOnSend -> R.string.composer_pdf_metadata_removed_on_send
             ComposerPdfPrivacy.Signed -> R.string.composer_pdf_metadata_signed
             ComposerPdfPrivacy.Encrypted -> R.string.composer_pdf_metadata_encrypted
             ComposerPdfPrivacy.Unsupported -> R.string.composer_pdf_metadata_unsupported
