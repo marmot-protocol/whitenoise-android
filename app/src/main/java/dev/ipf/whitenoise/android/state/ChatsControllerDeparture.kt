@@ -26,7 +26,10 @@ internal suspend fun ChatsController.departCapturedChat(
             row == null -> departWithoutChatRow(attempt, deleteAfterLeave)
             row.leaveRequestPending -> {
                 foldChatRow(row)
-                appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+                appState.presentTransient(
+                    R.string.toast_leave_not_confirmed_history_kept,
+                    kind = TransientNoticeKind.Information,
+                )
                 false
             }
             row.selfMembership.isNonMember() -> {
@@ -92,7 +95,10 @@ internal suspend fun ChatsController.departResolvedChat(
 ): Boolean {
     val group = resolution.applied.group
     if (group.leaveRequestPending) {
-        appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+        appState.presentTransient(
+            R.string.toast_leave_not_confirmed_history_kept,
+            kind = TransientNoticeKind.Information,
+        )
         return false
     }
     attempt.members = resolution.applied.members
@@ -239,7 +245,12 @@ internal suspend fun ChatsController.confirmChatListDeparture(
     departureRow?.let { foldChatRow(it) }
     val confirmed =
         departureRow != null && !departureRow.leaveRequestPending && departureRow.selfMembership.isNonMember()
-    if (!confirmed) appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+    if (!confirmed) {
+        appState.presentTransient(
+            R.string.toast_leave_not_confirmed_history_kept,
+            kind = TransientNoticeKind.Information,
+        )
+    }
     return confirmed
 }
 

@@ -7,10 +7,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -92,6 +94,7 @@ import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SystemFolderKind
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
@@ -210,6 +213,7 @@ internal fun ChatsScreen(
     globalSearchState: GlobalSearchState = GlobalSearchState(),
     onGlobalSearchStateChange: ((GlobalSearchState) -> GlobalSearchState) -> Unit = {},
     searchViewport: GlobalSearchViewport? = null,
+    searchRecents: GlobalSearchRecents? = null,
     // Shell-owned so the filter survives conversation navigation (issue #1897).
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
@@ -354,7 +358,10 @@ internal fun ChatsScreen(
                             directBatchResult = null
                             pendingStateBatch = null
                         } else if (previous == null) {
-                            appState.presentTransient(resources.getString(R.string.toast_couldnt_update_chat))
+                            appState.presentTransient(
+                                resources.getString(R.string.toast_couldnt_update_chat),
+                                kind = TransientNoticeKind.Information,
+                            )
                         }
                     } else {
                         directBatchResult = null
@@ -1171,6 +1178,11 @@ internal fun ChatsScreen(
         openGroupFromVisibleList(item, messageIdHex, false)
     }
 
+    /** Remembers a chat or profile opened from global search for the blank search page (#4004). */
+    fun recordSearchOpen(entry: GlobalSearchRecent) {
+        searchRecents?.record(globalSearchState.accountScopeToken, entry)
+    }
+
     /** Presents a profile from the visible list, remembering the list head for the return scroll. */
     fun presentProfileFromVisibleList(npub: String) {
         val visibleHead =
@@ -1401,7 +1413,7 @@ internal fun ChatsScreen(
                         ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
                         else -> R.string.chat_batch_order_failed
                     }
-                appState.presentTransient(resources.getString(message))
+                appState.presentTransient(resources.getString(message), kind = TransientNoticeKind.Information)
             }
         }
     }
@@ -2087,6 +2099,7 @@ internal fun ChatsScreen(
                         },
                         onOpen = {
                             if (menuActionsCurrent()) {
+                                if (searchActive) recordSearchOpen(GlobalSearchRecent.Chat(item.group.groupIdHex))
                                 searchViewport?.selection?.selected = GlobalSearchSelectedResult()
                                 openGroupFromVisibleList(item, null, false)
                             }
@@ -2496,6 +2509,7 @@ internal fun ChatsScreen(
                                         if (controller.chatListActionIsCurrent(owner)) {
                                             appState.presentTransient(
                                                 resources.getString(R.string.toast_chat_list_select_all_loaded_only),
+                                                kind = TransientNoticeKind.Information,
                                             )
                                         }
                                     }
@@ -2603,11 +2617,22 @@ internal fun ChatsScreen(
                 accountRef = controller.boundAccountRef,
                 existingDirectChat = { npub -> appState.existingDirectChat(npub) },
                 onOpenChat = { chat ->
+                    recordSearchOpen(GlobalSearchRecent.Chat(chat.group.groupIdHex))
                     openGroupFromVisibleList(chat, null, false)
                 },
                 onOpenProfile = { npub ->
+                    recordSearchOpen(GlobalSearchRecent.Profile(npub))
                     presentProfileFromVisibleList(npub)
                 },
+            )
+            GlobalSearchRecentStrip(
+                recents = searchRecents,
+                scopeToken = globalSearchState.accountScopeToken,
+                visible = globalSearchRecentsVisible(globalSearchState) && !selectionMode,
+                controller = controller,
+                appState = appState,
+                onOpenChat = { chat -> openGroupFromVisibleList(chat, null, false) },
+                onOpenProfile = ::presentProfileFromVisibleList,
             )
             ChatListBodyFrame(
                 modifier = Modifier.fillMaxSize(),
@@ -3094,6 +3119,73 @@ private fun ChatListIdentifierResult(
             }
     }
 }
+
+/**
+ * Jump-to-top control (#413): the top of the bottom-end floating stack. It rests just above the
+ * navigation bar and lifts above the dictation capsule and the pen, centred on the pen's column, so
+ * it never overlaps either of them.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatListJumpToTopControl(
+    visible: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier) {
+        val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
+        FloatingControlVisibility(
+            visible = visible,
+            motionEnabled = rememberSystemAnimationsEnabled(),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = paneInset + JUMP_TO_TOP_END_INSET, bottom = FloatingControlGap)
+                    .floatingDictationCapsuleClearance(clearColumnObstacles = true),
+        ) {
+            ChatListJumpToTopButton(onClick = onClick)
+        }
+    }
+}
+
+/** The chat list's jump-to-top control: a 34dp disc inside a 42dp touch box. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatListJumpToTopButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scrollToTopLabel = stringResource(R.string.scroll_to_top)
+    Box(
+        modifier =
+            modifier
+                .size(42.dp)
+                .semantics { contentDescription = scrollToTopLabel }
+                .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shadowElevation = 2.dp,
+            modifier = Modifier.size(34.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    painterResource(R.drawable.ic_jump_to_edge),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
+    }
+}
+
+// Centres the 42dp jump control on the 48dp pen, which the Scaffold insets 16dp from the end edge:
+// 19 + 42 / 2 == 16 + 48 / 2.
+internal val JUMP_TO_TOP_END_INSET = 19.dp
 
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back

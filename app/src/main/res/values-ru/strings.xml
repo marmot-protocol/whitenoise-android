@@ -117,6 +117,9 @@
         <item quantity="other">%1$d активных фильтров</item>
     </plurals>
     <string name="chat_list_search_clear_all_filters">Очистить все</string>
+    <string name="chat_list_search_recent">Недавние</string>
+    <string name="chat_list_search_recent_clear">Очистить</string>
+    <string name="chat_list_search_recent_remove">Убрать из недавних</string>
     <string name="chat_list_search_filter_chat">Чаты</string>
     <string name="chat_list_search_filter_sender">Отправители</string>
     <string name="chat_list_search_filter_date">Дата</string>

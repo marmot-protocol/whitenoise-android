@@ -17,8 +17,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -28,6 +30,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
@@ -43,9 +46,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Temporary banners in a conversation's top region (#3312): an invitation result and an actionable error with
- * Copy sit below the header and the playback strip, the transcript absorbs their height and the composer stays at
- * the bottom with its own size, in light, dark, AMOLED and large-text RTL themes.
+ * The compact invitation confirmation overlays the transcript below the playback strip. Capture it in light,
+ * dark, AMOLED and large-text RTL themes.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -70,12 +72,16 @@ class TopNoticePlacementScreenshotTest {
     @Test
     fun largeRtl() = capture("large_rtl", dark = false, largeRtl = true)
 
-    /** Renders the hosted shell and conversation slots with both banners showing, then captures the window. */
+    @Test
+    fun withActionableErrorAndPartialResult() = capture("with_actionable_feedback", dark = true, withFeedback = true)
+
+    /** Captures a conversation-scoped success overlay in the hosted shell. */
     private fun capture(
         suffix: String,
         dark: Boolean,
         amoled: Boolean = false,
         largeRtl: Boolean = false,
+        withFeedback: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val notice =
@@ -83,14 +89,28 @@ class TopNoticePlacementScreenshotTest {
                 id = 1L,
                 title = AppText.Resource(R.string.toast_invite_accepted),
                 conversation = ConversationNoticeDestination(ACCOUNT, GROUP),
+                kind = TransientNoticeKind.Confirmation,
             )
-        val host = TopNoticeHost(SnackbarHostState(), notice = { notice })
-        val error = context.getString(R.string.toast_send_connection_failed)
+        val partial =
+            notice
+                .copy(
+                    id = 2L,
+                    title = AppText.Plain("Invited some members"),
+                    detail = AppText.Plain("One member still needs an invite"),
+                    kind = TransientNoticeKind.Partial,
+                ).takeIf { withFeedback }
+        val host = TopNoticeHost(SnackbarHostState(), notice = { notice }, partial = { partial })
         composeRule.setContent {
-            LaunchedEffect(host) {
-                host.snackbarHostState.showSnackbar(
-                    ToastSnackbarVisuals(message = error, copyable = true, copyText = "operation=MESSAGE_SEND"),
-                )
+            if (withFeedback) {
+                LaunchedEffect(host) {
+                    host.snackbarHostState.showSnackbar(
+                        ToastSnackbarVisuals(
+                            message = context.getString(R.string.toast_send_connection_failed),
+                            copyable = true,
+                            copyText = "operation=MESSAGE_SEND",
+                        ),
+                    )
+                }
             }
             CompositionLocalProvider(
                 LocalTopNoticeHost provides host,
@@ -103,7 +123,11 @@ class TopNoticePlacementScreenshotTest {
                 }
             }
         }
-        composeRule.onNodeWithContentDescription(context.getString(R.string.copy)).assertExists()
+        if (withFeedback) {
+            composeRule.onNodeWithContentDescription(context.getString(R.string.copy)).assertExists()
+            composeRule.onNodeWithText("One member still needs an invite").assertIsDisplayed()
+        }
+        composeRule.onNodeWithText(context.getString(R.string.toast_invite_accepted)).assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/top_notice_placement_$suffix.png")
     }
 

@@ -107,6 +107,9 @@
         <item quantity="other">%1$d filtros ativos</item>
     </plurals>
     <string name="chat_list_search_clear_all_filters">Limpar tudo</string>
+    <string name="chat_list_search_recent">Recentes</string>
+    <string name="chat_list_search_recent_clear">Limpar</string>
+    <string name="chat_list_search_recent_remove">Remover dos recentes</string>
     <string name="chat_list_search_filter_chat">Conversas</string>
     <string name="chat_list_search_filter_sender">Remetentes</string>
     <string name="chat_list_search_filter_date">Data</string>

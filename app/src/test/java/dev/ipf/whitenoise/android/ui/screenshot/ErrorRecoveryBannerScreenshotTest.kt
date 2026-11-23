@@ -20,8 +20,8 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.TransientNotice
-import dev.ipf.whitenoise.android.ui.common.CONVERSATION_TRANSIENT_NOTICE_TAG
-import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
+import dev.ipf.whitenoise.android.ui.common.AnchoredConfirmationBubble
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -107,17 +107,14 @@ class ErrorRecoveryBannerScreenshotTest {
                                 modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            InlineConfirmationNotice(
+                            AnchoredConfirmationBubble(
                                 notice =
                                     TransientNotice(
                                         id = 1L,
                                         title = AppText.Plain("Admin removed"),
                                         conversation = ConversationNoticeDestination("account-a", "group-a"),
+                                        kind = TransientNoticeKind.Confirmation,
                                     ),
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.TopCenter)
-                                        .testTag(CONVERSATION_TRANSIENT_NOTICE_TAG),
                             )
                         }
                     }

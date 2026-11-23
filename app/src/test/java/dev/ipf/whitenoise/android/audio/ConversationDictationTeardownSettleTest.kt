@@ -55,7 +55,7 @@ class ConversationDictationTeardownSettleTest {
         val timing = finishTimingEvents().single()
         assertEquals("paste", timing["action"])
         assertEquals(250L, timing["tap_to_last_result_ms"])
-        assertEquals(250L, timing["tap_to_delivered_ms"])
+        assertEquals(250L, timing["tap_to_transcript_ready_ms"])
         assertEquals(1L, timing["generations_after_tap"])
         assertEquals(0L, timing["retries_after_tap"])
         assertEquals(PROVIDER_ENDED_TEARDOWN_SETTLE_MILLIS, timing["settle_wait_ms"])

@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.state.AppText
 
 /** A failed, unaccepted attempt owns only the captured selection, never native membership. */
 internal data class GroupCreationRecovery(
@@ -42,3 +44,14 @@ internal fun groupCreationRecovery(
         members.singleOrNull { account != null && it.accountIdHex == account },
     )
 }
+
+/** Shows the skipped-recipient report even when opening needed a projection retry. */
+internal fun createdGroupNoticeTitle(
+    showCreatedToast: Boolean,
+    skipped: AppText?,
+): Int? =
+    when {
+        skipped != null -> R.string.toast_some_members_not_added
+        showCreatedToast -> R.string.toast_chat_created
+        else -> null
+    }

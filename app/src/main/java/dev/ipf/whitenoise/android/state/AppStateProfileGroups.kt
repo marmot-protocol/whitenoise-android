@@ -48,15 +48,15 @@ internal suspend fun WhiteNoiseAppState.profileMembershipController(
     }
 }
 
-/** Makes [targetRef] an admin of [groupIdHex], asking first if MDK holds the change back. True once committed. */
+/** Makes [targetRef] an admin of [groupIdHex] and returns the confirmation for the committed change. */
 suspend fun WhiteNoiseAppState.promoteProfileInGroup(
     targetRef: String,
     groupIdHex: String,
-): Boolean {
+): TransientNotice? {
     val target = targetRef.trim()
     val groupId = groupIdHex.trim()
     val account = activeAccountRef
-    if (target.isEmpty() || groupId.isEmpty() || account == null) return false
+    if (target.isEmpty() || groupId.isEmpty() || account == null) return null
     return runCatchingCancellable {
         // The lock is released only while the user decides, and held again for the acknowledgement and retry.
         withGroupCommitLock(account, groupId) {
@@ -78,10 +78,9 @@ suspend fun WhiteNoiseAppState.promoteProfileInGroup(
             groupIdHex = groupId,
             titleRes = R.string.toast_admin_added,
         )
-        true
     }.onFailure { error ->
         presentFailure(R.string.toast_couldnt_update_admin, "PROFILE_GROUP_ADMIN_UPDATE", error)
-    }.getOrDefault(false)
+    }.getOrNull()
 }
 
 /**
@@ -155,7 +154,16 @@ private fun WhiteNoiseAppState.presentProfileGroupInvite(
                 detail = toast.detail ?: AppText.Resource(R.string.error_try_again),
             )
         } else if (!toast.copyable) {
-            presentTransient(toast.messageRes, toast.detail)
+            presentTransient(
+                toast.messageRes,
+                toast.detail,
+                kind =
+                    if (outcome.completedSuccessfully) {
+                        TransientNoticeKind.Confirmation
+                    } else {
+                        TransientNoticeKind.Partial
+                    },
+            )
         } else if (toast.detail == null) {
             present(toast.messageRes, copyable = toast.copyable)
         } else {

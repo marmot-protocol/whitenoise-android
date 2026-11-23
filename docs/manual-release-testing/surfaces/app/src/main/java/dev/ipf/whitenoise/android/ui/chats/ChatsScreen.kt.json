@@ -22,6 +22,22 @@
         ]
       },
       {
+        "surface": "ChatListJumpToTopButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListJumpToTopButton(",
+        "test_ids": [
+          "CHL-036"
+        ]
+      },
+      {
+        "surface": "ChatListJumpToTopControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListJumpToTopControl(",
+        "test_ids": [
+          "CHL-036"
+        ]
+      },
+      {
         "surface": "ChatsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "fun ChatsScreen(",
@@ -49,14 +65,6 @@
         ]
       },
       {
-        "surface": "Unread pull surface below folders",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "ChatListUnreadPullSurface(",
-        "test_ids": [
-          "CHL-031"
-        ]
-      },
-      {
         "surface": "Global message results",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "globalSearchResultItems(messageResultsContent)",
@@ -64,18 +72,17 @@
           "FIND-003",
           "FIND-018"
         ]
+      },
+      {
+        "surface": "Unread pull surface below folders",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "ChatListUnreadPullSurface(",
+        "test_ids": [
+          "CHL-031"
+        ]
       }
     ],
     "settings_controls": [
-      {
-        "surface": "string:couldnt_load_chats",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.couldnt_load_chats",
-        "test_ids": [
-          "CHL-001",
-          "FIND-015"
-        ]
-      },
       {
         "surface": "Global message results Retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
@@ -86,37 +93,12 @@
         ]
       },
       {
-        "surface": "string:chat_list_startup_slow",
+        "surface": "Pinned move through the complete native order",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.chat_list_startup_slow",
+        "anchor": "controller.movePinnedSelection(ids, delta, owner)",
         "test_ids": [
-          "CHL-015"
-        ]
-      },
-      {
-        "surface": "string:conversation_search_loading",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.conversation_search_loading",
-        "test_ids": [
-          "FIND-003",
-          "FIND-013"
-        ]
-      },
-      {
-        "surface": "Removed search target notice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.toast_original_message_unavailable",
-        "test_ids": [
-          "FIND-013"
-        ]
-      },
-      {
-        "surface": "string:you",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.you",
-        "test_ids": [
-          "FIND-008",
-          "FIND-012"
+          "CHL-010",
+          "CHL-012"
         ]
       },
       {
@@ -200,11 +182,13 @@
         ]
       },
       {
-        "surface": "Reviewed group action context: R.string.delete_from_device",
+        "surface": "R.string.scroll_to_top",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.delete_from_device",
+        "anchor": "R.string.scroll_to_top",
         "test_ids": [
-          "GRP-034"
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
         ]
       },
       {
@@ -224,60 +208,70 @@
         ]
       },
       {
-        "surface": "Pinned move through the complete native order",
+        "surface": "Removed search target notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "controller.movePinnedSelection(ids, delta, owner)",
+        "anchor": "R.string.toast_original_message_unavailable",
         "test_ids": [
-          "CHL-010",
-          "CHL-012"
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.delete_from_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.delete_from_device",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "string:chat_list_startup_slow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_startup_slow",
+        "test_ids": [
+          "CHL-015"
+        ]
+      },
+      {
+        "surface": "string:conversation_search_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.conversation_search_loading",
+        "test_ids": [
+          "FIND-003",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:couldnt_load_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.couldnt_load_chats",
+        "test_ids": [
+          "CHL-001",
+          "FIND-015"
+        ]
+      },
+      {
+        "surface": "string:you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.you",
+        "test_ids": [
+          "FIND-008",
+          "FIND-012"
         ]
       }
     ],
     "source_coverage": [
       {
-        "surface": "Stored group-avatar surface: R.string.chat_list_filter_groups",
+        "surface": "Chats upward endpoint navigation icon",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.chat_list_filter_groups",
+        "anchor": "R.drawable.ic_jump_to_edge",
         "test_ids": [
           "CHL-017"
         ]
       },
       {
-        "surface": "R.string.chat_list_voice_unavailable",
+        "surface": "Opening the unread filter clears a failure from while it was closed, and a participant folder's unresolved rosters open pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.chat_list_voice_unavailable",
-        "test_ids": [
-          "FIND-010"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "surface": "User gesture authority during head correction",
-        "anchor": "userGestureGeneration = userGestureGeneration",
-        "test_ids": [
-          "CHL-029"
-        ]
-      },
-      {
-        "surface": "Returning chat-list avatar preparation handoff",
-        "anchor": "retainedPreparation = retainedAvatarPreparation",
-        "test_ids": [
-          "CHL-017"
-        ],
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"
-      },
-      {
-        "surface": "R.string.pull_unread_retry",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.pull_unread_retry",
-        "test_ids": [
-          "CHL-031"
-        ]
-      },
-      {
-        "surface": "R.string.pull_unread_load_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.pull_unread_load_failed",
+        "anchor": "val setUnreadOnly",
         "test_ids": [
           "CHL-031"
         ]
@@ -307,6 +301,38 @@
         ]
       },
       {
+        "surface": "R.string.chat_list_voice_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_voice_unavailable",
+        "test_ids": [
+          "FIND-010"
+        ]
+      },
+      {
+        "surface": "R.string.pull_unread_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.pull_unread_load_failed",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "surface": "R.string.pull_unread_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.pull_unread_retry",
+        "test_ids": [
+          "CHL-031"
+        ]
+      },
+      {
+        "surface": "Returning chat-list avatar preparation handoff",
+        "anchor": "retainedPreparation = retainedAvatarPreparation",
+        "test_ids": [
+          "CHL-017"
+        ],
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"
+      },
+      {
         "surface": "Selection directions and silent skipped-only completion",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "chatListSelectionActions(",
@@ -314,6 +340,14 @@
           "CHL-011",
           "CHL-012",
           "CHL-035"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.chat_list_filter_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_filter_groups",
+        "test_ids": [
+          "CHL-017"
         ]
       },
       {
@@ -325,11 +359,11 @@
         ]
       },
       {
-        "surface": "Opening the unread filter clears a failure from while it was closed, and a participant folder's unresolved rosters open pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "val setUnreadOnly",
+        "surface": "User gesture authority during head correction",
+        "anchor": "userGestureGeneration = userGestureGeneration",
         "test_ids": [
-          "CHL-031"
+          "CHL-029"
         ]
       }
     ]
