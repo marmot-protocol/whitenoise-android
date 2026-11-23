@@ -140,6 +140,7 @@ private suspend fun ConversationController.uploadDraftStoredRetained(
                 }
             }
         }.also { outcome ->
+            retained.draftUploadRevision = outcome.draftRevision
             outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)
         }.upload
 

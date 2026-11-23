@@ -1,10 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import android.content.Context
-import android.net.Uri
-import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaFileTransferControlFfi
-import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftAttachmentFileRequestFfi
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
@@ -20,7 +16,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.IOException
 
 /** The most bytes one read of a stored draft file asks MarmotKit for, its own per-call ceiling. */
 internal const val DRAFT_FILE_READ_CHUNK_BYTES = 1024 * 1024
@@ -122,75 +117,6 @@ internal data class DraftAttachmentTarget(
     val groupIdHex: String,
     val attachmentId: String,
 )
-
-/**
- * Gives one restored native attachment a shelf file. Inline bytes are written out; a file-backed body is streamed
- * from MarmotKit under [read]'s revision.
- */
-internal suspend fun materializeRestoredAttachment(
-    context: Context,
-    drafts: MessageDraftRepository,
-    accountRef: String,
-    read: RevisionedMessageDraft,
-    attachment: MessageDraftAttachmentFfi,
-): Uri? =
-    if (attachment.hasInlineBody()) {
-        materializeDraftAttachment(context, attachment)
-    } else {
-        materializeFileBackedDraftAttachment(context, drafts, accountRef, read, attachment)
-    }
-
-/**
- * Writes a file-backed draft attachment's body to the composer's presentation file for [attachment], streaming it
- * from MarmotKit's media store in bounded chunks so the shelf can show it and a send can read it like a pick. A
- * file already there with the stored size is reused, so reopening a chat does not copy a large file again. Returns
- * null when the body cannot be read under [base]'s revision or does not fit on the device.
- */
-internal suspend fun materializeFileBackedDraftAttachment(
-    context: Context,
-    drafts: MessageDraftRepository,
-    accountRef: String,
-    base: RevisionedMessageDraft,
-    attachment: MessageDraftAttachmentFfi,
-): Uri? {
-    val revision = base.revision
-    val size = base.fileBacked[attachment.id]?.plaintextSize?.toLong()
-    val file = draftPresentationFile(context, attachment)
-    val ready =
-        when {
-            revision == null || size == null || file == null -> false
-            file.isFile && file.length() == size -> true
-            else ->
-                replaceWithDraftFileBody(file, size) { offset ->
-                    drafts.files.readChunk(accountRef, revision, attachment.id, offset, DRAFT_FILE_READ_CHUNK_BYTES)
-                }
-        }
-    return file?.takeIf { ready }?.let { draftPresentationUri(context, it, attachment) }
-}
-
-/**
- * Streams a stored body into a sibling partial file and moves it over [file] only once all [size] bytes arrived,
- * so a shelf never shows a truncated copy. Reports whether [file] now holds the body.
- */
-@Suppress("SwallowedException") // A disk or native read failure only means the shelf skips this attachment.
-private suspend fun replaceWithDraftFileBody(
-    file: File,
-    size: Long,
-    read: suspend (offset: Long) -> ByteArray?,
-): Boolean {
-    val partial = File(file.parentFile, "${file.name}.partial")
-    val copied =
-        try {
-            copyDraftFileBody(partial, read) == size
-        } catch (unreadable: IOException) {
-            false
-        } catch (refused: MarmotKitException) {
-            false
-        }
-    val moved = copied && partial.renameTo(file)
-    if (!moved) partial.delete()
-    return moved
-}
 
 /**
  * Appends chunks from [read] to [target] until an empty chunk marks the end, checking for cancellation between

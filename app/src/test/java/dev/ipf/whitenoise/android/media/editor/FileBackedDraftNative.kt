@@ -13,9 +13,10 @@ import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.whitenoise.android.state.nativeBoundary
 
 /**
- * An in-memory MarmotKit draft store for one chat that follows 0.18.0's rules for stored files: every write is
- * revision-checked, a whole-draft read is refused, an input left out of a save is deleted, and a stored file is
- * kept only by id. Records each native call so tests can pin the sequence.
+ * An in-memory MarmotKit draft store for one chat that follows 0.19.0's rules for stored files: every write is
+ * revision-checked, a whole-draft read is refused, an input save keeps every attachment it does not name (after the
+ * named ones) and deletes only those it names as removed, and a stored file is read back in chunks. Records each
+ * native call so tests can pin the sequence.
  */
 internal class FileBackedDraftNative(
     content: String = "",
@@ -28,6 +29,14 @@ internal class FileBackedDraftNative(
     val savedInputs = mutableListOf<List<MessageDraftAttachmentInputFfi>>()
     val stagedRequests = mutableListOf<MessageDraftAttachmentFileRequestFfi>()
     var stageFailure: Exception? = null
+    private val fileBodies = mutableMapOf<String, ByteArray>()
+
+    /** When set, every inline body read after a stage fails, as a follow-up read can. */
+    var failInlineReadsAfterStage = false
+    private var staged = false
+
+    /** When set, each chunk read of a stored body first waits on this, so a test can cancel mid-copy. */
+    var beforeChunk: (suspend (attachmentId: String, offset: Long) -> Unit)? = null
 
     /** The ids the draft holds, in order. */
     val attachmentIds: List<String> get() = descriptors.map { it.id }
@@ -45,14 +54,19 @@ internal class FileBackedDraftNative(
         if (text == null) text = ""
     }
 
-    /** Seeds a stored file of [size] bytes. */
+    /** Seeds a stored file of [size] bytes, with [body] as its contents when a test reads it back. */
     fun holdFile(
         id: String,
         size: ULong,
+        body: ByteArray = ByteArray(0),
     ) {
         descriptors += descriptor(id, size, fileBacked = true)
+        fileBodies[id] = body
         if (text == null) text = ""
     }
+
+    /** The current revision, for reading stored bodies the way a restore does. */
+    val currentRevision: MessageDraftRevisionFfi get() = revision
 
     /** Makes the next read miss one inline body, as when another writer moved the draft. */
     fun dropInlineBody(id: String) {
@@ -87,8 +101,25 @@ internal class FileBackedDraftNative(
         ): ByteArray? =
             record("messageDraftAttachmentIfRevision") {
                 requireCurrent(revision)
+                if (failInlineReadsAfterStage && staged) throw MarmotKitException.MessageDraftRevisionConflict()
                 bodies[attachmentId]
             }
+
+        /** Returns one chunk of a stored body while [revision] is current, empty past its end. */
+        override suspend fun readMessageDraftAttachment(
+            accountRef: String,
+            revision: MessageDraftRevisionFfi,
+            attachmentId: String,
+            offset: ULong,
+            limit: UInt,
+        ): ByteArray? {
+            calls += "readMessageDraftAttachment"
+            beforeChunk?.invoke(attachmentId, offset.toLong())
+            requireCurrent(revision)
+            val body = fileBodies[attachmentId] ?: return null
+            val start = offset.toInt().coerceAtMost(body.size)
+            return body.copyOfRange(start, minOf(body.size, start + limit.toInt()))
+        }
 
         /** Applies an input save while [revision] is current. */
         override fun saveMessageDraftInputsIfRevision(
@@ -135,20 +166,25 @@ internal class FileBackedDraftNative(
         }
     }
 
-    /** Applies one input save: each input is a held id kept as it is, or a new inline body. */
+    /**
+     * Applies one input save: each input keeps a held id, writes new inline bytes, or removes an id. Attachments the
+     * save does not name stay after the named ones, in their stored order.
+     */
     private fun save(
         content: String,
         inputs: List<MessageDraftAttachmentInputFfi>,
     ): SelectedMessageDraftFfi {
         savedInputs += inputs
         val held = descriptors.associateBy { it.id }
-        val next =
-            inputs.map { input ->
+        val removed = inputs.filterIsInstance<MessageDraftAttachmentInputFfi.Removed>().mapTo(HashSet()) { it.id }
+        val named =
+            inputs.mapNotNull { input ->
                 when (input) {
                     is MessageDraftAttachmentInputFfi.Retained ->
                         held[input.id] ?: throw MarmotKitException.InvalidMessageDraft("unknown retained id")
                     is MessageDraftAttachmentInputFfi.Inline -> {
                         bodies[input.attachment.id] = input.attachment.plaintext
+                        fileBodies -= input.attachment.id
                         descriptor(
                             input.attachment.id,
                             input.attachment.plaintext.size
@@ -156,9 +192,16 @@ internal class FileBackedDraftNative(
                             fileBacked = false,
                         )
                     }
+                    is MessageDraftAttachmentInputFfi.Removed -> null
                 }
             }
-        (held.keys - next.map { it.id }.toSet()).forEach { bodies -= it }
+        val namedIds = named.mapTo(HashSet()) { it.id }
+        val unnamed = descriptors.filter { it.id !in namedIds && it.id !in removed }
+        val next = named + unnamed
+        (held.keys - next.map { it.id }.toSet()).forEach {
+            bodies -= it
+            fileBodies -= it
+        }
         descriptors = next.toMutableList()
         text = content
         revision = newRevision()
@@ -171,6 +214,7 @@ internal class FileBackedDraftNative(
         stageFailure?.let { throw it }
         descriptors += descriptor(request.id, request.expectedSize ?: 0uL, fileBacked = true)
         if (text == null) text = ""
+        staged = true
         revision = newRevision()
         return selected()
     }

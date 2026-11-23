@@ -256,7 +256,8 @@ internal class MarmotMessageDraftGateway(
      * Writes against [base]'s revision through MDK's input save. A file-backed attachment [base] holds, and any
      * attachment passed back exactly as [base] read it, is kept by id, so MDK neither copies its body again nor
      * unlinks its file. Anything else is written inline. A body-less attachment [base] does not hold as a file
-     * is refused rather than saved empty.
+     * is refused rather than saved empty. MDK keeps every attachment a save does not name, so each one [base]
+     * holds that the write leaves out is named as removed.
      */
     override fun saveRevisioned(
         accountRef: String,
@@ -280,13 +281,15 @@ internal class MarmotMessageDraftGateway(
                     MessageDraftAttachmentInputFfi.Inline(attachment)
                 }
             }
+        val written = write.mediaAttachments.mapTo(HashSet()) { it.id }
+        val removed = held.keys.filterNot { it in written }.map { MessageDraftAttachmentInputFfi.Removed(it) }
         val saved =
             marmot().saveMessageDraftInputsIfRevision(
                 accountRef,
                 revision,
                 write.content,
                 write.replyToMessageIdHex,
-                inputs,
+                inputs + removed,
             )
         return hydratedAfterWrite(groupIdHex, write, saved)
     }
@@ -329,5 +332,34 @@ private fun hydratedAfterWrite(
         mediaAttachments = write.mediaAttachments,
         createdAtMs = saved.draft?.createdAtMs ?: now,
         updatedAtMs = saved.draft?.updatedAtMs ?: now,
+    )
+}
+
+/**
+ * The draft a stage left, built from the descriptors MarmotKit returned and the inline bodies [base] already read
+ * under the lock, so a committed stage never depends on reading the draft again. A stored file gets an empty body;
+ * an inline descriptor [base] did not read, which the draft's lock rules out, is left out.
+ */
+internal fun stagedDraft(
+    base: RevisionedMessageDraft,
+    staged: SelectedMessageDraftFfi,
+): MessageDraftFfi? {
+    val content = staged.draft ?: return null
+    val bodies =
+        base.draft
+            ?.mediaAttachments
+            .orEmpty()
+            .associateBy { it.id }
+    val attachments =
+        content.mediaAttachments.mapNotNull { descriptor ->
+            if (descriptor.fileBacked) descriptor.toDraftAttachment(ByteArray(0)) else bodies[descriptor.id]
+        }
+    return MessageDraftFfi(
+        groupIdHex = content.groupIdHex,
+        content = content.content,
+        replyToMessageIdHex = content.replyToMessageIdHex,
+        mediaAttachments = attachments,
+        createdAtMs = content.createdAtMs,
+        updatedAtMs = content.updatedAtMs,
     )
 }

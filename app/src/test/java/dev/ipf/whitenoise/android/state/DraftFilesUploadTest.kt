@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaFileTransferControlFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageDraftAttachmentInputFfi
@@ -35,6 +38,7 @@ class DraftFilesUploadTest {
             assertEquals("new caption", engine.savedContent)
             assertSame(engine.savedRevision, engine.uploadRevision)
             assertEquals(listOf("clip"), engine.uploadedIds)
+            assertSame(engine.savedRevision, outcome.draftRevision)
             assertNull(outcome.acceptance)
         }
 
@@ -59,6 +63,8 @@ class DraftFilesUploadTest {
                 content("new caption", stored("other")),
                 content("new caption", stored("clip"), stored("extra")),
                 content("new caption", stored("clip")).copy(replyToMessageIdHex = "a".repeat(64)),
+                content("new caption", stored("clip").copy(fileBacked = false)),
+                content("new caption", stored("clip").copy(plaintextSize = 901uL)),
             )) {
                 val engine = DraftUploadEngine(draft = draft)
 
@@ -93,7 +99,59 @@ class DraftFilesUploadTest {
         assertEquals(listOf("a", "b"), draftFileIdsFor(draft, send("a", "b").attachments))
         assertNull(draftFileIdsFor(draft, send("b", "a").attachments))
         assertNull(draftFileIdsFor(draft, listOf(storedPick("a"), inlinePick("b"))))
+        val inlineUnderStoredId = content("", stored("a"), stored("b").copy(fileBacked = false))
+        assertNull(draftFileIdsFor(inlineUnderStoredId, send("a", "b").attachments))
     }
+
+    /** Uploaded stored files are admitted under the revision they uploaded from, without reading the draft again. */
+    @Test
+    fun admissionUsesTheUploadRevision() =
+        runBlocking {
+            val engine = DraftUploadEngine(draft = content("new caption", stored("clip")))
+
+            engine.marmot.sendComposerDraftFiles("acct", "group", emptyList(), send("clip"), admission(engine.uploaded))
+
+            assertEquals(listOf("localSendStatus", "admit"), engine.calls)
+            assertSame(engine.uploaded, engine.admittedRevision)
+        }
+
+    /** A save after the upload moved the draft: the same stored files are admitted under the draft's new revision. */
+    @Test
+    fun movedDraftWithTheSameFilesIsAdmittedUnderItsNewRevision() =
+        runBlocking {
+            val engine = DraftUploadEngine(draft = content("typed later", stored("clip")), staleRevisions = 1)
+
+            engine.marmot.sendComposerDraftFiles("acct", "group", emptyList(), send("clip"), admission(engine.uploaded))
+
+            assertEquals("new caption", engine.savedContent)
+            assertSame(engine.savedRevision, engine.admittedRevision)
+        }
+
+    /** A moved draft that no longer holds exactly the uploaded files keeps the conflict, so a retry uploads again. */
+    @Test
+    fun movedDraftWithOtherFilesKeepsTheConflict() =
+        runBlocking {
+            for (draft in listOf(content("", stored("other")), content("", stored("clip").copy(plaintextSize = 1uL)))) {
+                val engine = DraftUploadEngine(draft = draft, staleRevisions = 1)
+
+                val failure =
+                    runCatching {
+                        engine.marmot.sendComposerDraftFiles(
+                            "acct",
+                            "group",
+                            emptyList(),
+                            send("clip"),
+                            admission(engine.uploaded),
+                        )
+                    }.exceptionOrNull()
+
+                assertTrue(failure is MarmotKitException.MessageDraftRevisionConflict)
+                assertNull(engine.admittedRevision)
+            }
+        }
+
+    /** The admission for files uploaded under [revision] with the send's token. */
+    private fun admission(revision: MessageDraftRevisionFfi) = DraftFilesAdmission(revision, "t")
 
     /** A send of stored picks named [ids], with the caption the composer sends. */
     private fun send(vararg ids: String) = DraftFilesUpload(ids.map(::storedPick), "new caption")
@@ -138,9 +196,14 @@ class DraftFilesUploadTest {
 private class DraftUploadEngine(
     draft: SelectedMessageDraftContentFfi?,
     private val recovered: Boolean = false,
+    private var staleRevisions: Int = 0,
 ) {
     val selectedRevision: MessageDraftRevisionFfi = nativeHandleStub(MessageDraftRevisionFfi::class.java)
     val savedRevision: MessageDraftRevisionFfi = nativeHandleStub(MessageDraftRevisionFfi::class.java)
+
+    // The revision a test's earlier upload used.
+    val uploaded: MessageDraftRevisionFfi = nativeHandleStub(MessageDraftRevisionFfi::class.java)
+    var admittedRevision: MessageDraftRevisionFfi? = null
     private var current = draft
     val calls = mutableListOf<String>()
     var savedInputs: List<MessageDraftAttachmentInputFfi>? = null
@@ -198,6 +261,19 @@ private class DraftUploadEngine(
             uploadRevision = revision
             uploadedIds = attachmentIds
             return MediaUploadResultFfi(emptyList(), null)
+        }
+
+        /** Admits the send under [revision], refusing the first [staleRevisions] attempts as a moved draft. */
+        override suspend fun sendMessageDraftWithClientToken(
+            accountRef: String,
+            revision: MessageDraftRevisionFfi,
+            attachments: List<MediaAttachmentReferenceFfi>,
+            clientToken: String,
+        ): LocalSendAcceptanceFfi {
+            calls += "admit"
+            if (staleRevisions-- > 0) throw MarmotKitException.MessageDraftRevisionConflict()
+            admittedRevision = revision
+            return LocalSendAcceptanceFfi(clientToken, "m".repeat(64))
         }
     }
 

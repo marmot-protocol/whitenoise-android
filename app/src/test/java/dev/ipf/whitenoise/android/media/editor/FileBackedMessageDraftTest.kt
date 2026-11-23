@@ -110,9 +110,12 @@ class FileBackedMessageDraftTest {
             assertFalse("clearMessageDraftIfRevision" in native.calls)
         }
 
-    /** Removing another attachment keeps the stored file; removing the stored file leaves it out of the save. */
+    /**
+     * In a draft holding inline and stored attachments, a removal names the removed one explicitly, as MarmotKit
+     * 0.19.0 keeps any attachment a save leaves unnamed, and keeps the others by id.
+     */
     @Test
-    fun removalKeepsOrDropsStoredFile() =
+    fun removalFromAMixedDraftNamesTheRemovedAttachment() =
         runTest {
             val native = FileBackedDraftNative("caption")
             native.holdInline("photo", byteArrayOf(1))
@@ -121,10 +124,17 @@ class FileBackedMessageDraftTest {
 
             repository.removeAttachment("acct", "group", "photo")
             assertEquals(listOf("video"), native.attachmentIds)
+            assertEquals(
+                listOf(
+                    MessageDraftAttachmentInputFfi.Retained("video"),
+                    MessageDraftAttachmentInputFfi.Removed("photo"),
+                ),
+                native.savedInputs.last(),
+            )
 
             repository.removeAttachment("acct", "group", "video")
             assertEquals(emptyList<String>(), native.attachmentIds)
-            assertEquals(emptyList<MessageDraftAttachmentInputFfi>(), native.savedInputs.last())
+            assertEquals(listOf(MessageDraftAttachmentInputFfi.Removed("video")), native.savedInputs.last())
         }
 
     /** Staging copies a file once into the selected revision and returns the draft with its body-less entry. */
@@ -140,6 +150,28 @@ class FileBackedMessageDraftTest {
             assertEquals(listOf("video"), draft.mediaAttachments.map { it.id })
             assertFalse(draft.mediaAttachments.single().hasInlineBody())
             assertEquals(1, native.stagedRequests.size)
+        }
+
+    /**
+     * Once the file is stored the stage is accepted: its result comes from what MarmotKit returned and the inline
+     * bodies already read, even when reading the draft again would fail, and it advances the draft's generation.
+     */
+    @Test
+    fun committedStageSurvivesAFailingFollowUpRead() =
+        runTest {
+            val native = FileBackedDraftNative("caption")
+            native.holdInline("photo", byteArrayOf(1, 2))
+            native.failInlineReadsAfterStage = true
+            val repository = repositoryFor(native)
+            val before = repository.coordinated.generation("acct", "group")
+
+            val result = repository.files.add("acct", "group", request("video"), control())
+
+            val draft = (result as MessageDraftMutationResult.Success).draft!!
+            assertEquals(listOf("photo", "video"), draft.mediaAttachments.map { it.id })
+            assertArrayEquals(byteArrayOf(1, 2), draft.mediaAttachments[0].plaintext)
+            assertFalse(draft.mediaAttachments[1].hasInlineBody())
+            assertFalse(repository.coordinated.isCurrent("acct", "group", before))
         }
 
     /** A held id is a duplicate without copying, and a lost revision is reported, never copied again. */

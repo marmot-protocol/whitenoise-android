@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -25,6 +26,9 @@ internal class RetainedMediaUpload(
     val replyVersion: Long = 0L,
 ) {
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null
+
+    // The draft revision a send of stored draft files uploaded under, which its admission must use.
+    var draftUploadRevision: MessageDraftRevisionFfi? = null
     var localAcceptance: SendSummaryFfi? = null
     var recoveredWithoutUpload: Boolean = false
     var acceptedPending: Boolean = false
@@ -76,6 +80,18 @@ internal class RetainedMediaUpload(
     fun requestTransferCancel() {
         transferCancelRequested = true
         transferCancel?.invoke()
+    }
+
+    /**
+     * Forgets the uploaded references when [failure] means a retry must upload again: MDK refused them for a stale
+     * epoch (mdk#2891), or the draft this send's stored files uploaded from no longer holds exactly them.
+     */
+    fun forgetUploadAfter(failure: Throwable) {
+        val draftMoved = isDraftStored && failure is MarmotKitException.MessageDraftRevisionConflict
+        if (isStaleMediaReferenceEpoch(failure) || draftMoved) {
+            uploadedReferences = null
+            draftUploadRevision = null
+        }
     }
 
     /** Whether the user cancelled this send; reading it clears the request. */

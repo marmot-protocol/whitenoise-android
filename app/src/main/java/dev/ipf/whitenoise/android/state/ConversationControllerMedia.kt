@@ -247,13 +247,12 @@ internal suspend fun ConversationController.performMediaUpload(
                                 val accepted =
                                     mediaPublisher?.invoke(account, group.groupIdHex, references, retained.caption)
                                         ?: appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-                                            sendComposerMedia(
+                                            publishRetainedMedia(
                                                 account,
                                                 group.groupIdHex,
                                                 references,
-                                                retained.caption,
+                                                retained,
                                                 tempId,
-                                                replyRevision = retained.replyRevision,
                                             )
                                         }
                                 recordOptimisticSendAcceptance(key, accepted)
@@ -519,7 +518,7 @@ internal suspend fun ConversationController.performMediaUpload(
             }
             // MDK refuses references whose upload epoch or branch is no longer current (mdk#2891), and
             // reusing them would fail every Retry the same way, so the next attempt uploads again.
-            if (isStaleMediaReferenceEpoch(throwable)) retained.uploadedReferences = null
+            retained.forgetUploadAfter(throwable)
             // A failed bubble offers Retry, not the bytes of the attempt that failed.
             retained.clearTransferProgress()
             optimisticMessages[key] =

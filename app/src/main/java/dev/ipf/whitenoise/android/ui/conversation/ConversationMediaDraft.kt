@@ -491,42 +491,48 @@ internal class ConversationMediaDraftState(
                     attachments,
                     removedDraftAttachmentIds(accountRef),
                 )
-            val materialized =
-                withContext(Dispatchers.IO) {
-                    val drafts = appState.messageDraftRepository
-                    plan.reconciliation.unmatched.mapNotNull { attachment ->
-                        materializeRestoredAttachment(context, drafts, accountRef, read, attachment)
-                            ?.let { attachment to it }
+            val drafts = appState.messageDraftRepository
+            val attempt = DraftRestoreAttempt(ContextDraftPresentation(context), drafts, accountRef, read)
+            try {
+                val materialized =
+                    withContext(Dispatchers.IO) {
+                        plan.reconciliation.unmatched.mapNotNull { attachment ->
+                            attempt.materialize(attachment)?.let { attachment to it }
+                        }
                     }
+                if (
+                    !restorationIsCurrent(
+                        version,
+                        documentOwnerFence,
+                        appState.nativeComposerCleanupRevision(version.owner.accountRef, controller.group.groupIdHex),
+                        inputsRevision,
+                    )
+                ) {
+                    return@withLock null
                 }
-            if (
-                !restorationIsCurrent(
-                    version,
-                    documentOwnerFence,
-                    appState.nativeComposerCleanupRevision(version.owner.accountRef, controller.group.groupIdHex),
-                    inputsRevision,
-                )
-            ) {
-                return@withLock null
+                // Check the screen snapshot before committing owner state or its restored version.
+                // The caller applies the result on the main thread without another suspension.
+                if (!canPublish()) return@withLock null
+                restoredDraftRevision = version
+                val projection =
+                    projectDraftRestoration(
+                        restorationInputs(),
+                        plan,
+                        materialized,
+                        removedDraftAttachmentIds(accountRef),
+                        messages.sourceUnavailable,
+                    )
+                preparedPhotos = projection.inputs.preparedPhotos.withStoredSizes(read)
+                preparedDocuments = projection.inputs.preparedDocuments.withStoredSizes(read)
+                activeEditor?.takeIf { it.slot.id in plan.removedPhotos }?.let(::dismissEditor)
+                backedPhotos = projection.inputs.backedPhotos
+                nonEditableDescriptions = projection.inputs.descriptions
+                attempt.adopt()
+                RestoredConversationAttachments(projection.media, projection.documents)
+            } finally {
+                // A restore cancelled or abandoned before the composer took its files leaves none behind.
+                attempt.releaseUnadopted()
             }
-            // Check the screen snapshot before committing owner state or its restored version.
-            // The caller applies the result on the main thread without another suspension.
-            if (!canPublish()) return@withLock null
-            restoredDraftRevision = version
-            val projection =
-                projectDraftRestoration(
-                    restorationInputs(),
-                    plan,
-                    materialized,
-                    removedDraftAttachmentIds(accountRef),
-                    messages.sourceUnavailable,
-                )
-            preparedPhotos = projection.inputs.preparedPhotos.withStoredSizes(read)
-            preparedDocuments = projection.inputs.preparedDocuments.withStoredSizes(read)
-            activeEditor?.takeIf { it.slot.id in plan.removedPhotos }?.let(::dismissEditor)
-            backedPhotos = projection.inputs.backedPhotos
-            nonEditableDescriptions = projection.inputs.descriptions
-            RestoredConversationAttachments(projection.media, projection.documents)
         }
 
     /** Snapshots the composer's current shelf and prepared attachments for restoration planning. */

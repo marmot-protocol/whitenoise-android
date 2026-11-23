@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.MediaFileUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MediaUploadSubmissionFfi
+import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -108,6 +109,8 @@ internal data class DurableComposerMediaUpload(
     val upload: MediaUploadResultFfi,
     val acceptance: SendSummaryFfi?,
     val recoveredWithoutUpload: Boolean,
+    // The draft revision stored draft files uploaded under; their admission must use it.
+    val draftRevision: MessageDraftRevisionFfi? = null,
 )
 
 /**

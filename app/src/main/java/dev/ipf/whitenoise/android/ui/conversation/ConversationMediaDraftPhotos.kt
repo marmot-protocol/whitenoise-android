@@ -20,17 +20,6 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
-/** Materializes native draft bytes only while their composer is visible. */
-internal fun materializeDraftAttachment(
-    context: Context,
-    attachment: MessageDraftAttachmentFfi,
-): Uri? =
-    runCatching {
-        val file = draftPresentationFile(context, attachment) ?: return@runCatching null
-        file.writeBytes(attachment.plaintext)
-        draftPresentationUri(context, file, attachment)
-    }.getOrNull()
-
 /** The composer presentation file of one native draft attachment, named stably by its id, or null without one. */
 internal fun draftPresentationFile(
     context: Context,

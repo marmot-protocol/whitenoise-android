@@ -38,7 +38,9 @@ internal class MessageDraftFiles(
      * Copies [request]'s file into the draft as a file-backed attachment. The draft's lock is held for the whole
      * copy, so no save can write the revision the copy replaces. Unlike other mutations a lost revision is not
      * retried: MDK discards a copy whose draft was cleared or sent meanwhile, and copying it into the next draft
-     * would bring back an attachment that already left. [control] reports progress and cancels the copy.
+     * would bring back an attachment that already left. [control] reports progress and cancels the copy. Once
+     * MarmotKit has stored the file the mutation is accepted, and its result comes from what the stage returned,
+     * so no later read can report a stored file as failed.
      */
     suspend fun add(
         accountRef: String,
@@ -49,17 +51,15 @@ internal class MessageDraftFiles(
         val key = DraftKey(accountRef, groupIdHex)
         return withContext(ioDispatcher) {
             draftLocks.withLock(key) {
-                val result =
-                    runDraftMutation {
-                        val base = gateway.readRevisioned(accountRef, groupIdHex)
-                        if (base.holds(request.id)) {
-                            return@runDraftMutation MessageDraftMutationResult.DuplicateAttachment
-                        }
-                        gateway.stageFile(accountRef, base, request, control)
-                        MessageDraftMutationResult.Success(gateway.read(accountRef, groupIdHex))
+                runDraftMutation {
+                    val base = gateway.readRevisioned(accountRef, groupIdHex)
+                    if (base.holds(request.id)) {
+                        return@runDraftMutation MessageDraftMutationResult.DuplicateAttachment
                     }
-                if (result is MessageDraftMutationResult.Success) mutationGenerations.advance(key)
-                result
+                    val staged = gateway.stageFile(accountRef, base, request, control)
+                    mutationGenerations.advance(key)
+                    MessageDraftMutationResult.Success(stagedDraft(base, staged))
+                }
             }
         }
     }
