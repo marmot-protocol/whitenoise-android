@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 
 /** Only a settled, exhausted, nonempty retained history can show the room policy at its oldest edge. */
@@ -73,7 +73,7 @@ internal fun ConversationHistoryBoundary(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+            AppDivider(modifier = Modifier.weight(1f))
             Icon(
                 painter = painterResource(R.drawable.ic_timer),
                 contentDescription = null,
@@ -85,7 +85,7 @@ internal fun ConversationHistoryBoundary(
                 style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.ContentOrLtr),
                 color = color,
             )
-            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+            AppDivider(modifier = Modifier.weight(1f))
         }
     }
 }
