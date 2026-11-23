@@ -18,6 +18,14 @@
         "test_ids": [
           "SET-069"
         ]
+      },
+      {
+        "surface": "R.string.settings_help_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchUserHelp.kt",
+        "anchor": "R.string.settings_help_support",
+        "test_ids": [
+          "SET-069"
+        ]
       }
     ]
   }
