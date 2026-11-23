@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -42,11 +43,10 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
-import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
+import dev.ipf.whitenoise.android.ui.conversation.LocalMeasuredPenDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -180,7 +180,12 @@ private fun NewMessageActionGroup(
     busy: Boolean,
     inviteShareInProgress: Boolean,
 ) {
-    SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Related)) {
+    val pen = LocalMeasuredPenDialog.current
+    val reportLanding = remember(pen) { pen?.let { it::reportLanding } }
+    SettingsGroup(
+        modifier = Modifier.padding(top = WhiteNoiseSpacing.Related),
+        onMeasured = reportLanding,
+    ) {
         row("new_group") { context ->
             SettingsLink(
                 context,
@@ -226,7 +231,7 @@ private fun NewMessageActionGroup(
 /** Native interactive row with prototype segmented surfaces and the existing followed state. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
+@Suppress("FunctionNaming", "LongParameterList")
 internal fun NewMessagePersonRow(
     person: NewMessagePerson,
     index: Int,
@@ -239,8 +244,6 @@ internal fun NewMessagePersonRow(
     val (personModifier, personClick) = rememberMeasuredControlClick(onClick)
     val (profileModifier, profileClick) = rememberMeasuredControlClick(onLongClick)
     val candidate = person.candidate
-    val titleIsKey = abbreviatesPublicKey(candidate.displayName, candidate.npub)
-    val subtitle = person.subtitle?.takeUnless { titleIsKey && abbreviatesPublicKey(it, candidate.npub) }
     val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
     val followed = if (candidate.isFollowing) stringResource(R.string.user_search_you_follow) else null
     Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
@@ -272,14 +275,8 @@ internal fun NewMessagePersonRow(
                 }
             },
             supportingContent =
-                subtitle?.let { label ->
-                    {
-                        if (abbreviatesPublicKey(label, candidate.npub)) {
-                            PublicKeyCopyText(label, candidate.npub, enabled = enabled)
-                        } else {
-                            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
+                person.subtitle?.let { subtitle ->
+                    { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 },
             trailingContent =
                 if (creating) {
@@ -287,13 +284,7 @@ internal fun NewMessagePersonRow(
                 } else {
                     null
                 },
-            content = {
-                if (titleIsKey) {
-                    PublicKeyCopyText(candidate.displayName, candidate.npub, enabled = enabled)
-                } else {
-                    EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            },
+            content = { EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         )
         if (index < count - 1) HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerLow)
     }
