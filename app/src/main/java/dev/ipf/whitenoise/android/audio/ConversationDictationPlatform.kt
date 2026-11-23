@@ -200,17 +200,8 @@ internal interface ConversationDictationPlatform {
     /** Whether the current session records through White Noise, so a second recording can be held back. */
     fun followUpCaptureSupported(): Boolean = false
 
-    /** Opens a second recorder that only buffers audio; no recognizer is attached to it. */
-    fun beginFollowUpCapture(): Boolean = false
-
-    /** Seals the follow-up recorder's tail and keeps its audio. */
-    fun finishFollowUpCapture(onClosed: () -> Unit): Boolean = false
-
-    /** Wipes the follow-up audio and closes its recorder. */
-    fun discardFollowUpCapture(onClosed: () -> Unit): Boolean = false
-
-    /** Makes the follow-up recording the session capture once the previous one has left the slot. */
-    fun adoptFollowUpCapture(): Boolean = false
+    /** Recorders that only buffer audio beside the session capture; null when unsupported. */
+    fun followUpCaptures(): ConversationDictationFollowUpCaptures? = null
 
     /** Creates one recognition generation whose callbacks are owned by [listener]. */
     fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession

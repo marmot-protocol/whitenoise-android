@@ -292,7 +292,7 @@ internal fun accountSwitchProfileSeed(
                 ProfileSanitizer.displayName(profile.displayName)
                     ?: ProfileSanitizer.displayName(profile.name)
             } else {
-                ProfileSanitizer.displayName(rawDisplayName)
+                mdkFallbackDisplayName(rawDisplayName)
             },
         avatarUrl = ProfileSanitizer.protocolImageUrl(profile?.picture),
     )

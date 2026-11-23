@@ -7129,6 +7129,41 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/remotesigner/RemoteSignerScreen.kt",
+      "symbol": "RemoteSignerScreen",
+      "bindings": [
+        {
+          "case": "presentation-surface-onboarding-signin",
+          "selector": {
+            "id": "remote_signer.method.link"
+          },
+          "scope": "Sign-in entry opens the production remote-signer method picker before native pairing.",
+          "opened_by": {
+            "id": "onboarding.sign_in.remote_signer"
+          }
+        }
+      ],
+      "remaining": "Exercise both pairing directions against a cooperative remote signer, including permission review, browser approval and successful sign-in (ONB-027 and ONB-028)."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RemoteSignerAccountSection.kt",
+      "symbol": "RemoteSignerAccountDialogs",
+      "bindings": [
+        {
+          "case": "presentation-surface-remote-signer-disconnect",
+          "selector": {
+            "id": "confirmation.confirm"
+          },
+          "scope": "Disconnect confirmation is visible and Cancel dispatches dismissal on fixture state.",
+          "entry_assertion": {
+            "text": "Disconnect the signer\\?"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Exercise the permission review and disconnect dialogs with a paired account, and confirm disconnect keeps the account on the device (ONB-029)."
     }
   ]
 }

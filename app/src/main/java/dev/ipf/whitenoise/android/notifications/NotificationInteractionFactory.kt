@@ -32,6 +32,32 @@ internal class NotificationInteractionFactory(
             }
         }
 
+    suspend fun addMessageActions(
+        builder: NotificationCompat.Builder,
+        actionTarget: NotificationActionTarget,
+        actions: List<NotificationActionKind>,
+        quickReactions: List<String>,
+    ) {
+        actions.forEach { action ->
+            when (action) {
+                NotificationActionKind.REPLY -> builder.addAction(replyNotificationAction(actionTarget, quickReactions))
+                // Native reaction choices ride on Reply's RemoteInput.
+                NotificationActionKind.REACT -> Unit
+                NotificationActionKind.MARK_READ -> builder.addAction(markReadNotificationAction(actionTarget))
+            }
+        }
+        val artwork = notificationReactionChipArtwork(context, quickReactions)
+        if (artwork.isEmpty()) return
+        val rows =
+            notificationQuickReactionRows(context, quickReactions, artwork) { reaction ->
+                reactionPendingIntent(actionTarget, reaction)
+            }
+        builder.extras.apply {
+            putString(EXTRA_QUICK_REACTION_TARGET, actionTarget.target.messageIdHex)
+            putParcelable(EXTRA_QUICK_REACTION_ROWS, rows)
+        }
+    }
+
     fun replyNotificationAction(
         actionTarget: NotificationActionTarget,
         reactionChoices: List<String>,
@@ -59,6 +85,22 @@ internal class NotificationInteractionFactory(
             .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
             .setShowsUserInterface(false)
             .build()
+    }
+
+    fun reactionPendingIntent(
+        actionTarget: NotificationActionTarget,
+        reaction: String,
+    ): PendingIntent {
+        val intent =
+            Intent(context, NotificationActionReceiver::class.java).apply {
+                NotificationActions.applyToIntent(
+                    this,
+                    NotificationActionKind.REACT,
+                    actionTarget,
+                    directReaction = reaction,
+                )
+            }
+        return PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
     }
 
     /**
