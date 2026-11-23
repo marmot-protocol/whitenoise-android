@@ -65,7 +65,7 @@ private enum class LearnTopic(
         R.drawable.learn_actions,
         R.string.learn_marmot_title,
     ),
-    Marmot(R.string.learn_marmot_title, R.string.learn_marmot_body, R.drawable.learn_marmot, R.string.done),
+    Interop(R.string.learn_marmot_title, R.string.learn_marmot_body, R.drawable.learn_marmot, R.string.done),
 }
 
 @Suppress("FunctionNaming")
@@ -138,7 +138,7 @@ private fun LearnTopicPage(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (topic == LearnTopic.Actions) LearnMessageDemo()
-        if (topic == LearnTopic.Marmot) LearnMarmotLink()
+        if (topic == LearnTopic.Interop) LearnMarmotLink()
         Row(
             Modifier.align(Alignment.CenterHorizontally).clearAndSetSemantics { },
             horizontalArrangement = Arrangement.spacedBy(6.dp),

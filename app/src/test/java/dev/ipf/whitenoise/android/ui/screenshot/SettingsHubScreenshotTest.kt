@@ -125,6 +125,8 @@ class SettingsHubScreenshotTest {
                 composeRule.onNodeWithText("Reply").assertExists()
                 composeRule.onRoot().captureRoboImage("src/test/snapshots/learn_white_noise_demo_actions_amoled.png")
                 example.performTouchInput { swipeRight() }
+                composeRule.mainClock.advanceTimeBy(1_000)
+                composeRule.waitForIdle()
                 composeRule.onNodeWithText("Demo contact").assertExists()
                 composeRule.onRoot().captureRoboImage("src/test/snapshots/learn_white_noise_demo_reply_amoled.png")
                 advanceWalkthrough("Chat across apps", "learn_white_noise_marmot_amoled")
