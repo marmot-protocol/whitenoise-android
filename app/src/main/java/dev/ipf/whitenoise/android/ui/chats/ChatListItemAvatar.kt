@@ -48,3 +48,13 @@ internal fun ChatListItemAvatar(
         followedAccount = followedAccount,
     )
 }
+
+/**
+ * The direct chat peer whose followed-person badge [item]'s avatar may carry: only for a direct chat listed for the
+ * active account, whose follows are the ones known.
+ */
+internal fun chatListItemFollowedPeer(
+    item: ChatListItem,
+    accountRef: String?,
+    activeAccountRef: String?,
+): String? = chatListItemAvatarAccount(item)?.takeIf { item.isDm() && accountRef == activeAccountRef }
