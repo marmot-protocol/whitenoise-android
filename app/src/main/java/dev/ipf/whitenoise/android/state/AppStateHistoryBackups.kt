@@ -75,6 +75,7 @@ internal class NativeHistoryBackupsAccess(
             }
         }
 
+    /** Checks ownership and dispatches the native call away from the UI thread. */
     private suspend fun <T> call(block: suspend MarmotInterface.() -> T): T =
         withContext(dispatcher) {
             if (!isCurrent()) throw CancellationException("History backups owner retired")

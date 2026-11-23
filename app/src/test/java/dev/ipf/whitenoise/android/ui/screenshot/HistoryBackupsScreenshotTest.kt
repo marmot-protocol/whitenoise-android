@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -32,6 +33,7 @@ import dev.ipf.whitenoise.android.ui.settings.HistoryBackupsContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -106,6 +108,7 @@ class HistoryBackupsScreenshotTest {
             dark = true,
         )
 
+    /** Checks that numbered words fit in larger RTL text. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
     fun wordsLargeRtl() =
@@ -156,11 +159,12 @@ class HistoryBackupsScreenshotTest {
     /** Typed restore words are handed over once, then cleared, and never come back from saved state. */
     @Test fun restoreWordsAreClearedAndNeverRestoredFromSavedState() {
         val restored = mutableListOf<String>()
+        val state = mutableStateOf(HistoryBackupsState(status = HistoryBackupStatus.Off))
         val tester = StateRestorationTester(compose)
         tester.setContent {
             WhiteNoiseTheme {
                 HistoryBackupsContent(
-                    HistoryBackupsState(status = HistoryBackupStatus.Off),
+                    state.value,
                     HistoryBackupsActions(onRestore = { restored += it }),
                     onBack = {},
                 )
@@ -185,6 +189,24 @@ class HistoryBackupsScreenshotTest {
         compose.onNodeWithTag("history_backups.restore_words").performTextInput(fixture)
         button.performClick()
         assertEquals(listOf(fixture), restored)
+        compose.runOnIdle { state.value = state.value.copy(problem = HistoryBackupProblem.InvalidRestoreWords) }
+        assertTrue(
+            compose
+                .onNodeWithTag("history_backups.restore_words")
+                .fetchSemanticsNode()
+                .config
+                .toString()
+                .contains("orbit"),
+        )
+        button.performClick()
+        compose.runOnIdle {
+            state.value = state.value.copy(problem = null, restore = progress(BackupRestorePhaseFfi.RESTORING, 0))
+        }
+        compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.cancel_restore"))
+        compose.runOnIdle {
+            state.value = state.value.copy(restore = progress(BackupRestorePhaseFfi.COMPLETE, 1))
+        }
+        compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.restore"))
         assertFalse(
             compose
                 .onNodeWithTag("history_backups.restore_words")

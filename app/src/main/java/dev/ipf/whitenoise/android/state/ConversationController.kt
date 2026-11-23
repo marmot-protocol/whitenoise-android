@@ -744,17 +744,17 @@ class ConversationController(
                 appState.activeAccountRef == conversationAccountRef &&
                 appState.runtimeGeneration == conversationRuntimeGeneration
 
-    // Self-identity for conversation-scoped UI ("is me", mention detection).
-    // Follows the conversation's account, which the active account only lags
-    // during a notification-routed early open (#586).
+    // Use the conversation's identity for mentions and "is me" checks.
+    // The active account can lag during an early open from a notification (#586).
     internal val boundAccountIdHex: String?
         get() = conversationAccountIdHex
 
     internal fun presentConversationTransient(
         @StringRes titleRes: Int,
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
     ) {
         val accountRef = conversationAccountRef ?: return
-        appState.presentConversationTransient(accountRef, group.groupIdHex, titleRes)
+        appState.presentConversationTransient(accountRef, group.groupIdHex, titleRes, kind = kind)
     }
 
     internal fun presentConversationTransient(title: AppText) {
@@ -1706,7 +1706,7 @@ class ConversationController(
         if (showsBlockedLeave) {
             // Dictation's send action and the in-conversation wave and location shares reach here without the
             // composer gate, so say why.
-            if (text.isNotBlank()) appState.presentTransient(blockedLeaveHint())
+            if (text.isNotBlank()) appState.presentTransient(blockedLeaveHint(), kind = TransientNoticeKind.Information)
             return
         }
         val trimmed = text.trim()
@@ -2662,7 +2662,7 @@ class ConversationController(
     suspend fun retryFailedSend(item: TimelineMessage) {
         // A send that failed before the leave was blocked, or before a disband, stays failed while that state holds.
         outboundRefusal()?.let {
-            appState.presentTransient(it)
+            appState.presentTransient(it, kind = TransientNoticeKind.Information)
             return
         }
         val key = item.id

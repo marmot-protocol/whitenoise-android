@@ -157,6 +157,7 @@ open class WhiteNoiseApplication :
         initializedAppState()?.trimPresentationMemory(trim)
     }
 
+    /** Enqueues periodic startup work once and allows retries after scheduling failure. */
     @Suppress("TooGenericExceptionCaught")
     internal fun ensurePeriodicWorkScheduled(
         scope: CoroutineScope = applicationScope,

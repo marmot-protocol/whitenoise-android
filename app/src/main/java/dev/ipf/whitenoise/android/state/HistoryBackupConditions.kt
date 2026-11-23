@@ -103,6 +103,7 @@ internal object HistoryBackupConditions {
                 .isSuccess
         }
 
+    /** Registers the power receiver once for the application. */
     @Synchronized
     private fun listenForPower(app: Context) {
         if (listening) return

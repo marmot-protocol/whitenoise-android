@@ -492,7 +492,9 @@ class WhiteNoiseAppState private constructor(
                     conversationDictationPreferences.current().silenceDeliveryMode
                 },
                 sendTranscriptIfOriginUnchanged = ::sendDictationTranscriptIfOriginUnchanged,
-                onSendBlocked = { presentTransient(R.string.dictation_send_blocked) },
+                onSendBlocked = {
+                    presentTransient(R.string.dictation_send_blocked, kind = TransientNoticeKind.Information)
+                },
             ).also { initializedDictation = it }
         }
 
@@ -1502,11 +1504,12 @@ class WhiteNoiseAppState private constructor(
     /** Queued-change size refusals already shown, so a redelivered refusal is not shown twice. Main thread only. */
     internal val shownQueuedSizeRefusals = ShownQueuedRefusals()
 
-    var transientNotice by mutableStateOf<TransientNotice?>(null)
-        private set
+    private val transientNotices = TransientNotices { NoticeOwner(activeAccountRef, runtimeGeneration) }
 
-    // staleness-exempt: monotonically unique notice identity, not an async publication fence.
-    private var transientNoticeSequence = 0L
+    val transientNotice: TransientNotice?
+        get() = transientNotices.transient
+
+    internal fun currentPartialNotice(): TransientNotice? = transientNotices.partial()
 
     /** Launch geometry belongs to this one profile presentation, never the next request. */
     internal var pendingProfileContour: dev.ipf.whitenoise.android.ui.settings.SettingsContour? = null
@@ -2422,10 +2425,15 @@ class WhiteNoiseAppState private constructor(
         var durablyAccepted = false
         return try {
             durablyAccepted =
-                sendConversationText(controller, request.payload, onAccepted = {
-                    pendingShown = true
-                    request.onPendingShown()
-                })
+                sendConversationText(
+                    controller,
+                    request.payload,
+                    onSendSettled = request.onTextSendSettled,
+                    onAccepted = {
+                        pendingShown = true
+                        request.onPendingShown()
+                    },
+                )
             if (!durablyAccepted && !pendingShown) rejectDictationDispatchBeforeTransport(request) else durablyAccepted
         } finally {
             if (!durablyAccepted && replyTarget != null && controller.replyingTo == null) {
@@ -2501,6 +2509,7 @@ class WhiteNoiseAppState private constructor(
         controller: ConversationController,
         text: String,
         onPresentationAccepted: (String) -> Unit = {},
+        onSendSettled: (durablyAccepted: Boolean) -> Unit = {},
         onAccepted: () -> Unit = {},
     ): Boolean {
         val pendingClear = captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
@@ -2517,11 +2526,13 @@ class WhiteNoiseAppState private constructor(
             onDurablyAccepted = {
                 durablyAccepted = true
                 pendingClear?.let(::clearDraftAfterSuccessfulSend)
+                onSendSettled(true)
             },
             onTerminalFailure = {
                 if (accepted && !durablyAccepted) {
                     pendingClear?.let(composerDraftExpansionBridge::restoreAfterTerminalFailure)
                 }
+                onSendSettled(false)
             },
         )
         return durablyAccepted
@@ -4594,7 +4605,7 @@ class WhiteNoiseAppState private constructor(
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             if (error is MarmotKitException.ExternalSignerRejected) {
-                presentTransient(R.string.toast_amber_sign_in_cancelled)
+                presentTransient(R.string.toast_amber_sign_in_cancelled, kind = TransientNoticeKind.Information)
             } else {
                 appStateDebug(error) { "amber login failed: ${error.readableMessage()}" }
                 presentFailure(
@@ -5949,10 +5960,7 @@ class WhiteNoiseAppState private constructor(
                                             }
                                         }
                                     }
-                                    if (revision == fontScaleSaveRevision) {
-                                        fontScale = durableFontScale
-                                        if (commitAttempted) presentTransient(R.string.font_size_save_failed)
-                                    }
+                                    restoreDurableFontScaleIfCurrent(revision, reportFailure = commitAttempted)
                                 }
                                 reconciled = true
                             }
@@ -5963,7 +5971,7 @@ class WhiteNoiseAppState private constructor(
                         // Cancellation before acquiring the mutex must wait for prior saves to settle.
                         withContext(NonCancellable) {
                             hostPreferenceCommitMutex.withLock {
-                                if (revision == fontScaleSaveRevision) fontScale = durableFontScale
+                                restoreDurableFontScaleIfCurrent(revision, reportFailure = false)
                             }
                         }
                     }
@@ -5971,6 +5979,17 @@ class WhiteNoiseAppState private constructor(
             }.invokeOnCompletion { cause ->
                 if (cause is CancellationException) attempt.cancel()
             }
+    }
+
+    private fun restoreDurableFontScaleIfCurrent(
+        revision: Long,
+        reportFailure: Boolean,
+    ) {
+        if (revision != fontScaleSaveRevision) return
+        fontScale = durableFontScale
+        if (reportFailure) {
+            presentTransient(R.string.font_size_save_failed, kind = TransientNoticeKind.Information)
+        }
     }
 
     fun updateAppFont(font: AppFont) {
@@ -7974,15 +7993,17 @@ class WhiteNoiseAppState private constructor(
     fun presentTransient(
         @StringRes titleRes: Int,
         detail: AppText? = null,
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
     ) {
-        presentTransient(AppText.Resource(titleRes), detail)
+        presentTransient(AppText.Resource(titleRes), detail, kind)
     }
 
     fun presentTransient(
         title: AppText,
         detail: AppText? = null,
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
     ) {
-        setTransientNotice(title, detail)
+        transientNotices.publish(title, detail, kind)
     }
 
     fun presentConversationTransient(
@@ -7990,42 +8011,29 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         @StringRes titleRes: Int,
         detail: AppText? = null,
-    ): TransientNotice = presentConversationTransient(accountRef, groupIdHex, AppText.Resource(titleRes), detail)
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
+    ): TransientNotice = presentConversationTransient(accountRef, groupIdHex, AppText.Resource(titleRes), detail, kind)
 
     fun presentConversationTransient(
         accountRef: String,
         groupIdHex: String,
         title: AppText,
         detail: AppText? = null,
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
     ): TransientNotice =
-        setTransientNotice(
+        transientNotices.publish(
             title = title,
             detail = detail,
             conversation = ConversationNoticeDestination(accountRef, groupIdHex),
+            kind = kind,
         )
-
-    private fun setTransientNotice(
-        title: AppText,
-        detail: AppText? = null,
-        conversation: ConversationNoticeDestination? = null,
-    ): TransientNotice {
-        transientNoticeSequence += 1L
-        val notice =
-            TransientNotice(
-                id = transientNoticeSequence,
-                title = title,
-                detail = detail,
-                conversation = conversation,
-            )
-        transientNotice = notice
-        return notice
-    }
 
     fun presentTransient(
         title: String,
         detail: String? = null,
+        kind: TransientNoticeKind = TransientNoticeKind.Confirmation,
     ) {
-        presentTransient(AppText.Plain(title), detail?.let(AppText::Plain))
+        presentTransient(AppText.Plain(title), detail?.let(AppText::Plain), kind)
     }
 
     /** Retire only the toast observed by the caller, preserving a newer notice. */
@@ -8033,9 +8041,7 @@ class WhiteNoiseAppState private constructor(
         if (toast === notice) toast = null
     }
 
-    fun clearTransientNotice(notice: TransientNotice? = transientNotice) {
-        if (transientNotice === notice) transientNotice = null
-    }
+    fun clearTransientNotice(notice: TransientNotice? = transientNotice) = transientNotices.dismiss(notice)
 
     private suspend fun configurePrivacyRuntime() {
         runCatchingCancellable {

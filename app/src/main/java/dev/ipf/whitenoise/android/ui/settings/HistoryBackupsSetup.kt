@@ -246,6 +246,7 @@ internal fun RecoveryWordsInput(
     enabled: Boolean,
     modifier: Modifier = Modifier,
     supporting: String? = null,
+    error: String? = null,
     multiLine: Boolean = false,
 ) {
     WhiteNoiseTextField(
@@ -254,6 +255,7 @@ internal fun RecoveryWordsInput(
         modifier = modifier,
         label = { Text(label) },
         supportingText = supporting?.let { { Text(it) } },
+        errorMessage = error,
         keyboardOptions =
             KeyboardOptions(
                 capitalization = KeyboardCapitalization.None,

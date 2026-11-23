@@ -121,6 +121,10 @@ internal fun HistoryBackupsContent(
     var confirmTurnOff by remember { mutableStateOf(false) }
     // Typed restore words are composition-only: never saveable, cleared when this content leaves.
     val restoreWords = remember { TextFieldState() }
+    val restoreOperation = state.restore?.operation
+    LaunchedEffect(restoreOperation) {
+        if (restoreOperation != null) restoreWords.clearText()
+    }
     DisposableEffect(restoreWords) { onDispose { restoreWords.clearText() } }
     SettingsScaffold(title = stringResource(R.string.history_backups), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag("history_backups.list")) {
@@ -231,6 +235,7 @@ private fun HistoryBackupsStatusGroup(
     }
 }
 
+/** Displays account-level guidance above the restore controls. */
 private fun LazyListScope.historyBackupsCallouts(state: HistoryBackupsState) {
     if (state.status == HistoryBackupStatus.Unavailable) {
         item(key = "history_backups.unavailable") {
@@ -244,7 +249,7 @@ private fun LazyListScope.historyBackupsCallouts(state: HistoryBackupsState) {
         item(key = "history_backups.schedule") { SettingsExplainer(stringResource(R.string.history_backups_schedule)) }
     }
     val problem = state.problem
-    if (problem != null && problem != HistoryBackupProblem.Unavailable) {
+    if (problem != null && problem != HistoryBackupProblem.Unavailable && problem != HistoryBackupProblem.InvalidRestoreWords) {
         item(key = "history_backups.problem") {
             SettingsCallout(
                 text = stringResource(historyBackupProblemText(problem)),
@@ -302,17 +307,19 @@ private fun HistoryRestoreGroup(
                 state = words,
                 label = stringResource(R.string.history_backups_restore_words),
                 supporting = stringResource(R.string.history_backups_restore_words_help),
+                error =
+                    if (state.problem == HistoryBackupProblem.InvalidRestoreWords) {
+                        stringResource(R.string.history_backups_problem_restore_words)
+                    } else {
+                        null
+                    },
                 enabled = state.running == null,
                 multiLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("history_backups.restore_words"),
             )
             val starting = state.running == HistoryBackupAction.BeginRestore
             WhiteNoiseButton(
-                onClick = {
-                    val typed = words.text.toString()
-                    words.clearText()
-                    actions.onRestore(typed)
-                },
+                onClick = { actions.onRestore(words.text.toString()) },
                 enabled = state.running == null && hasTwelveRecoveryWords(words.text),
                 loading = starting,
                 loadingLabel = stringResource(R.string.history_backups_restoring),

@@ -14,4 +14,16 @@
     <string name="shared_content_partial">No matching attachments loaded yet</string>
     <string name="shared_content_page_failed">Couldn’t load shared content. Try again.</string>
     <string name="shared_content_history_end">End of local attachment history</string>
+    <plurals name="shared_media_photos_selected_count">
+        <item quantity="one">%1$d photo selected</item>
+        <item quantity="other">%1$d photos selected</item>
+    </plurals>
+    <string name="shared_media_select_photo">Select photo</string>
+    <string name="shared_media_cancel_selection">Cancel selection</string>
+    <string name="shared_media_share_selected_photos">Share selected photos</string>
+    <string name="shared_media_photo_from">Photo from %1$s</string>
+    <string name="shared_media_video_not_selectable">Video, can’t be selected</string>
+    <string name="shared_media_share_photos_failed">Couldn’t share photos</string>
+    <string name="shared_media_share_photos_unavailable">Some selected photos are no longer available, so nothing was shared. They’re now deselected. Try again.</string>
+    <string name="shared_media_share_photos_too_large">These photos are too large to share at once. Select fewer and try again.</string>
 </resources>
