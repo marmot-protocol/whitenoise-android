@@ -117,8 +117,8 @@ internal suspend fun ConversationController.uploadFileBackedRetained(
 
 /**
  * Uploads a send of files the composer's draft stores from the draft's own copies, under the same commit lock,
- * cancellation check, progress and retry capture as a file upload. Nothing is read from the pick again; the draft
- * send that follows admits the references with this send's token.
+ * cancellation check, acceptance record, progress and retry capture as a file upload. Nothing is read from the pick
+ * again; the draft send that follows admits the references with this send's token.
  */
 private suspend fun ConversationController.uploadDraftStoredRetained(
     account: String,
@@ -130,15 +130,19 @@ private suspend fun ConversationController.uploadDraftStoredRetained(
     appState
         .withGroupCommitLock(account, group.groupIdHex) {
             requireOptimisticSendNotCancelled(key)
-            withNativeTransferControl(
-                retained::attachTransferCancel,
-                onProgress = retained::reportTransferProgress,
-            ) { control ->
-                appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
-                    val upload = DraftFilesUpload(retained.attachments, retained.caption)
-                    uploadComposerDraftFilesWithToken(account, group.groupIdHex, upload, control, tempId)
+            val outcome =
+                withNativeTransferControl(
+                    retained::attachTransferCancel,
+                    onProgress = retained::reportTransferProgress,
+                ) { control ->
+                    appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                        val upload = DraftFilesUpload(retained.attachments, retained.caption)
+                        uploadComposerDraftFilesWithToken(account, group.groupIdHex, upload, control, tempId)
+                    }
                 }
-            }
+            // A send MDK already owns is recorded under the lock, as the file-backed path does.
+            outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
+            outcome
         }.also { outcome ->
             retained.draftUploadRevision = outcome.draftRevision
             outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)

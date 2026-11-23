@@ -23,7 +23,7 @@ internal val sourceFileSizeBaseline: Map<String, Int> =
         "dev/ipf/whitenoise/android/diagnostics/PerformanceDiagnostics.kt" to 695,
         "dev/ipf/whitenoise/android/media/DiskByteCache.kt" to 1482,
         "dev/ipf/whitenoise/android/media/MediaPipeline.kt" to 1404,
-        "dev/ipf/whitenoise/android/media/editor/MessageDraftRepository.kt" to 632,
+        "dev/ipf/whitenoise/android/media/editor/MessageDraftRepository.kt" to 618,
         "dev/ipf/whitenoise/android/media/sandbox/IsolatedAnimationSession.kt" to 611,
         "dev/ipf/whitenoise/android/media/sandbox/IsolatedAutomaticAvTransport.kt" to 895,
         "dev/ipf/whitenoise/android/media/sandbox/IsolatedAvStream.kt" to 876,

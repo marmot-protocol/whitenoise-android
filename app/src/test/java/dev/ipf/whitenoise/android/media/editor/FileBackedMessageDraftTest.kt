@@ -5,9 +5,12 @@ import dev.ipf.marmotkit.MediaFileTransferControlFfi
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftAttachmentFileRequestFfi
 import dev.ipf.marmotkit.MessageDraftAttachmentInputFfi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -172,6 +175,63 @@ class FileBackedMessageDraftTest {
             assertArrayEquals(byteArrayOf(1, 2), draft.mediaAttachments[0].plaintext)
             assertFalse(draft.mediaAttachments[1].hasInlineBody())
             assertFalse(repository.coordinated.isCurrent("acct", "group", before))
+        }
+
+    /** Text typed while a large file is copied into the draft is still saved once the copy lands, beside the file. */
+    @Test
+    fun textTypedDuringAStageIsKept() =
+        runTest {
+            val native = FileBackedDraftNative("before")
+            val gate = CompletableDeferred<Unit>()
+            native.stageGate = gate
+            val repository = repositoryFor(native)
+            val writer = CoalescingMessageDraftWriter(scope = this, drafts = repository, debounceMillis = 0L)
+
+            val staging = async { repository.files.add("acct", "group", request("video"), control()) }
+            runCurrent()
+            writer.submit("acct", "group", "typed during the copy")
+            runCurrent()
+            gate.complete(Unit)
+            assertTrue(staging.await() is MessageDraftMutationResult.Success)
+            writer.flush()
+
+            assertEquals("typed during the copy", native.content)
+            assertEquals(listOf("video"), native.attachmentIds)
+        }
+
+    /** A queued text save that loses a revision race re-reads the draft and saves once more while it is current. */
+    @Test
+    fun conflictedTextSaveIsRetriedWhileCurrent() =
+        runTest {
+            val native = FileBackedDraftNative("old")
+            native.holdFile("video", 900uL)
+            native.conflictNextSave = true
+            val repository = repositoryFor(native)
+            val generation = repository.coordinated.acceptMutation("acct", "group")
+
+            val saved = repository.coordinated.saveAcceptedTextIfCurrent("acct", "group", "new", generation)
+
+            val result = (saved as MessageDraftConditionalSaveResult.Applied).result
+            assertTrue(result is MessageDraftMutationResult.Success)
+            assertEquals("new", native.content)
+            assertEquals(listOf("video"), native.attachmentIds)
+            assertEquals(2, native.calls.count { it == "saveMessageDraftInputsIfRevision" })
+        }
+
+    /** A queued text save that a newer edit superseded is neither written nor retried. */
+    @Test
+    fun supersededTextSaveIsNotWritten() =
+        runTest {
+            val native = FileBackedDraftNative("old")
+            val repository = repositoryFor(native)
+            val older = repository.coordinated.acceptMutation("acct", "group")
+            repository.coordinated.acceptMutation("acct", "group")
+
+            val saved = repository.coordinated.saveAcceptedTextIfCurrent("acct", "group", "stale", older)
+
+            assertEquals(MessageDraftConditionalSaveResult.Superseded, saved)
+            assertEquals("old", native.content)
+            assertEquals(0, native.calls.count { it == "saveMessageDraftInputsIfRevision" })
         }
 
     /** A held id is a duplicate without copying, and a lost revision is reported, never copied again. */

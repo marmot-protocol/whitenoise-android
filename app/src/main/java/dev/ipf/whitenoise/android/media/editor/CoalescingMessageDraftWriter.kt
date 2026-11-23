@@ -394,7 +394,7 @@ internal class CoalescingMessageDraftWriter(
                     activeMerges[key]?.latestResult = result
                     activeMerges[key]?.latestContent = content
                     state.lastResult = result
-                    drafts.coordinated.isCurrent(
+                    drafts.coordinated.isTextCurrent(
                         key.accountRef,
                         key.groupIdHex,
                         MessageDraftGeneration(generation),

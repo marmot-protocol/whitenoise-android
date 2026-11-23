@@ -97,7 +97,7 @@ internal class MessageDraftRepository(
         attachment: MessageDraftAttachmentFfi,
         pendingSession: EditorAttachmentSession? = null,
     ): MessageDraftMutationResult =
-        mutate(accountRef, groupIdHex) {
+        mutate(accountRef, groupIdHex, attachmentOnly = true) {
             val base = gateway.readRevisioned(accountRef, groupIdHex)
             val current = base.draft
             if (current?.mediaAttachments.orEmpty().any { it.id == attachment.id }) {
@@ -128,7 +128,7 @@ internal class MessageDraftRepository(
         replacement: MessageDraftAttachmentFfi,
         pendingSession: EditorAttachmentSession,
     ): MessageDraftMutationResult =
-        mutate(accountRef, groupIdHex) {
+        mutate(accountRef, groupIdHex, attachmentOnly = true) {
             if (replacement.id != attachmentId ||
                 !pendingSession.matches(accountRef, groupIdHex, replacement)
             ) {
@@ -169,7 +169,7 @@ internal class MessageDraftRepository(
         attachmentId: String,
         expectedDigest: String? = null,
     ): MessageDraftMutationResult =
-        mutate(accountRef, groupIdHex) {
+        mutate(accountRef, groupIdHex, attachmentOnly = true) {
             val base = gateway.readRevisioned(accountRef, groupIdHex)
             val current = base.draft
             val attachments = current?.mediaAttachments ?: return@mutate MessageDraftMutationResult.MissingAttachment
@@ -270,9 +270,14 @@ internal class MessageDraftRepository(
             }
         }
 
+    /**
+     * Runs one mutation under the draft's lock, re-running it once after a lost revision race. An [attachmentOnly]
+     * mutation leaves text that was accepted before it current, so a queued text save still lands.
+     */
     private suspend fun mutate(
         accountRef: String,
         groupIdHex: String,
+        attachmentOnly: Boolean = false,
         block: suspend () -> MessageDraftMutationResult,
     ): MessageDraftMutationResult {
         val key = DraftKey(accountRef, groupIdHex)
@@ -282,7 +287,9 @@ internal class MessageDraftRepository(
                 // the same lock, so the user's newest edit is applied on top of the other writer's state.
                 var result = runDraftMutation(block)
                 if (result.isRevisionConflict()) result = runDraftMutation(block)
-                if (result is MessageDraftMutationResult.Success) mutationGenerations.advance(key)
+                if (result is MessageDraftMutationResult.Success) {
+                    mutationGenerations.advance(key, fencesText = !attachmentOnly)
+                }
                 result
             }
         }
@@ -321,6 +328,13 @@ internal class MessageDraftCoordinatedOperations(
         generation: MessageDraftGeneration,
     ): Boolean = mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)
 
+    /** Whether text accepted at [generation] may still be written; only attachment-only mutations have landed since. */
+    fun isTextCurrent(
+        accountRef: String,
+        groupIdHex: String,
+        generation: MessageDraftGeneration,
+    ): Boolean = mutationGenerations.isTextCurrent(DraftKey(accountRef, groupIdHex), generation)
+
     /**
      * Writes [content] only while [generation] is still authoritative for this account and
      * group, making the same currency check [deleteIf] and [draftIf] already make.
@@ -338,13 +352,18 @@ internal class MessageDraftCoordinatedOperations(
         generation: MessageDraftGeneration,
     ): MessageDraftConditionalSaveResult =
         withContext(ioDispatcher) {
-            draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
-                if (!mutationGenerations.isCurrent(DraftKey(accountRef, groupIdHex), generation)) {
+            val key = DraftKey(accountRef, groupIdHex)
+            draftLocks.withLock(key) {
+                if (!mutationGenerations.isTextCurrent(key, generation)) {
                     return@withLock MessageDraftConditionalSaveResult.Superseded
                 }
-                MessageDraftConditionalSaveResult.Applied(
-                    runDraftMutation { saveDraftText(gateway, accountRef, groupIdHex, content) },
-                )
+                // A lost revision race, such as a send saving its caption, re-reads and saves once more while the
+                // text is still current; a pass superseded meanwhile does not.
+                var result = runDraftMutation { saveDraftText(gateway, accountRef, groupIdHex, content) }
+                if (result.isRevisionConflict() && mutationGenerations.isTextCurrent(key, generation)) {
+                    result = runDraftMutation { saveDraftText(gateway, accountRef, groupIdHex, content) }
+                }
+                MessageDraftConditionalSaveResult.Applied(result)
             }
         }
 
@@ -597,36 +616,3 @@ private fun finishAttachmentCommit(
         editorSessionRecoveryPending = recoveryPending,
     )
 }
-
-private fun editorSessionStoreUnavailable() = IllegalStateException(EDITOR_SESSION_STORE_UNAVAILABLE_MESSAGE)
-
-private fun editorSourceStoreUnavailable() = IllegalStateException(EDITOR_SOURCE_STORE_UNAVAILABLE_MESSAGE)
-
-private const val EDITOR_SESSION_STORE_UNAVAILABLE_MESSAGE =
-    "Encrypted editor sessions are temporarily unavailable"
-
-private const val EDITOR_SOURCE_STORE_UNAVAILABLE_MESSAGE =
-    "Encrypted editor sources are temporarily unavailable"
-
-internal fun MessageDraftAttachmentFfi.editorDigest(): String =
-    editorAttachmentDigest(
-        attachmentId = id,
-        fileName = fileName,
-        mediaType = mediaType,
-        plaintext = plaintext,
-        dim = dim,
-        thumbhash = thumbhash,
-        durationSeconds = durationSeconds,
-        waveformSamples = waveformSamples,
-    )
-
-private fun EditorAttachmentSession.matches(
-    accountRef: String,
-    groupIdHex: String,
-    attachment: MessageDraftAttachmentFfi,
-): Boolean =
-    phase == EditorSessionPhase.Pending &&
-        this.accountRef == accountRef &&
-        this.groupIdHex == groupIdHex &&
-        attachmentId == attachment.id &&
-        attachmentDigest == attachment.editorDigest()

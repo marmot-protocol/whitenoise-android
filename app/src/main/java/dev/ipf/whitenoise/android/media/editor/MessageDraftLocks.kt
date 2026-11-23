@@ -42,10 +42,22 @@ internal class MessageDraftMutationGenerations {
     private val lock = Any()
     private val lifetimes = mutableMapOf<DraftKey, StalenessGuard>()
 
-    /** Accepts a new mutation for [key] and returns its guarded generation. */
-    fun advance(key: DraftKey): MessageDraftGeneration =
+    // The newest generation per key that was not an attachment-only mutation; text accepted before it is stale.
+    private val textFences = mutableMapOf<DraftKey, Long>()
+
+    /**
+     * Accepts a new mutation for [key] and returns its guarded generation. With [fencesText] false, for a mutation that
+     * changes only attachments, it still supersedes send cleanup and hydration captured before it, but text already
+     * accepted stays current and is still written.
+     */
+    fun advance(
+        key: DraftKey,
+        fencesText: Boolean = true,
+    ): MessageDraftGeneration =
         synchronized(lock) {
-            MessageDraftGeneration(lifetime(key).advance())
+            val generation = lifetime(key).advance()
+            if (fencesText) textFences[key] = generation
+            MessageDraftGeneration(generation)
         }
 
     /** Atomically accepts a mutation only while [expected] still owns [key]. */
@@ -54,7 +66,7 @@ internal class MessageDraftMutationGenerations {
         expected: MessageDraftGeneration,
     ): MessageDraftGeneration? =
         synchronized(lock) {
-            lifetime(key).advanceIfCurrent(expected.value)?.let(::MessageDraftGeneration)
+            lifetime(key).advanceIfCurrent(expected.value)?.also { textFences[key] = it }?.let(::MessageDraftGeneration)
         }
 
     /** Captures the mutation generation currently visible for [key]. */
@@ -65,6 +77,18 @@ internal class MessageDraftMutationGenerations {
         key: DraftKey,
         generation: MessageDraftGeneration,
     ): Boolean = synchronized(lock) { lifetime(key).isCurrent(generation.value) }
+
+    /**
+     * Reports whether text accepted at [generation] may still be written: no mutation has landed since it except
+     * attachment-only ones.
+     */
+    fun isTextCurrent(
+        key: DraftKey,
+        generation: MessageDraftGeneration,
+    ): Boolean =
+        synchronized(lock) {
+            generation.value >= (textFences[key] ?: 0L) && generation.value <= lifetime(key).capture()
+        }
 
     /** Returns the single staleness primitive assigned to one draft key. */
     private fun lifetime(key: DraftKey): StalenessGuard = lifetimes.getOrPut(key, ::StalenessGuard)

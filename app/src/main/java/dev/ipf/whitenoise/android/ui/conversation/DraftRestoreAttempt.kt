@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
+import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.media.editor.RevisionedMessageDraft
 import dev.ipf.whitenoise.android.media.editor.hasInlineBody
@@ -12,6 +13,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+
+/** How many times one stored-body read follows a draft that saves keep moving before the restore gives up on it. */
+private const val MAX_DRAFT_REVISION_FOLLOWS = 8
 
 /** Where restored draft bodies are written for the shelf, and the URI the shelf shows each one under. */
 internal interface DraftPresentation {
@@ -54,10 +58,13 @@ internal class DraftRestoreAttempt(
     private val created = mutableListOf<File>()
     private var adopted = false
 
+    // The revision stored bodies are read under: the restore's read, then any newer one a text save moved it to.
+    private var revision: MessageDraftRevisionFfi? = read.revision
+
     /**
      * Gives one restored attachment a shelf file: inline bytes are written out, and a stored body is streamed from
-     * MarmotKit under the read's revision, reusing a file already there with the stored size. Returns null, keeping no
-     * new file, when the body cannot be written.
+     * MarmotKit, reusing a file already there with the stored size. Returns null, keeping no new file, when the body
+     * cannot be written or the shelf cannot be given a URI for it.
      */
     suspend fun materialize(attachment: MessageDraftAttachmentFfi): Uri? {
         val file = presentation.fileFor(attachment) ?: return null
@@ -65,8 +72,12 @@ internal class DraftRestoreAttempt(
         // Owned before any byte is written, so a cancelled write is still cleaned up.
         if (createdHere) synchronized(this) { created += file }
         val ready = if (attachment.hasInlineBody()) writeInline(file, attachment) else writeStored(file, attachment)
-        if (!ready && createdHere) file.delete()
-        return if (ready) presentation.uriFor(file, attachment) else null
+        val uri = if (ready) presentation.uriFor(file, attachment) else null
+        if (uri == null && createdHere) {
+            file.delete()
+            synchronized(this) { created -= file }
+        }
+        return uri
     }
 
     /** Hands every file this attempt created to the composer, which now shows them. */
@@ -98,16 +109,46 @@ internal class DraftRestoreAttempt(
         file: File,
         attachment: MessageDraftAttachmentFfi,
     ): Boolean {
-        val revision = read.revision
         val size = read.fileBacked[attachment.id]?.plaintextSize?.toLong()
         return when {
-            revision == null || size == null -> false
+            read.revision == null || size == null -> false
             file.isFile && file.length() == size -> true
-            else ->
-                replaceWithDraftFileBody(file, size) { offset ->
-                    drafts.files.readChunk(accountRef, revision, attachment.id, offset, DRAFT_FILE_READ_CHUNK_BYTES)
-                }
+            else -> replaceWithDraftFileBody(file, size) { offset -> readStoredChunk(attachment.id, size, offset) }
         }
+    }
+
+    /**
+     * Reads one chunk of a stored body. When a save moved the draft meanwhile, such as typing while a large file
+     * streams back, the chunk is read again under the draft's new revision as long as that draft still holds the same
+     * stored file. Returns null when the draft no longer holds it, or keeps moving after [MAX_DRAFT_REVISION_FOLLOWS]
+     * reads.
+     */
+    @Suppress("ReturnCount", "SwallowedException") // A moved draft is followed, never reported as a failed read.
+    private suspend fun readStoredChunk(
+        attachmentId: String,
+        size: Long,
+        offset: Long,
+    ): ByteArray? {
+        var follows = 0
+        while (true) {
+            val current = revision ?: return null
+            try {
+                return drafts.files.readChunk(accountRef, current, attachmentId, offset, DRAFT_FILE_READ_CHUNK_BYTES)
+            } catch (moved: MarmotKitException.MessageDraftRevisionConflict) {
+                if (follows++ == MAX_DRAFT_REVISION_FOLLOWS) return null
+                revision = revisionStillHolding(attachmentId, size)
+            }
+        }
+    }
+
+    /** The selected draft's revision when it still holds [attachmentId] as a stored file of [size] bytes, else null. */
+    private suspend fun revisionStillHolding(
+        attachmentId: String,
+        size: Long,
+    ): MessageDraftRevisionFfi? {
+        val group = read.draft?.groupIdHex ?: return null
+        val fresh = drafts.files.revisioned(accountRef, group).getOrNull()
+        return fresh?.revision?.takeIf { fresh.fileBacked[attachmentId]?.plaintextSize?.toLong() == size }
     }
 }
 

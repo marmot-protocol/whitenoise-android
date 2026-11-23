@@ -457,7 +457,8 @@ internal class ConversationAttachmentReader(
         pick: String? = null,
         toFile: Boolean = false,
     ): PendingAttachment? =
-        withContext(Dispatchers.Default) {
+        // Copying a large video to a file is I/O-bound, so it runs on the IO pool; an in-memory read stays on Default.
+        withContext(if (toFile) Dispatchers.IO else Dispatchers.Default) {
             val fileBacked = if (toFile) fileBackedBudget() else null
             readVisualAttachment(uri, MEDIA_ALBUM_MAX_TOTAL_BYTES, fileBacked = fileBacked, pick = pick).attachment
         }

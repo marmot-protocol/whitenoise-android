@@ -57,7 +57,7 @@ internal class MessageDraftFiles(
                         return@runDraftMutation MessageDraftMutationResult.DuplicateAttachment
                     }
                     val staged = gateway.stageFile(accountRef, base, request, control)
-                    mutationGenerations.advance(key)
+                    mutationGenerations.advance(key, fencesText = false)
                     MessageDraftMutationResult.Success(stagedDraft(base, staged))
                 }
             }

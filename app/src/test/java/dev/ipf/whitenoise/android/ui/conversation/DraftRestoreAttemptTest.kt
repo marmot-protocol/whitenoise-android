@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -110,8 +111,56 @@ class DraftRestoreAttemptTest {
             assertEquals(0, native.calls.count { it == "readMessageDraftAttachment" })
         }
 
+    /** A text save that moves the draft mid-stream is followed, and the stored body still restores in full. */
+    @Test
+    fun movedDraftIsFollowedMidStream() =
+        runTest {
+            val native = FileBackedDraftNative("caption").apply { holdFile("clip", 3uL, byteArrayOf(1, 2, 3)) }
+            var moved = false
+            native.beforeChunk = { _, offset ->
+                if (offset > 0L && !moved) {
+                    moved = true
+                    native.moveRevision()
+                }
+            }
+            val (attempt, read) = attemptFor(native)
+
+            assertNotNull(attempt.materialize(attachment(read, "clip")))
+
+            assertArrayEquals(byteArrayOf(1, 2, 3), File(folder.root, "clip").readBytes())
+        }
+
+    /** A stored file removed from the draft mid-stream is not restored, and leaves no file behind. */
+    @Test
+    fun fileRemovedMidStreamIsNotRestored() =
+        runTest {
+            val native = FileBackedDraftNative("caption").apply { holdFile("clip", 3uL, byteArrayOf(1, 2, 3)) }
+            native.beforeChunk = { id, offset -> if (offset > 0L) native.dropFile(id) }
+            val (attempt, read) = attemptFor(native)
+
+            assertNull(attempt.materialize(attachment(read, "clip")))
+
+            assertEquals(emptyList<String>(), presentationFiles())
+        }
+
+    /** A file the shelf cannot be given a URI for is deleted, even when the restore is adopted. */
+    @Test
+    fun unlinkableFileIsDeleted() =
+        runTest {
+            val native = FileBackedDraftNative("caption").apply { holdInline("photo", byteArrayOf(7)) }
+            val (attempt, read) = attemptFor(native, linkable = false)
+
+            assertNull(attempt.materialize(attachment(read, "photo")))
+            attempt.adopt()
+
+            assertEquals(emptyList<String>(), presentationFiles())
+        }
+
     /** A restore attempt over [native]'s draft writing into the test folder, with the read it restores from. */
-    private suspend fun TestScope.attemptFor(native: FileBackedDraftNative): RestoreUnderTest {
+    private suspend fun TestScope.attemptFor(
+        native: FileBackedDraftNative,
+        linkable: Boolean = true,
+    ): RestoreUnderTest {
         val drafts =
             MessageDraftRepository(
                 gateway = MarmotMessageDraftGateway { native.marmot },
@@ -119,7 +168,8 @@ class DraftRestoreAttemptTest {
                 ioDispatcher = UnconfinedTestDispatcher(testScheduler),
             )
         val read = drafts.files.revisioned("acct", "group").getOrThrow()
-        return RestoreUnderTest(DraftRestoreAttempt(FolderPresentation(folder.root), drafts, "acct", read), read)
+        val presentation = FolderPresentation(folder.root, linkable)
+        return RestoreUnderTest(DraftRestoreAttempt(presentation, drafts, "acct", read), read)
     }
 
     /** The attachment [id] as the restore read it. */
@@ -142,16 +192,17 @@ private data class RestoreUnderTest(
     val read: RevisionedMessageDraft,
 )
 
-/** Names each presentation file after its attachment id in [directory]. */
+/** Names each presentation file after its attachment id in [directory]; [linkable] false gives no URI. */
 private class FolderPresentation(
     private val directory: File,
+    private val linkable: Boolean,
 ) : DraftPresentation {
     /** The file named after [attachment]'s id. */
     override fun fileFor(attachment: MessageDraftAttachmentFfi): File = File(directory, attachment.id)
 
-    /** A plain file URI for [file]. */
+    /** A plain file URI for [file], or none when the presentation is not linkable. */
     override fun uriFor(
         file: File,
         attachment: MessageDraftAttachmentFfi,
-    ): Uri = Uri.fromFile(file)
+    ): Uri? = if (linkable) Uri.fromFile(file) else null
 }

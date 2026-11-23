@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.SelectedMessageDraftAttachmentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.whitenoise.android.state.nativeBoundary
+import kotlinx.coroutines.CompletableDeferred
 
 /**
  * An in-memory MarmotKit draft store for one chat that follows 0.19.0's rules for stored files: every write is
@@ -37,6 +38,24 @@ internal class FileBackedDraftNative(
 
     /** When set, each chunk read of a stored body first waits on this, so a test can cancel mid-copy. */
     var beforeChunk: (suspend (attachmentId: String, offset: Long) -> Unit)? = null
+
+    /** When set, a stage waits on this before copying, so a test can act while the copy holds the draft's lock. */
+    var stageGate: CompletableDeferred<Unit>? = null
+
+    /** When set, the next input save loses a revision race to another writer, as a send saving its caption would. */
+    var conflictNextSave = false
+
+    /** Moves the draft to a new revision without changing what it holds, as a text save elsewhere would. */
+    fun moveRevision() {
+        revision = newRevision()
+    }
+
+    /** Removes a stored file from the draft and moves its revision, as a removal on another path would. */
+    fun dropFile(id: String) {
+        descriptors.removeAll { it.id == id }
+        fileBodies -= id
+        revision = newRevision()
+    }
 
     /** The ids the draft holds, in order. */
     val attachmentIds: List<String> get() = descriptors.map { it.id }
@@ -130,6 +149,10 @@ internal class FileBackedDraftNative(
             mediaAttachments: List<MessageDraftAttachmentInputFfi>,
         ): SelectedMessageDraftFfi =
             record("saveMessageDraftInputsIfRevision") {
+                if (conflictNextSave) {
+                    conflictNextSave = false
+                    moveRevision()
+                }
                 requireCurrent(revision)
                 save(content, mediaAttachments)
             }
@@ -150,11 +173,13 @@ internal class FileBackedDraftNative(
             revision: MessageDraftRevisionFfi,
             request: MessageDraftAttachmentFileRequestFfi,
             control: MediaFileTransferControlFfi,
-        ): SelectedMessageDraftFfi =
-            record("stageMessageDraftAttachmentFile") {
+        ): SelectedMessageDraftFfi {
+            stageGate?.await()
+            return record("stageMessageDraftAttachmentFile") {
                 requireCurrent(revision)
                 stage(request)
             }
+        }
 
         /** Records [method] before answering it. */
         private inline fun <T> record(
