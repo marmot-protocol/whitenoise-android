@@ -108,6 +108,28 @@ class SelectedPhotoHistoryTest {
             assertAllHandlesClosed(source)
         }
 
+    /** A removal while the found photos are projected reads the history again, so the removed photo is reported. */
+    @Test
+    fun aRemovalWhileProjectingStartsOver() =
+        runTest {
+            val source = GroupAttachmentFixture(rows)
+            val pager = GroupAttachmentPager(source)
+            val selected = tiles(listOf(rows[2], rows[5]))
+            // Version read 1 is the baseline and 2 the recheck after projection, so the removal lands mid-projection.
+            source.beforeVersion = {
+                if (source.versionCalls == 2) {
+                    source.rows = rows - rows[5]
+                    source.removals++
+                }
+            }
+
+            val current = pager.selectedPhotoResolver { ACCOUNT }(selected)
+
+            assertEquals(tiles(listOf(rows[5])), unavailableSelectedPhotos(selected, current))
+            assertEquals(4, source.versionCalls)
+            assertAllHandlesClosed(source)
+        }
+
     /** A new photo between pages keeps the read going, since additions never remove a selected slot. */
     @Test
     fun anAdditionDuringTheReadDoesNotStartOver() =

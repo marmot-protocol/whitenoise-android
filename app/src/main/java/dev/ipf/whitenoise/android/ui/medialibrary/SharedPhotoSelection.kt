@@ -97,13 +97,17 @@ internal typealias SelectedPhotoResolver = suspend (List<SharedMediaTile>) -> Li
 /**
  * Resolves selected photos from MDK's attachment history, not from the rows the gallery shows: a refresh empties those
  * while it reloads and a restart keeps only the first page, so a present photo would look removed. Slots MDK no longer
- * lists are simply absent from the result, which the availability check then reports.
+ * lists are simply absent from the result, which the availability check then reports. The tiles are projected while
+ * the read's version is held, and a removal during that projection reads the history again, so the final check before
+ * the share sheet never returns a photo deleted after its page was read.
  */
 internal fun GroupAttachmentPager.selectedPhotoResolver(accountId: () -> String?): SelectedPhotoResolver =
     { photos ->
-        val entries = entriesFor(photos.mapTo(mutableSetOf()) { it.messageIdHex to it.attachmentIndex.toUInt() })
-        val account = accountId()
-        withContext(Dispatchers.Default) { attachmentLibraryTiles(entries, account).visuals }
+        val slots = photos.mapTo(mutableSetOf()) { it.messageIdHex to it.attachmentIndex.toUInt() }
+        projectSlots(slots) { entries ->
+            val account = accountId()
+            withContext(Dispatchers.Default) { attachmentLibraryTiles(entries, account).visuals }
+        }
     }
 
 /**

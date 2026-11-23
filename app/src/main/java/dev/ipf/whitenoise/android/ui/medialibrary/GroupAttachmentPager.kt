@@ -97,12 +97,17 @@ internal class GroupAttachmentPager(
 
     /**
      * Reads [slots] from MDK's attachment history with this owner's reader but none of its rows or cursor, which a
-     * refresh empties and a restart cuts to the first page. Stops at the page that completes the set. A removal
-     * restarts the read once from the head, since a slot can only vanish then; a history that keeps changing fails
-     * rather than reporting present slots as gone. Additions never remove a slot, so they don't restart it.
+     * refresh empties and a restart cuts to the first page, and returns [project] of the entries found. Stops at the
+     * page that completes the set. The read's version is held through [project] and compared again afterwards, so a
+     * removal during the projection counts like one between pages: it restarts the read once from the head, and a
+     * history that keeps changing fails rather than returning a slot that is gone. Additions never remove a slot, so
+     * they don't restart it.
      */
-    internal suspend fun entriesFor(slots: Set<Pair<String, UInt>>): List<AttachmentEntryFfi> {
-        repeat(SLOT_READ_ATTEMPTS) { reader.readSlots(slots, ::checkCurrent)?.let { return it } }
+    internal suspend fun <T : Any> projectSlots(
+        slots: Set<Pair<String, UInt>>,
+        project: suspend (List<AttachmentEntryFfi>) -> T,
+    ): T {
+        repeat(SLOT_READ_ATTEMPTS) { reader.readSlots(slots, ::checkCurrent, project)?.let { return it } }
         throw IOException("Attachment history changed during the slot read")
     }
 
@@ -244,13 +249,14 @@ private sealed interface SlotRead {
 }
 
 /**
- * One stable-generation read of [slots] from the head, or null when a removal invalidated it. Every cursor and
- * version handle it receives is closed before it returns.
+ * One stable-generation read of [slots] from the head, projected while its version is still held, or null when a
+ * removal invalidated it. Every cursor and version handle it receives is closed before it returns.
  */
-private suspend fun GroupAttachmentReader.readSlots(
+private suspend fun <T : Any> GroupAttachmentReader.readSlots(
     slots: Set<Pair<String, UInt>>,
     checkCurrent: suspend () -> Unit,
-): List<AttachmentEntryFfi>? {
+    project: suspend (List<AttachmentEntryFfi>) -> T,
+): T? {
     checkCurrent()
     val baseline = version()
     val found = mutableMapOf<Pair<String, UInt>, AttachmentEntryFfi>()
@@ -273,7 +279,7 @@ private suspend fun GroupAttachmentReader.readSlots(
                 }
             when (step) {
                 SlotRead.Restart -> return null
-                SlotRead.Done -> return found.values.toList()
+                SlotRead.Done -> return projectUnchanged(found.values.toList(), baseline, checkCurrent, project)
                 is SlotRead.More -> cursor = step.cursor
             }
         }
@@ -281,6 +287,19 @@ private suspend fun GroupAttachmentReader.readSlots(
         cursor?.close()
         baseline.close()
     }
+}
+
+/** [project] of [entries], or null when a removal landed after [baseline] while it ran or the history was read. */
+private suspend fun <T : Any> GroupAttachmentReader.projectUnchanged(
+    entries: List<AttachmentEntryFfi>,
+    baseline: AttachmentHistoryVersion,
+    checkCurrent: suspend () -> Unit,
+    project: suspend (List<AttachmentEntryFfi>) -> T,
+): T? {
+    val projected = project(entries)
+    val change = version().use { it.changeSince(baseline) }
+    checkCurrent()
+    return projected.takeIf { change != AttachmentHistoryChangeFfi.RESTART_REQUIRED }
 }
 
 /** Adds this page's [slots] to [found]; only a returned [SlotRead.More] keeps the page's next cursor open. */
