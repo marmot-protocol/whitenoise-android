@@ -158,7 +158,7 @@ class NotificationsScreenScreenshotTest {
         if (scrollToToneScope) {
             composeRule
                 .onNode(hasScrollToNodeAction())
-                .performScrollToNode(hasText(app.getString(R.string.notification_tone_scope)))
+                .performScrollToNode(hasText(app.getString(R.string.notification_tones)))
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }

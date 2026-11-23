@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">White Noise’u keşfet</string>
+    <string name="user_documentation">Belgeler</string>
+    <string name="search_documentation">Belgelerde ara</string>
+    <string name="documentation_unavailable">Uygulamayla gelen kılavuzlar açılamadı.</string>
+    <string name="help_open_share_connect">Paylaş ve bağlan ekranını aç</string>
+    <string name="learn_find_title">Birini bul</string>
+    <string name="learn_find_body">Yeni bir sohbet açıp profil bağlantısını yapıştır veya QR kodunu tara. Adla arama sonuç vermezse profil bağlantısını iste.</string>
+    <string name="learn_share_title">Profilini paylaş</string>
+    <string name="learn_share_body">QR kodunu göstermek veya profil bağlantını paylaşmak için Paylaş ve bağlan ekranını aç. Özel giriş anahtarını kimseyle paylaşma.</string>
+    <string name="learn_actions_title">Yanıtla veya tepki ver</string>
+    <string name="learn_actions_body">Mesaj işlemlerini görmek için mesaja basılı tut. Bu örnekte dene.</string>
+    <string name="learn_example_message">Yarın görüşürüz!</string>
+    <string name="learn_show_actions">Mesaj işlemlerini göster</string>
+    <string name="learn_actions_explanation">Mesajı alıntılamak için Yanıtla’yı seç veya tepki vermek için bir emoji seç.</string>
+    <string name="learn_page_number">%1$d / %2$d</string>
+    <string name="learn_previous">Önceki</string>
+    <string name="learn_next">Sonraki</string>
+    <string name="learn_close">Kapat</string>
+    <string name="learn_view_topics">Tüm konuları göster</string>
+</resources>

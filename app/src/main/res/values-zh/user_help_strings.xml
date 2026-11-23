@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">了解 White Noise</string>
+    <string name="user_documentation">文档</string>
+    <string name="search_documentation">搜索文档</string>
+    <string name="documentation_unavailable">无法打开内置指南。</string>
+    <string name="help_open_share_connect">打开“分享与连接”</string>
+    <string name="learn_find_title">查找联系人</string>
+    <string name="learn_find_body">打开新聊天，粘贴对方的个人资料链接或扫描二维码。如果按姓名找不到，请向对方索要链接。</string>
+    <string name="learn_share_title">分享你的个人资料</string>
+    <string name="learn_share_body">打开“分享与连接”以展示二维码或分享个人资料链接。请妥善保管你的私钥。</string>
+    <string name="learn_actions_title">回复或添加表情回应</string>
+    <string name="learn_actions_body">长按消息即可查看操作。用这条示例消息试试。</string>
+    <string name="learn_example_message">明天见！</string>
+    <string name="learn_show_actions">显示消息操作</string>
+    <string name="learn_actions_explanation">选择“回复”可引用消息，也可以选择一个表情来回应。</string>
+    <string name="learn_page_number">第 %1$d 页，共 %2$d 页</string>
+    <string name="learn_previous">上一页</string>
+    <string name="learn_next">下一页</string>
+    <string name="learn_close">关闭</string>
+    <string name="learn_view_topics">查看所有主题</string>
+</resources>

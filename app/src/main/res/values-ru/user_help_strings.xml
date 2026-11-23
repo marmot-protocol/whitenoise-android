@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">Знакомство с White Noise</string>
+    <string name="user_documentation">Документация</string>
+    <string name="search_documentation">Поиск в документации</string>
+    <string name="documentation_unavailable">Не удалось открыть встроенные руководства.</string>
+    <string name="help_open_share_connect">Открыть «Поделиться и связаться»</string>
+    <string name="learn_find_title">Найти человека</string>
+    <string name="learn_find_body">Откройте новый чат и вставьте ссылку на профиль или отсканируйте QR-код. Если поиск по имени не дал результатов, попросите ссылку на профиль.</string>
+    <string name="learn_share_title">Поделиться профилем</string>
+    <string name="learn_share_body">Откройте «Поделиться и связаться», чтобы показать QR-код или отправить ссылку на профиль. Храните закрытый ключ в секрете.</string>
+    <string name="learn_actions_title">Ответить или отреагировать</string>
+    <string name="learn_actions_body">Нажмите и удерживайте сообщение, чтобы увидеть доступные действия. Попробуйте на этом примере.</string>
+    <string name="learn_example_message">До завтра!</string>
+    <string name="learn_show_actions">Показать действия с сообщением</string>
+    <string name="learn_actions_explanation">Выберите «Ответить», чтобы процитировать сообщение, или выберите эмодзи, чтобы отреагировать.</string>
+    <string name="learn_page_number">%1$d из %2$d</string>
+    <string name="learn_previous">Назад</string>
+    <string name="learn_next">Далее</string>
+    <string name="learn_close">Закрыть</string>
+    <string name="learn_view_topics">Все темы</string>
+</resources>

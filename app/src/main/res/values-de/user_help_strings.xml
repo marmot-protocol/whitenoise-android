@@ -1,0 +1,21 @@
+<resources>
+    <string name="learn_white_noise">White Noise kennenlernen</string>
+    <string name="user_documentation">Dokumentation</string>
+    <string name="search_documentation">Dokumentation durchsuchen</string>
+    <string name="documentation_unavailable">Die mitgelieferten Anleitungen konnten nicht geöffnet werden.</string>
+    <string name="help_open_share_connect">Teilen &amp; verbinden öffnen</string>
+    <string name="learn_find_title">Eine Person finden</string>
+    <string name="learn_find_body">Öffne einen neuen Chat und füge den Profillink ein oder scanne den QR-Code. Wenn die Namenssuche nichts findet, bitte um den Profillink.</string>
+    <string name="learn_share_title">Dein Profil teilen</string>
+    <string name="learn_share_body">Öffne Teilen &amp; verbinden, um deinen QR-Code oder Profillink zu teilen. Behalte deinen privaten Anmeldeschlüssel für dich.</string>
+    <string name="learn_actions_title">Antworten oder reagieren</string>
+    <string name="learn_actions_body">Halte eine Nachricht gedrückt, um ihre Aktionen zu sehen. Probiere es an diesem Beispiel aus.</string>
+    <string name="learn_example_message">Bis morgen!</string>
+    <string name="learn_show_actions">Nachrichtenaktionen anzeigen</string>
+    <string name="learn_actions_explanation">Mit Antworten zitierst du die Nachricht in deiner Antwort. Wähle ein Emoji, um zu reagieren.</string>
+    <string name="learn_page_number">%1$d von %2$d</string>
+    <string name="learn_previous">Zurück</string>
+    <string name="learn_next">Weiter</string>
+    <string name="learn_close">Schließen</string>
+    <string name="learn_view_topics">Alle Themen anzeigen</string>
+</resources>

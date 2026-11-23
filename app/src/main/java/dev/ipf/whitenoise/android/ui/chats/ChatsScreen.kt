@@ -2818,8 +2818,11 @@ internal fun ChatsScreen(
                                     onCreate = openNewMessageFlow,
                                     onFirstRunHelp =
                                         onFirstRunHelp.takeIf {
-                                            controller.error == null && controller.archivedItems.isEmpty() &&
-                                                selectedFolderId == null && !searchOpen && !searchActive
+                                            controller.error == null &&
+                                                controller.archivedItems.isEmpty() &&
+                                                selectedFolderId == null &&
+                                                !searchOpen &&
+                                                !searchActive
                                         },
                                 ) { newChatFlowOrigin = it }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
