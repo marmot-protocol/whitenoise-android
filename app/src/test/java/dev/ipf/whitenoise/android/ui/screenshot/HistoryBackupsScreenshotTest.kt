@@ -181,14 +181,7 @@ class HistoryBackupsScreenshotTest {
         button.assertIsNotEnabled()
         tester.emulateSavedInstanceStateRestore()
         compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.restore"))
-        assertFalse(
-            compose
-                .onNodeWithTag("history_backups.restore_words")
-                .fetchSemanticsNode()
-                .config
-                .toString()
-                .contains("alpha"),
-        )
+        assertFalse(restoreFieldContains("alpha"))
         val fixture = setup().words.joinToString(" ")
         compose.onNodeWithTag("history_backups.restore_words").performTextInput(fixture)
         button.performClick()
@@ -197,14 +190,7 @@ class HistoryBackupsScreenshotTest {
         val error = ApplicationProvider.getApplicationContext<android.app.Application>()
             .getString(R.string.history_backups_problem_restore_words)
         compose.onNodeWithText(error).assertIsDisplayed()
-        assertTrue(
-            compose
-                .onNodeWithTag("history_backups.restore_words")
-                .fetchSemanticsNode()
-                .config
-                .toString()
-                .contains("orbit"),
-        )
+        assertTrue(restoreFieldContains("orbit"))
         button.performClick()
         compose.runOnIdle {
             state.value = state.value.copy(problem = null, restore = progress(BackupRestorePhaseFfi.RESTORING, 0))
@@ -214,15 +200,16 @@ class HistoryBackupsScreenshotTest {
             state.value = state.value.copy(restore = progress(BackupRestorePhaseFfi.COMPLETE, 1))
         }
         compose.onNodeWithTag("history_backups.list").performScrollToNode(hasTestTag("history_backups.restore"))
-        assertFalse(
-            compose
-                .onNodeWithTag("history_backups.restore_words")
-                .fetchSemanticsNode()
-                .config
-                .toString()
-                .contains("orbit"),
-        )
+        assertFalse(restoreFieldContains("orbit"))
     }
+
+    private fun restoreFieldContains(word: String): Boolean =
+        compose
+            .onNodeWithTag("history_backups.restore_words")
+            .fetchSemanticsNode()
+            .config
+            .toString()
+            .contains(word)
 
     /** Renders [state] in the requested theme and direction, scrolls to [scrollTo], and records [name]. */
     private fun capture(
