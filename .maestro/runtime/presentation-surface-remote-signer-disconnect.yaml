@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-remote-signer-disconnect
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: "Disconnect the signer\\?"
+- assertVisible:
+    id: confirmation.confirm
+- tapOn:
+    id: confirmation.cancel
+- assertVisible:
+    id: presentation.complete
