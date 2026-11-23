@@ -49,8 +49,7 @@ class ComposerCustomEmojiScreenshotTest {
     fun composerCustomEmojiDark() = capture(darkTheme = true, largeRtl = false, "composer_custom_emoji_dark.png")
 
     @Test
-    fun composerCustomEmojiLargeRtl() =
-        capture(darkTheme = false, largeRtl = true, "composer_custom_emoji_large_rtl.png")
+    fun composerCustomEmojiLargeRtl() = capture(darkTheme = false, largeRtl = true, "composer_custom_emoji_large_rtl.png")
 
     private fun capture(
         darkTheme: Boolean,

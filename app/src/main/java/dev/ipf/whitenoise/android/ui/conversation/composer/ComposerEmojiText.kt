@@ -44,8 +44,7 @@ private data class VisibleRun(
 )
 
 /** Shortcodes the composer sends as emoji: bundled marmots plus the user's sendable, installed and chat sets. */
-internal fun composerEmojiShortcodes(library: CustomEmojiSet): Set<String> =
-    (EmojiShortcodes.builtins + library.composerShortcodes).toSet()
+internal fun composerEmojiShortcodes(library: CustomEmojiSet): Set<String> = (EmojiShortcodes.builtins + library.composerShortcodes).toSet()
 
 /** Nonliteral occurrences of [shortcodes] in the stored draft, in text order. */
 internal fun composerEmojiRanges(
