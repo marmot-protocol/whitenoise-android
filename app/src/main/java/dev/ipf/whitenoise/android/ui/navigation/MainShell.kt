@@ -1836,8 +1836,7 @@ internal fun MainShell(
                                 },
                                 onFirstRunHelp = { support ->
                                     sectionName = MainSection.Settings.name
-                                    settingsDetailName =
-                                        (if (support) SettingsDetail.Support else SettingsDetail.LearnWhiteNoise).name
+                                    settingsDetailName = firstRunHelpDetail(support).name
                                 },
                                 onOpenSettings = {
                                     pendingConversationOpen = null

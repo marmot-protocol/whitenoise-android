@@ -7163,7 +7163,7 @@
         {
           "case": "settings-help-support",
           "selector": {
-            "text": "Find someone"
+            "text": "Share your profile"
           },
           "scope": "Help hub navigation to the first visible control.",
           "opened_by": {

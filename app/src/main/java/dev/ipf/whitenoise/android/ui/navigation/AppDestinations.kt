@@ -52,3 +52,6 @@ internal enum class SettingsDetail {
     NotificationSounds,
     NotificationDelivery,
 }
+
+internal fun firstRunHelpDetail(support: Boolean): SettingsDetail =
+    if (support) SettingsDetail.Support else SettingsDetail.LearnWhiteNoise

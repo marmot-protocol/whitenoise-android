@@ -53,7 +53,12 @@ private enum class LearnTopic(
 ) {
     Invite(R.string.learn_share_title, R.string.learn_share_body, R.drawable.learn_share, R.string.learn_find_title),
     Connect(R.string.learn_find_title, R.string.learn_find_body, R.drawable.learn_connect, R.string.learn_group_title),
-    Groups(R.string.learn_group_title, R.string.learn_group_body, R.drawable.learn_groups, R.string.learn_actions_title),
+    Groups(
+        R.string.learn_group_title,
+        R.string.learn_group_body,
+        R.drawable.learn_groups,
+        R.string.learn_actions_title,
+    ),
     Actions(R.string.learn_actions_title, R.string.learn_actions_body, R.drawable.learn_actions, R.string.done),
 }
 
@@ -91,7 +96,8 @@ internal fun LearnWhiteNoiseScreen(
     }
 }
 
-private val LightBackgroundArtwork = ColorFilter.colorMatrix(ColorMatrix().apply { setToScale(0.52f, 0.52f, 0.52f, 1f) })
+private val LightBackgroundArtwork =
+    ColorFilter.colorMatrix(ColorMatrix().apply { setToScale(0.52f, 0.52f, 0.52f, 1f) })
 
 @Suppress("FunctionNaming")
 @Composable
@@ -100,15 +106,19 @@ private fun LearnTopicPage(
     onShareProfile: () -> Unit,
     onContinue: () -> Unit,
 ) {
+    val lightBackground = MaterialTheme.colorScheme.surfaceContainerLow.luminance() > 0.5f
     Column(
-        Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp),
+        Modifier
+            .fillMaxWidth()
+            .fadingVerticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Image(
             painter = painterResource(topic.artwork),
             contentDescription = null,
             modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
-            colorFilter = if (MaterialTheme.colorScheme.surfaceContainerLow.luminance() > 0.5f) LightBackgroundArtwork else null,
+            colorFilter = if (lightBackground) LightBackgroundArtwork else null,
         )
         Text(
             stringResource(topic.title),
@@ -127,7 +137,8 @@ private fun LearnTopicPage(
         ) {
             LearnTopic.entries.forEach { item ->
                 val color = if (item == topic) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                Box(Modifier.size(width = if (item == topic) 16.dp else 6.dp, height = 6.dp).background(color, CircleShape))
+                val width = if (item == topic) 16.dp else 6.dp
+                Box(Modifier.size(width = width, height = 6.dp).background(color, CircleShape))
             }
         }
         if (topic == LearnTopic.Invite) {
