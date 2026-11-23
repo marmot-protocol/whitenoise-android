@@ -148,13 +148,14 @@ class NewGroupScreenshotTest {
                         when {
                             empty -> emptyList()
                             addressFailed -> people().take(1).map { it.copy(subtitle = "Address not verified") }
-                            expandKey -> people().mapIndexed { index, person ->
-                                if (index == 0) {
-                                    person.copy(candidate = person.candidate.copy(npub = npub), subtitle = shortKey)
-                                } else {
-                                    person
+                            expandKey ->
+                                people().mapIndexed { index, person ->
+                                    if (index == 0) {
+                                        person.copy(candidate = person.candidate.copy(npub = npub), subtitle = shortKey)
+                                    } else {
+                                        person
+                                    }
                                 }
-                            }
                             else -> people()
                         },
                         if (selected) people().take(2) else emptyList(),
