@@ -173,7 +173,7 @@ internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(notice: GroupChang
         else -> {
             showingGroupChangeNotices += showing
             try {
-                showUntilSeen(notice).also { seen ->
+                showUntilSeen(notice, showing).also { seen ->
                     if (seen) shownGroupChangeNotices.firstShowing(notice.accountRef, notice.changeIdHex)
                 }
             } finally {
@@ -184,14 +184,18 @@ internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(notice: GroupChang
 }
 
 /**
- * Presents [notice], titled with the chat's name when the chat list knows it, and waits until its own snackbar retires
- * it. The toast has one slot, so a toast that replaces it first is waited out and the notice presented again. Returns
- * false once its account is no longer active before it is seen.
+ * Presents [notice], titled with the chat's name when the chat list knows it and tagged with its [showing] key, and
+ * waits until its own snackbar retires it. The toast has one slot, so a toast that replaces it first is waited out and
+ * the notice presented again. Returns false once its account is no longer active before it is seen.
  */
-private suspend fun WhiteNoiseAppState.showUntilSeen(notice: GroupChangeNotice): Boolean {
+private suspend fun WhiteNoiseAppState.showUntilSeen(
+    notice: GroupChangeNotice,
+    showing: String,
+): Boolean {
     val (title, detail) = groupChangeToast(chatTitle(notice.accountRef, notice.groupIdHex), notice)
     while (activeAccountRef == notice.accountRef) {
-        presentText(title, detail)
+        // Tagged with the change, so another change's notice with the same wording still replaces this one.
+        presentText(ToastMessage(title, detail, groupChangeKey = showing))
         val shown = toast
         if (snapshotFlow { toast }.first { it !== shown } == null) return true
         snapshotFlow { toast }.first { it == null }

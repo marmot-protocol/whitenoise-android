@@ -176,6 +176,26 @@ class GroupChangeNoticeTest {
             assertTrue(seen.await())
         }
 
+    /** Two changes whose notices read the same each get their own snackbar before either is acknowledged. */
+    @Test
+    fun twoChangesWithTheSameWordingAreEachSeen() =
+        runBlocking {
+            val state = appState(active = ACCOUNT)
+            val first = groupChangeNotice(notDelivered("invite", "refused"))!!
+            val second = first.copy(changeIdHex = "12".repeat(32), commitIdHex = "12".repeat(32))
+            val firstSeen = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(first) }
+            val secondSeen = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(second) }
+            Snapshot.sendApplyNotifications()
+            repeat(SETTLE_YIELDS) { yield() }
+            assertEquals("$ACCOUNT|${"12".repeat(32)}", state.toast?.groupChangeKey)
+            retireToast(state)
+            assertTrue(secondSeen.await())
+            assertFalse(firstSeen.isCompleted)
+            assertEquals("$ACCOUNT|$COMMIT", state.toast?.groupChangeKey)
+            retireToast(state)
+            assertTrue(firstSeen.await())
+        }
+
     /**
      * A change MDK reports again while its notice is showing is left to that notice; once seen, it returns at once so a
      * failed acknowledgement can be retried, without showing again. A different change still shows.
