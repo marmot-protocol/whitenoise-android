@@ -45,10 +45,11 @@ private data class StoredThumbnail(
 )
 
 /**
- * A photo or video row's thumbnail. A decode this session already made shows at once; otherwise the row looks up the
- * attachment's message reference, paints its thumbhash, and then decodes the copy on this device in the isolated media
- * decoder: a photo within the presentation budget from its bytes, a video from the app's cached file when there is
- * one. Nothing is downloaded, and a result for another account is never drawn. Null keeps the kind glyph.
+ * A photo or video row's thumbnail. A decode this session already made, here or in the chat, shows at once; otherwise
+ * the row looks up the attachment's message reference, paints its thumbhash, and then decodes the copy on this device
+ * in the isolated media decoder: a photo within the presentation budget from its bytes, a video from the app's cached
+ * file when there is one. Nothing is downloaded, and a result for another account is never drawn. Null keeps the kind
+ * glyph.
  */
 @Composable
 internal fun rememberStoredAttachmentThumbnail(
@@ -80,6 +81,9 @@ internal fun rememberStoredAttachmentThumbnail(
                     decodeStoredThumbnail(appState, context, account, attachment, reference, video)
                 }.getOrNull()
             bitmap?.takeIf { current() }?.let {
+                // Cached with its edge, so a row scrolled back skips the scan and decode, and a larger request
+                // elsewhere still decodes its own.
+                appState.cacheMediaThumbnail(key, it, STORED_THUMBNAIL_EDGE_PX)
                 value = value.copy(bitmap = it.asImageBitmap())
             }
         }

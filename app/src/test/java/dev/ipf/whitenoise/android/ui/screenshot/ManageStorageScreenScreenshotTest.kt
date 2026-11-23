@@ -104,6 +104,16 @@ class ManageStorageScreenScreenshotTest {
     @Test
     fun chatAttachmentsDark() = attachments("manage_storage_chat_dark", groupIdHex = DESIGN, darkTheme = true)
 
+    /**
+     * One chat's list right to left at double text size, with a long name, a right-to-left name and an untranslated
+     * size line, so name isolation, the middle ellipsis and the Remove all subtitle keep their order.
+     */
+    @Test
+    fun chatAttachmentsRtlLargeFont() {
+        val rows = RtlRows + LargestRows.filter { it.groupIdHex == DESIGN }
+        attachments("manage_storage_chat_rtl_large_font", DESIGN, darkTheme = false, rows, fontScale = 2f, rtl = true)
+    }
+
     /** Records the overview for [state]. */
     @Suppress("LongParameterList")
     private fun overview(
@@ -125,13 +135,16 @@ class ManageStorageScreenScreenshotTest {
     }
 
     /** Records an attachment list, account-wide when [groupIdHex] is null, with two rows selected. */
+    @Suppress("LongParameterList")
     private fun attachments(
         name: String,
         groupIdHex: String?,
         darkTheme: Boolean,
+        rows: List<StoredAttachment> = LargestRows.filter { groupIdHex == null || it.groupIdHex == groupIdHex },
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
     ) {
         val appState = testAppState(name)
-        val rows = if (groupIdHex == null) LargestRows else LargestRows.filter { it.groupIdHex == groupIdHex }
         val list =
             StoredAttachmentsUiState(
                 items = rows,
@@ -139,7 +152,7 @@ class ManageStorageScreenScreenshotTest {
                 selected = if (groupIdHex == null) rows.take(2).mapTo(HashSet()) { it.key } else emptySet(),
             )
         seedThumbnails(appState, rows)
-        render(darkTheme) {
+        render(darkTheme, fontScale = fontScale, rtl = rtl) {
             StoredAttachmentsContent(
                 appState = appState,
                 storage = Populated,
@@ -272,6 +285,12 @@ class ManageStorageScreenScreenshotTest {
                 stored(ANA, "m4", 12 * MB, "image/jpeg", "IMG_2041.jpg", OCT_30_2026),
                 stored(DESIGN, "m5", 3 * MB, "audio/ogg", "voice-note.ogg", 0),
             )
+
+        /** A right-to-left name in the design chat, "third quarter report.pdf" in Arabic. */
+        const val ARABIC_REPORT =
+            "\u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u0631\u0628\u0639 " +
+                "\u0627\u0644\u062B\u0627\u0644\u062B.pdf"
+        val RtlRows = listOf(stored(DESIGN, "m6", 2 * MB, "application/pdf", ARABIC_REPORT, JAN_20_2026))
 
         /** A retained attachment named [fileName] and received at [receivedAt], zero when unknown. */
         @Suppress("LongParameterList")

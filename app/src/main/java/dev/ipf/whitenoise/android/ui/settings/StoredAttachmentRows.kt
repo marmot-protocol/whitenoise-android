@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextOverflow.Companion.MiddleEllipsis
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StoredAttachment
@@ -169,16 +170,37 @@ private fun StoredAttachmentRow(
         colors = storedAttachmentRowColors(context, selected),
         content = {
             Text(
-                // Isolated and laid out by its own direction, so a name in another script cannot reorder the row.
-                text = name?.let { "\u2068$it\u2069" } ?: kindLabel,
+                // Its own paragraph, laid out by the name's direction, so a name in another script cannot reorder the
+                // row; the sanitized name holds no direction controls.
+                text = name ?: kindLabel,
                 color = MaterialTheme.colorScheme.onSurface.dimmedUnless(enabled),
                 style = LocalTextStyle.current.copy(textDirection = TextDirection.Content),
                 maxLines = 1,
-                overflow = TextOverflow.MiddleEllipsis,
+                // The middle ellipsis keeps a name's extension, but Compose clips the run it keeps at the far end of a
+                // right-to-left name, so such a name ellipsizes at its end instead.
+                overflow = if (name?.startsRightToLeft() == true) TextOverflow.Ellipsis else MiddleEllipsis,
             )
         },
     )
 }
+
+/** Whether the first letter with a direction reads right to left, as the paragraph laying out the name decides. */
+private fun String.startsRightToLeft(): Boolean {
+    val strong =
+        codePoints()
+            .map { Character.getDirectionality(it).toInt() }
+            .filter { it in StrongDirections }
+            .findFirst()
+    return strong.isPresent && strong.asInt != Character.DIRECTIONALITY_LEFT_TO_RIGHT.toInt()
+}
+
+/** Bidirectional classes that set a paragraph's direction. */
+private val StrongDirections =
+    setOf(
+        Character.DIRECTIONALITY_LEFT_TO_RIGHT.toInt(),
+        Character.DIRECTIONALITY_RIGHT_TO_LEFT.toInt(),
+        Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC.toInt(),
+    )
 
 /** The row's check mark: a full-size checkbox target of its own, so selecting never opens the attachment. */
 @Composable

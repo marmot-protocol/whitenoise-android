@@ -22,6 +22,15 @@ class StorageUsagePresentationTest {
         assertEquals("tag.pdf", storageDisplayName("tag\uDB40\uDC20.pdf"))
     }
 
+    /** Zero-width joiners stay, since emoji sequences and Persian or Indic names shape with them. */
+    @Test fun joinersAreKept() {
+        val emoji = "\uD83D\uDC69\u200D\uD83D\uDCBB notes.pdf"
+        val persian = "\u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645.pdf"
+        assertEquals(emoji, storageDisplayName(emoji))
+        assertEquals(persian, storageDisplayName(persian))
+        assertNull(storageDisplayName("\u200D\u200C"))
+    }
+
     /** Nothing readable left falls back to the attachment's kind. */
     @Test fun blankNamesAreNull() {
         assertNull(storageDisplayName(""))

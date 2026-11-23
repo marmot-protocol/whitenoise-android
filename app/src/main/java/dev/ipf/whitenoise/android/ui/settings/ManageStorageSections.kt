@@ -125,7 +125,7 @@ internal fun LazyListScope.storageFreeUpItems(
                 SettingsLink(
                     context = context,
                     title = stringResource(R.string.storage_clear_cache),
-                    subtitle = cacheBytes?.let { stringResource(R.string.storage_size_detail, it, help) } ?: help,
+                    subtitle = cacheBytes?.let { storageSizeDetail(it, help) } ?: help,
                     onClick = { dialogs.clearCache.value = true },
                     enabled = ready && (usage?.clearableCacheBytes ?: 0) > 0,
                     busy = state.action == StorageAction.ClearCaches,

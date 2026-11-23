@@ -38,8 +38,18 @@ internal fun storageCountAndSize(
 ): String {
     val quantity = count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     val attachments = pluralStringResource(R.plurals.storage_attachment_count, quantity, count)
-    return stringResource(R.string.storage_size_detail, storageBytes(bytes), attachments)
+    return storageSizeDetail(storageBytes(bytes), attachments)
 }
+
+/**
+ * "150 MB · [detail]", isolated as a whole so the paragraph takes its direction from the detail's words rather than
+ * the leading size: an untranslated sentence in a right-to-left layout keeps its size in front instead of splitting.
+ */
+@Composable
+internal fun storageSizeDetail(
+    size: String,
+    detail: String,
+): String = "\u2068${stringResource(R.string.storage_size_detail, size, detail)}\u2069"
 
 /** The picker label for a Keep media window, written so it also reads inside a sentence. */
 internal val KeepMediaPeriod.labelRes: Int
@@ -132,16 +142,18 @@ internal fun storageDisplayName(raw: String): String? {
 }
 
 /**
- * Keeps the code points of [segment] that draw: controls become spaces, format, unassigned and default-ignorable
- * points go, and runs of spaces collapse. Whole code points are filtered, so a supplementary format character such as
- * a Unicode tag cannot slip through as a surrogate pair.
+ * Keeps the code points of [segment] a name needs: controls become spaces; format characters other than the zero-width
+ * joiners that Persian, Indic scripts and emoji sequences shape with, unassigned points and blank Hangul fillers go;
+ * runs of spaces collapse. Whole code points are filtered, so a supplementary format character such as a Unicode tag
+ * cannot slip through as a surrogate pair.
  */
 private fun storageNameCodePoints(segment: String): String =
     buildString {
         segment.codePoints().forEach { point ->
             when {
                 Character.isISOControl(point) -> append(' ')
-                Character.getType(point) in StorageNameDroppedTypes || point.isDefaultIgnorable() -> Unit
+                point in StorageNameJoiners -> appendCodePoint(point)
+                Character.getType(point) in StorageNameDroppedTypes || point in StorageNameFillers -> Unit
                 else -> appendCodePoint(point)
             }
         }
@@ -160,21 +172,29 @@ private fun boundedStorageName(name: String): String {
 private val StorageNameDroppedTypes =
     setOf(Character.FORMAT.toInt(), Character.UNASSIGNED.toInt(), Character.SURROGATE.toInt())
 
-/** Default-ignorable code points outside the format category that draw as nothing: fillers and variation selectors. */
+/** Zero-width non-joiner and joiner, kept because they change how neighbouring letters and emoji join. */
+@Suppress("MagicNumber") // Unicode code points.
+private val StorageNameJoiners = setOf(0x200C, 0x200D)
+
+/** Hangul fillers, letters that draw as blank space and could pad a name out of sight. */
+@Suppress("MagicNumber") // Unicode code points.
+private val StorageNameFillers = setOf(0x115F, 0x1160, 0x3164, 0xFFA0)
+
+/**
+ * Default-ignorable code points and blank cells that draw nothing on their own: they may stay inside a name, but a name
+ * made only of them has nothing to read.
+ */
 @Suppress("MagicNumber") // Unicode code points, named by the property they share.
-private val StorageNameIgnorables =
+private val StorageNameInvisibles =
     listOf(
         0x034F..0x034F,
-        0x115F..0x1160,
         0x17B4..0x17B5,
         0x180B..0x180F,
-        0x3164..0x3164,
+        0x200C..0x200D,
+        0x2800..0x2800,
         0xFE00..0xFE0F,
-        0xFFA0..0xFFA0,
         0xE0100..0xE01EF,
     )
-
-private fun Int.isDefaultIgnorable(): Boolean = StorageNameIgnorables.any { this in it }
 
 /** Marks that only decorate their neighbour, so a name made of them alone draws nothing. */
 private val StorageNameMarkTypes =
@@ -184,11 +204,8 @@ private val StorageNameMarkTypes =
         Character.COMBINING_SPACING_MARK.toInt(),
     )
 
-/** A character that draws on its own: not a space, a blank Braille cell or a mark. */
+/** A character that draws on its own: not a space, a mark or an invisible code point. */
 private fun Int.isVisibleNameCharacter(): Boolean {
     val mark = Character.getType(this) in StorageNameMarkTypes
-    return !mark && !Character.isWhitespace(this) && this != BRAILLE_PATTERN_BLANK
+    return !mark && !Character.isWhitespace(this) && StorageNameInvisibles.none { this in it }
 }
-
-/** A symbol that draws as an empty cell, so it never counts as a readable character on its own. */
-private const val BRAILLE_PATTERN_BLANK = 0x2800

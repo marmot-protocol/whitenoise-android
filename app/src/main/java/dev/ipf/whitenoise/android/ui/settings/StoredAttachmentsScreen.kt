@@ -175,20 +175,25 @@ private fun selectionAwareBack(
 ): () -> Unit = { if (list.selecting) actions.onSelectAll(false) else onBack() }
 
 /**
- * The chat's attachment count and bytes: summed from its own list once every page is loaded, else the overview's row,
- * else null. The overview pages its chats and reloads only the first page after an action, so it may not hold one, and
- * a list emptied under an open confirmation answers null rather than zero.
+ * The chat's attachment count and bytes: the overview's row when it holds the chat, since MarmotKit counts a file the
+ * chat shares between attachments once; else summed from the chat's own list once every page is loaded; else null. The
+ * overview pages its chats and reloads only the first page after an action, so it may not hold one, and a list emptied
+ * under an open confirmation answers null rather than zero.
  */
 internal fun chatFigures(
     storage: ManageStorageUiState,
     list: StoredAttachmentsUiState,
     groupIdHex: String,
-): Pair<Long, Long>? =
-    if (list.complete && !list.failed && list.items.isNotEmpty()) {
-        list.items.size.toLong() to list.items.sumOf { it.bytes }
-    } else {
-        storage.chats.firstOrNull { it.groupIdHex == groupIdHex }?.let { it.attachmentCount to it.bytes }
+): Pair<Long, Long>? {
+    val loaded = list.complete && !list.failed
+    val row = storage.chats.firstOrNull { it.groupIdHex == groupIdHex }
+    return when {
+        loaded && list.items.isEmpty() -> null
+        row != null -> row.attachmentCount to row.bytes
+        loaded -> list.items.size.toLong() to list.items.sumOf { it.bytes }
+        else -> null
     }
+}
 
 /** The confirmation key for removing the selection rather than a whole chat. */
 private const val SELECTION = "selection"
