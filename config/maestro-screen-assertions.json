@@ -6673,6 +6673,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/VoiceNoteSettingsScreen.kt",
+      "symbol": "VoiceNoteSettingsScreen",
+      "bindings": [
+        {
+          "case": "settings-voice-language",
+          "selector": {
+            "id": "settings.voice_notes.group"
+          },
+          "scope": "Voice notes page shows both switches and Back returns to Voice & language.",
+          "entry_assertion": {
+            "id": "settings.voice_notes.group"
+          },
+          "opened_by": {
+            "text": "Voice notes"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
       "symbol": "VoiceLanguageScreen",
       "bindings": [

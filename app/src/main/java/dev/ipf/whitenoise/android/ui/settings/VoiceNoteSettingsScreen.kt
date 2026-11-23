@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -19,7 +21,11 @@ internal fun VoiceNoteSettingsScreen(
     SettingsScaffold(title = stringResource(R.string.settings_voice_notes), onBack = onBack) {
         SettingsList {
             item(key = "search.VoiceNotes.1") {
-                SettingsGroup(destination = SettingsDetail.VoiceNotes, surface = "voice-note-controls") {
+                SettingsGroup(
+                    modifier = Modifier.testTag("settings.voice_notes.group"),
+                    destination = SettingsDetail.VoiceNotes,
+                    surface = "voice-note-controls",
+                ) {
                     row("voice_send_on_release") { context ->
                         SettingsSwitch(
                             context = context,

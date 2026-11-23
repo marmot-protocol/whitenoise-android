@@ -513,8 +513,8 @@ class AppStateSendLockCoverageTest {
         val source = conversationScreenSource().motionOwnerSource()
         val autoChain =
             source.substring(
-                source.indexOf("Auto-chain voice playback"),
-                source.indexOf("val nextMsg", source.indexOf("Auto-chain voice playback")),
+                source.indexOf("fun voicePlaybackHosts()"),
+                source.indexOf("val nextMsg", source.indexOf("fun voicePlaybackHosts()")),
             )
 
         assertTrue(
