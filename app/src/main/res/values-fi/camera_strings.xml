@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In-app camera opened by the composer's Camera action. -->
+    <string name="camera_close">Sulje kamera</string>
+    <string name="camera_mode_photo">Kuva</string>
+    <string name="camera_mode_video">Video</string>
+    <string name="camera_take_photo">Ota kuva</string>
+    <string name="camera_start_recording">Aloita tallennus</string>
+    <string name="camera_stop_recording">Lopeta tallennus</string>
+    <string name="camera_switch">Vaihda kameraa</string>
+    <string name="camera_video_without_sound">Mikrofonin käyttöoikeus on pois päältä, joten videot tallentuvat ilman ääntä.</string>
+    <string name="camera_capture_failed">Tallentaminen ei onnistunut. Yritä uudelleen.</string>
+</resources>

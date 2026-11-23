@@ -8,6 +8,7 @@
     <string name="explanation_chat_info_mute">Hiljentää tavalliset viesti-ilmoitukset tästä keskustelusta. Suorat maininnat voivat silti ilmoittaa sinulle, ja saat edelleen kaikki viestit.</string>
     <string name="explanation_chat_info_copy_peer_public_key">Kopioi tämän henkilön julkisen avaimen leikepöydälle. Julkinen avain on osoite, jolla ihmiset löytävät hänet ja ottavat häneen yhteyttä, joten sen jakaminen on turvallista. Se ei koskaan sisällä hänen yksityistä avaintaan.</string>
     <string name="explanation_chat_info_unmute">Ottaa tämän keskustelun ilmoitukset taas käyttöön.</string>
+    <string name="explanation_chat_info_add_members">Avaa jäsenvalitsimen, jotta voit kutsua ihmisiä tähän ryhmään.</string>
     <string name="explanation_chat_info_disappearing">Määrittää, katoavatko tämän keskustelun uudet viestit valitun ajan jälkeen. Jo lähetettyihin viesteihin se ei vaikuta.</string>
     <string name="explanation_chat_info_copy_chat_link">Kopioi linkin tähän keskusteluun. Voit jakaa sen, jotta muut voivat pyytää liittymistä.</string>
     <string name="explanation_chat_info_relays">Näyttää ja muokkaa releitä, joiden kautta tämä ryhmä lähettää ja vastaanottaa viestejä. Muutokset koskevat koko ryhmää.</string>

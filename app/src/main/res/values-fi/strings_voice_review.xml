@@ -2,6 +2,17 @@
 <resources>
     <string name="voice_review_title">Tarkista ääniviesti</string>
     <string name="voice_record_again">Nauhoita uudelleen</string>
-    <string name="voice_message_release_to_review">Tarkista päästämällä irti · peru liu\'uttamalla sivuun</string>
+    <string name="voice_message_slide_to_cancel">Peru liu\'uttamalla sivuun</string>
     <string name="voice_recording_stop">Lopeta nauhoitus</string>
+    <string name="voice_recording_pause">Keskeytä nauhoitus</string>
+    <string name="voice_discard_title">Hylätäänkö ääniviesti?</string>
+    <string name="voice_discard_message">Tätä nauhoitusta ei ole lähetetty, ja se poistetaan.</string>
+    <string name="voice_send_interrupted">Ääniviestiä ei lähetetty</string>
+    <string name="voice_recording_elsewhere">Toisessa keskustelussa nauhoitetaan ääniviestiä.</string>
+    <string name="voice_row_recording">Nauhoitetaan ääniviestiä</string>
+    <string name="voice_row_unsent">Lähettämätön ääniviesti</string>
+    <string name="voice_recording_paused">Ääniviestin nauhoitus keskeytetty</string>
+    <string name="voice_send_on_release">Lähetä ääniviesti, kun päästät irti</string>
+    <string name="voice_transcribe_automatically">Litteroi vastaanotetut ääniviestit automaattisesti</string>
+    <string name="settings_voice_notes">Ääniviestit</string>
 </resources>

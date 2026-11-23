@@ -11,7 +11,7 @@
     <string name="explanation_composer_dictation">Kirjoittaa sanomasi Androidin puheentunnistuksella. White Noise pyytää offline-tunnistusta, mutta laitteesi voi silti käyttää verkkopalvelua.</string>
     <string name="explanation_composer_translate">Ottaa käännöstilan käyttöön tai pois. Kun se on päällä, Lähetä lähettää Lähetetään-rivillä näkyvän käännöksen, eikä mitään lähetetä ennen kuin käännös on valmis.</string>
     <string name="explanation_composer_voice_note">Pidä painettuna nauhoittaaksesi ääniviestin.</string>
-    <string name="explanation_composer_camera">Avaa kameran, jotta voit liittää uuden kuvan. Android pyytää kameran käyttöoikeutta ensimmäisellä kerralla.</string>
+    <string name="explanation_composer_camera">Avaa kameran, jotta voit ottaa kuvan tai tallentaa videon liitettäväksi. Android pyytää kameran käyttöoikeutta ensimmäisellä kerralla ja mikrofonin käyttöoikeutta, kun tallennat ensimmäisen kerran.</string>
     <string name="explanation_composer_gallery">Avaa Androidin kuvavalitsimen. White Noise saa vain valitsemasi kuvat ja videot.</string>
     <string name="explanation_composer_files">Avaa Androidin tiedostovalitsimen, jolla voit liittää minkä tahansa tiedoston.</string>
     <string name="explanation_composer_location">Lähettää nykyisen sijaintisi kerran karttalinkkinä. Sijaintia ei jaeta jatkuvasti.</string>

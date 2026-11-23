@@ -11,6 +11,7 @@
     <string name="explanation_conversation_dictation_cancel">Hylkää sanomasi. Mitään ei lähetetä eikä lisätä viestiin, eikä tätä voi kumota.</string>
     <string name="explanation_conversation_dictation_send">Lopettaa kuuntelun ja lähettää tunnistetun tekstin viestinä. Valitse sen sijaan Liitä litterointi, jos haluat tarkistaa tekstin ennen lähettämistä.</string>
     <string name="explanation_conversation_dictation_paste">Lisää tunnistetun tekstin viestikenttään lähettämättä sitä, jotta voit ensin muokata sitä.</string>
+    <string name="explanation_conversation_dictation_continue">Aloittaa seuraavan osan tallentamisen heti. Aiemmin sanomaasi muutetaan vielä tekstiksi, ja se sijoitetaan ensimmäiseksi.</string>
     <string name="explanation_conversation_dictation_recovery_paste">Lisää tunnistetun tekstin viestikenttään lähettämättä sitä.</string>
     <string name="explanation_conversation_dictation_recovery_retry_send">Yrittää uudelleen lähettää tunnistetun tekstin viestinä.</string>
     <string name="explanation_conversation_dictation_recovery_app_settings">Avaa White Noisen Android-asetukset, joissa voit sallia mikrofonin käytön.</string>
@@ -34,6 +35,7 @@
     <string name="explanation_conversation_header_details">Avaa tämän keskustelun tiedot, kuten jäsenet ja asetukset.</string>
     <string name="explanation_conversation_jump_to_mention">Vierittää seuraavaan lukemattomaan viestiin, jossa sinut mainitaan.</string>
     <string name="explanation_composer_draft_top">Vierittää luonnoksen takaisin ensimmäiselle riville. Se ei muuta tekstiä.</string>
+    <string name="explanation_composer_draft_bottom">Vierittää luonnoksen sen viimeiselle riville. Teksti ei muutu.</string>
     <string name="explanation_emoji_search">Hakee emojiluettelosta nimen perusteella.</string>
     <string name="explanation_emoji_configure">Avaa asetukset, joissa valitset pikareaktioiden emojit.</string>
 
