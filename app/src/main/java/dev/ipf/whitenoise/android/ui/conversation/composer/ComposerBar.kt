@@ -408,7 +408,6 @@ internal fun ComposerBar(
 ) {
     var lastMeasuredHeight by remember { mutableStateOf(0) }
     val routeDensity = LocalDensity.current
-    val composerEmojiShortcodes = rememberComposerEmojiShortcodes()
     if (!LocalControlHandoffEndpointCurrent.current) {
         // Retain only layout, never an outgoing input connection, focus target or action callback.
         Box(modifier.fillMaxWidth().height(with(routeDensity) { lastMeasuredHeight.toDp() }))
@@ -568,6 +567,8 @@ internal fun ComposerBar(
     // from that chat's saved draft rather than carrying state across.
     var textFieldValue by textState.valueState
     val text = textFieldValue.text
+    val composerEmojiPainters = rememberComposerEmojiPainters(text)
+    val composerEmojiShortcodes = composerEmojiPainters.keys
     val dictationState = dictationController?.state ?: ConversationDictationState.Idle
     val dictationOwnedByComposer =
         dictationAccountRef != null &&
@@ -1681,6 +1682,7 @@ internal fun ComposerBar(
                                 expandedControlLayout,
                             ),
                         textFieldValue = textFieldValue,
+                        emojiPainters = composerEmojiPainters,
                         readAcceptedValue = { textState.valueState.value },
                         composerFocus = composerFocus,
                         emojiPickerOpen = composerEmojiPickerRequested,

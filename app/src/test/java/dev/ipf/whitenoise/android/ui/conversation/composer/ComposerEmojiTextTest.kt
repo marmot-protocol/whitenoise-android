@@ -96,23 +96,52 @@ class ComposerEmojiTextTest {
         val rightOne = beforeEmoji.copy(selection = TextRange(3))
 
         assertEquals(TextRange(2), clampComposerEmojiSelection(afterEmoji, leftOne, CODES).selection)
-        assertEquals(TextRange("x :marmot:".length), clampComposerEmojiSelection(beforeEmoji, rightOne, CODES).selection)
+        assertEquals(
+            TextRange("x :marmot:".length),
+            clampComposerEmojiSelection(beforeEmoji, rightOne, CODES).selection,
+        )
     }
 
     @Test
     fun aComposingShortcodeStaysTextUntilCommitted() {
         val text = "say :marmot:"
-        val emoji = setOf(":marmot:")
-        val composing =
-            ComposerVisualTransformation(null, SpanStyle(), TextRange(5, 11), emoji).filter(AnnotatedString(text)).text
-        val committed = ComposerVisualTransformation(null, SpanStyle(), null, emoji).filter(AnnotatedString(text)).text
+        val composing = TextFieldValue(text, selection = TextRange(11), composition = TextRange(5, 11))
+        val committed = TextFieldValue(text, selection = TextRange(text.length))
 
-        assertEquals(text, composing.text)
-        assertEquals("say $COMPOSER_EMOJI_SLOT", committed.text)
-        assertEquals(
-            listOf(":marmot:"),
-            committed.getStringAnnotations(COMPOSER_EMOJI_TAG, 0, committed.length).map { it.item },
-        )
+        assertEquals(emptyList<Any>(), activeComposerEmojiRanges(composing, CODES))
+        val ranges = activeComposerEmojiRanges(committed, CODES)
+        val visible = ComposerVisualTransformation(null, SpanStyle(), null, ranges).filter(AnnotatedString(text)).text
+        assertEquals("say $COMPOSER_EMOJI_SLOT", visible.text)
+        val slots = visible.getStringAnnotations(COMPOSER_EMOJI_TAG, 0, visible.length)
+        assertEquals(listOf(":marmot:"), slots.map { it.item })
+    }
+
+    @Test
+    fun aCaretInsideAShortcodeKeepsItEditableText() {
+        // Typing the opening `:` in front of `marmot:` leaves the caret inside the new code.
+        val typed = TextFieldValue(":marmot:", selection = TextRange(1))
+
+        assertEquals(emptyList<Any>(), activeComposerEmojiRanges(typed, CODES))
+        val proposed = TextFieldValue("::marmot:", selection = TextRange(2))
+        assertEquals(proposed, repairComposerMentionEdit(typed, proposed, false, CODES))
+    }
+
+    @Test
+    fun backspaceInAComposingShortcodeDeletesOneCharacter() {
+        val old = TextFieldValue("a :marmot:", selection = TextRange(10), composition = TextRange(3, 10))
+        val proposed = TextFieldValue("a :marmot", selection = TextRange(9), composition = TextRange(3, 9))
+
+        assertNull(repairComposerEmojiDeletion(old, proposed, CODES))
+    }
+
+    @Test
+    fun aKeyboardThatStartsComposingInsideARenderedEmojiEditsItAsText() {
+        val old = TextFieldValue(":marmot:", selection = TextRange(8))
+        val renamed = TextFieldValue(":marmo:", selection = TextRange(6), composition = TextRange(1, 6))
+        val moved = old.copy(selection = TextRange(4), composition = TextRange(1, 7))
+
+        assertEquals(renamed, repairComposerMentionEdit(old, renamed, false, CODES))
+        assertEquals(moved, repairComposerMentionEdit(old, moved, false, CODES))
     }
 
     private fun visual(text: String): ComposerVisualText =

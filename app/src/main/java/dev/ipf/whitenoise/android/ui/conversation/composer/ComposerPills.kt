@@ -87,6 +87,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -321,6 +322,8 @@ internal fun ComposerPill(
     hasContactShare: Boolean = false,
     highlightMentionChips: Boolean = false,
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
+    // Shortcodes whose artwork is ready; the owner passes the same set to its edit repair.
+    emojiPainters: Map<String, Painter> = rememberComposerEmojiPainters(textFieldValue.text),
     // Mention chips share the send button's colours: the exact account accent with readable content.
     // Required so a caller cannot silently fall back to the default accent.
     actionColors: AccountActionColors,
@@ -462,14 +465,15 @@ internal fun ComposerPill(
                 }
             }
         }
-    val emojiPainters = rememberComposerEmojiPainters(textFieldValue.text)
+    val emojiCodes = emojiPainters.keys.toSet()
+    val emojiRanges = remember(textFieldValue, emojiCodes) { activeComposerEmojiRanges(textFieldValue, emojiCodes) }
     val mentionVisualTransformation =
         rememberComposerVisualTransformation(
             highlightMentionChips,
             mentionCandidates,
             actionColors,
             textFieldValue.composition,
-            emojiShortcodes = emojiPainters.keys.toSet(),
+            emojiRanges,
         )
     val transformedText =
         remember(textFieldValue.text, mentionVisualTransformation) {

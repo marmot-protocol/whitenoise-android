@@ -15,7 +15,7 @@ import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 
 /**
  * #414/#442: paint stored `@npub1…` chip runs as friendly visible labels (`@alice` when the profile is resolved,
- * short `@npub1…` otherwise) and each `:shortcode:` in [emojiShortcodes] as an artwork slot, while keeping the
+ * short `@npub1…` otherwise) and each `:shortcode:` range in [emoji] as an artwork slot, while keeping the
  * backing TextFieldValue canonical for send/markdown. A filled chip with black-or-white content reads on any
  * accent, including ones that vanish as text.
  */
@@ -25,7 +25,7 @@ internal fun rememberComposerVisualTransformation(
     mentionCandidates: List<MentionComposer.Candidate>,
     actionColors: AccountActionColors,
     composition: TextRange?,
-    emojiShortcodes: Set<String>,
+    emoji: List<AnnotatedString.Range<String>>,
 ): VisualTransformation {
     val chipColor = actionColors.container
     val chipContentColor = actionColors.content
@@ -39,27 +39,27 @@ internal fun rememberComposerVisualTransformation(
         chipContentColor,
         mentionCandidateLookup,
         composition,
-        emojiShortcodes,
+        emoji,
     ) {
-        if (!highlightMentionChips && emojiShortcodes.isEmpty()) {
+        if (!highlightMentionChips && emoji.isEmpty()) {
             VisualTransformation.None
         } else {
             ComposerVisualTransformation(
                 mentionCandidates = mentionCandidateLookup.takeIf { highlightMentionChips },
                 chipStyle = SpanStyle(color = chipContentColor, fontWeight = FontWeight.Medium, background = chipColor),
                 composition = composition,
-                emojiShortcodes = emojiShortcodes,
+                emoji = emoji,
             )
         }
     }
 }
 
-/** Mention labels when [mentionCandidates] is set, plus emoji slots; the stored text stays canonical. */
+/** Mention labels when [mentionCandidates] is set, plus a slot per [emoji] range; the stored text stays canonical. */
 internal class ComposerVisualTransformation(
     private val mentionCandidates: Map<String, MentionComposer.Candidate>?,
     private val chipStyle: SpanStyle,
     private val composition: TextRange?,
-    private val emojiShortcodes: Set<String>,
+    private val emoji: List<AnnotatedString.Range<String>>,
 ) : VisualTransformation {
     // #607: the chip renderer must never crash the composer. The
     // primary fix (MentionComposer.repairChipDeletion in
@@ -76,13 +76,9 @@ internal class ComposerVisualTransformation(
         val mentions =
             mentionCandidates?.let { MentionComposer.editingVisualText(source, it) }
                 ?: MentionComposer.ChipVisualText(source, emptyList(), source.length)
-        // A shortcode the IME is still composing stays text until it commits.
-        val emoji =
-            composerEmojiRanges(source, emojiShortcodes).filter { code ->
-                val composing = composition?.takeUnless { it.collapsed }
-                composing == null || code.end <= composing.min || code.start >= composing.max
-            }
-        val composer = composerVisualText(source, mentions, emoji)
+        // Ranges come from the field value; skip any that no longer match the text being transformed.
+        val slots = emoji.filter { source.regionMatches(it.start, it.item, 0, it.item.length) }
+        val composer = composerVisualText(source, mentions, slots)
         val visual = composer.mapping
         // Legacy BasicTextField reports the IME's composing-character
         // bounds through CursorAnchorInfo. A shortened mention label can

@@ -59,6 +59,25 @@ internal fun composerEmojiRanges(
     }
 
 /**
+ * The shortcodes in [value] that draw as artwork: those in [shortcodes] outside any range the keyboard is composing
+ * and with no selection end strictly inside. A caret placed inside a code, or a code being typed, stays editable
+ * text, and editing repairs only what is drawn. An edit also leaves alone any code its [incoming] composition
+ * touches, so a keyboard that starts composing inside one edits it as text.
+ */
+internal fun activeComposerEmojiRanges(
+    value: TextFieldValue,
+    shortcodes: Set<String>,
+    incoming: TextRange? = null,
+): List<AnnotatedString.Range<String>> {
+    val composing = listOfNotNull(value.composition, incoming).filterNot { it.collapsed }
+    return composerEmojiRanges(value.text, shortcodes).filter { code ->
+        val interior = code.start + 1 until code.end
+        val composed = composing.any { code.start < it.max && code.end > it.min }
+        !composed && value.selection.start !in interior && value.selection.end !in interior
+    }
+}
+
+/**
  * Combines [mentions] with one [COMPOSER_EMOJI_SLOT] per range in [emoji]. The stored draft keeps the canonical
  * `:shortcode:` for sending; only the visible text changes, the same way mention chips show labels.
  */
@@ -117,13 +136,6 @@ internal fun rememberComposerEmojiPainters(text: String): Map<String, Painter> {
     return painters
 }
 
-/** The shortcodes [repairComposerMentionEdit] keeps whole, from the current emoji library. */
-@Composable
-internal fun rememberComposerEmojiShortcodes(): Set<String> {
-    val library = LocalCustomEmoji.current
-    return remember(library) { composerEmojiShortcodes(library) }
-}
-
 /** Draws each emoji slot's artwork over the field's text, using the slots annotated in [layout]'s own text. */
 internal fun Modifier.composerEmojiArtwork(
     painters: Map<String, Painter>,
@@ -161,12 +173,11 @@ internal fun repairComposerEmojiDeletion(
     proposed: TextFieldValue,
     shortcodes: Set<String>,
 ): TextFieldValue? {
-    val deleted =
-        deletedRange(old.text, proposed).takeIf { shortcodes.isNotEmpty() && proposed.text.length < old.text.length }
-            ?: return null
+    val deletion = shortcodes.isNotEmpty() && proposed.text.length < old.text.length
+    val deleted = (if (deletion) deletedRange(old.text, proposed) else null) ?: return null
     var start = deleted.first
     var end = deleted.last + 1
-    for (code in composerEmojiRanges(old.text, shortcodes)) {
+    for (code in activeComposerEmojiRanges(old, shortcodes, proposed.composition)) {
         val overlaps = start < code.end && end > code.start
         if (overlaps && (start > code.start || end < code.end)) {
             start = minOf(start, code.start)
@@ -203,7 +214,7 @@ internal fun clampComposerEmojiSelection(
     shortcodes: Set<String>,
 ): TextFieldValue {
     val moved = shortcodes.isNotEmpty() && edited.text == old.text && edited.selection != old.selection
-    val ranges = if (moved) composerEmojiRanges(edited.text, shortcodes) else emptyList()
+    val ranges = if (moved) activeComposerEmojiRanges(old, shortcodes, edited.composition) else emptyList()
 
     /** Moves [offset] to the shortcode edge beyond it, judged from where the caret was. */
     fun clamp(
