@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="linked_devices">Cihazlar</string>
-    <string name="settings_search_alias_linked_devices">bağlı cihazlar|cihaz bağla</string>
+    <string name="settings_search_alias_linked_devices">bağlı cihazlar|cihaz bağla|cihazı bağla</string>
     <string name="group_account_devices_title">Bağlı cihazlar</string>
     <string name="linked_devices_detail">Bağlı bir cihazdan gönderdiğiniz mesajlar, tüm bağlı cihazlarınızda sizin mesajlarınız olarak görünür.</string>
     <string name="linked_devices_this_device">Bu cihaz</string>

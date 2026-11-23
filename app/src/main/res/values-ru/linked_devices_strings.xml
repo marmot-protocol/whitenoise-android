@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="linked_devices">Устройства</string>
-    <string name="settings_search_alias_linked_devices">связанные устройства|привязанные устройства|привязать устройство</string>
+    <string name="settings_search_alias_linked_devices">связанные устройства|привязанные устройства|привязать устройство|связать устройство</string>
     <string name="group_account_devices_title">Связанные устройства</string>
     <string name="linked_devices_detail">Сообщения, отправленные с привязанного устройства, отображаются как ваши на всех ваших привязанных устройствах.</string>
     <string name="linked_devices_this_device">Это устройство</string>

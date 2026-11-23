@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="linked_devices">Appareils</string>
-    <string name="settings_search_alias_linked_devices">appareils associés|appareils liés|associer un appareil</string>
+    <string name="settings_search_alias_linked_devices">appareils associés|appareils liés|associer un appareil|associer l’appareil</string>
     <string name="group_account_devices_title">Appareils associés</string>
     <string name="linked_devices_detail">Les messages que vous envoyez depuis un appareil associé apparaissent comme les vôtres sur tous vos appareils associés.</string>
     <string name="linked_devices_this_device">Cet appareil</string>
