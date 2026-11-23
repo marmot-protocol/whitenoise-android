@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import kotlinx.coroutines.runBlocking
+import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_DISK_RESERVE_BYTES
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -93,6 +94,30 @@ class NostrVideoDownloadTest {
     }
 
     @Test
+    fun downloadsLeaveTheAppDiskReserveFree() {
+        val bytes = ByteArray(1_000)
+        val reserve = FILE_BACKED_DISK_RESERVE_BYTES
+        val tight = temporary.newFolder()
+        val refused =
+            download(tight, VIDEO_URL, usableBytes = { reserve + 999 }) { bytes.toResponseBody() }
+        assertNull(refused)
+        assertEquals(0, tight.listFiles()!!.size)
+        val fits =
+            download(tight, VIDEO_URL, usableBytes = { reserve + 1_000 }) { bytes.toResponseBody() }
+        assertNotNull(fits)
+
+        // An undeclared length is checked while copying, and the partial file is removed.
+        val streamed = temporary.newFolder()
+        val large = ByteArray(5 * 1024 * 1024)
+        val stopped =
+            download(streamed, VIDEO_URL, maxBytes = 8L * 1024 * 1024, usableBytes = { reserve }) {
+                UnknownLengthBody(large)
+            }
+        assertNull(stopped)
+        assertEquals(0, streamed.listFiles()!!.size)
+    }
+
+    @Test
     fun aDeletedPlayerDirectoryIsNotRecreated() {
         val directory = File(temporary.root, "gone")
         assertNull(download(directory, VIDEO_URL) { "video".toResponseBody() })
@@ -117,6 +142,8 @@ class NostrVideoDownloadTest {
         code: Int = 200,
         contentEncoding: List<String> = emptyList(),
         onRequest: (Request) -> Unit = {},
+        maxBytes: Long = MAX_TEST_BYTES,
+        usableBytes: () -> Long = { Long.MAX_VALUE },
         body: () -> ResponseBody,
     ): File? {
         val client =
@@ -134,7 +161,7 @@ class NostrVideoDownloadTest {
                         .apply { contentEncoding.forEach { addHeader("Content-Encoding", it) } }
                         .build()
                 }.build()
-        return runBlocking { downloadNostrVideo(directory, url, client, MAX_TEST_BYTES) }
+        return runBlocking { downloadNostrVideo(directory, url, client, maxBytes, usableBytes) }
     }
 
     /** A chunked response whose size is known only by reading it. */

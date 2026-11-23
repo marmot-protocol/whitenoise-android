@@ -95,12 +95,13 @@ private fun NostrVideoPlayback(
     var attempt by remember(directory) { mutableIntStateOf(0) }
     var download by remember(directory) { mutableStateOf<File?>(null) }
     var failed by remember(directory) { mutableStateOf(false) }
-    // Consumed synchronously, so one failure starts at most one new download.
+    var playerGeneration by remember(directory) { mutableIntStateOf(0) }
+    // Consumed synchronously, so one failure starts at most one new attempt. A completed download is kept: a playback
+    // failure rebuilds only the player, and only a failed download fetches the clip again.
     val retry = {
         if (failed) {
             failed = false
-            download = null
-            attempt++
+            if (download == null) attempt++ else playerGeneration++
         }
     }
     LaunchedEffect(directory) {
@@ -108,7 +109,7 @@ private fun NostrVideoPlayback(
             snapshotFlow { attempt }.collect {
                 val ready =
                     withContext(Dispatchers.IO) {
-                        // A retry replaces the copy that failed to play; its released player no longer reads it.
+                        // A retried download replaces any partial copy the previous attempt left behind.
                         directory.listFiles()?.forEach(File::delete)
                         directory.isDirectory || directory.mkdirs()
                     }
@@ -125,7 +126,7 @@ private fun NostrVideoPlayback(
     if (file == null) {
         NostrVideoPlayerSurface(player = null, playbackFailed = failed, onRetry = retry, onDismiss = onDismiss)
     } else {
-        val player = rememberNostrVideoPlayer(file) { failed = true }
+        val player = rememberNostrVideoPlayer(file, playerGeneration) { failed = true }
         NostrVideoPlayerSurface(player = player, playbackFailed = failed, onRetry = retry, onDismiss = onDismiss)
     }
 }
@@ -134,12 +135,13 @@ private fun NostrVideoPlayback(
 @Composable
 private fun rememberNostrVideoPlayer(
     file: File,
+    generation: Int,
     onPlaybackFailed: () -> Unit,
 ): Player {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val player =
-        remember(file) {
+        remember(file, generation) {
             requireNotNull(localVideoPlayer(context, Uri.fromFile(file))).apply {
                 setAudioAttributes(nostrVideoAudioAttributes, true)
                 // Unplugging headphones pauses instead of moving the clip to the speaker.

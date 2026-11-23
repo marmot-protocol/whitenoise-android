@@ -126,9 +126,10 @@ decoder handling of skip-sample metadata remains enabled.
 Source dimensions retain the 32768-edge and 200-million-pixel admission bounds.
 A requested video decoder additionally caps its surface at 16777216 pixels
 before allocation. Oversized decode surfaces produce a resource refusal instead
-of a smaller hidden decode. Video decoders use frame and slice threads, one per
-online core up to four; audio decoders stay single-threaded and dav1d frame
-delay stays at one. The threads live in the same worker under its seccomp
+of a smaller hidden decode. Explicit playback reads give video decoders frame
+and slice threads, one per online core up to four. Automatic posters, probes
+and waveforms, and every audio decoder, stay single-threaded; dav1d frame delay
+stays at one. The threads live in the same worker under its seccomp
 filter, and each holds its own decode context, so peak worker memory grows with
 the thread count. The 64 MiB per-allocation ceiling applies to FFmpeg's allocation API.
 This is not a process-wide or aggregate native-memory limit: dav1d internal

@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.sandbox.MAX_MEDIA_SOURCE_BYTES
+import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_DISK_RESERVE_BYTES
+import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -39,13 +41,16 @@ internal fun sweepOrphanedNostrVideoFiles(cacheDir: File) {
  * parses the sender-chosen bytes. Only one public HTTPS resource is fetched: playlists are never expanded, and the
  * declared and streamed sizes stay within the decoder's input limit. Cancellation aborts the request. [directory] must
  * already exist and belong to one player: the player deletes it on disposal, so a download that finishes after the
- * player left cannot create a file there. Returns null when the source is refused or unavailable.
+ * player left cannot create a file there. The copy leaves the app's disk reserve free: a declared size that does
+ * not fit is refused before writing, and an undeclared one stops when free space reaches the reserve. Returns null
+ * when the source is refused or unavailable.
  */
 internal suspend fun downloadNostrVideo(
     directory: File,
     url: String,
     client: OkHttpClient = nostrMediaHttpClient,
     maxBytes: Long = MAX_MEDIA_SOURCE_BYTES,
+    usableBytes: () -> Long = { usableSpaceFor(directory) },
 ): File? =
     withContext(Dispatchers.IO) {
         val target = url.toHttpUrlOrNull()?.takeIf { it.isSafeMediaDestination() } ?: return@withContext null
@@ -77,10 +82,12 @@ internal suspend fun downloadNostrVideo(
                         .headers("Content-Encoding")
                         .flatMap { it.split(',') }
                         .any { coding -> coding.isNotBlank() && !coding.trim().equals("identity", ignoreCase = true) }
-                if (!response.isSuccessful || encoded || body.contentLength() > maxBytes) return@use
+                val declared = body.contentLength()
+                if (!response.isSuccessful || encoded || declared > maxBytes) return@use
+                if (declared > 0 && declared + FILE_BACKED_DISK_RESERVE_BYTES > usableBytes()) return@use
                 val download = File.createTempFile("video-", ".bin", directory).also { file = it }
                 body.byteStream().use { input ->
-                    download.outputStream().use { output -> copyBounded(input, output, maxBytes) }
+                    download.outputStream().use { output -> copyBounded(input, output, maxBytes, usableBytes) }
                 }
                 ensureActive()
                 keep = download.length() > 0
@@ -94,11 +101,15 @@ internal suspend fun downloadNostrVideo(
         }
     }
 
-/** Copies at most [maxBytes]; a longer stream is refused rather than truncated into a different file. */
+/**
+ * Copies at most [maxBytes]; a longer stream is refused rather than truncated into a different file. Free space is
+ * rechecked every few MiB, so an undeclared length cannot fill the volume past the app's reserve.
+ */
 private suspend fun copyBounded(
     input: InputStream,
     output: OutputStream,
     maxBytes: Long,
+    usableBytes: () -> Long,
 ) {
     val buffer = ByteArray(COPY_BUFFER_BYTES)
     var written = 0L
@@ -108,8 +119,14 @@ private suspend fun copyBounded(
         if (read < 0) return
         written += read
         if (written > maxBytes) throw IOException("Referenced video exceeds the decoder input limit")
+        if (written / SPACE_CHECK_BYTES != (written - read) / SPACE_CHECK_BYTES &&
+            usableBytes() < FILE_BACKED_DISK_RESERVE_BYTES + read
+        ) {
+            throw IOException("Referenced video would fill the app's disk reserve")
+        }
         output.write(buffer, 0, read)
     }
 }
 
 private const val COPY_BUFFER_BYTES = 64 * 1024
+private const val SPACE_CHECK_BYTES = 4L * 1024 * 1024
