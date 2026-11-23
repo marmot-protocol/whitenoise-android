@@ -96,22 +96,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Upgrade receive-side compatibility references before a transfer. Timeline
- * fallback records can temporarily carry sourceEpoch=0; passing that value to
- * MarmotKit can never succeed and previously left visual media spinning.
- */
-internal suspend fun authoritativeVisualMediaReference(
-    reference: MediaAttachmentReferenceFfi,
-    mine: Boolean,
-    resolve: suspend () -> MediaAttachmentReferenceFfi,
-): MediaAttachmentReferenceFfi =
-    if (mine || reference.sourceEpoch != 0uL) {
-        reference
-    } else {
-        resolve()
-    }
-
-/**
  * Resolve the decrypted bytes for an attachment, preferring the retained
  * plaintext in `pendingAttachmentsList` for own optimistic sends so the
  * viewer / save / share paths don't spin while waiting for the projection

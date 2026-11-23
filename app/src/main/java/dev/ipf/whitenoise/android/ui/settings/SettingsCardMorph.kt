@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -85,7 +86,6 @@ internal class SettingsCardMorph(
      * on their own; going back, that group folds into the outline again.
      */
     var anchor: SettingsMorphAnchor? = null
-    var closingAnchor: SettingsMorphAnchor? = null
 
     /** Linear morph time from 0 to 1; read during draw so each frame follows the animation. */
     var time: () -> Float = { 1f }
@@ -107,7 +107,6 @@ internal class SettingsCardMorph(
 
     init {
         page?.anchorContour = { anchorContour }
-        page?.closingAnchorContour = { closingAnchor?.let(anchorOutlines::get) ?: anchorContour }
     }
 
     private val folding: Boolean get() = gather != null || (!fan && anchorBounds != null && cardTokens.isEmpty())
@@ -338,24 +337,18 @@ internal val LocalSettingsCardMorph = compositionLocalOf<SettingsCardMorph?> { n
 
 /**
  * Marks one Settings card (a row group or panel), or the [anchor] control a route grows from, as a
- * motion block. [anchorInset] trims an anchor to its visible control. Fullscreen routes register
- * geometry here and keep their sole permitted
+ * motion block. Fullscreen routes register geometry here and keep their sole permitted
  * picture. The non-page facade retains its existing card treatment. No effect outside a route host.
  */
 @Composable
-internal fun Modifier.settingsCardMorph(
-    anchor: SettingsMorphAnchor? = null,
-    anchorInset: Dp = 0.dp,
-): Modifier {
+internal fun Modifier.settingsCardMorph(anchor: SettingsMorphAnchor? = null): Modifier {
     val morph = LocalSettingsCardMorph.current
     if (morph == null) return this
     val view = LocalView.current
-    val inset = with(LocalDensity.current) { anchorInset.toPx() }
     val token = remember(morph, anchor) { anchor ?: Any() }
     DisposableEffect(morph, token) { onDispose { morph.remove(token) } }
     // Reported outside the card's own layer, so the bounds stay the settled ones while it travels.
-    // An anchor may report only the visible control inside its larger touch target.
-    val positioned = onGloballyPositioned { morph.report(token, it.motionBoundsOnScreen(view).deflate(inset)) }
+    val positioned = onGloballyPositioned { morph.report(token, it.motionBoundsOnScreen(view)) }
     // An anchor only marks where routes grow from; it neither travels nor is recorded.
     return if (anchor != null || morph.page != null) {
         positioned
@@ -533,11 +526,12 @@ internal fun <T> rememberSettingsCardMorphHost(
         } else {
             Modifier
         }
+    val containerMoving by remember(borderlessProgress) { derivedStateOf { borderlessProgress.value < 1f } }
     return morphing to
         Modifier
             .settingsCardMorphHost(morph, colors, view)
             // Only a growing container clips live controls; a slide keeps them whole and usable.
-            .settingsTransitionInputGate(borderlessOrigin != null && borderlessProgress.value < 1f)
+            .settingsTransitionInputGate(borderlessOrigin != null && containerMoving)
             .then(if (morph.blocksPointerInput) Modifier.clearAndSetSemantics {} else Modifier)
             .then(borderlessMotion)
 }

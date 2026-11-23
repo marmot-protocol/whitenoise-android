@@ -2,21 +2,17 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.graphics.Picture
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
 import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.common.SurfaceMorphCard
@@ -67,18 +63,9 @@ internal class SettingsPageMorph {
 
     /** The cards the mounted child route measured, which a top-level bubble may land on. */
     internal var childCards: (() -> List<SurfaceMorphCard>)? by mutableStateOf(null)
-    private var bubbleRevision by mutableIntStateOf(0)
-    private var cachedBubbleRevision = -1
-    private var cachedBubbleCards: List<SurfaceMorphCard> = emptyList()
-
-    internal fun bubbleCards(): List<SurfaceMorphCard> {
-        childCards?.invoke()?.takeIf { it.isNotEmpty() }?.let { return it }
-        if (cachedBubbleRevision != bubbleRevision) {
-            cachedBubbleRevision = bubbleRevision
-            cachedBubbleCards = destinations.values.map { it.bubbleCard() }
-        }
-        return cachedBubbleCards
-    }
+    private val bubbleCache = SettingsBubbleCardCache()
+    internal fun bubbleCards(): List<SurfaceMorphCard> =
+        childCards?.invoke()?.takeIf { it.isNotEmpty() } ?: bubbleCache.cards(destinations.values)
 
     internal val bodyTop: Float
         get() =
@@ -104,13 +91,13 @@ internal class SettingsPageMorph {
     ) {
         if (destinations[token] == endpoint) return
         destinations[token] = endpoint
-        bubbleRevision++
+        bubbleCache.invalidate()
         nativeFrame = null
     }
 
     fun removeDestination(token: Any) {
         val destination = destinations.remove(token)
-        if (destination != null) bubbleRevision++
+        if (destination != null) bubbleCache.invalidate()
         val groupRows = rows.remove(token)
         if (destination != null || groupRows != null) nativeFrame = null
     }
@@ -316,7 +303,8 @@ internal class SettingsPageMorph {
                 selected != null &&
                 visibleSelection?.visibleIn(host) == true
             ) {
-                returnTargets[next] = ReturnTarget(selected.center, correspondenceKey, unoutlinedOrigin = originSource?.bounds)
+                returnTargets[next] =
+                    ReturnTarget(selected.center, correspondenceKey, unoutlinedOrigin = originSource?.bounds)
             } else {
                 returnTargets.remove(next)
             }
@@ -358,7 +346,7 @@ internal class SettingsPageMorph {
         target = next
         opening = forward
         destinations.clear()
-        bubbleRevision++
+        bubbleCache.invalidate()
         rows.clear()
         nativeFrame = null
         pendingOrigin = null
@@ -566,23 +554,10 @@ internal class SettingsPageMorph {
         time: Float,
     ) {
         val frame = leaving ?: return
-        val body = frame.body
         if (outgoingPresence(time) <= 0f) return
         val alpha = settingsPageHandoffAlpha(opening, time, false)
         val chrome = leavingMask ?: nativeChromeMask(frame.contours, host).also { leavingMask = it }
-        // The source and destination's measured body edges leave both native headers untouched.
-        clipRect(top = (maxOf(frame.bodyTop, bodyTop) - host.top).coerceAtLeast(0f)) {
-            clipPath(body) {
-                clipPath(chrome, ClipOp.Difference) {
-                    drawIntoCanvas { canvas ->
-                        val layered = alpha < 1f
-                        if (layered) canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { this.alpha = alpha })
-                        canvas.nativeCanvas.drawPicture(frame.picture)
-                        if (layered) canvas.restore()
-                    }
-                }
-            }
-        }
+        drawFrozenSettingsBody(frame, chrome, alpha, (maxOf(frame.bodyTop, bodyTop) - host.top).coerceAtLeast(0f))
     }
 
     /** Commit one measured native batch to this owner before painting its body and chrome. */

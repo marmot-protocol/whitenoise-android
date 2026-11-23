@@ -2113,14 +2113,6 @@ internal fun ComposerPill(
     }
 }
 
-/** Keeps accessory overflow scrollable while reserving at least half the finite viewport for input. */
-private fun Modifier.boundedComposerAccessory(): Modifier =
-    layout { measurable, constraints ->
-        val limit = if (constraints.hasBoundedHeight) constraints.maxHeight / 2 else constraints.maxHeight
-        val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = limit))
-        layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
-    }
-
 /** The grip marks the parent-owned drag region without intercepting child controls. */
 @Composable
 @Suppress("FunctionNaming")

@@ -30,18 +30,9 @@ import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlin.math.ceil
 
-/**
- * Compatibility facade for existing rectangle-only launchers. [originInset] shrinks the recorded
- * origin to the visible control inside a larger touch target, such as an avatar in its IconButton.
- */
+/** Retains the rectangle reported by a launcher without an outlined row. */
 @Composable
 internal fun rememberSettingsRouteClick(onClick: () -> Unit) = rememberSettingsRouteClick(null, null, onClick)
-
-@Composable
-internal fun rememberSettingsRouteClick(
-    onClick: () -> Unit,
-    originInset: Dp,
-) = rememberSettingsRouteClick(null, null, onClick, originInset)
 
 /** Capture the actual activating row, including its scrolled position, before navigation changes it. */
 @Composable
@@ -51,7 +42,6 @@ internal fun rememberSettingsRouteClick(
     context: SettingsRowContext?,
     routeKey: Any?,
     onClick: () -> Unit,
-    originInset: Dp = 0.dp,
 ): Pair<Modifier, () -> Unit> {
     if (context != null && routeKey == null) return Modifier to onClick
     val morph = LocalSettingsCardMorph.current ?: return Modifier to onClick
@@ -71,8 +61,7 @@ internal fun rememberSettingsRouteClick(
         .onGloballyPositioned {
             val rect = it.fullSettingsMorphBounds(view)
             val visible = it.motionBoundsOnScreen(view)
-            val inset = with(density) { originInset.toPx() }
-            bounds[0] = rect.takeUnless { visible.isEmpty }?.deflate(inset)?.takeUnless { it.isEmpty } ?: Rect.Zero
+            bounds[0] = rect.takeUnless { visible.isEmpty }?.takeUnless { it.isEmpty } ?: Rect.Zero
             if (context != null && !rect.isEmpty) {
                 val destination = checkNotNull(routeKey)
                 val shape = context.shapes.shape
