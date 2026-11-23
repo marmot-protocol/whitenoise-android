@@ -80,16 +80,21 @@ private class PdfObjectSources(
             false
         }
 
-    /** Whether [stream]'s declared `/Length` ends its data exactly where the walk found its `endstream`. */
+    /**
+     * Whether [stream]'s declared `/Length`, stored once, ends its data exactly where the walk found its `endstream`.
+     * A length stored in several revisions is ambiguous, so it confirms nothing.
+     */
     fun confirms(stream: PdfGuessedStream): Boolean {
         val reference = stream.length as? PdfRef
-        val declared = reference?.let { values(it.number to it.generation) }.orEmpty()
-        return stream.endKeyword >= 0 &&
-            declared.any { (value, _) ->
-                val end = (value as? PdfNumber)?.intOrNull()?.let { stream.dataStart.toLong() + it }
-                end != null && end <= bytes.size && bytes.skipSpace(end.toInt()) == stream.endKeyword
-            }
+        val declared = reference?.let { values(it.number to it.generation) }?.singleOrNull()?.first as? PdfNumber
+        val end = declared?.intOrNull()?.let { stream.dataStart.toLong() + it }
+        return stream.endKeyword >= 0 && end != null && end <= bytes.size && skipsTo(end.toInt(), stream.endKeyword)
     }
+
+    private fun skipsTo(
+        from: Int,
+        keyword: Int,
+    ): Boolean = bytes.skipSpace(from) == keyword
 
     /** How often each of [targets] is referred to anywhere: in the file and in object streams it compresses. */
     fun referenceCounts(targets: Set<Pair<Int, Int>>): Map<Pair<Int, Int>, Int> {
@@ -116,10 +121,12 @@ private fun planInfoDictionaries(
     val references = mutableListOf<PdfRef>()
     val named = mutableSetOf<Pair<Int, Int>>()
     (layout.trailers.mapNotNull { it["Info"] } + layout.embeddedInfo).forEach { info ->
-        if (info is PdfRef) {
-            named += info.number to info.generation
-        } else {
-            blankInfoValue(info, plan.fields, references) { at, replacement -> plan.replace(at, replacement) }
+        when {
+            // A string named indirectly, such as pdfTeX's file name, is emptied only when nothing else uses it.
+            info is PdfRef && sources.values(info.number to info.generation)?.all { it.first is PdfString } == true ->
+                references += info
+            info is PdfRef -> named += info.number to info.generation
+            else -> blankInfoValue(info, plan.fields, references) { at, replacement -> plan.replace(at, replacement) }
         }
     }
     val orphans = (layout.infoLike + sources.compressedInfoLike()).toSet() - named
@@ -128,7 +135,7 @@ private fun planInfoDictionaries(
         (named + unreferenced).all { reference ->
             val values = sources.values(reference)
             !values.isNullOrEmpty() &&
-                values.all { (value, edit) -> blankInfoValue(value, plan.fields, references, edit) }
+                values.all { (value, edit) -> value is PdfDict && blankInfoValue(value, plan.fields, references, edit) }
         }
     if (!blanked || !blankReferencedStrings(references, sources, plan)) {
         plan.refuse(PdfMetadataRefusal.Unsupported)

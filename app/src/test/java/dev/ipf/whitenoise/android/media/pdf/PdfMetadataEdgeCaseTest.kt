@@ -144,6 +144,52 @@ class PdfMetadataEdgeCaseTest {
         assertFalse(bytes.text().contains("Alice Example"))
     }
 
+    /** A length stored in two revisions is ambiguous, so a guessed stream end is not trusted. */
+    @Test
+    fun aLengthStoredTwiceConfirmsNothing() {
+        val source =
+            pdf(
+                "1 0 obj << /Type /Catalog >> endobj",
+                "3 0 obj << /Author (Alice Example) >> endobj",
+                "5 0 obj << /Length 6 0 R >> stream\nBT ET\nendstream endobj",
+                "6 0 obj 5 endobj",
+                "6 0 obj 9 endobj",
+                trailer = "<< /Root 1 0 R /Info 3 0 R >>",
+            )
+
+        assertEquals(PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported), PdfMetadataScrubber.inspect(source))
+    }
+
+    /** pdfTeX's file name, stored as a string a form field also uses, is left alone by refusing. */
+    @Test
+    fun anIndirectFileNameSharedWithAFieldIsRefused() {
+        val source =
+            pdf(
+                "1 0 obj << /Type /Catalog >> endobj",
+                "4 0 obj << /FT /Tx /V 9 0 R >> endobj",
+                "7 0 obj << /Type /XObject /Subtype /Form /PTEX.FileName 9 0 R /Length 0 >> stream\n\nendstream endobj",
+                "9 0 obj (figure.pdf) endobj",
+                trailer = "<< /Root 1 0 R >>",
+            )
+
+        assertEquals(PdfMetadataResult.Refused(PdfMetadataRefusal.Unsupported), PdfMetadataScrubber.inspect(source))
+    }
+
+    /** pdfTeX's file name stored on its own is emptied. */
+    @Test
+    fun anIndirectFileNameOnItsOwnIsEmptied() {
+        val bytes =
+            pdf(
+                "1 0 obj << /Type /Catalog >> endobj",
+                "7 0 obj << /Type /XObject /Subtype /Form /PTEX.FileName 9 0 R /Length 0 >> stream\n\nendstream endobj",
+                "9 0 obj (/home/alice/figure.pdf) endobj",
+                trailer = "<< /Root 1 0 R >>",
+            )
+
+        assertTrue(PdfMetadataScrubber.scrub(bytes) is PdfMetadataResult.Scrubbed)
+        assertFalse(bytes.text().contains("alice"))
+    }
+
     /** A signature key spelled with name escapes still marks the PDF signed. */
     @Test
     fun anEscapedSignatureKeyIsFound() {

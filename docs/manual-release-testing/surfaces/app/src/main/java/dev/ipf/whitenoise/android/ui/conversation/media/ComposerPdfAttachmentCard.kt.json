@@ -36,6 +36,24 @@
           "MED-064",
           "MED-065"
         ]
+      },
+      {
+        "surface": "ComposerPdfPrivacyIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfPrivacyIcon(",
+        "test_ids": [
+          "MED-064",
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "ComposerPdfPrivacy.color",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfPrivacy.color(",
+        "test_ids": [
+          "MED-064",
+          "MED-065"
+        ]
       }
     ]
   },

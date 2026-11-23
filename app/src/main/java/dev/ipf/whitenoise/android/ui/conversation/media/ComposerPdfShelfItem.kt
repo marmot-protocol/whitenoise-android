@@ -170,7 +170,8 @@ private fun unpreparedPdf(
             FileInputStream(asset.fileDescriptor).use { input ->
                 val channel = input.channel
                 val length = if (asset.length >= 0) asset.length else channel.size() - asset.startOffset
-                PdfMetadataScrubber.inspect(channel, asset.startOffset, length)
+                // A pipe reports no size; it cannot be mapped, so it is read as a PDF that could not be opened.
+                if (length > 0) PdfMetadataScrubber.inspect(channel, asset.startOffset, length) else null
             }
         }
     }.getOrNull() ?: unreadable
