@@ -166,8 +166,16 @@ internal class GlobalAttachmentOpener(
             downloadLibraryFile(appState) { fetch() }
             return
         }
+        val file =
+            runCatchingCancellable { fetch() }
+                .getOrElse { error ->
+                    appState.presentFailure(R.string.media_couldnt_open, "GLOBAL_LIBRARY_FILE_OPEN", error)
+                    return
+                }
+        // A closed opener belongs to an account or runtime that is gone, so its file never reaches another app.
+        if (closed) return
         val outcome =
-            runCatchingCancellable { openFile(fetch(), reference.mediaType, reference.fileName, null, null) }
+            runCatchingCancellable { openFile(file, reference.mediaType, reference.fileName, null, null) }
                 .getOrElse { error ->
                     appState.presentFailure(R.string.media_couldnt_open, "GLOBAL_LIBRARY_FILE_OPEN", error)
                     return

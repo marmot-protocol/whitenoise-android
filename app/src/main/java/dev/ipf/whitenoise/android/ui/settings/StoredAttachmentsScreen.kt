@@ -123,7 +123,8 @@ internal fun StoredAttachmentsContent(
         groupIdHex?.let { storageChatTitle(appState, it) } ?: stringResource(R.string.storage_largest_attachments)
     SettingsScaffold(
         title = title,
-        onBack = onBack,
+        // The toolbar's Back clears a selection first, the same as the system Back.
+        onBack = { if (list.selecting) actions.onSelectAll(false) else onBack() },
         topBarActions = { if (list.items.isNotEmpty()) SelectAllAction(list, actions.onSelectAll) },
         bottomBar = { if (list.selecting) StorageSelectionBar(list, storage.busy) { confirm = SELECTION } },
     ) {

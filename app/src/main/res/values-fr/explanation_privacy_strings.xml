@@ -64,5 +64,5 @@
     <string name="explanation_privacy_profile_mute">Met en sourdine les notifications de messages de cette personne. Cela ne concerne que les messages ; la livraison et les compteurs de non lus ne changent pas.</string>
     <string name="explanation_privacy_profile_system">Ouvre les réglages d\'Android pour les notifications de cette personne, où vous pouvez définir un son et un comportement personnalisés. Les réglages personnalisés s\'appliquent à toutes les conversations de ce compte.</string>
     <string name="explanation_privacy_profile_vibration">Choisit le motif de vibration des notifications de cette personne.</string>
-    <string name="explanation_privacy_storage_attachment_open">Ouvre cette pièce jointe pour que vous puissiez la vérifier avant de la retirer. La coche, ou un appui long sur la ligne, la sélectionne pour la retirer avec d\'autres. Rien n\'est retiré tant que vous ne choisissez pas Retirer.</string>
+    <string name="explanation_privacy_storage_attachment_open">Ouvre cette pièce jointe pour que vous puissiez la vérifier avant de la supprimer. La coche, ou un appui long sur la ligne, la sélectionne pour la supprimer avec d\'autres. Rien n\'est supprimé tant que vous ne choisissez pas Supprimer.</string>
 </resources>
