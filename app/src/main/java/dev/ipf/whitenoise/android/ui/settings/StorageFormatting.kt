@@ -6,6 +6,8 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GlobalAttachmentPresentation
 import dev.ipf.whitenoise.android.core.globalAttachmentIsVideo
@@ -27,6 +29,17 @@ internal fun formatStorageBytes(
 /** [formatStorageBytes] for composition. */
 @Composable
 internal fun storageBytes(bytes: Long): String = formatStorageBytes(LocalContext.current, bytes)
+
+/** "1.1 GB · 88 attachments". */
+@Composable
+internal fun storageCountAndSize(
+    count: Long,
+    bytes: Long,
+): String {
+    val quantity = count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    val attachments = pluralStringResource(R.plurals.storage_attachment_count, quantity, count)
+    return stringResource(R.string.storage_size_detail, storageBytes(bytes), attachments)
+}
 
 /** The picker label for a Keep media window, written so it also reads inside a sentence. */
 internal val KeepMediaPeriod.labelRes: Int

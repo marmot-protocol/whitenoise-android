@@ -123,8 +123,7 @@ internal fun StoredAttachmentsContent(
         groupIdHex?.let { storageChatTitle(appState, it) } ?: stringResource(R.string.storage_largest_attachments)
     SettingsScaffold(
         title = title,
-        // The toolbar's Back clears a selection first, the same as the system Back.
-        onBack = { if (list.selecting) actions.onSelectAll(false) else onBack() },
+        onBack = selectionAwareBack(list, actions, onBack),
         topBarActions = { if (list.items.isNotEmpty()) SelectAllAction(list, actions.onSelectAll) },
         bottomBar = { if (list.selecting) StorageSelectionBar(list, storage.busy) { confirm = SELECTION } },
     ) {
@@ -167,6 +166,13 @@ internal fun StoredAttachmentsContent(
         }
     }
 }
+
+/** The toolbar's Back: it clears a selection first, the same as the system Back, and otherwise leaves the list. */
+private fun selectionAwareBack(
+    list: StoredAttachmentsUiState,
+    actions: StoredAttachmentsActions,
+    onBack: () -> Unit,
+): () -> Unit = { if (list.selecting) actions.onSelectAll(false) else onBack() }
 
 /**
  * The chat's attachment count and bytes: summed from its own list once every page is loaded, else the overview's row,
@@ -233,17 +239,6 @@ private fun LazyListScope.storageChatActionItems(
             SettingsExplainer(stringResource(R.string.storage_removal_help))
         }
     }
-}
-
-/** "1.1 GB · 88 attachments". */
-@Composable
-private fun storageCountAndSize(
-    count: Long,
-    bytes: Long,
-): String {
-    val quantity = count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-    val attachments = pluralStringResource(R.plurals.storage_attachment_count, quantity, count)
-    return stringResource(R.string.storage_size_detail, storageBytes(bytes), attachments)
 }
 
 /**

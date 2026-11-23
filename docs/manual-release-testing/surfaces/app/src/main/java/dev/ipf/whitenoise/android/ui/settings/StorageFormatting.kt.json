@@ -172,6 +172,14 @@
           "SET-049",
           "SET-050"
         ]
+      },
+      {
+        "surface": "string:storage_size_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_size_detail",
+        "test_ids": [
+          "SET-049"
+        ]
       }
     ]
   },
