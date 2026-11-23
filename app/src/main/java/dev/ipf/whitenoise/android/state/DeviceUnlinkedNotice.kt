@@ -26,11 +26,23 @@ internal suspend fun WhiteNoiseAppState.presentDeviceUnlinked(accountRef: String
     val next = signOutOutcome(accounts, accountRef).nextActiveRef
     if (unlinkNoticeNeeded(listed, active, hasNext = next != null)) {
         presentText(
-            title = AppText.Resource(R.string.device_unlinked_title),
-            detail = AppText.Resource(R.string.device_unlinked_detail, listOf(name ?: accountRef)),
+            ToastMessage(
+                title = AppText.Resource(R.string.device_unlinked_title),
+                detail = AppText.Resource(R.string.device_unlinked_detail, listOf(name ?: accountRef)),
+                unlinkedAccount = accountRef,
+            ),
         )
     }
     if (active && next != null) setActiveAccount(next)
+}
+
+/**
+ * Takes down the notice that [accountRef] was unlinked once that account is gone from this device. The notice asks
+ * the user to remove the account, so it stops being true when no copy is left, and it stays while one is. A notice
+ * about another account, or about anything else, stays too.
+ */
+internal fun WhiteNoiseAppState.retireDeviceUnlinkedNotice(accountRef: String) {
+    if (toast?.unlinkedAccount == accountRef && accounts.none { it.label == accountRef }) clearToast()
 }
 
 /**

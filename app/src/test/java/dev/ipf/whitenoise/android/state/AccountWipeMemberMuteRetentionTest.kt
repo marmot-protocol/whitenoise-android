@@ -4,10 +4,13 @@ import android.app.Application
 import android.content.Context
 import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.appModuleSource
+import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
@@ -96,13 +99,15 @@ class AccountWipeMemberMuteRetentionTest {
                         wiped = localCleanupCompleted
                     }
                 "listAccounts" -> {
-                    val before = listOf(localAccount(WIPED_ACCOUNT).copy(unlinked = savedUnlinked))
+                    val unlinked = localAccount(WIPED_ACCOUNT).copy(unlinked = savedUnlinked)
+                    val before = listOf(unlinked) + remainingAccounts
                     listAccountsFailure?.let(::suspendFailure) ?: if (wiped) remainingAccounts else before
                 }
                 "signInAccount" -> {
                     signInCalls++
                     Unit
                 }
+                "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
                 "toString" -> "AccountWipeMemberMuteRetentionMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -325,12 +330,18 @@ class AccountWipeMemberMuteRetentionTest {
     @Test
     fun refusedInactiveRemovalKeepsBothProfilesIntact() = verifyInactiveWipe(completed = false)
 
+    /**
+     * Removes the unlinked inactive account, with native cleanup finishing or refused as [completed] says, and checks
+     * the surviving profile's session, files and upload are untouched. The unlinked notice goes only when it finished.
+     */
     private fun verifyInactiveWipe(completed: Boolean) =
         runBlocking {
             savedUnlinked = true
             localCleanupCompleted = completed
             unreachableSibling = completed
             val state = appState(active = SURVIVING_ACCOUNT)
+            state.presentDeviceUnlinked(WIPED_ACCOUNT)
+            assertEquals(WIPED_ACCOUNT, state.toast?.unlinkedAccount)
             val files =
                 listOf(MediaCacheDirs.COMPOSER_PASTE, MediaCacheDirs.UPLOAD_SOURCES).map { directory ->
                     val root = File(context.cacheDir, directory).apply { mkdirs() }
@@ -355,6 +366,8 @@ class AccountWipeMemberMuteRetentionTest {
                 registered.await()
                 assertEquals(completed, state.removeUnlinkedAccount(WIPED_ACCOUNT))
                 assertEquals(WIPED_ACCOUNT, nativeWipeTarget)
+                // The notice asks for this removal, so it goes with the removed copy and stays when removal is refused.
+                assertEquals(if (completed) null else WIPED_ACCOUNT, state.toast?.unlinkedAccount)
                 assertEquals(SURVIVING_ACCOUNT, state.activeAccountRef)
                 assertEquals(epoch, state.runtimeGeneration)
                 assertEquals(uploadEpoch, state.mediaUploadSessionEpoch())
@@ -367,6 +380,38 @@ class AccountWipeMemberMuteRetentionTest {
                 upload.cancel()
             }
         }
+
+    /** Removing one unlinked account leaves a notice about another account, and any ordinary notice, on screen. */
+    @Test
+    fun removingAnUnlinkedAccountKeepsEveryOtherNotice() =
+        runBlocking {
+            val others =
+                listOf(
+                    ToastMessage(AppText.Plain("unlinked"), unlinkedAccount = SURVIVING_ACCOUNT),
+                    ToastMessage(AppText.Plain("something else")),
+                )
+            for (other in others) {
+                savedUnlinked = true
+                wiped = false
+                val state = appState(active = SURVIVING_ACCOUNT)
+                state.presentText(other)
+
+                assertTrue(state.removeUnlinkedAccount(WIPED_ACCOUNT))
+                assertEquals(other, state.toast)
+            }
+        }
+
+    /** Sign out and wipe in Settings retires the unlinked notice as well, after its own wipe attempt. */
+    @Test
+    fun theSettingsWipeRetiresTheUnlinkedNoticeAfterItsWipe() {
+        val wipe =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountWipeAndSignOut.kt")
+                .functionBody("launchAccountWipe")
+        val attempt = wipe.indexOf("signOutAndWipeActiveAccount()")
+
+        assertTrue(attempt >= 0)
+        assertTrue(wipe.indexOf("retireDeviceUnlinkedNotice(requested)") > attempt)
+    }
 
     /** An inactive wipe reports retained ownerless files, evicts unused playback and keeps a live player readable. */
     @Test

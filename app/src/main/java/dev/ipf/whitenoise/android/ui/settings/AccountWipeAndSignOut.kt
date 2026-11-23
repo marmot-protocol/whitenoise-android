@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SignOutCompletion
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
+import dev.ipf.whitenoise.android.state.retireDeviceUnlinkedNotice
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
@@ -139,6 +140,7 @@ private fun launchAccountWipe(
                 return@runAccountWipeMutation
             }
             val report = appState.signOutAndWipeActiveAccount()?.report
+            appState.retireDeviceUnlinkedNotice(requested)
             if (report == null) {
                 // Total FFI failure: nothing was wiped and the
                 // runtime state was restored — this one is

@@ -10,7 +10,10 @@ internal suspend fun WhiteNoiseAppState.removeUnlinkedAccount(label: String): Bo
     return completion.native.localCleanup.completed
 }
 
-/** Removes exactly the rendered unlinked identity, after rechecking its native status under the account lifetime. */
+/**
+ * Removes exactly the rendered unlinked identity, after rechecking its native status under the account lifetime.
+ * Once the copy is gone its unlinked notice goes with it, and a removal that did not finish leaves the notice up.
+ */
 internal suspend fun WhiteNoiseAppState.removeUnlinkedAccountForOutcome(
     label: String,
     expectedRuntime: Int = runtimeGeneration,
@@ -24,6 +27,8 @@ internal suspend fun WhiteNoiseAppState.removeUnlinkedAccountForOutcome(
         if (!ownsRequest()) return@withAccountLifetime null
         val unlinked = runCatchingCancellable { marmotIo { listAccounts().find { it.label == label && it.unlinked } } }
         val target = unlinked.getOrNull() ?: return@withAccountLifetime null
-        if (ownsRequest()) signOutAndWipeActiveAccountLocked(label, target.accountIdHex) else null
+        val completion = if (ownsRequest()) signOutAndWipeActiveAccountLocked(label, target.accountIdHex) else null
+        retireDeviceUnlinkedNotice(label)
+        completion
     }
 }
