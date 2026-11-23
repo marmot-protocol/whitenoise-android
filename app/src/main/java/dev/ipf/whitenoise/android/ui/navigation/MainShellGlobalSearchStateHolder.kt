@@ -82,7 +82,8 @@ internal fun rememberMainShellGlobalSearchState(
         GlobalSearchTransitions.reconcileAccountScope(globalSearchState, globalSearchAccountScope)
     val viewport = key(globalSearchAccountScope) { rememberGlobalSearchViewport() }
     // In memory only, and out of the saveable codec: a new account or process starts with no recents (#4004).
-    val recents = remember(globalSearchAccountScope, recentsOwner) { recentsOwner.obtain(globalSearchAccountScope.encodeToken()) }
+    val recents =
+        remember(globalSearchAccountScope, recentsOwner) { recentsOwner.obtain(globalSearchAccountScope.encodeToken()) }
     var conversationReturn by key(globalSearchAccountScope) {
         rememberSaveable(stateSaver = ConversationSearchReturnSaver) { mutableStateOf<ConversationSearchReturn?>(null) }
     }

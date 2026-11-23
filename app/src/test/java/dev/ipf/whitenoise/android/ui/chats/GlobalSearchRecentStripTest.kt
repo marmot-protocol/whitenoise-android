@@ -154,7 +154,9 @@ class GlobalSearchRecentStripTest {
         assertEquals(2, recents.entries.size)
     }
 
-    private fun mount(prepare: (OffWindowActionFixture) -> Unit = {}): Pair<OffWindowActionFixture, GlobalSearchRecents> {
+    private fun mount(
+        prepare: (OffWindowActionFixture) -> Unit = {},
+    ): Pair<OffWindowActionFixture, GlobalSearchRecents> {
         val model = OffWindowActionFixture(scope)
         fixture = model
         prepare(model)

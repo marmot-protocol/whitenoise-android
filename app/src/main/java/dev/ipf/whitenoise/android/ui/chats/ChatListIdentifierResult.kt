@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,30 +20,6 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
 /**
- * Resolution state for a chat-list search query that parsed as a Nostr
- * identifier (npub / NIP-05) — issue #344. An npub resolves synchronously to
- * its key; a NIP-05 address has to be looked up over the network, so it passes
- * through [Resolving] before landing on [Resolved] or [Failed]. [None] is the
- * ordinary plain-text-query case where the chat list filters as before.
- */
-internal sealed interface IdentifierResolution {
-    data object None : IdentifierResolution
-
-    data object Resolving : IdentifierResolution
-
-    /** Resolved to a profile; [npub] is ready to hand to the profile sheet. */
-    data class Resolved(
-        val npub: String,
-    ) : IdentifierResolution
-
-    /** Resolution failed; [messageRes] is the inline error to show. */
-    data class Failed(
-        @StringRes val messageRes: Int,
-        val arg: String? = null,
-    ) : IdentifierResolution
-}
-
-/**
  * Inline chat-list search result for a pasted Nostr identifier (#344). Renders
  * the resolve lifecycle: a spinner while a NIP-05 lookup is in flight; once
  * resolved, either the existing 1:1 chat row (when the active account already
@@ -55,6 +30,7 @@ internal sealed interface IdentifierResolution {
  * reach here — they keep filtering the list as before.
  */
 @Composable
+@Suppress("FunctionNaming")
 internal fun ChatListIdentifierResult(
     resolution: IdentifierResolution,
     appState: WhiteNoiseAppState,

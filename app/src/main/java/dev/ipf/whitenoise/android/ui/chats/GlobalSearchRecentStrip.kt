@@ -148,7 +148,10 @@ internal fun GlobalSearchRecentSection(
         }
         // A plain row of at most eight tiles: no lazy saveable item state, so no destination ID reaches saved state.
         Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+            modifier =
+                Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             entries.forEach { entry ->
@@ -242,7 +245,9 @@ private fun rememberGlobalSearchRecentChats(
 ): Map<String, ChatListItem> {
     val ids =
         remember(entries) {
-            entries.filterIsInstance<GlobalSearchRecent.Chat>().mapTo(HashSet()) { it.groupIdHex.lowercase(Locale.ROOT) }
+            entries.filterIsInstance<GlobalSearchRecent.Chat>().mapTo(HashSet()) {
+                it.groupIdHex.lowercase(Locale.ROOT)
+            }
         }
     val window = remember(controller.items, controller.archivedItems) { controller.items + controller.archivedItems }
     val loaded =
