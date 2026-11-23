@@ -2006,7 +2006,7 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
       "symbol": "NostrVideoPlayerDialog",
       "bindings": [
         {
@@ -2014,7 +2014,7 @@
           "selector": {
             "text": "Couldn’t play this video\\."
           },
-          "scope": "ExoPlayer local missing-file failure and Close; no successful playback claim.",
+          "scope": "Refused non-HTTPS video source failure and Close; no successful playback claim.",
           "entry_assertion": {
             "text": "Couldn’t play this video\\."
           },

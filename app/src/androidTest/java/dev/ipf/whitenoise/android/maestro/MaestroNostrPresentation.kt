@@ -16,7 +16,6 @@ internal fun MaestroNostrPresentation(fixture: MaestroPresentationFixture) {
         "nostr-video-failure", "nostr-video-retry" ->
             NostrVideoPlayerDialog(
                 mediaUrl = "file:///nonexistent/maestro-video-fixture.mp4",
-                mediaMimeType = "video/mp4",
                 onDismiss = { fixture.finish("dismiss") },
             )
         "nostr-image", "nostr-image-failure" ->
