@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.findNativeAttachment
+import dev.ipf.whitenoise.android.state.hasNativeAttachment
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.chats.GlobalAttachmentViewerHost
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalAttachmentOpener
@@ -42,8 +43,12 @@ internal fun rememberStoredAttachmentPreview(appState: WhiteNoiseAppState): (Sto
             if (opener != null && account != null && pending[0]?.isActive != true) {
                 pending[0] =
                     scope.launch {
+                        val generation = appState.runtimeGeneration
                         val item = resolveStoredAttachment(appState, account, attachment)
-                        if (appState.activeAccountRef != account) return@launch
+                        // A result for an account or runtime the screen no longer shows is dropped unannounced.
+                        if (appState.activeAccountRef != account || appState.runtimeGeneration != generation) {
+                            return@launch
+                        }
                         if (item == null) {
                             appState.present(R.string.storage_open_failed)
                         } else {
@@ -57,7 +62,10 @@ internal fun rememberStoredAttachmentPreview(appState: WhiteNoiseAppState): (Sto
     }
 }
 
-/** The library item for [attachment], with the message reference MarmotKit holds for it, or null once it is gone. */
+/**
+ * The library item for [attachment], with the message reference MarmotKit holds for it, or null once its local copy
+ * or message is gone.
+ */
 private suspend fun resolveStoredAttachment(
     appState: WhiteNoiseAppState,
     account: String,
@@ -71,6 +79,8 @@ private suspend fun resolveStoredAttachment(
             attachmentIndex = attachment.attachmentIndex,
             sourceMessageIdHex = attachment.sourceMessageIdHex,
         )
+    // Only a copy still on the device opens, so a row removed meanwhile never starts a download.
+    if (!runCatchingCancellable { appState.hasNativeAttachment(request) }.getOrDefault(false)) return null
     val match = runCatchingCancellable { appState.findNativeAttachment(request) }.getOrNull() ?: return null
     return GlobalAttachmentItem(
         groupIdHex = attachment.groupIdHex,

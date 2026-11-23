@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -17,12 +18,14 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -279,6 +282,16 @@ class ManageStorageSemanticsTest {
         composeRule.onNodeWithTag("storage.attachment.select").performClick()
         composeRule.runOnIdle { assertEquals(listOf(rows[0].key) to listOf(rows[0].key), opened to toggled.toList()) }
         composeRule.onNodeWithContentDescription("Select Photo").assertExists()
+        composeRule.onNodeWithTag("storage.attachment").performTouchInput { longClick() }
+        composeRule.runOnIdle { assertEquals(listOf(rows[0].key, rows[0].key), toggled.toList()) }
+        assertEquals(1, opened.size)
+        val labels =
+            composeRule
+                .onNodeWithTag("storage.attachment")
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .map { it.label }
+        assert("Explain" in labels) { labels }
     }
 
     /** Before the last page loads, select-all says it selects only the rows shown. */
