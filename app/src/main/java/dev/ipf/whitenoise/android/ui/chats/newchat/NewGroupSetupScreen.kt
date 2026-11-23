@@ -39,8 +39,6 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.MarmotTraceSection
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
-import dev.ipf.whitenoise.android.state.chatListItemFromProjection
 import dev.ipf.whitenoise.android.state.defaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
@@ -225,33 +223,6 @@ internal fun createdGroupNoticeTitle(
         showCreatedToast -> R.string.toast_chat_created
         else -> null
     }
-
-/**
- * Same authoritative projection mapper, with a captured account and an IO-boundary owner check. Also returns the
- * created roster's member IDs from that same read.
- */
-private suspend fun loadCreatedGroupForOwner(
-    appState: WhiteNoiseAppState,
-    accountRef: String,
-    groupIdHex: String,
-    owner: GroupCreationSession,
-): Pair<ChatListItem, List<String>> {
-    owner.ensureCurrent()
-    val accountHex = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex
-    // The conversation loads its full roster after opening from this committed row.
-    owner.createdRow?.takeIf { it.groupIdHex == groupIdHex }?.let { row ->
-        return chatListItemFromProjection(row = row, activeAccountIdHex = accountHex) to emptyList()
-    }
-    appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
-    val details =
-        appState.marmotIo(MarmotTraceSection.CREATED_GROUP_DETAILS) {
-            owner.ensureCurrent()
-            groupDetails(accountRef, groupIdHex)
-        }
-    owner.ensureCurrent()
-    appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_RETURN)
-    return chatListItemFromAuthoritativeGroupDetails(details, accountHex) to details.members.map { it.memberIdHex }
-}
 
 /**
  * Final step of the New Group flow: name the group, preview the invited

@@ -5,6 +5,12 @@ import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.whitenoise.android.diagnostics.CreationOperation
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
+import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.MarmotTraceSection
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
+import dev.ipf.whitenoise.android.state.chatListItemFromProjection
 import dev.ipf.whitenoise.android.state.groupMemberSelectionFailure
 import dev.ipf.whitenoise.android.state.missingGroupMembersDetail
 import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
@@ -89,4 +95,28 @@ internal class GroupCreationSession(
         ensureCurrent()
         return value
     }
+}
+
+/** Loads the committed chat row, with a full details read for recovered creates. */
+internal suspend fun loadCreatedGroupForOwner(
+    appState: WhiteNoiseAppState,
+    accountRef: String,
+    groupIdHex: String,
+    owner: GroupCreationSession,
+): Pair<ChatListItem, List<String>> {
+    owner.ensureCurrent()
+    val accountHex = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+    // The conversation loads its full roster after opening from this committed row.
+    owner.createdRow?.takeIf { it.groupIdHex == groupIdHex }?.let { row ->
+        return chatListItemFromProjection(row = row, activeAccountIdHex = accountHex) to emptyList()
+    }
+    appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
+    val details =
+        appState.marmotIo(MarmotTraceSection.CREATED_GROUP_DETAILS) {
+            owner.ensureCurrent()
+            groupDetails(accountRef, groupIdHex)
+        }
+    owner.ensureCurrent()
+    appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_RETURN)
+    return chatListItemFromAuthoritativeGroupDetails(details, accountHex) to details.members.map { it.memberIdHex }
 }
