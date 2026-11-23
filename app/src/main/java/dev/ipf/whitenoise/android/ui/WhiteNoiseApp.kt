@@ -575,7 +575,6 @@ internal fun WhiteNoiseApp(
             dictation.cancel()
         }
     }
-
     val explanationHost = rememberExplanationHostState()
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
     // whole app UI so every descendant text field requests incognito mode from
@@ -588,6 +587,7 @@ internal fun WhiteNoiseApp(
             LocalHiddenBuiltinEmojiSets provides rememberBuiltinEmojiSetChoices(context).pickerHidden,
             LocalInAppLinkHandler provides inAppLinkHandler,
             LocalExplanationHost provides explanationHost,
+            dev.ipf.whitenoise.android.ui.common.followedPeopleFor(appState),
         ) {
             // Holding a control explains it; the lock drops any open explanation.
             ExplanationSheetHost(explanationHost, visible = !appState.appLock.screenVisible)

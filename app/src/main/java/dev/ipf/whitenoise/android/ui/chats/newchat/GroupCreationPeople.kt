@@ -98,6 +98,7 @@ internal fun GroupCreationPersonRow(
             48.dp,
             pictureUrl = person.avatarUrl,
             pictureDomain = AvatarImageLoader.publicProfiles(),
+            followedAccount = candidate.accountIdHex,
         )
     }
     val titleIsKey = abbreviatesPublicKey(candidate.displayName, candidate.npub)
@@ -189,6 +190,7 @@ internal fun GroupSelectedPerson(
                     64.dp,
                     pictureUrl = person.avatarUrl,
                     pictureDomain = AvatarImageLoader.publicProfiles(),
+                    followedAccount = candidate.accountIdHex,
                 )
             }
             Surface(

@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.FollowedPersonAvatarFrame
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
@@ -70,6 +71,8 @@ internal fun GroupDetailsHeader(
     readLocalBytes: (suspend () -> ByteArray?)? = null,
     pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+    // A direct chat's peer, as public-key hex, for the followed-person badge; null for a group.
+    followedAccount: String? = null,
 ) {
     val (editOrigin, editClick) =
         dev.ipf.whitenoise.android.ui.settings
@@ -96,26 +99,29 @@ internal fun GroupDetailsHeader(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .testTag("chat_info.avatar")
-                        .clip(CircleShape)
-                        .clickable(
-                            enabled = avatarImageAvailable,
-                            onClickLabel = stringResource(R.string.profile_view_picture),
-                            role = Role.Button,
-                        ) { viewerOpen = true },
-            ) {
-                Avatar(
-                    title = title,
-                    seed = seed,
-                    size = avatarSize,
-                    pictureUrl = safePictureUrl?.takeIf { picture == null },
-                    picture = picture,
-                    groupAnimation = groupAnimation,
-                    pictureDomain = pictureDomain,
-                )
+            // The clip shapes the picture viewer's ripple; the followed badge sits outside it.
+            FollowedPersonAvatarFrame(followedAccount, avatarSize) {
+                Box(
+                    modifier =
+                        Modifier
+                            .testTag("chat_info.avatar")
+                            .clip(CircleShape)
+                            .clickable(
+                                enabled = avatarImageAvailable,
+                                onClickLabel = stringResource(R.string.profile_view_picture),
+                                role = Role.Button,
+                            ) { viewerOpen = true },
+                ) {
+                    Avatar(
+                        title = title,
+                        seed = seed,
+                        size = avatarSize,
+                        pictureUrl = safePictureUrl?.takeIf { picture == null },
+                        picture = picture,
+                        groupAnimation = groupAnimation,
+                        pictureDomain = pictureDomain,
+                    )
+                }
             }
             if (onEdit == null) {
                 EmojiLabel(

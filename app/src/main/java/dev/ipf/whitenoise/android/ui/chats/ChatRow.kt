@@ -1,14 +1,12 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Badge
@@ -22,9 +20,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -34,8 +30,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onLongClick
@@ -313,31 +307,18 @@ internal fun ChatRow(
         selected = selected,
         menuHighlighted = menuHighlighted,
         leadingContent = {
-            Box(
-                modifier =
-                    if (!selectionMode && openableDmAvatarAccount != null) {
-                        // The row offers Open profile to the screen reader; a separate unlabelled stop would not.
-                        Modifier
-                            .clip(CircleShape)
-                            .clearAndSetSemantics {}
-                            .clickable(enabled = interactionsEnabled, role = Role.Button) {
-                                onOpenProfile(appState.npub(openableDmAvatarAccount))
-                            }
-                    } else {
-                        Modifier
-                    },
-            ) {
-                ChatListItemAvatar(item, appState, accountRef, title, 52.dp)
-                if (pinned) {
-                    Surface(
-                        modifier = Modifier.align(Alignment.BottomEnd).size(20.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surface,
-                    ) {
-                        Box(contentAlignment = Alignment.Center) { PinnedBadge() }
-                    }
-                }
-            }
+            ChatRowAvatar(
+                appState = appState,
+                item = item,
+                title = title,
+                accountRef = accountRef,
+                avatarAccount = avatarAccount,
+                openableDmAvatarAccount = openableDmAvatarAccount,
+                profileTapEnabled = !selectionMode,
+                interactionsEnabled = interactionsEnabled,
+                pinned = pinned,
+                onOpenProfile = onOpenProfile,
+            )
         },
         supportingContent = supportingContent@{
             val draft =
