@@ -10,7 +10,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GlobalAttachmentItem
-import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.findNativeAttachment
@@ -71,27 +70,22 @@ private suspend fun resolveStoredAttachment(
     account: String,
     attachment: StoredAttachment,
 ): GlobalAttachmentItem? {
-    val request =
-        AttachmentTransferRequest(
-            accountRef = account,
+    val request = attachment.transferRequest(account)
+    // Only a copy still on the device opens, so a row removed meanwhile never starts a download.
+    val local = runCatchingCancellable { appState.hasNativeAttachment(request) }.getOrDefault(false)
+    val match = if (local) runCatchingCancellable { appState.findNativeAttachment(request) }.getOrNull() else null
+    return match?.let {
+        GlobalAttachmentItem(
             groupIdHex = attachment.groupIdHex,
+            chatTitle = appState.chatTitle(account, attachment.groupIdHex).orEmpty(),
             messageIdHex = attachment.messageIdHex,
             attachmentIndex = attachment.attachmentIndex,
+            mediaType = it.reference.mediaType.ifBlank { attachment.mediaType },
+            label = storageDisplayName(attachment.fileName).orEmpty(),
+            timelineAt = it.timelineAt,
+            sender = it.sender,
             sourceMessageIdHex = attachment.sourceMessageIdHex,
+            reference = it.reference,
         )
-    // Only a copy still on the device opens, so a row removed meanwhile never starts a download.
-    if (!runCatchingCancellable { appState.hasNativeAttachment(request) }.getOrDefault(false)) return null
-    val match = runCatchingCancellable { appState.findNativeAttachment(request) }.getOrNull() ?: return null
-    return GlobalAttachmentItem(
-        groupIdHex = attachment.groupIdHex,
-        chatTitle = appState.chatTitle(account, attachment.groupIdHex).orEmpty(),
-        messageIdHex = attachment.messageIdHex,
-        attachmentIndex = attachment.attachmentIndex,
-        mediaType = match.reference.mediaType.ifBlank { attachment.mediaType },
-        label = storageDisplayName(attachment.fileName).orEmpty(),
-        timelineAt = match.timelineAt,
-        sender = match.sender,
-        sourceMessageIdHex = attachment.sourceMessageIdHex,
-        reference = match.reference,
-    )
+    }
 }

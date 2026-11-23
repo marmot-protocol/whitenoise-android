@@ -1,6 +1,11 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Shader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -21,6 +26,7 @@ import dev.ipf.whitenoise.android.state.StorageUsage
 import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.StoredAttachmentsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.settings.LocalStorageChatTitles
 import dev.ipf.whitenoise.android.ui.settings.ManageStorageActions
 import dev.ipf.whitenoise.android.ui.settings.ManageStorageContent
@@ -132,6 +138,7 @@ class ManageStorageScreenScreenshotTest {
                 complete = true,
                 selected = if (groupIdHex == null) rows.take(2).mapTo(HashSet()) { it.key } else emptySet(),
             )
+        seedThumbnails(appState, rows)
         render(darkTheme) {
             StoredAttachmentsContent(
                 appState = appState,
@@ -143,6 +150,41 @@ class ManageStorageScreenScreenshotTest {
             )
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /**
+     * Gives the video and the photo among [rows] a decoded thumbnail, as a session that already showed them would hold,
+     * so the list draws real previews beside the kind glyphs of the file and the voice note.
+     */
+    private fun seedThumbnails(
+        appState: WhiteNoiseAppState,
+        rows: List<StoredAttachment>,
+    ) {
+        val tones =
+            mapOf(
+                "video/mp4" to Pair(0xFF35506B.toInt(), 0xFFE0A458.toInt()),
+                "image/jpeg" to Pair(0xFF4F7A4A.toInt(), 0xFFF2E3B3.toInt()),
+            )
+        composeRule.runOnUiThread {
+            rows.filter { it.mediaType in tones && it.fileName.isNotEmpty() }.forEach { row ->
+                val (top, bottom) = tones.getValue(row.mediaType)
+                val key = mediaCacheKey(ACCOUNT_REF, row.groupIdHex, row.messageIdHex, row.attachmentIndex)
+                appState.cacheMediaThumbnail(key, gradient(top, bottom))
+            }
+        }
+    }
+
+    /** A small vertical two-tone picture standing in for decoded media. */
+    private fun gradient(
+        top: Int,
+        bottom: Int,
+    ): Bitmap {
+        val size = 96
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val edge = size.toFloat()
+        val paint = Paint().apply { shader = LinearGradient(0f, 0f, 0f, edge, top, bottom, Shader.TileMode.CLAMP) }
+        Canvas(bitmap).drawRect(0f, 0f, edge, edge, paint)
+        return bitmap
     }
 
     /** Sets [content] in the app theme with fixed chat titles. */

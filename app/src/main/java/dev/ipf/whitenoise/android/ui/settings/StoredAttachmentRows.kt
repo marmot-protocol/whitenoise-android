@@ -5,11 +5,13 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -17,6 +19,7 @@ import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,10 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -39,7 +42,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.StoredAttachmentsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
@@ -52,6 +54,11 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 private val StoredAttachmentPreviewSize = 40.dp
+
+/** A video thumbnail's play badge: a small translucent disc that leaves most of the frame visible. */
+private val StoredAttachmentBadgeSize = 20.dp
+private val StoredAttachmentBadgeInset = 2.dp
+private const val STORED_ATTACHMENT_BADGE_ALPHA = 0.72f
 
 /** The check mark's touch target, Material's minimum. */
 private val StoredAttachmentCheckTarget = 48.dp
@@ -229,27 +236,44 @@ private fun storedAttachmentRowColors(
     return ListItemDefaults.colors(containerColor = container, disabledContainerColor = container)
 }
 
-/** A decoded preview already held this session, otherwise the kind glyph, nothing is downloaded or decoded here. */
+/**
+ * The attachment's thumbnail from this device, with a play badge on a video, or its kind glyph while none can be drawn.
+ * See [rememberStoredAttachmentThumbnail] for where the pixels come from; nothing is downloaded.
+ */
 @Composable
 private fun StoredAttachmentPreview(
     appState: WhiteNoiseAppState,
     attachment: StoredAttachment,
     kind: StoredAttachmentKind,
 ) {
-    val account = appState.activeAccountRef
-    val bitmap =
-        account
-            ?.takeIf { kind == StoredAttachmentKind.Photo || kind == StoredAttachmentKind.Video }
-            ?.let { mediaCacheKey(it, attachment.groupIdHex, attachment.messageIdHex, attachment.attachmentIndex) }
-            ?.let(appState::cachedMediaThumbnail)
-    if (bitmap == null) {
-        StoredAttachmentGlyph(kind)
-    } else {
+    val thumbnail = rememberStoredAttachmentThumbnail(appState, attachment, kind)
+    if (thumbnail == null) return StoredAttachmentGlyph(kind)
+    Box(
+        Modifier
+            .size(StoredAttachmentPreviewSize)
+            .clip(MaterialTheme.shapes.small)
+            .testTag("storage.attachment.thumbnail"),
+        contentAlignment = Alignment.Center,
+    ) {
         Image(
-            bitmap = bitmap.asImageBitmap(),
+            bitmap = thumbnail,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(StoredAttachmentPreviewSize).clip(MaterialTheme.shapes.small),
+            modifier = Modifier.fillMaxSize(),
         )
+        if (kind == StoredAttachmentKind.Video) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = STORED_ATTACHMENT_BADGE_ALPHA),
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                modifier = Modifier.size(StoredAttachmentBadgeSize),
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_play_arrow),
+                    contentDescription = null,
+                    modifier = Modifier.padding(StoredAttachmentBadgeInset),
+                )
+            }
+        }
     }
 }

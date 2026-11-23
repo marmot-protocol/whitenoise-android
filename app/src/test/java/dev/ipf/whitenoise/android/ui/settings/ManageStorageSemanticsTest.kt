@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -34,6 +35,8 @@ import dev.ipf.whitenoise.android.state.StorageUsage
 import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.StoredAttachmentsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.ExplanationHostState
+import dev.ipf.whitenoise.android.ui.common.LocalExplanationHost
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -258,23 +261,25 @@ class ManageStorageSemanticsTest {
         val toggled = mutableListOf<String>()
         val appState = appState()
         composeRule.setContent {
-            WhiteNoiseTheme {
-                StoredAttachmentsContent(
-                    appState = appState,
-                    storage = ManageStorageUiState(),
-                    list = StoredAttachmentsUiState(items = rows, complete = true),
-                    groupIdHex = null,
-                    onBack = {},
-                    actions =
-                        StoredAttachmentsActions(
-                            onToggle = { toggled += it },
-                            onSelectAll = {},
-                            onLoadMore = {},
-                            onRetry = {},
-                            onAction = {},
-                            onOpen = { opened += it.key },
-                        ),
-                )
+            CompositionLocalProvider(LocalExplanationHost provides ExplanationHostState()) {
+                WhiteNoiseTheme {
+                    StoredAttachmentsContent(
+                        appState = appState,
+                        storage = ManageStorageUiState(),
+                        list = StoredAttachmentsUiState(items = rows, complete = true),
+                        groupIdHex = null,
+                        onBack = {},
+                        actions =
+                            StoredAttachmentsActions(
+                                onToggle = { toggled += it },
+                                onSelectAll = {},
+                                onLoadMore = {},
+                                onRetry = {},
+                                onAction = {},
+                                onOpen = { opened += it.key },
+                            ),
+                    )
+                }
             }
         }
         composeRule.onNodeWithTag("storage.attachment").performClick()
