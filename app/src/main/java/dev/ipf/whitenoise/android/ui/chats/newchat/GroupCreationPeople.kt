@@ -48,7 +48,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
-import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
