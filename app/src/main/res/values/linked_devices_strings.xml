@@ -158,8 +158,8 @@
     <string name="link_offer_reminder">Link this device to see your chats from your other devices.</string>
     <string name="link_request_default_label">New device</string>
     <string name="link_request_options">Options</string>
-    <string name="link_request_options_detail">Choose the device name and whether to share chats and their history.</string>
-    <string name="explanation_link_request_options">Opens the new device\'s name and what it receives.</string>
+    <string name="link_request_options_detail">Choose whether to share chats and their history.</string>
+    <string name="explanation_link_request_options">Opens what the new device receives.</string>
     <string name="device_move_advanced">Advanced</string>
     <string name="setup_device_link_next">After signing in, you can link this device to get chats from your other devices.</string>
     <string name="unlinked_account_remove_for">Remove %1$s from this device</string>

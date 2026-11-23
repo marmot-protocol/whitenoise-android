@@ -158,8 +158,8 @@
     <string name="link_offer_reminder">Associez cet appareil pour voir les discussions de vos autres appareils.</string>
     <string name="link_request_default_label">Nouvel appareil</string>
     <string name="link_request_options">Options avancées</string>
-    <string name="link_request_options_detail">Choisissez le nom de l’appareil et indiquez si vous souhaitez partager les discussions et leur historique.</string>
-    <string name="explanation_link_request_options">Ouvre le nom du nouvel appareil et ce qu’il reçoit.</string>
+    <string name="link_request_options_detail">Indiquez si vous souhaitez partager les discussions et leur historique.</string>
+    <string name="explanation_link_request_options">Ouvre ce que reçoit le nouvel appareil.</string>
     <string name="device_move_advanced">Avancé</string>
     <string name="setup_device_link_next">Après la connexion, vous pourrez associer cet appareil pour y retrouver les discussions de vos autres appareils.</string>
     <string name="unlinked_account_remove_for">Retirer %1$s de cet appareil</string>

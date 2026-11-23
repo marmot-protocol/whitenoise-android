@@ -158,8 +158,8 @@
     <string name="link_offer_reminder">Collega questo dispositivo per vedere le chat degli altri tuoi dispositivi.</string>
     <string name="link_request_default_label">Nuovo dispositivo</string>
     <string name="link_request_options">Opzioni</string>
-    <string name="link_request_options_detail">Scegli il nome del dispositivo e se condividere le chat e la loro cronologia.</string>
-    <string name="explanation_link_request_options">Apre il nome del nuovo dispositivo e ciò che riceve.</string>
+    <string name="link_request_options_detail">Scegli se condividere le chat e la loro cronologia.</string>
+    <string name="explanation_link_request_options">Apre ciò che riceve il nuovo dispositivo.</string>
     <string name="device_move_advanced">Avanzate</string>
     <string name="setup_device_link_next">Dopo l’accesso puoi collegare questo dispositivo per ricevere le chat dagli altri dispositivi.</string>
     <string name="unlinked_account_remove_for">Rimuovi %1$s da questo dispositivo</string>
