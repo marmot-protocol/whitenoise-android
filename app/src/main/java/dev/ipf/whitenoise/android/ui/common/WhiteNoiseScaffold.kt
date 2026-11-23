@@ -32,6 +32,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.zIndex
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.settingsTransitionInputGate
 
@@ -117,7 +118,7 @@ fun ScaffoldTopBarWithNoticeSlot(
 ) {
     var consumed by remember { mutableStateOf<WindowInsets>(WindowInsets(0, 0, 0, 0)) }
     Layout(
-        modifier = Modifier.onConsumedWindowInsetsChanged { consumed = it },
+        modifier = Modifier.zIndex(1f).onConsumedWindowInsetsChanged { consumed = it },
         content = {
             Box { topBar() }
             Box { if (topNoticeSlot) TopNoticeSlot() }

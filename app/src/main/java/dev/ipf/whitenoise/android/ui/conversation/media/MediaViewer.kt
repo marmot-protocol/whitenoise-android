@@ -1038,7 +1038,7 @@ internal fun MediaViewerFrame(
                             placeable.placeRelative(0, inset)
                         }
                     }.windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
-            snackbar = { SwipeDismissibleSnackbar(it) },
+            snackbar = { SwipeDismissibleSnackbar(it, overlayConfirmation = true) },
         )
     }
 }

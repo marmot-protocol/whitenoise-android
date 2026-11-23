@@ -114,7 +114,15 @@ internal fun Modifier.snackbarSurfaceBoundary(): Modifier = amoledSurfaceBorder(
  * next snackbar would never render.
  */
 @Composable
-fun SwipeDismissibleSnackbar(data: SnackbarData) {
+fun SwipeDismissibleSnackbar(
+    data: SnackbarData,
+    overlayConfirmation: Boolean = false,
+) {
+    val visuals = data.visuals as? ToastSnackbarVisuals
+    if (overlayConfirmation && visuals?.tier == NoticeTier.Confirmation && visuals.actionLabel == null) {
+        ConfirmationBubble(visuals.message, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+        return
+    }
     val dismissState =
         key(data) {
             rememberSwipeToDismissBoxState(

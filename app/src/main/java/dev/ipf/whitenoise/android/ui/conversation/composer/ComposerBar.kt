@@ -87,6 +87,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
 import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
@@ -890,6 +891,7 @@ internal fun ComposerBar(
                 draftAccountRef,
                 draftGroupIdHex,
                 R.string.translation_composer_dictation_off,
+                kind = TransientNoticeKind.Information,
             )
         }
     }
