@@ -89,17 +89,18 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
         if (awaitColdWorkers) selections else selectionsServableNow(selections, accountRef),
         accountRef,
     )
-    val decoded = selections.map { it.first }.mapNotNull { asset ->
-        val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
-        AvatarImageLoader.cachedImage(key)?.let { image ->
-            FirstFrameDurableAvatar(
-                key,
-                image,
-                AvatarImageLoader.peekAnimatedSource(key),
-                AvatarImageLoader.cachedAnimationClassification(key),
-            )
+    val decoded =
+        selections.map { it.first }.mapNotNull { asset ->
+            val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
+            AvatarImageLoader.cachedImage(key)?.let { image ->
+                FirstFrameDurableAvatar(
+                    key,
+                    image,
+                    AvatarImageLoader.peekAnimatedSource(key),
+                    AvatarImageLoader.cachedAnimationClassification(key),
+                )
+            }
         }
-    }
     onPrepared?.invoke(selections.size, decoded.size)
     return decoded
 }
