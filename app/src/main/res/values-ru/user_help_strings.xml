@@ -16,4 +16,5 @@
     <string name="learn_marmot_title">Общайтесь через разные приложения</string>
     <string name="learn_marmot_body">Друзья могут присоединиться к беседе из другого совместимого приложения. White Noise использует Marmot — открытый протокол, позволяющий разным командам создавать совместимые приложения.</string>
     <string name="learn_marmot_link">Приложения Marmot</string>
+    <string name="learn_marmot_link_failed">Не удалось открыть каталог приложений. Откройте marmot.build/apps.html в браузере.</string>
 </resources>

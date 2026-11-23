@@ -16,4 +16,5 @@
     <string name="learn_marmot_title">Farklı uygulamalarda sohbet et</string>
     <string name="learn_marmot_body">Arkadaşların sohbete başka bir uyumlu uygulamadan katılabilir. White Noise, farklı ekiplerin birlikte çalışan uygulamalar geliştirmesini sağlayan açık Marmot protokolünü kullanır.</string>
     <string name="learn_marmot_link">Marmot uygulamalarını keşfet</string>
+    <string name="learn_marmot_link_failed">Uygulama dizini açılamadı. Tarayıcıda marmot.build/apps.html adresini aç.</string>
 </resources>

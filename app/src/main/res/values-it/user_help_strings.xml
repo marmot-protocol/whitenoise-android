@@ -16,4 +16,5 @@
     <string name="learn_marmot_title">Chatta tra app diverse</string>
     <string name="learn_marmot_body">I tuoi amici possono partecipare da un’altra app compatibile. White Noise usa Marmot, un protocollo aperto che permette a team diversi di creare app che funzionano insieme.</string>
     <string name="learn_marmot_link">Scopri le app Marmot</string>
+    <string name="learn_marmot_link_failed">Impossibile aprire il catalogo delle app. Visita marmot.build/apps.html nel browser.</string>
 </resources>

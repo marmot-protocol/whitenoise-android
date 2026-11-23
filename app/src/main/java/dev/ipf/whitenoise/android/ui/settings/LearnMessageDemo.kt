@@ -36,7 +36,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.rememberMessageReplyS
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 
-private const val DemoMessageId = "walkthrough-message"
+private const val DEMO_MESSAGE_ID = "walkthrough-message"
 
 @Suppress("FunctionNaming")
 @Composable
@@ -104,14 +104,14 @@ private fun LearnDemoBubble(
     onReply: () -> Unit,
 ) {
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val swipe = rememberMessageReplySwipeState(DemoMessageId, rtl)
+    val swipe = rememberMessageReplySwipeState(DEMO_MESSAGE_ID, rtl)
     val showActions = stringResource(R.string.learn_show_actions)
     Box(
         Modifier
             .fillMaxWidth()
             .onGloballyPositioned { if (swipe.atRest) swipe.rowBoundsInRoot = it.boundsInRoot() }
             .directionalSwipe(
-                owner = DemoMessageId,
+                owner = DEMO_MESSAGE_ID,
                 settings = rtl,
                 left = rtl,
                 right = !rtl,
@@ -120,7 +120,7 @@ private fun LearnDemoBubble(
                 onCancel = swipe::cancel,
             ),
     ) {
-        MessageReplySwipeGlyph(state = swipe, messageIdHex = DemoMessageId)
+        MessageReplySwipeGlyph(state = swipe, messageIdHex = DEMO_MESSAGE_ID)
         MessageBubbleFrame(
             presentation = messageBubblePresentation(deleted = false, mine = false),
             highlighted = false,

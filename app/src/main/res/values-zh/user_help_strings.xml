@@ -16,4 +16,5 @@
     <string name="learn_marmot_title">跨应用聊天</string>
     <string name="learn_marmot_body">好友可以通过其他兼容应用加入对话。White Noise 使用开放的 Marmot 协议，让不同团队开发的应用能够互通。</string>
     <string name="learn_marmot_link">探索 Marmot 应用</string>
+    <string name="learn_marmot_link_failed">无法打开应用目录。请在浏览器中访问 marmot.build/apps.html。</string>
 </resources>
