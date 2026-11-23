@@ -50,7 +50,13 @@ internal suspend fun downloadNostrVideo(
     withContext(Dispatchers.IO) {
         val target = url.toHttpUrlOrNull()?.takeIf { it.isSafeMediaDestination() } ?: return@withContext null
         // Identity encoding keeps the declared length and the streamed bytes in the same representation.
-        val call = client.newCall(Request.Builder().url(target).header("Accept-Encoding", "identity").build())
+        val request =
+            Request
+                .Builder()
+                .url(target)
+                .header("Accept-Encoding", "identity")
+                .build()
+        val call = client.newCall(request)
         // A blocking connect or read does not observe coroutine cancellation; this child aborts the call instead,
         // on the cancelling thread rather than waiting for a slot in the I/O pool the blocked call occupies.
         val canceller =
