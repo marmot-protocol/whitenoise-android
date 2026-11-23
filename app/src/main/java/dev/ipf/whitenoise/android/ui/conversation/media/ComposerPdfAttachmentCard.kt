@@ -52,13 +52,14 @@ import dev.ipf.whitenoise.android.ui.icons.filled.PictureAsPdf
 import dev.ipf.whitenoise.android.ui.icons.filled.Shield
 import dev.ipf.whitenoise.android.ui.icons.filled.WarningAmber
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import dev.ipf.whitenoise.android.ui.theme.Typography as BaseTypography
 
-private const val PDF_CARD_WIDTH = 256
+private const val PDF_CARD_WIDTH = 288
 private const val PDF_CARD_HEIGHT = 72
 private const val PAGE_WIDTH = 42
 private const val PAGE_HEIGHT = 56
 
-// From this text scale the card drops its page-count line so the name and metadata state fit its fixed height.
+// From this text scale, system and in-app together, the card keeps one line: the metadata state's icon and the name.
 private const val COMPACT_FONT_SCALE = 1.5f
 private val PDF_CARD_SHAPE =
     RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 12.dp, bottomEnd = 12.dp)
@@ -140,18 +141,22 @@ internal fun ComposerPdfAttachmentCard(
             ) {
                 ComposerPdfFirstPage(firstPage)
                 Spacer(Modifier.width(10.dp))
-                val compact = LocalDensity.current.fontScale >= COMPACT_FONT_SCALE
-                Column(verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 2.dp)) {
-                    ComposerPdfFilename(label)
-                    if (!compact || privacyText == null) {
+                if (composerTextScale() >= COMPACT_FONT_SCALE) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (privacy != null) ComposerPdfPrivacyIcon(privacy, Modifier.padding(end = 6.dp).size(20.dp))
+                        ComposerPdfFilename(label)
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        ComposerPdfFilename(label)
                         Text(
                             summary,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                         )
+                        if (privacy != null && privacyText != null) ComposerPdfPrivacyLine(privacy, privacyText)
                     }
-                    if (privacy != null && privacyText != null) ComposerPdfPrivacyLine(privacy, privacyText)
                 }
             }
             ComposerAccessoryRemoveButton(
@@ -216,31 +221,47 @@ private fun ComposerPdfFilename(label: String) {
     }
 }
 
+/** The system font scale times the in-app text size step, which the theme applies to its typography. */
+@Composable
+private fun composerTextScale(): Float {
+    val appScale = MaterialTheme.typography.labelLarge.fontSize.value / BaseTypography.labelLarge.fontSize.value
+    return LocalDensity.current.fontScale * appScale
+}
+
 @Composable
 private fun ComposerPdfPrivacyLine(
     privacy: ComposerPdfPrivacy,
     text: String,
 ) {
-    val removed = privacy == ComposerPdfPrivacy.Removed || privacy == ComposerPdfPrivacy.RemovedOnSend
-    val color =
-        when (privacy) {
-            ComposerPdfPrivacy.Removed, ComposerPdfPrivacy.RemovedOnSend -> MaterialTheme.colorScheme.primary
-            ComposerPdfPrivacy.SendingAsIs -> MaterialTheme.colorScheme.onSurfaceVariant
-            else -> MaterialTheme.colorScheme.error
-        }
-    val icon: ImageVector = if (removed) Icons.Default.Shield else Icons.Default.WarningAmber
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, Modifier.size(12.dp), tint = color)
-        Spacer(Modifier.width(4.dp))
+        ComposerPdfPrivacyIcon(privacy, Modifier.padding(end = 4.dp))
         Text(
             text,
             style = MaterialTheme.typography.labelSmall,
-            color = color,
+            color = privacy.color(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
 }
+
+@Composable
+private fun ComposerPdfPrivacyIcon(
+    privacy: ComposerPdfPrivacy,
+    modifier: Modifier = Modifier,
+) {
+    val removed = privacy == ComposerPdfPrivacy.Removed || privacy == ComposerPdfPrivacy.RemovedOnSend
+    val icon: ImageVector = if (removed) Icons.Default.Shield else Icons.Default.WarningAmber
+    Icon(icon, null, modifier.size(12.dp), tint = privacy.color())
+}
+
+@Composable
+private fun ComposerPdfPrivacy.color(): Color =
+    when (this) {
+        ComposerPdfPrivacy.Removed, ComposerPdfPrivacy.RemovedOnSend -> MaterialTheme.colorScheme.primary
+        ComposerPdfPrivacy.SendingAsIs -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.error
+    }
 
 private val ComposerPdfPrivacy.labelRes: Int
     get() =
