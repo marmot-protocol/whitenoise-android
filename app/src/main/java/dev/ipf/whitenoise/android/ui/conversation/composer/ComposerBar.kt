@@ -1210,14 +1210,11 @@ internal fun ComposerBar(
                 val voicePhase = voiceComposerPhase(voiceRecordingController, voiceReview)
                 val voiceReviewClip = voiceReview?.clip?.takeIf { voicePhase.showsReview }
                 val replyVisible = replyingTo != null || replyExit.exiting
-                // The composer already reserves the resize strip above the accessory slot.
-                val replyInsets =
-                    PaddingValues(
-                        start = 8.dp,
-                        top = if (isAmoledSurfaceTheme()) 0.dp else 8.dp,
-                        end = 8.dp,
-                        bottom = 8.dp,
-                    )
+                val amoled = isAmoledSurfaceTheme()
+                val replyTopInset = if (amoled) 0.dp else 8.dp
+                val replyInsets = PaddingValues(start = 8.dp, top = replyTopInset, end = 8.dp, bottom = 8.dp)
+                val replyLeadsAccessory = replyVisible && attachmentContent == null && editingMessageId == null
+                val accessoryTopInset = if (amoled && replyLeadsAccessory) 8.dp else ComposerResizeStripHeight
                 val baseAccessoryContent: (@Composable () -> Unit)? =
                     // Edit shows its pill in the action row instead, and takes precedence over a reply.
                     if (editingMessageId == null && (replyVisible || attachmentContent != null)) {
@@ -1670,6 +1667,7 @@ internal fun ComposerBar(
                             (maximumComposerHeight - editorLineHeight - ComposerShortcutTarget)
                                 .coerceIn(ComposerShortcutTarget, ComposerToolbarMaximumHeight),
                         accessoryContent = accessoryContent.takeIf { voiceReviewClip == null },
+                        accessoryTopInset = accessoryTopInset,
                         voiceReviewContent =
                             rememberVoiceReviewSlot(voiceReview, voiceReviewClip, voiceRecordingController),
                         recordingContent =

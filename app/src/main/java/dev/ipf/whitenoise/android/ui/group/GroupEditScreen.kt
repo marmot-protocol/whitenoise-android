@@ -64,7 +64,6 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
-import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
@@ -80,6 +79,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelectio
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
@@ -542,7 +542,7 @@ internal fun GroupEditScreen(
             },
             bottomBar = {
                 if (canEdit) {
-                    StickyFormActionBar {
+                    SettingsBottomAction(tonalElevation = 0.dp) {
                         WhiteNoiseButton(
                             onClick = { saveGroupProfile() },
                             enabled = saveEnabled,
