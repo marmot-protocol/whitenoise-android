@@ -24,9 +24,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isOff
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -47,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,7 +62,7 @@ import java.io.File
 
 /**
  * A received voice message keeps its transcribe disc in the side gutter, like translation, and shows the
- * transcript as plain text directly beneath the voice row; no dialog is ever shown.
+ * transcript as labelled body text directly beneath the voice row inside the same bubble; no dialog is ever shown.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -81,6 +86,80 @@ class AudioTranscriptionScreenshotTest {
 
     @Test
     fun completedLargeRtlAmoled() = capture("complete-amoled-rtl-large", completed(), Appearance.AMOLED_RTL)
+
+    /** The production frame: the player on top, the transcript, then the time, all in one bubble. */
+    @Test
+    fun completedInBubbleLight() = capture("bubble-light", completed(), inlineMedia = true)
+
+    @Test
+    fun completedInBubbleAmoledRtlLarge() {
+        capture("bubble-amoled-rtl-large", completed(), Appearance.AMOLED_RTL, inlineMedia = true)
+    }
+
+    /** Automatic mode shows a transcript that is already known at once, with the disc on and no tap. */
+    @Test
+    fun automaticShowsKnownTranscriptWithoutTap() {
+        val scope = VoiceTranscriptionScope(ReceivedVoiceTranscripts(), "alice", automatic = true)
+        scope.storeResult(ATTACHMENT, completed())
+        setReceivedTranscription(scope, File("never-read.ogg"))
+        composeRule.onNodeWithTag(AUDIO_TRANSCRIPT_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(completed().text).assertIsDisplayed()
+        composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG).assertIsOn()
+    }
+
+    /** Turning the disc off hides the transcript but keeps it, so turning it on again shows it immediately. */
+    @Test
+    fun hidingKeepsTranscriptForTheNextShow() {
+        val scope = VoiceTranscriptionScope(ReceivedVoiceTranscripts(), "alice", automatic = true)
+        scope.storeResult(ATTACHMENT, completed())
+        setReceivedTranscription(scope, File("never-read.ogg"))
+        val disc = composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG)
+        disc.performClick().assertIsOff()
+        composeRule.onNodeWithTag(AUDIO_TRANSCRIPT_TEST_TAG).assertDoesNotExist()
+        disc.performClick().assertIsOn()
+        composeRule.onNodeWithText(completed().text).assertIsDisplayed()
+    }
+
+    /**
+     * An automatic attempt that fails turns the disc off without putting guidance under the recording; asking
+     * for that transcript explicitly runs it again and shows the guidance.
+     */
+    @Test
+    fun automaticFailureStaysQuietUntilRequested() {
+        val scope = VoiceTranscriptionScope(ReceivedVoiceTranscripts(), "alice", automatic = true)
+        val file = File.createTempFile("voice", ".ogg").apply { deleteOnExit() }
+        setReceivedTranscription(scope, file)
+        composeRule.waitUntil(TIMEOUT_MS) {
+            val discs = composeRule.onAllNodes(hasTestTag(AUDIO_TRANSCRIBE_TEST_TAG) and isOff())
+            discs.fetchSemanticsNodes().isNotEmpty()
+        }
+        assertTrue(scope.shown(MESSAGE))
+        composeRule.onNodeWithTag(AUDIO_TRANSCRIPT_TEST_TAG).assertDoesNotExist()
+
+        composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG).assertIsOff().performClick()
+        composeRule.waitUntil(TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag(AUDIO_TRANSCRIPT_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertTrue(scope.requestedExplicitly(MESSAGE))
+        composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG).assertIsOn()
+    }
+
+    private fun setReceivedTranscription(
+        scope: VoiceTranscriptionScope,
+        file: File,
+    ) {
+        val toggle = AudioTranscriptionToggleState(MESSAGE)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalVoiceTranscription provides scope) {
+                    Column {
+                        AudioTranscriptionToggle(toggle)
+                        ReceivedAudioTranscription(file, ATTACHMENT, toggle)
+                    }
+                }
+            }
+        }
+    }
 
     @Test
     fun missingProviderLargeRtl() =
@@ -130,7 +209,7 @@ class AudioTranscriptionScreenshotTest {
         val toggle = AudioTranscriptionToggleState()
         composeRule.setContent { WhiteNoiseTheme { AudioTranscriptionToggle(toggle) } }
         composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG).assertDoesNotExist()
-        composeRule.runOnIdle { toggle.register(Any(), ready = true, working = false) }
+        composeRule.runOnIdle { toggle.register(Any(), ready = true, working = false, failedAutomatically = false) }
         composeRule.onNodeWithTag(AUDIO_TRANSCRIBE_TEST_TAG).assertIsDisplayed().assertIsOff()
     }
 
@@ -194,6 +273,7 @@ class AudioTranscriptionScreenshotTest {
         name: String,
         state: AudioTranscriptUi?,
         appearance: Appearance = Appearance.LIGHT,
+        inlineMedia: Boolean = false,
     ) {
         val amoledRtl = appearance == Appearance.AMOLED_RTL
         val direction = if (amoledRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -205,7 +285,7 @@ class AudioTranscriptionScreenshotTest {
             ) {
                 CompositionLocalProvider(LocalLayoutDirection provides direction) {
                     Surface(modifier = Modifier.width(360.dp).testTag(FRAME)) {
-                        IncomingVoiceMessage(state)
+                        IncomingVoiceMessage(state, inlineMedia = inlineMedia)
                     }
                 }
             }
@@ -251,6 +331,7 @@ class AudioTranscriptionScreenshotTest {
                                 status = MessageStatus.Received,
                                 editedLabel = null,
                                 onEditedClick = null,
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         },
                     )
@@ -311,5 +392,8 @@ class AudioTranscriptionScreenshotTest {
 
     private companion object {
         const val FRAME = "audio.transcription.frame"
+        const val MESSAGE = "m1"
+        const val ATTACHMENT = "m1:0:1"
+        const val TIMEOUT_MS = 10_000L
     }
 }

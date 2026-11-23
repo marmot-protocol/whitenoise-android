@@ -110,6 +110,22 @@
         ]
       },
       {
+        "surface": "setting:dictation_transcribe_voice_messages_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_transcribe_voice_messages_title",
+        "test_ids": [
+          "MED-058"
+        ]
+      },
+      {
+        "surface": "setting:dictation_transcribe_voice_messages_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.dictation_transcribe_voice_messages_subtitle",
+        "test_ids": [
+          "MED-058"
+        ]
+      },
+      {
         "surface": "setting:dictation_finish_manual",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_finish_manual",
@@ -264,6 +280,15 @@
         "anchor": "R.string.explanation_appearance_dictation_pause_other_audio",
         "test_ids": [
           "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_dictation_transcribe_voice_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+        "anchor": "R.string.explanation_appearance_dictation_transcribe_voice_messages",
+        "test_ids": [
+          "SET-054",
+          "MED-058"
         ]
       },
       {

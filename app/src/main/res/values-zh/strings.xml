@@ -2792,4 +2792,6 @@
     <string name="remote_signer_disconnect_body">此账号会保留在此设备上。重新配对前，无法发送消息或执行其他需要签名的操作。</string>
     <string name="remote_signer_disconnect_confirm">断开连接</string>
     <string name="remote_signer_switcher_attention">远程签名器需要你的处理</string>
+    <string name="dictation_transcribe_voice_messages_title">自动转写语音消息</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">在查看聊天时显示已下载语音消息的转写文本。 需要 Offline Speech to Text。</string>
 </resources>

@@ -2838,4 +2838,6 @@
     <string name="remote_signer_disconnect_body">L’account rimane su questo dispositivo. L’invio e le altre azioni che richiedono una firma riprendono dopo un nuovo abbinamento.</string>
     <string name="remote_signer_disconnect_confirm">Disconnetti</string>
     <string name="remote_signer_switcher_attention">L’app di firma remota richiede attenzione</string>
+    <string name="dictation_transcribe_voice_messages_title">Trascrivi automaticamente i messaggi vocali</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">Mostra nella conversazione le trascrizioni dei messaggi vocali scaricati. Richiede Offline Speech to Text.</string>
 </resources>

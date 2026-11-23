@@ -2792,4 +2792,6 @@
     <string name="remote_signer_disconnect_body">此賬號會保留在此裝置上。重新配對前，無法傳送訊息或執行其他需要簽名的操作。</string>
     <string name="remote_signer_disconnect_confirm">斷開連線</string>
     <string name="remote_signer_switcher_attention">遠端簽名器需要你的處理</string>
+    <string name="dictation_transcribe_voice_messages_title">自動轉錄語音訊息</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">在查看聊天時顯示已下載語音訊息的轉錄文字。 需要 Offline Speech to Text。</string>
 </resources>

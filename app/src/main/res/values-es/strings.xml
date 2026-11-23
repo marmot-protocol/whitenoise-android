@@ -2838,4 +2838,6 @@
     <string name="remote_signer_disconnect_body">Esta cuenta permanece en el dispositivo. No podrás enviar mensajes ni realizar otras acciones que requieran firma hasta que vuelvas a vincularla.</string>
     <string name="remote_signer_disconnect_confirm">Desconectar</string>
     <string name="remote_signer_switcher_attention">La aplicación de firma remota requiere tu atención</string>
+    <string name="dictation_transcribe_voice_messages_title">Transcribir mensajes de voz automáticamente</string>
+    <string name="dictation_transcribe_voice_messages_subtitle">Muestra las transcripciones de los mensajes de voz descargados al abrir el chat. Requiere Offline Speech to Text.</string>
 </resources>
