@@ -51,7 +51,7 @@ class GlobalSearchPresentationScreenshotTest {
     @Config(sdk = [36], qualifiers = "ar-w320dp-h780dp-mdpi")
     fun typedLargeRtl() = capture("typed_large_rtl", query = "بحث", largeRtl = true)
 
-    /** The actual native identifier profile action has one grouped row. */
+    /** The identifier row presents the published name with the copyable public key. */
     @Test fun identifierLight() = capture("identifier_light", query = "npub1", person = true)
 
     /** Check-row presentation remains a bounded component, not a claim of native filter availability. */
@@ -97,7 +97,7 @@ class GlobalSearchPresentationScreenshotTest {
                             ChatListTopBar(app, true, query, remember { FocusRequester() }, {}, {}, {}, {}, {}, {})
                             if (person) {
                                 ChatListSearchSectionHeader("People", "global-search-heading")
-                                GlobalPersonRow("npub1" + "a".repeat(58), {})
+                                GlobalPersonRow("npub1" + "a".repeat(58), displayName = "Alice Rivera", onOpen = {})
                             }
                             if (content) {
                                 GlobalSearchContentFilterChips(

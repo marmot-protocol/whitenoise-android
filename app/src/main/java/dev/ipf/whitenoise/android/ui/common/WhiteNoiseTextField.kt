@@ -165,7 +165,8 @@ internal fun WhiteNoiseTextField(
 
 /**
  * Password variant of [WhiteNoiseTextField]: same 28 dp container, above label and inset, single line, obfuscated
- * input that reveals the last typed character.
+ * input that reveals the last typed character. [containerModifier] applies to the input surface alone, excluding its
+ * label and supporting text.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -186,6 +187,7 @@ internal fun WhiteNoiseSecureTextField(
     textObfuscationMode: TextObfuscationMode = TextObfuscationMode.RevealLastTyped,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     onKeyboardAction: KeyboardActionHandler? = null,
+    containerModifier: Modifier = Modifier,
 ) {
     val isError = errorMessage != null
     val interactionSource = remember { MutableInteractionSource() }
@@ -236,6 +238,7 @@ internal fun WhiteNoiseSecureTextField(
                             isError = isError,
                             interactionSource = interactionSource,
                             colors = colors,
+                            modifier = containerModifier,
                         )
                     },
                 ),
@@ -268,11 +271,13 @@ private fun WhiteNoiseTextFieldContainer(
     isError: Boolean,
     interactionSource: MutableInteractionSource,
     colors: TextFieldColors,
+    modifier: Modifier = Modifier,
 ) {
     OutlinedTextFieldDefaults.Container(
         enabled = enabled,
         isError = isError,
         interactionSource = interactionSource,
+        modifier = modifier,
         colors = colors,
         shape = WhiteNoiseTextFieldDefaults.Shape,
         focusedBorderThickness = WhiteNoiseTextFieldDefaults.StateRingWidth,

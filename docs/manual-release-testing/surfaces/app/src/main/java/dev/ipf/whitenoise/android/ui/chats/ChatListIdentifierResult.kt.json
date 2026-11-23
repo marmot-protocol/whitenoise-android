@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListIdentifierResult.kt",
         "anchor": "fun ChatListIdentifierResult(",
         "test_ids": [
-          "CHL-001"
+          "CHL-001",
+          "FIND-005"
         ]
       }
     ],

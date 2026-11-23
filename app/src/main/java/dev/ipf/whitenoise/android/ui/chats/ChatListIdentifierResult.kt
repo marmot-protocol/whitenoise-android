@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.search.GlobalPersonRow
 
 /**
  * Inline chat-list search result for a pasted Nostr identifier (#344). Renders
@@ -70,8 +71,13 @@ internal fun ChatListIdentifierResult(
                     onOpenProfile = onOpenProfile,
                 )
             } else {
-                dev.ipf.whitenoise.android.ui.search.GlobalPersonRow(
+                val accountIdHex = resolution.accountIdHex
+                GlobalPersonRow(
                     npub = resolution.npub,
+                    displayName =
+                        appState.contactNicknameFor(accountRef, accountIdHex)
+                            ?: appState.networkDisplayNameOrNull(accountIdHex),
+                    pictureUrl = appState.contactAvatarSource(accountIdHex, accountRef),
                     onOpen = onOpenProfile,
                 )
             }
