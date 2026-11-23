@@ -249,18 +249,21 @@ class ConversationTimelineUnderlayTest {
             val fixtures = listOf(clearHeight - 2 to 4, clearHeight + 2 to 4, clearHeight + 2 to 7)
 
             for ((contentHeight, exposedRowHeight) in fixtures) {
-                val row = object : LazyListItemInfo by newest {
-                    override val size = contentHeight + senderGapPx
-                    override val offset = reading.viewportStartOffset - size + exposedRowHeight
-                }
-                val layout = object : LazyListLayoutInfo by reading {
-                    override val visibleItemsInfo = listOf(row, older)
-                }
+                val row =
+                    object : LazyListItemInfo by newest {
+                        override val size = contentHeight + senderGapPx
+                        override val offset = reading.viewportStartOffset - size + exposedRowHeight
+                    }
+                val layout =
+                    object : LazyListLayoutInfo by reading {
+                        override val visibleItemsInfo = listOf(row, older)
+                    }
                 assertEquals(newest.key, layout.newestReadRow(TIMELINE_LIST_INDICES)?.key)
                 val expected = if (exposedRowHeight <= senderGapPx) older.key else newest.key
-                val candidate = layout.newestReadRow(TIMELINE_LIST_INDICES) { key ->
-                    if (key == newest.key) senderGapPx else 0
-                }
+                val candidate =
+                    layout.newestReadRow(TIMELINE_LIST_INDICES) { key ->
+                        if (key == newest.key) senderGapPx else 0
+                    }
                 assertEquals(expected, candidate?.key)
             }
         }
