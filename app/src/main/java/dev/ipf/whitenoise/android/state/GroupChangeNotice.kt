@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.GroupEventKindFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
 /** MDK's stable refusal tag for a change whose commit or Welcome fits none of its relays. */
@@ -192,7 +193,8 @@ internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(notice: GroupChang
  * waits until its own snackbar has run to the end in its own profile, which [noteToastSeen] records. The toast has one
  * slot, so when the notice leaves the slot without that record, another toast replaced it, and the notice is presented
  * again once the slot is free. A switch to another profile takes the notice off screen, so it is neither seen nor
- * dismissed there, and returns false, leaving MDK's record for when its profile is active again.
+ * dismissed there, and returns false, leaving MDK's record for when its profile is active again. Cancelling it, as a
+ * closing event stream does, takes the notice off screen too, unseen.
  */
 private suspend fun WhiteNoiseAppState.showUntilSeen(
     notice: GroupChangeNotice,
@@ -210,7 +212,14 @@ private suspend fun WhiteNoiseAppState.showUntilSeen(
         // Tagged with the change, so another change's notice with the same wording still replaces this one.
         presentText(ToastMessage(title, detail, groupChangeKey = showing))
         val shown = toast
-        awaitToastOrSwitch { it !== shown }
+        try {
+            awaitToastOrSwitch { it !== shown }
+        } catch (cancelled: CancellationException) {
+            // Its event stream closed, so the notice is withdrawn too, rather than left up for whichever profile comes
+            // next. A newer toast that replaced it stays.
+            clearToast(shown)
+            throw cancelled
+        }
         when {
             // A switch woke it, even one already undone if the notice is still up. Only this notice is withdrawn: a
             // newer toast that replaced it stays.

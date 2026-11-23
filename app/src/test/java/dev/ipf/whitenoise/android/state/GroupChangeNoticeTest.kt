@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
@@ -333,6 +334,27 @@ class GroupChangeNoticeTest {
             Snapshot.sendApplyNotifications()
             repeat(SETTLE_YIELDS) { yield() }
             assertFalse(seen.await())
+            assertEquals(AppText.Plain("Other"), state.toast?.title)
+        }
+
+    /**
+     * Cancelling a notice, as a closing event stream does, takes it off screen unseen, so the next profile never sees
+     * it, but leaves a newer toast that replaced it.
+     */
+    @Test
+    fun aCancelledNoticeIsWithdrawnButANewerToastStays() =
+        runBlocking {
+            val state = appState(active = ACCOUNT)
+            val notice = groupChangeNotice(notDelivered("invite", "not_delivered"))!!
+            async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(notice) }.cancelAndJoin()
+            assertNull(state.toast)
+
+            val again = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(notice) }
+            assertEquals(notice.headline, state.toast?.title)
+            state.presentText(AppText.Plain("Other"))
+            Snapshot.sendApplyNotifications()
+            yield()
+            again.cancelAndJoin()
             assertEquals(AppText.Plain("Other"), state.toast?.title)
         }
 
