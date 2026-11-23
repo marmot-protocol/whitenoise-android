@@ -123,10 +123,8 @@ import dev.ipf.whitenoise.android.state.setConversationMuted
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
-import dev.ipf.whitenoise.android.ui.chats.newchat.LocalNewMessagePenFlight
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
-import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePenFlight
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -1156,8 +1154,9 @@ internal fun ChatsScreen(
 
     // Taken while the list is still on screen, since it may already include the new chat
     // by the time the flow completes (#3529).
-    val penFlight = remember { NewMessagePenFlight() }
-    var newChatFlowOrigin by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var newChatFlowLaunch by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<NewMessageFlowLaunch?>(null)
+    }
     val openNewMessageFlow = {
         newChatFlowOriginHead = visibleReturnHead()
         showNewChatFlow = true
@@ -1839,7 +1838,8 @@ internal fun ChatsScreen(
                     .takeIf { showPlaybackTransport },
         ) {
             dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog(
-                origin = newChatFlowOrigin,
+                origin = newChatFlowLaunch?.origin,
+                penMotion = newChatFlowLaunch?.pen,
                 ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
                 properties =
                     androidx.compose.ui.window.DialogProperties(
@@ -1848,25 +1848,25 @@ internal fun ChatsScreen(
                     ),
                 onDismissRequest = {
                     showNewChatFlow = false
+                    newChatFlowLaunch = null
                     onGroupCreateFlowSuperseded()
                 },
             ) {
-                LaunchedEffect(penFlight.origin) { penFlight.fly() }
-                CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                    NewChatFlowHost(
-                        appState = appState,
-                        onOpenConversation = { item, justCreated ->
-                            showNewChatFlow = false
-                            onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
-                        },
-                        onClose = dismiss,
-                        onGroupCreateSubmitted = onGroupCreateSubmitted,
-                        onGroupCreateCompletedOpen = { item, requestToken ->
-                            showNewChatFlow = false
-                            onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
-                        },
-                    )
-                }
+                NewChatFlowHost(
+                    appState = appState,
+                    onOpenConversation = { item, justCreated ->
+                        showNewChatFlow = false
+                        newChatFlowLaunch = null
+                        onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
+                    },
+                    onClose = dismiss,
+                    onGroupCreateSubmitted = onGroupCreateSubmitted,
+                    onGroupCreateCompletedOpen = { item, requestToken ->
+                        showNewChatFlow = false
+                        newChatFlowLaunch = null
+                        onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
+                    },
+                )
             }
         }
     }
@@ -2536,13 +2536,12 @@ internal fun ChatsScreen(
                 visible = !searchOpen && !selectionMode,
                 motionEnabled = rememberSystemAnimationsEnabled(),
             ) {
-                CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                    ChatsNewMessageFab(
-                        appState,
-                        openNewMessageFlow,
-                        onNewMessageOrigin = { newChatFlowOrigin = it },
-                    )
-                }
+                ChatsNewMessageFab(
+                    appState,
+                    openNewMessageFlow,
+                    onNewMessageOrigin = { pen -> newChatFlowLaunch = pen?.let { NewMessageFlowLaunch(it.origin, it) } },
+                    hidePen = { showNewChatFlow && newChatFlowLaunch?.pen?.drawsSource?.invoke() == true },
+                )
             }
         },
     ) { padding ->
@@ -2812,7 +2811,7 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(appState, onCreate = openNewMessageFlow) { newChatFlowOrigin = it }
+                                EmptyChats(appState, onCreate = openNewMessageFlow) { newChatFlowLaunch = NewMessageFlowLaunch(it) }
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }

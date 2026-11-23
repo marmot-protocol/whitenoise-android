@@ -130,6 +130,7 @@ internal fun rememberSettingsNativeSurface(
     horizontalInset: Dp = 0.dp,
     registrationToken: Any? = null,
     strokeColor: Color = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outline else Color.Unspecified,
+    onMeasured: ((SettingsBubbleCard?) -> Unit)? = null,
 ): Pair<Modifier, () -> Boolean> {
     val morph = LocalSettingsCardMorph.current
     val page = morph?.page
@@ -141,8 +142,13 @@ internal fun rememberSettingsNativeSurface(
     val viewport = LocalSettingsNativeViewport.current
     val identity = LocalSettingsSearchItemKey.current to surface
     val width = with(density) { ceil(1.dp.toPx()) }
-    DisposableEffect(page, token) { onDispose { page?.removeDestination(token) } }
-    if (page == null) return Modifier to { false }
+    DisposableEffect(page, token, onMeasured) {
+        onDispose {
+            page?.removeDestination(token)
+            onMeasured?.invoke(null)
+        }
+    }
+    if (page == null && onMeasured == null) return Modifier to { false }
     val modifier =
         Modifier.onGloballyPositioned { coordinates ->
             // boundsInWindow clips tall content; layout size and local origin retain the true perimeter.
@@ -163,8 +169,7 @@ internal fun rememberSettingsNativeSurface(
                     is Outline.Rounded -> native.roundRect
                     else -> RoundRect(Rect(Offset.Zero, rect.size))
                 }
-            page.reportDestination(
-                token,
+            val endpoint =
                 SettingsRouteEndpoint(
                     identity,
                     destination ?: token,
@@ -178,8 +183,9 @@ internal fun rememberSettingsNativeSurface(
                     strokeWidth = width,
                     viewportToken = viewport,
                     rtl = direction == androidx.compose.ui.unit.LayoutDirection.Rtl,
-                ),
-            )
+                )
+            page?.reportDestination(token, endpoint)
+            onMeasured?.invoke(endpoint.bubbleCard())
         }
     return modifier to { false }
 }

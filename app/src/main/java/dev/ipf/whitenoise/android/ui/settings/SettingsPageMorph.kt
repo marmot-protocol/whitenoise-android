@@ -1,6 +1,10 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.graphics.Picture
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ClipOp
@@ -59,7 +63,20 @@ internal class SettingsPageMorph {
     internal var childBodyTop: (() -> Float)? = null
 
     /** The cards the mounted child route measured, which a top-level bubble may land on. */
-    internal var childCards: (() -> List<SettingsBubbleCard>)? = null
+    internal var childCards: (() -> List<SettingsBubbleCard>)? by mutableStateOf(null)
+    private var bubbleRevision by mutableIntStateOf(0)
+    private var cachedBubbleRevision = -1
+    private var cachedBubbleCards: List<SettingsBubbleCard> = emptyList()
+
+    internal fun bubbleCards(): List<SettingsBubbleCard> {
+        childCards?.invoke()?.takeIf { it.isNotEmpty() }?.let { return it }
+        if (cachedBubbleRevision != bubbleRevision) {
+            cachedBubbleRevision = bubbleRevision
+            cachedBubbleCards = destinations.values.map { it.bubbleCard() }
+        }
+        return cachedBubbleCards
+    }
+
     internal val bodyTop: Float
         get() =
             childBodyTop?.invoke()
@@ -84,11 +101,13 @@ internal class SettingsPageMorph {
     ) {
         if (destinations[token] == endpoint) return
         destinations[token] = endpoint
+        bubbleRevision++
         nativeFrame = null
     }
 
     fun removeDestination(token: Any) {
         val destination = destinations.remove(token)
+        if (destination != null) bubbleRevision++
         val groupRows = rows.remove(token)
         if (destination != null || groupRows != null) nativeFrame = null
     }
@@ -333,6 +352,7 @@ internal class SettingsPageMorph {
         target = next
         opening = forward
         destinations.clear()
+        bubbleRevision++
         rows.clear()
         nativeFrame = null
         pendingOrigin = null

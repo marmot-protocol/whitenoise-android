@@ -50,7 +50,7 @@ import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.TimeUnit
 
 /**
- * Chats and Settings on the top-level route. The measured avatar and pen travel independently.
+ * Chats and Settings on the top-level route. The avatar starts the route and the pen supplies its one moving outline.
  * With neither measured control the page fades over Chats, and reduced motion settles at once.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -106,11 +106,11 @@ class SettingsBubbleMotionScreenshotTest {
         capture("settings_bubble_close_settled_dark")
     }
 
-    @Test fun measuredAmoledAvatarAndPenCarryThePageInAndBack() = measuredRoundTrip("amoled")
+    @Test fun measuredAmoledAvatarEntryCarriesOnePenOutlineInAndBack() = measuredRoundTrip("amoled")
 
-    @Test fun measuredLightAvatarAndPenCarryThePageInAndBack() = measuredRoundTrip("light", dark = false)
+    @Test fun measuredLightAvatarEntryCarriesOnePenOutlineInAndBack() = measuredRoundTrip("light", dark = false)
 
-    @Test fun measuredLargeRtlAvatarAndPenCarryThePageInAndBack() = measuredRoundTrip("large_rtl", largeRtl = true)
+    @Test fun measuredLargeRtlAvatarEntryCarriesOnePenOutlineInAndBack() = measuredRoundTrip("large_rtl", largeRtl = true)
 
     private fun measuredRoundTrip(
         variant: String,
@@ -228,16 +228,12 @@ private fun Route(
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.padding(16.dp)) {
                 if (measured) {
-                    val (origin, open) = rememberSettingsRouteClick(onOpen)
                     Surface(
                         modifier =
                             Modifier
                                 .size(40.dp)
-                                .then(origin)
-                                .settingsCardMorph(SettingsHomeOriginAnchor)
-                                .settingsAvatarFlightSource(0.dp)
                                 .testTag(AVATAR_TAG)
-                                .clickable(onClick = open),
+                                .clickable(onClick = onOpen),
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primaryContainer,
                     ) {
@@ -267,7 +263,7 @@ private fun MeasuredSettings() {
                 row("Profile") {
                     SettingsGroupPanel(it) {
                         Surface(
-                            Modifier.padding(16.dp).size(56.dp).settingsAvatarFlightTarget(),
+                            Modifier.padding(16.dp).size(56.dp),
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
                         ) {

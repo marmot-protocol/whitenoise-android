@@ -8,195 +8,65 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
 
-/**
- * The live endpoints of the top-level Chats/Settings pair, in screen coordinates: the chat-list
- * [avatar] that flies into the Settings profile card's [avatarTarget], and the New message [pen] that
- * morphs into the bottom-most card. Geometry and a display-list layer only; nothing is captured.
- * While a leg draws them, [hideAvatar] and [hidePen] keep the live controls from showing twice; both
- * are state, so a control drawn before its leg began redraws hidden.
- */
+/** The live Home pen can supply one outline to the top-level Settings route. */
 internal class SettingsTopLevelHandoff {
-    var avatar: SettingsAvatarSource? = null
-    var avatarTarget: Rect? = null
-    var pen: SettingsPenSource? = null
-    var hideAvatar: () -> Boolean by mutableStateOf({ false })
+    var pen: SettingsBubbleSource? by mutableStateOf(null)
     var hidePen: () -> Boolean by mutableStateOf({ false })
+    private val landing = SettingsBubbleLanding()
+
+    fun bubble(
+        host: Rect,
+        cards: List<SettingsBubbleCard>,
+    ) = landing.measure(host, cards, pen)
 }
 
-/** The chat-list avatar's live drawing: its [layer], the layer's [layerBounds] and the visible circle's [bounds]. */
-internal class SettingsAvatarSource(
-    val layer: GraphicsLayer,
-) {
-    var layerBounds: Rect = Rect.Zero
-    var bounds: Rect = Rect.Zero
+/** Only a change to a measured endpoint or viewport picks a new landing. */
+internal class SettingsBubbleLanding {
+    private var sceneHost = Rect.Zero
+    private var sceneCards: List<SettingsBubbleCard>? = null
+    private var scenePen: SettingsBubbleSource? = null
+    private var scene: SettingsBubbleGeometry? = null
+
+    fun measure(
+        host: Rect,
+        cards: List<SettingsBubbleCard>,
+        source: SettingsBubbleSource?,
+    ): SettingsBubbleGeometry? {
+        if (host != sceneHost || cards !== sceneCards || source !== scenePen) {
+            sceneHost = host
+            sceneCards = cards
+            scenePen = source
+            val landing = cards.asSequence().filter { it.visibleBounds.visibleIn(host) }.maxByOrNull { it.visibleBounds.bottom }
+            scene = source?.bubbleTo(landing, host)
+        }
+        return scene
+    }
 }
 
-/** The New message pen: its [bounds], corner [radius], [fill] and [border]. */
-internal data class SettingsPenSource(
+/** Source and landing bounds are measured in screen coordinates, then rebased to their receiving host. */
+internal data class SettingsBubbleSource(
     val bounds: Rect,
-    val radius: Float,
-    val fill: Color,
-    val border: Color,
-)
-
-/** The flying avatar in host coordinates: its source layer and the circle it leaves and lands in. */
-internal class SettingsAvatarFlight(
-    val layer: GraphicsLayer,
-    val layerBounds: Rect,
-    val from: Rect,
-    val to: Rect,
-    val profileFill: Color,
-)
-
-/** The measured elements that draw independently of the Settings stack. */
-internal class SettingsBubbleScene(
-    val pen: SettingsBubbleGeometry? = null,
-    val origin: SettingsBubbleGeometry? = null,
-    val flight: SettingsAvatarFlight? = null,
+    val surface: ControlMorphSurface,
 ) {
-    val isEmpty: Boolean get() = pen == null && origin == null && flight == null
-}
-
-/**
- * The top-level scene in [host] coordinates. A measured [origin] flies the avatar into its profile
- * slot or grows an outline into the nearest card. The pen takes the lowest visible card unless the
- * activated control already claims it. With no pen landing, the Settings stack fades in place.
- */
-internal fun settingsBubbleScene(
-    host: Rect,
-    origin: Rect?,
-    cards: List<SettingsBubbleCard>,
-    handoff: SettingsTopLevelHandoff?,
-    avatarTarget: Rect?,
-): SettingsBubbleScene {
-    val start = origin?.takeIf { it.visibleIn(host) } ?: return SettingsBubbleScene()
-    val visible = cards.filter { it.visibleBounds.visibleIn(host) }
-    val avatar = handoff?.avatar?.takeIf { it.bounds.visibleIn(host) && it.bounds.contains(start.center) }
-    val alternateCard = if (avatar == null) nearestSettingsBubbleCard(visible, start, host) else null
-    val bottom = visible.maxByOrNull { it.visibleBounds.bottom }?.takeUnless { it == alternateCard }
-    val pen = handoff?.pen?.takeIf { it.bounds.visibleIn(host) }
-    val shift = -host.topLeft
-    val penLanding =
-        if (bottom != null && pen != null) {
-            val control = SettingsBubbleControl(pen.radius, pen.fill, pen.border)
-            SettingsBubbleGeometry(pen.bounds.translate(shift), bottom.translate(shift), control)
-        } else {
-            null
-        }
-    val flight = avatar?.flightTo(avatarTarget, visible, host)
-    val alternate = alternateCard?.let { SettingsBubbleGeometry(start.translate(shift), it.translate(shift)) }
-    return SettingsBubbleScene(pen = penLanding, origin = alternate, flight = flight)
-}
-
-private fun SettingsAvatarSource.flightTo(
-    avatarTarget: Rect?,
-    cards: List<SettingsBubbleCard>,
-    host: Rect,
-): SettingsAvatarFlight? {
-    val target = avatarTarget?.takeIf { it.visibleIn(host) } ?: return null
-    val profile = cards.firstOrNull { it.visibleBounds.contains(target.center) }
-    val shift = -host.topLeft
-    return profile?.let {
-        SettingsAvatarFlight(
-            layer = layer,
-            layerBounds = layerBounds.translate(shift),
-            from = bounds.translate(shift),
-            to = target.translate(shift),
-            profileFill = it.fill,
-        )
+    fun bubbleTo(
+        landing: SettingsBubbleCard?,
+        host: Rect,
+    ): SettingsBubbleGeometry? {
+        if (landing == null || !bounds.visibleIn(host) || !landing.visibleBounds.visibleIn(host)) return null
+        return SettingsBubbleGeometry(bounds.translate(-host.topLeft), landing.translate(-host.topLeft), surface)
     }
 }
 
-/** The flying avatar's circle at [presence], moving and scaling on the bubble's clock. */
-internal fun settingsAvatarFlightBounds(
-    flight: SettingsAvatarFlight,
-    presence: Float,
-): Rect = lerp(flight.from, flight.to, presence.coerceIn(0f, 1f))
-
-/** Draws the avatar's live layer moved and scaled from its circle to [settingsAvatarFlightBounds], clipped to it. */
-internal fun DrawScope.drawSettingsAvatarFlight(
-    flight: SettingsAvatarFlight,
-    presence: Float,
-) {
-    val circle = settingsAvatarFlightBounds(flight, presence)
-    if (flight.from.width <= 0f || circle.isEmpty) return
-    val scale = circle.width / flight.from.width
-    val inset = flight.from.topLeft - flight.layerBounds.topLeft
-    val clip = Path().apply { addRoundRect(RoundRect(circle, CornerRadius(circle.width / 2f))) }
-    clipPath(clip) {
-        translate(circle.left - inset.x * scale, circle.top - inset.y * scale) {
-            scale(scale, Offset.Zero) { drawLayer(flight.layer) }
-        }
-    }
-}
-
-/**
- * Offers this chat-list avatar's live drawing to the top-level Settings leg that flies it. [inset]
- * trims the touch target to the visible circle. While the leg draws it, the avatar is not drawn here.
- */
-@Composable
-internal fun Modifier.settingsAvatarFlightSource(inset: Dp): Modifier {
-    val handoff = LocalSettingsCardMorph.current?.takeIf { it.page != null }?.topLevel ?: return this
-    val view = LocalView.current
-    val insetPx = with(LocalDensity.current) { inset.toPx() }
-    val layer = rememberGraphicsLayer()
-    val source = remember(handoff, layer) { SettingsAvatarSource(layer) }
-    DisposableEffect(handoff, source) {
-        handoff.avatar = source
-        onDispose { if (handoff.avatar === source) handoff.avatar = null }
-    }
-    return onGloballyPositioned {
-        source.layerBounds = it.settingsMorphBounds(view)
-        source.bounds = source.layerBounds.deflate(insetPx)
-    }.drawWithContent {
-        layer.record { this@drawWithContent.drawContent() }
-        if (!handoff.hideAvatar()) drawLayer(layer)
-    }
-}
-
-/** Marks the Settings profile avatar, where the flying chat-list avatar lands. */
-@Composable
-internal fun Modifier.settingsAvatarFlightTarget(): Modifier {
-    val handoff =
-        LocalSettingsCardMorph.current
-            ?.root
-            ?.takeIf { it.page != null }
-            ?.topLevel ?: return this
-    val view = LocalView.current
-    val token = remember(handoff) { arrayOf<Rect?>(null) }
-    DisposableEffect(handoff, token) {
-        onDispose { if (handoff.avatarTarget === token[0]) handoff.avatarTarget = null }
-    }
-    return onGloballyPositioned {
-        val bounds = it.settingsMorphBounds(view)
-        token[0] = bounds
-        handoff.avatarTarget = bounds
-    }
-}
-
-/**
- * Offers the New message pen to the top-level Settings leg that morphs it into the bottom card; while
- * the leg draws it, the pen is not drawn here. Without [enabled] (another control) nothing is offered.
- */
+/** The relay warning is not a pen and does not supply an outline. */
 @Composable
 internal fun Modifier.settingsPenSource(
     enabled: Boolean,
@@ -206,14 +76,16 @@ internal fun Modifier.settingsPenSource(
 ): Modifier {
     val handoff = LocalSettingsCardMorph.current?.takeIf { enabled && it.page != null }?.topLevel ?: return this
     val view = LocalView.current
-    val radiusPx = with(LocalDensity.current) { radius.toPx() }
-    val token = remember(handoff) { arrayOf<SettingsPenSource?>(null) }
+    val surface = with(LocalDensity.current) { ControlMorphSurface(fill, border, radius.toPx(), 1.dp.toPx(), 1f) }
+    val token = remember(handoff) { arrayOf<SettingsBubbleSource?>(null) }
     DisposableEffect(handoff, token) {
         onDispose { if (handoff.pen === token[0]) handoff.pen = null }
     }
     return onGloballyPositioned {
-        val pen = SettingsPenSource(it.settingsMorphBounds(view), radiusPx, fill, border)
-        token[0] = pen
-        handoff.pen = pen
+        val pen = SettingsBubbleSource(it.settingsMorphBounds(view), surface)
+        if (token[0] != pen) {
+            token[0] = pen
+            handoff.pen = pen
+        }
     }.drawWithContent { if (!handoff.hidePen()) drawContent() }
 }

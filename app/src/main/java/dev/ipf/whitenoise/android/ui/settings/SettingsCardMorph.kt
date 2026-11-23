@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -62,11 +63,9 @@ internal class SettingsCardMorph(
 ) {
     val page: SettingsPageMorph? = if (fullScreen) SettingsPageMorph() else null
 
-    /** The outermost route host, which owns the top-level Chats/Settings [topLevel] endpoints. */
-    internal val root: SettingsCardMorph get() = parent?.root ?: this
     internal val topLevel = SettingsTopLevelHandoff()
     private val live = LinkedHashMap<Any, Rect>()
-    private val anchorOutlines = HashMap<SettingsMorphAnchor, SettingsContour>()
+    private val anchorOutlines = mutableStateMapOf<SettingsMorphAnchor, SettingsContour>()
     private val pictures = HashMap<Any, Picture>()
     private var host = Rect.Zero
     private var from: List<SettingsMorphCard> = emptyList()
@@ -98,13 +97,10 @@ internal class SettingsCardMorph(
 
     private val anchorBounds: Rect? get() = anchor?.let(live::get)?.takeIf(::onScreen)
 
-    /** The settled on-screen bounds a mounted [anchor] control last reported, if any. */
-    internal fun reportedAnchorBounds(anchor: SettingsMorphAnchor): Rect? = live[anchor]?.takeIf(::onScreen)
-
     /** Where an opening route grows from when the click recorded no origin, as [beginPage] resolves it. */
     internal val anchorOrigin: Rect? get() = anchorContour?.bounds ?: anchorBounds
 
-    private val anchorContour: SettingsContour? get() = anchor?.let(anchorOutlines::get)?.takeIf { onScreen(it.bounds) }
+    internal val anchorContour: SettingsContour? get() = anchor?.let(anchorOutlines::get)?.takeIf { onScreen(it.bounds) }
 
     init {
         page?.anchorContour = { anchorContour }
@@ -310,9 +306,6 @@ internal class SettingsCardMorph(
 /** Marks a control that routes grow out of; see [SettingsCardMorph.anchor]. */
 internal interface SettingsMorphAnchor
 
-/** The chat-list control top-level Settings opens from and closes back into (the active account avatar). */
-internal object SettingsHomeOriginAnchor : SettingsMorphAnchor
-
 /**
  * Bubble shapes and alphas at eased progress [shape]. A [fan] spreads the single starting shape into
  * every destination card; an [anchor] with no destination cards gathers every old card into it.
@@ -380,6 +373,7 @@ internal fun Modifier.settingsMorphAnchorOutline(
     shape: Shape,
     color: Color,
     width: Dp = 1.dp,
+    fill: Color = Color.Unspecified,
 ): Modifier {
     val morph = LocalSettingsCardMorph.current
     if (morph?.page == null) return this
@@ -395,7 +389,7 @@ internal fun Modifier.settingsMorphAnchorOutline(
                 else -> RoundRect(Rect(Offset.Zero, bounds.size))
             }
         val stroke = with(density) { ceil(width.toPx()) }
-        morph.reportAnchorOutline(anchor, SettingsContour(bounds, corners, bounds, color, stroke))
+        morph.reportAnchorOutline(anchor, SettingsContour(bounds, corners, bounds, color, stroke, fill = fill))
     }
 }
 

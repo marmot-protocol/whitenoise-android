@@ -7,7 +7,6 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -541,6 +540,7 @@ private fun LayoutCoordinates.visibleMotionBounds(): Rect? {
 internal fun ComposerSendMotionHost(
     motion: ComposerSendMotion,
     motionEnabled: Boolean = rememberConversationMotionEnabled(),
+    settingsMotion: ConversationSettingsMotion? = null,
     content: @Composable () -> Unit,
 ) {
     DisposableEffect(motion) { onDispose { motion.dispose() } }
@@ -550,9 +550,13 @@ internal fun ComposerSendMotionHost(
     CompositionLocalProvider(
         LocalComposerSendMotion provides motion,
         LocalConversationMotionEnabled provides motionEnabled,
+        LocalConversationSettingsMotion provides settingsMotion,
         dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionWindowCoordinates provides reactionWindow,
     ) {
-        Box(Modifier.fillMaxSize().onGloballyPositioned { reactionWindow.update() }) {
+        ConversationSettingsLayer(
+            Modifier.fillMaxSize().onGloballyPositioned { reactionWindow.update() },
+            active = settingsMotion?.transcriptActive != false,
+        ) {
             content()
             motion.Overlay()
         }

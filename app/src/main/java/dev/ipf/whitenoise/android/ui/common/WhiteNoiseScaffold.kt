@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,14 +28,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.Layout
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.settings.settingsTransitionInputGate
 
 /** The pinned top-bar scroll behaviour a [WhiteNoiseScaffold] shares with its [WhiteNoiseTopBar]. */
 @OptIn(ExperimentalMaterial3Api::class)
 val LocalWhiteNoiseHeaderScroll = staticCompositionLocalOf<TopAppBarScrollBehavior?> { null }
+
+/** An entering page can hold its body input while its measured toolbar already handles Back. */
+internal val LocalScaffoldBodyInputBlocked = staticCompositionLocalOf<State<Boolean>?> { null }
 
 /**
  * Material scaffold whose top bar receives the content's scroll so it can tint when content moves under it.
@@ -60,6 +66,7 @@ fun WhiteNoiseScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val nativeBody = LocalNativePageBody.current
+    val bodyBlocked = LocalScaffoldBodyInputBlocked.current
     CompositionLocalProvider(LocalWhiteNoiseHeaderScroll provides scrollBehavior) {
         Scaffold(
             modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -77,10 +84,12 @@ fun WhiteNoiseScaffold(
             contentColor = contentColor,
             contentWindowInsets = contentWindowInsets,
             content = { padding ->
-                if (nativeBody == null) {
+                if (nativeBody == null && bodyBlocked == null) {
                     content(padding)
                 } else {
-                    Box(Modifier.fillMaxSize().nativePageBody(padding)) { content(padding) }
+                    val blocked = bodyBlocked?.value == true
+                    val body = Modifier.fillMaxSize().nativePageBody(padding).settingsTransitionInputGate(blocked)
+                    Box(body.focusProperties { if (blocked) onEnter = { cancelFocusChange() } }) { content(padding) }
                 }
             },
         )

@@ -4,22 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Modifier.settingsAvatarFlightSource",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsTopLevelHandoff.kt",
-        "anchor": "fun Modifier.settingsAvatarFlightSource(",
-        "test_ids": [
-          "SET-069"
-        ]
-      },
-      {
-        "surface": "Modifier.settingsAvatarFlightTarget",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsTopLevelHandoff.kt",
-        "anchor": "fun Modifier.settingsAvatarFlightTarget(",
-        "test_ids": [
-          "SET-069"
-        ]
-      },
-      {
         "surface": "Modifier.settingsPenSource",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsTopLevelHandoff.kt",
         "anchor": "fun Modifier.settingsPenSource(",
@@ -30,9 +14,9 @@
     ],
     "source_coverage": [
       {
-        "surface": "Measured pen, profile avatar and alternate Settings landings",
+        "surface": "Measured pen to visible Settings group",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsTopLevelHandoff.kt",
-        "anchor": "fun settingsBubbleScene(",
+        "anchor": "fun bubble(",
         "test_ids": [
           "SET-069"
         ]

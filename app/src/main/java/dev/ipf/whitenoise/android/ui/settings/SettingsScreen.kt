@@ -812,7 +812,6 @@ private fun SettingsProfileRow(
                             .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
                             .clickable(role = Role.Button, onClick = onAvatarClick)
                             .testTag("settings.active_profile_avatar")
-                            .settingsAvatarFlightTarget()
                             .semantics {
                                 contentDescription = editPictureDescription
                                 role = Role.Button

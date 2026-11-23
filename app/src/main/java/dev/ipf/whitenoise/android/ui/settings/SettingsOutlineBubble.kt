@@ -4,21 +4,19 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
 import dev.ipf.whitenoise.android.ui.common.drawControlMorphOutline
+import dev.ipf.whitenoise.android.ui.common.drawControlMorphPen
 
 /** Chats is covered by the Settings backplate from this presence on: it fades out quickly. */
 private const val SETTINGS_BUBBLE_UNDERLAY_FADE_END = 0.5f
@@ -29,8 +27,6 @@ private const val BUBBLE_CARD_FADE_END = 0.8f
 
 /** A control bubble's pen is gone by this presence, as the pen's is entering the composer. */
 private const val SETTINGS_BUBBLE_GLYPH_FADE_END = 0.5f
-
-private val SettingsBubbleGlyphSize = 24.dp
 
 /** A card that rests without a border takes over the bubble's edge and fill over this last stretch. */
 private const val SETTINGS_BUBBLE_HANDOVER_START = 0.85f
@@ -54,45 +50,16 @@ internal data class SettingsBubbleCard(
 internal fun SettingsRouteEndpoint.bubbleCard(): SettingsBubbleCard =
     SettingsBubbleCard(bounds, visibleBounds, corners.topLeftCornerRadius.x, fill, outline, strokeWidth)
 
-/** The cards this page, or the child route mounted inside it, last measured. */
-internal fun SettingsPageMorph.bubbleCards(): List<SettingsBubbleCard> =
-    childCards?.invoke()?.takeIf { it.isNotEmpty() } ?: destinations.values.map { it.bubbleCard() }
-
-/** The card on screen in [host] nearest [origin]: the one the bubble grows into and shrinks out of. */
-internal fun nearestSettingsBubbleCard(
-    cards: Collection<SettingsBubbleCard>,
-    origin: Rect,
-    host: Rect,
-): SettingsBubbleCard? {
-    val point = origin.center
-    return cards.filter { it.visibleBounds.visibleIn(host) }.minByOrNull { card ->
-        val b = card.visibleBounds
-        val dx = point.x - point.x.coerceIn(b.left, b.right)
-        val dy = point.y - point.y.coerceIn(b.top, b.bottom)
-        dx * dx + dy * dy
-    }
-}
-
-/** A control a bubble leaves as itself (the New message pen): its corner [radius], [fill] and [border]. */
-internal data class SettingsBubbleControl(
-    val radius: Float,
-    val fill: Color,
-    val border: Color,
-)
-
-/**
- * One bubble in host coordinates: the origin it leaves and the card it lands on. Without a [control]
- * it leaves the origin's circle as a bare outline; with one it starts as that control, pen and all.
- */
+/** The measured pen and native landing group, in the receiving host's coordinates. */
 internal class SettingsBubbleGeometry(
     val origin: Rect,
     val card: SettingsBubbleCard,
-    val control: SettingsBubbleControl? = null,
+    val control: ControlMorphSurface,
 )
 
 /**
  * Paint for the top-level pair: the Settings [backplate], the hairline [edge] of a borderless card's
- * bubble and the pen [glyph] a control bubble fades out.
+ * bubble and the pen [glyph] that fades out.
  */
 internal data class SettingsBubbleColors(
     val backplate: Color,
@@ -121,7 +88,7 @@ internal fun settingsBubbleShape(
     val p = presence.coerceIn(0f, 1f)
     val origin = geometry.origin
     val bounds = lerp(origin, geometry.card.bounds, p)
-    val from = geometry.control?.radius ?: (minOf(origin.width, origin.height) / 2f)
+    val from = geometry.control.radius
     val radius = (from + (geometry.card.radius - from) * p).coerceIn(0f, minOf(bounds.width, bounds.height) / 2f)
     return RoundRect(bounds, CornerRadius(radius))
 }
@@ -192,8 +159,8 @@ private fun DrawScope.drawSettingsBubble(
     val p = presence.coerceIn(0f, 1f)
     val handover = if (card.outline.isSpecified) 0f else ramp(presence, SETTINGS_BUBBLE_HANDOVER_START, 1f)
     val path = Path().apply { addRoundRect(shape) }
-    val fill = (if (control != null) 1f else settingsBubbleUnderlayCover(presence)) * (1f - handover)
-    val fillColor = if (control != null) lerp(control.fill, card.fill, p) else card.fill
+    val fill = 1f - handover
+    val fillColor = lerp(control.fill, card.fill, p)
     if (fill > 0f) drawPath(path, fillColor, alpha = fill)
     val cardInk = settingsBubbleCardAlpha(presence) * ink
     if (content != null && cardInk > 0f) {
@@ -208,21 +175,11 @@ private fun DrawScope.drawSettingsBubble(
     }
     val bounds = Rect(shape.left, shape.top, shape.right, shape.bottom)
     val resting = if (card.outline.isSpecified) card.outline else colors.edge
-    val color = if (control != null) lerp(control.border, resting, p) else resting
-    if (handover < 1f) drawControlMorphOutline(bounds, shape.topLeftCornerRadius.x, color, card.stroke, 1f - handover)
-    if (control != null) drawSettingsPen(bounds, presence, colors)
-}
-
-private fun DrawScope.drawSettingsPen(
-    bounds: Rect,
-    presence: Float,
-    colors: SettingsBubbleColors,
-) {
-    val glyph = colors.glyph ?: return
-    val glyphAlpha = 1f - ramp(presence, 0f, SETTINGS_BUBBLE_GLYPH_FADE_END)
-    if (glyphAlpha <= 0f) return
-    val glyphSize = SettingsBubbleGlyphSize.toPx()
-    translate(bounds.center.x - glyphSize / 2f, bounds.center.y - glyphSize / 2f) {
-        with(glyph) { draw(Size(glyphSize, glyphSize), glyphAlpha, ColorFilter.tint(colors.glyphTint)) }
+    val color = lerp(control.border ?: resting, resting, p)
+    val stroke = control.stroke + (card.stroke - control.stroke) * p
+    if (handover < 1f) drawControlMorphOutline(bounds, shape.topLeftCornerRadius.x, color, stroke, fill)
+    colors.glyph?.let { glyph ->
+        val alpha = control.decorationAlpha * (1f - ramp(presence, 0f, SETTINGS_BUBBLE_GLYPH_FADE_END))
+        drawControlMorphPen(bounds, glyph, colors.glyphTint, alpha)
     }
 }

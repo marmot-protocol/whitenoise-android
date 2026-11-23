@@ -276,18 +276,14 @@ private fun Chats(
     open: () -> Unit,
     extra: @Composable () -> Unit,
 ) {
-    val inset = 4.dp
-    val (origin, click) = rememberSettingsRouteClick(open, originInset = inset)
     Box(Modifier.fillMaxSize().background(Color(0xFFFFC107))) {
         extra()
         Box(
             Modifier
                 .padding(start = 8.dp, top = 8.dp)
                 .size(48.dp)
-                .then(origin)
-                .settingsCardMorph(SettingsHomeOriginAnchor, inset)
                 .testTag("underlay.avatar")
-                .clickable { click() },
+                .clickable(onClick = open),
             contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.size(40.dp).background(Color(0xFF2E7D32), CircleShape))

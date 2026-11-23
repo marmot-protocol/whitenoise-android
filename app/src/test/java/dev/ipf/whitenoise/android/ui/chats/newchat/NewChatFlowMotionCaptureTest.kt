@@ -1,14 +1,23 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import android.app.Application
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.window.DialogProperties
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -17,8 +26,13 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.chats.ChatsNewMessageFab
 import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPenDialogMotion
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
@@ -26,7 +40,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLooper
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /** Opt-in actual-owner rendering only. Does not submit a group or simulate native success. */
 @RunWith(RobolectricTestRunner::class)
@@ -37,6 +53,71 @@ class NewChatFlowMotionCaptureTest {
     val composeRule = createComposeRule()
 
     private val app: Application = ApplicationProvider.getApplicationContext()
+
+    @Test
+    fun realHomePenTransfersToTheActionGroupAndReturnsOnTheDialogClock() {
+        val state = fixture()
+        val show = mutableStateOf(false)
+        val launch = mutableStateOf<MeasuredPenDialogMotion?>(null)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                    Surface(Modifier.fillMaxSize()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
+                            ChatsNewMessageFab(
+                                state,
+                                onNewMessage = { show.value = true },
+                                loadRelays = { null },
+                                onNewMessageOrigin = { launch.value = it },
+                                hidePen = { show.value && launch.value?.drawsSource?.invoke() == true },
+                            )
+                        }
+                        if (show.value) {
+                            MeasuredPlaybackDialog(
+                                origin = launch.value?.origin,
+                                penMotion = launch.value,
+                                onDismissRequest = { show.value = false },
+                                properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+                            ) {
+                                NewChatFlowHost(state, onOpenConversation = { _, _ -> }, onClose = dismiss)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        val newMessage = composeRule.onNodeWithContentDescription(app.getString(R.string.new_message))
+        val actionGroup = composeRule.onNodeWithTag("new_message.agentSettings")
+        newMessage.assertIsDisplayed()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            newMessage.performClick()
+            composeRule.runOnIdle { Snapshot.sendApplyNotifications() }
+            repeat(6) {
+                composeRule.mainClock.advanceTimeByFrame()
+                ShadowLooper.idleMainLooper(16L, TimeUnit.MILLISECONDS)
+            }
+            composeRule.runOnIdle {
+                val motion = checkNotNull(launch.value)
+                assertTrue(motion.debugGeometry(), motion.drawsSource())
+            }
+            actionGroup.assertIsNotDisplayed()
+            composeRule.mainClock.advanceTimeBy(1_000L)
+            actionGroup.assertIsDisplayed()
+            composeRule.runOnIdle { assertFalse(checkNotNull(launch.value).drawsSource()) }
+            composeRule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
+            composeRule.mainClock.advanceTimeBy(96L)
+            composeRule.runOnIdle {
+                assertTrue(show.value)
+                assertTrue(checkNotNull(launch.value).drawsSource())
+            }
+            composeRule.mainClock.advanceTimeBy(1_000L)
+            newMessage.assertIsDisplayed()
+            composeRule.runOnIdle { assertFalse(show.value) }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
 
     @Test
     fun captureNewMessageToNewGroupAndBack() {

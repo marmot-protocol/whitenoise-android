@@ -76,9 +76,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.settings.SettingsContour
-import dev.ipf.whitenoise.android.ui.settings.SettingsHomeOriginAnchor
-import dev.ipf.whitenoise.android.ui.settings.settingsAvatarFlightSource
-import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -137,11 +134,6 @@ internal fun ChatListTopBar(
     var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
     val profileState by appState.notificationProfiles.state.collectAsState()
     val showProfileAction = profileState.showInChatList && profileState.profiles.isNotEmpty()
-    // The avatar is where top-level Settings opens from and closes into, also via the account selector.
-    val avatarInset = (CHAT_LIST_ACCOUNT_AVATAR_TOUCH_TARGET - CHAT_LIST_ACCOUNT_AVATAR_SIZE) / 2
-    val (settingsOrigin, openSettings) =
-        dev.ipf.whitenoise.android.ui.settings
-            .rememberSettingsRouteClick(onOpenSettings, originInset = avatarInset)
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
             showSelector = false
@@ -280,7 +272,7 @@ internal fun ChatListTopBar(
                                             if (appState.chatsAvatarOpensSelector()) {
                                                 openSelector()
                                             } else {
-                                                openSettings()
+                                                onOpenSettings()
                                             }
                                         }
                                     },
@@ -288,9 +280,6 @@ internal fun ChatListTopBar(
                                         Modifier
                                             .padding(start = 8.dp)
                                             .testTag("chats.switchProfile")
-                                            .then(settingsOrigin)
-                                            .settingsCardMorph(SettingsHomeOriginAnchor, avatarInset)
-                                            .settingsAvatarFlightSource(avatarInset)
                                             .explainOnLongPress(avatarExplanation),
                                     // Per-account dot: light only when the active account
                                     // itself has unread, same shared decision the other
@@ -370,7 +359,7 @@ internal fun ChatListTopBar(
             onAccountSwitched = { showSelector = false },
             onSettings = {
                 showSelector = false
-                openSettings()
+                onOpenSettings()
             },
         )
     }

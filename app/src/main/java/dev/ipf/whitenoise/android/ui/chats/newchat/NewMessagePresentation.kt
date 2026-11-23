@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -45,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.conversation.LocalMeasuredPenDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -178,7 +180,12 @@ private fun NewMessageActionGroup(
     busy: Boolean,
     inviteShareInProgress: Boolean,
 ) {
-    SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Related)) {
+    val pen = LocalMeasuredPenDialog.current
+    val reportLanding = remember(pen) { pen?.let { it::reportLanding } }
+    SettingsGroup(
+        modifier = Modifier.padding(top = WhiteNoiseSpacing.Related),
+        onMeasured = reportLanding,
+    ) {
         row("new_group") { context ->
             SettingsLink(
                 context,

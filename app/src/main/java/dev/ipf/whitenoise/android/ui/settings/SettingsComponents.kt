@@ -81,20 +81,22 @@ internal var SemanticsPropertyReceiver.settingsRow by SettingsRowKey
  * No theme, preference, or route changes occur here. Non-AMOLED rows keep Material's segmented
  * gap; AMOLED rows touch and share one-pixel seams.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun SettingsGroup(
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
     destination: Any? = null,
     surface: Any = destination ?: Unit,
+    onMeasured: ((SettingsBubbleCard?) -> Unit)? = null,
     content: SettingsGroupScope.() -> Unit,
 ) {
     val group = SettingsGroupScope().apply(content)
     val gap = WhiteNoiseListItemDefaults.segmentedGap
     val page = LocalSettingsCardMorph.current?.page
     val token = remember(page, destination, surface) { Any() }
-    val native = rememberSettingsNativeSurface(destination, containerColor, surface, registrationToken = token)
+    val native =
+        rememberSettingsNativeSurface(destination, containerColor, surface, registrationToken = token, onMeasured = onMeasured)
     Column(
         modifier
             .fillMaxWidth()

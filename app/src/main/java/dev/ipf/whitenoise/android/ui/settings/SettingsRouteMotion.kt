@@ -60,10 +60,6 @@ private class SettingsMotionHistory<T>(
     var progress: Animatable<Float, AnimationVector1D>? = null
     var containerLeg = false
 
-    /** Where top-level Settings last opened from, valid only while the host keeps [originHost]. */
-    var origin: Rect? = null
-    var originHost: Rect = Rect.Zero
-
     /** Whether the last top-level leg was a close that drew no Settings picture. */
     var pictureless = false
 
@@ -112,13 +108,10 @@ internal fun <T> SettingsRouteMotion(
         history.target = target
         history.depth = depth
     }
-    // The top-level pair owns the flying avatar and the Settings stack anchored to the pen contour.
-    // A measured alternate control can claim its own card (see settingsBubbleScene).
+    // The top-level pair moves only the Home pen into the lowest visible Settings group.
     val topLevelPair = topLevelBubble && morph?.page != null && usesSettingsBubble(previousDepth, depth)
-    // Read before the page host consumes the click's measured origin and clears the leaving cards.
-    val topLevelOrigin = remember(ownerKey, target) { morph?.page?.pendingOrigin?.takeIf { topLevelPair && forward } }
+    // Read before the mounted Settings page clears the leaving groups.
     val leavingCards = remember(ownerKey, target) { morph?.page?.bubbleCards().orEmpty() }
-    val leavingAvatar = remember(ownerKey, target) { morph?.topLevel?.avatarTarget }
     // Chats stays live beneath the arriving Settings page, until the open settles.
     val opened = remember(ownerKey, target) { mutableStateOf(false) }
     val animatedOpen = topLevelBubble && motion && forward
@@ -143,15 +136,12 @@ internal fun <T> SettingsRouteMotion(
                 suppressMotion = suppressMotion || morphing || (morph?.page != null && !topLevelPair),
                 animationsEnabled = animationsEnabled,
                 topLevelBubble = topLevelBubble,
-                origin = topLevelOrigin,
-                closeTarget = { morph?.reportedAnchorBounds(SettingsHomeOriginAnchor) },
                 snapshot = morph?.routeSnapshot,
                 recording = { morph?.recording != false },
                 container =
                     SettingsContainerRouteHooks(
                         onSettled = { opened.value = true },
                         cards = { if (forward) morph?.page?.bubbleCards().orEmpty() else leavingCards },
-                        avatarTarget = { if (forward) morph?.topLevel?.avatarTarget else leavingAvatar },
                         handoff = morph?.topLevel,
                     ),
             ),
@@ -220,22 +210,19 @@ private fun <T> SettingsTopLevelRouteLayers(
 }
 
 /**
- * How the top-level pair meets its routes: [onSettled] once an open finishes, and the Settings
- * [cards] and profile [avatarTarget] (screen coordinates) the leg lands on, live while opening and as
- * last reported when closing, with the live chat-list endpoints in [handoff].
+ * The top-level pair uses live Settings [cards] while opening and their last measured geometry while
+ * closing. The live Home pen comes from [handoff].
  */
 internal class SettingsContainerRouteHooks(
     val onSettled: () -> Unit = {},
     val cards: () -> List<SettingsBubbleCard> = { emptyList() },
-    val avatarTarget: () -> Rect? = { null },
     val handoff: SettingsTopLevelHandoff? = null,
 )
 
 /**
- * A single destination draw layer for route hosts with existing early-return rendering. For the
- * top-level pair, [origin] is the activating control in screen coordinates; closing contracts into
- * [closeTarget] (the live control) or else that remembered origin. [snapshot] is the host's purgeable
- * Settings frame, recorded only while [recording] allows it.
+ * A single destination draw layer for route hosts with existing early-return rendering. The
+ * top-level pair draws the measured Home pen and a purgeable Settings frame, recorded only while
+ * [recording] allows it.
  */
 @Composable
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
@@ -246,8 +233,6 @@ internal fun <T> rememberRouteMotionModifier(
     suppressMotion: Boolean = false,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
     topLevelBubble: Boolean = false,
-    origin: Rect? = null,
-    closeTarget: () -> Rect? = { null },
     snapshot: SettingsCardSnapshot? = null,
     recording: () -> Boolean = { true },
     container: SettingsContainerRouteHooks = SettingsContainerRouteHooks(),
@@ -256,7 +241,7 @@ internal fun <T> rememberRouteMotionModifier(
     val history = remember(ownerKey) { SettingsMotionHistory(target, depth) }
     val ownSnapshot = remember(ownerKey) { SettingsCardSnapshot() }
     val frame = snapshot ?: ownSnapshot
-    val host = remember(ownerKey) { arrayOf(Rect.Zero) }
+    val host = remember(ownerKey) { mutableStateOf(Rect.Zero) }
     val view = LocalView.current
     val layoutDirection = LocalLayoutDirection.current
     val previousDepth = remember(ownerKey, target) { history.depth }
@@ -290,11 +275,6 @@ internal fun <T> rememberRouteMotionModifier(
                 SettingsBubbleResume(presence, ink)
             }
         }
-    if (bubble && opening && history.progress !== progress) {
-        // Keep this open's origin for the close; a moved or resized host invalidates it.
-        history.origin = origin
-        history.originHost = host[0]
-    }
     SideEffect {
         history.target = target
         history.depth = depth
@@ -320,29 +300,14 @@ internal fun <T> rememberRouteMotionModifier(
         val scheme = MaterialTheme.colorScheme
         val pen = painterResource(R.drawable.ic_edit)
         val colors = SettingsBubbleColors(scheme.surfaceContainerLow, scheme.outlineVariant, pen, scheme.onSurface)
-        val localOrigin: () -> Rect? = {
-            val bounds = host[0]
-            val measured =
-                if (opening) {
-                    origin
-                } else {
-                    val previousOrigin = history.origin?.takeIf { history.originHost == bounds }
-                    if (interrupted) previousOrigin ?: closeTarget() else closeTarget() ?: previousOrigin
-                }
-            measured?.takeIf { it.visibleIn(bounds) }?.translate(-bounds.topLeft)
-        }
-        val scene: () -> SettingsBubbleScene = {
-            val bounds = host[0]
-            val start = localOrigin()?.translate(bounds.topLeft)
-            settingsBubbleScene(bounds, start, hooks.cards(), hooks.handoff, hooks.avatarTarget())
-        }
+        val leavingHost = remember(ownerKey, target) { host.value }
+        val geometryCurrent = { opening || host.value == leavingHost }
+        val landing = { hooks.handoff?.takeIf { geometryCurrent() }?.bubble(host.value, hooks.cards()) }
         SideEffect {
-            // The live avatar and pen stay out of sight while this leg draws them.
-            hooks.handoff?.hideAvatar = { motion && progress.value < 1f && scene().flight != null }
-            hooks.handoff?.hidePen = { motion && progress.value < 1f && scene().pen != null }
+            hooks.handoff?.hidePen = { motion && progress.value < 1f && landing() != null }
         }
         return Modifier
-            .onGloballyPositioned { host[0] = it.settingsMorphBounds(view) }
+            .onGloballyPositioned { host.value = it.settingsMorphBounds(view) }
             .settingsTransitionInputGate(opening && motion && progress.value < 1f)
             .settingsBubbleMotion(
                 opening = opening,
@@ -350,8 +315,8 @@ internal fun <T> rememberRouteMotionModifier(
                 animating = { motion && progress.value < 1f },
                 colors = colors,
                 snapshot = frame.takeIf { animationsEnabled },
-                closingPicture = { closingPicture[0] },
-                scene = scene,
+                closingPicture = { closingPicture[0].takeIf { geometryCurrent() } },
+                landing = landing,
                 recording = recording,
                 resume = resume,
             )
@@ -363,10 +328,7 @@ internal fun <T> rememberRouteMotionModifier(
         } else {
             Modifier
         }
-    return Modifier
-        .onGloballyPositioned { host[0] = it.settingsMorphBounds(view) }
-        .then(recorder)
-        .settingsSlide(motion, { progress.value }, backplate, direction * travel)
+    return recorder.settingsSlide(motion, { progress.value }, backplate, direction * travel)
 }
 
 private suspend fun runRouteMotion(

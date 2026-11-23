@@ -33,8 +33,6 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsMatcher
@@ -47,6 +45,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -62,11 +61,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
 
-/**
- * The production top-level host (topLevelBubble with cardMorph and the avatar's measured origin):
- * the chat-list avatar flies into the Settings profile card while the New message pen pulls the
- * stack toward its bottom card. Back runs both in reverse, including after an interruption.
- */
+/** The production top-level Settings host gives the Home pen one landing and keeps native ink in place. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -86,121 +81,77 @@ class SettingsTopLevelBubbleMotionTest {
     @After
     fun restoreMotion() = setAnimatorScale(originalAnimatorScale)
 
-    @Test fun aBubbleStartsAsItsOriginAndRestsOnItsCardsOutline() {
-        val avatar = Rect(12f, 12f, 52f, 52f)
+    @Test fun thePenStartsAndEndsAtItsMeasuredNativeOutline() {
         val card = fixedCard(Rect(16f, 100f, 344f, 260f))
-        val start = settingsBubbleShape(SettingsBubbleGeometry(avatar, card), 0f)
-        assertEquals(avatar, Rect(start.left, start.top, start.right, start.bottom))
-        assertEquals(20f, start.topLeftCornerRadius.x, 0.01f)
-        val end = settingsBubbleShape(SettingsBubbleGeometry(avatar, card), 1f)
+        val bubble = SettingsBubbleGeometry(PEN, card, PEN_SURFACE)
+        val start = settingsBubbleShape(bubble, 0f)
+        assertEquals(PEN, Rect(start.left, start.top, start.right, start.bottom))
+        assertEquals(PEN_SURFACE.radius, start.topLeftCornerRadius.x, 0f)
+        val end = settingsBubbleShape(bubble, 1f)
         assertEquals(card.bounds, Rect(end.left, end.top, end.right, end.bottom))
-        assertEquals(16f, end.topLeftCornerRadius.x, 0.01f)
-        // The pen bubble starts as the pen's own rounded square.
-        val pen = SettingsBubbleGeometry(PEN, card, SettingsBubbleControl(12f, Color.Gray, Color.White))
-        assertEquals(12f, settingsBubbleShape(pen, 0f).topLeftCornerRadius.x, 0.01f)
-        // Every alpha is a function of presence alone, so a reversal is continuous.
+        assertEquals(card.radius, end.topLeftCornerRadius.x, 0f)
         assertEquals(0f, settingsBubbleUnderlayCover(0f), 0f)
         assertEquals(1f, settingsBubbleUnderlayCover(0.5f), 0f)
         assertEquals(0f, settingsBubbleCardAlpha(0f), 0f)
         assertEquals(1f, settingsBubbleCardAlpha(1f), 0f)
     }
 
-    @Test fun theAvatarFliesIntoTheProfileCardAndThePenIntoTheBottomMostVisibleCard() {
-        val handoff = handoff(pen = true)
-        val target = Rect(32f, 196f, 88f, 252f)
-        val scene = settingsBubbleScene(HOST, AVATAR, CARDS, handoff, target)
-        val flight = checkNotNull(scene.flight)
-        assertEquals(AVATAR, flight.from)
-        assertEquals(target, flight.to)
-        assertEquals(AVATAR, settingsAvatarFlightBounds(flight, 0f))
-        assertEquals(target, settingsAvatarFlightBounds(flight, 1f))
-        assertNull("the avatar has no outline of its own", scene.origin)
-        val pen = checkNotNull(scene.pen)
-        assertEquals("the pen lands on the bottom-most visible card", BOTTOM.bounds, pen.card.bounds)
-        assertEquals(PEN, pen.origin)
-        assertEquals(16f, checkNotNull(pen.control).radius, 0f)
+    @Test fun thePenLandsOnTheBottomMostVisibleCard() {
+        val handoff = SettingsTopLevelHandoff().apply { pen = SettingsBubbleSource(PEN, PEN_SURFACE) }
+        val bubble = checkNotNull(handoff.bubble(HOST, CARDS))
+        assertEquals(BOTTOM, bubble.card)
+        assertEquals(PEN, bubble.origin)
+        assertEquals(PEN_SURFACE, bubble.control)
     }
 
     @Test fun withoutAPenTheBottomCardFadesInPlace() {
-        val scene = settingsBubbleScene(HOST, AVATAR, CARDS, handoff(pen = false), TARGET)
-        assertNull(scene.origin)
-        assertNull(scene.pen)
-        checkNotNull(scene.flight)
+        val handoff = SettingsTopLevelHandoff()
+        assertNull(handoff.bubble(HOST, CARDS))
         val pixels =
             drawFrame {
-                drawSettingsArrival(scene, 0.5f, BUBBLE_COLORS, 1f) {
+                drawSettingsArrival(null, 0.5f, BUBBLE_COLORS, 1f) {
                     drawRect(Color.Red, Offset(165f, 635f), Size(30f, 30f))
                 }
             }
         assertTrue("the bottom card draws at its resting position", pixels[180, 650].red > 0.2f)
     }
 
-    @Test fun anotherOriginGrowsIntoItsNearestCardWithoutTheAvatar() {
-        val handoff = handoff(pen = true)
-        val updateBounds = Rect(300f, 12f, 340f, 52f)
-        val update = settingsBubbleScene(HOST, updateBounds, CARDS, handoff, TARGET)
-        assertNull("only the avatar origin flies the avatar", update.flight)
-        assertEquals(PROFILE.bounds, update.origin?.card?.bounds)
-        assertEquals(BOTTOM.bounds, update.pen?.card?.bounds)
-        val low = settingsBubbleScene(HOST, Rect(12f, 730f, 52f, 770f), CARDS, handoff, null)
-        assertEquals(BOTTOM.bounds, low.origin?.card?.bounds)
-        assertNull("the activated low control gets first choice", low.pen)
-        val pixels = drawFrame { drawSettingsArrival(update, 0f, BUBBLE_COLORS, 1f, null) }
-        assertTrue("the alternate origin's outline draws at launch", pixels[320, 12].alpha > 0.4f)
-        assertTrue("the pen also draws at launch", pixels[324, 720].alpha > 0.4f)
-    }
-
-    @Test fun missingOrOffscreenOriginUsesOnlyTheFade() {
-        val handoff = handoff(pen = true)
+    @Test fun aMissingOrOffscreenEndpointUsesOnlyTheFade() {
+        val handoff = SettingsTopLevelHandoff()
         val offscreen = Rect(16f, 900f, 56f, 940f)
-        for (origin in listOf(null, offscreen)) {
-            val scene = settingsBubbleScene(HOST, origin, CARDS, handoff, TARGET)
-            assertNull(scene.pen)
-            assertNull(scene.origin)
-            assertNull(scene.flight)
-        }
+        handoff.pen = SettingsBubbleSource(offscreen, PEN_SURFACE)
+        assertNull(handoff.bubble(HOST, CARDS))
+        handoff.pen = SettingsBubbleSource(PEN, PEN_SURFACE)
+        assertNull(handoff.bubble(HOST, listOf(fixedCard(offscreen))))
     }
 
-    @Test fun theStackMovesWithTheTopEdgeOfThePenContour() {
-        val scene = settingsBubbleScene(HOST, AVATAR, CARDS, handoff(pen = true), null)
+    @Test fun theOutlineMovesWhileSiblingInkStaysInPlace() {
+        val bubble = SettingsBubbleGeometry(PEN, BOTTOM, PEN_SURFACE)
         val pixels =
             drawFrame {
-                drawSettingsArrival(scene, 0.5f, BUBBLE_COLORS, 1f) {
+                drawSettingsArrival(bubble, 0.5f, BUBBLE_COLORS, 1f) {
                     drawRect(Color.Red, Offset(165f, 590f), Size(30f, 20f))
                 }
             }
-        // At half presence, the pen top-center is (252, 673). The marker above the
-        // landing card stays centered on it, 26 px * 0.78 scale above that edge.
-        assertTrue("the moving contour reaches its interpolated top edge", pixels[252, 673].alpha > 0.4f)
-        assertTrue("the sibling ink shares that anchor", pixels[252, 653].red > 0.4f)
-        assertEquals("the sibling ink leaves its resting coordinates", 0f, pixels[180, 600].alpha, 0f)
+        assertTrue("the outline reaches its interpolated top edge", pixels[252, 673].alpha > 0.4f)
+        assertTrue("the sibling ink stays in place", pixels[180, 600].alpha > 0.4f)
+        assertEquals("there is no translated sibling ink", 0f, pixels[252, 653].alpha, 0f)
     }
 
-    @Test fun theOnlyVisibleCardCanTakeThePenAndStillMaskTheProfileSlot() {
+    @Test fun aSoleProfileCardKeepsItsPortraitAtItsNativePosition() {
         val profile = BOTTOM.copy(fill = Color.Yellow)
         val target = Rect(84f, 634f, 116f, 666f)
-        val scene = settingsBubbleScene(HOST, AVATAR, listOf(profile), handoff(pen = true), target)
-        assertEquals(profile, scene.pen?.card)
-        assertNull(scene.origin)
-        checkNotNull(scene.flight)
+        val handoff = SettingsTopLevelHandoff().apply { pen = SettingsBubbleSource(PEN, PEN_SURFACE) }
+        val bubble = checkNotNull(handoff.bubble(HOST, listOf(profile)))
+        assertEquals(profile, bubble.card)
         val pixels =
             drawFrame {
-                drawSettingsArrival(scene, 0.95f, BUBBLE_COLORS, 1f) {
+                drawSettingsArrival(bubble, 0.95f, BUBBLE_COLORS, 1f) {
                     drawRect(Color.Yellow, profile.bounds.topLeft, profile.bounds.size)
                     drawCircle(Color.Green, target.width / 2, target.center)
                 }
             }
-        // At this presence the flight is above the card, but the landing card's content is visible.
-        assertEquals("the profile slot shows only the surrounding fill", Color.Yellow, pixels[100, 650])
-    }
-
-    @Test fun theBubbleLandsOnTheCardNearestItsOrigin() {
-        val middle = fixedCard(Rect(16f, 300f, 344f, 500f))
-        val offscreen = fixedCard(Rect(16f, 900f, 344f, 1000f))
-        val cards = listOf(offscreen, BOTTOM, middle, PROFILE)
-        assertEquals(PROFILE, nearestSettingsBubbleCard(cards, Rect(12f, 12f, 52f, 52f), HOST))
-        assertEquals(BOTTOM, nearestSettingsBubbleCard(cards, Rect(12f, 730f, 52f, 770f), HOST))
-        assertNull(nearestSettingsBubbleCard(listOf(offscreen), Rect(12f, 730f, 52f, 770f), HOST))
+        assertEquals(Color.Green, pixels[100, 650])
     }
 
     @Test fun partlyClippedCardsKeepTheirViewportClipWhileTheBubblesAreOnThem() {
@@ -211,8 +162,8 @@ class SettingsTopLevelBubbleMotionTest {
         val low =
             fixedCard(Rect(16f, 600f, 344f, 800f))
                 .copy(visibleBounds = Rect(16f, 600f, 344f, 740f), fill = Color.Blue)
-        val pen = SettingsBubbleControl(16f, Color.Blue, Color.White)
-        val bubbles = listOf(SettingsBubbleGeometry(AVATAR, top), SettingsBubbleGeometry(PEN, low, pen))
+        val pen = PEN_SURFACE.copy(fill = Color.Blue)
+        val bubbles = listOf(SettingsBubbleGeometry(AVATAR, top, pen), SettingsBubbleGeometry(PEN, low, pen))
         listOf(1f, CLOSING_PRESENCE, 0.9f, 0.6f).forEach { presence ->
             val pixels =
                 drawFrame {
@@ -241,26 +192,6 @@ class SettingsTopLevelBubbleMotionTest {
         assertEquals(1f, settingsBubbleInk(1f, opening = true, reopened), 0f)
         assertEquals(drawn, settingsBubbleInk(0.6f, opening = false, SettingsBubbleResume(0.6f, drawn)), 0f)
         assertEquals(1f, settingsBubbleInk(0.3f, opening = false, null), 0f)
-    }
-
-    @Test fun amoledAvatarFliesIntoTheProfileCardAndBack() {
-        host(amoled = true, pen = true, rows = false)
-        rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag(AVATAR_TAG).performClick()
-        val opening = List(OPEN_FRAMES) { step().let { frame() } }
-        rule.mainClock.advanceTimeBy(SETTLE_MILLIS)
-        step()
-        val settled = checkNotNull(singleAvatar(frame(), "settled Settings"))
-        assertNear("the avatar rests in the profile card", TARGET, settled)
-        update { section.value = 0 }
-        val closing = List(CLOSE_FRAMES) { step().let { frame() } }
-        rule.mainClock.advanceTimeBy(SETTLE_MILLIS)
-        step()
-        assertNear("the avatar is back in the top corner", AVATAR, checkNotNull(singleAvatar(frame(), "settled Chats")))
-        val flights = (opening + closing).mapIndexed { index, image -> singleAvatar(image, "frame $index") }
-        assertNear("the open starts at the top corner", AVATAR, checkNotNull(flights.first()))
-        assertNear("the close starts in the profile card", TARGET, checkNotNull(flights[OPEN_FRAMES]))
-        assertTrue("the avatar travels between them", flights.filterNotNull().any { it.top > AVATAR.bottom })
     }
 
     @Test fun amoledPenMorphsIntoTheBottomCardAndBack() {
@@ -305,7 +236,7 @@ class SettingsTopLevelBubbleMotionTest {
         }
     }
 
-    @Test fun lightChatsFadeWithoutAScrimAndThereIsNeverASecondAvatar() {
+    @Test fun lightChatsFadeInPlaceAndBothPortraitsStayAtTheirNativePositions() {
         host(amoled = false, pen = true, rows = true)
         val chats = frame()
         rule.mainClock.autoAdvance = false
@@ -316,7 +247,7 @@ class SettingsTopLevelBubbleMotionTest {
         val settings = frame()
         opening.forEachIndexed { index, open ->
             assertBetween("open frame $index", open, chats, settings)
-            singleAvatar(open, "open frame $index")
+            assertStationaryPortraits(open, "open frame $index")
         }
         assertTrue(
             "the chat list is gone well before the open settles",
@@ -329,28 +260,28 @@ class SettingsTopLevelBubbleMotionTest {
         val settled = frame()
         closing.forEachIndexed { index, close ->
             assertBetween("close frame $index", close, settled, settings)
-            singleAvatar(close, "close frame $index")
+            assertStationaryPortraits(close, "close frame $index")
         }
         assertTrue("the avatar is back in place", near(settled.getPixel(32, 32), chats.getPixel(32, 32), 3))
     }
 
-    @Test fun reversingMidOpenTurnsTheAvatarAroundFromItsDrawnPosition() {
+    @Test fun reversingMidOpenReturnsThePenToHome() {
         host(amoled = true, pen = true, rows = false)
+        val cards = measureCards()
+        val middle = (cards.first().bottom + cards.last().top) / 2f
         rule.mainClock.autoAdvance = false
         rule.onNodeWithTag(AVATAR_TAG).performClick()
-        val opened = List(REVERSE_AFTER_FRAMES) { step().let { singleAvatar(frame(), "open") } }.filterNotNull()
+        repeat(REVERSE_AFTER_FRAMES) { step() }
+        val departing = checkNotNull(outlineBounds(frame(), cards) { it > middle })
         update { section.value = 0 }
-        val closed = List(CLOSE_FRAMES) { step().let { singleAvatar(frame(), "close") } }.filterNotNull()
-        val tops = opened.map { it.top.toInt() } to closed.map { it.top.toInt() }
-        assertTrue("the avatar was flying when reversed: $tops", opened.last().top > AVATAR.top + MAX_STEP)
-        // The reversal may follow the open's clock by the one frame it already ticked, never further.
-        val openStep = opened.zipWithNext().maxOf { (a, b) -> b.top - a.top }
+        val returning = List(CLOSE_FRAMES) { step().let { outlineBounds(frame(), cards) { it > middle } } }
+        assertTrue("the pen moved before the interruption", departing.width > PEN_STAND_IN.width)
         assertTrue(
-            "the reversal starts from the drawn avatar: $tops",
-            abs(closed.first().top - opened.last().top) <= openStep + MAX_STEP / 4,
+            "the pen returns to its measured Home position",
+            returning.filterNotNull().any { bounds ->
+                PEN_STAND_IN.inflate(PEN_SLACK).containsRect(bounds)
+            },
         )
-        closed.zipWithNext().forEach { (a, b) -> assertTrue("then heads straight back: $tops", b.top <= a.top + 1) }
-        assertTrue("and lands in the corner: $tops", closed.last().top <= AVATAR.top + LANDING_SLACK)
     }
 
     private fun host(
@@ -419,44 +350,22 @@ class SettingsTopLevelBubbleMotionTest {
         return if (right < 0) null else Rect(left.toFloat(), top.toFloat(), right + 1f, bottom + 1f)
     }
 
-    /** The one avatar-coloured circle in [frame]; fails if the green pixels form anything but one circle. */
-    private fun singleAvatar(
+    /** Green pixels may belong to either native portrait, with no travelling portrait between them. */
+    private fun assertStationaryPortraits(
         frame: Bitmap,
         label: String,
-    ): Rect? {
-        var left = Int.MAX_VALUE
-        var top = Int.MAX_VALUE
-        var right = -1
-        var bottom = -1
-        var count = 0
+    ) {
+        val home = AVATAR.inflate(2f)
+        val settings = TARGET.inflate(2f)
         for (y in 0 until frame.height) {
             for (x in 0 until frame.width) {
                 val (r, g, b) = channels(frame.getPixel(x, y))
                 if (g > r + GREEN_MARGIN && g > b + GREEN_MARGIN) {
-                    count++
-                    left = minOf(left, x)
-                    top = minOf(top, y)
-                    right = maxOf(right, x)
-                    bottom = maxOf(bottom, y)
+                    val at = Offset(x + 0.5f, y + 0.5f)
+                    assertTrue("$label has travelling portrait pixels at $at", home.contains(at) || settings.contains(at))
                 }
             }
         }
-        if (right < 0) return null
-        val bounds = Rect(left.toFloat(), top.toFloat(), right + 1f, bottom + 1f)
-        assertTrue("$label shows one avatar, not two: $bounds", abs(bounds.width - bounds.height) <= SQUARE_SLACK)
-        val disc = count <= bounds.width * bounds.height * DISC
-        assertTrue("$label shows one avatar, not two: $count px in $bounds", disc)
-        return bounds
-    }
-
-    private fun assertNear(
-        label: String,
-        expected: Rect,
-        actual: Rect,
-    ) {
-        val off =
-            maxOf(abs(expected.left - actual.left), abs(expected.top - actual.top), abs(expected.right - actual.right))
-        assertTrue("$label: expected $expected, drew $actual", off <= NEAR)
     }
 
     private fun Rect.span(other: Rect) =
@@ -472,20 +381,6 @@ class SettingsTopLevelBubbleMotionTest {
             top <= other.top &&
             right >= other.right &&
             bottom >= other.bottom
-
-    private fun handoff(pen: Boolean): SettingsTopLevelHandoff {
-        var layer: GraphicsLayer? = null
-        rule.setContent { layer = rememberGraphicsLayer() }
-        rule.waitForIdle()
-        return SettingsTopLevelHandoff().apply {
-            avatar =
-                SettingsAvatarSource(checkNotNull(layer)).apply {
-                    layerBounds = AVATAR.inflate(4f)
-                    bounds = AVATAR
-                }
-            if (pen) this.pen = SettingsPenSource(PEN, 16f, Color.Gray, Color.White)
-        }
-    }
 
     private fun assertBetween(
         label: String,
@@ -554,15 +449,10 @@ class SettingsTopLevelBubbleMotionTest {
         const val CLOSE_FRAMES = 18
         const val REVERSE_AFTER_FRAMES = 5
         const val CHATS_GONE_FRAME = 9
-        const val MAX_STEP = 16
-        const val LANDING_SLACK = 12
         const val CARD_MARGIN = 3f
         const val LIGHT = 60
         const val GREY_SPREAD = 40
         const val GREEN_MARGIN = 40
-        const val SQUARE_SLACK = 4f
-        const val DISC = 0.9f
-        const val NEAR = 4f
         const val PEN_SLACK = 12f
         const val FAR_X = 18
         const val FAR_Y = 394
@@ -571,6 +461,7 @@ class SettingsTopLevelBubbleMotionTest {
         val AVATAR = Rect(12f, 12f, 52f, 52f)
         val TARGET = Rect(32f, 196f, 88f, 252f)
         val PEN = Rect(300f, 720f, 348f, 768f)
+        val PEN_SURFACE = ControlMorphSurface(Color.Gray, Color.White, 16f, 1f, 1f)
         val PEN_STAND_IN = Rect(304f, 724f, 352f, 772f)
         val PROFILE = fixedCard(Rect(16f, 180f, 344f, 326f))
         val BOTTOM = fixedCard(Rect(16f, 626f, 344f, 740f))
@@ -586,8 +477,6 @@ private fun ChatsStandIn(
     rows: Boolean,
     open: () -> Unit,
 ) {
-    val inset = 4.dp
-    val (origin, click) = rememberSettingsRouteClick(open, originInset = inset)
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (rows) {
             Column(Modifier.padding(top = 72.dp)) {
@@ -606,11 +495,8 @@ private fun ChatsStandIn(
             Modifier
                 .padding(8.dp)
                 .size(48.dp)
-                .then(origin)
-                .settingsCardMorph(SettingsHomeOriginAnchor, inset)
-                .settingsAvatarFlightSource(inset)
                 .testTag("fixture.avatar")
-                .clickable { click() },
+                .clickable(onClick = open),
             contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.size(40.dp).background(Color(0xFF2E7D32), CircleShape))
@@ -644,7 +530,6 @@ private fun SettingsStandIn() {
                         Modifier
                             .padding(16.dp)
                             .size(56.dp)
-                            .settingsAvatarFlightTarget()
                             .background(Color(0xFF2E7D32), CircleShape),
                     )
                 }
