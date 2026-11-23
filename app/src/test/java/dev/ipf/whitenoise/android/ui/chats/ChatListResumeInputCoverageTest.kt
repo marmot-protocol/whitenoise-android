@@ -14,6 +14,8 @@ import org.junit.Test
  * Behaviour is exercised by [ChatListResumeBaselineTest].
  */
 class ChatListResumeInputCoverageTest {
+    private val baselineBranchSkipsCorrection =
+        Regex("""if \(current\.resumeBaseline\) \{[\s\S]*?\} else if \(shouldCorrectHeadScroll""")
     private val chatsDir = "src/main/java/dev/ipf/whitenoise/android/ui/chats"
     private val screen = appModuleSource("$chatsDir/ChatsScreen.kt").functionBody("ChatsScreen")
 
@@ -54,17 +56,19 @@ class ChatListResumeInputCoverageTest {
 
     @Test
     fun zeroPlacementDurationSnapsRowsAndLeavesInputOpen() {
-        val gate = appModuleSource("$chatsDir/ChatListRowPlacementGate.kt").functionBody("rememberChatListRowPlacementGate")
+        val gate =
+            appModuleSource("$chatsDir/ChatListRowPlacementGate.kt").functionBody("rememberChatListRowPlacementGate")
         assertTrue("a zero-duration placement must not close row input", "placementDurationMillis > 0" in gate)
 
         val motion = appModuleSource("$chatsDir/ChatListHeadReorderMotion.kt")
+        val rowMotion = appModuleSource("$chatsDir/ChatListRowMotionDuration.kt")
         assertTrue(
             "zero-duration rows must snap instead of running a placement tween",
-            "placementSpec = if (placementDurationMillis > 0) tween(placementDurationMillis) else null" in motion,
+            "placementSpec = if (placementDurationMillis > 0) tween(placementDurationMillis) else null" in rowMotion,
         )
         assertTrue(
             "zero-duration rows must drop the item animation so inserted rows are drawn opaque at once",
-            "fadeInSpec = if (placementDurationMillis > 0) tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS) else null" in motion,
+            "fadeInSpec = if (placementDurationMillis > 0) tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS) else null" in rowMotion,
         )
         assertTrue(
             "the resumed head must not open the head reorder gate",
@@ -79,7 +83,7 @@ class ChatListResumeInputCoverageTest {
         )
         assertTrue(
             "the resume baseline must never launch the animated head correction",
-            Regex("""if \(current\.resumeBaseline\) \{[\s\S]*?\} else if \(shouldCorrectHeadScroll""").containsMatchIn(headEffect),
+            baselineBranchSkipsCorrection.containsMatchIn(headEffect),
         )
     }
 }

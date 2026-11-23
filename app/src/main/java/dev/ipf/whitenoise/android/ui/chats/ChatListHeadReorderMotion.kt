@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -36,19 +35,6 @@ internal fun LazyItemScope.chatListRowMotion(
     placementDurationMillis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS,
 ): Modifier =
     chatListPlacementMotion(placementDurationMillis).zIndex(chatListTargetZIndex(targetIndex))
-
-/**
- * Keyed placement and membership fade. A zero duration removes the item animation: rows,
- * including inserted ones, appear fully drawn in their new slots, and placement still running
- * from before the snap is dropped. [rememberChatListResumeBaseline] recomposes once after the
- * snap so live motion starts again from the snapped slots.
- */
-internal fun LazyItemScope.chatListPlacementMotion(placementDurationMillis: Int): Modifier =
-    Modifier.animateItem(
-        fadeInSpec = if (placementDurationMillis > 0) tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS) else null,
-        placementSpec = if (placementDurationMillis > 0) tween(placementDurationMillis) else null,
-        fadeOutSpec = null,
-    )
 
 internal fun chatListTargetZIndex(targetIndex: Int): Float = -targetIndex.toFloat()
 
@@ -265,7 +251,7 @@ internal fun rememberChatListHeadReorderGate(
  * animated scroll correction when [shouldSnapChatListForHeadReorder] fires.
  * Dataset, gesture and demotion fences belong to this single viewport owner.
  */
-@Suppress("FunctionNaming", "LongParameterList")
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod") // One collector owns every head-motion path.
 @Composable
 internal fun ChatListActiveHeadScrollEffect(
     listState: LazyListState,
@@ -326,13 +312,10 @@ internal fun ChatListActiveHeadScrollEffect(
                 )
             }.collect { current ->
                 if (current.resumeBaseline) {
-                    // Hidden changes never animate: chatListResumeHeadSnap places a
-                    // promoted head before layout. A correction the stop froze
-                    // finishes at once instead of after resume (#3780).
-                    if (correctionJob?.isActive == true) {
-                        correctionSerial += 1L
-                        correctionJob?.cancel()
-                        liveProgressCallback(false)
+                    // Finish a correction the stop froze; its cleanup releases the gate. Hidden
+                    // promotions never animate: chatListResumeHeadSnap places them before layout (#3780).
+                    correctionJob?.takeIf { it.isActive }?.let { frozen ->
+                        frozen.cancel()
                         listState.requestScrollToItem(0)
                     }
                 } else if (shouldCorrectHeadScroll(previous, current, isActiveList)) {

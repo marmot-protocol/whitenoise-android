@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 
 private class ChatListRowMotionHistory {
     var orderedRowIds: List<String>? = null
@@ -89,3 +92,16 @@ private fun chatListHeadPromotionTravelSlots(
 
 private const val CHAT_LIST_ROW_PLACEMENT_EXTRA_MILLIS_PER_SLOT = 30
 internal const val CHAT_LIST_ROW_PLACEMENT_MAX_MILLIS = 360
+
+/**
+ * Keyed placement and membership fade. A zero duration removes the item animation: rows,
+ * including inserted ones, appear fully drawn in their new slots, and placement still running
+ * from before the snap is dropped. [rememberChatListResumeBaseline] recomposes once after the
+ * snap so live motion starts again from the snapped slots.
+ */
+internal fun LazyItemScope.chatListPlacementMotion(placementDurationMillis: Int): Modifier =
+    Modifier.animateItem(
+        fadeInSpec = if (placementDurationMillis > 0) tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS) else null,
+        placementSpec = if (placementDurationMillis > 0) tween(placementDurationMillis) else null,
+        fadeOutSpec = null,
+    )

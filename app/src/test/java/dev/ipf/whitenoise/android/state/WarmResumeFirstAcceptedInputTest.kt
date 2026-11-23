@@ -25,7 +25,7 @@ class WarmResumeFirstAcceptedInputTest {
         val token = WarmResumeTrace.activityCreated(WarmResumeLifecycleClass.entries.first(), false, 0)
         WarmResumeTrace.foregroundStarted(token, 1, WarmResumeLifecycleClass.entries.first())
 
-        WarmResumeTrace.firstAcceptedInput(WarmResumeRenderedSurface.ChatList)
+        WarmResumeInputTrace.firstAcceptedInput(WarmResumeRenderedSurface.ChatList)
         WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.InputReceived)
 
         val markers = inputMarkers()
@@ -52,11 +52,11 @@ class WarmResumeFirstAcceptedInputTest {
         WarmResumeTrace.foregroundStarted(token, 1, WarmResumeLifecycleClass.entries.first())
         WarmResumeTrace.foregroundStopped(token, 1)
 
-        WarmResumeTrace.firstAcceptedInput(WarmResumeRenderedSurface.ChatList)
+        WarmResumeInputTrace.firstAcceptedInput(WarmResumeRenderedSurface.ChatList)
         assertEquals(emptyList<String>(), inputMarkers())
 
         WarmResumeTrace.foregroundStarted(token, 2, WarmResumeLifecycleClass.entries.first())
-        WarmResumeTrace.firstAcceptedInput(WarmResumeRenderedSurface.ChatList)
+        WarmResumeInputTrace.firstAcceptedInput(WarmResumeRenderedSurface.ChatList)
         assertTrue("epoch=2 surface=chat_list" in inputMarkers().single())
         WarmResumeTrace.foregroundStopped(token, 2)
     }

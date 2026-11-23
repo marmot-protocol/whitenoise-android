@@ -210,7 +210,10 @@ class ChatListResumeBaselineTest {
         advanceFrames(1)
         // Live motion starts from the snapped slot (index 2), not from a list edge.
         val movingTop = rowTop("C")
-        assertTrue("C should be moving up from its resumed slot, was at $movingTop", movingTop > 0.5f && movingTop <= 96.5f)
+        assertTrue(
+            "C should be moving up from its resumed slot, was at $movingTop",
+            movingTop > 0.5f && movingTop <= 96.5f,
+        )
         tap("C")
         composeRule.runOnIdle { assertEquals(emptyList<String>(), openedIds) }
 

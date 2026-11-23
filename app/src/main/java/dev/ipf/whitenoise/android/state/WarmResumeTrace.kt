@@ -15,7 +15,6 @@ internal object WarmResumeTrace {
     private val nextActivityToken = AtomicInteger()
     private val nextTraceCookie = AtomicInteger()
     private val openTraceCookies = mutableMapOf<ForegroundKey, Int>()
-    private var pendingInputTrace: Pair<ForegroundKey, Int>? = null
     private val renderedSurfaceFrames = ArrayDeque<WarmResumeRenderedFrame>()
 
     fun activityCreated(
@@ -50,11 +49,8 @@ internal object WarmResumeTrace {
             val cookie = nextTraceCookie.incrementAndGet()
             openTraceCookies[key] = cookie
             Trace.beginAsyncSection(TRACE_SECTION, cookie)
-            completeInputTrace()
-            val inputCookie = nextTraceCookie.incrementAndGet()
-            pendingInputTrace = key to inputCookie
-            Trace.beginAsyncSection(INPUT_TRACE_SECTION, inputCookie)
         }
+        WarmResumeInputTrace.foregroundStarted(activityToken, foregroundEpoch)
     }
 
     @Synchronized
@@ -64,22 +60,7 @@ internal object WarmResumeTrace {
     ) {
         marker(activityToken, "foreground-stopped", "epoch=$foregroundEpoch")
         completeTrace(activityToken, foregroundEpoch)
-        if (pendingInputTrace?.first == ForegroundKey(activityToken, foregroundEpoch)) completeInputTrace()
-    }
-
-    /**
-     * Ends the foreground-to-first-handled-input section (#3780). Call only from a handler
-     * that acted on the input; later inputs in the same foreground are ignored.
-     */
-    @Synchronized
-    fun firstAcceptedInput(surface: WarmResumeRenderedSurface) {
-        val key = pendingInputTrace?.first ?: return
-        completeInputTrace()
-        marker(
-            key.activityToken,
-            "first-accepted-input",
-            "epoch=${key.foregroundEpoch} surface=${surface.name.lowercase()} uptime_ms=${SystemClock.uptimeMillis()}",
-        )
+        WarmResumeInputTrace.foregroundStopped(activityToken, foregroundEpoch)
     }
 
     fun lifecycle(
@@ -158,8 +139,11 @@ internal object WarmResumeTrace {
         imeRequested: Boolean? = null,
         imeObserved: Boolean? = null,
     ) {
-        if (phase == WarmResumeConversationPhase.InputReceived || phase == WarmResumeConversationPhase.NavigationRequested) {
-            firstAcceptedInput(WarmResumeRenderedSurface.Conversation)
+        when (phase) {
+            WarmResumeConversationPhase.InputReceived,
+            WarmResumeConversationPhase.NavigationRequested,
+            -> WarmResumeInputTrace.firstAcceptedInput(WarmResumeRenderedSurface.Conversation)
+            else -> Unit
         }
         if (!BuildConfig.DEBUG && !BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return
         Log.i(
@@ -179,19 +163,12 @@ internal object WarmResumeTrace {
         }
     }
 
-    @Synchronized
-    private fun completeInputTrace() {
-        pendingInputTrace?.let { (_, cookie) -> Trace.endAsyncSection(INPUT_TRACE_SECTION, cookie) }
-        pendingInputTrace = null
-    }
-
     private data class ForegroundKey(
         val activityToken: Int,
         val foregroundEpoch: Int,
     )
 
     private const val TRACE_SECTION = "WhiteNoise.warmResume.firstUsefulFrame"
-    internal const val INPUT_TRACE_SECTION = "WhiteNoise.warmResume.firstAcceptedInput"
     private const val MAX_RECORDED_SURFACE_FRAMES = 64
 }
 
