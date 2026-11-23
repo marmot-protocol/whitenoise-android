@@ -129,7 +129,10 @@ class SettingsHubScreenshotTest {
             LearnWhiteNoiseScreen(onBack = {}, onShareProfile = {})
         }
 
-    private fun advanceWalkthrough(label: String, snapshot: String) {
+    private fun advanceWalkthrough(
+        label: String,
+        snapshot: String,
+    ) {
         composeRule.onNodeWithText(label).performScrollTo().performClick()
         composeRule.onNodeWithText(label).assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot.png")
