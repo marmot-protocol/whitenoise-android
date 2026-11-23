@@ -66,7 +66,11 @@ internal suspend fun downloadNostrVideo(
         try {
             call.execute().use { response ->
                 val body = response.body
-                val encoded = response.header("Content-Encoding")?.equals("identity", ignoreCase = true) == false
+                val encoded =
+                    response
+                        .headers("Content-Encoding")
+                        .flatMap { it.split(',') }
+                        .any { coding -> coding.isNotBlank() && !coding.trim().equals("identity", ignoreCase = true) }
                 if (!response.isSuccessful || encoded || body.contentLength() > maxBytes) return@use
                 val download = File.createTempFile("video-", ".bin", directory).also { file = it }
                 body.byteStream().use { input ->

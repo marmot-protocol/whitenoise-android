@@ -78,8 +78,14 @@ class NostrVideoDownloadTest {
         assertEquals(0, missing.listFiles()!!.size)
 
         val compressed = temporary.newFolder()
-        assertNull(download(compressed, VIDEO_URL, contentEncoding = "gzip") { "small".toResponseBody() })
-        assertEquals(0, compressed.listFiles()!!.size)
+        listOf(listOf("gzip"), listOf("gzip", "identity"), listOf("identity, br")).forEach { codings ->
+            val file = download(compressed, VIDEO_URL, contentEncoding = codings) { "small".toResponseBody() }
+            assertNull(codings.toString(), file)
+            assertEquals(0, compressed.listFiles()!!.size)
+        }
+        val identity =
+            download(compressed, VIDEO_URL, contentEncoding = listOf("identity")) { "small".toResponseBody() }
+        assertNotNull(identity)
 
         val empty = temporary.newFolder()
         assertNull(download(empty, VIDEO_URL) { ByteArray(0).toResponseBody() })
@@ -109,7 +115,7 @@ class NostrVideoDownloadTest {
         directory: File,
         url: String,
         code: Int = 200,
-        contentEncoding: String? = null,
+        contentEncoding: List<String> = emptyList(),
         onRequest: (Request) -> Unit = {},
         body: () -> ResponseBody,
     ): File? {
@@ -125,7 +131,7 @@ class NostrVideoDownloadTest {
                         .code(code)
                         .message("test")
                         .body(body())
-                        .apply { contentEncoding?.let { header("Content-Encoding", it) } }
+                        .apply { contentEncoding.forEach { addHeader("Content-Encoding", it) } }
                         .build()
                 }.build()
         return runBlocking { downloadNostrVideo(directory, url, client, MAX_TEST_BYTES) }

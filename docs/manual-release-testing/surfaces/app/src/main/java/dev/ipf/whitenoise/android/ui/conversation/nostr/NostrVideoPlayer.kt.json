@@ -48,6 +48,33 @@
         "test_ids": [
           "MED-047"
         ]
+      },
+      {
+        "surface": "R.string.nostr_video_playback_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "R.string.nostr_video_playback_failed",
+        "test_ids": [
+          "RDR-001",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "RDR-001",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrVideoPlayer.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "RDR-001",
+          "RDR-004"
+        ]
       }
     ]
   },
