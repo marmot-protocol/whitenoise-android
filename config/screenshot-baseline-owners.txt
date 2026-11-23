@@ -272,5 +272,3 @@
 
 # In-app document viewers: deterministic PDF fixtures and native HTML chrome.
 *.DocumentAttachmentViewerScreenshotTest
-
-*.NewMessageEntryScreenshotTest

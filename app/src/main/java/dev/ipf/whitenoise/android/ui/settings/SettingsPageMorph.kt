@@ -52,7 +52,6 @@ internal class SettingsPageMorph {
     /** The live outline of the control an anchor-only route, such as a chat, opens from. */
     internal var anchorContour: (() -> SettingsContour?)? = null
     private var closingOrigin: Rect? = null
-    internal var closingAnchorContour: (() -> SettingsContour?)? = null
     private var exitStart = 1f
     private var entryStart = 0f
     private var entryOnly = false
@@ -155,7 +154,7 @@ internal class SettingsPageMorph {
             native
         } else {
             val key = targetAnchorKey ?: correspondenceKey ?: 0
-            val anchor = (closingAnchorContour ?: anchorContour)?.invoke()?.takeIf { it.bounds.validIn(transitionHost) }
+            val anchor = anchorContour?.invoke()?.takeIf { it.bounds.validIn(transitionHost) }
             val measured = closingOrigin?.takeIf { it.validIn(transitionHost) }
             val contour =
                 anchor?.copy(key = key, viewport = transitionHost)
