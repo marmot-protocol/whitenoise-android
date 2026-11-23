@@ -136,8 +136,9 @@ class InvitationAccountSwitchDeviceTest {
             name: String,
             memberRefs: List<String>,
             options: CreateGroupOptionsFfi,
-        ): DetailedGroupCreationResultFfi =
-            observe { native.createGroupWithOptionsDetailed(accountRef, name, memberRefs, options) }
+        ): DetailedGroupCreationResultFfi = observe {
+            native.createGroupWithOptionsDetailed(accountRef, name, memberRefs, options)
+        }
 
         override suspend fun inviteMembersDetailedWithInitialAdmins(
             accountRef: String,
