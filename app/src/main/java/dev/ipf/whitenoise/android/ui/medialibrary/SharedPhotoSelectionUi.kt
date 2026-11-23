@@ -51,25 +51,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.OutboundShareTooLargeExc
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailure
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-
-/** Top-bar Back ends selection mode first, as system Back does, and otherwise leaves the gallery. */
-internal fun SharedPhotoShare.backOr(leave: () -> Unit): () -> Unit =
-    {
-        if (selection.active) exit() else leave()
-    }
-
-/** The pager's photos and videos from its live state, which can be newer than the last composed projection. */
-internal fun GroupAttachmentPager.liveVisuals(accountId: () -> String?): suspend () -> List<SharedMediaTile> =
-    {
-        val entries = state.entries
-        val account = accountId()
-        withContext(Dispatchers.Default) { attachmentLibraryTiles(entries, account).visuals }
-    }
 
 /**
  * Owns photo selection for one gallery route. The share is checked against [liveVisuals] when available, otherwise
@@ -131,7 +115,8 @@ internal fun rememberSharedPhotoShare(
                 val self = currentCoroutineContext()[Job]
                 try {
                     runCatchingCancellable {
-                        val current = suspend { if (ownsShare()) currentVisuals() else null }
+                        // Ownership is checked again once the gallery is read, as reading it can suspend.
+                        val current = suspend { if (ownsShare()) currentVisuals().takeIf { ownsShare() } else null }
                         shareSelectedPhotos(context, account, photos, chooserTitle, current, source)
                     }.onSuccess {
                         state.selection.clear()

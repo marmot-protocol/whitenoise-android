@@ -50,6 +50,8 @@ class SharedPhotoShareLifecycleTest {
     private var shown by mutableStateOf(true)
     private var owned = true
     private var current = listOf(beach, harbour)
+    private var checks = 0
+    private var ownershipLostOnFinalCheck = false
     private lateinit var share: SharedPhotoShare
 
     @Before
@@ -62,7 +64,11 @@ class SharedPhotoShareLifecycleTest {
                     rememberSharedPhotoShare(
                         ownsShare = { owned },
                         accountRef = { "account" },
-                        currentVisuals = { current },
+                        currentVisuals = {
+                            checks += 1
+                            if (checks == 2 && ownershipLostOnFinalCheck) owned = false
+                            current
+                        },
                         source = { photo ->
                             if (photo == harbour) {
                                 secondRead.complete(Unit)
@@ -88,6 +94,8 @@ class SharedPhotoShareLifecycleTest {
     @Test
     fun closingTheGalleryCancelsStaging() {
         composeRule.runOnIdle { shown = false }
+        // The gallery has left composition before the paused read returns.
+        composeRule.waitForIdle()
         release.complete(Unit)
 
         composeRule.waitUntil(TIMEOUT_MS) { sharedFiles().isEmpty() }
@@ -103,6 +111,19 @@ class SharedPhotoShareLifecycleTest {
         release.complete(Unit)
 
         composeRule.waitUntil(TIMEOUT_MS) { !share.sharing }
+        assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+        assertTrue(sharedFiles().isEmpty())
+        assertTrue(failures.isEmpty())
+    }
+
+    /** Ownership lost while the final gallery read is in flight still prevents the sheet. */
+    @Test
+    fun losingOwnershipDuringTheFinalCheckCancels() {
+        ownershipLostOnFinalCheck = true
+        release.complete(Unit)
+
+        composeRule.waitUntil(TIMEOUT_MS) { !share.sharing }
+        assertEquals(2, checks)
         assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
         assertTrue(sharedFiles().isEmpty())
         assertTrue(failures.isEmpty())

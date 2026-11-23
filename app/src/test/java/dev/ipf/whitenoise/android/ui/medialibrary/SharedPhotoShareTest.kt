@@ -330,6 +330,20 @@ class SharedPhotoShareTest {
         assertEquals(0, selection.count)
     }
 
+    /** Entries replaced while they were projected are projected again, so a removed photo never looks current. */
+    @Test
+    fun liveVisualsReprojectEntriesChangedDuringProjection() =
+        runTest {
+            val before = listOf(historyEntry(1), historyEntry(2))
+            val after = listOf(historyEntry(2))
+            var reads = 0
+
+            val visuals = liveAttachmentVisuals({ if (reads++ == 0) before else after }, { "account" })
+
+            assertEquals(listOf("message-2"), visuals.map { it.messageIdHex })
+            assertTrue(reads >= 3)
+        }
+
     /** The gallery's own Back ends selection mode first and only then leaves, as system Back does. */
     @Test
     fun topBarBackEndsSelectionBeforeLeaving() {

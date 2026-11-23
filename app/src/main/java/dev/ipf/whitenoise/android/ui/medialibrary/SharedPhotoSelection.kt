@@ -5,11 +5,14 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.marmotkit.AttachmentEntryFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.ui.conversation.media.OutboundShareAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentsExternally
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 
 /** A gallery slot: the message and authored attachment index a tile was selected from. */
 private fun SharedMediaTile.slot() = messageIdHex to attachmentIndex
@@ -80,6 +83,32 @@ internal class SharedPhotoShare {
     /** Forgets [finished] unless a newer share replaced it. */
     internal fun end(finished: Job?) {
         if (job === finished) job = null
+    }
+}
+
+/** Top-bar Back ends selection mode first, as system Back does, and otherwise leaves the gallery. */
+internal fun SharedPhotoShare.backOr(leave: () -> Unit): () -> Unit =
+    {
+        if (selection.active) exit() else leave()
+    }
+
+/** The pager's photos and videos from its live state, which can be newer than the last composed projection. */
+internal fun GroupAttachmentPager.liveVisuals(accountId: () -> String?): suspend () -> List<SharedMediaTile> =
+    { liveAttachmentVisuals({ state.entries }, accountId) }
+
+/**
+ * Projects the current [entries] off the main thread, projecting again if they or the account changed meanwhile, so
+ * the caller resumes with photos matching the gallery's state at that moment.
+ */
+internal suspend fun liveAttachmentVisuals(
+    entries: () -> List<AttachmentEntryFfi>,
+    accountId: () -> String?,
+): List<SharedMediaTile> {
+    while (true) {
+        val read = entries()
+        val account = accountId()
+        val visuals = withContext(Dispatchers.Default) { attachmentLibraryTiles(read, account).visuals }
+        if (entries() === read && accountId() == account) return visuals
     }
 }
 
