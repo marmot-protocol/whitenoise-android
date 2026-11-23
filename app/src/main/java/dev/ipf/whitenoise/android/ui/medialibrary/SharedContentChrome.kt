@@ -112,7 +112,10 @@ internal fun SharedContentCategories(
     }
 }
 
-/** Shared settings frame with the prototype media-only filter chips; native content retains its scroll owner. */
+/**
+ * Shared settings frame with the prototype media-only filter chips, which a non-null [selectionBar] replaces while
+ * selecting; native content retains its scroll owner.
+ */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun SharedContentScaffold(
@@ -123,11 +126,14 @@ internal fun SharedContentScaffold(
     loading: Boolean,
     paging: GroupAttachmentState? = null,
     onLoadMore: () -> Unit = {},
+    selectionBar: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     SettingsScaffold(title = stringResource(category.titleRes), onBack = onBack) {
         Column(Modifier.fillMaxSize().testTag("shared.destination.${category.name}")) {
-            if (category == SharedContentCategory.Media) {
+            if (selectionBar != null) {
+                selectionBar()
+            } else if (category == SharedContentCategory.Media) {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

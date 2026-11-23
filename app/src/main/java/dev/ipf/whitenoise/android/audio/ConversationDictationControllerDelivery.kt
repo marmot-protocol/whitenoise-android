@@ -13,7 +13,7 @@ internal fun ConversationDictationController.deliverTranscript(
     // for automatic completion. Everything else — restoration, a target captured before that
     // setting existed — pastes into the draft rather than sending on its own.
     val deliveryMode = requestedDeliveryMode ?: ConversationDictationDeliveryMode.PasteIntoDraft
-    finishTiming.delivered(elapsedRealtime(), deliveryMode)?.let { conversationDictationDiagnostic(it) }
+    finishTiming.transcriptReady(elapsedRealtime(), deliveryMode)?.let { conversationDictationDiagnostic(it) }
     if (deliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
         if (followUpSendBlocked(sessionId)) {
             fail(sessionId, target, ConversationDictationFailure.SendBlocked, retainedTranscript = transcript)

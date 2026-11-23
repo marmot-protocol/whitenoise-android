@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.ui
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.NoticeTier
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.ui.common.RootToastSnackbarEffect
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -47,14 +49,30 @@ class RootToastSnackbarTest {
         composeRule.runOnIdle {
             assertNull(host.currentSnackbarData)
             assertNotNull(state.toast)
-            assertFalse(key in state.seenGroupChangeToasts)
+            assertFalse(key in state.groupChangeNotices.seenToasts)
         }
 
         onScreen.value = true
         composeRule.runOnIdle { requireNotNull(host.currentSnackbarData).dismiss() }
         composeRule.runOnIdle {
             assertNull(state.toast)
-            assertTrue(key in state.seenGroupChangeToasts)
+            assertTrue(key in state.groupChangeNotices.seenToasts)
+        }
+    }
+
+    /** A plain confirmation becomes a transient notice instead of a snackbar, so the screen under it stays steady. */
+    @Test
+    fun aPlainConfirmationBecomesATransientNotice() {
+        val state = emptyAppState()
+        val host = SnackbarHostState()
+        composeRule.setContent {
+            RootToastSnackbarEffect(state, host, retryLabel = "Retry", onScreen = MutableStateFlow(true))
+        }
+        composeRule.runOnIdle { state.presentText(AppText.Plain("Saved"), tier = NoticeTier.Confirmation) }
+        composeRule.runOnIdle {
+            assertNull(host.currentSnackbarData)
+            assertNull(state.toast)
+            assertEquals(AppText.Plain("Saved"), state.transientNotice?.title)
         }
     }
 

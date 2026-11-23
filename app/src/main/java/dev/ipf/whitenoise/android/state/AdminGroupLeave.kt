@@ -33,10 +33,14 @@ internal suspend fun WhiteNoiseAppState.leaveAsAdmin(
         }
         else -> {
             when {
-                management.leaveRequestPending -> presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+                management.leaveRequestPending ->
+                    presentTransient(
+                        R.string.toast_leave_not_confirmed_history_kept,
+                        kind = TransientNoticeKind.Information,
+                    )
                 management.isLastAdmin ->
                     present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
-                else -> presentTransient(R.string.toast_couldnt_leave_chat)
+                else -> presentTransient(R.string.toast_couldnt_leave_chat, kind = TransientNoticeKind.Information)
             }
             false
         }

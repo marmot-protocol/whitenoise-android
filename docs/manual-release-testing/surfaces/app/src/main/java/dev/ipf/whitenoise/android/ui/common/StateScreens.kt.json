@@ -59,6 +59,15 @@
         "test_ids": [
           "AXY-001"
         ]
+      },
+      {
+        "surface": "R.string.dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "CON-034",
+          "AXY-001"
+        ]
       }
     ]
   },

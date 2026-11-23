@@ -172,16 +172,16 @@ private fun refusalReason(reason: String): Int =
 internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(notice: GroupChangeNotice): Boolean {
     val showing = "${notice.accountRef}|${notice.changeIdHex.lowercase()}"
     return when {
-        activeAccountRef != notice.accountRef || showing in showingGroupChangeNotices -> false
-        shownGroupChangeNotices.contains(notice.accountRef, notice.changeIdHex) -> true
+        activeAccountRef != notice.accountRef || showing in groupChangeNotices.showing -> false
+        groupChangeNotices.shown.contains(notice.accountRef, notice.changeIdHex) -> true
         else -> {
-            showingGroupChangeNotices += showing
+            groupChangeNotices.showing += showing
             try {
                 showUntilSeen(notice, showing).also { seen ->
-                    if (seen) shownGroupChangeNotices.firstShowing(notice.accountRef, notice.changeIdHex)
+                    if (seen) groupChangeNotices.shown.firstShowing(notice.accountRef, notice.changeIdHex)
                 }
             } finally {
-                showingGroupChangeNotices -= showing
+                groupChangeNotices.showing -= showing
             }
         }
     }
@@ -206,7 +206,7 @@ private suspend fun WhiteNoiseAppState.showUntilSeen(
     }
 
     while (activeAccountRef == notice.accountRef) {
-        seenGroupChangeToasts -= showing
+        groupChangeNotices.seenToasts -= showing
         // Tagged with the change, so another change's notice with the same wording still replaces this one.
         presentText(ToastMessage(title, detail, groupChangeKey = showing))
         val shown = toast
@@ -218,11 +218,11 @@ private suspend fun WhiteNoiseAppState.showUntilSeen(
                 clearToast(shown)
                 break
             }
-            seenGroupChangeToasts.remove(showing) -> return true
+            groupChangeNotices.seenToasts.remove(showing) -> return true
             else -> awaitToastOrSwitch { it == null }
         }
     }
-    seenGroupChangeToasts -= showing
+    groupChangeNotices.seenToasts -= showing
     return false
 }
 
@@ -233,7 +233,7 @@ private suspend fun WhiteNoiseAppState.showUntilSeen(
  * cleared.
  */
 internal fun WhiteNoiseAppState.noteToastSeen(toast: ToastMessage) {
-    toast.groupChangeKey?.takeIf { it.startsWith("$activeAccountRef|") }?.let { seenGroupChangeToasts += it }
+    toast.groupChangeKey?.takeIf { it.startsWith("$activeAccountRef|") }?.let { groupChangeNotices.seenToasts += it }
 }
 
 /**
@@ -254,6 +254,18 @@ internal fun groupChangeToast(
         headline != null -> headline to notice.reason
         else -> notice.reason to null
     }
+}
+
+/** One process's group-change notices, by account and MDK ID. Not thread-safe: use it from the main thread. */
+internal class GroupChangeNotices {
+    /** Notices already seen, so a change MDK reports again is not shown twice. */
+    val shown = ShownQueuedRefusals()
+
+    /** Notices on screen and not yet seen. */
+    val showing = mutableSetOf<String>()
+
+    /** Toasts whose snackbar ran to the end, until their notice reads it. */
+    val seenToasts = mutableSetOf<String>()
 }
 
 /**

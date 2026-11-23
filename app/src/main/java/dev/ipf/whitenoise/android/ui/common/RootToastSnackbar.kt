@@ -9,6 +9,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.ipf.whitenoise.android.state.NoticeTier
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.noteToastSeen
@@ -19,10 +20,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.takeWhile
 
 /**
- * Shows the app's toast in the root snackbar and retires it when the snackbar ends. Most toasts run even while app lock
- * hides the slot, so a confirmation is never shown twice. A group-change notice is acknowledged once its snackbar has
- * run to the end, so it runs only while [onScreen] holds: it waits while the app is locked or in the background, and
- * one they interrupt starts again once the app is back on screen. [retryLabel] names a local delete's retry action.
+ * Shows the app's toast in the root snackbar and retires it when the snackbar ends, or hands a plain confirmation to
+ * the transient notice. Most snackbars run even while app lock hides the slot, so none is shown twice. A group-change
+ * notice is acknowledged once its snackbar has run to the end, so it runs only while [onScreen] holds: it waits while
+ * the app is locked or in the background, and one they interrupt starts again once the app is back on screen.
+ * [retryLabel] names a local delete's retry action.
  */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
@@ -36,6 +38,12 @@ internal fun RootToastSnackbarEffect(
     val context = LocalContext.current
     LaunchedEffect(toast, retryLabel) {
         toast ?: return@LaunchedEffect
+        // A plain confirmation shows as a transient notice instead, so the screen under it stays steady.
+        if (toast.tier == NoticeTier.Confirmation && toast.localDeleteNotice == null && !toast.copyable) {
+            appState.presentTransient(toast.title, toast.detail)
+            appState.clearToast(toast)
+            return@LaunchedEffect
+        }
         var ended = false
 
         suspend fun show() {

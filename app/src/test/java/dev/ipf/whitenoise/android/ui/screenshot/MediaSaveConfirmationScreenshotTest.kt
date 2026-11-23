@@ -28,9 +28,11 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.TransientNotice
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTransientNoticeLayout
 import dev.ipf.whitenoise.android.ui.conversation.DaySeparator
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -53,18 +55,16 @@ class MediaSaveConfirmationScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 ShellTransientNoticeLayout(
-                    notice = TransientNotice(id = 1L, title = AppText.Resource(R.string.shared_media_saved)),
+                    notice =
+                        TransientNotice(
+                            id = 1L,
+                            title = AppText.Resource(R.string.shared_media_saved),
+                            kind = TransientNoticeKind.Confirmation,
+                        ),
                     modifier = Modifier.testTag(GLOBAL_TAG),
+                    persistentTopContent = { WhiteNoiseTopBar(title = "Media library", onBack = {}) },
                 ) {
-                    Surface(modifier = Modifier.fillMaxSize()) {
-                        Box(Modifier.fillMaxSize()) {
-                            Text(
-                                "Media library",
-                                modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
-                                style = MaterialTheme.typography.titleLarge,
-                            )
-                        }
-                    }
+                    Surface(modifier = Modifier.fillMaxSize()) {}
                 }
             }
         }
@@ -168,6 +168,7 @@ class MediaSaveConfirmationScreenshotTest {
                                         id = 1L,
                                         title = AppText.Resource(R.string.shared_media_saved),
                                         conversation = ConversationNoticeDestination("account-a", "group-a"),
+                                        kind = TransientNoticeKind.Confirmation,
                                     ),
                                 accountRef = "account-a",
                                 groupIdHex = "group-a",
@@ -213,6 +214,7 @@ class MediaSaveConfirmationScreenshotTest {
                                     id = 2L,
                                     title = AppText.Resource(R.string.shared_media_saved),
                                     conversation = ConversationNoticeDestination("account-a", "group-a"),
+                                    kind = TransientNoticeKind.Confirmation,
                                 ),
                             accountRef = "account-a",
                             groupIdHex = "group-a",

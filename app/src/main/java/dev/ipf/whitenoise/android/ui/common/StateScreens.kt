@@ -44,8 +44,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.TransientNotice
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
+import dev.ipf.whitenoise.android.state.TransientNoticeKind
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal enum class LoadFailurePlacement {
@@ -118,11 +117,12 @@ internal fun WarmResumeUsefulSurface(content: @Composable () -> Unit) {
     }
 }
 
-/** Presents a non-blocking confirmation while preserving the destination beneath it. */
+/** Keeps supplemental status or a dismissible partial outcome visible in the notice region. */
 @Composable
 internal fun InlineConfirmationNotice(
     notice: TransientNotice,
     modifier: Modifier = Modifier,
+    onDismiss: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     Surface(
@@ -135,7 +135,13 @@ internal fun InlineConfirmationNotice(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(
+                painterResource(
+                    if (notice.kind == TransientNoticeKind.Partial) R.drawable.ic_warning else R.drawable.ic_info,
+                ),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(notice.title.resolve(context), style = MaterialTheme.typography.bodyMedium)
                 notice.detail?.let {
@@ -144,6 +150,11 @@ internal fun InlineConfirmationNotice(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                     )
+                }
+            }
+            if (onDismiss != null) {
+                IconButton(onClick = onDismiss) {
+                    Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.dismiss))
                 }
             }
         }

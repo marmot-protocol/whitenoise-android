@@ -58,6 +58,8 @@ internal data class ConversationDictationSendRequest(
     val onDispatchRejectedBeforeTransport: () -> Unit = {},
     /** Called after the send is visibly pending or natively accepted, when dictation UI can release ownership. */
     val onPendingShown: () -> Unit = {},
+    /** Reports durable acceptance or definite rejection from the text transport, even after handoff. */
+    val onTextSendSettled: (durablyAccepted: Boolean) -> Unit = {},
 )
 
 internal enum class ConversationDictationFailure {

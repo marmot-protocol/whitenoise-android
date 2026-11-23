@@ -184,6 +184,19 @@ class TopNoticePlacementCoverageTest {
         assertTrue("presentationAllowed() && claims.lastOrNull() === claim" in owns)
     }
 
+    /** The confirmation's own height and insets never contribute to the destination constraints. */
+    @Test
+    fun successUsesAZeroHeightOverlayIndependentOfActionableFeedback() {
+        val overlay = mainSource("ui/common/ConfirmationBubble.kt").functionBody("AnchoredConfirmationBubble")
+        assertTrue("a shown confirmation must report zero layout height", "layout(width, 0)" in overlay)
+        val region = mainSource("ui/common/TopNotice.kt").functionBody("TopNoticeRegion")
+        assertTrue(
+            "the overlay follows actionable feedback so it never covers its controls",
+            region.indexOf("WhiteNoiseSnackbarHost(") in 0 until region.indexOf("AnchoredConfirmationBubble("),
+        )
+        assertTrue("the owning slot must present the confirmation overlay", "AnchoredConfirmationBubble(" in region)
+    }
+
     /** Material `Scaffold(` calls in one source, as their balanced argument lists, skipping the app's own scaffold. */
     private fun plainScaffoldCalls(source: String): List<String> {
         if (SCAFFOLD_ALIAS in source) return emptyList()

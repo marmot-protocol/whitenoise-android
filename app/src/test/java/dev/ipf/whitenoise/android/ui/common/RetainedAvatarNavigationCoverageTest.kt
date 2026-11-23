@@ -112,14 +112,16 @@ class RetainedAvatarNavigationCoverageTest {
     fun compatibilityWindowDropsReplacedRowsAndRejectsAnotherSource() {
         val retained = RetainedGroupCompatibilityPixels()
         val source = ChatListAvatarSource.ENCRYPTED_GROUP
-        retained.select(setOf("visible"))
+        retained.select(listOf(CompatibilityAvatarSelection("visible", mapOf(source to "image-hash"))))
         retained.record("visible", source, "image-hash", image)
         retained.record("offscreen", source, "image-hash", image)
         assertSame(image, retained.imageFor("visible", source, "image-hash"))
         assertNull(retained.imageFor("visible", source, "replacement-hash"))
         assertNull(retained.imageFor("visible", ChatListAvatarSource.LEGACY_URL, "image-hash"))
         assertNull(retained.imageFor("offscreen", source, "image-hash"))
-        retained.select(setOf("offscreen"))
+        retained.select(listOf(CompatibilityAvatarSelection("visible", mapOf(source to "replacement-hash"))))
+        retained.record("visible", source, "image-hash", image)
+        retained.select(listOf(CompatibilityAvatarSelection("visible", mapOf(source to "image-hash"))))
         assertNull(retained.imageFor("visible", source, "image-hash"))
     }
 
@@ -140,7 +142,7 @@ class RetainedAvatarNavigationCoverageTest {
         assertSame(image, shown)
         assertEquals("selecting a measured window must not restart the shell", initialCommits, ownerCommits)
 
-        select(assets.subList(1, 2))
+        select(assets.subList(1, 2), rows = assets.subList(1, 2))
         assertNull(shown)
         rule.runOnIdle { checkNotNull(owner.pixels.recordLoaded)(assets[1], image) }
         rule.waitForIdle()
@@ -175,7 +177,11 @@ class RetainedAvatarNavigationCoverageTest {
             }
         }
         rule.waitForIdle()
-        val expected = assets.subList(20, 36).map { checkNotNull(it.cacheKey(ACCOUNT)) }.toSet()
+        val expected =
+            avatarViewport(assets.size, listOf(20, 21))
+                .nearby
+                .map { checkNotNull(assets[it].cacheKey(ACCOUNT)) }
+                .toSet()
         assertEquals(expected, owner.pixels.images.keys)
         rule.runOnIdle { mounted = false }
         rule.waitForIdle()
@@ -195,18 +201,39 @@ class RetainedAvatarNavigationCoverageTest {
         )
     }
 
-    /** Window replacement releases older pins rather than accumulating every previously visited row. */
+    /** Bounded recency preserves both directions and eventually releases the oldest known pins. */
     @Test
-    fun replacingTheViewportKeepsOnlySixteenPins() {
+    fun recentRowsSurviveWindowChangesWithinTheRetentionBudget() {
+        val rows = (0 until 72).map(::asset)
         mountOwner()
-        seed(assets)
-        select(assets)
-        assertEquals(assets.take(16).map { it.cacheKey(ACCOUNT) }.toSet(), owner.pixels.images.keys)
+        seed(rows)
+        select(rows.take(16), rows = rows)
+        select(rows.subList(16, 32), rows = rows)
+        select(rows.subList(40, 56), rows = rows)
 
-        select(assets.drop(20))
+        assertEquals(
+            (rows.subList(16, 32) + rows.subList(40, 56)).map { it.cacheKey(ACCOUNT) }.toSet(),
+            owner.pixels.images.keys,
+        )
 
-        assertEquals(assets.subList(20, 36).map { it.cacheKey(ACCOUNT) }.toSet(), owner.pixels.images.keys)
-        assertEquals("revision fallback shares the same window bound", 16, owner.pixels.retained.size)
+        select(rows.subList(56, 72), rows = rows)
+        assertEquals(
+            rows.subList(40, 72).map { it.cacheKey(ACCOUNT) }.toSet(),
+            owner.pixels.images.keys,
+        )
+    }
+
+    /** Offscreen selections are checked against the current projection before they can return. */
+    @Test
+    fun changedOffscreenSelectionRetiresItsPreviousPixels() {
+        mountOwner()
+        seed(assets.take(1))
+        select(assets.take(1), rows = assets)
+        evictDecodedPixels()
+        val replacement = assets.first().copy(reference = "replacement")
+        select(assets.drop(20), rows = listOf(replacement) + assets.drop(1))
+        select(assets.take(1), rows = assets)
+        assertNull(owner.pixels.retainedFor(assets.first()))
     }
 
     /** A → B → A, sign-out, and a new list owner cannot revive a selection through an outgoing callback. */
@@ -215,14 +242,14 @@ class RetainedAvatarNavigationCoverageTest {
         mountOwner()
         seed(assets.take(1))
         select(assets.take(1))
-        val retired = owner.updateVisible
+        val retired = owner
         val retiredPixels = checkNotNull(owner.pixels.recordLoaded)
 
         listOf("other", null, ACCOUNT).forEach { next ->
             rule.runOnIdle { account = next }
             rule.waitForIdle()
             rule.runOnIdle {
-                retired(assets.take(1))
+                updateViewport(retired, assets.take(1), assets)
                 retiredPixels(assets.first(), image)
             }
             rule.waitForIdle()
@@ -240,13 +267,13 @@ class RetainedAvatarNavigationCoverageTest {
         mountOwner()
         seed(assets.take(1))
         select(assets.take(1))
-        val retired = owner.updateVisible
+        val retired = owner
 
         rule.runOnIdle {
             replaceRuntime()
         }
         rule.waitForIdle()
-        rule.runOnIdle { retired(assets.take(1)) }
+        rule.runOnIdle { updateViewport(retired, assets.take(1), assets) }
         rule.waitForIdle()
         assertTrue(owner.pixels.images.isEmpty())
         seed(assets.take(1))
@@ -372,9 +399,26 @@ class RetainedAvatarNavigationCoverageTest {
     }
 
     /** Delivers a measured viewport and waits for its cached pixels to be committed. */
-    private fun select(selected: List<AvatarAssetFfi>) {
-        rule.runOnIdle { owner.updateVisible(selected) }
+    private fun select(
+        selected: List<AvatarAssetFfi>,
+        rows: List<AvatarAssetFfi> = assets,
+    ) {
+        rule.runOnIdle { updateViewport(owner, selected, rows) }
         rule.waitForIdle()
+    }
+
+    private fun updateViewport(
+        owner: RetainedGroupAvatarPreparation,
+        selected: List<AvatarAssetFfi>,
+        rows: List<AvatarAssetFfi>,
+    ) {
+        val indexes = selected.take(VISIBLE_GROUP_AVATAR_LIMIT).map(rows::indexOf)
+        owner.updateVisible(
+            AvatarViewport(visible = indexes, nearby = indexes),
+            keyAt = { rows[it].target },
+            indexFor = { key -> rows.indexOfFirst { it.target == key }.takeIf { it >= 0 } },
+            assetAt = rows::get,
+        )
     }
 
     /** Warms validated synthetic assets without native reads or network acquisition. */

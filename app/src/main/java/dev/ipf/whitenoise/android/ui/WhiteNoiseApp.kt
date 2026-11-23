@@ -103,11 +103,8 @@ import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateState
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-internal const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
 
 /** Keeps exactly one dictation control visible without duplicating the origin composer. */
 internal fun shouldShowConversationDictationPersistentControl(
@@ -135,19 +132,6 @@ internal fun shouldShowConversationDictationPersistentControl(
             -> false
         }
 
-@Composable
-@Suppress("FunctionNaming")
-internal fun TransientNoticeTimeoutEffect(
-    notice: TransientNotice?,
-    onClear: (TransientNotice) -> Unit,
-) {
-    LaunchedEffect(notice) {
-        notice ?: return@LaunchedEffect
-        delay(TRANSIENT_NOTICE_DURATION_MILLIS)
-        onClear(notice)
-    }
-}
-
 /**
  * Notice layout (#3312): persistent top strips, temporary-banner slot, destination, then durable bottom controls.
  * Destinations with no slot below their bars use the top slot; bottom chrome and keyboard handling stay stable.
@@ -174,6 +158,7 @@ internal fun ShellTransientNoticeLayout(
             slot = slot,
             notice = notice,
             scope = null,
+            confirmationNeedsStatusInset = !persistentTopContentConsumesStatusBars,
             modifier = if (bannerOwnsStatusBar) Modifier.statusBarsPadding() else Modifier,
         )
         Box(
@@ -238,6 +223,8 @@ internal fun WhiteNoiseApp(
             TopNoticeHost(
                 snackbarHostState = snackbarHostState,
                 notice = { appState.transientNotice },
+                partial = appState::currentPartialNotice,
+                dismissNotice = appState::clearTransientNotice,
                 presentationAllowed = { !appState.appLock.screenVisible },
             )
         }
