@@ -57,6 +57,8 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationActivity
 import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
+import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.messagePreviewForRetention
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
@@ -121,12 +123,10 @@ internal fun ChatListRow(
         selected = selected,
         menuHighlighted = menuHighlighted,
         onActionsHeldChange = onActionsHeldChange,
-        onClick =
-            if (selectionMode) {
-                onToggleSelection
-            } else {
-                onOpen
-            },
+        onClick = {
+            WarmResumeTrace.firstAcceptedInput(WarmResumeRenderedSurface.ChatList)
+            if (selectionMode) onToggleSelection() else onOpen()
+        },
         onLongClick =
             if (selectionMode && !rangeDragActive) {
                 null

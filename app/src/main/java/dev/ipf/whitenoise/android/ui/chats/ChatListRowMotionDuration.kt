@@ -13,6 +13,8 @@ private class ChatListRowMotionHistory {
  * Keeps adjacent reorders quick while bounding the velocity of a visible row
  * promoted across several slots. Every row in one reorder receives the same
  * duration, so the promoted row and the displaced block settle together.
+ * Returns zero while [resumeBaseline] is active: rows snap and no placement
+ * gate closes (#3780).
  */
 @Composable
 internal fun rememberChatListRowPlacementDurationMillis(
@@ -20,6 +22,7 @@ internal fun rememberChatListRowPlacementDurationMillis(
     pinnedBoundaryIndex: Int?,
     datasetKey: ChatListDatasetKey,
     headPromotionEligible: Boolean,
+    resumeBaseline: ChatListResumeBaseline = ChatListResumeBaseline.None,
 ): Int {
     val history =
         remember(datasetKey, pinnedBoundaryIndex) {
@@ -43,7 +46,7 @@ internal fun rememberChatListRowPlacementDurationMillis(
         history.orderedRowIds = currentOrder
         history.placementDurationMillis = durationMillis
     }
-    return durationMillis
+    return if (resumeBaseline.active) 0 else durationMillis
 }
 
 internal fun chatListRowPlacementDurationMillis(

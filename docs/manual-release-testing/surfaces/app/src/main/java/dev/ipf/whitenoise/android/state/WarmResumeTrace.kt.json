@@ -10,6 +10,15 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/WarmResumeTrace.kt",
+        "surface": "First accepted input after resume",
+        "anchor": "fun firstAcceptedInput(",
+        "test_ids": [
+          "CHL-041",
+          "CON-033"
+        ]
       }
     ]
   },

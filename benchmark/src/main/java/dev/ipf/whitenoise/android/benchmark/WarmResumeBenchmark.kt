@@ -37,6 +37,32 @@ class WarmResumeBenchmark {
         )
     }
 
+    /**
+     * Taps the fixture row as soon as the task is brought back, without waiting for launch
+     * completion; ignored taps are retried and counted in the time (#3780). Chat activity that
+     * arrives while the app is hidden is not arranged here, so this samples the plain resume path
+     * unless the fixture receives messages during the iteration.
+     */
+    @Test
+    fun sameActivityWarmResumeToFirstAcceptedInput() {
+        val groupName = BenchmarkConfig.requireFixture(BenchmarkConfig.groupName, "groupName")
+        val journeys = WhiteNoiseJourneys()
+        benchmarkRule.measureRepeated(
+            packageName = BenchmarkConfig.TARGET_PACKAGE,
+            metrics = warmResumeInputMetrics(),
+            compilationMode = CompilationMode.Partial(),
+            iterations = 10,
+            setupBlock = {
+                journeys.run { resumeToChatList() }
+                pressHome()
+            },
+            measureBlock = {
+                device.executeShellCommand("am start -n ${BenchmarkConfig.TARGET_PACKAGE}/$MAIN_ACTIVITY")
+                journeys.openGroup(groupName)
+            },
+        )
+    }
+
     @Test
     fun activityRecreationToFirstUsefulFrame() {
         val journeys = WhiteNoiseJourneys()
@@ -78,3 +104,5 @@ class WarmResumeBenchmark {
         )
     }
 }
+
+private const val MAIN_ACTIVITY = "dev.ipf.whitenoise.android.MainActivity"

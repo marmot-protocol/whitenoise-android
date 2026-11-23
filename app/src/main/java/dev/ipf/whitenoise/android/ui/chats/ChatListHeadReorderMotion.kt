@@ -35,12 +35,20 @@ internal fun LazyItemScope.chatListRowMotion(
     targetIndex: Int,
     placementDurationMillis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS,
 ): Modifier =
-    Modifier
-        .animateItem(
-            fadeInSpec = tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS),
-            placementSpec = tween(placementDurationMillis),
-            fadeOutSpec = null,
-        ).zIndex(chatListTargetZIndex(targetIndex))
+    chatListPlacementMotion(placementDurationMillis).zIndex(chatListTargetZIndex(targetIndex))
+
+/**
+ * Keyed placement and membership fade. A zero duration removes the item animation: rows,
+ * including inserted ones, appear fully drawn in their new slots, and placement still running
+ * from before the snap is dropped. [rememberChatListResumeBaseline] recomposes once after the
+ * snap so live motion starts again from the snapped slots.
+ */
+internal fun LazyItemScope.chatListPlacementMotion(placementDurationMillis: Int): Modifier =
+    Modifier.animateItem(
+        fadeInSpec = if (placementDurationMillis > 0) tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS) else null,
+        placementSpec = if (placementDurationMillis > 0) tween(placementDurationMillis) else null,
+        fadeOutSpec = null,
+    )
 
 internal fun chatListTargetZIndex(targetIndex: Int): Float = -targetIndex.toFloat()
 
@@ -91,6 +99,7 @@ private data class ChatListHeadMotionState(
     val activeHeadId: String?,
     val pinnedOrder: List<String>,
     val userGestureGeneration: Long,
+    val resumeBaseline: Boolean,
 )
 
 private data class ChatListHeadScrollSnapshot(
@@ -99,6 +108,7 @@ private data class ChatListHeadScrollSnapshot(
     val firstVisibleItemIndex: Int,
     val isScrollInProgress: Boolean,
     val correctionOwnsViewport: Boolean,
+    val resumeBaseline: Boolean,
 )
 
 internal fun LazyListState.chatListViewportAnchor(visibleChatIds: Set<String>): ChatListViewportAnchor? =
@@ -216,6 +226,8 @@ private fun shouldCorrectHeadScroll(
  * A dataset replacement establishes a fresh baseline instead of treating its
  * first head as a live promotion. Re-keying by [activeHeadId] creates a fresh
  * gate even when rapid activity returns to an earlier head before settling.
+ * While [resumeBaseline] is active nothing moves under the user's finger, so
+ * the gate stays open, and each return from the background starts fresh (#3780).
  */
 @Composable
 internal fun rememberChatListHeadReorderGate(
@@ -223,26 +235,29 @@ internal fun rememberChatListHeadReorderGate(
     datasetKey: ChatListDatasetKey,
     isActiveList: Boolean,
     scrollCorrectionInProgress: Boolean,
+    resumeBaseline: ChatListResumeBaseline = ChatListResumeBaseline.None,
 ): Boolean {
     var datasetCompositionEstablished by
         remember(datasetKey, isActiveList) { mutableStateOf(false) }
     var synchronousGateInProgress by
-        remember(datasetKey, isActiveList, activeHeadId) {
+        remember(datasetKey, isActiveList, activeHeadId, resumeBaseline.epoch) {
             mutableStateOf(
                 datasetCompositionEstablished &&
                     isActiveList &&
-                    activeHeadId != null,
+                    activeHeadId != null &&
+                    !resumeBaseline.active,
             )
         }
 
     SideEffect { datasetCompositionEstablished = true }
-    LaunchedEffect(datasetKey, isActiveList, activeHeadId) {
+    LaunchedEffect(datasetKey, isActiveList, activeHeadId, resumeBaseline.epoch) {
         if (!synchronousGateInProgress) return@LaunchedEffect
         delay(CHAT_LIST_HEAD_INPUT_GATE_MILLIS)
         synchronousGateInProgress = false
     }
 
-    return synchronousGateInProgress || scrollCorrectionInProgress
+    // A correction the stop interrupted keeps input closed until its collector settles it.
+    return (synchronousGateInProgress && !resumeBaseline.active) || scrollCorrectionInProgress
 }
 
 /**
@@ -265,6 +280,7 @@ internal fun ChatListActiveHeadScrollEffect(
     userGestureGeneration: Long = viewportGeneration,
     onUserHeadDemotionConsumed: (ChatListHeadDemotion) -> Unit = {},
     onHeadReorderInProgressChange: (Boolean) -> Unit = {},
+    resumeBaseline: ChatListResumeBaseline = ChatListResumeBaseline.None,
 ) {
     chatListViewportAnchorEffect(
         listState = listState,
@@ -281,8 +297,10 @@ internal fun ChatListActiveHeadScrollEffect(
                 activeHeadId = activeHeadId,
                 pinnedOrder = pinnedOrder,
                 userGestureGeneration = userGestureGeneration,
+                resumeBaseline = resumeBaseline.active,
             ),
         )
+    chatListResumeHeadSnap(listState, activeHeadId, pinnedOrder, datasetKey, isActiveList, resumeBaseline.active)
     val liveProgressCallback by rememberUpdatedState(onHeadReorderInProgressChange)
     // A filter replacement restarts this collector and clears its previous-head
     // snapshot. LazyColumn keeps any still-valid keyed scroll anchor; unlike an
@@ -304,9 +322,20 @@ internal fun ChatListActiveHeadScrollEffect(
                     firstVisibleItemIndex = listState.firstVisibleItemIndex,
                     isScrollInProgress = listState.isScrollInProgress && !correctionOwnsViewport,
                     correctionOwnsViewport = correctionOwnsViewport,
+                    resumeBaseline = headMotionState.resumeBaseline,
                 )
             }.collect { current ->
-                if (shouldCorrectHeadScroll(previous, current, isActiveList)) {
+                if (current.resumeBaseline) {
+                    // Hidden changes never animate: chatListResumeHeadSnap places a
+                    // promoted head before layout. A correction the stop froze
+                    // finishes at once instead of after resume (#3780).
+                    if (correctionJob?.isActive == true) {
+                        correctionSerial += 1L
+                        correctionJob?.cancel()
+                        liveProgressCallback(false)
+                        listState.requestScrollToItem(0)
+                    }
+                } else if (shouldCorrectHeadScroll(previous, current, isActiveList)) {
                     correctionSerial += 1L
                     val serial = correctionSerial
                     correctionGestureGeneration = liveHeadMotionState.userGestureGeneration
