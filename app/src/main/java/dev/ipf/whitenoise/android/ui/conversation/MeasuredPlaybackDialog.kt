@@ -12,7 +12,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogProperties
+import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.ui.common.LocalNativePageBody
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.drawMeasuredPage
 import dev.ipf.whitenoise.android.ui.common.drawNativePage
@@ -38,6 +40,7 @@ internal fun MeasuredPlaybackDialog(
     dismissEnabled: () -> Boolean = { true },
     sourceContour: SettingsContour? = null,
     penMotion: MeasuredPenDialogMotion? = null,
+    noticeScope: ConversationNoticeDestination? = LocalTopNoticeScope.current,
     content: @Composable PopupSurfaceMotion.() -> Unit,
 ) {
     val contourMorph =
@@ -60,6 +63,7 @@ internal fun MeasuredPlaybackDialog(
     PlaybackDialog(
         onDismissRequest = surface.dismiss,
         properties = properties,
+        noticeScope = noticeScope,
         onSourceDismiss = onSourceDismiss,
         onSourceExit =
             onSourceDismiss?.let { dismiss ->
