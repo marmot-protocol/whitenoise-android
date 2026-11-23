@@ -2319,10 +2319,11 @@ internal fun ConversationScreen(
                     mentionsActiveAccount = mentionsSelf,
                     loadMessage = { controller.loadUntilMessageAvailable(it) },
                     hasMoreAfter = { controller.hasMoreAfterTimeline },
-                ) {
-                    snapshotFlow { controller.isLoadingPage }.first { !it }
-                    controller.loadNewerTimelinePage()
-                }
+                    loadNewer = {
+                        snapshotFlow { controller.isLoadingPage }.first { !it }
+                        controller.loadNewerTimelinePage()
+                    },
+                )
             }
         if (!isCurrent()) return null
         if (search is ConversationMentionSearch.Found) return search.messageId
