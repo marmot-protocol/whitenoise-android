@@ -45,7 +45,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
@@ -789,13 +788,11 @@ private fun SettingsProfileRow(
         shape = context.shapes.shape,
         modifier = Modifier.fillMaxWidth().settingsRowBorder(context),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(horizontalAlignment = Alignment.End) {
             ListItem(
                 headlineContent = {
                     EmojiLabel(
                         text = account.title,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleMedium,
