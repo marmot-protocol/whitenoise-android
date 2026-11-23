@@ -19,6 +19,11 @@ data class PendingAttachment(
      */
     val outgoingDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+    /**
+     * Whether the person chose to send this PDF as it is, keeping metadata that could not be removed (#3377). It
+     * belongs to this send only: it is never saved with a draft, so a restored PDF asks again.
+     */
+    val keepsPdfMetadata: Boolean = false,
 ) {
     init {
         require(sourceFile == null || plaintextBytes.isEmpty()) { "attachment must have one input representation" }

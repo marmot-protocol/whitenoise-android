@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerPdfMetadataDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "fun ComposerPdfMetadataDialog(",
+        "test_ids": [
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "ComposerPdfMetadataDialogContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfMetadataDialog.kt",
+        "anchor": "fun ComposerPdfMetadataDialogContent(",
+        "test_ids": [
+          "MED-065"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

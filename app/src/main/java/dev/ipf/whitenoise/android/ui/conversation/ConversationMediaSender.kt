@@ -13,6 +13,7 @@ import dev.ipf.whitenoise.android.state.ATTACHMENT_CHUNK_MAX_ITEMS
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.media.ComposerPdfMetadataChoices
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickBudget
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickFailure
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
@@ -20,10 +21,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendStaging
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedVideoCheck
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
+import dev.ipf.whitenoise.android.ui.conversation.media.dropUnconfirmedPdfMetadata
 import dev.ipf.whitenoise.android.ui.conversation.media.isVideoMediaType
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.releaseUnadoptedStagedSources
-import dev.ipf.whitenoise.android.ui.conversation.media.removePreparedDocumentVideoMetadata
+import dev.ipf.whitenoise.android.ui.conversation.media.removePreparedDocumentMetadata
 import dev.ipf.whitenoise.android.ui.conversation.media.removePreparedVideoMetadata
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
@@ -65,6 +67,9 @@ internal class ConversationMediaSender(
             usableSpace,
             controller::outgoingMediaTrustDomain,
         )
+
+    /** The composer's PDFs that keep their metadata and which of them the person chose to send as they are. */
+    internal val pdfChoices = ComposerPdfMetadataChoices()
 
     init {
         bindCollectionSender(this)
@@ -364,7 +369,7 @@ internal class ConversationMediaSender(
             } else {
                 readStagedDocuments(
                     documentUris,
-                    withContext(Dispatchers.IO) { removePreparedDocumentVideoMetadata(preparedDocumentAttachments) },
+                    withContext(Dispatchers.IO) { removePreparedDocumentMetadata(preparedDocumentAttachments) },
                     documentBudget,
                     allowFileBacked,
                     staging,
@@ -425,6 +430,7 @@ internal class ConversationMediaSender(
                 return@forEach
             }
             val staged = preparedDocuments.ready[uri]
+            val firstOfUri = attachments.size
             if (uri in preparedDocuments.refused) {
                 failures += DocumentReadFailure.VIDEO_METADATA
             } else if (staged != null && staged.plaintextBytes.size.toLong() <= remaining) {
@@ -448,6 +454,8 @@ internal class ConversationMediaSender(
                 failures += read.failures
                 overflowed = overflowed || read.albumOverflowed
             }
+            val keepsOriginal = pdfChoices.keepsOriginal(uri)
+            withContext(Dispatchers.IO) { attachments.dropUnconfirmedPdfMetadata(firstOfUri, keepsOriginal, failures) }
         }
         return DocumentReadOutcome(attachments, failures, overflowed, totalBytes)
     }

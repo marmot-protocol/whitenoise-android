@@ -1,0 +1,50 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/DocumentReadFailureMessages.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Empty document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/DocumentReadFailureMessages.kt",
+        "anchor": "R.string.media_file_empty",
+        "test_ids": [
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "Unreadable document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/DocumentReadFailureMessages.kt",
+        "anchor": "R.string.media_file_unreadable",
+        "test_ids": [
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "Oversized document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/DocumentReadFailureMessages.kt",
+        "anchor": "R.string.media_file_too_large",
+        "test_ids": [
+          "MED-009",
+          "MED-030"
+        ]
+      },
+      {
+        "surface": "Video document private metadata refusal feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/DocumentReadFailureMessages.kt",
+        "anchor": "R.string.media_file_video_metadata_not_removable",
+        "test_ids": [
+          "MED-043"
+        ]
+      },
+      {
+        "surface": "Unconfirmed PDF metadata send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/DocumentReadFailureMessages.kt",
+        "anchor": "R.string.media_file_pdf_metadata_kept",
+        "test_ids": [
+          "MED-065"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

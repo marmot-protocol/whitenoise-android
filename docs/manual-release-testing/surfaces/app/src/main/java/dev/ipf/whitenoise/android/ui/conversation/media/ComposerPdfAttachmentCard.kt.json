@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerPdfAttachmentCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfAttachmentCard(",
+        "test_ids": [
+          "MED-064",
+          "MED-065"
+        ]
+      },
+      {
+        "surface": "ComposerPdfFirstPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfFirstPage(",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "ComposerPdfFilename",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfFilename(",
+        "test_ids": [
+          "MED-064"
+        ]
+      },
+      {
+        "surface": "ComposerPdfPrivacyLine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerPdfAttachmentCard.kt",
+        "anchor": "fun ComposerPdfPrivacyLine(",
+        "test_ids": [
+          "MED-064",
+          "MED-065"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
