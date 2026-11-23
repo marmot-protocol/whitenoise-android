@@ -117,6 +117,6 @@ class NewMessageEntryScreenshotTest {
         direction: String,
         variant: String,
     ) {
-        captureRoboImage("src/test/snapshots/new_message_entry_${direction}_${variant}.png")
+        captureRoboImage("src/test/snapshots/new_message_entry_${direction}_$variant.png")
     }
 }
