@@ -1503,6 +1503,9 @@ class WhiteNoiseAppState private constructor(
     /** Group-change notices on screen and not yet seen, by account and change ID. Main thread only. */
     internal val showingGroupChangeNotices = mutableSetOf<String>()
 
+    /** Group-change toasts whose snackbar ran to the end, until their notice reads it. Main thread only. */
+    internal val seenGroupChangeToasts = mutableSetOf<String>()
+
     var transientNotice by mutableStateOf<TransientNotice?>(null)
         private set
 

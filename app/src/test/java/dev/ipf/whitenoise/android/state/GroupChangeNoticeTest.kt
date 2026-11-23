@@ -176,6 +176,26 @@ class GroupChangeNoticeTest {
             assertTrue(seen.await())
         }
 
+    /**
+     * A toast that replaces the notice and is cleared before the notice looks, without its snackbar running, does not
+     * count as the notice being seen: the notice shows again.
+     */
+    @Test
+    fun aNoticeReplacedAndClearedAtOnceIsNotSeen() =
+        runBlocking {
+            val state = appState(active = ACCOUNT)
+            val notice = groupChangeNotice(notDelivered("invite", "refused"))!!
+            val seen = async(start = CoroutineStart.UNDISPATCHED) { state.showGroupChangeNotice(notice) }
+            state.presentText(AppText.Plain("Send failed"))
+            state.clearToast()
+            Snapshot.sendApplyNotifications()
+            repeat(SETTLE_YIELDS) { yield() }
+            assertFalse(seen.isCompleted)
+            assertEquals(notice.headline, state.toast?.title)
+            retireToast(state)
+            assertTrue(seen.await())
+        }
+
     /** Two changes whose notices read the same each get their own snackbar before either is acknowledged. */
     @Test
     fun twoChangesWithTheSameWordingAreEachSeen() =
@@ -242,6 +262,7 @@ class GroupChangeNoticeTest {
 
     /** Retires the current toast as its snackbar does when it ends, then lets the waiting notice run. */
     private suspend fun retireToast(state: WhiteNoiseAppState) {
+        state.toast?.let(state::noteToastSeen)
         state.clearToast()
         Snapshot.sendApplyNotifications()
         repeat(SETTLE_YIELDS) { yield() }

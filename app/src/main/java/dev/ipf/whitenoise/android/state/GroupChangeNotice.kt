@@ -185,8 +185,9 @@ internal suspend fun WhiteNoiseAppState.showGroupChangeNotice(notice: GroupChang
 
 /**
  * Presents [notice], titled with the chat's name when the chat list knows it and tagged with its [showing] key, and
- * waits until its own snackbar retires it. The toast has one slot, so a toast that replaces it first is waited out and
- * the notice presented again. Returns false once its account is no longer active before it is seen.
+ * waits until its own snackbar has run to the end, which [noteToastSeen] records. The toast has one slot, so when the
+ * notice leaves the slot without that record, another toast replaced it, and the notice is presented again once the
+ * slot is free. Returns false once its account is no longer active before it is seen.
  */
 private suspend fun WhiteNoiseAppState.showUntilSeen(
     notice: GroupChangeNotice,
@@ -194,13 +195,23 @@ private suspend fun WhiteNoiseAppState.showUntilSeen(
 ): Boolean {
     val (title, detail) = groupChangeToast(chatTitle(notice.accountRef, notice.groupIdHex), notice)
     while (activeAccountRef == notice.accountRef) {
+        seenGroupChangeToasts -= showing
         // Tagged with the change, so another change's notice with the same wording still replaces this one.
         presentText(ToastMessage(title, detail, groupChangeKey = showing))
         val shown = toast
-        if (snapshotFlow { toast }.first { it !== shown } == null) return true
+        snapshotFlow { toast }.first { it !== shown }
+        if (seenGroupChangeToasts.remove(showing)) return true
         snapshotFlow { toast }.first { it == null }
     }
     return false
+}
+
+/**
+ * Records that [toast]'s snackbar ran to the end, so the group-change notice it carries counts as seen. A snackbar a
+ * newer toast cancels never gets here. Must run on the main thread, before the toast is cleared.
+ */
+internal fun WhiteNoiseAppState.noteToastSeen(toast: ToastMessage) {
+    toast.groupChangeKey?.let { seenGroupChangeToasts += it }
 }
 
 /**

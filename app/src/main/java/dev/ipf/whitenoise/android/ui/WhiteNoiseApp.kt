@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.noteToastSeen
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
@@ -459,6 +460,7 @@ internal fun WhiteNoiseApp(
                         actionLabel = deletion?.retry?.let { deletionRetryLabel },
                     ),
                 )
+            appState.noteToastSeen(toast)
             finishLocalDeleteSnackbar(appState, toast, result)
         }
     }
