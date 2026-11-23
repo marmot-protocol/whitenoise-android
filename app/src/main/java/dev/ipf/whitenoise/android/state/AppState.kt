@@ -143,7 +143,6 @@ import dev.ipf.whitenoise.android.updates.shouldStartInAppSelfUpdate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -210,7 +209,6 @@ internal data class HostPerformanceRuntimeOwner(
 
 private fun openMarmotRuntime(context: Context) = MarmotClient(context).let { AppMarmotRuntime(it.rootPath, it.marmot) }
 
-private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 private const val FORWARD_BACKGROUND_RETRY_ATTEMPTS = 3
 private const val FORWARD_BACKGROUND_RETRY_DELAY_MS = 1_000L
 private const val FORWARD_TERMINAL_STATUS_DURATION_MS = 2_000L
@@ -224,16 +222,6 @@ private val processNotificationCardCancellationDispatcher: CoroutineDispatcher b
             Thread(task, "wn-notification-cancel").apply { isDaemon = true }
         }.asCoroutineDispatcher()
 }
-
-internal fun appStateScopeExceptionHandler(
-    report: (Throwable) -> Unit = { throwable ->
-        if (BuildConfig.DEBUG) {
-            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure", throwable)
-        } else {
-            Log.w(APP_STATE_SCOPE_LOG_TAG, "unhandled AppState scope failure")
-        }
-    },
-): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
 
 private data class PendingAccountSwitchTrace(
     val accountRef: String,
