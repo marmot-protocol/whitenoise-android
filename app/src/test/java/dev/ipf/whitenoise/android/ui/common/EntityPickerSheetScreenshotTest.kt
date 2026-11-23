@@ -30,7 +30,8 @@ class EntityPickerSheetScreenshotTest {
 
     @Test
     @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
-    fun filteredChoicesAmoledLargeRtl() = captureChoices("filtered_amoled_large_rtl", dark = true, amoled = true, filtered = true)
+    fun filteredChoicesAmoledLargeRtl() =
+        captureChoices("filtered_amoled_large_rtl", dark = true, amoled = true, filtered = true)
 
     private fun captureChoices(
         name: String,
@@ -38,9 +39,10 @@ class EntityPickerSheetScreenshotTest {
         amoled: Boolean = false,
         filtered: Boolean = false,
     ) {
+        val direction = if (filtered) LayoutDirection.Rtl else LayoutDirection.Ltr
         rule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (filtered) 2f else 1f) {
-                CompositionLocalProvider(LocalLayoutDirection provides if (filtered) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                CompositionLocalProvider(LocalLayoutDirection provides direction) {
                     WhiteNoiseEntityPickerSheet(
                         title = "Included Chats",
                         items =
