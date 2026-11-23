@@ -161,8 +161,7 @@ internal fun MessageSideDisc(
                     enabled = enabled,
                     role = Role.Switch,
                     onValueChange = onToggle,
-                )
-                .semantics {
+                ).semantics {
                     contentDescription = description
                     stateDescription?.let { this.stateDescription = it }
                 },

@@ -9,7 +9,10 @@ import androidx.compose.ui.unit.Dp
 
 /** Keeps the measured decoration for attached timeline rows out of message-reading eligibility. */
 internal class ConversationSenderGapMeasurements {
-    private data class Measurement(val owner: Any, val gapPx: Int)
+    private data class Measurement(
+        val owner: Any,
+        val gapPx: Int,
+    )
 
     private val rows = mutableMapOf<Any, Measurement>()
 
