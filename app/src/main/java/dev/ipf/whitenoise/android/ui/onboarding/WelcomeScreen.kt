@@ -76,6 +76,7 @@ fun OnboardingContent(
     onContinueWithSavedAccount: (String) -> Unit = {},
     onRecoverSavedAccount: (String) -> Unit = {},
     privateKeyState: TextFieldState? = null,
+    onUseRemoteSigner: ((String?) -> Unit)? = null,
 ) {
     var signingIn by remember { mutableStateOf(signingInBusy || loggingInWithAmber) }
     val busy = creatingIdentity || signingInBusy || loggingInWithAmber || reactivatingAccountLabel != null
@@ -102,6 +103,7 @@ fun OnboardingContent(
             loggingInWithAmber = loggingInWithAmber,
             amberSignInStage = amberSignInStage,
             onLoginWithAmber = onLoginWithAmber,
+            onUseRemoteSigner = onUseRemoteSigner,
         )
     } else {
         WelcomeScreen(

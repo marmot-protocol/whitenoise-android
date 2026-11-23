@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
+import dev.ipf.whitenoise.android.ui.onboarding.remotesigner.isBunkerLink
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.drop
@@ -71,6 +72,7 @@ internal fun SignInContent(
     onLoginWithAmber: () -> Unit = {},
     onSignInValue: ((String) -> Unit)? = null,
     onSystemBackWhileBusy: (() -> Unit)? = null,
+    onUseRemoteSigner: ((String?) -> Unit)? = null,
 ) {
     WindowSecureFlag()
     // The real onboarding owner supplies the native state; the fallback retains existing standalone callers/tests.
@@ -101,6 +103,10 @@ internal fun SignInContent(
         val value = key.text.toString()
         // Flush a just-typed edit before native work; its queued observer cannot erase the resulting error or consent.
         reportKeyEdit(value)
+        if (onUseRemoteSigner != null && isBunkerLink(value)) {
+            onUseRemoteSigner(value.trim())
+            return
+        }
         when (IdentityEntryInput.classify(value)) {
             IdentityEntryInput.Kind.Invalid -> onErrorChange(R.string.identity_entry_error_invalid_key)
             IdentityEntryInput.Kind.PublicKey -> onErrorChange(R.string.sign_in_error_public_key)
@@ -174,6 +180,13 @@ internal fun SignInContent(
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
                 SignInKeyField(key, busy, errorRes, ::reportKeyEdit, onErrorChange, ::submit)
+                if (onUseRemoteSigner != null) {
+                    TextButton(
+                        onClick = { onUseRemoteSigner(null) },
+                        enabled = !busy,
+                        modifier = Modifier.align(Alignment.Start).testTag("onboarding.sign_in.remote_signer"),
+                    ) { Text(stringResource(R.string.remote_signer_use)) }
+                }
                 if (offlineErrorVisible) OnboardingOfflineNotice(onOfflineRetry)
             }
         }

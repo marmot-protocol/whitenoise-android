@@ -7,6 +7,16 @@ name: presentation-surface-onboarding-signin
 - assertVisible:
     id: onboarding.sign_in.action
     enabled: false
+- tapOn:
+    id: onboarding.sign_in.remote_signer
+- assertVisible:
+    id: remote_signer.method.link
+- assertVisible:
+    id: remote_signer.method.code
+- back
+- assertVisible:
+    id: onboarding.sign_in.action
+    enabled: false
 - tapOn: Back
 - assertVisible:
     id: onboarding.welcome.mark

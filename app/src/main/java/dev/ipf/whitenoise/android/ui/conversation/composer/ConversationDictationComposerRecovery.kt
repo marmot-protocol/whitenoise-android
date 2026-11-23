@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerAccess
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.queueDictation
 
 /** Dictate starts a fresh attempt after safe local settlement, with no recovery decision pop-ups. */
 @Composable
@@ -30,7 +31,10 @@ internal fun rememberComposerDictationAction(
     val binding = remember(controller, accountRef, groupIdHex) { ConversationDictationPanelBinding() }
     DisposableEffect(binding) { onDispose { binding.dispose() } }
     return {
-        if (binding.active) {
+        if (binding.active && controller.queuesFromComposer(accountRef, groupIdHex)) {
+            // Another chat's dictation is still being transcribed; this recording waits its turn.
+            controller.queueDictation(accountRef, groupIdHex, replyToMessageIdHex)
+        } else if (binding.active) {
             controller.requestFreshComposerStart(accountRef, groupIdHex, draft, replyToMessageIdHex)
         }
     }

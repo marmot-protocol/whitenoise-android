@@ -939,7 +939,7 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
     ) {
-        parkedRecoveries.remove(ConversationDictationKey.from(accountRef, groupIdHex))?.audio?.discard()
+        forgetConversationAudio(accountRef, groupIdHex)
         if (!isOwnedBy(accountRef, groupIdHex)) return
         draftTargetRemoved = true
         val current = state
@@ -968,11 +968,8 @@ internal class ConversationDictationController internal constructor(
     }
 
     fun onAccountUnavailable(accountRef: String) {
-        parkedRecoveries.keys.filter { it.accountRef.equals(accountRef, ignoreCase = true) }.forEach { key ->
-            parkedRecoveries.remove(key)?.audio?.discard()
-        }
+        forgetAccountAudio(accountRef)
         if (state.target?.accountRef?.equals(accountRef, ignoreCase = true) == true) {
-            discardFollowUp()
             conversationDictationDiagnostic("event=account_unavailable outcome=cancelled")
             cancelSession()
         }
