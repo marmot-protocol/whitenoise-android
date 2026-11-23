@@ -23,9 +23,6 @@ internal class RawVideoOutput(
     private var ownedSurface = false
     private var textureIdentity: SurfaceTexture? = null
     private var holder: SurfaceHolder? = null
-
-    // The surface whose hardware canvas failed; only that surface falls back to CPU drawing.
-    private var softwareSurface: Surface? = null
     private var texture: TextureView? = null
     private val holderCallback =
         object : SurfaceHolder.Callback {
@@ -157,20 +154,10 @@ internal class RawVideoOutput(
 
     /**
      * Draws on the GPU: a CPU canvas scales every frame into the full display surface in software, which costs
-     * more than the frame interval at phone resolutions. A surface without hardware drawing keeps the CPU path.
+     * more than the frame interval at phone resolutions. A surface connected to HWUI posts every canvas through
+     * HWUI, so this output never mixes in a CPU canvas; a failed lock skips that frame or clear instead.
      */
-    private fun lockFrameCanvas(target: Surface): Canvas {
-        if (softwareSurface !== target) {
-            try {
-                return target.lockHardwareCanvas()
-            } catch (_: IllegalStateException) {
-                softwareSurface = target
-            } catch (_: IllegalArgumentException) {
-                softwareSurface = target
-            }
-        }
-        return target.lockCanvas(null)
-    }
+    private fun lockFrameCanvas(target: Surface): Canvas = target.lockHardwareCanvas()
 
     /**
      * Detaches only if [expected] is null or is the exact current target, rejecting stale clears.
@@ -190,7 +177,6 @@ internal class RawVideoOutput(
         surface = null
         ownedSurface = false
         textureIdentity = null
-        softwareSurface = null
     }
 
     /**

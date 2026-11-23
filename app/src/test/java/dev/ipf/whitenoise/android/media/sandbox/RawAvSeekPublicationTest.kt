@@ -180,18 +180,19 @@ class RecordingCanvasSurface {
     @Implementation
     fun isValid(): Boolean = true
 
-    /** Supplies a tiny real software canvas to the production CPU draw operation. */
-    @Suppress("UnusedParameter") // Required platform signature; the sink requests a full canvas.
+    /** Supplies a tiny real canvas in place of the production hardware canvas. */
     @Implementation
-    fun lockCanvas(dirty: android.graphics.Rect?): Canvas {
+    fun lockHardwareCanvas(): Canvas {
         val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
         canvasBitmap = bitmap
         return Canvas(bitmap)
     }
 
-    /** Production draws on the hardware canvas; this fixture supplies the same tiny real canvas. */
+    /** Production never mixes a CPU canvas into a surface it draws on with HWUI. */
+    @Suppress("UnusedParameter") // Required platform signature.
     @Implementation
-    fun lockHardwareCanvas(): Canvas = lockCanvas(null)
+    fun lockCanvas(dirty: android.graphics.Rect?): Canvas =
+        throw AssertionError("CPU canvas used on a hardware surface")
 
     /** Counts actual sink posts, including explicit clears separately reset by the fixture. */
     @Implementation fun unlockCanvasAndPost(canvas: Canvas) {
