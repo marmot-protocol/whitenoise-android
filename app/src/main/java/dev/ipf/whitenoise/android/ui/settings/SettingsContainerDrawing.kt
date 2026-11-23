@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.boundingRect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath

@@ -1495,7 +1495,7 @@ internal fun GroupDetailsScreen(
                                 // The title actually shown decides: a member titled by their own key copies it (#3565).
                                 val titleIsKey = opensProfile && abbreviatesPublicKey(memberTitle, profileNpub)
                                 val profileLaunch =
-                                    dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick { origin ->
+                                    rememberMeasuredControlClick { origin ->
                                         appState.presentProfile(profileNpub, origin = origin)
                                     }
                                 ChatInfoMemberCard(
@@ -1755,7 +1755,7 @@ internal fun GroupDetailsScreen(
                         SettingsGroup(modifier = Modifier.testTag("chat_info.group_actions")) {
                             row("start_group") { rowContext ->
                                 val launch =
-                                    dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlClick { origin ->
+                                    rememberMeasuredControlClick { origin ->
                                         val candidate =
                                             RecipientSearch.Candidate(
                                                 dmPeerAccountIdHex,
