@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
@@ -219,6 +220,7 @@ internal fun PublicKeyCopyText(
             },
         style = if (expanded) style.copy(fontFamily = FontFamily.Monospace) else style,
         color = color,
+        textAlign = if (expanded) TextAlign.Center else style.textAlign,
         maxLines = if (expanded) Int.MAX_VALUE else maxLines,
         overflow = TextOverflow.Ellipsis,
     )

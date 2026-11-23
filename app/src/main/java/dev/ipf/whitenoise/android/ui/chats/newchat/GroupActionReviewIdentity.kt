@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -186,6 +187,7 @@ private fun GroupReviewKeyText(
         modifier = Modifier.animatePublicKeyExpansion(expanded),
         style = MaterialTheme.typography.bodySmall,
         fontFamily = if (expanded) FontFamily.Monospace else null,
+        textAlign = if (expanded) TextAlign.Center else null,
     )
 }
 

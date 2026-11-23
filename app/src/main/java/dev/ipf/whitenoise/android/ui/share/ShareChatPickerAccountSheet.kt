@@ -35,7 +35,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -118,6 +120,8 @@ private fun ShareChatPickerAccountItem(
     onChooseAccount: (String) -> Unit,
 ) {
     val accountTitle = appState.networkDisplayName(account.accountIdHex)
+    val npub = appState.npubForDisplay(account.accountIdHex)
+    val titleIsKey = abbreviatesPublicKey(accountTitle, npub)
     ListItem(
         modifier =
             Modifier
@@ -144,16 +148,24 @@ private fun ShareChatPickerAccountItem(
             )
         },
         headlineContent = {
-            Text(accountTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (titleIsKey) {
+                PublicKeyCopyText(accountTitle, npub)
+            } else {
+                Text(accountTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         },
-        supportingContent = {
-            Text(
-                appState.shortNpub(account.accountIdHex),
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
+        supportingContent =
+            if (titleIsKey) {
+                null
+            } else {
+                {
+                    PublicKeyCopyText(
+                        appState.shortNpub(account.accountIdHex),
+                        npub,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    )
+                }
+            },
         trailingContent = {
             if (selected) {
                 Icon(painterResource(R.drawable.ic_check), contentDescription = stringResource(R.string.selected))

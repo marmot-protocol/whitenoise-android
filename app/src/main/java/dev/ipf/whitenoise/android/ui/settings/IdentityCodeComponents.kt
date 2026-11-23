@@ -38,10 +38,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -152,7 +152,6 @@ internal fun IdentifierCopyCapsule(
                     },
                 ).testTag(targetTestTag)
                 .semantics {
-                    role = Role.Button
                     contentDescription = actionDescription
                     stateDescription = state
                 },
@@ -177,6 +176,7 @@ internal fun IdentifierCopyCapsule(
                 maxLines = if (expanded) Int.MAX_VALUE else 1,
                 overflow = if (expanded) TextOverflow.Clip else TextOverflow.MiddleEllipsis,
                 fontFamily = if (expanded) FontFamily.Monospace else null,
+                textAlign = if (expanded) TextAlign.Center else null,
                 style = MaterialTheme.typography.bodySmall,
             )
             Icon(

@@ -666,7 +666,8 @@ private fun NewMessageAccountScreen(
     val people =
         displayedCandidates.map { candidate ->
             NewMessagePerson(
-                candidate = candidate,
+                candidate =
+                    candidate.copy(npub = appState.npubForDisplay(candidate.accountIdHex).ifBlank { candidate.npub }),
                 subtitle =
                     if (addressQuery && resolution.resolvedHex == null) {
                         stringResource(R.string.user_search_address_result)

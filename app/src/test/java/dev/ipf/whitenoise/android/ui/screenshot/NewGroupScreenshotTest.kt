@@ -3,8 +3,11 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -116,6 +119,11 @@ class NewGroupScreenshotTest {
     /** Unknown identity offers manual editing without an invented recipient removal. */
     @Test fun setupUnattributedRecovery() = setup("group_setup_unattributed_recovery.png", unknown = true)
 
+    @Test
+    fun peopleKeyExpandsInPlace() {
+        picker("new_group_people_expanded_key.png", expandKey = true)
+    }
+
     /** The real picker composable renders controlled display states, never a fake search provider. */
     private fun picker(
         file: String,
@@ -126,7 +134,10 @@ class NewGroupScreenshotTest {
         partial: Boolean = false,
         largeRtl: Boolean = false,
         addressFailed: Boolean = false,
+        expandKey: Boolean = false,
     ) {
+        val npub = "npub1424242424242424242424242424242424242424242424242424qamrcaj"
+        val shortKey = "npub142424…4qamrcaj"
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
@@ -137,6 +148,13 @@ class NewGroupScreenshotTest {
                         when {
                             empty -> emptyList()
                             addressFailed -> people().take(1).map { it.copy(subtitle = "Address not verified") }
+                            expandKey -> people().mapIndexed { index, person ->
+                                if (index == 0) {
+                                    person.copy(candidate = person.candidate.copy(npub = npub), subtitle = shortKey)
+                                } else {
+                                    person
+                                }
+                            }
                             else -> people()
                         },
                         if (selected) people().take(2) else emptyList(),
@@ -150,6 +168,10 @@ class NewGroupScreenshotTest {
                     )
                 }
             }
+        }
+        if (expandKey) {
+            composeRule.onNodeWithText(shortKey, useUnmergedTree = true).performTouchInput { click(center) }
+            composeRule.onNodeWithText(npub.chunked(5).joinToString(" "), useUnmergedTree = true).assertExists()
         }
         composeRule.onNodeWithTag("new_group.screen").captureRoboImage("src/test/snapshots/$file")
     }
