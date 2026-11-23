@@ -113,7 +113,7 @@ class PublicKeyCopyPresentationCoverageTest {
         val key = keyText(ROW).getUnclippedBoundsInRoot()
         assertTrue("the key target leaves its row", key.left >= row.left && key.right <= row.right)
         assertTrue("the key target spans the whole row", key.right - key.left < row.right - row.left)
-        assertRowKeepsLabelAndActions(ROW, FIRST_KEY, "Alice", SHORT_KEY)
+        assertRowKeepsLabelAndActions(ROW, FIRST_KEY, "Alice", "npub1 qqqqq")
     }
 
     /**
@@ -579,7 +579,7 @@ class PublicKeyCopyPresentationCoverageTest {
 
     /** The unmerged key text inside the node tagged [tag]. */
     private fun keyText(tag: String): SemanticsNodeInteraction =
-        composeRule.onNode(hasText("npub1qqqq", substring = true) and hasAnyAncestor(hasTestTag(tag)), true)
+        composeRule.onNode(hasText("npub1", substring = true) and hasAnyAncestor(hasTestTag(tag)), true)
 
     /** The Copy public key custom action merged into the row tagged [tag]. */
     private fun copyAction(

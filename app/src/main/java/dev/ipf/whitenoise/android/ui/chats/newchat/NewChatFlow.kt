@@ -664,19 +664,18 @@ private fun NewMessageAccountScreen(
             matches
         }
     val people =
-        displayedCandidates.map { candidate ->
+        displayedCandidates.map { person ->
             NewMessagePerson(
-                candidate =
-                    candidate.copy(npub = appState.npubForDisplay(candidate.accountIdHex).ifBlank { candidate.npub }),
+                candidate = person.copy(npub = appState.npubForDisplay(person.accountIdHex).ifBlank(person::npub)),
                 subtitle =
                     if (addressQuery && resolution.resolvedHex == null) {
                         stringResource(R.string.user_search_address_result)
                     } else {
-                        appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
+                        appState.shortNpub(person.accountIdHex).takeIf { it.isNotBlank() }
                     },
                 avatarUrl =
-                    appState.contactAvatarSource(candidate.accountIdHex)
-                        ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
+                    appState.contactAvatarSource(person.accountIdHex)
+                        ?: ProfileSanitizer.protocolImageUrl(person.searchProfile?.picture),
             )
         }
 

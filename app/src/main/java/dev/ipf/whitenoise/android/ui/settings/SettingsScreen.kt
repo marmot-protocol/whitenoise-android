@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -45,8 +44,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
@@ -62,7 +59,6 @@ import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.SearchCollapse
-import dev.ipf.whitenoise.android.ui.common.animatePublicKeyExpansion
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
@@ -858,46 +854,6 @@ private fun SettingsProfileRow(
     }
 }
 
-@Composable
-@Suppress("FunctionNaming")
-private fun SettingsExpandedProfileKey(npub: String) {
-    val style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center)
-    PublicKeyCopyText(
-        publicKeyDisplayGroups(npub).joinToString(" "),
-        npub,
-        Modifier
-            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
-            .padding(bottom = WhiteNoiseSpacing.Related)
-            .animatePublicKeyExpansion(expanded = true),
-        style = style,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = Int.MAX_VALUE,
-        keyboardFocusable = true,
-        onExpand = {},
-    )
-}
-
-/** QR glyph and chevron that announce the profile row as the way to Share & Connect. */
-@Composable
-@Suppress("FunctionNaming")
-private fun SettingsProfileTrailing() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_settings_qr_code_2),
-            contentDescription = null,
-            modifier = Modifier.size(SettingsHomeDefaults.IconSize),
-        )
-        Icon(
-            painter = painterResource(R.drawable.ic_chevron_right),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
 /** A hub section: one connected, unheaded group of its rows. */
 @Composable
 @Suppress("FunctionNaming")
@@ -955,5 +911,4 @@ private fun SignOutGroup(onSignOut: () -> Unit) {
 /** Sizes the Settings home fixes independently of the row components. */
 private object SettingsHomeDefaults {
     val ProfileAvatarSize = 56.dp
-    val IconSize = 24.dp
 }

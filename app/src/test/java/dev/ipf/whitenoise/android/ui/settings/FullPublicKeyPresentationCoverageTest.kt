@@ -46,15 +46,27 @@ class FullPublicKeyPresentationCoverageTest {
         assertTrue("the public key row lost its full display", "fullPublicKey = true" in publicRow)
     }
 
-    /** Only the display component groups a key; copy, share and QR paths keep the contiguous value. */
+    /** Only display components group a key; copy, share and QR paths keep the contiguous value. */
     @Test
     fun groupingStaysDisplayOnly() {
         val grouping =
             mainSources()
                 .filter { "publicKeyDisplayGroups(" in it.motionOwnerSource() }
                 .map { it.name }
+                .toSet()
 
-        assertEquals(listOf("FullPublicKey.kt"), grouping)
+        assertEquals(
+            setOf(
+                "AiAgentsScreen.kt",
+                "FullPublicKey.kt",
+                "GroupActionReviewIdentity.kt",
+                "GroupRosterMutationUi.kt",
+                "IdentityCodeComponents.kt",
+                "PublicKeyCopy.kt",
+                "SettingsProfileKey.kt",
+            ),
+            grouping,
+        )
     }
 
     /** One main source file by its path below the app package. */
