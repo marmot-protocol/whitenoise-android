@@ -20,10 +20,12 @@ import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.SwipePreferenceState
 import dev.ipf.whitenoise.android.state.SwipePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SpeechChoice
-import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+
+/** The swipe-action choice dialog, which Maestro and Compose tests find without depending on its row content. */
+internal const val GESTURE_PICKER_TAG = "gestures.picker"
 
 /** Settings owns Android gesture preferences; command eligibility stays with each current row. */
 @Composable
@@ -145,20 +147,19 @@ internal fun GestureSettingsContent(
         }
     }
     picker?.let { binding ->
-        SpeechChoiceDialog(
+        val actions = SwipePreferences.choices(binding)
+        val titles = actions.associateWith { actionTitle(it) }
+        ChoiceDialog(
             title = bindingTitle(binding),
+            values = actions,
+            selected = state.choice(binding),
+            label = titles::getValue,
             onDismiss = { picker = null },
-            choices =
-                SwipePreferences.choices(binding).map { action ->
-                    SpeechChoice(
-                        title = actionTitle(action),
-                        selected = state.choice(binding) == action,
-                        onClick = {
-                            onChange(binding, action)
-                            picker = null
-                        },
-                    )
-                },
+            onSelect = { action ->
+                onChange(binding, action)
+                picker = null
+            },
+            modifier = Modifier.testTag(GESTURE_PICKER_TAG),
         )
     }
 }

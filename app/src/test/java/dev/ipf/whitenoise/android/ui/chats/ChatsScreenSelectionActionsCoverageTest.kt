@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.motionOwnerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -88,7 +89,7 @@ class ChatsScreenSelectionActionsCoverageTest {
 
     /** Bulk actions must enter one fixed-scope command, never loop the selection-clearing row callbacks. */
     @Test fun selectionCapturesExplicitTargetsAndDirections() {
-        val source = chatsScreenSource().readText()
+        val source = chatsScreenSource().motionOwnerSource()
         val controls =
             source
                 .requiredSection("ChatListSelectionControls(", "\n        floatingActionButton =")
@@ -116,7 +117,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "ordering uses complete native universe",
-            "onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) }" in controls &&
+            "onMovePinned = { delta -> chatListActions.movePinnedChats(selectedChatIds.toSet(), delta) }" in controls &&
                 "controller.movePinnedSelection(ids, delta, owner)" in source,
         )
         assertFalse(
@@ -184,7 +185,7 @@ class ChatsScreenSelectionActionsCoverageTest {
 
     /** Row/menu callbacks retain the existing captured presentation and session ownership boundaries. */
     @Test fun singleContextActionsKeepOwnershipAndAuthoritativeResolution() {
-        val source = chatsScreenSource().readText()
+        val source = chatsScreenSource().motionOwnerSource()
         val helper = source.requiredSection("fun markChatRead(", "\n    fun toggleChatMute(")
         assertTrue(
             "single callbacks still resolve native rows",
@@ -222,7 +223,7 @@ class ChatsScreenSelectionActionsCoverageTest {
     /** Long press sheet reuses pin and manual order mutations. */
     @Test
     fun longPressSheetReusesPinAndManualOrderMutations() {
-        val source = chatsScreenSource().readText()
+        val source = chatsScreenSource().motionOwnerSource()
 
         val actionSheet =
             source.requiredSection(
@@ -232,13 +233,13 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue(
             "the long-press sheet must expose the same unarchived pin toggle",
             "showPinToggle = !item.group.archived" in actionSheet &&
-                "onPinToggle = { toggleChatPin(item) }" in actionSheet,
+                "onPinToggle = { chatListActions.toggleChatPin(item) }" in actionSheet,
         )
         assertTrue(
             "the long-press sheet must reuse the same pinned-order mutation path",
             "showMovePinnedUp" in actionSheet &&
                 "showMovePinnedDown" in actionSheet &&
-                "onMovePinned = { delta -> movePinnedChat(item, delta) }" in actionSheet,
+                "onMovePinned = { delta -> chatListActions.movePinnedChat(item, delta) }" in actionSheet,
         )
         val singleMove = source.requiredSection(start = "fun movePinnedChat(", end = "\n    }\n")
         assertTrue(
@@ -250,7 +251,7 @@ class ChatsScreenSelectionActionsCoverageTest {
     /** Selection bar wires add to folder picker and create handoff. */
     @Test
     fun selectionBarWiresAddToFolderPickerAndCreateHandoff() {
-        val source = chatsScreenSource().readText()
+        val source = chatsScreenSource().motionOwnerSource()
         val selectionBar =
             source.requiredSection(
                 start = "ChatListSelectionControls(",

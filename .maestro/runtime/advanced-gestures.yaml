@@ -22,18 +22,18 @@ name: advanced-gestures
 - tapOn:
     id: gestures.MessageLeft
 - assertVisible:
-    id: speech.choice.0
+    id: gestures.picker
 - assertVisible: "Off"
 - tapOn: Cancel
 - assertNotVisible:
-    id: speech.choice.0
+    id: gestures.picker
 - tapOn:
     id: gestures.MessageLeft
 - assertVisible:
-    id: speech.choice.0
+    id: gestures.picker
 - back
 - assertNotVisible:
-    id: speech.choice.0
+    id: gestures.picker
 - assertVisible:
     id: gestures.MessageLeft
 - back

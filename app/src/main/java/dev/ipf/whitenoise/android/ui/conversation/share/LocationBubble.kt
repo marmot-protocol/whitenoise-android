@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.theme.Radii
 
 /**
  * Location bubble rendered from the shared coordinates with **no network
@@ -41,9 +42,9 @@ internal fun LocationMessageBubble(
         modifier =
             modifier
                 .width(260.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(Radii.lg))
                 .clickable(onClick = onOpen),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Radii.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(

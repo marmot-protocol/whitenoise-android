@@ -6416,14 +6416,14 @@
         {
           "case": "advanced-gestures",
           "selector": {
-            "id": "speech.choice.0"
+            "id": "gestures.picker"
           },
           "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
           "opened_by": {
             "id": "gestures.MessageLeft"
           },
           "entry_assertion": {
-            "id": "speech.choice.0"
+            "id": "gestures.picker"
           }
         }
       ]

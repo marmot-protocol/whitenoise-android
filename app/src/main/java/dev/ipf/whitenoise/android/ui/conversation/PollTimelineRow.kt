@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import kotlinx.coroutines.delay
 import java.time.format.FormatStyle
 
@@ -199,7 +200,7 @@ internal fun PollCard(
     val display = currentDateTimeDisplay()
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Radii.md),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -305,7 +306,7 @@ private fun PollOptionRow(
     canVote: Boolean,
     onVote: (String) -> Unit,
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(Radii.xl)
     Column(
         modifier =
             Modifier

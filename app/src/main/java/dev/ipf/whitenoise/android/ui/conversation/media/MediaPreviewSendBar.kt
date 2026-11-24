@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 private val ADD_MORE_TILE = 56.dp
@@ -137,7 +138,7 @@ internal fun AddMoreThumb(
             modifier =
                 Modifier
                     .size(ADD_MORE_TILE)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(Radii.md))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .explainOnLongPress(
                         composerExplanation(

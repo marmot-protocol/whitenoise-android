@@ -162,6 +162,7 @@ import dev.ipf.whitenoise.android.ui.navigation.composerFabGrip
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
@@ -1271,7 +1272,7 @@ internal fun ComposerPill(
     ) {
         val sourceFill = MaterialTheme.colorScheme.surfaceContainerHigh
         val sourceBorder = MaterialTheme.colorScheme.outlineVariant
-        val sourceShape = RoundedCornerShape(24.dp)
+        val sourceShape = RoundedCornerShape(Radii.xl)
         SideEffect {
             sendMotion?.sourceFill = sourceFill
             sendMotion?.sourceBorder = sourceBorder

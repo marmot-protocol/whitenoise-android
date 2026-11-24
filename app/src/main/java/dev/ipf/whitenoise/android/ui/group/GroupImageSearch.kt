@@ -87,6 +87,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.settings.subtitleRes
+import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -120,7 +121,7 @@ private fun ImageSourceButton(
             modifier
                 .height(52.dp)
                 .semantics { contentDescription = accessibilityLabel },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Radii.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -208,7 +209,7 @@ internal fun ImageSearchPreview(
                         Modifier
                             .fillMaxWidth()
                             .aspectRatio(IMAGE_SEARCH_BANNER_ASPECT_RATIO)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(Radii.md))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .testTag(IMAGE_SEARCH_BANNER_PREVIEW_TAG),
                     contentAlignment = Alignment.Center,
