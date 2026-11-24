@@ -254,7 +254,7 @@ internal fun TextAttachmentReaderScreen(
             // App banners sit below this screen's bar rather than over it (#3312).
             Column {
                 TextAttachmentReaderTopBar(
-                    onDismiss = onBack,
+                    onDismiss = onDismiss,
                     onOpenExternal = onOpenExternal,
                     onSave = onSave,
                     onShare = onShare,
@@ -316,7 +316,7 @@ internal fun TextAttachmentReaderScreen(
 /**
  * The reader's viewer chrome: Close, the title, and read-aloud, Copy and Share as visible icons (#3385). Share sends
  * the original file to another app (#3331) and is unavailable while a share is still being prepared, while Save and
- * Open externally stay in the overflow. With a selection active, Close clears the selection first.
+ * Open externally stay in the overflow. Close always leaves the reader, even with a selection active.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

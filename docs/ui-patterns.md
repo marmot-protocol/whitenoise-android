@@ -59,5 +59,6 @@ The leading control says how the user got here.
 | X, labelled "Close" (`WhiteNoiseTopBarNavigation.Close`) | A modal or full-screen flow that returns to where it started when it is cancelled or finished, and viewers opened from a message | Share to, Forward, every attachment viewer (image, video, document, text, Nostr) and the photo editor |
 
 The icon and its accessibility label always match: an arrow is "Back" and an X
-is "Close". Android system Back does the same as the leading control in both
-cases.
+is "Close", and Close always closes. Android system Back leaves the screen the
+same way, except that it first dismisses a transient state on the screen, such
+as a text selection.

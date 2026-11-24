@@ -227,6 +227,25 @@ class LocalHtmlPolicyTest {
             assertTrue(LocalHtmlPolicy.sanitize("<style>$css</style>").omitted)
         }
 
+    /** Theming recolours only the policy's own header rules and leaves sender markup and sender CSS alone. */
+    @Test
+    fun themedRecoloursOnlyThePolicyHeader() =
+        runBlocking {
+            val sender = "<style>body{background:#000;color:#eee;}a{color:#8ac7ff}</style><p>text</p>"
+            val document = LocalHtmlPolicy.sanitize(sender)
+            val palette = LocalHtmlPalette(background = 0xF7F7F7, text = 0x1A1A1A, link = 0x123456, border = 0xABCDEF)
+            val themed = LocalHtmlPolicy.themed(document, palette)
+            val head = Jsoup.parse(themed.html).head().select("style")
+            assertTrue("body{background:#f7f7f7;color:#1a1a1a;" in head.first()!!.data())
+            assertTrue("a{color:#123456}" in head.first()!!.data())
+            assertTrue("td,th{border:1px solid #abcdef;" in head.first()!!.data())
+            val senderRules = head.last()!!.data()
+            assertTrue("the sender's own rules are untouched", "body{background:#000;color:#eee;}" in senderRules)
+            assertEquals(Jsoup.parse(document.html).body().html(), Jsoup.parse(themed.html).body().html())
+            assertEquals(document.links, themed.links)
+            assertEquals(document, LocalHtmlPolicy.themed(document, LocalHtmlPalette.Dark))
+        }
+
     @Test fun formattingTextAndBoundedTableSpansSurvive() =
         runBlocking {
             val doc =

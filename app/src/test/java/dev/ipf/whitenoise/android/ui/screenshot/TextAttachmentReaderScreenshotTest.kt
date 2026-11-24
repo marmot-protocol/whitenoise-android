@@ -309,9 +309,9 @@ class TextAttachmentReaderScreenshotTest {
         captureScreenRoboImage("src/test/snapshots/text_attachment_reader_overflow_menu_dark_large_rtl.png")
     }
 
-    /** Top back clears a real selection before closing the reader. */
+    /** The top Close leaves the reader at once, even while a real selection is active. */
     @Test
-    fun topBackClearsARealSelectionBeforeClosingTheReader() {
+    fun topCloseLeavesTheReaderEvenWithASelection() {
         val source = "select a few words from this attachment"
         var dismissed = 0
         var copied = ""
@@ -324,10 +324,6 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onNodeWithText(source).performTouchInput { longClick() }
         composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
         assertTrue(copied.isNotBlank() && copied != source && source.contains(copied))
-        composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
-        assertEquals(0, dismissed)
-        composeRule.onNodeWithContentDescription(string(R.string.copy_text)).performClick()
-        assertEquals(source, copied)
         composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
         assertEquals(1, dismissed)
     }

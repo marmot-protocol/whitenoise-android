@@ -63,28 +63,36 @@ class DocumentAttachmentViewerScreenshotTest {
             DocumentLoading()
         }
 
-    @Test fun pdfPagesDark() =
-        render("pdf_pages_dark", DocumentAttachmentKind.Pdf) {
-            Text("3 / 12", modifier = Modifier.padding(16.dp))
-            val bitmap =
-                remember {
-                    Bitmap.createBitmap(300, 420, Bitmap.Config.ARGB_8888).apply {
-                        eraseColor(android.graphics.Color.WHITE)
-                        val paint =
-                            Paint().apply {
-                                color = android.graphics.Color.BLACK
-                                textSize = 18f
-                                isAntiAlias = true
-                            }
-                        Canvas(this).apply {
-                            drawText("Community meeting notes", 16f, 42f, paint)
-                            paint.textSize = 12f
-                            drawText("Saturday · Local library", 16f, 72f, paint)
+    @Test fun pdfPagesDark() = pdfPages("pdf_pages_dark", dark = true)
+
+    /** On the light reader background a hairline edge keeps the white page distinct. */
+    @Test fun pdfPagesLight() = pdfPages("pdf_pages_light", dark = false)
+
+    /** Renders one white PDF page under the page counter in the given theme. */
+    private fun pdfPages(
+        name: String,
+        dark: Boolean,
+    ) = render(name, DocumentAttachmentKind.Pdf, dark = dark) {
+        Text("3 / 12", modifier = Modifier.padding(16.dp))
+        val bitmap =
+            remember {
+                Bitmap.createBitmap(300, 420, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(android.graphics.Color.WHITE)
+                    val paint =
+                        Paint().apply {
+                            color = android.graphics.Color.BLACK
+                            textSize = 18f
+                            isAntiAlias = true
                         }
+                    Canvas(this).apply {
+                        drawText("Community meeting notes", 16f, 42f, paint)
+                        paint.textSize = 12f
+                        drawText("Saturday · Local library", 16f, 72f, paint)
                     }
                 }
-            PdfPageImage(bitmap, "Page 3 of 12")
-        }
+            }
+        PdfPageImage(bitmap, "Page 3 of 12")
+    }
 
     @Test fun pdfErrorLargeRtl() =
         render("pdf_error_large_rtl", DocumentAttachmentKind.Pdf, rtl = true, font = 1.5f) {

@@ -30,6 +30,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -139,8 +140,9 @@ internal fun DocumentAttachmentViewer(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
+                    val palette = documentPalette()
                     LocalHtmlView(
-                        document,
+                        remember(document, palette) { LocalHtmlPolicy.themed(document, palette) },
                         Modifier.fillMaxSize(),
                         onLink = {
                             if (actions.isCurrent()) pendingLink = it
@@ -148,6 +150,7 @@ internal fun DocumentAttachmentViewer(
                         onUnavailable = {
                             error = true
                         },
+                        backgroundColor = MaterialTheme.colorScheme.background.toArgb(),
                     )
                 }
             }
@@ -260,6 +263,18 @@ internal fun DocumentViewerFrame(
             content()
         }
     }
+}
+
+/** The rendered HTML page's colours from the theme, so the page matches the viewer frame around it. */
+@Composable
+private fun documentPalette(): LocalHtmlPalette {
+    val colors = MaterialTheme.colorScheme
+    return LocalHtmlPalette(
+        background = colors.background.toArgb(),
+        text = colors.onBackground.toArgb(),
+        link = colors.primary.toArgb(),
+        border = colors.outline.toArgb(),
+    )
 }
 
 /** The HTML source as selectable plain text in the theme's content colour. */

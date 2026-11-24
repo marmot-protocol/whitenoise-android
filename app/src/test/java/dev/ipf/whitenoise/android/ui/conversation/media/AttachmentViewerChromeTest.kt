@@ -89,6 +89,10 @@ class AttachmentViewerChromeTest {
         val document = sourceFile("ui/conversation/media/DocumentAttachmentViewer.kt").readText()
         val frame = document.functionBody("DocumentViewerFrame")
         assertFalse("the document viewer follows the theme, not a forced black frame", "Color.Black" in frame)
+        val viewer = document.functionBody("DocumentAttachmentViewer")
+        val themed = "LocalHtmlPolicy.themed(document, palette)" in viewer
+        assertTrue("the rendered HTML page takes the theme's palette", themed)
+        assertTrue("the WebView background follows the theme", "backgroundColor = MaterialTheme.colorScheme" in viewer)
     }
 
     /** One production source by its path below the app package, from the module or the repository root. */

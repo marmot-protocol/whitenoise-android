@@ -25,10 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBarNavigation
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 
-/** Locale-independent handle for a viewer chrome's leading Close or Back control. */
+/** Locale-independent handle for a viewer chrome's leading Close control. */
 internal const val ATTACHMENT_VIEWER_CLOSE_TAG = "attachment.viewer.close"
 
 /** The minimum height of a viewer chrome row above its insets, matching the shared page top bar. */
@@ -48,13 +47,13 @@ internal object AttachmentViewerChromeDefaults {
 /**
  * The one toolbar every attachment viewer uses: image, video, PDF and document, text, Nostr and the photo editor.
  *
- * It leads with [navigation], which for a viewer is Close (an X labelled Close) because a viewer returns to the
- * message it opened from (see docs/ui-patterns.md); the icon and its label always match. The [title] uses one
- * style everywhere, with an optional [subtitle], and [titleContent] replaces both for a viewer whose title row
- * carries its own controls. [actions] hold the viewer's direct actions and [overflow] its existing More menu,
- * passed through unchanged. The chrome draws only theme colours, [containerColor] chooses docked or overlay,
- * and [windowInsets] pads the row clear of the status bar and side cutouts while the media stays edge to edge.
- * [navigationButton] replaces the default control for a viewer with its own press feedback.
+ * It leads with Close, an X labelled Close, because a viewer returns to the message it opened from (see
+ * docs/ui-patterns.md). The [title] uses one style everywhere, with an optional [subtitle], and [titleContent]
+ * replaces both for a viewer whose title row carries its own controls. [actions] hold the viewer's direct actions
+ * and [overflow] its existing More menu, passed through unchanged. The chrome draws only theme colours,
+ * [containerColor] chooses docked or overlay, and [windowInsets] pads the row clear of the status bar and side
+ * cutouts while the media stays edge to edge. [closeButton] draws Close for a viewer with its own press feedback,
+ * and receives [onClose] and [closeEnabled].
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -63,12 +62,13 @@ internal fun AttachmentViewerChrome(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    navigation: WhiteNoiseTopBarNavigation = WhiteNoiseTopBarNavigation.Close,
+    titleModifier: Modifier = Modifier,
+    subtitleModifier: Modifier = Modifier,
     closeEnabled: Boolean = true,
     containerColor: Color = AttachmentViewerChromeDefaults.dockedColor(),
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     windowInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
-    navigationButton: (@Composable () -> Unit)? = null,
+    closeButton: (@Composable (onClose: () -> Unit, enabled: Boolean) -> Unit)? = null,
     titleContent: (@Composable RowScope.() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     overflow: (@Composable () -> Unit)? = null,
@@ -83,15 +83,15 @@ internal fun AttachmentViewerChrome(
                     .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (navigationButton != null) {
-                navigationButton()
+            if (closeButton != null) {
+                closeButton(onClose, closeEnabled)
             } else {
-                AttachmentViewerNavigationButton(navigation, closeEnabled, onClose)
+                AttachmentViewerCloseButton(closeEnabled, onClose)
             }
             if (titleContent != null) {
                 titleContent()
             } else {
-                AttachmentViewerTitle(title, subtitle, Modifier.weight(1f))
+                AttachmentViewerTitle(title, subtitle, Modifier.weight(1f), titleModifier, subtitleModifier)
             }
             actions()
             overflow?.invoke()
@@ -99,11 +99,10 @@ internal fun AttachmentViewerChrome(
     }
 }
 
-/** The default leading control: an X labelled Close, or a back arrow labelled Back. */
+/** The default leading control: an X labelled Close. */
 @Suppress("FunctionNaming")
 @Composable
-private fun AttachmentViewerNavigationButton(
-    navigation: WhiteNoiseTopBarNavigation,
+private fun AttachmentViewerCloseButton(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
@@ -112,21 +111,7 @@ private fun AttachmentViewerNavigationButton(
         enabled = enabled,
         modifier = Modifier.size(48.dp).testTag(ATTACHMENT_VIEWER_CLOSE_TAG),
     ) {
-        Icon(
-            painterResource(
-                when (navigation) {
-                    WhiteNoiseTopBarNavigation.Close -> R.drawable.ic_close
-                    WhiteNoiseTopBarNavigation.Back -> R.drawable.ic_arrow_back
-                },
-            ),
-            contentDescription =
-                stringResource(
-                    when (navigation) {
-                        WhiteNoiseTopBarNavigation.Close -> R.string.close
-                        WhiteNoiseTopBarNavigation.Back -> R.string.back
-                    },
-                ),
-        )
+        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
     }
 }
 

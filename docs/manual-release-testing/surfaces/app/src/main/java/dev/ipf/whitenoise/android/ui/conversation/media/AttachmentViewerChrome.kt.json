@@ -17,9 +17,9 @@
         ]
       },
       {
-        "surface": "AttachmentViewerNavigationButton",
+        "surface": "AttachmentViewerCloseButton",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
-        "anchor": "fun AttachmentViewerNavigationButton(",
+        "anchor": "fun AttachmentViewerCloseButton(",
         "test_ids": [
           "MED-010",
           "MED-056",
@@ -48,14 +48,6 @@
           "MED-056",
           "RDR-001",
           "RDR-004"
-        ]
-      },
-      {
-        "surface": "string:back",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentViewerChrome.kt",
-        "anchor": "R.string.back",
-        "test_ids": [
-          "MED-010"
         ]
       }
     ],

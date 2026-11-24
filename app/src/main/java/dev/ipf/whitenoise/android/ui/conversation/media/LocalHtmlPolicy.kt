@@ -12,6 +12,22 @@ import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import org.jsoup.parser.Parser
 
+/**
+ * The reader page's colours, as packed `0xRRGGBB` values from the app theme, never from the sender. [Dark] is the
+ * page's built-in palette, so a document that is never themed keeps the colours the policy has always written.
+ */
+internal data class LocalHtmlPalette(
+    val background: Int,
+    val text: Int,
+    val link: Int,
+    val border: Int,
+) {
+    internal companion object {
+        /** The page's built-in dark palette, matching the colour literals in the policy's own style header. */
+        val Dark = LocalHtmlPalette(background = 0x000000, text = 0xEEEEEE, link = 0x8AC7FF, border = 0x888888)
+    }
+}
+
 internal data class LocalHtmlDocument(
     val html: String,
     val links: List<String>,
@@ -85,15 +101,43 @@ internal object LocalHtmlPolicy {
     private const val FIRST_PRINTABLE = 0x20
     private const val DELETE = 0x7f
 
+    private const val BODY_COLOURS = "body{background:#000;color:#eee;"
+    private const val LINK_COLOUR = "a{color:#8ac7ff}"
+    private const val CELL_BORDER = "td,th{border:1px solid #888;"
+
     private const val HEAD =
         "<meta charset=\"UTF-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; " +
             "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\"><meta name=\"referrer\" " +
             "content=\"no-referrer\"><meta http-equiv=\"X-DNS-Prefetch-Control\" content=\"off\"><meta " +
             "name=\"viewport\" content=\"width=device-width, initial-scale=1\"><style>" +
-            "body{background:#000;color:#eee;font:16px sans-serif;line-height:1.5;margin:16px;" +
-            "overflow-wrap:anywhere}a{color:#8ac7ff}table{border-collapse:collapse;max-width:100%}" +
-            "td,th{border:1px solid #888;padding:4px}pre{white-space:pre-wrap}blockquote{margin-inline:16px}" +
+            BODY_COLOURS + "font:16px sans-serif;line-height:1.5;margin:16px;" +
+            "overflow-wrap:anywhere}" + LINK_COLOUR + "table{border-collapse:collapse;max-width:100%}" +
+            CELL_BORDER + "padding:4px}pre{white-space:pre-wrap}blockquote{margin-inline:16px}" +
             "img,svg{max-width:100%}</style>"
+
+    /**
+     * Recolours a sanitized document's own style header with [palette], leaving the sender's markup and styles
+     * untouched. Only the policy's fixed colour rules change, and the first match of each is the policy's header,
+     * which precedes the sender's style element and body. The new values are formatted here from integers, so no
+     * sender text reaches the page.
+     */
+    fun themed(
+        document: LocalHtmlDocument,
+        palette: LocalHtmlPalette,
+    ): LocalHtmlDocument {
+        if (palette == LocalHtmlPalette.Dark) return document
+        val html =
+            document.html
+                .replaceFirst(BODY_COLOURS, "body{background:${hex(palette.background)};color:${hex(palette.text)};")
+                .replaceFirst(LINK_COLOUR, "a{color:${hex(palette.link)}}")
+                .replaceFirst(CELL_BORDER, "td,th{border:1px solid ${hex(palette.border)};")
+        return document.copy(html = html)
+    }
+
+    /** A packed `0xRRGGBB` colour as a CSS hex literal. */
+    private fun hex(rgb: Int): String = "#%06x".format(rgb and RGB_MASK)
+
+    private const val RGB_MASK = 0xFFFFFF
 
     private enum class Context { HTML, SVG, SVG_TEXT }
 

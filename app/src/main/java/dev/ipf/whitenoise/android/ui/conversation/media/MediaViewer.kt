@@ -854,20 +854,15 @@ internal fun MediaViewerFrame(
                 containerColor = scrim,
                 contentColor = MaterialTheme.colorScheme.onBackground,
                 windowInsets = contentWindowInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                navigationButton = {
-                    MediaViewerCloseButton(onDismiss = onDismiss, enabled = actionsEnabled, icon = icons.close)
-                },
-                titleContent = {
-                    AttachmentViewerTitle(
-                        title = senderLabel,
-                        subtitle =
-                            recordedAtLabel.takeIf { it.isNotBlank() }?.let {
-                                stringResource(R.string.media_viewer_metadata, it, currentPosition, pageCount)
-                            },
-                        modifier = Modifier.weight(1f),
-                        titleModifier = Modifier.testTag("conversation.media.viewer.sender"),
-                        subtitleModifier = Modifier.testTag("conversation.media.viewer.position"),
-                    )
+                subtitle =
+                    recordedAtLabel.takeIf { it.isNotBlank() }?.let {
+                        stringResource(R.string.media_viewer_metadata, it, currentPosition, pageCount)
+                    },
+                titleModifier = Modifier.testTag("conversation.media.viewer.sender"),
+                subtitleModifier = Modifier.testTag("conversation.media.viewer.position"),
+                closeEnabled = actionsEnabled,
+                closeButton = { close, enabled ->
+                    MediaViewerCloseButton(onDismiss = close, enabled = enabled, icon = icons.close)
                 },
                 overflow =
                     if (hasViewerOverflowActions(onSave, onSetGroupPicture, onGoToMessage)) {
