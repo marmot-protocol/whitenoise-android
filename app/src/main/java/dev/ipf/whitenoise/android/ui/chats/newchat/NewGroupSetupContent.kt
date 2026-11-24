@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
+import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -106,7 +107,6 @@ internal fun NewGroupSetupContent(
     var customize by rememberSaveable {
         mutableStateOf(draft.description.text.isNotBlank() || draft.imageDraft != null || draft.imageNeedsReselection)
     }
-    var showMembers by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(draft.imageNeedsReselection) {
         if (draft.imageNeedsReselection) customize = true
     }
@@ -183,20 +183,12 @@ internal fun NewGroupSetupContent(
             if (state.members.isNotEmpty()) {
                 item(key = "group_setup.members") {
                     val count = state.members.size
-                    GroupSetupDisclosure(
-                        label = pluralStringResource(R.plurals.group_setup_selected_members, count, count),
-                        expanded = showMembers,
-                        tag = "group_setup.members",
-                        onClick = { showMembers = !showMembers },
-                    )
+                    SettingsSection(pluralStringResource(R.plurals.group_setup_selected_members, count, count))
                 }
-                if (showMembers) {
-                    itemsIndexed(state.members, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
-                        GroupCreationPersonRow(person, index, state.members.size, selected = null)
-                    }
+                itemsIndexed(state.members, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
+                    GroupCreationPersonRow(person, index, state.members.size, selected = null)
                 }
-            }
-            if (state.members.isEmpty()) {
+            } else {
                 item {
                     SettingsExplainer(stringResource(R.string.group_add_members_after_create))
                 }

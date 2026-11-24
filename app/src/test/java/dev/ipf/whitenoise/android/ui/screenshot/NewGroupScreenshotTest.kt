@@ -72,7 +72,7 @@ class NewGroupScreenshotTest {
     /** Large RTL chips and field retain scrolling and native directionality. */
     @Test fun selectedLargeRtl() = picker("new_group_selected_large_rtl.png", selected = true, largeRtl = true)
 
-    /** The group name and member count lead the default form. */
+    /** The group name and selected identities lead the default form. */
     @Test fun setupLight() = setup("group_setup_light.png")
 
     /** Native read-only membership styling in dark setup. */
@@ -97,11 +97,6 @@ class NewGroupScreenshotTest {
             largeRtl = true,
             description = "A place to coordinate our next trip.",
         )
-
-    /** Expanding the member count reveals the selected roster without an extra screen. */
-    @Test fun setupMembersAmoled() {
-        setup("group_setup_members_amoled.png", dark = true, amoled = true, membersOpen = true)
-    }
 
     /** Native image work gets feedback and disabled competing controls. */
     @Test fun setupPreparing() = setup("group_setup_preparing.png", preparing = true)
@@ -212,7 +207,6 @@ class NewGroupScreenshotTest {
         recovery: Boolean = false,
         unknown: Boolean = false,
         description: String = "",
-        membersOpen: Boolean = false,
     ) {
         val draft =
             NewGroupDraft(
@@ -255,7 +249,6 @@ class NewGroupScreenshotTest {
                 }
             }
         }
-        if (membersOpen) composeRule.onNodeWithTag("group_setup.members").performClick()
         composeRule.onNodeWithTag("group_setup.screen").captureRoboImage("src/test/snapshots/$file")
     }
 

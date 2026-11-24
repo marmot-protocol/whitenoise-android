@@ -284,7 +284,7 @@
         ]
       },
       {
-        "surface": "Group setup member count and roster disclosure",
+        "surface": "Group setup member count and visible roster",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
         "anchor": "R.plurals.group_setup_selected_members",
         "test_ids": [
