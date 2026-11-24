@@ -39,7 +39,9 @@ import org.robolectric.annotation.GraphicsMode
 class GlobalSearchPresentationScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    private enum class PersonPreview(val displayName: String?) {
+    private enum class PersonPreview(
+        val displayName: String?,
+    ) {
         Followed("Alice Rivera"),
         Unknown(null),
     }
@@ -62,8 +64,11 @@ class GlobalSearchPresentationScreenshotTest {
     @Test fun identifierLight() = capture("identifier_light", query = "npub1", person = PersonPreview.Followed)
 
     /** A valid key with no published metadata still offers a tappable profile and copyable key. */
-    @Test fun identifierFallbackLight() =
-        capture("identifier_fallback_light", query = "npub1", person = PersonPreview.Unknown)
+    @Test fun identifierFallbackLight() = capture(
+        "identifier_fallback_light",
+        query = "npub1",
+        person = PersonPreview.Unknown,
+    )
 
     /** Check-row presentation remains a bounded component, not a claim of native filter availability. */
     @Test fun stagedContentLargeRtl() = capture("staged_content_large_rtl", largeRtl = true, content = true)
