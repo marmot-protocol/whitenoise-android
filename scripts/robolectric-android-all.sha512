@@ -3,7 +3,7 @@
 # the test JVMs; scripts/prefetch-robolectric-android-all.sh fetches them first.
 # Update this list with every Robolectric bump: versions come from that release's
 # DefaultSdkProvider, hashes from the sibling .sha512 files on Maven Central.
-robolectric=4.18
+robolectric=4.18.1
 11-robolectric-6757853-i7 686c3d5faf7772795fc28f356baf9a92dcd89dedc2f7a16720ce4eb8d7b5ee5932500c623c3028355cc13a14c855210bcba796180681a01b0a7f2a276eb5303d
 12-robolectric-7732740-i7 1fe2738ae44f06ec77ddfd61a04ab80d6d070a7692724d983855157065b13d31a2dc98363846d7f6178e287b0a445a71adf4f6661e8443b21b4682b433ca5399
 12.1-robolectric-8229987-i7 747d403cd1e80a898a9ffb917920ce094216312b3dabaa312410e100647102b4141d2fbd1efca32251308e713fd69dca72c0971f93f7d6f1247d19a13cbac4ef

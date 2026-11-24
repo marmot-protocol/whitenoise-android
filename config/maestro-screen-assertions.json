@@ -5648,6 +5648,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+      "symbol": "CivilDatePickerDialog",
+      "bindings": [
+        {
+          "case": "presentation-extra-media-date-jump",
+          "selector": {
+            "text": "Cancel"
+          },
+          "scope": "Actual Jump to date calendar opens on loaded media days and hands the chosen day over once; no attachment history read or grid movement.",
+          "entry_assertion": {
+            "text": "Show"
+          },
+          "opened_by": {
+            "text": "Jump to date"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
       "symbol": "OnboardingSavedAccountActions",
       "bindings": [

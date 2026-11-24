@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "CivilDatePickerDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+        "anchor": "fun CivilDatePickerDialog(",
+        "test_ids": [
+          "INT-001",
+          "GRP-046"
+        ]
+      },
+      {
+        "surface": "CivilDateHeadline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+        "anchor": "fun CivilDateHeadline(",
+        "test_ids": [
+          "FIND-008",
+          "GRP-046"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "INT-001",
+          "GRP-046"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: CivilDatePickerDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CivilDatePickerDialog.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

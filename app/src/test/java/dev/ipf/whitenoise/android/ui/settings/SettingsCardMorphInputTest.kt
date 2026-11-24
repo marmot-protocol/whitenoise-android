@@ -20,6 +20,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -75,7 +76,7 @@ class SettingsCardMorphInputTest {
                     Box(
                         Modifier.fillMaxSize().then(host).onGloballyPositioned {
                             measuredHost =
-                                it.settingsMorphBounds(view)
+                                it.motionBoundsOnScreen(view)
                         },
                     ) {
                         // Distinct native pages must lay out their destination before admission.
@@ -89,7 +90,7 @@ class SettingsCardMorphInputTest {
                                     },
                                 ).then(native)
                                 .onGloballyPositioned {
-                                    measuredOrigin = it.settingsMorphBounds(view)
+                                    measuredOrigin = it.motionBoundsOnScreen(view)
                                     measuredTarget = renderedTarget
                                 },
                         )

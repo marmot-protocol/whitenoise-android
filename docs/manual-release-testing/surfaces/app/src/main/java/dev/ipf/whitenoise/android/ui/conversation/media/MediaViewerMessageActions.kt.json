@@ -10,6 +10,14 @@
         "test_ids": [
           "MED-015"
         ]
+      },
+      {
+        "surface": "Media viewer page binding stays current after dismissal retires actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMessageActions.kt",
+        "anchor": "internal fun ConversationMediaViewerOwner.matchesPageSource(",
+        "test_ids": [
+          "MED-044"
+        ]
       }
     ]
   },

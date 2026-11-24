@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-media-date-jump
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Jump to date
+- assertNotVisible: Show
+- tapOn: Jump to date
+- assertVisible: Show
+- assertVisible: Cancel
+- tapOn: Show
+- assertVisible:
+    id: presentation.complete

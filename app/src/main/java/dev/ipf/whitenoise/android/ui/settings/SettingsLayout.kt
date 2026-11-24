@@ -63,6 +63,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.common.motionBoundsOnScreen
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -155,7 +156,7 @@ internal fun SettingsList(
         WhiteNoiseLazyColumn(
             modifier =
                 modifier.fillMaxSize().testTag(listTag).onGloballyPositioned {
-                    page?.reportViewport(viewport, it.settingsMorphBounds(view))
+                    page?.reportViewport(viewport, it.motionBoundsOnScreen(view))
                 },
             state = state,
             contentPadding = contentPadding,

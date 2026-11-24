@@ -26,4 +26,5 @@
     <string name="shared_media_share_photos_failed">Não foi possível compartilhar as fotos</string>
     <string name="shared_media_share_photos_unavailable">Algumas fotos selecionadas não estão mais disponíveis, então nada foi compartilhado. Elas foram desmarcadas. Tente novamente.</string>
     <string name="shared_media_share_photos_too_large">Essas fotos são grandes demais para compartilhar de uma vez. Selecione menos e tente novamente.</string>
+    <string name="shared_media_jump_to_date">Ir para uma data</string>
 </resources>

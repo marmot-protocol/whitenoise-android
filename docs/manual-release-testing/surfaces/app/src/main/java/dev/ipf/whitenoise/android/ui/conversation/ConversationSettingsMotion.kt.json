@@ -1,0 +1,81 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "rememberConversationSettingsMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
+        "anchor": "fun rememberConversationSettingsMotion(",
+        "test_ids": [
+          "CON-037",
+          "GRP-041",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "ConversationSettingsLayer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
+        "anchor": "fun ConversationSettingsLayer(",
+        "test_ids": [
+          "CON-037",
+          "GRP-041",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "ConversationSettingsPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
+        "anchor": "fun ConversationSettingsPage(",
+        "test_ids": [
+          "CON-037",
+          "GRP-041",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "Modifier.conversationSettingsOutline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
+        "anchor": "fun Modifier.conversationSettingsOutline(",
+        "test_ids": [
+          "CON-037",
+          "GRP-041",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "Modifier.conversationSettingsGrip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
+        "anchor": "fun Modifier.conversationSettingsGrip(",
+        "test_ids": [
+          "CON-037",
+          "GRP-041",
+          "NAV-011"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Live transcript fade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
+        "anchor": "fun Modifier.conversationSettingsBody(",
+        "test_ids": [
+          "CON-037",
+          "GRP-041",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "Capture the composer before opening settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationSettingsMotion.kt",
+        "anchor": "fun launchFromComposer(",
+        "test_ids": [
+          "CON-037",
+          "GRP-041",
+          "NAV-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
