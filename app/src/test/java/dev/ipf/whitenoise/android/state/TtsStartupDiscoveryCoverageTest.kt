@@ -24,7 +24,7 @@ class TtsStartupDiscoveryCoverageTest {
     /** Keeps an utterance-locale voice result when discovery reuses the attached engine handle. */
     @Test
     fun sameHandleRefreshDoesNotOverwriteTheRuntimeVoiceResolution() {
-        val body = appStateSource().readText().functionBody("publishTtsResolution")
+        val body = readAloudSource().readText().functionBody("publishTtsResolution")
 
         val sameHandleReturn = body.indexOf("if (handle === attachedTtsHandle) return")
         val resolutionPublish = body.indexOf("ttsVoiceResolution = handle?.voiceResolution")
@@ -39,4 +39,11 @@ class TtsStartupDiscoveryCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    private fun readAloudSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppReadAloud.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppReadAloud.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing AppReadAloud.kt source file")
 }
