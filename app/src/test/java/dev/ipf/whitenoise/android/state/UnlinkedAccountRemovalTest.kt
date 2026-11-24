@@ -27,13 +27,22 @@ class UnlinkedAccountRemovalTest {
         assertTrue(unlinkNoticeNeeded(listed = true, active = true, hasNext = true))
     }
 
-    /** Only an account that was listed and no longer is counts as removed, so an unread list never hides an unlink. */
+    /** Removing an account's copy outdates what was captured for it, and leaves every other account's capture alone. */
     @Test
-    fun aCopyCountsAsRemovedOnlyWhenItWasListedAndNoLongerIs() {
-        assertTrue(unlinkedCopyRemoved(wasListed = true, isListed = false))
-        assertFalse(unlinkedCopyRemoved(wasListed = true, isListed = true))
-        assertFalse(unlinkedCopyRemoved(wasListed = false, isListed = false))
-        assertFalse(unlinkedCopyRemoved(wasListed = false, isListed = true))
+    fun removingACopyOutdatesOnlyThatAccountsEarlierCaptures() {
+        val copies = AccountCopyLifetimes()
+        val removed = copies.capture("work")
+        val other = copies.capture("home")
+        var retired = 0
+
+        copies.copyRemoved("work") { retired++ }
+
+        assertEquals(1, retired)
+        assertFalse(copies.isCurrent("work", removed))
+        assertFalse(copies.runIfCurrent("work", removed) { retired++ })
+        assertTrue(copies.runIfCurrent("work", copies.capture("work")) { retired++ })
+        assertTrue(copies.isCurrent("home", other))
+        assertEquals(2, retired)
     }
 
     /** A read that fails is tried again, and one that never succeeds stops after the last attempt. */

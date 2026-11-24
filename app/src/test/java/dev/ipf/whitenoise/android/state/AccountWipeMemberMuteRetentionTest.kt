@@ -2,10 +2,12 @@ package dev.ipf.whitenoise.android.state
 
 import android.app.Application
 import android.content.Context
+import android.os.Looper
 import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.R
@@ -15,8 +17,11 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.sharedPlaintextPrefix
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -29,6 +34,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 import java.lang.reflect.Proxy
@@ -451,6 +457,55 @@ class AccountWipeMemberMuteRetentionTest {
         }
 
     /**
+     * An unlink reported before the removal stays silent even when its handler only starts once the removal is done,
+     * which is the order the main thread can run them in.
+     */
+    @Test
+    fun anUnlinkReportedBeforeTheRemovalIsNotAnnouncedAfterIt() =
+        runBlocking {
+            savedUnlinked = true
+            val state = appState(active = SURVIVING_ACCOUNT)
+            val handlers = Job()
+
+            state.presentEventNotices(MarmotEventFfi.DeviceUnlinked("id", WIPED_ACCOUNT), CoroutineScope(handlers))
+            assertTrue(state.removeUnlinkedAccount(WIPED_ACCOUNT))
+            withTimeout(PAUSED_READ_TIMEOUT_MS) {
+                while (handlers.children.any()) {
+                    shadowOf(Looper.getMainLooper()).idle()
+                    delay(HANDLER_POLL_MS)
+                }
+            }
+
+            assertNull(state.toast)
+            assertEquals(SURVIVING_ACCOUNT, state.activeAccountRef)
+        }
+
+    /**
+     * An account removed and then listed again while the unlink handler was still reading is a fresh copy, and the
+     * late handler does not announce an unlink for it.
+     */
+    @Test
+    fun aNoticeStillBeingPreparedIsDroppedOnceItsAccountIsRemovedAndAddedBack() =
+        runBlocking {
+            savedUnlinked = true
+            val state = appState(active = SURVIVING_ACCOUNT)
+            val read = HeldAccountRead().also { heldAccountRead = it }
+            val handler = launch(start = CoroutineStart.UNDISPATCHED) { state.presentDeviceUnlinked(WIPED_ACCOUNT) }
+            withTimeout(PAUSED_READ_TIMEOUT_MS) { read.reached.await() }
+
+            assertTrue(withTimeout(PAUSED_READ_TIMEOUT_MS) { state.removeUnlinkedAccount(WIPED_ACCOUNT) })
+            savedUnlinked = false
+            wiped = false
+            state.refreshAccounts()
+            assertTrue(state.accounts.any { it.label == WIPED_ACCOUNT && !it.unlinked })
+            read.listing.complete(unlinkedListing())
+            withTimeout(PAUSED_READ_TIMEOUT_MS) { handler.join() }
+
+            assertNull(state.toast)
+            assertEquals(SURVIVING_ACCOUNT, state.activeAccountRef)
+        }
+
+    /**
      * Sign out and wipe in Settings retires the unlinked notice as well. Both removal routes do it in a finally
      * after their wipe attempt, so cleanup that throws once the removal is published cannot leave the notice up.
      */
@@ -543,5 +598,6 @@ class AccountWipeMemberMuteRetentionTest {
         const val GROUP = "aa11bb22"
         const val MEMBER = "11aa22bb"
         const val PAUSED_READ_TIMEOUT_MS = 10_000L
+        const val HANDLER_POLL_MS = 10L
     }
 }
