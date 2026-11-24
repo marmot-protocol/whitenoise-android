@@ -4,9 +4,9 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Dialog window width bounds",
+        "surface": "Dialog width bounds over the app window",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DialogWidthBounds.kt",
-        "anchor": "fun Modifier.dialogWindowWidthBounds(",
+        "anchor": "fun Modifier.dialogWidthBounds(",
         "test_ids": [
           "SET-006"
         ]

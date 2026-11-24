@@ -1,32 +1,28 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Material's widest dialog surface. */
 private val DialogMaxWidth = 560.dp
 
-/** The gap kept to each window edge: content that fills its width still leaves a 312 dp surface at 360 dp. */
+/** The gap kept to each edge of the app window: content that fills its width leaves a 312 dp surface at 360 dp. */
 private val DialogMinSideMargin = WhiteNoiseSpacing.Section
 
+/** The widest a dialog surface may be over an app window [windowWidth] wide: 560 dp, and 24 dp clear of each edge. */
+internal fun dialogMaxWidth(windowWidth: Dp): Dp {
+    val insetWidth = (windowWidth - DialogMinSideMargin * 2).coerceAtLeast(0.dp)
+    return minOf(DialogMaxWidth, insetWidth)
+}
+
 /**
- * Bounds a dialog surface to Material's widest dialog (560 dp) and keeps 24 dp to each window edge, on top of
- * Material's own 280–560 dp bounds. Those alone let content that fills its width reach both edges of a narrow phone.
- * It must be the first modifier on the dialog, where the incoming width is the window's: further in, a measured source
- * morph has already pinned the width and the margins would be taken twice.
+ * Caps a dialog surface at [dialogMaxWidth] of the app window it opens over. Material only bounds the surface to
+ * 280–560 dp, so content that fills its width reaches both screen edges wherever the dialog window spans the screen.
+ * Android often narrows dialog windows already, so this is only a maximum: it never takes a second margin from a
+ * window the platform has inset. [windowWidth] is the app window's width, read where the dialog is composed, not the
+ * width the dialog window offers its content.
  */
-internal fun Modifier.dialogWindowWidthBounds(): Modifier =
-    layout { measurable, constraints ->
-        val maxWidth =
-            if (constraints.hasBoundedWidth) {
-                val margins = 2 * DialogMinSideMargin.roundToPx()
-                minOf(DialogMaxWidth.roundToPx(), (constraints.maxWidth - margins).coerceAtLeast(0))
-            } else {
-                DialogMaxWidth.roundToPx()
-            }
-        val placeable =
-            measurable.measure(constraints.copy(minWidth = minOf(constraints.minWidth, maxWidth), maxWidth = maxWidth))
-        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-    }
+internal fun Modifier.dialogWidthBounds(windowWidth: Dp): Modifier = widthIn(max = dialogMaxWidth(windowWidth))

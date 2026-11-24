@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.common
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.Modifier
@@ -45,6 +46,27 @@ class DialogWidthBoundsTest {
     /** A short dialog keeps Material's natural 280 dp width instead of stretching to the bound. */
     @Test
     fun shortContentKeepsTheNaturalWidth() = assertSurfaceWidth(fill = false, expected = 280.dp)
+
+    /**
+     * A dialog window the platform already narrowed keeps its width: the bound is a maximum over the app window,
+     * never a second margin taken from the width the dialog window offers (320 dp of a 411 dp phone stays 320 dp).
+     */
+    @Test
+    fun aPlatformNarrowedDialogWindowKeepsItsWidth() {
+        rule.setContent {
+            Box(Modifier.requiredWidth(320.dp)) {
+                Box(
+                    Modifier
+                        .dialogWidthBounds(windowWidth = 411.dp)
+                        .fillMaxWidth()
+                        .height(24.dp)
+                        .testTag(DIALOG_TAG),
+                )
+            }
+        }
+        val bounds = rule.onNodeWithTag(DIALOG_TAG).getBoundsInRoot()
+        assertEquals(320f, (bounds.right - bounds.left).value, WIDTH_TOLERANCE_DP)
+    }
 
     /** Renders one shared dialog and compares its surface width with [expected]. */
     private fun assertSurfaceWidth(

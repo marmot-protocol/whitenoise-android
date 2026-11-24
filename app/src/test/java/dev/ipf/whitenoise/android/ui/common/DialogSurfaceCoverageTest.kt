@@ -33,19 +33,21 @@ class DialogSurfaceCoverageTest {
         )
     }
 
-    /** Both raw renderers bound the width first, while the incoming width is still the dialog window's. */
+    /** Both raw renderers cap the surface against the app window they open over, not the dialog window's own width. */
     @Test
-    fun bothRenderersBoundTheirWidthAgainstTheWindow() {
+    fun bothRenderersCapTheirWidthAgainstTheAppWindow() {
         val raw = appModuleSource("src/main/java/$APP/$RAW_DIALOGS_SOURCE")
-        assertTrue(
-            "the alert dialog's modifier chain must start with the window width bound",
-            Regex("""modifier\s*=\s*Modifier\s*\.dialogWindowWidthBounds\(\)""")
-                .containsMatchIn(raw.functionBody("AnimatedAlertDialog")),
-        )
-        assertTrue(
-            "the custom-body dialog's modifier chain must start with the window width bound",
-            "modifier = Modifier.dialogWindowWidthBounds()" in raw.functionBody("AnimatedBasicAlertDialog"),
-        )
+        for (renderer in listOf("AnimatedAlertDialog", "AnimatedBasicAlertDialog")) {
+            val body = raw.functionBody(renderer)
+            assertTrue(
+                "$renderer must read the app window's width where the dialog is composed",
+                "val appWindowWidth = LocalWindowInfo.current.containerDpSize.width" in body,
+            )
+            assertTrue(
+                "$renderer must cap its surface with that width",
+                Regex("""Modifier\s*\.dialogWidthBounds\(appWindowWidth\)""").containsMatchIn(body),
+            )
+        }
     }
 
     /** Main sources, relative to the app package, that mention [identifier] as a whole word. */
