@@ -98,6 +98,9 @@ class NewGroupScreenshotTest {
             description = "A place to coordinate our next trip.",
         )
 
+    /** Expanding the member count reveals the selected roster without an extra screen. */
+    @Test fun setupMembersAmoled() = setup("group_setup_members_amoled.png", dark = true, amoled = true, membersOpen = true)
+
     /** Native image work gets feedback and disabled competing controls. */
     @Test fun setupPreparing() = setup("group_setup_preparing.png", preparing = true)
 
@@ -207,6 +210,7 @@ class NewGroupScreenshotTest {
         recovery: Boolean = false,
         unknown: Boolean = false,
         description: String = "",
+        membersOpen: Boolean = false,
     ) {
         val draft =
             NewGroupDraft(
@@ -249,6 +253,7 @@ class NewGroupScreenshotTest {
                 }
             }
         }
+        if (membersOpen) composeRule.onNodeWithTag("group_setup.members").performClick()
         composeRule.onNodeWithTag("group_setup.screen").captureRoboImage("src/test/snapshots/$file")
     }
 

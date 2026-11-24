@@ -106,6 +106,7 @@ internal fun NewGroupSetupContent(
     var customize by rememberSaveable {
         mutableStateOf(draft.description.text.isNotBlank() || draft.imageDraft != null || draft.imageNeedsReselection)
     }
+    var showMembers by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(draft.imageNeedsReselection) {
         if (draft.imageNeedsReselection) customize = true
     }
@@ -149,23 +150,6 @@ internal fun NewGroupSetupContent(
             }
             item { GroupSetupNameField(draft, state, customize, actions.emoji) }
             item {
-                val count = state.members.size
-                Text(
-                    text =
-                        if (count == 0) {
-                            stringResource(R.string.group_setup_no_members)
-                        } else {
-                            pluralStringResource(R.plurals.group_setup_selected_members, count, count)
-                        },
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = WhiteNoiseSpacing.Related),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            item {
                 SettingsGroup(Modifier.padding(top = WhiteNoiseSpacing.Related)) {
                     row("retention") { context ->
                         SettingsLink(
@@ -179,8 +163,34 @@ internal fun NewGroupSetupContent(
                     }
                 }
             }
-            item(key = "group_setup.customize") { GroupSetupCustomizeButton(customize) { customize = !customize } }
             item { GroupSetupPhotoStatus(draft, state) }
+            if (state.members.isNotEmpty()) {
+                item(key = "group_setup.members") {
+                    val count = state.members.size
+                    GroupSetupDisclosure(
+                        label = pluralStringResource(R.plurals.group_setup_selected_members, count, count),
+                        expanded = showMembers,
+                        tag = "group_setup.members",
+                        onClick = { showMembers = !showMembers },
+                    )
+                }
+                if (showMembers) {
+                    itemsIndexed(state.members, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
+                        GroupCreationPersonRow(person, index, state.members.size, selected = null)
+                    }
+                }
+            }
+            item(key = "group_setup.customize") {
+                GroupSetupDisclosure(
+                    label =
+                        stringResource(
+                            if (customize) R.string.group_setup_hide_customization else R.string.group_setup_customize,
+                        ),
+                    expanded = customize,
+                    tag = "group_setup.customize",
+                    onClick = { customize = !customize },
+                )
+            }
             if (customize) {
                 item { GroupSetupPhoto(draft, state, actions.photo, photoMenu) }
                 item(key = "group_setup.description") {
@@ -198,9 +208,6 @@ internal fun NewGroupSetupContent(
                 item {
                     SettingsExplainer(stringResource(R.string.group_add_members_after_create))
                 }
-            }
-            itemsIndexed(state.members, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
-                GroupCreationPersonRow(person, index, state.members.size, selected = null)
             }
         }
     }
@@ -238,11 +245,13 @@ private fun GroupSetupNameField(
     )
 }
 
-/** Toggle optional draft fields while exposing the current disclosure state to accessibility. */
+/** Expose optional setup content and announce each disclosure's state. */
 @Composable
 @Suppress("FunctionNaming") // Compose naming follows the framework convention.
-private fun GroupSetupCustomizeButton(
+private fun GroupSetupDisclosure(
+    label: String,
     expanded: Boolean,
+    tag: String,
     onClick: () -> Unit,
 ) {
     val disclosureState =
@@ -251,14 +260,9 @@ private fun GroupSetupCustomizeButton(
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         TextButton(
             onClick = onClick,
-            modifier = Modifier.testTag("group_setup.customize").semantics { stateDescription = disclosureState },
+            modifier = Modifier.testTag(tag).semantics { stateDescription = disclosureState },
         ) {
-            Text(
-                stringResource(
-                    if (expanded) R.string.group_setup_hide_customization else R.string.group_setup_customize,
-                ),
-                modifier = Modifier.weight(1f, fill = false),
-            )
+            Text(label, modifier = Modifier.weight(1f, fill = false))
             Icon(
                 painterResource(R.drawable.ic_expand_more),
                 contentDescription = null,

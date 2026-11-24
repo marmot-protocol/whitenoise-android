@@ -2273,7 +2273,6 @@
     <string name="new_message_open_chat">開啟聊天</string>
     <string name="group_setup_customize">自訂群組照片和描述</string>
     <string name="group_setup_hide_customization">隱藏自訂選項</string>
-    <string name="group_setup_no_members">尚未選取成員</string>
     <plurals name="group_setup_selected_members">
         <item quantity="other">已選取 %d 位成員</item>
     </plurals>

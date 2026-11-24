@@ -2381,7 +2381,6 @@
     <string name="new_message_open_chat">Открыть чат</string>
     <string name="group_setup_customize">Настроить фото и описание группы</string>
     <string name="group_setup_hide_customization">Скрыть настройки оформления</string>
-    <string name="group_setup_no_members">Участники не выбраны</string>
     <plurals name="group_setup_selected_members">
         <item quantity="one">Выбран %d участник</item>
         <item quantity="few">Выбрано %d участника</item>

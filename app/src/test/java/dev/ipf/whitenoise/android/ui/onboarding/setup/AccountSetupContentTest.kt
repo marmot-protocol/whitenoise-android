@@ -557,6 +557,12 @@ class AccountSetupContentTest {
         retry.assertIsDisplayed()
         composeRule.onNodeWithText("A relay didn’t respond in time").assertIsDisplayed()
         composeRule.onNodeWithText("relay_edge.example").assertIsDisplayed()
+        composeRule.onNodeWithTag("setup-stage-progress").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                "2 of 6 stages complete. Stage 3 of 6 · Read and write relays. Needs attention",
+            ),
+        )
         composeRule.onNodeWithText(endpoint).assertDoesNotExist()
         composeRule.onNodeWithTag("setup-action-EDIT_RELAYS").assertIsDisplayed()
 

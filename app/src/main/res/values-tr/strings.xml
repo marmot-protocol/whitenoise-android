@@ -2305,7 +2305,6 @@
     <string name="new_message_open_chat">Sohbeti aç</string>
     <string name="group_setup_customize">Grup fotoğrafını ve açıklamasını özelleştir</string>
     <string name="group_setup_hide_customization">Özelleştirme seçeneklerini gizle</string>
-    <string name="group_setup_no_members">Üye seçilmedi</string>
     <plurals name="group_setup_selected_members">
         <item quantity="one">%d üye seçildi</item>
         <item quantity="other">%d üye seçildi</item>

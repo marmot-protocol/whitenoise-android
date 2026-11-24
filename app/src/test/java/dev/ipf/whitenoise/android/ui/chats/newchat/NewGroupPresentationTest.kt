@@ -156,6 +156,21 @@ class NewGroupPresentationTest {
         composeRule.onNodeWithText(context.getString(R.string.group_preparing_photo)).assertIsDisplayed()
     }
 
+    /** The count stays available while a long roster only takes space on request. */
+    @Test fun memberCountTogglesTheSelectedRoster() {
+        setup(NewGroupDraft(TextFieldState("Plans")), presentation().copy(members = listOf(person)))
+        val count = composeRule.onNodeWithTag("group_setup.members")
+        val member = composeRule.onNodeWithText("Ada")
+        count.assertIsDisplayed()
+        member.assertDoesNotExist()
+
+        count.performClick()
+        member.assertIsDisplayed()
+        count.performClick()
+        member.assertDoesNotExist()
+        composeRule.onNodeWithTag("group_setup.create").assertIsEnabled()
+    }
+
     /** An image that needs reselection after setup opens reveals the action that fixes it. */
     @Test fun latePhotoReselectionRevealsThePhotoAction() {
         val draft = NewGroupDraft()

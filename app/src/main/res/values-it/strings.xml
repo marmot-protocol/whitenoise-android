@@ -2312,7 +2312,6 @@
     <string name="new_message_open_chat">Apri chat</string>
     <string name="group_setup_customize">Personalizza foto e descrizione del gruppo</string>
     <string name="group_setup_hide_customization">Nascondi le opzioni di personalizzazione</string>
-    <string name="group_setup_no_members">Nessun membro selezionato</string>
     <plurals name="group_setup_selected_members">
         <item quantity="one">%d membro selezionato</item>
         <item quantity="other">%d membri selezionati</item>

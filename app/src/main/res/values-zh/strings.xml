@@ -2272,7 +2272,6 @@
     <string name="new_message_open_chat">打开聊天</string>
     <string name="group_setup_customize">自定义群组照片和描述</string>
     <string name="group_setup_hide_customization">隐藏自定义选项</string>
-    <string name="group_setup_no_members">尚未选择成员</string>
     <plurals name="group_setup_selected_members">
         <item quantity="other">已选择 %d 位成员</item>
     </plurals>

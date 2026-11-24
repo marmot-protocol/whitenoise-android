@@ -119,7 +119,7 @@ internal fun SetupStageProgress(state: AccountSetupState) {
         stageLabel?.let {
             Text(it, style = MaterialTheme.typography.labelMedium, modifier = Modifier.clearAndSetSemantics {})
         }
-        completedLabel?.let {
+        completedLabel?.takeUnless { state.focusesRelayTimeout() }?.let {
             Text(
                 it,
                 style = MaterialTheme.typography.bodySmall,
