@@ -12,9 +12,9 @@
         ]
       },
       {
-        "surface": "DeviceEmblem",
+        "surface": "DeviceHeaderGlyph",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceVisuals.kt",
-        "anchor": "fun DeviceEmblem(",
+        "anchor": "fun DeviceHeaderGlyph(",
         "test_ids": [
           "SET-060",
           "SET-064"

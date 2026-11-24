@@ -45,8 +45,8 @@ class DeviceManagementContentTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     /**
-     * A device's page is headed by the facts MDK reports, link history included, read as one item under the name
-     * in the title. Holding the header explains them, as the row it replaced did.
+     * A device's page is headed by its name and the facts MDK reports, link history included, read as one item.
+     * Holding the header explains them, as the row it replaced did.
      */
     @Test
     fun theDevicePageIsHeadedByItsFactsAndExplainsThem() {
@@ -56,15 +56,24 @@ class DeviceManagementContentTest {
         }
 
         val linkedBy = context.getString(R.string.linked_devices_linked_by, "Phone")
-        compose.onNodeWithText("Tablet").assertIsDisplayed()
         compose
             .onNodeWithTag(DEVICE_DETAIL_HERO_TAG)
             .assertIsDisplayed()
+            .assertTextContains("Tablet")
             .assertTextContains("White Noise · Android", substring = true)
             .assertTextContains(linkedBy, substring = true)
             .performTouchInput { longClick() }
         val explanation = context.getString(R.string.explanation_linked_device_row)
         compose.onNodeWithTag("explanation.body").assertTextEquals(explanation)
+    }
+
+    /** A name of the longest length a device can have is given in full in the header, whatever the title bar fits. */
+    @Test
+    fun aLongNameIsGivenInFullInTheHeader() {
+        val name = "Workshop bench computer by the north window ".padEnd(64, 'x')
+        detail(fixtureDevice("tablet", label = name))
+
+        compose.onNodeWithTag(DEVICE_DETAIL_HERO_TAG).assertIsDisplayed().assertTextContains(name)
     }
 
     /** Each switch sends a patch that names only its own setting. */

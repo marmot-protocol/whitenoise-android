@@ -111,7 +111,7 @@
     <string name="devices_leftover_chats_detail">Queste chat non possono applicare la rimozione dai tuoi dispositivi. Un amministratore può rimuovere il dispositivo lì.</string>
     <string name="devices_key_refresh_overdue">Questo dispositivo non è riuscito a rinnovare le chiavi di invito. Dopo 30 giorni potrebbe non essere più possibile aggiungerlo a nuove chat. Tieni l’app aperta sui tuoi dispositivi perché possano aggiornarsi.</string>
     <string name="devices_stalled">Questo dispositivo non riesce più a tenere il passo con gli altri. Ripara il collegamento per continuare.</string>
-    <string name="device_repair_confirm_again">Apri Dispositivi nelle impostazioni e conferma di nuovo la riparazione prima di collegare questo dispositivo.</string>
+    <string name="device_repair_confirm_again">Apri «Dispositivi» nelle impostazioni e conferma di nuovo la riparazione prima di collegare questo dispositivo.</string>
     <string name="device_repair_try_link_again">Collegamento reimpostato. Prova a collegare di nuovo il dispositivo per completare la riparazione.</string>
     <string name="devices_repair">Ripara il collegamento di questo dispositivo</string>
     <string name="devices_repair_confirm">Il collegamento attuale verrà rimosso per permetterti di collegare di nuovo il dispositivo. Conserverai chat, messaggi, bozze e impostazioni. Il vecchio collegamento non si può ripristinare, anche se annulli la procedura.</string>

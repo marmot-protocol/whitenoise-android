@@ -38,13 +38,13 @@ internal const val LINKED_DEVICES_EXTERNAL_SIGNER_TAG = "linked_devices.external
 internal const val LINKED_DEVICES_MOVE_FINISH_LINKING_TAG = "linked_devices.move.finish_linking"
 
 /**
- * The roster screen for [state]. The open security warning and this device's standing notices lead the screen,
- * ahead of the emblem and the line saying what linking does. This device heads the rows, other devices follow, and
- * devices whose removal the device group has not taken yet are listed apart. A failed read is announced above
- * whatever rows were already read, with a retry, and is never shown as an empty list. A row opens that device's
- * page. Below the rows come the chat counts, any moves MDK reports, then the linking actions: Link this device
- * while it has no linked sibling (or to return to a link under way), Move this device once it has, and what to do
- * on another device to add it. [showLoading] false holds the loading note back while a first read is expected at once.
+ * The roster screen for [state]. The open security warning and this device's standing notices lead the screen, ahead
+ * of the devices glyph and the line saying what linking does. This device heads the rows, other devices follow, and
+ * devices whose removal the device group has not taken yet are listed apart. A failed read is announced above whatever
+ * rows were already read, with a retry, and is never shown as an empty list. A row opens that device's page. Below the
+ * rows come the chat counts, any moves MDK reports, then the linking actions: Link this device while it has no linked
+ * sibling (or to return to a link under way), Move this device once it has, and what to do on another device to add
+ * it. [showLoading] false holds the loading note back while a first read is expected at once.
  */
 @Composable
 internal fun LinkedDevicesContent(

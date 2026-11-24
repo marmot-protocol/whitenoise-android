@@ -111,7 +111,7 @@
     <string name="devices_leftover_chats_detail">Ces discussions ne peuvent pas appliquer la suppression depuis vos appareils. Un administrateur peut y supprimer l’appareil.</string>
     <string name="devices_key_refresh_overdue">Cet appareil n’a pas pu renouveler ses clés d’invitation. Après 30 jours, il pourrait ne plus pouvoir être ajouté à de nouvelles discussions. Gardez l’application ouverte sur vos appareils pour qu’ils se mettent à jour.</string>
     <string name="devices_stalled">Cet appareil ne peut plus suivre vos autres appareils. Réparez son association pour continuer.</string>
-    <string name="device_repair_confirm_again">Ouvrez Appareils dans les paramètres et confirmez de nouveau la réparation avant de lier cet appareil.</string>
+    <string name="device_repair_confirm_again">Ouvrez « Appareils » dans les paramètres et confirmez de nouveau la réparation avant de lier cet appareil.</string>
     <string name="device_repair_try_link_again">Le lien a été réinitialisé. Réessayez de lier cet appareil pour terminer la réparation.</string>
     <string name="devices_repair">Réparer l’association de cet appareil</string>
     <string name="devices_repair_confirm">L’association actuelle sera supprimée pour que vous puissiez associer à nouveau cet appareil. Vous conserverez vos discussions, messages, brouillons et réglages. L’ancienne association ne pourra pas être rétablie, même si vous annulez la nouvelle.</string>

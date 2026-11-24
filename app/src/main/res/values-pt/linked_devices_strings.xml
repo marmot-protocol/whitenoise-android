@@ -111,7 +111,7 @@
     <string name="devices_leftover_chats_detail">Estas conversas não podem aplicar a remoção a partir dos seus dispositivos. Um administrador pode remover o dispositivo nelas.</string>
     <string name="devices_key_refresh_overdue">Este dispositivo não conseguiu renovar as chaves de convite. Depois de 30 dias, talvez não seja mais possível adicioná-lo a novas conversas. Mantenha o app aberto nos seus dispositivos para que eles se atualizem.</string>
     <string name="devices_stalled">Este dispositivo não consegue mais acompanhar seus outros dispositivos. Repare o vínculo para continuar.</string>
-    <string name="device_repair_confirm_again">Abra Dispositivos nas configurações e confirme o reparo novamente antes de vincular este dispositivo.</string>
+    <string name="device_repair_confirm_again">Abra “Dispositivos” nas configurações e confirme o reparo novamente antes de vincular este dispositivo.</string>
     <string name="device_repair_try_link_again">Vínculo redefinido. Tente vincular o dispositivo novamente para concluir o reparo.</string>
     <string name="devices_repair">Reparar o vínculo deste dispositivo</string>
     <string name="devices_repair_confirm">O vínculo atual será removido para que você possa vincular este dispositivo novamente. Suas conversas, mensagens, rascunhos e configurações serão mantidos. O vínculo antigo não poderá ser restaurado, mesmo que você cancele a vinculação.</string>

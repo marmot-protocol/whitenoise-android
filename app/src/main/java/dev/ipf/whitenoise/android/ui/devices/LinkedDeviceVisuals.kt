@@ -3,19 +3,14 @@
 package dev.ipf.whitenoise.android.ui.devices
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,13 +24,13 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.LinkedDeviceRow
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
 
 internal const val DEVICE_DETAIL_HERO_TAG = "device_detail.hero"
 
-private val EmblemSize = 80.dp
-private val EmblemGlyphSize = 40.dp
+private val HeaderGlyphSize = 48.dp
 
 /**
  * The glyph for a device. A device's app writes its own platform name into the roster and many write none, this
@@ -50,59 +45,39 @@ internal fun linkedDeviceIcon(platform: String): Int =
         else -> R.drawable.ic_device
     }
 
-/**
- * A device glyph on the nine-sided emblem that heads the devices pages. It is decoration and is not read. The
- * emblem takes the primary pair because every container role is black on the AMOLED theme's black page.
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** A device glyph that heads the devices pages. It is decoration and is not read. */
 @Composable
-private fun DeviceEmblem(
+private fun DeviceHeaderGlyph(
     @DrawableRes icon: Int,
 ) {
-    Box(
-        modifier =
-            Modifier
-                .size(EmblemSize)
-                .background(MaterialTheme.colorScheme.primary, MaterialShapes.Cookie9Sided.toShape()),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            painter = painterResource(icon),
-            contentDescription = null,
-            modifier = Modifier.size(EmblemGlyphSize),
-            tint = MaterialTheme.colorScheme.onPrimary,
-        )
-    }
+    Icon(
+        painter = painterResource(icon),
+        contentDescription = null,
+        modifier = Modifier.size(HeaderGlyphSize),
+        tint = MaterialTheme.colorScheme.primary,
+    )
 }
 
-/** The head of the devices page: the emblem for the account's devices above [detail], which says what linking does. */
+/** The head of the devices page: the glyph for the account's devices above [detail], which says what linking does. */
 @Composable
 internal fun LinkedDevicesIntro(
     detail: String,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .padding(horizontal = WhiteNoiseSpacing.SettingsSectionInset, vertical = WhiteNoiseSpacing.Related),
+        modifier = modifier.fillMaxWidth().padding(top = WhiteNoiseSpacing.Related),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
     ) {
-        DeviceEmblem(R.drawable.ic_devices)
-        Text(
-            text = detail,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+        DeviceHeaderGlyph(R.drawable.ic_devices)
+        SettingsExplainer(detail)
     }
 }
 
 /**
- * The head of a device's page: its glyph on the emblem above the facts MDK reports for [device]. The page's title
- * already carries [name], so it is not repeated here. The facts are read as one item, and holding it, or its
- * Explain action, says what they mean.
+ * The head of a device's page: its glyph above [name] and the facts MDK reports for [device]. The title bar also
+ * carries [name] but can cut a long one short, so it is given in full here. The head is read as one item, and
+ * holding it, or its Explain action, says what the facts mean.
  */
 @Composable
 internal fun LinkedDeviceHero(
@@ -121,10 +96,16 @@ internal fun LinkedDeviceHero(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
     ) {
-        DeviceEmblem(linkedDeviceIcon(device.platform))
+        DeviceHeaderGlyph(linkedDeviceIcon(device.platform))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
         Text(
             text = linkedDeviceSummary(device).joinToString("\n"),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )

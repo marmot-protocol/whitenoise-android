@@ -165,10 +165,13 @@ class LinkedDevicesContentTest {
         val lastActivePrefix = context.getString(R.string.linked_devices_last_active, "").trim()
 
         compose.runOnIdle {
-            assertEquals(false, row.any { it == linkedBy || it.startsWith(linkedOnPrefix) })
+            val history = page - row.toSet()
+            assertEquals(2, history.size)
+            assertEquals(true, history[0].startsWith(linkedOnPrefix) && "2026" in history[0])
+            assertEquals(linkedBy, history[1])
+            assertEquals(row, page - history.toSet())
+            assertEquals(false, row.any { it.startsWith(linkedOnPrefix) })
             assertEquals(true, row.any { it.startsWith(lastActivePrefix) })
-            assertEquals(true, linkedBy in page && page.any { it.startsWith(linkedOnPrefix) })
-            assertEquals(row, page.filterNot { it == linkedBy || it.startsWith(linkedOnPrefix) })
         }
     }
 
