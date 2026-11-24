@@ -9581,6 +9581,17 @@
             <sha256 value="b4abfc9ae7f3aebfe62cd3babf620c1910043e9e768e8a8764459333e9bba2d2" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="org.robolectric" name="annotations" version="4.18.1">
+         <artifact name="annotations-4.18.1.jar">
+            <sha256 value="1ed14d1d099dd083042a70e70babc0f03874fd56167094e3f430527dc6035773" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="annotations-4.18.1.module">
+            <sha256 value="bad7c3e5ac150aafc4223a285d66f6bbd5dbe6fd558bba07545799e757d3b9b8" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="annotations-4.18.1.pom">
+            <sha256 value="fa7555328a915943e9ef0c21d4c38278f9dfbe29192a7ca6cab54690f7012071" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="org.robolectric" name="junit" version="4.17">
          <artifact name="junit-4.17.jar">
             <sha256 value="33b836ebbfdf91ea24a6b074b859b97c8afbc6fe163751fc0cda9fa673d218e5" origin="Independent official supplier audit" />
@@ -9601,6 +9612,17 @@
          </artifact>
          <artifact name="junit-4.18.pom">
             <sha256 value="a67d31ae58eab2097514336f19ee04bfea24df6e29acb5d33bfb4e8667a06079" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="org.robolectric" name="junit" version="4.18.1">
+         <artifact name="junit-4.18.1.jar">
+            <sha256 value="6a0914eee6f23c7eed95890c325a74ca79743f7abfa72f5b2051255158bbee0d" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="junit-4.18.1.module">
+            <sha256 value="eb0dbf5467421cc24c13bacfa75e3e8011e620bb6e9aef183ac4ae38d7b3c3b2" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="junit-4.18.1.pom">
+            <sha256 value="dfb3bf2d2f2d1897ba35550f6d57e071b8ba23439082854242a7e28913690ee6" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="org.robolectric" name="nativeruntime-dist-compat" version="1.0.19">
@@ -9641,6 +9663,17 @@
             <sha256 value="0f3954a3e3900bd764c841b7e63bfbb16ee8c342f15ae402c5b1492f4e9f56c8" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="org.robolectric" name="nativeruntime" version="4.18.1">
+         <artifact name="nativeruntime-4.18.1.jar">
+            <sha256 value="fc65221504669f0f3de0c646da026d0108b49689045763bfb71a26d9daa5ba6c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="nativeruntime-4.18.1.module">
+            <sha256 value="29f5ed9adac84cbb2bd5be31fb872ce4bd6572dda51b4d8a7e2640f2cf6a2cff" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="nativeruntime-4.18.1.pom">
+            <sha256 value="6fd45eab98aeb26fbc7675d47884ab9ad4ad63456f99e7ab7ffb34e56db7058b" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="org.robolectric" name="pluginapi" version="4.17">
          <artifact name="pluginapi-4.17.jar">
             <sha256 value="10b0c220c058458b52387d30f2790a66c597ad3e47e7bfbcff32993d5f3fa81c" origin="Independent official supplier audit" />
@@ -9663,6 +9696,17 @@
             <sha256 value="0816fa08f92c09846176a6ca7b5455fa31797a5dfbbe27f236c8722cc0a77d8a" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="org.robolectric" name="pluginapi" version="4.18.1">
+         <artifact name="pluginapi-4.18.1.jar">
+            <sha256 value="10b0c220c058458b52387d30f2790a66c597ad3e47e7bfbcff32993d5f3fa81c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="pluginapi-4.18.1.module">
+            <sha256 value="cadf960373e3cc1111ec309b2d6f9788c56fcd2938a55feaf76892290efb899d" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="pluginapi-4.18.1.pom">
+            <sha256 value="4629b9026b5c8c9e83ac119d119959160705101e0024bebe666802b36b5f9a16" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="org.robolectric" name="plugins-maven-dependency-resolver" version="4.17">
          <artifact name="plugins-maven-dependency-resolver-4.17.jar">
             <sha256 value="a833b576c740a3e387e849e777d0a97aab41a2ababcf6f87c7e54dfcace88d0c" origin="Independent official supplier audit" />
@@ -9677,6 +9721,14 @@
          </artifact>
          <artifact name="plugins-maven-dependency-resolver-4.18.pom">
             <sha256 value="ea6891d171102e1d800a70cea24bce500c7efcc2df09cb9711245ad16ca7579a" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="org.robolectric" name="plugins-maven-dependency-resolver" version="4.18.1">
+         <artifact name="plugins-maven-dependency-resolver-4.18.1.jar">
+            <sha256 value="eab00f15e1a9215136590199ca103f867ff13c818b636da175c898b3772633af" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="plugins-maven-dependency-resolver-4.18.1.pom">
+            <sha256 value="2f7880a4cb767118fd4b8c5bb10ee6d1a165f700450448851f5cb8abbaba37e9" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="org.robolectric" name="resources" version="4.17">
@@ -9701,6 +9753,17 @@
             <sha256 value="cdcba278082ea59e7e98e370a7c12e58e71671e2b519ce8137549cf146509692" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="org.robolectric" name="resources" version="4.18.1">
+         <artifact name="resources-4.18.1.jar">
+            <sha256 value="7e89f0eb99c24ca0ecdd22e8930f71e7f133205f7fab8a33908fcaadd02997aa" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="resources-4.18.1.module">
+            <sha256 value="6741aa20ad51dab909465ca6cde4c6620f7202b4be71fcee9529a228682bf057" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="resources-4.18.1.pom">
+            <sha256 value="d3563718f27656ceb2e9a08b137bbe2a5f3efcfdb540cc7400f18cc08bf955bc" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="org.robolectric" name="robolectric" version="4.17">
          <artifact name="robolectric-4.17.jar">
             <sha256 value="69e5bc128ba8d1fbb09d36bfb8a617018d6a3a418f77d44b36e7aca6747f14ea" origin="Independent official supplier audit" />
@@ -9721,6 +9784,17 @@
          </artifact>
          <artifact name="robolectric-4.18.pom">
             <sha256 value="0bc48eee951e43c41ddf35f3e4f14cef51021d071f7978a5831e563e546e2a2f" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="org.robolectric" name="robolectric" version="4.18.1">
+         <artifact name="robolectric-4.18.1.jar">
+            <sha256 value="218fcb25bc9629262c157ea44af196d33b963ef15966d28fc87513bcdd7fb8b4" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="robolectric-4.18.1.module">
+            <sha256 value="efd6261f47e97838921ba576e426da2523bc82a567e4b34cd447496564216582" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="robolectric-4.18.1.pom">
+            <sha256 value="21e2c8168d92741e27f3ebe6636ac0d3fb9e8a26d6fb258c537cc262114d8b1b" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="org.robolectric" name="sandbox" version="4.17">
@@ -9745,6 +9819,17 @@
             <sha256 value="62a11b7ae07ec33f6d9fca574c0739b4a204a6c3dc2da8a5bc7724deb7da19e3" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="org.robolectric" name="sandbox" version="4.18.1">
+         <artifact name="sandbox-4.18.1.jar">
+            <sha256 value="5e883c877e04c48b155b2147ce1602e695c87be30b8e25d8687b9a3806f48bb5" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="sandbox-4.18.1.module">
+            <sha256 value="465aec0956b43c42d21df6e57fc9ab93c7261f8afae43f246c5969bc63aad925" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="sandbox-4.18.1.pom">
+            <sha256 value="17b35954d67a7b673bdeedf71d46c747198afd804c63c43be3d0e94733d01a49" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="org.robolectric" name="shadowapi" version="4.17">
          <artifact name="shadowapi-4.17.jar">
             <sha256 value="18a94a1fd24ddd37cfc57cbf5cca7b90a9afab3e32fcdce17be20f3fa3179d04" origin="Independent official supplier audit" />
@@ -9765,6 +9850,17 @@
          </artifact>
          <artifact name="shadowapi-4.18.pom">
             <sha256 value="d3f936e8ac0662c2a67c6617179d2f1df4a335b886470e2bfb00221fc69482b7" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="org.robolectric" name="shadowapi" version="4.18.1">
+         <artifact name="shadowapi-4.18.1.jar">
+            <sha256 value="80bb9d40a46676943718c59a2d66e6244b334259a051941c4e94c7ad98f6cab6" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="shadowapi-4.18.1.module">
+            <sha256 value="e757e7d199744de4645b04cf81ebfafe0f7c15a761d522a5f3e19f4527abc383" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="shadowapi-4.18.1.pom">
+            <sha256 value="4f135fa907ab0c8bade749f9e01e4760cb87c33d51d1f63343e5486dda7206e6" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="org.robolectric" name="shadows-framework" version="4.17">
@@ -9789,6 +9885,17 @@
             <sha256 value="50fe4a87e8e5448059ba3a4a43dbe8c1b3c3e4172cd1f6ec0e1745031411cbad" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="org.robolectric" name="shadows-framework" version="4.18.1">
+         <artifact name="shadows-framework-4.18.1.jar">
+            <sha256 value="61ff68ef6a7d067538839cb0fb47fda18f3d7755312462ab33107bbc5c82ec33" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="shadows-framework-4.18.1.module">
+            <sha256 value="a3ac1a1ee87a6c05333df462d7cb056a97cfe896780e8ceb219ff03c32306cf7" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="shadows-framework-4.18.1.pom">
+            <sha256 value="1fe9dcbcb61e2f973a8015254615cb8bc9f87cb1d01d27443366e50328514af6" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="org.robolectric" name="utils-reflector" version="4.17">
          <artifact name="utils-reflector-4.17.jar">
             <sha256 value="f80de68e0f8538b6204576af42eeea9e6806426dcf313558d7df16d4cabc4f41" origin="Independent official supplier audit" />
@@ -9811,6 +9918,17 @@
             <sha256 value="56b5fde17e2bdfe0f538c9a8438cd0ed00e83d1796a2efa6986e372e4b0fd824" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="org.robolectric" name="utils-reflector" version="4.18.1">
+         <artifact name="utils-reflector-4.18.1.jar">
+            <sha256 value="f80de68e0f8538b6204576af42eeea9e6806426dcf313558d7df16d4cabc4f41" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="utils-reflector-4.18.1.module">
+            <sha256 value="f5c20e848c77e81cccda19b323704e001ecf56e9efbf4c4b96abd66ecbc4ea77" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="utils-reflector-4.18.1.pom">
+            <sha256 value="a48b67adc4488c4aa950dba6fd9c4a401962ea8a62bf5292eb9c5eb457c53e72" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="org.robolectric" name="utils" version="4.17">
          <artifact name="utils-4.17.jar">
             <sha256 value="7b34ee3139de81e4eb3e35877e028aa0f9eb2b08e3e1f50eefb93ca825dafcaa" origin="Independent official supplier audit" />
@@ -9825,6 +9943,14 @@
          </artifact>
          <artifact name="utils-4.18.pom">
             <sha256 value="8666c614caea190aabbfd22013c564cb9ba261cd0b49e7220650f82046c536a6" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="org.robolectric" name="utils" version="4.18.1">
+         <artifact name="utils-4.18.1.jar">
+            <sha256 value="88b0c34a5d1cd53fab538fd9c94208cf2361c960625a142726dfede05fea636b" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="utils-4.18.1.pom">
+            <sha256 value="07aac8e14e6b239da4500355c848904b9f9b737418bbfd25e157240767c9c2dc" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="org.slf4j" name="slf4j-api" version="1.7.30">
