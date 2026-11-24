@@ -14,9 +14,10 @@ internal sealed interface IdentifierResolution {
 
     data object Resolving : IdentifierResolution
 
-    /** Resolved to a profile; [npub] is ready to hand to the profile sheet. */
+    /** Holds the decoded account ID for profile lookups and the npub for opening or copying. */
     data class Resolved(
         val npub: String,
+        val accountIdHex: String,
     ) : IdentifierResolution
 
     /** Resolution failed; [messageRes] is the inline error to show. */

@@ -47,14 +47,6 @@
         "test_ids": [
           "TTS-001"
         ]
-      },
-      {
-        "surface": "Accepted reaction presentation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "localReactionMotion.accept(",
-        "test_ids": [
-          "MSG-041"
-        ]
       }
     ],
     "settings_controls": [
@@ -161,14 +153,6 @@
         "anchor": "val sendSelectableTextLayoutReporter:",
         "test_ids": [
           "CON-036"
-        ]
-      },
-      {
-        "surface": "Forward picker opens on a payload snapshot",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "surfaces.forwardSnapshot = forwardPayload",
-        "test_ids": [
-          "MSG-010"
         ]
       },
       {

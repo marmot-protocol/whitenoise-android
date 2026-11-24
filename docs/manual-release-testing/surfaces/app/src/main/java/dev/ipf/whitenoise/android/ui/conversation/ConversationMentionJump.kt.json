@@ -1,0 +1,55 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionJump.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationJumpToMentionButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionJump.kt",
+        "anchor": "fun ConversationJumpToMentionButton(",
+        "test_ids": [
+          "CON-028",
+          "CON-049"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionJump.kt",
+        "surface": "Holding the jump to mention pill explains it",
+        "anchor": "R.string.explanation_conversation_jump_to_mention",
+        "test_ids": [
+          "CON-049"
+        ]
+      },
+      {
+        "surface": "Unread mention control shows from the entry count on the first frame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionJump.kt",
+        "anchor": "internal class ConversationMentionJumpSeed(",
+        "test_ids": [
+          "CON-028"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:conversation_jump_to_mention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionJump.kt",
+        "anchor": "R.string.conversation_jump_to_mention",
+        "test_ids": [
+          "CON-028",
+          "CON-031"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Bounded search for an unread mention outside the loaded window",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionJump.kt",
+        "anchor": "internal suspend fun resolveFirstUnreadMention(",
+        "test_ids": [
+          "CON-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

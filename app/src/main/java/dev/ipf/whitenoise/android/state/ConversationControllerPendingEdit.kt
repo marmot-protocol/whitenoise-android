@@ -109,6 +109,77 @@ internal suspend fun ConversationController.admitPendingEdit(
     }
 }
 
+/**
+ * The composer's edit mode: publishes [trimmed] as a revision of [editTarget] instead of a new message, then
+ * clears edit state. The bubble's text rebinds once the kind-1009 echoes back into the timeline and
+ * [ConversationController.editsByTarget] picks it up.
+ */
+internal suspend fun ConversationController.submitComposerEdit(
+    editTarget: String,
+    trimmed: String,
+) {
+    // Native projection tokens come from MDK's retained submission ledger.
+    // Keep native edit ordering after publication and controller replacement too.
+    val originalToken =
+        pendingMessageEditHandoff.originalClientToken(pendingEditKey(editTarget))
+            ?: optimisticEdits[editTarget]
+                ?.takeIf { it.status != MessageStatus.Sent }
+                ?.durableIntent
+                ?.originalClientToken
+            ?: timelineRecords[editTarget]?.clientToken
+    if (originalToken != null && (textPublisher == null || pendingMessageEditPublisher != null)) {
+        var session = editSessionRevision
+        // Local admission is independent of relay publication. Until it succeeds the editor
+        // retains its revision; an unadmitted original cannot silently consume this edit.
+        val admitted =
+            admitPendingEdit(editTarget, originalToken, trimmed, onAttemptStarted = {
+                editSessionRevision += 1
+                session = editSessionRevision
+            })
+        if (admitted && editSessionRevision == session) {
+            pendingMessageEditHandoff.abandon(pendingEditKey(editTarget))
+            editingMessageId = null
+        }
+        return
+    }
+    val handoffKey = pendingEditKey(editTarget)
+    if ("msg:$editTarget" in optimisticMessages && !pendingMessageEditHandoff.hasSession(handoffKey)) {
+        pendingMessageEditHandoff.begin(handoffKey, editTarget)
+    }
+    val editSubmission = pendingMessageEditHandoff.submit(handoffKey, editTarget, trimmed)
+    editingMessageId = null
+    when (editSubmission) {
+        is PendingMessageEditHandoff.Submission.Publish -> editMessage(editSubmission.targetId, trimmed)
+        PendingMessageEditHandoff.Submission.Deferred -> {
+            // The UUID is a client token, not an event id. Keep the
+            // revision visible, but publish no kind-1009 until the
+            // original has a confirmed target.
+            val previous = optimisticEdits[editTarget]?.preEditText ?: currentDisplayedText(editTarget)
+            optimisticEdits[editTarget] = OptimisticEdit(trimmed, previous, MessageStatus.Pending)
+            publishTimelineFromIndexes()
+        }
+    }
+}
+
+/**
+ * Retries the failed edit shown on [target]'s row by re-running its edit publish, never a new message. Editing
+ * flips the overlay back to Pending, so a second tap no longer finds a failed edit.
+ */
+internal suspend fun ConversationController.retryFailedEdit(
+    target: String,
+    failedEdit: OptimisticEdit,
+) {
+    val intent = failedEdit.durableIntent
+    if (intent == null) {
+        editMessage(target, failedEdit.text)
+    } else {
+        // A definite native rejection owns no publication. Only this deliberate Retry
+        // creates a new token; ambiguous admissions keep their original identity.
+        val retryIntent = intent.takeUnless { failedEdit.nativeRevisionRejected }
+        admitPendingEdit(target, intent.originalClientToken, failedEdit.text, retryIntent)
+    }
+}
+
 private suspend fun ConversationController.performPendingEdit(
     account: String,
     target: String,

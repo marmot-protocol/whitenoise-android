@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,11 +35,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ManageStorageUiState
 import dev.ipf.whitenoise.android.state.StorageAction
+import dev.ipf.whitenoise.android.state.StoredAttachment
 import dev.ipf.whitenoise.android.state.StoredAttachmentsController
 import dev.ipf.whitenoise.android.state.StoredAttachmentsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -57,6 +63,7 @@ internal data class StoredAttachmentsActions(
     val onRetry: () -> Unit,
     val onAction: (StorageAction) -> Unit,
     val ownerKey: Any? = Unit,
+    val onOpen: (StoredAttachment) -> Unit = {},
 )
 
 /**
@@ -79,6 +86,7 @@ internal fun StoredAttachmentsRoute(
     DisposableEffect(controller) { onDispose { controller.close() } }
     LaunchedEffect(controller, storage.revision) { controller.reload() }
     val state by controller.state.collectAsStateWithLifecycle()
+    val preview = rememberStoredAttachmentPreview(appState)
     StoredAttachmentsContent(
         appState = appState,
         storage = storage,
@@ -93,6 +101,7 @@ internal fun StoredAttachmentsRoute(
                 onLoadMore = controller::loadMore,
                 onRetry = { if (state.items.isEmpty()) controller.reload() else controller.loadMore() },
                 onAction = onAction,
+                onOpen = preview,
             ),
     )
 }
@@ -109,18 +118,26 @@ internal fun StoredAttachmentsContent(
 ) {
     val dialogs = rememberStorageDialogs(actions.ownerKey)
     var confirm by rememberSaveable { mutableStateOf<String?>(null) }
+    // Back clears a selection before it leaves the list, as Android's selection modes do.
+    BackHandler(enabled = list.selecting) { actions.onSelectAll(false) }
     val title =
         groupIdHex?.let { storageChatTitle(appState, it) } ?: stringResource(R.string.storage_largest_attachments)
     SettingsScaffold(
         title = title,
-        onBack = onBack,
+        onBack = selectionAwareBack(list, actions, onBack),
         topBarActions = { if (list.items.isNotEmpty()) SelectAllAction(list, actions.onSelectAll) },
         bottomBar = { if (list.selecting) StorageSelectionBar(list, storage.busy) { confirm = SELECTION } },
     ) {
         // No list-wide spacing: attachment rows sit on the segmented gap, other items pad themselves.
-        SettingsList(listTag = "storage.attachments", verticalArrangement = Arrangement.Top) {
-            if (groupIdHex != null) storageChatActionItems(storage, list, dialogs) { confirm = groupIdHex }
-            storageAttachmentItems(appState, list, groupIdHex == null, storage.busy, actions)
+        // Row thumbnails last as long as the list for this account and runtime, never in the app's media cache.
+        val thumbnails = remember(appState.activeAccountRef, appState.runtimeGeneration) { StoredThumbnailCache() }
+        CompositionLocalProvider(LocalStoredThumbnails provides thumbnails) {
+            SettingsList(listTag = "storage.attachments", verticalArrangement = Arrangement.Top) {
+                if (groupIdHex != null) {
+                    storageChatActionItems(storage, list, groupIdHex, dialogs) { confirm = groupIdHex }
+                }
+                storageAttachmentItems(appState, list, groupIdHex == null, storage.busy, actions)
+            }
         }
     }
     RemoveOlderDialogs(dialogs, groupIdHex, actions.onAction)
@@ -157,49 +174,51 @@ internal fun StoredAttachmentsContent(
     }
 }
 
+/** The toolbar's Back: it clears a selection first, the same as the system Back, and otherwise leaves the list. */
+private fun selectionAwareBack(
+    list: StoredAttachmentsUiState,
+    actions: StoredAttachmentsActions,
+    onBack: () -> Unit,
+): () -> Unit = { if (list.selecting) actions.onSelectAll(false) else onBack() }
+
 /**
- * The chat's attachment count and bytes: summed from its own list once every page is loaded, else the overview's row,
- * else null. The overview pages its chats and reloads only the first page after an action, so it may not hold one, and
- * a list emptied under an open confirmation answers null rather than zero.
+ * The chat's attachment count and bytes: the overview's row when it holds the chat, since MarmotKit counts a file the
+ * chat shares between attachments once; else summed from the chat's own list once every page is loaded; else null. The
+ * overview pages its chats and reloads only the first page after an action, so it may not hold one, and a list emptied
+ * under an open confirmation answers null rather than zero.
  */
 internal fun chatFigures(
     storage: ManageStorageUiState,
     list: StoredAttachmentsUiState,
     groupIdHex: String,
-): Pair<Long, Long>? =
-    if (list.complete && !list.failed && list.items.isNotEmpty()) {
-        list.items.size.toLong() to list.items.sumOf { it.bytes }
-    } else {
-        storage.chats.firstOrNull { it.groupIdHex == groupIdHex }?.let { it.attachmentCount to it.bytes }
+): Pair<Long, Long>? {
+    val loaded = list.complete && !list.failed
+    val row = storage.chats.firstOrNull { it.groupIdHex == groupIdHex }
+    return when {
+        loaded && list.items.isEmpty() -> null
+        row != null -> row.attachmentCount to row.bytes
+        loaded -> list.items.size.toLong() to list.items.sumOf { it.bytes }
+        else -> null
     }
+}
 
 /** The confirmation key for removing the selection rather than a whole chat. */
 private const val SELECTION = "selection"
 
-/** Remove all attachments and Remove older attachments for one chat. */
+/**
+ * Remove older attachments, then Remove all attachments with the chat's size and count once known, so the sweeping
+ * action is the second choice and says how much it takes.
+ */
 private fun LazyListScope.storageChatActionItems(
     storage: ManageStorageUiState,
     list: StoredAttachmentsUiState,
+    groupIdHex: String,
     dialogs: StorageDialogs,
     onRemoveAll: () -> Unit,
 ) {
     val enabled = storage.available && !storage.busy && list.items.isNotEmpty()
     item(key = "storage.chat.actions") {
         SettingsGroup(modifier = Modifier.testTag("storage.chat.actions")) {
-            row("remove_all") { context ->
-                SettingsAction(
-                    context = context,
-                    title = stringResource(R.string.storage_remove_all_in_chat),
-                    onClick = onRemoveAll,
-                    enabled = enabled,
-                    destructive = true,
-                    modifier = Modifier.testTag("storage.chat.remove_all"),
-                    explanation = stringResource(R.string.explanation_privacy_storage_remove_all_chat),
-                    leading = {
-                        SettingsLeadingIcon(R.drawable.ic_delete_sweep, tint = MaterialTheme.colorScheme.error)
-                    },
-                )
-            }
             row("older") { context ->
                 SettingsLink(
                     context = context,
@@ -209,6 +228,22 @@ private fun LazyListScope.storageChatActionItems(
                     modifier = Modifier.testTag("storage.chat.remove_older"),
                     explanation = stringResource(R.string.explanation_privacy_storage_chat_remove_older),
                     leading = { SettingsLeadingIcon(R.drawable.ic_auto_delete) },
+                )
+            }
+            row("remove_all") { context ->
+                val figures = chatFigures(storage, list, groupIdHex)
+                SettingsAction(
+                    context = context,
+                    title = stringResource(R.string.storage_remove_all_in_chat),
+                    subtitle = figures?.let { (count, bytes) -> storageCountAndSize(count, bytes) },
+                    onClick = onRemoveAll,
+                    enabled = enabled,
+                    destructive = true,
+                    modifier = Modifier.testTag("storage.chat.remove_all"),
+                    explanation = stringResource(R.string.explanation_privacy_storage_remove_all_chat),
+                    leading = {
+                        SettingsLeadingIcon(R.drawable.ic_delete_sweep, tint = MaterialTheme.colorScheme.error)
+                    },
                 )
             }
         }
@@ -273,7 +308,8 @@ private fun StorageSelectionBar(
         ) {
             Text(
                 pluralStringResource(R.plurals.storage_selected, count, count, storageBytes(list.selectedBytes)),
-                modifier = Modifier.weight(1f),
+                // TalkBack hears the running count and size as rows are checked.
+                modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
                 style = MaterialTheme.typography.titleMedium,
             )
             WhiteNoiseButton(

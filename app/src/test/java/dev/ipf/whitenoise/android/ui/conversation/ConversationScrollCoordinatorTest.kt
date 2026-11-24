@@ -1916,10 +1916,7 @@ class ConversationScrollCoordinatorTest {
     @Test
     fun conversationScreenStartsReplyHighlightBeforeLoadingAndScrolling() {
         val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
-        val replyNavigation =
-            screen
-                .substringAfter("fun navigateToReplyTarget(item: TimelineMessage)")
-                .substringBefore("fun jumpToNextUnreadMention")
+        val replyNavigation = screen.functionBody("navigateToReplyTarget")
         val highlight = replyNavigation.indexOf("targetHighlight.highlightWhile(targetMessageId)")
         val load = replyNavigation.indexOf("loadMessageAvailability", startIndex = highlight)
         val center = replyNavigation.indexOf("centerTimelineItemAt", startIndex = load)
@@ -1932,18 +1929,15 @@ class ConversationScrollCoordinatorTest {
     @Test
     fun conversationScreenRejectsSupersededReplyAndSearchNavigationAtPagingBoundaries() {
         val screen = sourceFile("ConversationScreen.kt").motionOwnerSource()
-        val replyNavigation =
-            screen
-                .substringAfter("fun navigateToReplyTarget(item: TimelineMessage)")
-                .substringBefore("fun jumpToNextUnreadMention")
+        val replyNavigation = screen.functionBody("navigateToReplyTarget")
         val searchNavigation =
             screen
                 .substringAfter("fun scrollToSearchMatch(match: ConversationSearchMatch)")
-                .substringBefore("fun navigateToSearchMatch(forward: Boolean)")
+                .substringBefore("fun closeSearch()")
         val searchCallbacks =
             screen
                 .substringAfter("onSearchQueryChange = {")
-                .substringBefore("onCloseSearch = ::closeSearch")
+                .substringBefore("onCloseSearch = messageNavigator::closeSearch")
 
         assertTrue(
             "reply navigation must register with the shared owner",

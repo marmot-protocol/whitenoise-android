@@ -37,7 +37,6 @@
     <string name="explanation_privacy_storage_keep_media">Sceglie per quanto tempo gli allegati restano su questo dispositivo. Quelli più vecchi vengono rimossi ora e con il passare del tempo, e scaricarne uno di nuovo lo conserva per l\'intero periodo. I messaggi restano.</string>
     <string name="explanation_privacy_storage_chat">Apre gli allegati salvati per questa chat.</string>
     <string name="explanation_privacy_storage_remove_all_chat">Chiede conferma e poi rimuove da questo dispositivo tutti gli allegati di questa chat. I messaggi restano e puoi scaricare di nuovo gli allegati finché la copia del mittente è ancora disponibile.</string>
-    <string name="explanation_privacy_storage_attachment">Seleziona o deseleziona questo allegato per poterlo rimuovere insieme ad altri. Non viene rimosso nulla finché non scegli Rimuovi.</string>
     <string name="explanation_privacy_storage_select_all">Seleziona tutti gli allegati di questo elenco per poterli rimuovere insieme. Non viene rimosso nulla finché non scegli Rimuovi.</string>
     <string name="explanation_privacy_storage_select_shown">Seleziona solo gli allegati caricati finora. Altri si caricano mentre scorri e non viene rimosso nulla finché non scegli Rimuovi.</string>
     <string name="explanation_privacy_storage_clear_selection">Cancella la selezione attuale senza rimuovere nulla.</string>
@@ -65,4 +64,5 @@
     <string name="explanation_privacy_profile_mute">Silenzia le notifiche dei messaggi di questa persona. Vale solo per i messaggi; consegna e contatori dei non letti non cambiano.</string>
     <string name="explanation_privacy_profile_system">Apre le impostazioni di Android per le notifiche di questa persona, dove puoi impostare un suono e un comportamento personalizzati. Le impostazioni personalizzate valgono per tutte le conversazioni di questo account.</string>
     <string name="explanation_privacy_profile_vibration">Sceglie il modello di vibrazione per le notifiche di questa persona.</string>
+    <string name="explanation_privacy_storage_attachment_open">Apre questo allegato per controllarlo prima di rimuoverlo. Il segno di spunta, o tenere premuta la riga, lo seleziona per rimuoverlo insieme ad altri. Non viene rimosso nulla finché non scegli Rimuovi.</string>
 </resources>

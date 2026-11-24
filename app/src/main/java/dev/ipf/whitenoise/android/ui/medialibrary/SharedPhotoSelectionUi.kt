@@ -56,7 +56,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 
 /**
- * Owns photo selection for one gallery route. The share is checked against [liveVisuals] when available, otherwise
+ * Owns photo selection for one gallery route. The share is checked against [resolvePhotos] when available, otherwise
  * against the composed [tiles], and may open a share sheet only while this gallery's account, runtime and
  * conversation still own the conversation's foreground presentation.
  */
@@ -65,7 +65,7 @@ internal fun rememberSharedPhotoShare(
     tiles: SharedMediaTiles,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    liveVisuals: (suspend () -> List<SharedMediaTile>)?,
+    resolvePhotos: SelectedPhotoResolver?,
 ): SharedPhotoShare {
     val currentTiles by rememberUpdatedState(tiles)
     val owner = remember { Triple(appState.activeAccountRef, controller.boundAccountRef, appState.runtimeGeneration) }
@@ -78,7 +78,7 @@ internal fun rememberSharedPhotoShare(
                 !appState.wipeInProgress
         },
         accountRef = { controller.conversationAccountRef },
-        currentVisuals = liveVisuals ?: { currentTiles.visuals },
+        currentPhotos = resolvePhotos ?: { currentTiles.visuals },
         source = { photo ->
             attachmentSource(controller, photo.messageIdHex, photo.attachmentIndex, photo.reference, photo.mine)
         },
@@ -89,14 +89,14 @@ internal fun rememberSharedPhotoShare(
 /**
  * The share runs in this composition's scope, so closing the gallery or switching account, runtime or conversation
  * cancels staging and deletes what was staged. Back ends selection mode before it leaves the gallery. A failure is
- * reported only while [ownsShare] holds.
+ * reported only while [ownsShare] holds. [currentPhotos] returns the gallery's current tiles for the selected photos.
  */
 @Suppress("LongParameterList")
 @Composable
 internal fun rememberSharedPhotoShare(
     ownsShare: () -> Boolean,
     accountRef: () -> String?,
-    currentVisuals: suspend () -> List<SharedMediaTile>,
+    currentPhotos: SelectedPhotoResolver,
     source: suspend (SharedMediaTile) -> AttachmentPlaintext,
     onFailure: (SharedPhotoSelection, Throwable) -> Unit,
 ): SharedPhotoShare {
@@ -116,7 +116,8 @@ internal fun rememberSharedPhotoShare(
                 try {
                     runCatchingCancellable {
                         // Ownership is checked again once the gallery is read, as reading it can suspend.
-                        val current = suspend { if (ownsShare()) currentVisuals().takeIf { ownsShare() } else null }
+                        val current =
+                            suspend { if (ownsShare()) currentPhotos(photos).takeIf { ownsShare() } else null }
                         shareSelectedPhotos(context, account, photos, chooserTitle, current, source)
                     }.onSuccess {
                         state.selection.clear()

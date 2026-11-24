@@ -25,7 +25,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -41,6 +40,7 @@ import dev.ipf.whitenoise.android.core.IdentityEntryInput
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButtonDefaults
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureInputCenter
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
@@ -101,13 +101,16 @@ internal fun SignInKeyField(
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         WhiteNoiseSecureTextField(
             state = key,
             enabled = !busy,
             textObfuscationMode = TextObfuscationMode.Hidden,
-            modifier = Modifier.weight(1f).testTag("onboarding.sign_in.private_key"),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .alignBy(WhiteNoiseSecureInputCenter)
+                    .testTag("onboarding.sign_in.private_key"),
             label = { Text(stringResource(R.string.private_key)) },
             placeholder = { Text(stringResource(R.string.onboarding_enter_private_key)) },
             errorMessage = errorRes?.let { stringResource(it) },
@@ -144,6 +147,7 @@ internal fun SignInKeyField(
                     imeAction = ImeAction.Done,
                 ),
             onKeyboardAction = { if (!busy && key.text.isNotBlank()) onSubmit() },
+            containerModifier = Modifier.testTag("onboarding.sign_in.private_key_container"),
         )
         FilledTonalIconButton(
             onClick = {
@@ -151,7 +155,11 @@ internal fun SignInKeyField(
             },
             enabled = !busy,
             shape = MaterialTheme.shapes.extraLarge,
-            modifier = Modifier.size(WhiteNoiseButtonDefaults.TaskHeight).testTag("onboarding.sign_in.scan"),
+            modifier =
+                Modifier
+                    .alignBy { it.measuredHeight / 2 }
+                    .size(WhiteNoiseButtonDefaults.TaskHeight)
+                    .testTag("onboarding.sign_in.scan"),
         ) {
             Icon(painterResource(R.drawable.ic_qr_code_scanner), stringResource(R.string.scan_qr_code))
         }

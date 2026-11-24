@@ -38,13 +38,14 @@ internal fun fixtureDevice(
     linkedByLabel = linkedByLabel,
 )
 
-/** This device, two siblings in different states and one pending removal. */
+/** This device, three siblings of different platforms and states, and one pending removal. */
 internal fun fixtureRoster() =
     LinkedDeviceRoster(
         thisDevice = fixtureDevice("self", label = "Pixel", isThisDevice = true),
         others =
             listOf(
                 fixtureDevice("tablet", label = "Tablet", lastActiveAtSeconds = FIXTURE_LINKED_AT + 3_600),
+                fixtureDevice("laptop", label = "Laptop", platform = "macOS"),
                 fixtureDevice("desk", platform = "Desktop", status = LinkedDeviceStatusFfi.INACTIVE, inactive = true),
             ),
         removing = listOf(fixtureDevice("old", label = "Old phone", removalPending = true)),

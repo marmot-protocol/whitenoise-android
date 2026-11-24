@@ -37,7 +37,6 @@
     <string name="explanation_privacy_storage_keep_media">Elige cuánto tiempo permanecen los adjuntos en este dispositivo. Los más antiguos se eliminan ahora y a medida que envejecen, y volver a descargar uno lo conserva durante todo el periodo. Los mensajes se conservan.</string>
     <string name="explanation_privacy_storage_chat">Abre los adjuntos guardados de este chat.</string>
     <string name="explanation_privacy_storage_remove_all_chat">Te pide confirmación y después elimina de este dispositivo todos los adjuntos de este chat. Los mensajes se conservan y puedes volver a descargar los adjuntos mientras siga disponible la copia del remitente.</string>
-    <string name="explanation_privacy_storage_attachment">Selecciona o deselecciona este adjunto para que puedas eliminarlo junto con otros. No se elimina nada hasta que elijas Eliminar.</string>
     <string name="explanation_privacy_storage_select_all">Selecciona todos los adjuntos de esta lista para que puedas eliminarlos juntos. No se elimina nada hasta que elijas Eliminar.</string>
     <string name="explanation_privacy_storage_select_shown">Selecciona solo los adjuntos cargados hasta ahora. Se cargan más al desplazarte y no se elimina nada hasta que elijas Eliminar.</string>
     <string name="explanation_privacy_storage_clear_selection">Borra la selección actual sin eliminar nada.</string>
@@ -65,4 +64,5 @@
     <string name="explanation_privacy_profile_mute">Silencia las notificaciones de mensajes de esta persona. Solo se aplica a los mensajes; la entrega y los contadores de no leídos no cambian.</string>
     <string name="explanation_privacy_profile_system">Abre los ajustes de Android para las notificaciones de esta persona, donde puedes definir un sonido y un comportamiento personalizados. Los ajustes personalizados se aplican a todas las conversaciones de esta cuenta.</string>
     <string name="explanation_privacy_profile_vibration">Elige el patrón de vibración de las notificaciones de esta persona.</string>
+    <string name="explanation_privacy_storage_attachment_open">Abre este adjunto para que puedas revisarlo antes de eliminarlo. La marca de verificación, o mantener pulsada la fila, lo selecciona para eliminarlo junto con otros. No se elimina nada hasta que elijas Eliminar.</string>
 </resources>

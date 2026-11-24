@@ -1,0 +1,42 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceVisuals.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Linked devices: R.string.explanation_linked_device_row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceVisuals.kt",
+        "anchor": "R.string.explanation_linked_device_row",
+        "test_ids": [
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "DeviceHeaderGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceVisuals.kt",
+        "anchor": "fun DeviceHeaderGlyph(",
+        "test_ids": [
+          "SET-060",
+          "SET-064"
+        ]
+      },
+      {
+        "surface": "LinkedDevicesIntro",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceVisuals.kt",
+        "anchor": "fun LinkedDevicesIntro(",
+        "test_ids": [
+          "SET-060"
+        ]
+      },
+      {
+        "surface": "LinkedDeviceHero",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/devices/LinkedDeviceVisuals.kt",
+        "anchor": "fun LinkedDeviceHero(",
+        "test_ids": [
+          "SET-064"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

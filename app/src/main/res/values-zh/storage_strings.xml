@@ -87,4 +87,12 @@
     <string name="storage_cache_cleared">已释放 %1$s</string>
     <string name="storage_caches_cleared">已清除图片和临时文件</string>
     <string name="storage_action_failed">无法释放空间。请重试。</string>
+    <string name="storage_automatic_cleanup">自动清理</string>
+    <string name="storage_highlight_share">%1$s · 占 %3$s 的 %2$s</string>
+    <string name="storage_highlight_shared">%1$s · 由所有资料共享，不计入此总量</string>
+    <string name="storage_share_under_one">不到 %1$s</string>
+    <string name="storage_select">选择</string>
+    <string name="storage_deselect">取消选择</string>
+    <string name="storage_select_named">选择 %1$s</string>
+    <string name="storage_open_failed">无法打开此附件</string>
 </resources>
